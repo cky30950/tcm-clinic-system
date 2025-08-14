@@ -9004,22 +9004,6 @@ window.addEventListener('load', () => {
     subscribeToAppointments();
 });
         
-// 初始化系統
-document.addEventListener('DOMContentLoaded', function() {
-    
-    updateClinicSettingsDisplay();
-    
-    // 初始化數據遷移
-    initializeDataMigration();
-    
-    // 自動聚焦到電子郵件輸入框
-    const usernameInput = document.getElementById('mainLoginUsername');
-    if (usernameInput) {
-        setTimeout(() => {
-            usernameInput.focus();
-        }, 100);
-    }
-});
 
 
 // 為 HTML 內使用的函式建立全域引用。
