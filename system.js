@@ -9001,8 +9001,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     updateClinicSettingsDisplay();
     
-    // 初始化數據遷移
-    initializeDataMigration();
+    // 用戶系統已全面採用 Firebase，無需執行本地至雲端的數據遷移
+    // initializeDataMigration(); // 移除用戶數據遷移功能
     
     // 自動聚焦到電子郵件輸入框
     const usernameInput = document.getElementById('mainLoginUsername');
@@ -9013,81 +9013,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// 初始化數據遷移
-async function initializeDataMigration() {
-    // 等待 Firebase 數據管理器準備就緒
-    while (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
-    try {
-        // 檢查是否需要遷移用戶數據
-        await migrateUserDataToFirebase();
-    } catch (error) {
-        console.error('數據遷移初始化錯誤:', error);
-    }
-}
-
-// 遷移用戶數據到 Firebase
-async function migrateUserDataToFirebase() {
-    try {
-        // 檢查 Firebase 是否已有用戶數據
-        const firebaseResult = await window.firebaseDataManager.getUsers();
-        const hasFirebaseUsers = firebaseResult.success && firebaseResult.data.length > 0;
-
-        // 檢查本地是否有用戶數據
-        const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
-        const hasLocalUsers = localUsers.length > 0;
-
-        console.log(`Firebase 用戶數據: ${hasFirebaseUsers ? firebaseResult.data.length : 0} 筆`);
-        console.log(`本地用戶數據: ${hasLocalUsers ? localUsers.length : 0} 筆`);
-
-        if (hasLocalUsers && !hasFirebaseUsers) {
-            // 有本地數據但 Firebase 沒有數據，進行遷移
-            console.log('開始遷移用戶數據到 Firebase...');
-            
-            for (const user of localUsers) {
-                try {
-                    // 移除本地 ID，讓 Firebase 生成新的 ID
-                    const { id, ...userData } = user;
-                    
-                    const result = await window.firebaseDataManager.addUser(userData);
-                    if (result.success) {
-                        console.log(`用戶 ${user.name} 遷移成功`);
-                    } else {
-                        console.error(`用戶 ${user.name} 遷移失敗`);
-                    }
-                } catch (error) {
-                    console.error(`遷移用戶 ${user.name} 時發生錯誤:`, error);
-                }
-            }
-            
-            console.log('用戶數據遷移完成');
-            showToast('用戶數據已同步到雲端', 'success');
-        } else if (hasFirebaseUsers) {
-            // Firebase 有數據，同步到本地
-            await syncUserDataFromFirebase();
-        } else {
-            // 兩邊都沒有數據，載入預設用戶數據
-            if (localUsers.length === 0) {
-                users = defaultUsers;
-                localStorage.setItem('users', JSON.stringify(users));
-                
-                // 遷移預設用戶到 Firebase
-                for (const user of defaultUsers) {
-                    try {
-                        const { id, ...userData } = user;
-                        await window.firebaseDataManager.addUser(userData);
-                    } catch (error) {
-                        console.error('遷移預設用戶失敗:', error);
-                    }
-                }
-            }
-        }
-    } catch (error) {
-        console.error('遷移用戶數據時發生錯誤:', error);
-    }
-}
+// 移除本地至 Firebase 的用戶數據遷移邏輯，因系統已全面使用 Firebase。保留同步功能以取得雲端資料。
 
 // 為 HTML 內使用的函式建立全域引用。
 // 這些函式會被 HTML 屬性（例如 onclick、onkeypress）呼叫，若不掛在 window 上，瀏覽器會找不到對應函式。
