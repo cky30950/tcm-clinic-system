@@ -5,7 +5,13 @@
         var currentUserData = typeof currentUserData !== 'undefined' ? currentUserData : null;
         
         // 診所設定
-        let clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
+        //
+        // 使用 var 而非 let 來宣告 clinicSettings，以避免在重複載入此檔案時出現
+        // "Identifier 'clinicSettings' has already been declared" 的錯誤。若 clinicSettings
+        // 已存在，則直接使用其現有值；否則從 localStorage 中讀取或初始化為空物件。
+        var clinicSettings = typeof clinicSettings !== 'undefined'
+            ? clinicSettings
+            : JSON.parse(localStorage.getItem('clinicSettings') || '{}');
         if (!clinicSettings.chineseName) {
             clinicSettings.chineseName = '中醫診所系統';
             clinicSettings.englishName = 'TCM Clinic';
