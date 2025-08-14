@@ -9088,3 +9088,58 @@ async function migrateUserDataToFirebase() {
         console.error('遷移用戶數據時發生錯誤:', error);
     }
 }
+
+// 為 HTML 內使用的函式建立全域引用。
+// 這些函式會被 HTML 屬性（例如 onclick、onkeypress）呼叫，若不掛在 window 上，瀏覽器會找不到對應函式。
+(function() {
+  window.attemptMainLogin = attemptMainLogin;
+  window.cancelConsultation = cancelConsultation;
+  window.clearBillingSearch = clearBillingSearch;
+  window.clearPatientSearch = clearPatientSearch;
+  window.clearPrescriptionSearch = clearPrescriptionSearch;
+  window.closeMedicalHistoryModal = closeMedicalHistoryModal;
+  window.closePatientDetail = closePatientDetail;
+  window.closePatientMedicalHistoryModal = closePatientMedicalHistoryModal;
+  window.closeRegistrationModal = closeRegistrationModal;
+  window.confirmRegistration = confirmRegistration;
+  window.exportFinancialReport = exportFinancialReport;
+  window.filterBillingItems = filterBillingItems;
+  window.filterHerbLibrary = filterHerbLibrary;
+  window.filterUsers = filterUsers;
+  window.generateFinancialReport = generateFinancialReport;
+  window.hideAddBillingItemForm = hideAddBillingItemForm;
+  window.hideAddFormulaForm = hideAddFormulaForm;
+  window.hideAddHerbForm = hideAddHerbForm;
+  window.hideAddPatientForm = hideAddPatientForm;
+  window.hideAddUserForm = hideAddUserForm;
+  window.hideClinicSettingsModal = hideClinicSettingsModal;
+  window.loadPreviousBillingItems = loadPreviousBillingItems;
+  window.loadPreviousPrescription = loadPreviousPrescription;
+  window.logout = logout;
+  window.refreshPatientPackagesUI = refreshPatientPackagesUI;
+  window.saveBillingItem = saveBillingItem;
+  window.saveClinicSettings = saveClinicSettings;
+  window.saveConsultation = saveConsultation;
+  window.saveFormula = saveFormula;
+  window.saveHerb = saveHerb;
+  window.savePatient = savePatient;
+  window.saveUser = saveUser;
+  window.searchBillingForConsultation = searchBillingForConsultation;
+  window.searchHerbsForPrescription = searchHerbsForPrescription;
+  window.searchPatientsForRegistration = searchPatientsForRegistration;
+  window.setQuickDate = setQuickDate;
+  window.showAddBillingItemForm = showAddBillingItemForm;
+  window.showAddFormulaForm = showAddFormulaForm;
+  window.showAddHerbForm = showAddHerbForm;
+  window.showAddPatientForm = showAddPatientForm;
+  window.showAddUserForm = showAddUserForm;
+  window.showClinicSettingsModal = showClinicSettingsModal;
+  window.switchFinancialTab = switchFinancialTab;
+  window.toggleRegistrationNumberField = toggleRegistrationNumberField;
+  window.toggleSidebar = toggleSidebar;
+  window.updateMedicationDays = updateMedicationDays;
+  window.updateMedicationDaysFromInput = updateMedicationDaysFromInput;
+  window.updateMedicationFrequency = updateMedicationFrequency;
+  window.updatePatientAge = updatePatientAge;
+  window.updateRestPeriod = updateRestPeriod;
+})();

@@ -98,7 +98,6 @@
             </div>
         </div>
     </div>
-
     <!-- 主系統頁面 -->
     <div id="mainSystem" class="hidden fade-in">
         <!-- 側邊選單 -->
@@ -117,14 +116,12 @@
                     </div>
                     <div id="sidebarUserRole" class="text-sm text-green-100 mt-2"></div>
                 </div>
-
                 <!-- 功能選單項目 -->
                 <div class="flex-1 py-4">
                     <div id="sidebarMenu" class="space-y-2 px-4">
                         <!-- 選單項目會動態生成 -->
                     </div>
                 </div>
-
                 <!-- 底部操作 -->
                 <div class="border-t border-gray-200 p-4">
                     <button onclick="logout()" class="w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg text-sm transition duration-200 flex items-center justify-center">
@@ -134,10 +131,8 @@
                 </div>
             </div>
         </div>
-
         <!-- 遮罩層 -->
         <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden" onclick="toggleSidebar()"></div>
-
         <!-- 頂部導航 -->
         <nav class="bg-white shadow-lg border-b-4 border-green-500">
             <div class="max-w-7xl mx-auto px-4">
@@ -165,7 +160,6 @@
                 </div>
             </div>
         </nav>
-
         <!-- 主要內容區域 -->
         <div class="max-w-7xl mx-auto px-4 py-6">
             <!-- 歡迎頁面 -->
@@ -200,7 +194,6 @@
                     </div>
                 </div>
             </div>
-
             <!-- 病人資料管理 -->
             <div id="patientManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -215,7 +208,6 @@
                         </button>
                     </div>
                 </div>
-
                 <!-- 新增/編輯病人表單彈窗 -->
                 <div id="addPatientModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -280,7 +272,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- 病人列表 -->
                 <div class="overflow-x-auto">
                     <table class="w-full table-auto">
@@ -299,7 +290,6 @@
                         </tbody>
                     </table>
                 </div>
-
                 <!-- 病人詳細資料彈窗 -->
                 <div id="patientDetailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -312,7 +302,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- 病人病歷查看彈窗 -->
                 <div id="patientMedicalHistoryModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
@@ -334,12 +323,7 @@
                         </div>
                     </div>
                 </div>
-
-
-
-
             </div>
-
             <!-- 診症系統 -->
             <div id="consultationSystem" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="mb-6">
@@ -377,7 +361,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- 掛號彈窗 -->
                 <div id="registrationModal" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
@@ -435,7 +418,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- 今日掛號列表 -->
                 <div class="bg-white border border-gray-200 rounded-lg">
                     <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
@@ -475,9 +457,6 @@
                         </div>
                     </div>
                 </div>
-
-
-
                 <!-- 診症記錄查看彈窗 -->
                 <div id="medicalHistoryModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
@@ -499,7 +478,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- 診症表單區域 -->
                 <div id="consultationForm" class="hidden bg-white border border-gray-200 rounded-lg mt-6">
                     <div class="bg-green-600 text-white px-6 py-4 rounded-t-lg">
@@ -712,7 +690,6 @@
                                     
                                     <!-- 隱藏的文本域用於存儲收費項目 -->
                                     <textarea id="formBillingItems" class="hidden"></textarea>
-
                                     <!-- 病人套票管理 -->
                                     <div class="mt-4 border border-purple-200 rounded-lg p-3 bg-purple-50">
                                       <div class="flex items-center justify-between mb-2">
@@ -796,7 +773,6 @@
                     </div>
                 </div>
             </div>
-
             <!-- 中藥庫管理 -->
             <div id="herbLibrary" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -814,7 +790,6 @@
                         </button>
                     </div>
                 </div>
-
                 <!-- 分類標籤 -->
                 <div class="mb-6">
                     <div class="flex flex-wrap gap-2">
@@ -829,7 +804,6 @@
                         </button>
                     </div>
                 </div>
-
                 <!-- 新增/編輯中藥材表單彈窗 -->
                 <div id="addHerbModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -885,7 +859,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- 新增/編輯方劑表單彈窗 -->
                 <div id="addFormulaModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -942,7 +915,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- 中藥庫列表 -->
                 <div class="overflow-x-auto">
                     <div id="herbLibraryList" class="space-y-4">
@@ -950,7 +922,6 @@
                     </div>
                 </div>
             </div>
-
             <!-- 收費項目管理 -->
             <div id="billingManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -965,7 +936,6 @@
                         </button>
                     </div>
                 </div>
-
                 <!-- 分類標籤 -->
                 <div class="mb-6">
                     <div class="flex flex-wrap gap-2">
@@ -992,7 +962,6 @@
                         </button>
                     </div>
                 </div>
-
                 <!-- 新增/編輯收費項目表單彈窗 -->
                 <div id="addBillingItemModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1035,7 +1004,6 @@
                                     </div>
                                   </div>
                                 </div>
-
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">收費金額 *</label>
                                     <input type="number" id="billingItemPrice" placeholder="0" step="1" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
@@ -1068,7 +1036,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- 收費項目列表 -->
                 <div class="overflow-x-auto">
                     <div id="billingItemsList" class="space-y-4">
@@ -1076,7 +1043,6 @@
                     </div>
                 </div>
             </div>
-
             <!-- 診所用戶管理 -->
             <div id="userManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -1091,7 +1057,6 @@
                         </button>
                     </div>
                 </div>
-
                 <!-- 狀態篩選標籤 -->
                 <div class="mb-6">
                     <div class="flex flex-wrap gap-2">
@@ -1103,7 +1068,6 @@
                         </button>
                     </div>
                 </div>
-
                 <!-- 新增/編輯用戶表單彈窗 -->
                 <div id="addUserModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1167,7 +1131,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- 用戶列表 -->
                 <div class="overflow-x-auto">
                     <table class="w-full table-auto">
@@ -1188,7 +1151,6 @@
                     </table>
                 </div>
             </div>
-
 <!-- 財務報表 -->
             <div id="financialReports" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="mb-6">
@@ -1197,7 +1159,6 @@
                     </h2>
                     <p class="text-gray-600">診所收入分析與財務統計</p>
                 </div>
-
                 <!-- 篩選控制區 -->
                 <div class="bg-gray-50 rounded-lg p-4 mb-6">
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -1256,7 +1217,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- 關鍵指標卡片 -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div class="bg-gradient-to-r from-green-400 to-green-600 text-white rounded-xl p-6 shadow-lg transform hover:scale-105 transition duration-200">
@@ -1311,7 +1271,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- 詳細報表 -->
                 <div class="bg-white border border-gray-200 rounded-lg">
                     <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
@@ -1442,7 +1401,6 @@
                     </div>
                 </div>
             </div>
-
             <!-- 系統管理 -->
             <div id="systemManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6">系統管理</h2>
@@ -1468,7 +1426,6 @@
             </div>
         </div>
     </div>
-
     <!-- 診所資料修改彈窗 -->
     <div id="clinicSettingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1516,23 +1473,8 @@
             </div>
         </div>
     </div>
-
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="system.js"></script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96abf25724ae0514',t:'MTc1NDQ1NjE3NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96c38f22ee47ddc3","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96d90c272a1cdd44","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96dd51fb1d5d84a2","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96dd62519b8eb430","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96deefe9585702cc","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96e737872e69ddc3","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96e7cf3ffa4a02da","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96e8b85e7a146682","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96e8ce9b18e9dd9a","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96e9acf69ccb8cae","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96e9bd91ff94c5e8","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96ec2e89dbd70713","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96edc9bb6b681053","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96ee04dd0ce1e6c6","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96ee25e61cd4b929","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f0d9617feb04c3","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+    <script src="system.js"></script>
+    <script src="system.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 </body>
 </html>
