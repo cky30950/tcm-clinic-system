@@ -1,26 +1,16 @@
 // 系統資料儲存
-// 使用 var 而非 let 以避免重複載入此檔案時造成 "Identifier 'currentUser' has already been declared" 的錯誤。
-// 若 currentUser 已存在，保持其值，否則初始化為 null。
-        var currentUser = typeof currentUser !== 'undefined' ? currentUser : null;
-        var currentUserData = typeof currentUserData !== 'undefined' ? currentUserData : null;
+        let currentUser = null;
+        let currentUserData = null;
         
         // 診所設定
-        //
-        // 使用 var 而非 let 來宣告 clinicSettings，以避免在重複載入此檔案時出現
-        // "Identifier 'clinicSettings' has already been declared" 的錯誤。若 clinicSettings
-        // 已存在，則直接使用其現有值；否則從 localStorage 中讀取或初始化為空物件。
-        // 使用另一個變數名稱以避免與其他腳本中的 clinicSettings 衝突。
-        var tcmClinicSettings = typeof tcmClinicSettings !== 'undefined'
-            ? tcmClinicSettings
-            : JSON.parse(localStorage.getItem('clinicSettings') || '{}');
-        if (!tcmClinicSettings.chineseName) {
-            tcmClinicSettings.chineseName = '中醫診所系統';
-            tcmClinicSettings.englishName = 'TCM Clinic';
-            tcmClinicSettings.businessHours = '週一至週五 09:00-18:00';
-            tcmClinicSettings.phone = '(852) 2345-6789';
-            tcmClinicSettings.address = '香港中環皇后大道中123號';
-            // 將資料仍然儲存在相同的 localStorage key，但使用新的變數名稱存取。
-            localStorage.setItem('clinicSettings', JSON.stringify(tcmClinicSettings));
+        let clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
+        if (!clinicSettings.chineseName) {
+            clinicSettings.chineseName = '中醫診所系統';
+            clinicSettings.englishName = 'TCM Clinic';
+            clinicSettings.businessHours = '週一至週五 09:00-18:00';
+            clinicSettings.phone = '(852) 2345-6789';
+            clinicSettings.address = '香港中環皇后大道中123號';
+            localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
         }
         
         // 浮動提示功能
@@ -4056,9 +4046,9 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                 <div class="receipt-container">
                     <!-- 診所標題 -->
                     <div class="clinic-header">
-                        <div class="clinic-name">${tcmClinicSettings.chineseName || '中醫診所系統'}</div>
-                        <div class="clinic-subtitle">${tcmClinicSettings.englishName || 'TCM Clinic'}</div>
-                        <div class="clinic-subtitle">電話：${tcmClinicSettings.phone || '(852) 2345-6789'}　地址：${tcmClinicSettings.address || '香港中環皇后大道中123號'}</div>
+                        <div class="clinic-name">${clinicSettings.chineseName || '中醫診所系統'}</div>
+                        <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
+                        <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                     </div>
                     
                     <!-- 收據標題 -->
@@ -4247,7 +4237,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                         </div>
                         <div class="footer-row">
                             <span>診所營業時間：</span>
-                            <span>${tcmClinicSettings.businessHours || '週一至週五 09:00-18:00'}</span>
+                            <span>${clinicSettings.businessHours || '週一至週五 09:00-18:00'}</span>
                         </div>
                         <div class="footer-row">
                             <span>本收據請妥善保存</span>
@@ -4501,9 +4491,9 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                     <div class="content">
                         <!-- 診所標題 -->
                         <div class="clinic-header">
-                            <div class="clinic-name">${tcmClinicSettings.chineseName || '中醫診所系統'}</div>
-                            <div class="clinic-subtitle">${tcmClinicSettings.englishName || 'TCM Clinic'}</div>
-                            <div class="clinic-subtitle">電話：${tcmClinicSettings.phone || '(852) 2345-6789'}　地址：${tcmClinicSettings.address || '香港中環皇后大道中123號'}</div>
+                            <div class="clinic-name">${clinicSettings.chineseName || '中醫診所系統'}</div>
+                            <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
+                            <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                         </div>
                         
                         <!-- 證明書編號 -->
@@ -4610,7 +4600,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                         <!-- 頁尾說明 -->
                         <div class="footer-note">
                             <div>本證明書僅證明到診事實，如有疑問請洽本診所</div>
-                            <div>診所電話：${tcmClinicSettings.phone || '(852) 2345-6789'} | 營業時間：${tcmClinicSettings.businessHours || '週一至週五 09:00-18:00'}</div>
+                            <div>診所電話：${clinicSettings.phone || '(852) 2345-6789'} | 營業時間：${clinicSettings.businessHours || '週一至週五 09:00-18:00'}</div>
                             <div style="margin-top: 10px; font-size: 10px;">
                                 證明書開立時間：${new Date().toLocaleString('zh-TW')}
                             </div>
@@ -4837,9 +4827,9 @@ async function printSickLeave(consultationId, consultationData = null) {
                     <div class="content">
                         <!-- 診所標題 -->
                         <div class="clinic-header">
-                            <div class="clinic-name">${tcmClinicSettings.chineseName || '中醫診所系統'}</div>
-                            <div class="clinic-subtitle">${tcmClinicSettings.englishName || 'TCM Clinic'}</div>
-                            <div class="clinic-subtitle">電話：${tcmClinicSettings.phone || '(852) 2345-6789'}　地址：${tcmClinicSettings.address || '香港中環皇后大道中123號'}</div>
+                            <div class="clinic-name">${clinicSettings.chineseName || '中醫診所系統'}</div>
+                            <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
+                            <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                         </div>
                         
                         <!-- 證明書編號 -->
@@ -4987,7 +4977,7 @@ async function printSickLeave(consultationId, consultationData = null) {
                         <!-- 頁尾說明 -->
                         <div class="footer-note">
                             <div>本證明書僅供請假使用，如有疑問請洽本診所</div>
-                            <div>診所電話：${tcmClinicSettings.phone || '(852) 2345-6789'} | 營業時間：${tcmClinicSettings.businessHours || '週一至週五 09:00-18:00'}</div>
+                            <div>診所電話：${clinicSettings.phone || '(852) 2345-6789'} | 營業時間：${clinicSettings.businessHours || '週一至週五 09:00-18:00'}</div>
                             <div style="margin-top: 10px; font-size: 10px;">
                                 證明書開立時間：${new Date().toLocaleString('zh-TW')}
                             </div>
@@ -5427,11 +5417,11 @@ async function updateStatistics() {
         // 診所設定管理功能
         function showClinicSettingsModal() {
             // 載入現有設定
-            document.getElementById('clinicChineseName').value = tcmClinicSettings.chineseName || '';
-            document.getElementById('clinicEnglishName').value = tcmClinicSettings.englishName || '';
-            document.getElementById('clinicBusinessHours').value = tcmClinicSettings.businessHours || '';
-            document.getElementById('clinicPhone').value = tcmClinicSettings.phone || '';
-            document.getElementById('clinicAddress').value = tcmClinicSettings.address || '';
+            document.getElementById('clinicChineseName').value = clinicSettings.chineseName || '';
+            document.getElementById('clinicEnglishName').value = clinicSettings.englishName || '';
+            document.getElementById('clinicBusinessHours').value = clinicSettings.businessHours || '';
+            document.getElementById('clinicPhone').value = clinicSettings.phone || '';
+            document.getElementById('clinicAddress').value = clinicSettings.address || '';
             
             document.getElementById('clinicSettingsModal').classList.remove('hidden');
         }
@@ -5453,15 +5443,15 @@ async function updateStatistics() {
             }
             
             // 更新診所設定
-            tcmClinicSettings.chineseName = chineseName;
-            tcmClinicSettings.englishName = englishName;
-            tcmClinicSettings.businessHours = businessHours;
-            tcmClinicSettings.phone = phone;
-            tcmClinicSettings.address = address;
-            tcmClinicSettings.updatedAt = new Date().toISOString();
+            clinicSettings.chineseName = chineseName;
+            clinicSettings.englishName = englishName;
+            clinicSettings.businessHours = businessHours;
+            clinicSettings.phone = phone;
+            clinicSettings.address = address;
+            clinicSettings.updatedAt = new Date().toISOString();
             
             // 保存到本地儲存
-            localStorage.setItem('clinicSettings', JSON.stringify(tcmClinicSettings));
+            localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
             
             // 更新系統管理頁面的顯示
             updateClinicSettingsDisplay();
@@ -5476,40 +5466,40 @@ async function updateStatistics() {
             const englishNameSpan = document.getElementById('displayEnglishName');
             
             if (chineseNameSpan) {
-                chineseNameSpan.textContent = tcmClinicSettings.chineseName || '中醫診所系統';
+                chineseNameSpan.textContent = clinicSettings.chineseName || '中醫診所系統';
             }
             if (englishNameSpan) {
-                englishNameSpan.textContent = tcmClinicSettings.englishName || 'TCM Clinic';
+                englishNameSpan.textContent = clinicSettings.englishName || 'TCM Clinic';
             }
             
             // 更新登入頁面的診所名稱
             const loginTitle = document.getElementById('loginTitle');
             const loginEnglishTitle = document.getElementById('loginEnglishTitle');
             if (loginTitle) {
-                loginTitle.textContent = tcmClinicSettings.chineseName || '中醫診所系統';
+                loginTitle.textContent = clinicSettings.chineseName || '中醫診所系統';
             }
             if (loginEnglishTitle) {
-                loginEnglishTitle.textContent = tcmClinicSettings.englishName || 'TCM Clinic';
+                loginEnglishTitle.textContent = clinicSettings.englishName || 'TCM Clinic';
             }
             
             // 更新主頁面的診所名稱
             const systemTitle = document.getElementById('systemTitle');
             const systemEnglishTitle = document.getElementById('systemEnglishTitle');
             if (systemTitle) {
-                systemTitle.textContent = tcmClinicSettings.chineseName || '中醫診所系統';
+                systemTitle.textContent = clinicSettings.chineseName || '中醫診所系統';
             }
             if (systemEnglishTitle) {
-                systemEnglishTitle.textContent = tcmClinicSettings.englishName || 'TCM Clinic';
+                systemEnglishTitle.textContent = clinicSettings.englishName || 'TCM Clinic';
             }
             
             // 更新歡迎頁面的診所名稱
             const welcomeTitle = document.getElementById('welcomeTitle');
             const welcomeEnglishTitle = document.getElementById('welcomeEnglishTitle');
             if (welcomeTitle) {
-                welcomeTitle.textContent = `歡迎使用${tcmClinicSettings.chineseName || '中醫診所系統'}`;
+                welcomeTitle.textContent = `歡迎使用${clinicSettings.chineseName || '中醫診所系統'}`;
             }
             if (welcomeEnglishTitle) {
-                welcomeEnglishTitle.textContent = `Welcome to ${tcmClinicSettings.englishName || 'TCM Clinic'}`;
+                welcomeEnglishTitle.textContent = `Welcome to ${clinicSettings.englishName || 'TCM Clinic'}`;
             }
         }
 
