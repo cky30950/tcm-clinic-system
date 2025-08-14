@@ -1,6 +1,8 @@
 // 系統資料儲存
-        let currentUser = null;
-        let currentUserData = null;
+// 使用 var 而非 let 以避免重複載入此檔案時造成 "Identifier 'currentUser' has already been declared" 的錯誤。
+// 若 currentUser 已存在，保持其值，否則初始化為 null。
+        var currentUser = typeof currentUser !== 'undefined' ? currentUser : null;
+        var currentUserData = typeof currentUserData !== 'undefined' ? currentUserData : null;
         
         // 診所設定
         let clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
@@ -2307,7 +2309,7 @@ async function loadConsultationForEdit(consultationId) {
             // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
             const saveButtonTextEl = document.getElementById('consultationSaveButtonText');
             if (saveButtonTextEl) {
-                saveButtonTextEl.textContent = '保存病歷';
+                saveButtonTextEl.textContent = '更新病歷';
             } else {
                 // 如果找不到元素，不抛出錯誤，而是紀錄警告，這樣使用者可繼續操作
                 console.warn('consultationSaveButtonText element not found when loading consultation for edit. Skipping text update.');
