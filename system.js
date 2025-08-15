@@ -1,6 +1,11 @@
 // 系統資料儲存
-        let currentUser = null;
-        let currentUserData = null;
+let currentUser = null;
+let currentUserData = null;
+
+// 初始化全域變數
+let patients = [];
+let consultations = [];
+let appointments = [];
         
         // 診所設定
         let clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
@@ -1503,7 +1508,17 @@ function subscribeToAppointments() {
 async function loadConsultationForEdit(consultationId) {
     try {
         // 先嘗試從本地找
-        let consultation = consultations.find(c => c.id === consultationId);
+        let consultation = null;
+try {
+    const consultationResult = await window.firebaseDataManager.getConsultations();
+    if (consultationResult.success) {
+        consultation = consultationResult.data.find(c => c.id === consultationId);
+        // 同步更新全域變數
+        consultations = consultationResult.data;
+    }
+} catch (error) {
+    console.error('讀取診療記錄錯誤:', error);
+}
         
         // 如果本地找不到，從 Firebase 找
         if (!consultation) {
@@ -4464,9 +4479,19 @@ async function editMedicalRecord(appointmentId) {
             showToast(`無法修改病歷！病人 ${patient.name} 沒有對應的診症記錄。`, 'error');
             return;
         }
-        
-        // 嘗試從本地或 Firebase 取得診症記錄
-        let consultation = consultations.find(c => c.id === appointment.consultationId);
+
+        // 嘗試從本地或 Firebase 取得診療記錄
+let consultation = null;
+try {
+    const consResult = await window.firebaseDataManager.getConsultations();
+    if (consResult && consResult.success) {
+        consultation = consResult.data.find(c => c.id === appointment.consultationId);
+        // 同步更新全域變數
+        consultations = consResult.data;
+    }
+} catch (error) {
+    console.error('讀取診療記錄錯誤:', error);
+}
         if (!consultation) {
             // 如果本地沒有，則從 Firebase 讀取所有診症記錄並搜尋
             const consResult = await window.firebaseDataManager.getConsultations();
@@ -4622,7 +4647,7 @@ async function loadPatientConsultationSummary(patientId) {
 }
 
         
-// 6. 修改更新統計功能
+// 更新統計功能
 async function updateStatistics() {
     try {
         // 如果 Firebase 數據管理器尚未初始化或尚未準備好，則跳過統計更新。
@@ -4640,9 +4665,22 @@ async function updateStatistics() {
             totalPatientsElement.textContent = totalPatients;
         }
         
-        // 計算今日診症數（從本地appointments計算，因為掛號系統尚未移到Firebase）
+        // 從 Firebase 獲取掛號數據
+        let appointmentsData = [];
+        try {
+            const appointmentResult = await window.firebaseDataManager.getAppointments();
+            if (appointmentResult.success) {
+                appointmentsData = appointmentResult.data;
+                // 同步更新全域變數
+                appointments = appointmentsData;
+            }
+        } catch (error) {
+            console.error('獲取掛號數據錯誤:', error);
+        }
+        
+        // 計算今日診療數（從掛號數據計算）
         const today = new Date().toDateString();
-        const todayConsultations = appointments.filter(apt => 
+        const todayConsultations = appointmentsData.filter(apt => 
             apt.status === 'completed' && 
             new Date(apt.appointmentTime).toDateString() === today
         ).length;
@@ -4652,9 +4690,9 @@ async function updateStatistics() {
             todayConsultationsElement.textContent = todayConsultations;
         }
         
-        // 計算本月診症數
+        // 計算本月診療數
         const thisMonth = new Date();
-        const monthlyConsultations = appointments.filter(apt => 
+        const monthlyConsultations = appointmentsData.filter(apt => 
             apt.status === 'completed' && 
             new Date(apt.appointmentTime).getMonth() === thisMonth.getMonth() &&
             new Date(apt.appointmentTime).getFullYear() === thisMonth.getFullYear()
@@ -4674,49 +4712,8 @@ async function updateStatistics() {
         }
     }
 }
-        function exportData() {
-            const data = {
-                patients: patients,
-                consultations: consultations,
-                appointments: appointments,
-                exportDate: new Date().toISOString()
-            };
-            
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `診所資料_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast('資料匯出完成！', 'success');
-        }
 
-        function backupData() {
-            const backup = {
-                patients: patients,
-                consultations: consultations,
-                appointments: appointments,
-                backupDate: new Date().toISOString()
-            };
-            localStorage.setItem('clinicBackup', JSON.stringify(backup));
-            showToast('資料備份完成！', 'success');
-        }
 
-        function clearData() {
-            if (confirm('警告：此操作將清除所有資料，確定要繼續嗎？')) {
-                if (confirm('最後確認：所有病人資料和診症記錄將被永久刪除！')) {
-                    localStorage.removeItem('patients');
-                    localStorage.removeItem('consultations');
-                    localStorage.removeItem('appointments');
-                    patients = [];
-                    consultations = [];
-                    appointments = [];
-                    updateStatistics();
-                    showToast('所有資料已清除！', 'success');
-                }
-            }
-        }
 
         // 診所設定管理功能
         function showClinicSettingsModal() {
