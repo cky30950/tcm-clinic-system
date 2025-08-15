@@ -1,6 +1,11 @@
 // 系統資料儲存
-        let currentUser = null;
-        let currentUserData = null;
+let currentUser = null;
+let currentUserData = null;
+
+// 初始化全域變數
+let patients = [];
+let consultations = [];
+let appointments = [];
         
         // 診所設定
         let clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
@@ -1503,7 +1508,17 @@ function subscribeToAppointments() {
 async function loadConsultationForEdit(consultationId) {
     try {
         // 先嘗試從本地找
-        let consultation = consultations.find(c => c.id === consultationId);
+        let consultation = null;
+try {
+    const consultationResult = await window.firebaseDataManager.getConsultations();
+    if (consultationResult.success) {
+        consultation = consultationResult.data.find(c => c.id === consultationId);
+        // 同步更新全域變數
+        consultations = consultationResult.data;
+    }
+} catch (error) {
+    console.error('讀取診療記錄錯誤:', error);
+}
         
         // 如果本地找不到，從 Firebase 找
         if (!consultation) {
@@ -1600,7 +1615,7 @@ async function loadConsultationForEdit(consultationId) {
             // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
             const saveButtonTextEl = document.getElementById('consultationSaveButtonText');
             if (saveButtonTextEl) {
-                saveButtonTextEl.textContent = '更新病歷';
+                saveButtonTextEl.textContent = '保存病歷';
             } else {
                 // 如果找不到元素，不抛出錯誤，而是紀錄警告，這樣使用者可繼續操作
                 console.warn('consultationSaveButtonText element not found when loading consultation for edit. Skipping text update.');
@@ -2159,7 +2174,7 @@ async function showConsultationForm(appointment) {
             // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
             const saveButtonTextElNew = document.getElementById('consultationSaveButtonText');
             if (saveButtonTextElNew) {
-                saveButtonTextElNew.textContent = '完成診症';
+                saveButtonTextElNew.textContent = '保存病歷';
             } else {
                 // 若找不到元素，則紀錄警告並跳過，不造成程式崩潰
                 console.warn('consultationSaveButtonText element not found when starting consultation. Skipping text update.');
@@ -4316,6 +4331,32 @@ async function printSickLeave(consultationId, consultationData = null) {
 
 // 修復撤回診症功能
 async function withdrawConsultation(appointmentId) {
+    // 確保全域變數已初始化
+    if (!Array.isArray(appointments)) {
+        try {
+            const appointmentResult = await window.firebaseDataManager.getAppointments();
+            if (appointmentResult.success) {
+                appointments = appointmentResult.data;
+            } else {
+                appointments = [];
+            }
+        } catch (error) {
+            appointments = [];
+        }
+    }
+    
+    if (!Array.isArray(consultations)) {
+        try {
+            const consultationResult = await window.firebaseDataManager.getConsultations();
+            if (consultationResult.success) {
+                consultations = consultationResult.data;
+            } else {
+                consultations = [];
+            }
+        } catch (error) {
+            consultations = [];
+        }
+    }
     const appointment = appointments.find(apt => apt.id === appointmentId);
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
@@ -4425,6 +4466,34 @@ async function withdrawConsultation(appointmentId) {
 
 // 修復修改病歷功能
 async function editMedicalRecord(appointmentId) {
+    // 確保全域變數已初始化
+    if (!Array.isArray(appointments)) {
+        try {
+            const appointmentResult = await window.firebaseDataManager.getAppointments();
+            if (appointmentResult.success) {
+                appointments = appointmentResult.data;
+            } else {
+                appointments = [];
+            }
+        } catch (error) {
+            console.error('初始化掛號數據錯誤:', error);
+            appointments = [];
+        }
+    }
+    
+    if (!Array.isArray(consultations)) {
+        try {
+            const consultationResult = await window.firebaseDataManager.getConsultations();
+            if (consultationResult.success) {
+                consultations = consultationResult.data;
+            } else {
+                consultations = [];
+            }
+        } catch (error) {
+            console.error('初始化診療記錄錯誤:', error);
+            consultations = [];
+        }
+    }
     const appointment = appointments.find(apt => apt.id === appointmentId);
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
@@ -4464,9 +4533,19 @@ async function editMedicalRecord(appointmentId) {
             showToast(`無法修改病歷！病人 ${patient.name} 沒有對應的診症記錄。`, 'error');
             return;
         }
-        
-        // 嘗試從本地或 Firebase 取得診症記錄
-        let consultation = consultations.find(c => c.id === appointment.consultationId);
+
+        // 嘗試從本地或 Firebase 取得診療記錄
+let consultation = null;
+try {
+    const consResult = await window.firebaseDataManager.getConsultations();
+    if (consResult && consResult.success) {
+        consultation = consResult.data.find(c => c.id === appointment.consultationId);
+        // 同步更新全域變數
+        consultations = consResult.data;
+    }
+} catch (error) {
+    console.error('讀取診療記錄錯誤:', error);
+}
         if (!consultation) {
             // 如果本地沒有，則從 Firebase 讀取所有診症記錄並搜尋
             const consResult = await window.firebaseDataManager.getConsultations();
@@ -4622,7 +4701,7 @@ async function loadPatientConsultationSummary(patientId) {
 }
 
         
-// 6. 修改更新統計功能
+// 更新統計功能
 async function updateStatistics() {
     try {
         // 如果 Firebase 數據管理器尚未初始化或尚未準備好，則跳過統計更新。
@@ -4640,9 +4719,22 @@ async function updateStatistics() {
             totalPatientsElement.textContent = totalPatients;
         }
         
-        // 計算今日診症數（從本地appointments計算，因為掛號系統尚未移到Firebase）
+        // 從 Firebase 獲取掛號數據
+        let appointmentsData = [];
+        try {
+            const appointmentResult = await window.firebaseDataManager.getAppointments();
+            if (appointmentResult.success) {
+                appointmentsData = appointmentResult.data;
+                // 同步更新全域變數
+                appointments = appointmentsData;
+            }
+        } catch (error) {
+            console.error('獲取掛號數據錯誤:', error);
+        }
+        
+        // 計算今日診療數（從掛號數據計算）
         const today = new Date().toDateString();
-        const todayConsultations = appointments.filter(apt => 
+        const todayConsultations = appointmentsData.filter(apt => 
             apt.status === 'completed' && 
             new Date(apt.appointmentTime).toDateString() === today
         ).length;
@@ -4652,9 +4744,9 @@ async function updateStatistics() {
             todayConsultationsElement.textContent = todayConsultations;
         }
         
-        // 計算本月診症數
+        // 計算本月診療數
         const thisMonth = new Date();
-        const monthlyConsultations = appointments.filter(apt => 
+        const monthlyConsultations = appointmentsData.filter(apt => 
             apt.status === 'completed' && 
             new Date(apt.appointmentTime).getMonth() === thisMonth.getMonth() &&
             new Date(apt.appointmentTime).getFullYear() === thisMonth.getFullYear()
@@ -4674,49 +4766,8 @@ async function updateStatistics() {
         }
     }
 }
-        function exportData() {
-            const data = {
-                patients: patients,
-                consultations: consultations,
-                appointments: appointments,
-                exportDate: new Date().toISOString()
-            };
-            
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `診所資料_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast('資料匯出完成！', 'success');
-        }
 
-        function backupData() {
-            const backup = {
-                patients: patients,
-                consultations: consultations,
-                appointments: appointments,
-                backupDate: new Date().toISOString()
-            };
-            localStorage.setItem('clinicBackup', JSON.stringify(backup));
-            showToast('資料備份完成！', 'success');
-        }
 
-        function clearData() {
-            if (confirm('警告：此操作將清除所有資料，確定要繼續嗎？')) {
-                if (confirm('最後確認：所有病人資料和診症記錄將被永久刪除！')) {
-                    localStorage.removeItem('patients');
-                    localStorage.removeItem('consultations');
-                    localStorage.removeItem('appointments');
-                    patients = [];
-                    consultations = [];
-                    appointments = [];
-                    updateStatistics();
-                    showToast('所有資料已清除！', 'success');
-                }
-            }
-        }
 
         // 診所設定管理功能
         function showClinicSettingsModal() {
@@ -7782,189 +7833,191 @@ async function deleteUser(id) {
         }
 
         
-        // 套票管理函式
-        function getPatientPackagesStore() {
-            return JSON.parse(localStorage.getItem('patientPackages') || '[]');
+// 套票管理函式
+async function getPatientPackages(patientId) {
+    if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+        return [];
+    }
+    
+    try {
+        const result = await window.firebaseDataManager.getPatientPackages(patientId);
+        return result.success ? result.data : [];
+    } catch (error) {
+        console.error('獲取患者套票錯誤:', error);
+        return [];
+    }
+}
+
+async function purchasePackage(patientId, item) {
+    const totalUses = Number(item.packageUses || item.totalUses || 0);
+    const validityDays = Number(item.validityDays || 0);
+    const purchasedAt = new Date();
+    const expiresAt = new Date(purchasedAt);
+    expiresAt.setDate(expiresAt.getDate() + validityDays);
+    
+    const record = {
+        patientId: patientId,
+        packageItemId: item.id,
+        name: item.name,
+        totalUses: totalUses,
+        remainingUses: totalUses,
+        purchasedAt: purchasedAt.toISOString(),
+        expiresAt: expiresAt.toISOString()
+    };
+    
+    try {
+        const result = await window.firebaseDataManager.addPatientPackage(record);
+        if (result.success) {
+            return { ...record, id: result.id };
         }
-        function setPatientPackagesStore(list) {
-            localStorage.setItem('patientPackages', JSON.stringify(list));
+        return null;
+    } catch (error) {
+        console.error('購買套票錯誤:', error);
+        return null;
+    }
+}
+
+async function consumePackage(patientId, packageRecordId) {
+    try {
+        const packages = await getPatientPackages(patientId);
+        const pkg = packages.find(p => p.id === packageRecordId);
+        
+        if (!pkg) return { ok: false, msg: '找不到套票' };
+        
+        const now = new Date();
+        const exp = new Date(pkg.expiresAt);
+        if (now > exp) return { ok: false, msg: '套票已過期' };
+        if (pkg.remainingUses <= 0) return { ok: false, msg: '套票已用完' };
+        
+        const updatedPackage = {
+            ...pkg,
+            remainingUses: pkg.remainingUses - 1
+        };
+        
+        const result = await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
+        
+        if (result.success) {
+            return { ok: true, record: updatedPackage };
+        } else {
+            return { ok: false, msg: '更新套票失敗' };
         }
-        function getPatientPackages(patientId) {
-            const all = getPatientPackagesStore();
-            return all.filter(p => p.patientId === patientId);
+    } catch (error) {
+        console.error('使用套票錯誤:', error);
+        return { ok: false, msg: '系統錯誤' };
+    }
+}
+
+function formatPackageStatus(pkg) {
+    const exp = new Date(pkg.expiresAt);
+    const now = new Date();
+    const daysLeft = Math.ceil((exp - now) / (1000*60*60*24));
+    const expired = daysLeft < 0;
+    return expired
+      ? `已到期（${exp.toLocaleDateString('zh-TW')}）`
+      : `剩餘 ${pkg.remainingUses}/${pkg.totalUses} 次 · ${exp.toLocaleDateString('zh-TW')} 到期（約 ${daysLeft} 天）`;
+}
+
+async function renderPatientPackages(patientId) {
+    const container = document.getElementById('patientPackagesList');
+    if (!container) return;
+    
+    try {
+        const pkgs = await getPatientPackages(patientId);
+        const activePkgs = pkgs.filter(p => p.remainingUses > 0).sort((a,b)=> new Date(a.expiresAt)-new Date(b.expiresAt));
+        
+        if (activePkgs.length === 0) {
+            container.innerHTML = '<div class="text-gray-500">無已購買的套票</div>';
+            return;
         }
-        function purchasePackage(patientId, item) {
-            const totalUses = Number(item.packageUses || item.totalUses || 0);
-            const validityDays = Number(item.validityDays || 0);
-            const purchasedAt = new Date();
-            const expiresAt = new Date(purchasedAt);
-            expiresAt.setDate(expiresAt.getDate() + validityDays);
-            const record = {
-                id: Date.now(),
-                patientId: patientId,
-                packageItemId: item.id,
-                name: item.name,
-                totalUses: totalUses,
-                remainingUses: totalUses,
-                purchasedAt: purchasedAt.toISOString(),
-                expiresAt: expiresAt.toISOString()
-            };
-            const all = getPatientPackagesStore();
-            all.push(record);
-            setPatientPackagesStore(all);
-            return record;
-        }
-        function consumePackage(patientId, packageRecordId) {
-            const all = getPatientPackagesStore();
-            const idx = all.findIndex(p => p.id === packageRecordId && p.patientId === patientId);
-            if (idx === -1) return { ok: false, msg: '找不到套票' };
-            const now = new Date();
-            const exp = new Date(all[idx].expiresAt);
-            if (now > exp) return { ok: false, msg: '套票已過期' };
-            if (all[idx].remainingUses <= 0) return { ok: false, msg: '套票已用完' };
-            all[idx].remainingUses -= 1;
-            setPatientPackagesStore(all);
-            return { ok: true, record: all[idx] };
-        }
-        function formatPackageStatus(pkg) {
+        
+        container.innerHTML = activePkgs.map(pkg => {
             const exp = new Date(pkg.expiresAt);
             const now = new Date();
-            const daysLeft = Math.ceil((exp - now) / (1000*60*60*24));
-            const expired = daysLeft < 0;
-            return expired
-              ? `已到期（${exp.toLocaleDateString('zh-TW')}）`
-              : `剩餘 ${pkg.remainingUses}/${pkg.totalUses} 次 · ${exp.toLocaleDateString('zh-TW')} 到期（約 ${daysLeft} 天）`;
-        }
-        function renderPatientPackages(patientId) {
-            const container = document.getElementById('patientPackagesList');
-            if (!container) return;
-            // 僅顯示剩餘次數大於 0 的套票（已用完的套票不在診症記錄顯示）
-            const pkgs = getPatientPackages(patientId).filter(p => p.remainingUses > 0).sort((a,b)=> new Date(a.expiresAt)-new Date(b.expiresAt));
-            if (pkgs.length === 0) {
-                container.innerHTML = '<div class="text-gray-500">無已購買的套票</div>';
-                return;
-            }
-            container.innerHTML = pkgs.map(pkg => {
-                const exp = new Date(pkg.expiresAt);
-                const now = new Date();
-                const expired = now > exp;
-                const disabled = expired || pkg.remainingUses <= 0;
-                const badge =
-                  expired ? '<span class="ml-2 text-xs text-white px-2 py-0.5 rounded bg-red-500">已到期</span>' :
-                  (pkg.remainingUses <= 0 ? '<span class="ml-2 text-xs text-white px-2 py-0.5 rounded bg-gray-500">已用完</span>' : '');
-                return `
+            const expired = now > exp;
+            const disabled = expired || pkg.remainingUses <= 0;
+            const badge =
+              expired ? '<span class="ml-2 text-xs text-white px-2 py-0.5 rounded bg-red-500">已到期</span>' :
+              (pkg.remainingUses <= 0 ? '<span class="ml-2 text-xs text-white px-2 py-0.5 rounded bg-gray-500">已用完</span>' : '');
+            return `
       <div class="flex items-center justify-between bg-white border border-purple-200 rounded p-2">
         <div>
           <div class="font-medium text-purple-900">${pkg.name}${badge}</div>
           <div class="text-xs text-gray-600">${formatPackageStatus(pkg)}</div>
         </div>
         <button type="button" ${disabled ? 'disabled' : ''} 
-          onclick="useOnePackage(${pkg.patientId}, ${pkg.id})"
+          onclick="useOnePackage(${pkg.patientId}, '${pkg.id}')"
           class="px-3 py-1 rounded ${disabled ? 'bg-gray-300 text-gray-600' : 'bg-purple-600 text-white hover:bg-purple-700'}">
           使用一次
         </button>
       </div>
     `;
-            }).join('');
-        }
-        function refreshPatientPackagesUI() {
-            const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
-            if (!appointment) return;
-            renderPatientPackages(appointment.patientId);
-        }
-        function useOnePackage(patientId, packageRecordId) {
-            const res = consumePackage(patientId, packageRecordId);
-            if (!res.ok) {
-                showToast(res.msg || '套票不可用', 'warning');
-                return;
-            }
-            const usedName = `${res.record.name}（使用套票）`;
-            // 在推入套票使用紀錄時，額外存入 patientId 與 packageRecordId，方便後續取消
-            selectedBillingItems.push({
-                id: `use-${res.record.id}-${Date.now()}`,
-                name: usedName,
-                category: 'packageUse',
-                price: 0,
-                unit: '次',
-                description: '套票抵扣一次',
-                quantity: 1,
-                patientId: patientId,
-                packageRecordId: res.record.id
-            });
-            updateBillingDisplay();
-            refreshPatientPackagesUI();
-            showToast(`已使用套票：${res.record.name}，剩餘 ${res.record.remainingUses} 次`, 'success');
-        }
+        }).join('');
+    } catch (error) {
+        console.error('渲染患者套票錯誤:', error);
+        container.innerHTML = '<div class="text-red-500">載入套票資料失敗</div>';
+    }
+}
 
-        // 取消一次套票使用：退回剩餘次數並移除該筆使用紀錄
-        function undoPackageUse(patientId, packageRecordId, usageItemId) {
-            // 讀取所有病人套票紀錄
-            const all = getPatientPackagesStore();
-            // 找到對應套票索引
-            const idx = all.findIndex(p => p.id === packageRecordId && p.patientId === patientId);
-            if (idx === -1) {
-                showToast('找不到對應的套票，無法取消', 'warning');
-                return;
-            }
-            // 增加剩餘次數
-            all[idx].remainingUses += 1;
-            setPatientPackagesStore(all);
-            // 移除該筆 $0 使用紀錄
+async function refreshPatientPackagesUI() {
+    const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+    if (!appointment) return;
+    await renderPatientPackages(appointment.patientId);
+}
+
+async function useOnePackage(patientId, packageRecordId) {
+    const res = await consumePackage(patientId, packageRecordId);
+    if (!res.ok) {
+        showToast(res.msg || '套票不可用', 'warning');
+        return;
+    }
+    const usedName = `${res.record.name}（使用套票）`;
+    
+    selectedBillingItems.push({
+        id: `use-${res.record.id}-${Date.now()}`,
+        name: usedName,
+        category: 'packageUse',
+        price: 0,
+        unit: '次',
+        description: '套票抵扣一次',
+        quantity: 1,
+        patientId: patientId,
+        packageRecordId: res.record.id
+    });
+    updateBillingDisplay();
+    await refreshPatientPackagesUI();
+    showToast(`已使用套票：${res.record.name}，剩餘 ${res.record.remainingUses} 次`, 'success');
+}
+
+async function undoPackageUse(patientId, packageRecordId, usageItemId) {
+    try {
+        const packages = await getPatientPackages(patientId);
+        const pkg = packages.find(p => p.id === packageRecordId);
+        
+        if (!pkg) {
+            showToast('找不到對應的套票，無法取消', 'warning');
+            return;
+        }
+        
+        const updatedPackage = {
+            ...pkg,
+            remainingUses: pkg.remainingUses + 1
+        };
+        
+        const result = await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
+        
+        if (result.success) {
             selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
-            // 更新顯示
             updateBillingDisplay();
-            if (typeof refreshPatientPackagesUI === 'function') {
-                refreshPatientPackagesUI();
-            }
+            await refreshPatientPackagesUI();
             showToast('已取消本次套票使用，次數已退回', 'success');
+        } else {
+            showToast('取消套票使用失敗', 'error');
         }
-
-        // 病人詳細資料套票分頁顯示的變數與函式
-        let currentPatientPackages = [];
-        let currentPatientPackagePage = 0;
-        const PACKAGES_PER_PAGE = 5;
-        function renderPatientPackagesDetailPage() {
-            const start = currentPatientPackagePage * PACKAGES_PER_PAGE;
-            const end = start + PACKAGES_PER_PAGE;
-            const pkgs = currentPatientPackages.slice(start, end);
-            let html = '';
-            pkgs.forEach(function(pkg) {
-                const purchased = new Date(pkg.purchasedAt);
-                const exp = new Date(pkg.expiresAt);
-                const now = new Date();
-                const expired = now > exp;
-                const status = expired ? '<span class="text-red-600">已到期</span>' :
-                    (pkg.remainingUses <= 0 ? '<span class="text-gray-600">已用完</span>' :
-                        '<span class="text-green-600">剩餘 ' + pkg.remainingUses + '/' + pkg.totalUses + '</span>');
-                html += '<div class="flex justify-between items-start bg-purple-50 border border-purple-200 rounded p-2">';
-                html += '<div>';
-                html += '<div class="font-medium text-purple-900">' + pkg.name + '</div>';
-                html += '<div class="text-xs text-gray-600">購買日：' + purchased.toLocaleDateString("zh-TW") + ' · 到期日：' + exp.toLocaleDateString("zh-TW") + '</div>';
-                html += '<div class="text-xs text-gray-600">剩餘次數：' + pkg.remainingUses + '/' + pkg.totalUses + '</div>';
-                html += '</div>';
-                html += '<div class="mt-1">' + status + '</div>';
-                html += '</div>';
-            });
-            const totalPages = Math.ceil(currentPatientPackages.length / PACKAGES_PER_PAGE);
-            if (totalPages > 1) {
-                html += '<div class="flex justify-end space-x-2 mt-2">';
-                const prevDisabled = currentPatientPackagePage <= 0;
-                const nextDisabled = currentPatientPackagePage >= totalPages - 1;
-                html += '<button type="button" ' + (prevDisabled ? 'disabled' : '') + ' onclick="changePatientPackagePage(-1)" class="px-2 py-1 bg-gray-200 text-gray-700 rounded ' + (prevDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300') + '">上一頁</button>';
-                html += '<button type="button" ' + (nextDisabled ? 'disabled' : '') + ' onclick="changePatientPackagePage(1)" class="px-2 py-1 bg-gray-200 text-gray-700 rounded ' + (nextDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300') + '">下一頁</button>';
-                html += '</div>';
-            }
-            return html;
-        }
-        function changePatientPackagePage(delta) {
-            const totalPages = Math.ceil(currentPatientPackages.length / PACKAGES_PER_PAGE);
-            currentPatientPackagePage = Math.min(Math.max(currentPatientPackagePage + delta, 0), totalPages - 1);
-            const container = document.getElementById('patientPackagesDetailList');
-            if (container) {
-                container.innerHTML = renderPatientPackagesDetailPage();
-            }
-        }
-
+    } catch (error) {
+        console.error('取消套票使用錯誤:', error);
+        showToast('取消套票使用時發生錯誤', 'error');
+    }
+}
 // Firebase 數據管理系統
 class FirebaseDataManager {
     constructor() {
@@ -8287,13 +8340,118 @@ class FirebaseDataManager {
             return { success: false, error: error.message };
         }
     }
+// 患者套票數據管理
+    async addPatientPackage(packageData) {
+        if (!this.isReady) {
+            showToast('數據管理器尚未準備就緒', 'error');
+            return { success: false };
+        }
+
+        try {
+            const docRef = await window.firebase.addDoc(
+                window.firebase.collection(window.firebase.db, 'patientPackages'),
+                {
+                    ...packageData,
+                    createdAt: new Date(),
+                    createdBy: currentUser || 'system'
+                }
+            );
+            
+            console.log('患者套票已添加到 Firebase:', docRef.id);
+            return { success: true, id: docRef.id };
+        } catch (error) {
+            console.error('添加患者套票失敗:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getPatientPackages(patientId) {
+        if (!this.isReady) return { success: false, data: [] };
+
+        try {
+            const querySnapshot = await window.firebase.getDocs(
+                window.firebase.collection(window.firebase.db, 'patientPackages')
+            );
+            
+            const packages = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.patientId === patientId) {
+                    packages.push({ id: doc.id, ...data });
+                }
+            });
+            
+            return { success: true, data: packages };
+        } catch (error) {
+            console.error('讀取患者套票失敗:', error);
+            return { success: false, data: [] };
+        }
+    }
+
+    async updatePatientPackage(packageId, packageData) {
+        try {
+            await window.firebase.updateDoc(
+                window.firebase.doc(window.firebase.db, 'patientPackages', packageId),
+                {
+                    ...packageData,
+                    updatedAt: new Date(),
+                    updatedBy: currentUser || 'system'
+                }
+            );
+            return { success: true };
+        } catch (error) {
+            console.error('更新患者套票失敗:', error);
+            return { success: false, error: error.message };
+        }
+    }
 }
 
 // 初始化數據管理器
 let firebaseDataManager;
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
     firebaseDataManager = new FirebaseDataManager();
     window.firebaseDataManager = firebaseDataManager; // 全域使用
+    
+    // 等待 Firebase 初始化完成
+    while (!firebaseDataManager.isReady) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // 初始化全域變數
+    try {
+        // 載入掛號數據
+        const appointmentResult = await firebaseDataManager.getAppointments();
+        if (appointmentResult.success) {
+            appointments = appointmentResult.data;
+        } else {
+            appointments = [];
+        }
+        
+        // 載入診療記錄
+        const consultationResult = await firebaseDataManager.getConsultations();
+        if (consultationResult.success) {
+            consultations = consultationResult.data;
+        } else {
+            consultations = [];
+        }
+        
+        // 載入患者數據
+        const patientResult = await firebaseDataManager.getPatients();
+        if (patientResult.success) {
+            patients = patientResult.data;
+        } else {
+            patients = [];
+        }
+        
+        console.log('全域變數初始化完成');
+    } catch (error) {
+        console.error('初始化全域變數錯誤:', error);
+        // 設置預設值
+        appointments = [];
+        consultations = [];
+        patients = [];
+    }
+    
     // Firebase 資料管理器初始化完成後更新統計
     updateStatistics();
     // 啟動實時掛號監聽，無需手動更新今日掛號列表
@@ -8305,8 +8463,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     updateClinicSettingsDisplay();
     
-    // 用戶系統已全面採用 Firebase，無需執行本地至雲端的數據遷移
-    // initializeDataMigration(); // 移除用戶數據遷移功能
     
     // 自動聚焦到電子郵件輸入框
     const usernameInput = document.getElementById('mainLoginUsername');
@@ -8316,8 +8472,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 100);
     }
 });
-
-// 移除本地至 Firebase 的用戶數據遷移邏輯，因系統已全面使用 Firebase。保留同步功能以取得雲端資料。
 
 // 為 HTML 內使用的函式建立全域引用。
 // 這些函式會被 HTML 屬性（例如 onclick、onkeypress）呼叫，若不掛在 window 上，瀏覽器會找不到對應函式。
@@ -8372,4 +8526,6 @@ document.addEventListener('DOMContentLoaded', function() {
   window.updateMedicationFrequency = updateMedicationFrequency;
   window.updatePatientAge = updatePatientAge;
   window.updateRestPeriod = updateRestPeriod;
+  window.useOnePackage = useOnePackage;
+  window.undoPackageUse = undoPackageUse;
 })();
