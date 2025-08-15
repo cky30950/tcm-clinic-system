@@ -1614,13 +1614,18 @@ try {
                 updateBillingDisplay();
             }
             
-            // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
+            // 嘗試更新診症儲存按鈕的文字。
+            // 部分舊版模板可能沒有 consultationSaveButtonText 元素，因此嘗試先取得該元素，
+            // 如果不存在，則直接更新包含 saveConsultation() onclick 的按鈕文字。
             const saveButtonTextEl = document.getElementById('consultationSaveButtonText');
             if (saveButtonTextEl) {
                 saveButtonTextEl.textContent = '保存病歷';
             } else {
-                // 如果找不到元素，不抛出錯誤，而是紀錄警告，這樣使用者可繼續操作
-                console.warn('consultationSaveButtonText element not found when loading consultation for edit. Skipping text update.');
+                // 若沒有專用的 span 元素，則改為直接更新提交按鈕本身的文字。
+                const saveBtn = document.querySelector('[onclick="saveConsultation()"]');
+                if (saveBtn) {
+                    saveBtn.textContent = '保存病歷';
+                }
             }
         } else {
             showToast('找不到診症記錄，將使用空白表單', 'warning');
@@ -2173,13 +2178,17 @@ async function showConsultationForm(appointment) {
             // 自動添加預設診金收費項目
             addDefaultConsultationFee(patient);
             
-            // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
+            // 嘗試更新診症儲存按鈕的文字。
+            // 部分舊版模板可能沒有 consultationSaveButtonText 元素，因此嘗試先取得該元素，
+            // 如果不存在，則直接更新包含 saveConsultation() onclick 的按鈕文字。
             const saveButtonTextElNew = document.getElementById('consultationSaveButtonText');
             if (saveButtonTextElNew) {
                 saveButtonTextElNew.textContent = '保存病歷';
             } else {
-                // 若找不到元素，則紀錄警告並跳過，不造成程式崩潰
-                console.warn('consultationSaveButtonText element not found when starting consultation. Skipping text update.');
+                const saveBtn = document.querySelector('[onclick="saveConsultation()"]');
+                if (saveBtn) {
+                    saveBtn.textContent = '保存病歷';
+                }
             }
         }
         
