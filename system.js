@@ -2324,61 +2324,6 @@ async function saveConsultation() {
         showToast('請填寫必填欄位：主訴、中醫診斷！', 'error');
         return;
     }
-    // 取得當前掛號資訊並判斷是否為編輯模式，供後續預處理和保存使用
-    const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
-    // 判斷是否為編輯模式：掛號狀態為已完成且存在 consultationId
-    const isEditing = appointment && appointment.status === 'completed' && appointment.consultationId;
-    // 預處理套票購買和立即使用（僅在非編輯模式下處理，以免重複購買）
-    if (appointment && !isEditing && Array.isArray(selectedBillingItems)) {
-        try {
-            // 找到所有套票項目
-            const packageItems = selectedBillingItems.filter(item => item && item.category === 'package');
-            
-            for (const item of packageItems) {
-                // 先購買套票
-                const purchasedPackage = await purchasePackage(appointment.patientId, item);
-                
-                if (purchasedPackage) {
-                    // 套票購買成功後，詢問是否立即使用第一次
-                    const confirmUse = confirm(`套票「${item.name}」購買成功！\n\n是否立即使用第一次？\n\n套票詳情：\n• 總次數：${item.packageUses} 次\n• 有效期：${item.validityDays} 天`);
-                    
-                    if (confirmUse) {
-                        // 立即使用一次套票
-                        const useResult = await consumePackage(appointment.patientId, purchasedPackage.id);
-                        
-                        if (useResult.ok) {
-                            // 添加套票使用記錄到收費項目中
-                            const usedName = `${item.name}（使用套票）`;
-                            
-                            selectedBillingItems.push({
-                                id: `use-${purchasedPackage.id}-${Date.now()}`,
-                                name: usedName,
-                                category: 'packageUse',
-                                price: 0,
-                                unit: '次',
-                                description: '套票抵扣一次',
-                                quantity: 1,
-                                patientId: appointment.patientId,
-                                packageRecordId: purchasedPackage.id
-                            });
-                            
-                            showToast(`已使用套票：${item.name}，剩餘 ${useResult.record.remainingUses} 次`, 'info');
-                        } else {
-                            showToast(`使用套票失敗：${useResult.msg}`, 'error');
-                        }
-                    }
-                } else {
-                    showToast(`套票「${item.name}」購買失敗`, 'error');
-                }
-            }
-            
-            // 重新更新收費顯示，確保套票使用記錄被包含在最終的診症記錄中
-            updateBillingDisplay();
-            
-        } catch (e) {
-            console.error('預處理套票購買時發生錯誤：', e);
-        }
-    }
 
     // 在進入 try 區塊之前禁用保存按鈕並記錄原始按鈕文字，
     // 以避免 finally 區塊無法存取 originalText 的錯誤（參考語法：let/const 具有塊級作用域）
@@ -2390,7 +2335,8 @@ async function saveConsultation() {
         saveButton.disabled = true;
     }
     try {
-        // 確認預先取得的 appointment 是否存在，若不存在則提示錯誤
+        // 獲取當前掛號信息（從原始數據結構獲取，因為掛號還沒有遷移到 Firebase）
+        const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
         if (!appointment) {
             showToast('找不到掛號記錄！', 'error');
             return;
@@ -2421,7 +2367,7 @@ async function saveConsultation() {
         };
 
         // Determine whether this is an edit of an existing consultation or a new one
-        // isEditing 已在函式開始時定義，這裡直接使用
+        const isEditing = appointment.status === 'completed' && appointment.consultationId;
         let operationSuccess = false;
         if (isEditing) {
             // For editing we preserve the original date and doctor information if available
@@ -2468,6 +2414,22 @@ async function saveConsultation() {
         }
 
         if (operationSuccess) {
+            // 當新增診症完成時，為病人購買的套票寫入本地紀錄
+            // 僅在新建診症時處理（編輯既有記錄時不再次購買套票）
+            if (!isEditing && Array.isArray(selectedBillingItems)) {
+                try {
+                    // 遍歷所選收費項目，找到類別為 "package" 的項目
+                    selectedBillingItems.forEach(item => {
+                        if (item && item.category === 'package') {
+                            // 調用 purchasePackage 將套票加入病人的套票列表
+                            // 傳遞 patientId 及完整的套餐項目（含 packageUses 與 validityDays）
+                            purchasePackage(appointment.patientId, item);
+                        }
+                    });
+                } catch (e) {
+                    console.error('處理購買套票時發生錯誤：', e);
+                }
+            }
 
             // 完成後關閉診症表單並更新 UI
             closeConsultationForm();
@@ -6138,7 +6100,7 @@ async function initializeSystemAfterLogin() {
                         let subtotalDisplay;
                         // 檢查是否為套票使用
                         const isPackageUse = item.category === 'packageUse';
-                        // 取消按鈕：只有在套票使用且擁有有效的 patientId 和 packageRecordId 時顯示
+                        // 取消按鈕：只有在套票使用時顯示
                         // When generating inline event handlers we need to ensure that any dynamic values are
                         // properly quoted. In earlier versions patientId and packageRecordId were injected
                         // directly into the onclick attribute. If either of these identifiers is not a
@@ -6148,8 +6110,7 @@ async function initializeSystemAfterLogin() {
                         // errors when the event handler is parsed. To avoid this we wrap every
                         // argument in single quotes so that they're passed as strings. The handler
                         // itself will convert them back to the appropriate types if necessary.
-                        const canUndo = isPackageUse && item.patientId && item.packageRecordId;
-                        const undoBtn = canUndo ? `
+                        const undoBtn = isPackageUse ? `
                                     <button
                                         type="button"
                                         class="ml-2 text-xs px-2 py-0.5 rounded border border-purple-300 text-purple-700 hover:bg-purple-50"
@@ -6630,26 +6591,8 @@ updateBillingDisplay();
                         };
                         selectedBillingItems.push(selectedItem);
                     } else {
-                        // 如果在收費項目中找不到，嘗試處理動態產生的套票使用項目
-                        // 套票使用項目在保存時的格式為「名稱（使用套票） x數量 = $0」
-                        // 我們需要將此類項目重新載入到 selectedBillingItems 中，並標記為 packageUse
-                        if (itemName.includes('（使用套票）')) {
-                            selectedBillingItems.push({
-                                id: `loaded-packageUse-${Date.now()}-${Math.random().toString(36).substr(2,5)}`,
-                                name: itemName,
-                                category: 'packageUse',
-                                price: 0,
-                                unit: '次',
-                                description: '套票抵扣一次',
-                                quantity: quantity,
-                                // 保存的病歷不含 patientId、packageRecordId，留空避免顯示取消使用按鈕
-                                patientId: null,
-                                packageRecordId: null
-                            });
-                        } else {
-                            // 如果在收費項目中找不到，創建一個臨時項目（用於已刪除的收費項目）
-                            console.log(`找不到收費項目：${itemName}，可能已被刪除`);
-                        }
+                        // 如果在收費項目中找不到，創建一個臨時項目（用於已刪除的收費項目）
+                        console.log(`找不到收費項目：${itemName}，可能已被刪除`);
                     }
                 }
             });
