@@ -2324,57 +2324,61 @@ async function saveConsultation() {
         showToast('請填寫必填欄位：主訴、中醫診斷！', 'error');
         return;
     }
- // 預處理套票購買和立即使用（在保存診症之前）
-if (!isEditing && Array.isArray(selectedBillingItems)) {
-    try {
-        // 找到所有套票項目
-        const packageItems = selectedBillingItems.filter(item => item && item.category === 'package');
-        
-        for (const item of packageItems) {
-            // 先購買套票
-            const purchasedPackage = await purchasePackage(appointment.patientId, item);
+    // 取得當前掛號資訊並判斷是否為編輯模式，供後續預處理和保存使用
+    const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+    // 判斷是否為編輯模式：掛號狀態為已完成且存在 consultationId
+    const isEditing = appointment && appointment.status === 'completed' && appointment.consultationId;
+    // 預處理套票購買和立即使用（僅在非編輯模式下處理，以免重複購買）
+    if (appointment && !isEditing && Array.isArray(selectedBillingItems)) {
+        try {
+            // 找到所有套票項目
+            const packageItems = selectedBillingItems.filter(item => item && item.category === 'package');
             
-            if (purchasedPackage) {
-                // 套票購買成功後，詢問是否立即使用第一次
-                const confirmUse = confirm(`套票「${item.name}」購買成功！\n\n是否立即使用第一次？\n\n套票詳情：\n• 總次數：${item.packageUses} 次\n• 有效期：${item.validityDays} 天`);
+            for (const item of packageItems) {
+                // 先購買套票
+                const purchasedPackage = await purchasePackage(appointment.patientId, item);
                 
-                if (confirmUse) {
-                    // 立即使用一次套票
-                    const useResult = await consumePackage(appointment.patientId, purchasedPackage.id);
+                if (purchasedPackage) {
+                    // 套票購買成功後，詢問是否立即使用第一次
+                    const confirmUse = confirm(`套票「${item.name}」購買成功！\n\n是否立即使用第一次？\n\n套票詳情：\n• 總次數：${item.packageUses} 次\n• 有效期：${item.validityDays} 天`);
                     
-                    if (useResult.ok) {
-                        // 添加套票使用記錄到收費項目中
-                        const usedName = `${item.name}（使用套票）`;
+                    if (confirmUse) {
+                        // 立即使用一次套票
+                        const useResult = await consumePackage(appointment.patientId, purchasedPackage.id);
                         
-                        selectedBillingItems.push({
-                            id: `use-${purchasedPackage.id}-${Date.now()}`,
-                            name: usedName,
-                            category: 'packageUse',
-                            price: 0,
-                            unit: '次',
-                            description: '套票抵扣一次',
-                            quantity: 1,
-                            patientId: appointment.patientId,
-                            packageRecordId: purchasedPackage.id
-                        });
-                        
-                        showToast(`已使用套票：${item.name}，剩餘 ${useResult.record.remainingUses} 次`, 'info');
-                    } else {
-                        showToast(`使用套票失敗：${useResult.msg}`, 'error');
+                        if (useResult.ok) {
+                            // 添加套票使用記錄到收費項目中
+                            const usedName = `${item.name}（使用套票）`;
+                            
+                            selectedBillingItems.push({
+                                id: `use-${purchasedPackage.id}-${Date.now()}`,
+                                name: usedName,
+                                category: 'packageUse',
+                                price: 0,
+                                unit: '次',
+                                description: '套票抵扣一次',
+                                quantity: 1,
+                                patientId: appointment.patientId,
+                                packageRecordId: purchasedPackage.id
+                            });
+                            
+                            showToast(`已使用套票：${item.name}，剩餘 ${useResult.record.remainingUses} 次`, 'info');
+                        } else {
+                            showToast(`使用套票失敗：${useResult.msg}`, 'error');
+                        }
                     }
+                } else {
+                    showToast(`套票「${item.name}」購買失敗`, 'error');
                 }
-            } else {
-                showToast(`套票「${item.name}」購買失敗`, 'error');
             }
+            
+            // 重新更新收費顯示，確保套票使用記錄被包含在最終的診症記錄中
+            updateBillingDisplay();
+            
+        } catch (e) {
+            console.error('預處理套票購買時發生錯誤：', e);
         }
-        
-        // 重新更新收費顯示，確保套票使用記錄被包含在最終的診症記錄中
-        updateBillingDisplay();
-        
-    } catch (e) {
-        console.error('預處理套票購買時發生錯誤：', e);
     }
-}       
 
     // 在進入 try 區塊之前禁用保存按鈕並記錄原始按鈕文字，
     // 以避免 finally 區塊無法存取 originalText 的錯誤（參考語法：let/const 具有塊級作用域）
@@ -2386,8 +2390,7 @@ if (!isEditing && Array.isArray(selectedBillingItems)) {
         saveButton.disabled = true;
     }
     try {
-        // 獲取當前掛號信息（從原始數據結構獲取，因為掛號還沒有遷移到 Firebase）
-        const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+        // 確認預先取得的 appointment 是否存在，若不存在則提示錯誤
         if (!appointment) {
             showToast('找不到掛號記錄！', 'error');
             return;
@@ -2418,7 +2421,7 @@ if (!isEditing && Array.isArray(selectedBillingItems)) {
         };
 
         // Determine whether this is an edit of an existing consultation or a new one
-        const isEditing = appointment.status === 'completed' && appointment.consultationId;
+        // isEditing 已在函式開始時定義，這裡直接使用
         let operationSuccess = false;
         if (isEditing) {
             // For editing we preserve the original date and doctor information if available
