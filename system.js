@@ -6101,11 +6101,20 @@ async function initializeSystemAfterLogin() {
                         // 檢查是否為套票使用
                         const isPackageUse = item.category === 'packageUse';
                         // 取消按鈕：只有在套票使用時顯示
+                        // When generating inline event handlers we need to ensure that any dynamic values are
+                        // properly quoted. In earlier versions patientId and packageRecordId were injected
+                        // directly into the onclick attribute. If either of these identifiers is not a
+                        // literal number (for example, Firebase document IDs are strings like
+                        // "abc-123"), the resulting HTML would contain invalid JavaScript such as
+                        // `useOnePackage(abc-123, 'pkgId')` which causes "Invalid or unexpected token"
+                        // errors when the event handler is parsed. To avoid this we wrap every
+                        // argument in single quotes so that they're passed as strings. The handler
+                        // itself will convert them back to the appropriate types if necessary.
                         const undoBtn = isPackageUse ? `
                                     <button
                                         type="button"
                                         class="ml-2 text-xs px-2 py-0.5 rounded border border-purple-300 text-purple-700 hover:bg-purple-50"
-                                        onclick="undoPackageUse(${item.patientId}, ${item.packageRecordId}, '${item.id}')"
+                                        onclick="undoPackageUse('${item.patientId}', '${item.packageRecordId}', '${item.id}')"
                                     >取消使用</button>
                                 ` : '';
                         // 數量控制區：套票使用項目不顯示加減號
@@ -7990,7 +7999,7 @@ async function renderPatientPackages(patientId) {
           <div class="text-xs text-gray-600">${formatPackageStatus(pkg)}</div>
         </div>
         <button type="button" ${disabled ? 'disabled' : ''} 
-          onclick="useOnePackage(${pkg.patientId}, '${pkg.id}')"
+          onclick="useOnePackage('${pkg.patientId}', '${pkg.id}')"
           class="px-3 py-1 rounded ${disabled ? 'bg-gray-300 text-gray-600' : 'bg-purple-600 text-white hover:bg-purple-700'}">
           使用一次
         </button>
