@@ -6019,7 +6019,9 @@ async function initializeSystemAfterLogin() {
                 treatment: 'bg-orange-50 hover:bg-orange-100 border-orange-200',
                 other: 'bg-gray-50 hover:bg-gray-100 border-gray-200',
                 discount: 'bg-red-50 hover:bg-red-100 border-red-200',
-                package: 'bg-purple-50 hover:bg-purple-100 border-purple-200'
+                package: 'bg-purple-50 hover:bg-purple-100 border-purple-200',
+                // 套票使用與套票的顏色保持一致
+                packageUse: 'bg-purple-50 hover:bg-purple-100 border-purple-200'
             };
             return colors[category] || colors.other;
         }
@@ -6128,7 +6130,9 @@ async function initializeSystemAfterLogin() {
                             treatment: '治療費',
                             other: '其他',
                             discount: '折扣項目',
-                            package: '套票項目'
+                            package: '套票項目',
+                            // 套票使用項目專用分類，用於區分顯示
+                            packageUse: '套票使用'
                         };
                         const categoryName = categoryNames[item.category] || '未分類';
                         const bgColor = getCategoryBgColor(item.category);
@@ -6136,7 +6140,8 @@ async function initializeSystemAfterLogin() {
                         let subtotalDisplay;
                         // 檢查是否為套票使用
                         const isPackageUse = item.category === 'packageUse';
-                        // 取消按鈕：只有在套票使用時顯示
+                        const hasPackageInfo = isPackageUse && item.patientId && item.packageRecordId;
+                        // 取消按鈕：只有在套票使用且具備完整標識（patientId、packageRecordId）時顯示
                         // When generating inline event handlers we need to ensure that any dynamic values are
                         // properly quoted. In earlier versions patientId and packageRecordId were injected
                         // directly into the onclick attribute. If either of these identifiers is not a
@@ -6146,7 +6151,7 @@ async function initializeSystemAfterLogin() {
                         // errors when the event handler is parsed. To avoid this we wrap every
                         // argument in single quotes so that they're passed as strings. The handler
                         // itself will convert them back to the appropriate types if necessary.
-                        const undoBtn = isPackageUse ? `
+                        const undoBtn = hasPackageInfo ? `
                                     <button
                                         type="button"
                                         class="ml-2 text-xs px-2 py-0.5 rounded border border-purple-300 text-purple-700 hover:bg-purple-50"
@@ -6197,7 +6202,7 @@ async function initializeSystemAfterLogin() {
                                 <div class="mr-3 text-right">
                                     <div class="font-bold ${subtotal < 0 ? 'text-red-600' : 'text-green-600'}">${subtotalDisplay}</div>
                                 </div>
-                                ${undoBtn}<button onclick="removeBillingItem(${originalIndex})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>
+                                ${undoBtn}${(!isPackageUse || hasPackageInfo) ? `<button onclick="removeBillingItem(${originalIndex})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>` : ''}
                             </div>
                         `;
                     }).join('')}
@@ -6627,8 +6632,29 @@ updateBillingDisplay();
                         };
                         selectedBillingItems.push(selectedItem);
                     } else {
-                        // 如果在收費項目中找不到，創建一個臨時項目（用於已刪除的收費項目）
-                        console.log(`找不到收費項目：${itemName}，可能已被刪除`);
+                        // 未能在收費項目清單中找到對應項目。這很可能是“套票使用”類型的記錄，
+                        // 其名稱通常包含「（使用套票）」且費用為 0。為了讓此類項目在載入病歷時
+                        // 不會消失，我們以臨時項目的方式載入，並標註為 packageUse。由於缺乏
+                        // patientId 和 packageRecordId，這些項目僅用於顯示，不提供取消功能。
+                        const isPackageUseLine = itemName.includes('（使用套票') || itemName.includes('(使用套票');
+                        const priceNumber = parseInt(itemMatch[3].toString().replace(/[^0-9\-]/g, ''), 10);
+                        if (isPackageUseLine && priceNumber === 0) {
+                            const tempItem = {
+                                id: `temp-packageUse-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+                                name: itemName,
+                                category: 'packageUse',
+                                price: 0,
+                                unit: '次',
+                                description: '套票抵扣一次',
+                                quantity: quantity,
+                                patientId: null,
+                                packageRecordId: null
+                            };
+                            selectedBillingItems.push(tempItem);
+                        } else {
+                            // 如果既不是套票使用，也找不到對應收費項目，僅記錄提醒。這通常是因為該收費項目已被刪除。
+                            console.log(`找不到收費項目：${itemName}，可能已被刪除`);
+                        }
                     }
                 }
             });
