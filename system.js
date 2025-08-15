@@ -4331,6 +4331,36 @@ async function printSickLeave(consultationId, consultationData = null) {
 
 // 修復撤回診症功能
 async function withdrawConsultation(appointmentId) {
+        async function withdrawConsultation(appointmentId) {
+    // 確保全域變數已初始化
+    if (!Array.isArray(appointments)) {
+        try {
+            const appointmentResult = await window.firebaseDataManager.getAppointments();
+            if (appointmentResult.success) {
+                appointments = appointmentResult.data;
+            } else {
+                appointments = [];
+            }
+        } catch (error) {
+            appointments = [];
+        }
+    }
+    
+    if (!Array.isArray(consultations)) {
+        try {
+            const consultationResult = await window.firebaseDataManager.getConsultations();
+            if (consultationResult.success) {
+                consultations = consultationResult.data;
+            } else {
+                consultations = [];
+            }
+        } catch (error) {
+            consultations = [];
+        }
+    }
+
+    const appointment = appointments.find(apt => apt.id === appointmentId);
+    // ... 其餘代碼保持不變
     const appointment = appointments.find(apt => apt.id === appointmentId);
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
@@ -4440,6 +4470,34 @@ async function withdrawConsultation(appointmentId) {
 
 // 修復修改病歷功能
 async function editMedicalRecord(appointmentId) {
+       // 確保全域變數已初始化
+    if (!Array.isArray(appointments)) {
+        try {
+            const appointmentResult = await window.firebaseDataManager.getAppointments();
+            if (appointmentResult.success) {
+                appointments = appointmentResult.data;
+            } else {
+                appointments = [];
+            }
+        } catch (error) {
+            console.error('初始化掛號數據錯誤:', error);
+            appointments = [];
+        }
+    }
+    
+    if (!Array.isArray(consultations)) {
+        try {
+            const consultationResult = await window.firebaseDataManager.getConsultations();
+            if (consultationResult.success) {
+                consultations = consultationResult.data;
+            } else {
+                consultations = [];
+            }
+        } catch (error) {
+            console.error('初始化診療記錄錯誤:', error);
+            consultations = [];
+        }
+    }     
     const appointment = appointments.find(apt => apt.id === appointmentId);
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
@@ -8396,30 +8454,54 @@ class FirebaseDataManager {
 
 // 初始化數據管理器
 let firebaseDataManager;
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
     firebaseDataManager = new FirebaseDataManager();
     window.firebaseDataManager = firebaseDataManager; // 全域使用
+    
+    // 等待 Firebase 初始化完成
+    while (!firebaseDataManager.isReady) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // 初始化全域變數
+    try {
+        // 載入掛號數據
+        const appointmentResult = await firebaseDataManager.getAppointments();
+        if (appointmentResult.success) {
+            appointments = appointmentResult.data;
+        } else {
+            appointments = [];
+        }
+        
+        // 載入診療記錄
+        const consultationResult = await firebaseDataManager.getConsultations();
+        if (consultationResult.success) {
+            consultations = consultationResult.data;
+        } else {
+            consultations = [];
+        }
+        
+        // 載入患者數據
+        const patientResult = await firebaseDataManager.getPatients();
+        if (patientResult.success) {
+            patients = patientResult.data;
+        } else {
+            patients = [];
+        }
+        
+        console.log('全域變數初始化完成');
+    } catch (error) {
+        console.error('初始化全域變數錯誤:', error);
+        // 設置預設值
+        appointments = [];
+        consultations = [];
+        patients = [];
+    }
+    
     // Firebase 資料管理器初始化完成後更新統計
     updateStatistics();
     // 啟動實時掛號監聽，無需手動更新今日掛號列表
     subscribeToAppointments();
-});
-        
-// 初始化系統
-document.addEventListener('DOMContentLoaded', function() {
-    
-    updateClinicSettingsDisplay();
-    
-    // 用戶系統已全面採用 Firebase，無需執行本地至雲端的數據遷移
-    // initializeDataMigration(); // 移除用戶數據遷移功能
-    
-    // 自動聚焦到電子郵件輸入框
-    const usernameInput = document.getElementById('mainLoginUsername');
-    if (usernameInput) {
-        setTimeout(() => {
-            usernameInput.focus();
-        }, 100);
-    }
 });
 
 // 移除本地至 Firebase 的用戶數據遷移邏輯，因系統已全面使用 Firebase。保留同步功能以取得雲端資料。
