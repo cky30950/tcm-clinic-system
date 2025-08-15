@@ -317,6 +317,8 @@ async function attemptMainLogin() {
 
         // 登入成功，切換到主系統
         performLogin(currentUserData);
+        // 登入後初始化系統資料（載入掛號、診療記錄、患者等）
+        await initializeSystemAfterLogin();
         
         showToast('登入成功！', 'success');
 
@@ -407,8 +409,8 @@ function getUserPositionFromEmail(email) {
             document.getElementById('sidebarUserRole').textContent = `當前用戶：${getUserDisplayName(user)}`;
             
             generateSidebarMenu();
-            updateStatistics();
-            
+            // 統計資訊將在登入後初始化系統時更新
+
             showToast(`歡迎回來，${getUserDisplayName(user)}！`, 'success');
         }
 
@@ -4767,6 +4769,49 @@ async function updateStatistics() {
     }
 }
 
+// 在用戶透過 Authentication 登入後初始化系統資料。
+// 這個函式會載入掛號、診療記錄及患者資料，
+// 並在完成後更新統計資訊以及訂閱掛號即時更新。
+async function initializeSystemAfterLogin() {
+    // 確保 Firebase 資料管理器已準備好
+    while (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    try {
+        // 載入掛號數據
+        const appointmentResult = await window.firebaseDataManager.getAppointments();
+        if (appointmentResult && appointmentResult.success) {
+            appointments = appointmentResult.data;
+        } else {
+            appointments = [];
+        }
+        // 載入診療記錄
+        const consultationResult = await window.firebaseDataManager.getConsultations();
+        if (consultationResult && consultationResult.success) {
+            consultations = consultationResult.data;
+        } else {
+            consultations = [];
+        }
+        // 載入患者數據
+        const patientResult = await window.firebaseDataManager.getPatients();
+        if (patientResult && patientResult.success) {
+            patients = patientResult.data;
+        } else {
+            patients = [];
+        }
+        console.log('登入後系統資料初始化完成');
+    } catch (error) {
+        console.error('初始化系統資料失敗:', error);
+        appointments = [];
+        consultations = [];
+        patients = [];
+    }
+    // 更新統計
+    updateStatistics();
+    // 啟動實時掛號監聽，無需手動更新今日掛號列表
+    subscribeToAppointments();
+}
+
 
 
         // 診所設定管理功能
@@ -8409,53 +8454,13 @@ class FirebaseDataManager {
 // 初始化數據管理器
 let firebaseDataManager;
 window.addEventListener('load', async () => {
+    // 只初始化 FirebaseDataManager，避免在使用者登入前載入大量資料。
     firebaseDataManager = new FirebaseDataManager();
     window.firebaseDataManager = firebaseDataManager; // 全域使用
-    
-    // 等待 Firebase 初始化完成
+    // 等待管理器準備好再繼續，但不讀取資料，僅確保後續呼叫不失敗。
     while (!firebaseDataManager.isReady) {
         await new Promise(resolve => setTimeout(resolve, 100));
     }
-    
-    // 初始化全域變數
-    try {
-        // 載入掛號數據
-        const appointmentResult = await firebaseDataManager.getAppointments();
-        if (appointmentResult.success) {
-            appointments = appointmentResult.data;
-        } else {
-            appointments = [];
-        }
-        
-        // 載入診療記錄
-        const consultationResult = await firebaseDataManager.getConsultations();
-        if (consultationResult.success) {
-            consultations = consultationResult.data;
-        } else {
-            consultations = [];
-        }
-        
-        // 載入患者數據
-        const patientResult = await firebaseDataManager.getPatients();
-        if (patientResult.success) {
-            patients = patientResult.data;
-        } else {
-            patients = [];
-        }
-        
-        console.log('全域變數初始化完成');
-    } catch (error) {
-        console.error('初始化全域變數錯誤:', error);
-        // 設置預設值
-        appointments = [];
-        consultations = [];
-        patients = [];
-    }
-    
-    // Firebase 資料管理器初始化完成後更新統計
-    updateStatistics();
-    // 啟動實時掛號監聽，無需手動更新今日掛號列表
-    subscribeToAppointments();
 });
         
 // 初始化系統
