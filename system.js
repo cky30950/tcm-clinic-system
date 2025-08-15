@@ -5293,6 +5293,7 @@ async function loadPatientConsultationSummary(patientId) {
         const nextFollowUp = lastConsultation.followUpDate ? 
             new Date(lastConsultation.followUpDate).toLocaleDateString('zh-TW') : '無安排';
 
+        // 更新診症摘要：僅顯示總次數、最近診症日期以及下次複診日期，不再顯示「最近診症記錄」欄
         summaryContainer.innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div class="bg-blue-50 rounded-lg p-4 text-center">
