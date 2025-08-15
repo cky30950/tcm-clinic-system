@@ -1615,7 +1615,7 @@ try {
             // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
             const saveButtonTextEl = document.getElementById('consultationSaveButtonText');
             if (saveButtonTextEl) {
-                saveButtonTextEl.textContent = '更新病歷';
+                saveButtonTextEl.textContent = '保存病歷';
             } else {
                 // 如果找不到元素，不抛出錯誤，而是紀錄警告，這樣使用者可繼續操作
                 console.warn('consultationSaveButtonText element not found when loading consultation for edit. Skipping text update.');
@@ -2174,7 +2174,7 @@ async function showConsultationForm(appointment) {
             // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
             const saveButtonTextElNew = document.getElementById('consultationSaveButtonText');
             if (saveButtonTextElNew) {
-                saveButtonTextElNew.textContent = '完成診症';
+                saveButtonTextElNew.textContent = '保存病歷';
             } else {
                 // 若找不到元素，則紀錄警告並跳過，不造成程式崩潰
                 console.warn('consultationSaveButtonText element not found when starting consultation. Skipping text update.');
