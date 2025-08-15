@@ -3225,9 +3225,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         let billingItemsHtml = '';
         if (consultation.billingItems) {
             const lines = consultation.billingItems.split('\n');
-            lines.forEach(rawLine => {
-                // 移除行尾的 meta 資訊（如 |patientId,packageRecordId|）以避免在收據中顯示
-                const line = rawLine.split('|')[0].trim();
+            lines.forEach(line => {
                 if (line.includes('=') && line.includes('$')) {
                     const match = line.match(/\$(\d+)/);
                     if (match) {
@@ -6244,25 +6242,13 @@ async function initializeSystemAfterLogin() {
             }
             
             // 先記錄非折扣項目
-            // 為了能在後續病歷編輯時正確還原套票使用資訊，對於套票使用項目(packageUse)我們會在隱藏欄位中附加 patientId 和 packageRecordId。
-            // 格式示例： 項目名稱 x1 = $0 |patientId,packageRecordId|
-            // 其他類型的收費項目保持原有格式
             selectedBillingItems.forEach(item => {
                 if (item.category !== 'discount') {
-                    // 構建基礎行：名稱、數量、金額
-                    let line = `${item.name} x${item.quantity} = $${item.price * item.quantity}`;
-                    // 如果是套票使用項目且具有病人與套票記錄資訊，附加到行尾以便後續解析
-                    // 判斷是否為套票使用項目：除了顯式標記為 packageUse 外，名稱中包含「（使用套票）」的項目也視為套票使用
-                    if (item.category === 'packageUse' || (item.name && item.name.includes('（使用套票）'))) {
-                        const pid = item.patientId ? String(item.patientId) : '';
-                        const pkgId = item.packageRecordId ? String(item.packageRecordId) : '';
-                        line += ` |${pid},${pkgId}|`;
-                    }
-                    billingText += line + '\n';
+                    billingText += `${item.name} x${item.quantity} = $${item.price * item.quantity}\n`;
                 }
             });
             
-            // 再記錄折扣項目。折扣項目不附加 meta 資訊。
+            // 再記錄折扣項目
             selectedBillingItems.forEach(item => {
                 if (item.category === 'discount') {
                     if (item.price > 0 && item.price < 1) {
@@ -6622,14 +6608,10 @@ updateBillingDisplay();
                 if (!line || line.includes('小計') || line.includes('總費用')) return;
                 
                 // 解析收費項目格式：項目名 x數量 = $金額 或 項目名 x數量 = -$金額
-                // 支援行尾附加的 meta 資訊，例如 |patientId,packageRecordId|
-                // 透過正則捕獲可選的第四與第五群組作為 meta
-                const itemMatch = line.match(/^(.+?)\s+x(\d+)\s+=\s+([\-\$]?\d+)(?:\s+\|([^,|]*),([^|]*)\|)?$/);
+                const itemMatch = line.match(/^(.+?)\s+x(\d+)\s+=\s+([\-\$]?\d+)$/);
                 if (itemMatch) {
                     const itemName = itemMatch[1].trim();
                     const quantity = parseInt(itemMatch[2]);
-                    const metaPatientId = itemMatch[4] && itemMatch[4].trim() !== '' ? itemMatch[4].trim() : null;
-                    const metaPackageRecordId = itemMatch[5] && itemMatch[5].trim() !== '' ? itemMatch[5].trim() : null;
                     
                     // 在收費項目中尋找對應的項目
                     const billingItem = billingItems.find(item => 
@@ -6637,34 +6619,15 @@ updateBillingDisplay();
                     );
                     
                     if (billingItem) {
-                        // 對於正常項目使用 billingItem 的類別和價格；如果名稱中含有「（使用套票）」則視為套票使用項目
-                        let category = billingItem.category;
-                        let price = billingItem.price;
-                        let unit = billingItem.unit;
-                        let description = billingItem.description;
-                        let name = billingItem.name;
-                        if (itemName.includes('（使用套票）')) {
-                            // 套票使用的金額為 0，單位為次
-                            category = 'packageUse';
-                            price = 0;
-                            unit = '次';
-                            description = '套票抵扣一次';
-                            name = itemName; // 保持顯示名稱與原始文本一致
-                        }
                         const selectedItem = {
                             id: billingItem.id,
-                            name: name,
-                            category: category,
-                            price: price,
-                            unit: unit,
-                            description: description,
+                            name: billingItem.name,
+                            category: billingItem.category,
+                            price: billingItem.price,
+                            unit: billingItem.unit,
+                            description: billingItem.description,
                             quantity: quantity
                         };
-                        // 如果存在 meta 資訊，並且此項目為套票使用，附加 patientId 與 packageRecordId
-                        if (itemName.includes('（使用套票）')) {
-                            selectedItem.patientId = metaPatientId;
-                            selectedItem.packageRecordId = metaPackageRecordId;
-                        }
                         selectedBillingItems.push(selectedItem);
                     } else {
                         // 如果在收費項目中找不到，嘗試處理動態產生的套票使用項目
@@ -6679,9 +6642,9 @@ updateBillingDisplay();
                                 unit: '次',
                                 description: '套票抵扣一次',
                                 quantity: quantity,
-                                // 從 meta 中恢復 patientId、packageRecordId，若無則為 null
-                                patientId: metaPatientId,
-                                packageRecordId: metaPackageRecordId
+                                // 保存的病歷不含 patientId、packageRecordId，留空避免顯示取消使用按鈕
+                                patientId: null,
+                                packageRecordId: null
                             });
                         } else {
                             // 如果在收費項目中找不到，創建一個臨時項目（用於已刪除的收費項目）
@@ -6828,10 +6791,17 @@ const consultationDate = (() => {
             if (consultation.billingItems) {
                 // 直接將收費項目設置到隱藏文本域
                 document.getElementById('formBillingItems').value = consultation.billingItems;
-                
+
                 // 解析並載入收費項目
                 parseBillingItemsFromText(consultation.billingItems);
-                
+
+                // 嘗試為舊記錄補全套票使用的 meta 資訊（patientId 與 packageRecordId）
+                try {
+                    await restorePackageUseMeta(appointment.patientId);
+                } catch (e) {
+                    console.error('恢復套票使用 meta 錯誤:', e);
+                }
+
                 // 更新收費顯示
                 updateBillingDisplay();
             } else {
@@ -7607,9 +7577,7 @@ async function deleteUser(id) {
                 }
 
                 // 解析收費項目格式：項目名 x數量 = $金額 或 項目名 x數量 = -$金額
-                // 移除行尾可能存在的 meta 資訊（如 |patientId,packageRecordId|）以免影響解析
-                const baseLine = line.split('|')[0].trim();
-                const itemMatch = baseLine.match(/^(.+?)\s+x(\d+)\s+=\s+([\-\$]?\d+)$/);
+                const itemMatch = line.match(/^(.+?)\s+x(\d+)\s+=\s+([\-\$]?\d+)$/);
                 if (itemMatch) {
                     const itemName = itemMatch[1].trim();
                     const quantity = parseInt(itemMatch[2]);
@@ -8168,6 +8136,50 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         showToast('取消套票使用時發生錯誤', 'error');
     }
 }
+
+// 嘗試為缺失 meta 的套票使用項目補全 patientId 與 packageRecordId
+// 當舊病歷無法取消套票時，會嘗試透過病人當前的套票記錄推斷對應的套票ID
+async function restorePackageUseMeta(patientId) {
+    try {
+        // 取得病人的所有套票
+        const packages = await getPatientPackages(patientId);
+        // 遍歷已選擇的收費項目，尋找缺乏 meta 的套票使用項目
+        selectedBillingItems.forEach(item => {
+            const isPackageUse = item && (item.category === 'packageUse' || (item.name && item.name.includes('（使用套票）')));
+            if (isPackageUse && (!item.patientId || !item.packageRecordId)) {
+                // 補充病人ID
+                item.patientId = patientId;
+                // 從名稱中移除後綴以找出套票名稱，例如「推拿療程（使用套票）」→「推拿療程」
+                let baseName = item.name;
+                const suffix = '（使用套票）';
+                if (baseName.endsWith(suffix)) {
+                    baseName = baseName.substring(0, baseName.length - suffix.length);
+                }
+                // 在病人的套票中尋找名稱匹配的項目
+                const candidates = packages.filter(p => p.name === baseName);
+                if (candidates.length === 1) {
+                    item.packageRecordId = candidates[0].id;
+                } else if (candidates.length > 1) {
+                    // 如果有多個同名套票，選擇已使用次數最多的那一個
+                    let chosen = candidates[0];
+                    for (const c of candidates) {
+                        const usedCount = (c.totalUses || 0) - (c.remainingUses || 0);
+                        const chosenUsed = (chosen.totalUses || 0) - (chosen.remainingUses || 0);
+                        if (usedCount > chosenUsed) {
+                            chosen = c;
+                        }
+                    }
+                    item.packageRecordId = chosen.id;
+                }
+                // 如果找不到匹配，保持為 null，屆時取消時會出現找不到套票的提示
+            }
+        });
+    } catch (error) {
+        console.error('restorePackageUseMeta 錯誤:', error);
+    }
+}
+// 將函式暴露到全域以便其他部分調用
+window.restorePackageUseMeta = restorePackageUseMeta;
 // Firebase 數據管理系統
 class FirebaseDataManager {
     constructor() {
