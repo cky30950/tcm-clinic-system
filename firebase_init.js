@@ -2,7 +2,7 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
     import { getDatabase, ref, set, get, child, push, update, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
     // 您的 Firebase 配置（請替換成您的實際配置）
 const firebaseConfig = {
@@ -21,12 +21,22 @@ const firebaseConfig = {
     const rtdb = getDatabase(app);
     const auth = getAuth(app);
 
+// 將 Auth 的持久化模式設置為「session」，以確保當瀏覽器或分頁關閉時自動登出
+// 這會將登入狀態儲存在 sessionStorage 而非預設的 localStorage，
+// 一旦使用者關閉該瀏覽器分頁或整個瀏覽器，登入狀態會被清除。
+// 若設置失敗，會在控制台輸出錯誤訊息，但不會阻止應用程式繼續運作。
+setPersistence(auth, browserSessionPersistence).catch((error) => {
+  console.error('設置 Firebase Auth 持久化模式失敗:', error);
+});
+
     // 讓其他腳本可以使用 Firebase
     window.firebase = {
         app, db, rtdb, auth,
         collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit,
         ref, set, get, child, push, update, remove, onValue, off,
-        signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged
+        signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
+        // 讓其他模組可存取持久化相關方法（可選）
+        setPersistence, browserSessionPersistence
     };
 
     // 連接狀態監控
