@@ -3015,6 +3015,24 @@ async function saveConsultation() {
         }
 
         if (operationSuccess) {
+            // 當新增診症完成時，為病人購買的套票寫入本地紀錄
+            // 僅在新建診症時處理（編輯既有記錄時不再次購買套票）
+            if (!isEditing && Array.isArray(selectedBillingItems)) {
+                try {
+                    // 遍歷所選收費項目，找到類別為 "package" 的項目
+                    selectedBillingItems.forEach(item => {
+                        if (item && item.category === 'package') {
+                            // 調用 purchasePackage 將套票加入病人的套票列表
+                            // 傳遞 patientId 及完整的套餐項目（含 packageUses 與 validityDays）
+                            purchasePackage(appointment.patientId, item);
+                        }
+                    });
+                } catch (e) {
+                    console.error('處理購買套票時發生錯誤：', e);
+                }
+            }
+
+            // 完成後關閉診症表單並更新 UI
             closeConsultationForm();
             loadTodayAppointments();
             updateStatistics();
