@@ -1610,7 +1610,20 @@ try {
             selectedBillingItems = [];
             if (consultation.billingItems) {
                 document.getElementById('formBillingItems').value = consultation.billingItems;
+                // 解析保存的收費項目字串
                 parseBillingItemsFromText(consultation.billingItems);
+                // 為載入的套票使用項目補上 patientId 與 packageRecordId，
+                // 以便在編輯病歷時能夠取消並退回套票次數。
+                try {
+                    // 嘗試取得當前編輯中的掛號，從而獲取 patientId
+                    const aptForPkg = appointments.find(a => a.id === currentConsultingAppointmentId);
+                    const pidPkg = aptForPkg && aptForPkg.patientId ? aptForPkg.patientId : null;
+                    if (pidPkg) {
+                        await assignPackageRecordIds(pidPkg);
+                    }
+                } catch (error) {
+                    console.warn('assignPackageRecordIds 執行失敗:', error);
+                }
                 updateBillingDisplay();
             }
             
@@ -6654,6 +6667,46 @@ updateBillingDisplay();
                 }
             });
         }
+
+        /**
+         * 為已載入的套票使用項目補充 patientId 及 packageRecordId。
+         *
+         * 在編輯病歷時，從舊的診症記錄載入的 billingItems 僅包含文字描述，
+         * 其中的套票使用項目（category 為 'packageUse'）不包含 patientId 及
+         * packageRecordId，因此無法顯示「取消使用」按鈕，也無法退回套票次數。
+         * 此函式會根據當前病人已購買的套票記錄，將這些欄位補上，使使用者
+         * 能夠在編輯模式下取消套票使用。若無法找到相符的套票記錄，則保持
+         * 既有狀態，不會報錯。
+         *
+         * @param {string|number} patientId - 病人 ID
+         */
+        async function assignPackageRecordIds(patientId) {
+            if (!patientId) return;
+            try {
+                const pkgs = await getPatientPackages(patientId);
+                // pkgs 可能回傳為 { success: boolean, data: array } 或陣列
+                let packages = [];
+                if (Array.isArray(pkgs)) {
+                    packages = pkgs;
+                } else if (pkgs && pkgs.success && Array.isArray(pkgs.data)) {
+                    packages = pkgs.data;
+                }
+                selectedBillingItems.forEach(item => {
+                    if (item.category === 'packageUse' && (!item.patientId || !item.packageRecordId)) {
+                        // 取得套票名稱（移除「（使用套票）」部分）
+                        const name = item.name.replace(/（使用套票）/g, '').trim();
+                        // 在患者的套票記錄中尋找相同名稱且已使用過的套票
+                        const match = packages.find(p => p.name === name && p.remainingUses < p.totalUses);
+                        if (match) {
+                            item.patientId = patientId;
+                            item.packageRecordId = match.id;
+                        }
+                    }
+                });
+            } catch (err) {
+                console.error('assignPackageRecordIds 失敗:', err);
+            }
+        }
         
         // 載入上次收費項目（內部函數 - 保留向後兼容）
         function loadPreviousBillingItemsFromConsultation(lastConsultation) {
@@ -8049,17 +8102,26 @@ async function renderPatientPackages(patientId) {
             const badge =
               expired ? '<span class="ml-2 text-xs text-white px-2 py-0.5 rounded bg-red-500">已到期</span>' :
               (pkg.remainingUses <= 0 ? '<span class="ml-2 text-xs text-white px-2 py-0.5 rounded bg-gray-500">已用完</span>' : '');
+            // 按鈕區域：包含使用一次和退回套票
+            const buttons = `
+              <div class="flex items-center">
+                <button type="button" ${disabled ? 'disabled' : ''}
+                  onclick="useOnePackage('${pkg.patientId}', '${pkg.id}')"
+                  class="px-3 py-1 rounded ${disabled ? 'bg-gray-300 text-gray-600' : 'bg-purple-600 text-white hover:bg-purple-700'}">
+                  使用一次
+                </button>
+                <button type="button" onclick="cancelPatientPackage('${pkg.patientId}', '${pkg.id}')"
+                  class="ml-2 px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600">
+                  退回套票
+                </button>
+              </div>`;
             return `
       <div class="flex items-center justify-between bg-white border border-purple-200 rounded p-2">
         <div>
           <div class="font-medium text-purple-900">${pkg.name}${badge}</div>
           <div class="text-xs text-gray-600">${formatPackageStatus(pkg)}</div>
         </div>
-        <button type="button" ${disabled ? 'disabled' : ''} 
-          onclick="useOnePackage('${pkg.patientId}', '${pkg.id}')"
-          class="px-3 py-1 rounded ${disabled ? 'bg-gray-300 text-gray-600' : 'bg-purple-600 text-white hover:bg-purple-700'}">
-          使用一次
-        </button>
+        ${buttons}
       </div>
     `;
         }).join('');
@@ -8127,6 +8189,30 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
     } catch (error) {
         console.error('取消套票使用錯誤:', error);
         showToast('取消套票使用時發生錯誤', 'error');
+    }
+}
+
+// 新增：取消患者套票（退回套票）
+// 允許使用者將整張套票取消並退回未使用次數。
+// 這會刪除 patientPackages 集合中的對應記錄，並更新畫面。
+async function cancelPatientPackage(patientId, packageRecordId) {
+    try {
+        // 確認操作
+        const confirmMsg = '確定要退回並取消此套票嗎？\n此操作將刪除套票記錄，未使用的次數將全部退回。';
+        if (!confirm(confirmMsg)) return;
+
+        // 調用 Firebase 資料管理器刪除套票
+        const result = await window.firebaseDataManager.deletePatientPackage(packageRecordId);
+        if (result && result.success) {
+            showToast('套票已取消並退回', 'success');
+            // 刷新患者套票列表
+            await refreshPatientPackagesUI();
+        } else {
+            showToast('取消套票失敗', 'error');
+        }
+    } catch (error) {
+        console.error('取消套票錯誤:', error);
+        showToast('取消套票時發生錯誤', 'error');
     }
 }
 // Firebase 數據管理系統
@@ -8515,6 +8601,20 @@ class FirebaseDataManager {
             return { success: false, error: error.message };
         }
     }
+
+    // 新增：刪除患者套票記錄
+    // 用於取消套票時從 Firebase 中移除該記錄。
+    async deletePatientPackage(packageId) {
+        try {
+            await window.firebase.deleteDoc(
+                window.firebase.doc(window.firebase.db, 'patientPackages', packageId)
+            );
+            return { success: true };
+        } catch (error) {
+            console.error('刪除患者套票失敗:', error);
+            return { success: false, error: error.message };
+        }
+    }
 }
 
 // 初始化數據管理器
@@ -8599,4 +8699,6 @@ document.addEventListener('DOMContentLoaded', function() {
   window.updateRestPeriod = updateRestPeriod;
   window.useOnePackage = useOnePackage;
   window.undoPackageUse = undoPackageUse;
+  // 將取消套票函式掛載到全局，使模板中的 onclick 屬性可用
+  window.cancelPatientPackage = cancelPatientPackage;
 })();
