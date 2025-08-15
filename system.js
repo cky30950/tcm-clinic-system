@@ -5308,20 +5308,6 @@ async function loadPatientConsultationSummary(patientId) {
                     <div class="text-sm text-orange-800">下次複診</div>
                 </div>
             </div>
-            
-            <div class="bg-gray-50 rounded-lg p-4">
-                <h5 class="font-medium text-gray-800 mb-2">最近診症記錄</h5>
-                <div class="text-sm text-gray-700">
-                    <div><span class="font-medium">診斷：</span>${lastConsultation.diagnosis || '無記錄'}</div>
-                    <div class="mt-1"><span class="font-medium">證型：</span>${lastConsultation.syndrome || '無記錄'}</div>
-                    ${lastConsultation.instructions ? `<div class="mt-1"><span class="font-medium">醫囑：</span>${lastConsultation.instructions}</div>` : ''}
-                </div>
-                <div class="mt-3">
-                    <button onclick="viewPatientMedicalHistory('${patientId}')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition duration-200">
-                        查看完整病歷
-                    </button>
-                </div>
-            </div>
         `;
 
     } catch (error) {
