@@ -124,12 +124,86 @@
             return `P${newNumber.toString().padStart(6, '0')}`;
         }
 
-        // 移除本地預設測試病人資料，改為僅使用 Firebase 來源。
-        // 初始化病人資料為空陣列，待從雲端讀取。
-        let patients = [];
+        // 預設測試病人資料
+        const defaultPatients = [
+            {
+                id: 1001,
+                patientNumber: 'P000001',
+                name: '王小明',
+                gender: '男',
+                phone: '0912-345-678',
+                birthDate: '1989-03-15',
+                address: '台北市大安區信義路四段123號',
+                history: '高血壓病史3年，偶有頭暈症狀',
+                createdAt: new Date('2024-01-15').toISOString()
+            },
+            {
+                id: 1002,
+                patientNumber: 'P000002',
+                name: '李美華',
+                gender: '女',
+                phone: '0923-456-789',
+                birthDate: '1996-07-22',
+                address: '新北市板橋區中山路二段456號',
+                history: '經常性失眠，工作壓力大',
+                createdAt: new Date('2024-01-20').toISOString()
+            },
+            {
+                id: 1003,
+                patientNumber: 'P000003',
+                name: '張志強',
+                gender: '男',
+                phone: '0934-567-890',
+                birthDate: '1982-11-08',
+                address: '桃園市中壢區中正路789號',
+                history: '慢性胃炎，飲食不規律',
+                createdAt: new Date('2024-02-01').toISOString()
+            },
+            {
+                id: 1004,
+                patientNumber: 'P000004',
+                name: '陳雅婷',
+                gender: '女',
+                phone: '0945-678-901',
+                birthDate: '1993-05-12',
+                address: '台中市西屯區台灣大道三段321號',
+                history: '月經不調，經常腰酸背痛',
+                createdAt: new Date('2024-02-10').toISOString()
+            },
+            {
+                id: 1005,
+                patientNumber: 'P000005',
+                name: '林大偉',
+                gender: '男',
+                phone: '0956-789-012',
+                birthDate: '1969-12-03',
+                address: '高雄市前金區中正四路654號',
+                history: '糖尿病患者，需定期追蹤血糖',
+                createdAt: new Date('2024-02-15').toISOString()
+            }
+        ];
+
+        // 初始化病人資料（如果本地儲存為空則載入預設資料）
+        let patients = JSON.parse(localStorage.getItem('patients') || '[]');
+        if (patients.length === 0) {
+            patients = defaultPatients;
+            localStorage.setItem('patients', JSON.stringify(patients));
+        } else {
+            // 為舊資料補充病人編號
+            let needsUpdate = false;
+            patients.forEach(patient => {
+                if (!patient.patientNumber) {
+                    patient.patientNumber = generatePatientNumber();
+                    needsUpdate = true;
+                }
+            });
+            if (needsUpdate) {
+                localStorage.setItem('patients', JSON.stringify(patients));
+            }
+        }
         
-        // 預設診症記錄已移除，初始化為空陣列
-        const defaultConsultations = [];
+        // 預設診症記錄
+        const defaultConsultations = [
             {
                 id: 2001,
                 appointmentId: 3001,
@@ -189,11 +263,14 @@
             }
         ];
 
-        // 不使用本地預設診症記錄，本地初始化為空陣列
-        let consultations = [];
+        let consultations = JSON.parse(localStorage.getItem('consultations') || '[]');
+        if (consultations.length === 0) {
+            consultations = defaultConsultations;
+            localStorage.setItem('consultations', JSON.stringify(consultations));
+        }
         
-        // 預設掛號記錄已移除，初始化為空陣列
-        const defaultAppointments = [];
+        // 預設掛號記錄
+        const defaultAppointments = [
             {
                 id: 3001,
                 patientId: 1001,
@@ -247,11 +324,26 @@
             }
         ];
 
-        // 不使用本地預設掛號記錄，本地初始化為空陣列
-        let appointments = [];
+        let appointments = JSON.parse(localStorage.getItem('appointments') || '[]');
+        if (appointments.length === 0) {
+            appointments = defaultAppointments;
+            localStorage.setItem('appointments', JSON.stringify(appointments));
+        } else {
+            // 為舊資料補充醫師欄位
+            let needsUpdate = false;
+            appointments.forEach(appointment => {
+                if (!appointment.appointmentDoctor) {
+                    appointment.appointmentDoctor = 'drzhang'; // 預設為張醫師
+                    needsUpdate = true;
+                }
+            });
+            if (needsUpdate) {
+                localStorage.setItem('appointments', JSON.stringify(appointments));
+            }
+        }
 
-        // 預設中藥材資料已移除，改為僅使用 Firebase 來源。
-        /* const defaultHerbs = [
+        // 預設中藥材資料
+        const defaultHerbs = [
             {
                 id: 5001,
                 type: 'herb',
@@ -292,11 +384,9 @@
                 createdAt: new Date('2024-01-01').toISOString()
             }
         ];
-        */
-        const defaultHerbs = [];
 
-        // 預設方劑資料已移除，改為僅使用 Firebase 來源。
-        /* const defaultFormulas = [
+        // 預設方劑資料
+        const defaultFormulas = [
             {
                 id: 6001,
                 type: 'formula',
@@ -322,8 +412,6 @@
                 createdAt: new Date('2024-01-01').toISOString()
             }
         ];
-        */
-        const defaultFormulas = [];
 
         // 初始化中藥庫資料
         let herbLibrary = [];
@@ -347,8 +435,15 @@
                     herbsFromFirestore.push({ ...docSnap.data() });
                 });
                 if (herbsFromFirestore.length === 0) {
-                    // Firestore 中沒有資料時，不自動載入預設資料，保持空陣列
-                    herbLibrary = [];
+                    // 若 Firestore 中沒有資料，使用預設中藥材與方劑初始化
+                    const combinedDefaults = [...defaultHerbs, ...defaultFormulas];
+                    for (const item of combinedDefaults) {
+                        await window.firebase.setDoc(
+                            window.firebase.doc(window.firebase.db, 'herbLibrary', String(item.id)),
+                            item
+                        );
+                    }
+                    herbLibrary = combinedDefaults;
                 } else {
                     herbLibrary = herbsFromFirestore;
                 }
@@ -357,8 +452,8 @@
             }
         }
 
-        // 預設收費項目資料已移除，改為使用 Firebase 來源。
-        /* const defaultBillingItems = [
+        // 預設收費項目資料
+        const defaultBillingItems = [
             // 診療費類別
             {
                 id: 4001,
@@ -730,8 +825,6 @@
                 createdAt: new Date('2024-01-01').toISOString()
             }
         ];
-        */
-        const defaultBillingItems = [];
 
         // 初始化收費項目資料
         let billingItems = [];
@@ -754,8 +847,14 @@
                     itemsFromFirestore.push({ ...docSnap.data() });
                 });
                 if (itemsFromFirestore.length === 0) {
-                    // Firestore 中沒有資料時，不自動載入預設資料，保持空陣列
-                    billingItems = [];
+                    // 若 Firestore 中沒有資料，使用預設收費項目初始化
+                    for (const item of defaultBillingItems) {
+                        await window.firebase.setDoc(
+                            window.firebase.doc(window.firebase.db, 'billingItems', String(item.id)),
+                            item
+                        );
+                    }
+                    billingItems = defaultBillingItems;
                 } else {
                     billingItems = itemsFromFirestore;
                 }
@@ -764,8 +863,8 @@
             }
         }
 
-        // 預設用戶資料已移除，改為僅使用 Firebase 來源。
-        /* const defaultUsers = [
+        // 預設用戶資料
+        const defaultUsers = [
             {
                 id: 1,
                 username: 'manager',
@@ -807,11 +906,13 @@
                 lastLogin: null
             }
         ];
-        */
-        const defaultUsers = [];
 
-        // 初始化用戶資料：不使用本地預設，用空陣列代替，待由 Firebase 載入
-        let users = [];
+        // 初始化用戶資料
+        let users = JSON.parse(localStorage.getItem('users') || '[]');
+        if (users.length === 0) {
+            users = defaultUsers;
+            localStorage.setItem('users', JSON.stringify(users));
+        }
 
     
 
