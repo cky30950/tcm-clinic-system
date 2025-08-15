@@ -124,25 +124,6 @@
             return `P${newNumber.toString().padStart(6, '0')}`;
         }
 
-        // 移除本地預設測試病人資料，改為僅使用 Firebase 來源。
-        // 初始化病人資料為空陣列，待從雲端讀取。
-        let patients = [];
-        
-        // 預設診症記錄已移除，初始化為空陣列
-        const defaultConsultations = [];
-
-        // 不使用本地預設診症記錄，本地初始化為空陣列
-        let consultations = [];
-        
-        // 預設掛號記錄已移除，初始化為空陣列
-        const defaultAppointments = [];
-
-        // 不使用本地預設掛號記錄，本地初始化為空陣列
-        let appointments = [];
-
-        const defaultHerbs = [];
-
-        const defaultFormulas = [];
 
         // 初始化中藥庫資料
         let herbLibrary = [];
