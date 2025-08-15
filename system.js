@@ -130,122 +130,12 @@
         
         // 預設診症記錄已移除，初始化為空陣列
         const defaultConsultations = [];
-            {
-                id: 2001,
-                appointmentId: 3001,
-                patientId: 1001,
-                symptoms: '頭痛頭暈，血壓偏高，伴有心悸，睡眠品質不佳',
-                tongue: '舌質紅，苔薄黃',
-                pulse: '脈弦數',
-                currentHistory: '患者3年前診斷高血壓，平時血壓控制不穩定，近期工作壓力大，頭痛症狀加重',
-                diagnosis: '眩暈（高血壓病）',
-                syndrome: '肝陽上亢證',
-                prescription: '天麻鉤藤飲加減\n天麻 10g\n鉤藤 15g\n石決明 30g\n梔子 10g\n黃芩 10g\n川牛膝 15g\n杜仲 15g\n益母草 15g\n夜交藤 20g\n茯神 15g',
-                usage: '水煎服，每日一劑，分早晚兩次溫服',
-                treatmentCourse: '7天',
-                instructions: '注意休息，避免情緒激動，定期監測血壓，飲食清淡少鹽',
-                followUpDate: '2024-03-01T09:00',
-                date: new Date('2024-02-23T10:30').toISOString(),
-                doctor: 'drzhang',
-                status: 'completed'
-            },
-            {
-                id: 2002,
-                appointmentId: 3002,
-                patientId: 1002,
-                symptoms: '失眠多夢，入睡困難，易醒，伴有心煩，工作壓力大',
-                tongue: '舌質淡紅，苔薄白',
-                pulse: '脈細數',
-                currentHistory: '患者近半年來工作壓力增大，睡眠品質逐漸下降，每晚需1-2小時才能入睡',
-                diagnosis: '不寐（失眠症）',
-                syndrome: '心腎不交證',
-                prescription: '甘麥大棗湯合交泰丸加減\n甘草 6g\n小麥 30g\n大棗 10枚\n黃連 3g\n肉桂 1g\n酸棗仁 20g\n龍骨 15g\n牡蠣 15g\n遠志 10g\n茯神 15g',
-                usage: '水煎服，每日一劑，晚餐後及睡前各服一次',
-                treatmentCourse: '10天',
-                instructions: '睡前避免使用電子產品，保持規律作息，可適當進行放鬆運動',
-                followUpDate: '2024-03-05T14:00',
-                date: new Date('2024-02-25T14:15').toISOString(),
-                doctor: 'drzhang',
-                status: 'completed'
-            },
-            {
-                id: 2003,
-                appointmentId: 3003,
-                patientId: 1003,
-                symptoms: '胃脘脹痛，食後加重，噯氣頻繁，食慾不振',
-                tongue: '舌質淡，苔白膩',
-                pulse: '脈弦滑',
-                currentHistory: '患者有慢性胃炎病史，平時飲食不規律，常有胃脘不適，近期症狀加重',
-                diagnosis: '胃痛（慢性胃炎）',
-                syndrome: '脾胃虛弱，濕滯中焦證',
-                prescription: '香砂六君子湯加減\n黨參 15g\n白朮 10g\n茯苓 15g\n甘草 6g\n陳皮 10g\n半夏 10g\n木香 6g\n砂仁 6g\n枳殼 10g\n神麴 15g',
-                usage: '水煎服，每日一劑，飯前30分鐘溫服',
-                treatmentCourse: '14天',
-                instructions: '規律飲食，細嚼慢嚥，避免生冷辛辣食物，保持心情愉快',
-                followUpDate: '2024-03-10T10:30',
-                date: new Date('2024-02-26T10:45').toISOString(),
-                doctor: 'drzhang',
-                status: 'completed'
-            }
-        ];
 
         // 不使用本地預設診症記錄，本地初始化為空陣列
         let consultations = [];
         
         // 預設掛號記錄已移除，初始化為空陣列
         const defaultAppointments = [];
-            {
-                id: 3001,
-                patientId: 1001,
-                appointmentTime: new Date('2024-02-23T10:00').toISOString(),
-                appointmentDoctor: 'drzhang',
-                chiefComplaint: '頭痛頭暈，血壓偏高',
-                status: 'completed',
-                createdAt: new Date('2024-02-22T15:30').toISOString(),
-                createdBy: 'nurse_amy',
-                arrivedAt: new Date('2024-02-23T09:55').toISOString(),
-                confirmedBy: 'nurse_amy',
-                consultationStartTime: new Date('2024-02-23T10:30').toISOString(),
-                consultingDoctor: 'drzhang',
-                completedAt: new Date('2024-02-23T11:15').toISOString(),
-                consultationId: 2001,
-                completedBy: 'drzhang'
-            },
-            {
-                id: 3002,
-                patientId: 1002,
-                appointmentTime: new Date('2024-02-25T14:00').toISOString(),
-                appointmentDoctor: 'drzhang',
-                chiefComplaint: '失眠多夢，入睡困難',
-                status: 'completed',
-                createdAt: new Date('2024-02-24T10:20').toISOString(),
-                createdBy: 'nurse_amy',
-                arrivedAt: new Date('2024-02-25T13:50').toISOString(),
-                confirmedBy: 'nurse_amy',
-                consultationStartTime: new Date('2024-02-25T14:15').toISOString(),
-                consultingDoctor: 'drzhang',
-                completedAt: new Date('2024-02-25T15:00').toISOString(),
-                consultationId: 2002,
-                completedBy: 'drzhang'
-            },
-            {
-                id: 3003,
-                patientId: 1003,
-                appointmentTime: new Date('2024-02-26T10:30').toISOString(),
-                appointmentDoctor: 'drzhang',
-                chiefComplaint: '胃脘脹痛，食後加重',
-                status: 'completed',
-                createdAt: new Date('2024-02-25T16:45').toISOString(),
-                createdBy: 'nurse_amy',
-                arrivedAt: new Date('2024-02-26T10:25').toISOString(),
-                confirmedBy: 'nurse_amy',
-                consultationStartTime: new Date('2024-02-26T10:45').toISOString(),
-                consultingDoctor: 'drzhang',
-                completedAt: new Date('2024-02-26T11:30').toISOString(),
-                consultationId: 2003,
-                completedBy: 'drzhang'
-            }
-        ];
 
         // 不使用本地預設掛號記錄，本地初始化為空陣列
         let appointments = [];
