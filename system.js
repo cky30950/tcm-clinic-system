@@ -2348,7 +2348,7 @@ async function saveConsultation() {
                         
                         if (useResult.ok) {
                             // 添加套票使用記錄到收費項目中
-                            const usedName = `${item.name}（使用套票）`;
+                            const usedName = `${item.name} (使用套票)`;
                             
                             selectedBillingItems.push({
                                 id: `use-${purchasedPackage.id}-${Date.now()}`,
@@ -4678,9 +4678,30 @@ async function loadPatientConsultationSummary(patientId) {
         const totalConsultations = consultations.length;
         const lastConsultation = consultations[0]; // 最新的診症記錄
 
+        // 取得並計算套票狀態
+        let packageStatus = '無套票';
+        try {
+            const pkgs = await getPatientPackages(patientId);
+            // 若存在有效套票（剩餘次數 > 0），取即將到期的第一個
+            if (Array.isArray(pkgs) && pkgs.length > 0) {
+                const activePkgs = pkgs.filter(p => p.remainingUses > 0);
+                if (activePkgs.length > 0) {
+                    activePkgs.sort((a,b) => new Date(a.expiresAt) - new Date(b.expiresAt));
+                    const pkg = activePkgs[0];
+                    packageStatus = formatPackageStatus(pkg);
+                } else {
+                    // 有購買紀錄但無可用次數
+                    packageStatus = '無可用套票';
+                }
+            }
+        } catch (err) {
+            console.error('獲取套票資訊失敗:', err);
+            packageStatus = '無法載入';
+        }
+
         if (totalConsultations === 0) {
             summaryContainer.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div class="bg-blue-50 rounded-lg p-4 text-center">
                         <div class="text-2xl font-bold text-blue-600">0</div>
                         <div class="text-sm text-blue-800">總診症次數</div>
@@ -4692,6 +4713,10 @@ async function loadPatientConsultationSummary(patientId) {
                     <div class="bg-orange-50 rounded-lg p-4 text-center">
                         <div class="text-lg font-semibold text-orange-600">無安排</div>
                         <div class="text-sm text-orange-800">下次複診</div>
+                    </div>
+                    <div class="bg-purple-50 rounded-lg p-4 text-center">
+                        <div class="text-lg font-semibold text-purple-600">${packageStatus}</div>
+                        <div class="text-sm text-purple-800">套票狀態</div>
                     </div>
                 </div>
                 <div class="text-center py-8 text-gray-500">
@@ -4713,7 +4738,7 @@ async function loadPatientConsultationSummary(patientId) {
 
         // 更新診症摘要：僅顯示總次數、最近診症日期以及下次複診日期，不再顯示「最近診症記錄」欄
         summaryContainer.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div class="bg-blue-50 rounded-lg p-4 text-center">
                     <div class="text-2xl font-bold text-blue-600">${totalConsultations}</div>
                     <div class="text-sm text-blue-800">總診症次數</div>
@@ -4725,6 +4750,10 @@ async function loadPatientConsultationSummary(patientId) {
                 <div class="bg-orange-50 rounded-lg p-4 text-center">
                     <div class="text-lg font-semibold text-orange-600">${nextFollowUp}</div>
                     <div class="text-sm text-orange-800">下次複診</div>
+                </div>
+                <div class="bg-purple-50 rounded-lg p-4 text-center">
+                    <div class="text-lg font-semibold text-purple-600">${packageStatus}</div>
+                    <div class="text-sm text-purple-800">套票狀態</div>
                 </div>
             </div>
         `;
@@ -5988,7 +6017,8 @@ async function initializeSystemAfterLogin() {
                     treatment: '治療費',
                     other: '其他',
                     discount: '折扣項目',
-                    package: '套票項目'
+                    package: '套票項目',
+                    packageUse: '套票使用'
                 };
                 const categoryName = categoryNames[item.category] || '未分類';
                 const bgColor = getCategoryBgColor(item.category);
@@ -6021,7 +6051,8 @@ async function initializeSystemAfterLogin() {
                 treatment: 'bg-orange-50 hover:bg-orange-100 border-orange-200',
                 other: 'bg-gray-50 hover:bg-gray-100 border-gray-200',
                 discount: 'bg-red-50 hover:bg-red-100 border-red-200',
-                package: 'bg-purple-50 hover:bg-purple-100 border-purple-200'
+                package: 'bg-purple-50 hover:bg-purple-100 border-purple-200',
+                packageUse: 'bg-purple-50 hover:bg-purple-100 border-purple-200'
             };
             return colors[category] || colors.other;
         }
@@ -6130,7 +6161,8 @@ async function initializeSystemAfterLogin() {
                             treatment: '治療費',
                             other: '其他',
                             discount: '折扣項目',
-                            package: '套票項目'
+                            package: '套票項目',
+                            packageUse: '套票使用'
                         };
                         const categoryName = categoryNames[item.category] || '未分類';
                         const bgColor = getCategoryBgColor(item.category);
@@ -6633,7 +6665,7 @@ updateBillingDisplay();
                         // 如果在收費項目中找不到，嘗試處理動態產生的套票使用項目
                         // 套票使用項目在保存時的格式為「名稱（使用套票） x數量 = $0」
                         // 我們需要將此類項目重新載入到 selectedBillingItems 中，並標記為 packageUse
-                        if (itemName.includes('（使用套票）')) {
+                        if (itemName.includes('（使用套票）') || itemName.includes('(使用套票)')) {
                             selectedBillingItems.push({
                                 id: `loaded-packageUse-${Date.now()}-${Math.random().toString(36).substr(2,5)}`,
                                 name: itemName,
@@ -7732,7 +7764,8 @@ async function deleteUser(id) {
                 treatment: '治療費',
                 other: '其他費用',
                 discount: '折扣',
-                package: '套票項目'
+                package: '套票項目',
+                packageUse: '套票使用'
             };
             return names[category] || category;
         }
@@ -8088,7 +8121,7 @@ async function useOnePackage(patientId, packageRecordId) {
         showToast(res.msg || '套票不可用', 'warning');
         return;
     }
-    const usedName = `${res.record.name}（使用套票）`;
+    const usedName = `${res.record.name} (使用套票)`;
     
     selectedBillingItems.push({
         id: `use-${res.record.id}-${Date.now()}`,
@@ -8145,15 +8178,18 @@ async function restorePackageUseMeta(patientId) {
         const packages = await getPatientPackages(patientId);
         // 遍歷已選擇的收費項目，尋找缺乏 meta 的套票使用項目
         selectedBillingItems.forEach(item => {
-            const isPackageUse = item && (item.category === 'packageUse' || (item.name && item.name.includes('（使用套票）')));
+            const isPackageUse = item && (item.category === 'packageUse' || (item.name && (item.name.includes('（使用套票）') || item.name.includes('(使用套票)'))));
             if (isPackageUse && (!item.patientId || !item.packageRecordId)) {
                 // 補充病人ID
                 item.patientId = patientId;
                 // 從名稱中移除後綴以找出套票名稱，例如「推拿療程（使用套票）」→「推拿療程」
                 let baseName = item.name;
-                const suffix = '（使用套票）';
-                if (baseName.endsWith(suffix)) {
-                    baseName = baseName.substring(0, baseName.length - suffix.length);
+                const suffixFull = '（使用套票）';
+                const suffixHalf = '(使用套票)';
+                if (baseName.endsWith(suffixFull)) {
+                    baseName = baseName.substring(0, baseName.length - suffixFull.length);
+                } else if (baseName.endsWith(suffixHalf)) {
+                    baseName = baseName.substring(0, baseName.length - suffixHalf.length);
                 }
                 // 在病人的套票中尋找名稱匹配的項目
                 const candidates = packages.filter(p => p.name === baseName);
