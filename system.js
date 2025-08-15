@@ -1674,11 +1674,27 @@ async function viewPatient(id) {
             </div>
         `;
 
-                // 載入診症記錄摘要
+        // 將詳細資料內容插入到模態框中
+        const detailContainer = document.getElementById('patientDetailContent');
+        if (detailContainer) {
+            detailContainer.innerHTML = content;
+        }
+
+        // 顯示病人詳細資料模態框
+        const modalEl = document.getElementById('patientDetailModal');
+        if (modalEl) {
+            modalEl.classList.remove('hidden');
+        }
+
+        /**
+         * 載入診症記錄摘要
+         *
+         * 由於 loadPatientConsultationSummary 會嘗試取得 id 為 `patientConsultationSummary` 的元素，
+         * 該元素是在 above 的 `content` HTML 中動態建立的，因此必須在內容插入 DOM 之後再呼叫。
+         * 若在插入之前呼叫，`document.getElementById('patientConsultationSummary')` 會回傳 null，
+         * 造成摘要區塊永遠顯示 “載入中”。
+         */
         loadPatientConsultationSummary(id);
-        
-        document.getElementById('patientDetailContent').innerHTML = content;
-        document.getElementById('patientDetailModal').classList.remove('hidden');
 
     } catch (error) {
         console.error('查看病人資料錯誤:', error);
@@ -5224,7 +5240,13 @@ async function editMedicalRecord(appointmentId) {
 // 載入病人診症記錄摘要
 async function loadPatientConsultationSummary(patientId) {
     const summaryContainer = document.getElementById('patientConsultationSummary');
-    
+
+    // 如果容器不存在，代表尚未渲染病人詳細頁面，直接返回避免錯誤
+    if (!summaryContainer) {
+        console.warn('patientConsultationSummary 容器不存在，跳過診症記錄載入');
+        return;
+    }
+
     try {
         const result = await window.firebaseDataManager.getPatientConsultations(patientId);
         
