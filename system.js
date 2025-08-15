@@ -1674,13 +1674,11 @@ async function viewPatient(id) {
             </div>
         `;
 
-        // 將詳細資料內容插入到模態框中
+        // 先將內容插入並顯示模態框
         const detailContainer = document.getElementById('patientDetailContent');
         if (detailContainer) {
             detailContainer.innerHTML = content;
         }
-
-        // 顯示病人詳細資料模態框
         const modalEl = document.getElementById('patientDetailModal');
         if (modalEl) {
             modalEl.classList.remove('hidden');
@@ -1689,10 +1687,8 @@ async function viewPatient(id) {
         /**
          * 載入診症記錄摘要
          *
-         * 由於 loadPatientConsultationSummary 會嘗試取得 id 為 `patientConsultationSummary` 的元素，
-         * 該元素是在 above 的 `content` HTML 中動態建立的，因此必須在內容插入 DOM 之後再呼叫。
-         * 若在插入之前呼叫，`document.getElementById('patientConsultationSummary')` 會回傳 null，
-         * 造成摘要區塊永遠顯示 “載入中”。
+         * 注意：診症記錄摘要區塊是在上面插入的內容中動態生成的。
+         * 必須確保 DOM 已經渲染完畢後再呼叫，否則會找不到容器導致錯誤。
          */
         loadPatientConsultationSummary(id);
 
@@ -5241,9 +5237,9 @@ async function editMedicalRecord(appointmentId) {
 async function loadPatientConsultationSummary(patientId) {
     const summaryContainer = document.getElementById('patientConsultationSummary');
 
-    // 如果容器不存在，代表尚未渲染病人詳細頁面，直接返回避免錯誤
+    // 如果容器尚未渲染，直接跳過，以免對 null 設定 innerHTML
     if (!summaryContainer) {
-        console.warn('patientConsultationSummary 容器不存在，跳過診症記錄載入');
+        console.warn('patientConsultationSummary 容器不存在，診症摘要無法載入');
         return;
     }
 
