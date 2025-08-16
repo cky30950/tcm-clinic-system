@@ -2328,8 +2328,8 @@ async function saveConsultation() {
     const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
     // 判斷是否為編輯模式：掛號狀態為已完成且存在 consultationId
     const isEditing = appointment && appointment.status === 'completed' && appointment.consultationId;
-    // 預處理套票購買和立即使用（不再區分編輯模式，完成診症與修改病歷統一使用同一套票流程）
-    if (appointment && Array.isArray(selectedBillingItems)) {
+    // 預處理套票購買和立即使用（僅在非編輯模式下處理，以免重複購買）
+    if (appointment && !isEditing && Array.isArray(selectedBillingItems)) {
         try {
             // 找到所有套票項目
             const packageItems = selectedBillingItems.filter(item => item && item.category === 'package');
@@ -8187,7 +8187,44 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
     if (item.isHistorical && item.patientId && item.packageRecordId) {
         item.isHistorical = false;
     }
-    // 如果仍然缺少 meta，則移除項目但不嘗試退回次數
+    // 如果仍然缺少 meta，嘗試根據名稱匹配患者的套票以恢復 packageRecordId
+    // 先使用傳入的 patientId 參數填補 item.patientId（若缺失）
+    if (!item.patientId && patientId) {
+        item.patientId = patientId;
+    }
+    // 若缺少 packageRecordId，嘗試透過名稱匹配
+    if (!item.packageRecordId && item.patientId) {
+        try {
+            const pkgsForUndo = await getPatientPackages(item.patientId);
+            let baseName = item.name;
+            const suffixFull = '（使用套票）';
+            const suffixHalf = '(使用套票)';
+            if (baseName.endsWith(suffixFull)) {
+                baseName = baseName.substring(0, baseName.length - suffixFull.length);
+            } else if (baseName.endsWith(suffixHalf)) {
+                baseName = baseName.substring(0, baseName.length - suffixHalf.length);
+            }
+            const candidatesForUndo = pkgsForUndo.filter(p => p.name === baseName);
+            if (candidatesForUndo.length === 1) {
+                item.packageRecordId = candidatesForUndo[0].id;
+                item.isHistorical = false;
+            } else if (candidatesForUndo.length > 1) {
+                let chosenPkg = candidatesForUndo[0];
+                for (const cPkg of candidatesForUndo) {
+                    const usedCount = (cPkg.totalUses || 0) - (cPkg.remainingUses || 0);
+                    const chosenUsed = (chosenPkg.totalUses || 0) - (chosenPkg.remainingUses || 0);
+                    if (usedCount > chosenUsed) {
+                        chosenPkg = cPkg;
+                    }
+                }
+                item.packageRecordId = chosenPkg.id;
+                item.isHistorical = false;
+            }
+        } catch (e) {
+            console.error('套票名稱匹配錯誤:', e);
+        }
+    }
+    // 如果嘗試補全後仍缺少 meta，則移除項目但不嘗試退回次數
     if (!item.patientId || !item.packageRecordId) {
         selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
         updateBillingDisplay();
