@@ -8150,18 +8150,30 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
     }
     // 重新取得使用項目資料
     const item = selectedBillingItems.find(it => it.id === usageItemId);
-    // 如果仍然找不到項目或無法取得對應的套票記錄，顯示警告
-    if (!item || item.isHistorical || !item.patientId || !item.packageRecordId) {
-        showToast('找不到對應的套票記錄，無法取消', 'warning');
+    if (!item) {
+        // 找不到項目，可能已被刪除
+        showToast('找不到套票使用項目', 'warning');
+        return;
+    }
+    // 如果為舊病歷(歷史)或缺少病人/套票資訊，則僅移除項目，不嘗試退回次數
+    if (item.isHistorical || !item.patientId || !item.packageRecordId) {
+        // 從選擇的收費項目中移除該項目
+        selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
+        updateBillingDisplay();
+        // 不需要刷新套票列表，因為沒有變動
+        showToast('已移除套票使用項目，未退回次數', 'info');
         return;
     }
     // 以項目中的 packageRecordId 為準
     const pkgId = item.packageRecordId;
     try {
-        const packages = await getPatientPackages(patientId);
+        const packages = await getPatientPackages(item.patientId || patientId);
         const pkg = packages.find(p => p.id === pkgId);
         if (!pkg) {
-            showToast('找不到對應的套票，無法取消', 'warning');
+            // 找不到對應的套票，直接移除項目
+            selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
+            updateBillingDisplay();
+            showToast('找不到對應的套票，已移除項目', 'warning');
             return;
         }
         const updatedPackage = {
