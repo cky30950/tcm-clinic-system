@@ -8139,30 +8139,38 @@ async function useOnePackage(patientId, packageRecordId) {
 }
 
 async function undoPackageUse(patientId, packageRecordId, usageItemId) {
-    // 檢查是否為歷史記錄
+    // 嘗試恢復缺失的套票 meta，以便舊病歷也能取消使用
+    try {
+        // restorePackageUseMeta 會根據 patientId 嘗試為所有缺失的套票使用項目補全 patientId 和 packageRecordId
+        if (typeof restorePackageUseMeta === 'function') {
+            await restorePackageUseMeta(patientId);
+        }
+    } catch (e) {
+        console.error('恢復套票使用 meta 錯誤:', e);
+    }
+    // 重新取得使用項目資料
     const item = selectedBillingItems.find(it => it.id === usageItemId);
-    if (item && item.isHistorical) {
-        showToast('從舊病歷載入的套票使用記錄無法取消', 'warning');
+    // 如果仍然找不到項目或無法取得對應的套票記錄，顯示警告
+    if (!item || item.isHistorical || !item.patientId || !item.packageRecordId) {
+        showToast('找不到對應的套票記錄，無法取消', 'warning');
         return;
     }
-    
+    // 以項目中的 packageRecordId 為準
+    const pkgId = item.packageRecordId;
     try {
         const packages = await getPatientPackages(patientId);
-        const pkg = packages.find(p => p.id === packageRecordId);
-        
+        const pkg = packages.find(p => p.id === pkgId);
         if (!pkg) {
             showToast('找不到對應的套票，無法取消', 'warning');
             return;
         }
-        
         const updatedPackage = {
             ...pkg,
             remainingUses: pkg.remainingUses + 1
         };
-        
-        const result = await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
-        
+        const result = await window.firebaseDataManager.updatePatientPackage(pkgId, updatedPackage);
         if (result.success) {
+            // 從選擇的收費項目中移除該項目
             selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
             updateBillingDisplay();
             await refreshPatientPackagesUI();
@@ -8185,10 +8193,11 @@ async function restorePackageUseMeta(patientId) {
         // 遍歷已選擇的收費項目，尋找缺乏 meta 的套票使用項目
         selectedBillingItems.forEach(item => {
             const isPackageUse = item && (item.category === 'packageUse' || (item.name && (item.name.includes('（使用套票）') || item.name.includes('(使用套票)'))));
-                if (isPackageUse && (!item.patientId || !item.packageRecordId)) {
-                    // 即便項目被標記為歷史紀錄，也嘗試恢復對應的病人ID與套票記錄，以便可以取消使用。
-                    // 補充病人ID
-                    item.patientId = patientId;
+                if (isPackageUse && (item.isHistorical || !item.patientId || !item.packageRecordId)) {
+                // 即便標記為歷史記錄，也嘗試恢復 meta 以便可以取消使用
+                
+                // 補充病人ID
+                item.patientId = patientId;
                 // 從名稱中移除後綴以找出套票名稱，例如「推拿療程（使用套票）」→「推拿療程」
                 let baseName = item.name;
                 const suffixFull = '（使用套票）';
@@ -8200,27 +8209,27 @@ async function restorePackageUseMeta(patientId) {
                 }
                 // 在病人的套票中尋找名稱匹配的項目
                 const candidates = packages.filter(p => p.name === baseName);
-                    if (candidates.length === 1) {
-                        item.packageRecordId = candidates[0].id;
-                        // 找到對應套票，解除歷史標記以允許取消使用
-                        item.isHistorical = false;
-                    } else if (candidates.length > 1) {
-                        // 如果有多個同名套票，選擇已使用次數最多的那一個
-                        let chosen = candidates[0];
-                        for (const c of candidates) {
-                            const usedCount = (c.totalUses || 0) - (c.remainingUses || 0);
-                            const chosenUsed = (chosen.totalUses || 0) - (chosen.remainingUses || 0);
-                            if (usedCount > chosenUsed) {
-                                chosen = c;
-                            }
+                if (candidates.length === 1) {
+                    item.packageRecordId = candidates[0].id;
+                    // 找到對應的套票，取消歷史標記
+                    item.isHistorical = false;
+                } else if (candidates.length > 1) {
+                    // 如果有多個同名套票，選擇已使用次數最多的那一個
+                    let chosen = candidates[0];
+                    for (const c of candidates) {
+                        const usedCount = (c.totalUses || 0) - (c.remainingUses || 0);
+                        const chosenUsed = (chosen.totalUses || 0) - (chosen.remainingUses || 0);
+                        if (usedCount > chosenUsed) {
+                            chosen = c;
                         }
-                        item.packageRecordId = chosen.id;
-                        // 找到對應套票，解除歷史標記以允許取消使用
-                        item.isHistorical = false;
-                    } else {
-                        // 找不到匹配的套票，保持歷史記錄狀態
-                        item.isHistorical = true;
                     }
+                    item.packageRecordId = chosen.id;
+                    // 找到對應的套票，取消歷史標記
+                    item.isHistorical = false;
+                } else {
+                    // 找不到匹配的套票，保持歷史記錄狀態
+                    item.isHistorical = true;
+                }
             }
         });
     } catch (error) {
