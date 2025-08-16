@@ -9,6 +9,10 @@ let appointments = [];
 // 快取病人列表，避免重複從 Firestore 讀取
 let patientCache = null;
 
+// 快取診症記錄和用戶列表，避免重複從 Firestore 讀取
+let consultationCache = null;
+let userCache = null;
+
 /**
  * 取得病人列表並使用本地快取。
  * @param {boolean} forceRefresh 是否強制重新從 Firestore 讀取資料
@@ -28,6 +32,50 @@ async function fetchPatients(forceRefresh = false) {
     } catch (error) {
         console.error('取得病人資料失敗:', error);
         // 回傳空陣列避免程式崩潰
+        return [];
+    }
+}
+
+/**
+ * 取得診症記錄列表並使用本地快取。
+ * @param {boolean} forceRefresh 是否強制重新從 Firestore 讀取資料
+ * @returns {Promise<Array>} 診症資料陣列
+ */
+async function fetchConsultations(forceRefresh = false) {
+    try {
+        if (forceRefresh || !consultationCache) {
+            const result = await window.firebaseDataManager.getConsultations();
+            if (result && result.success) {
+                consultationCache = result.data;
+            } else {
+                consultationCache = null;
+            }
+        }
+        return consultationCache || [];
+    } catch (error) {
+        console.error('取得診症資料失敗:', error);
+        return [];
+    }
+}
+
+/**
+ * 取得用戶列表並使用本地快取。
+ * @param {boolean} forceRefresh 是否強制重新從 Firestore 讀取資料
+ * @returns {Promise<Array>} 用戶資料陣列
+ */
+async function fetchUsers(forceRefresh = false) {
+    try {
+        if (forceRefresh || !userCache) {
+            const result = await window.firebaseDataManager.getUsers();
+            if (result && result.success) {
+                userCache = result.data;
+            } else {
+                userCache = null;
+            }
+        }
+        return userCache || [];
+    } catch (error) {
+        console.error('取得用戶資料失敗:', error);
         return [];
     }
 }
@@ -5028,8 +5076,8 @@ async function initializeSystemAfterLogin() {
         let currentHerbFilter = 'all';
         
         async function loadHerbLibrary() {
-            // 進入中藥庫頁面時先從 Firestore 重新載入資料
-            if (typeof initHerbLibrary === 'function') {
+            // 若尚未載入中藥庫資料，才從 Firestore 重新載入
+            if (typeof initHerbLibrary === 'function' && (!Array.isArray(herbLibrary) || herbLibrary.length === 0)) {
                 await initHerbLibrary();
             }
             displayHerbLibrary();
@@ -5373,8 +5421,8 @@ async function initializeSystemAfterLogin() {
         let currentBillingFilter = 'all';
         
         async function loadBillingManagement() {
-            // 進入收費項目管理頁面時先從 Firestore 重新載入資料
-            if (typeof initBillingItems === 'function') {
+            // 若尚未載入收費項目資料，才從 Firestore 重新載入
+            if (typeof initBillingItems === 'function' && (!Array.isArray(billingItems) || billingItems.length === 0)) {
                 await initBillingItems();
             }
             displayBillingItems();
@@ -8458,6 +8506,8 @@ class FirebaseDataManager {
             );
             
             console.log('病人數據已添加到 Firebase:', docRef.id);
+            // 新增病人後清除緩存，讓下一次讀取時重新載入
+            this.patientsCache = null;
             return { success: true, id: docRef.id };
         } catch (error) {
             console.error('添加病人數據失敗:', error);
@@ -8497,6 +8547,8 @@ class FirebaseDataManager {
                     updatedBy: currentUser || 'system'
                 }
             );
+            // 更新病人資料後清除緩存，讓下一次讀取時重新載入
+            this.patientsCache = null;
             return { success: true };
         } catch (error) {
             console.error('更新病人數據失敗:', error);
@@ -8509,6 +8561,8 @@ class FirebaseDataManager {
             await window.firebase.deleteDoc(
                 window.firebase.doc(window.firebase.db, 'patients', patientId)
             );
+            // 刪除病人後清除緩存
+            this.patientsCache = null;
             return { success: true };
         } catch (error) {
             console.error('刪除病人數據失敗:', error);
@@ -8535,6 +8589,8 @@ class FirebaseDataManager {
             );
             
             console.log('診症記錄已添加到 Firebase:', docRef.id);
+            // 新增診症後清除緩存
+            this.consultationsCache = null;
             return { success: true, id: docRef.id };
         } catch (error) {
             console.error('添加診症記錄失敗:', error);
@@ -8574,6 +8630,8 @@ class FirebaseDataManager {
                     updatedBy: currentUser
                 }
             );
+            // 更新診症後清除緩存
+            this.consultationsCache = null;
             return { success: true };
         } catch (error) {
             console.error('更新診症記錄失敗:', error);
@@ -8662,6 +8720,8 @@ class FirebaseDataManager {
                     updatedBy: currentUser || 'system'
                 }
             );
+            // 更新用戶後清除用戶緩存
+            this.usersCache = null;
             return { success: true };
         } catch (error) {
             console.error('更新用戶數據失敗:', error);
@@ -8674,6 +8734,8 @@ class FirebaseDataManager {
             await window.firebase.deleteDoc(
                 window.firebase.doc(window.firebase.db, 'users', userId)
             );
+            // 刪除用戶後清除緩存
+            this.usersCache = null;
             return { success: true };
         } catch (error) {
             console.error('刪除用戶數據失敗:', error);
