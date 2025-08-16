@@ -4780,7 +4780,7 @@ async function loadPatientConsultationSummary(patientId) {
                     activePkgs.sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt));
                     
                     packageStatusHtml = `
-                        <div class="space-y-2">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             ${activePkgs.map(pkg => {
                                 const status = formatPackageStatus(pkg);
                                 const expiresAt = new Date(pkg.expiresAt);
@@ -4811,13 +4811,13 @@ async function loadPatientConsultationSummary(patientId) {
                                         <div class="flex items-start justify-between mb-2">
                                             <div class="flex items-center space-x-2">
                                                 <div class="${iconColor}">
-                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                                         <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                                     </svg>
                                                 </div>
-                                                <div class="font-semibold text-sm">${pkg.name}</div>
+                                                <div class="font-medium text-sm truncate">${pkg.name}</div>
                                             </div>
-                                            <div class="text-xs font-medium px-2 py-1 rounded-full bg-white bg-opacity-70">
+                                            <div class="text-xs font-medium px-2 py-1 rounded-full bg-white bg-opacity-70 whitespace-nowrap">
                                                 ${daysLeft <= 0 ? '已到期' : `${daysLeft}天`}
                                             </div>
                                         </div>
@@ -4825,26 +4825,26 @@ async function loadPatientConsultationSummary(patientId) {
                                         <!-- 使用次數和進度條 -->
                                         <div class="space-y-2">
                                             <div class="flex justify-between items-center text-xs">
-                                                <span>剩餘 ${pkg.remainingUses}/${pkg.totalUses} 次</span>
-                                                <span>${Math.round(100 - usagePercentage)}% 可用</span>
+                                                <span>剩餘 ${pkg.remainingUses}/${pkg.totalUses}</span>
+                                                <span>${Math.round(100 - usagePercentage)}%</span>
                                             </div>
                                             
                                             <!-- 進度條 -->
-                                            <div class="w-full bg-white bg-opacity-50 rounded-full h-2">
-                                                <div class="${progressColor} h-2 rounded-full transition-all duration-300" 
+                                            <div class="w-full bg-white bg-opacity-50 rounded-full h-1.5">
+                                                <div class="${progressColor} h-1.5 rounded-full transition-all duration-300" 
                                                      style="width: ${usagePercentage}%"></div>
                                             </div>
                                             
                                             <!-- 到期日 -->
-                                            <div class="text-xs opacity-75">
-                                                到期日：${expiresAt.toLocaleDateString('zh-TW')}
+                                            <div class="text-xs opacity-75 truncate">
+                                                ${expiresAt.toLocaleDateString('zh-TW')}
                                             </div>
                                         </div>
                                         
                                         <!-- 緊急標記 -->
                                         ${daysLeft <= 7 && daysLeft > 0 ? `
                                             <div class="absolute -top-1 -right-1">
-                                                <span class="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
+                                                <span class="inline-flex items-center justify-center w-4 h-4 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
                                                     !
                                                 </span>
                                             </div>
@@ -4852,9 +4852,7 @@ async function loadPatientConsultationSummary(patientId) {
                                     </div>
                                 `;
                             }).join('')}
-                        </div>
-                    `;
-                } else {
+                        </div>`;
                     // 有套票記錄但已全數用盡
                     packageStatusHtml = `
                         <div class="bg-gray-50 border-gray-200 border rounded-lg p-3 text-center">
@@ -4899,7 +4897,8 @@ async function loadPatientConsultationSummary(patientId) {
 
         if (totalConsultations === 0) {
             summaryContainer.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <!-- 第一行：基本統計資訊 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div class="bg-blue-50 rounded-lg p-4 text-center">
                         <div class="text-2xl font-bold text-blue-600">0</div>
                         <div class="text-sm text-blue-800">總診療次數</div>
@@ -4912,11 +4911,24 @@ async function loadPatientConsultationSummary(patientId) {
                         <div class="text-lg font-semibold text-orange-600">無安排</div>
                         <div class="text-sm text-orange-800">下次複診</div>
                     </div>
-                    <div class="bg-purple-50 rounded-lg p-4">
-                        <div class="text-sm text-purple-800 font-medium mb-2">套票狀態</div>
-                        ${packageStatusHtml}
-                    </div>
                 </div>
+
+                <!-- 第二行：套票狀態區域 -->
+                <div class="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200 mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-purple-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <h3 class="text-lg font-semibold text-purple-800">套票狀態</h3>
+                        </div>
+                        <div class="text-xs text-purple-600 bg-white px-2 py-1 rounded-full">
+                            0 個可用
+                        </div>
+                    </div>
+                    ${packageStatusHtml}
+                </div>
+
                 <div class="text-center py-8 text-gray-500">
                     <div class="text-4xl mb-2">📋</div>
                     <div>尚無診療記錄</div>
@@ -4934,9 +4946,10 @@ async function loadPatientConsultationSummary(patientId) {
         const nextFollowUp = lastConsultation.followUpDate ? 
             new Date(lastConsultation.followUpDate).toLocaleDateString('zh-TW') : '無安排';
 
-        // 更新診療摘要：僅顯示總次數、最近診療日期以及下次複診日期，不再顯示「最近診療記錄」欄
+        // 更新診療摘要：第一行顯示基本統計，第二行顯示套票狀態
         summaryContainer.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <!-- 第一行：基本統計資訊 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div class="bg-blue-50 rounded-lg p-4 text-center">
                     <div class="text-2xl font-bold text-blue-600">${totalConsultations}</div>
                     <div class="text-sm text-blue-800">總診療次數</div>
@@ -4949,15 +4962,22 @@ async function loadPatientConsultationSummary(patientId) {
                     <div class="text-lg font-semibold text-orange-600">${nextFollowUp}</div>
                     <div class="text-sm text-orange-800">下次複診</div>
                 </div>
-                <div class="bg-purple-50 rounded-lg p-4">
-                    <div class="text-sm text-purple-800 font-medium mb-3 flex items-center">
-                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            </div>
+
+            <!-- 第二行：套票狀態區域 -->
+            <div class="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 text-purple-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        套票狀態
+                        <h3 class="text-lg font-semibold text-purple-800">套票狀態</h3>
                     </div>
-                    ${packageStatusHtml}
+                    <div class="text-xs text-purple-600 bg-white px-2 py-1 rounded-full">
+                        ${Array.isArray(await getPatientPackages(patientId)) ? (await getPatientPackages(patientId)).filter(p => p.remainingUses > 0).length : 0} 個可用
+                    </div>
                 </div>
+                ${packageStatusHtml}
             </div>
         `;
 
