@@ -4740,13 +4740,13 @@ try {
         showToast('讀取病人資料失敗', 'error');
     }
 }
-// 載入病人診症記錄摘要
+// 載入病人診療記錄摘要
 async function loadPatientConsultationSummary(patientId) {
     const summaryContainer = document.getElementById('patientConsultationSummary');
 
     // 如果容器尚未渲染，直接跳過，以免對 null 設定 innerHTML
     if (!summaryContainer) {
-        console.warn('patientConsultationSummary 容器不存在，診症摘要無法載入');
+        console.warn('patientConsultationSummary 容器不存在，診療摘要無法載入');
         return;
     }
 
@@ -4757,7 +4757,7 @@ async function loadPatientConsultationSummary(patientId) {
             summaryContainer.innerHTML = `
                 <div class="text-center py-8 text-gray-500">
                     <div class="text-4xl mb-2">❌</div>
-                    <div>無法載入診症記錄</div>
+                    <div>無法載入診療記錄</div>
                 </div>
             `;
             return;
@@ -4765,11 +4765,10 @@ async function loadPatientConsultationSummary(patientId) {
 
         const consultations = result.data;
         const totalConsultations = consultations.length;
-        const lastConsultation = consultations[0]; // 最新的診症記錄
+        const lastConsultation = consultations[0]; // 最新的診療記錄
 
         // 取得並計算套票狀態
-        // 預設顯示為「無套票」，若使用者有購買套票則列出每個套票的剩餘次數與到期時間
-        let packageStatus = '無套票';
+        let packageStatusHtml = '';
         try {
             const pkgs = await getPatientPackages(patientId);
             // 如果有套票紀錄
@@ -4779,22 +4778,123 @@ async function loadPatientConsultationSummary(patientId) {
                 if (activePkgs.length > 0) {
                     // 按到期日排序，越早到期越前面顯示
                     activePkgs.sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt));
-                    // 為每一張套票建立顯示字串，格式如「套票名稱：剩餘 3/5 次 · 2025/08/30 到期（約 10 天）」
-                    const lines = activePkgs.map(pkg => {
-                        // 使用既有的 formatPackageStatus 函數取得剩餘次數和到期資訊
-                        const status = formatPackageStatus(pkg);
-                        return `${pkg.name}：${status}`;
-                    });
-                    // 以 <br/> 連接，使每張套票獨占一行
-                    packageStatus = lines.join('<br/>');
+                    
+                    packageStatusHtml = `
+                        <div class="space-y-2">
+                            ${activePkgs.map(pkg => {
+                                const status = formatPackageStatus(pkg);
+                                const expiresAt = new Date(pkg.expiresAt);
+                                const now = new Date();
+                                const daysLeft = Math.ceil((expiresAt - now) / (1000*60*60*24));
+                                
+                                // 根據剩餘天數決定顏色
+                                let statusColor = 'bg-green-50 border-green-200 text-green-800';
+                                let iconColor = 'text-green-600';
+                                let progressColor = 'bg-green-500';
+                                
+                                if (daysLeft <= 7) {
+                                    statusColor = 'bg-red-50 border-red-200 text-red-800';
+                                    iconColor = 'text-red-600';
+                                    progressColor = 'bg-red-500';
+                                } else if (daysLeft <= 30) {
+                                    statusColor = 'bg-yellow-50 border-yellow-200 text-yellow-800';
+                                    iconColor = 'text-yellow-600';
+                                    progressColor = 'bg-yellow-500';
+                                }
+                                
+                                // 計算使用進度
+                                const usagePercentage = ((pkg.totalUses - pkg.remainingUses) / pkg.totalUses) * 100;
+                                
+                                return `
+                                    <div class="relative ${statusColor} border rounded-lg p-3 transition-all duration-200 hover:shadow-md">
+                                        <!-- 套票名稱和圖標 -->
+                                        <div class="flex items-start justify-between mb-2">
+                                            <div class="flex items-center space-x-2">
+                                                <div class="${iconColor}">
+                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                    </svg>
+                                                </div>
+                                                <div class="font-semibold text-sm">${pkg.name}</div>
+                                            </div>
+                                            <div class="text-xs font-medium px-2 py-1 rounded-full bg-white bg-opacity-70">
+                                                ${daysLeft <= 0 ? '已到期' : `${daysLeft}天`}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- 使用次數和進度條 -->
+                                        <div class="space-y-2">
+                                            <div class="flex justify-between items-center text-xs">
+                                                <span>剩餘 ${pkg.remainingUses}/${pkg.totalUses} 次</span>
+                                                <span>${Math.round(100 - usagePercentage)}% 可用</span>
+                                            </div>
+                                            
+                                            <!-- 進度條 -->
+                                            <div class="w-full bg-white bg-opacity-50 rounded-full h-2">
+                                                <div class="${progressColor} h-2 rounded-full transition-all duration-300" 
+                                                     style="width: ${usagePercentage}%"></div>
+                                            </div>
+                                            
+                                            <!-- 到期日 -->
+                                            <div class="text-xs opacity-75">
+                                                到期日：${expiresAt.toLocaleDateString('zh-TW')}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- 緊急標記 -->
+                                        ${daysLeft <= 7 && daysLeft > 0 ? `
+                                            <div class="absolute -top-1 -right-1">
+                                                <span class="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
+                                                    !
+                                                </span>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
                 } else {
-                    // 有套票紀錄但已全數用盡
-                    packageStatus = '無可用套票';
+                    // 有套票記錄但已全數用盡
+                    packageStatusHtml = `
+                        <div class="bg-gray-50 border-gray-200 border rounded-lg p-3 text-center">
+                            <div class="text-gray-400 mb-1">
+                                <svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                            <div class="text-sm font-medium text-gray-600">無可用套票</div>
+                            <div class="text-xs text-gray-500 mt-1">所有套票已用完或過期</div>
+                        </div>
+                    `;
                 }
+            } else {
+                // 無套票記錄
+                packageStatusHtml = `
+                    <div class="bg-blue-50 border-blue-200 border rounded-lg p-3 text-center">
+                        <div class="text-blue-400 mb-1">
+                            <svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="text-sm font-medium text-blue-700">尚未購買套票</div>
+                        <div class="text-xs text-blue-600 mt-1">可於診療時購買套票享優惠</div>
+                    </div>
+                `;
             }
         } catch (err) {
-            console.error('獲取套票資訊失敗:', err);
-            packageStatus = '無法載入';
+            console.error('取得套票資訊失敗:', err);
+            packageStatusHtml = `
+                <div class="bg-red-50 border-red-200 border rounded-lg p-3 text-center">
+                    <div class="text-red-400 mb-1">
+                        <svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="text-sm font-medium text-red-700">載入失敗</div>
+                    <div class="text-xs text-red-600 mt-1">無法載入套票狀態</div>
+                </div>
+            `;
         }
 
         if (totalConsultations === 0) {
@@ -4802,30 +4902,30 @@ async function loadPatientConsultationSummary(patientId) {
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div class="bg-blue-50 rounded-lg p-4 text-center">
                         <div class="text-2xl font-bold text-blue-600">0</div>
-                        <div class="text-sm text-blue-800">總診症次數</div>
+                        <div class="text-sm text-blue-800">總診療次數</div>
                     </div>
                     <div class="bg-green-50 rounded-lg p-4 text-center">
                         <div class="text-lg font-semibold text-green-600">無</div>
-                        <div class="text-sm text-green-800">最近診症</div>
+                        <div class="text-sm text-green-800">最近診療</div>
                     </div>
                     <div class="bg-orange-50 rounded-lg p-4 text-center">
                         <div class="text-lg font-semibold text-orange-600">無安排</div>
                         <div class="text-sm text-orange-800">下次複診</div>
                     </div>
-                    <div class="bg-purple-50 rounded-lg p-4 text-center">
-                        <div class="text-lg font-semibold text-purple-600">${packageStatus}</div>
-                        <div class="text-sm text-purple-800">套票狀態</div>
+                    <div class="bg-purple-50 rounded-lg p-4">
+                        <div class="text-sm text-purple-800 font-medium mb-2">套票狀態</div>
+                        ${packageStatusHtml}
                     </div>
                 </div>
                 <div class="text-center py-8 text-gray-500">
                     <div class="text-4xl mb-2">📋</div>
-                    <div>尚無診症記錄</div>
+                    <div>尚無診療記錄</div>
                 </div>
             `;
             return;
         }
 
-        // 格式化最後診症日期
+        // 格式化最後診療日期
         const lastConsultationDate = lastConsultation.date ? 
             new Date(lastConsultation.date.seconds * 1000).toLocaleDateString('zh-TW') : 
             new Date(lastConsultation.createdAt.seconds * 1000).toLocaleDateString('zh-TW');
@@ -4834,39 +4934,43 @@ async function loadPatientConsultationSummary(patientId) {
         const nextFollowUp = lastConsultation.followUpDate ? 
             new Date(lastConsultation.followUpDate).toLocaleDateString('zh-TW') : '無安排';
 
-        // 更新診症摘要：僅顯示總次數、最近診症日期以及下次複診日期，不再顯示「最近診症記錄」欄
+        // 更新診療摘要：僅顯示總次數、最近診療日期以及下次複診日期，不再顯示「最近診療記錄」欄
         summaryContainer.innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div class="bg-blue-50 rounded-lg p-4 text-center">
                     <div class="text-2xl font-bold text-blue-600">${totalConsultations}</div>
-                    <div class="text-sm text-blue-800">總診症次數</div>
+                    <div class="text-sm text-blue-800">總診療次數</div>
                 </div>
                 <div class="bg-green-50 rounded-lg p-4 text-center">
                     <div class="text-lg font-semibold text-green-600">${lastConsultationDate}</div>
-                    <div class="text-sm text-green-800">最近診症</div>
+                    <div class="text-sm text-green-800">最近診療</div>
                 </div>
                 <div class="bg-orange-50 rounded-lg p-4 text-center">
                     <div class="text-lg font-semibold text-orange-600">${nextFollowUp}</div>
                     <div class="text-sm text-orange-800">下次複診</div>
                 </div>
-                <div class="bg-purple-50 rounded-lg p-4 text-center">
-                    <div class="text-lg font-semibold text-purple-600">${packageStatus}</div>
-                    <div class="text-sm text-purple-800">套票狀態</div>
+                <div class="bg-purple-50 rounded-lg p-4">
+                    <div class="text-sm text-purple-800 font-medium mb-3 flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        套票狀態
+                    </div>
+                    ${packageStatusHtml}
                 </div>
             </div>
         `;
 
     } catch (error) {
-        console.error('載入診症記錄摘要錯誤:', error);
+        console.error('載入診療記錄摘要錯誤:', error);
         summaryContainer.innerHTML = `
             <div class="text-center py-8 text-gray-500">
                 <div class="text-4xl mb-2">❌</div>
-                <div>載入診症記錄失敗</div>
+                <div>載入診療記錄失敗</div>
             </div>
         `;
     }
 }
-
         
 // 更新統計功能
 async function updateStatistics() {
