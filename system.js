@@ -6055,8 +6055,7 @@ async function initializeSystemAfterLogin() {
         // 更新收費項目顯示
         function updateBillingDisplay() {
             const container = document.getElementById('selectedBillingItems');
-            // 移除所有套票類型項目，確保診症系統不含套票
-            selectedBillingItems = selectedBillingItems.filter(item => item.category !== 'package' && item.category !== 'packageUse');
+            // 套票項目與套票使用項目也應顯示於收費清單，故不過濾
             const hiddenTextarea = document.getElementById('formBillingItems');
             const totalAmountSpan = document.getElementById('totalBillingAmount');
             
@@ -8084,6 +8083,82 @@ async function refreshPatientPackagesUI() {
     const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
     if (!appointment) return;
     await renderPatientPackages(appointment.patientId);
+    // 每次刷新患者套票時，同步刷新可購買套票列表
+    if (typeof populatePackageSelect === 'function') {
+        await populatePackageSelect();
+    }
+}
+
+// 載入可購買的套票列表至下拉選單
+async function populatePackageSelect() {
+    const select = document.getElementById('packageItemSelect');
+    if (!select) return;
+    // 若 billingItems 尚未載入，嘗試初始化
+    if (!billingItems || billingItems.length === 0) {
+        if (typeof initBillingItems === 'function') {
+            try {
+                await initBillingItems();
+            } catch (e) {
+                console.error('初始化收費項目失敗:', e);
+            }
+        }
+    }
+    // 過濾出所有啟用的套票項目
+    const packageItems = Array.isArray(billingItems) ? billingItems.filter(item => item.category === 'package' && item.active) : [];
+    let options = '<option value="">--請選擇套票--</option>';
+    packageItems.forEach(item => {
+        options += `<option value="${item.id}">${item.name} ($${item.price})</option>`;
+    });
+    select.innerHTML = options;
+}
+
+// 根據選擇的套票購買並加入收費項目清單
+async function purchaseSelectedPackage() {
+    const select = document.getElementById('packageItemSelect');
+    if (!select) return;
+    const itemId = select.value;
+    if (!itemId) {
+        showToast('請選擇套票項目', 'warning');
+        return;
+    }
+    const item = billingItems.find(i => String(i.id) === String(itemId));
+    if (!item) {
+        showToast('找不到套票項目', 'error');
+        return;
+    }
+    // 取得當前掛號對應的病人 ID
+    const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+    if (!appointment) {
+        showToast('系統錯誤：找不到掛號記錄', 'error');
+        return;
+    }
+    const patientId = appointment.patientId;
+    // 呼叫購買套票函式，將套票記錄保存至 Firebase
+    const record = await purchasePackage(patientId, item);
+    if (record) {
+        // 將此購買紀錄加入收費項目，以便財務統計
+        const existingIndex = selectedBillingItems.findIndex(b => b.id === item.id && b.category === 'package');
+        if (existingIndex !== -1) {
+            selectedBillingItems[existingIndex].quantity += 1;
+        } else {
+            selectedBillingItems.push({
+                id: item.id,
+                name: item.name,
+                category: 'package',
+                price: item.price,
+                unit: item.unit,
+                description: item.description,
+                packageUses: item.packageUses,
+                validityDays: item.validityDays,
+                quantity: 1
+            });
+        }
+        updateBillingDisplay();
+        await refreshPatientPackagesUI();
+        showToast(`已購買套票：${item.name}`, 'success');
+    } else {
+        showToast('購買套票失敗', 'error');
+    }
 }
 
 async function useOnePackage(patientId, packageRecordId) {
@@ -8692,4 +8767,6 @@ document.addEventListener('DOMContentLoaded', function() {
   window.updateRestPeriod = updateRestPeriod;
   window.useOnePackage = useOnePackage;
   window.undoPackageUse = undoPackageUse;
+  window.populatePackageSelect = populatePackageSelect;
+  window.purchaseSelectedPackage = purchaseSelectedPackage;
 })();
