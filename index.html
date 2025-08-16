@@ -701,6 +701,14 @@
                                         <!-- 動態載入 -->
                                         <div class="text-gray-500">尚未載入或無套票</div>
                                       </div>
+                                      <!-- 新增：購買套票功能 -->
+                                      <div id="purchasePackageSection" class="mt-2">
+                                        <div class="text-xs font-semibold text-purple-800 mb-1">購買套票</div>
+                                        <div class="flex items-center space-x-2">
+                                          <select id="packageItemSelect" class="flex-1 border border-purple-300 rounded p-1 text-sm"></select>
+                                          <button type="button" onclick="purchaseSelectedPackage()" class="bg-purple-600 text-white text-xs px-2 py-1 rounded hover:bg-purple-700">購買</button>
+                                        </div>
+                                      </div>
                                     </div>
                                 </div>
                                 
@@ -1476,5 +1484,6 @@
     <script src="system.js"></script>
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96fff8295ffc02c6","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 </body>
 </html>
