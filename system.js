@@ -8250,15 +8250,15 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         }
         const updatedPackage = {
             ...pkg,
-            // 將剩餘次數加1，如果不存在則視為0
+            // 將剩餘次數加 1，如果不存在則視為 0
             remainingUses: (pkg.remainingUses || 0) + 1
         };
         const result = await window.firebaseDataManager.updatePatientPackage(pkgId, updatedPackage);
         if (result && result.success) {
             /*
-             * 當套票使用項目的 quantity 大於 1 時，代表在同一次病歷中使用了多次。
-             * 此時取消一次應僅減少數量，並退回一次套票次數，而非直接刪除整個項目。
-             * 若 quantity 為 1，則可將該項目從列表中移除。
+             * 如果套票使用項目的數量大於 1，代表當次診症已抵扣多次。
+             * 此時取消使用只應減少數量並退回一次，並保留項目；
+             * 若數量為 1，則從列表中移除該項目。
              */
             const currentItem = selectedBillingItems.find(it => it.id === usageItemId);
             if (currentItem && typeof currentItem.quantity === 'number' && currentItem.quantity > 1) {
@@ -8690,7 +8690,7 @@ class FirebaseDataManager {
             const packages = [];
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
-                // 以字串比較避免型別不一致導致匹配失敗
+                // 以字串比較避免 patientId 型別不一致導致匹配失敗
                 if (String(data.patientId) === String(patientId)) {
                     packages.push({ id: doc.id, ...data });
                 }
