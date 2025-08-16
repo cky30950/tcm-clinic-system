@@ -6195,8 +6195,12 @@ async function initializeSystemAfterLogin() {
                                         onclick="undoPackageUse('${patientIdForUndo}', '${packageRecordIdForUndo}', '${item.id}')"
                                     >取消使用</button>
                                 ` : '';
-                        // 數量控制區：套票使用項目不顯示加減號
-                        const quantityControls = isPackageUse ? '' : `
+                        // 數量控制區：套票使用項目僅顯示次數，不提供加減按鈕
+                        const quantityControls = isPackageUse ? `
+                                <div class="flex items-center space-x-2 mr-3">
+                                    <span class="w-8 text-center font-semibold">${item.quantity}</span>
+                                </div>
+                        ` : `
                                 <div class="flex items-center space-x-2 mr-3">
                                     <button onclick="updateBillingQuantity(${originalIndex}, -1)" class="w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition duration-200">-</button>
                                     <span class="w-8 text-center font-semibold">${item.quantity}</span>
@@ -8251,8 +8255,17 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         };
         const result = await window.firebaseDataManager.updatePatientPackage(pkgId, updatedPackage);
         if (result && result.success) {
-            // 從選擇的收費項目中移除該項目
-            selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
+            /*
+             * 當套票使用項目的 quantity 大於 1 時，代表在同一次病歷中使用了多次。
+             * 此時取消一次應僅減少數量，並退回一次套票次數，而非直接刪除整個項目。
+             * 若 quantity 為 1，則可將該項目從列表中移除。
+             */
+            const currentItem = selectedBillingItems.find(it => it.id === usageItemId);
+            if (currentItem && typeof currentItem.quantity === 'number' && currentItem.quantity > 1) {
+                currentItem.quantity -= 1;
+            } else {
+                selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
+            }
             updateBillingDisplay();
             await refreshPatientPackagesUI();
             showToast('已取消本次套票使用，次數已退回', 'success');
@@ -8667,7 +8680,6 @@ class FirebaseDataManager {
     }
 
     async getPatientPackages(patientId) {
-        // 確保資料管理器已準備
         if (!this.isReady) return { success: false, data: [] };
 
         try {
@@ -8678,7 +8690,7 @@ class FirebaseDataManager {
             const packages = [];
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
-                // 使用字串比較，以避免 patientId 為數字或字串時無法匹配
+                // 以字串比較避免型別不一致導致匹配失敗
                 if (String(data.patientId) === String(patientId)) {
                     packages.push({ id: doc.id, ...data });
                 }
