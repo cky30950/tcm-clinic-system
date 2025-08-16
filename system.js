@@ -6828,8 +6828,13 @@ const consultationDate = (() => {
                 parseBillingItemsFromText(consultation.billingItems);
 
                 // 嘗試為舊記錄補全套票使用的 meta 資訊（patientId 與 packageRecordId）
+                // Note: use the current appointment's patientId instead of a non-existent variable
+                // "appointment" is not defined in this scope, which previously caused restorePackageUseMeta
+                // to be invoked with an undefined patientId. Without a valid patientId, the helper could not
+                // locate the correct packageRecordId for each package use item, making it impossible to undo
+                // package usage when editing existing records. We instead pass currentAppointment.patientId.
                 try {
-                    await restorePackageUseMeta(appointment.patientId);
+                    await restorePackageUseMeta(currentAppointment.patientId);
                 } catch (e) {
                     console.error('恢復套票使用 meta 錯誤:', e);
                 }
