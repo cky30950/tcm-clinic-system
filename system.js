@@ -4720,18 +4720,27 @@ async function loadPatientConsultationSummary(patientId) {
         const lastConsultation = consultations[0]; // 最新的診症記錄
 
         // 取得並計算套票狀態
+        // 預設顯示為「無套票」，若使用者有購買套票則列出每個套票的剩餘次數與到期時間
         let packageStatus = '無套票';
         try {
             const pkgs = await getPatientPackages(patientId);
-            // 若存在有效套票（剩餘次數 > 0），取即將到期的第一個
+            // 如果有套票紀錄
             if (Array.isArray(pkgs) && pkgs.length > 0) {
-                const activePkgs = pkgs.filter(p => p.remainingUses > 0);
+                // 只顯示有剩餘次數的套票
+                const activePkgs = pkgs.filter(p => p && p.remainingUses > 0);
                 if (activePkgs.length > 0) {
-                    activePkgs.sort((a,b) => new Date(a.expiresAt) - new Date(b.expiresAt));
-                    const pkg = activePkgs[0];
-                    packageStatus = formatPackageStatus(pkg);
+                    // 按到期日排序，越早到期越前面顯示
+                    activePkgs.sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt));
+                    // 為每一張套票建立顯示字串，格式如「套票名稱：剩餘 3/5 次 · 2025/08/30 到期（約 10 天）」
+                    const lines = activePkgs.map(pkg => {
+                        // 使用既有的 formatPackageStatus 函數取得剩餘次數和到期資訊
+                        const status = formatPackageStatus(pkg);
+                        return `${pkg.name}：${status}`;
+                    });
+                    // 以 <br/> 連接，使每張套票獨占一行
+                    packageStatus = lines.join('<br/>');
                 } else {
-                    // 有購買紀錄但無可用次數
+                    // 有套票紀錄但已全數用盡
                     packageStatus = '無可用套票';
                 }
             }
