@@ -1610,7 +1610,25 @@ try {
             selectedBillingItems = [];
             if (consultation.billingItems) {
                 document.getElementById('formBillingItems').value = consultation.billingItems;
+                // 解析舊病歷中的收費項目
                 parseBillingItemsFromText(consultation.billingItems);
+                // 嘗試為舊病歷載入的套票使用項目補全 meta（patientId 和 packageRecordId），
+                // 優先使用診症記錄中的 patientId，若不存在再嘗試使用當前掛號（currentConsultingAppointmentId）推斷。
+                try {
+                    // 優先使用 consultation.patientId，如果資料庫中有存儲病人 ID
+                    let pid = consultation && consultation.patientId ? consultation.patientId : null;
+                    // 如果 consultation.patientId 不存在，退而使用當前掛號的病人 ID
+                    if (!pid && typeof currentConsultingAppointmentId !== 'undefined' && Array.isArray(appointments)) {
+                        const appt = appointments.find(ap => ap && ap.id === currentConsultingAppointmentId);
+                        if (appt) pid = appt.patientId;
+                    }
+                    if (pid) {
+                        await restorePackageUseMeta(pid);
+                    }
+                } catch (e) {
+                    console.error('載入舊病歷時恢復套票 meta 失敗:', e);
+                }
+                // 更新顯示
                 updateBillingDisplay();
             }
             
