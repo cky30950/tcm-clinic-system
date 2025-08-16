@@ -2139,6 +2139,16 @@ async function showConsultationForm(appointment) {
         if (appointment.status === 'completed' && appointment.consultationId) {
             // 編輯模式：從 Firebase 載入現有診症記錄
             await loadConsultationForEdit(appointment.consultationId);
+            // 在編輯模式下，恢復套票使用的 meta 以便可取消或增加
+            try {
+                if (typeof window.restorePackageUseMeta === 'function') {
+                    await window.restorePackageUseMeta(patient.id);
+                    // 更新收費顯示，以便顯示「取消使用」按鈕和正確的數量控制
+                    updateBillingDisplay();
+                }
+            } catch (e) {
+                console.error('恢復套票 meta 錯誤:', e);
+            }
         } else {
             // 新診症模式：使用空白表單
             clearConsultationForm();
@@ -6188,8 +6198,9 @@ async function initializeSystemAfterLogin() {
                                         onclick="undoPackageUse('${item.patientId}', '${item.packageRecordId}', '${item.id}')"
                                     >取消使用</button>
                                 ` : '';
-                        // 數量控制區：套票使用項目不顯示加減號
-                        const quantityControls = isPackageUse ? '' : `
+                        // 數量控制區：無論是否為套票使用皆顯示加減號。
+                        // 對於套票使用項目，「-」按鈕會取消一次使用並退回次數，而「+」按鈕會再消耗一次套票。
+                        const quantityControls = `
                                 <div class="flex items-center space-x-2 mr-3">
                                     <button onclick="updateBillingQuantity(${originalIndex}, -1)" class="w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition duration-200">-</button>
                                     <span class="w-8 text-center font-semibold">${item.quantity}</span>
@@ -6302,12 +6313,20 @@ async function initializeSystemAfterLogin() {
         function updateBillingQuantity(index, change) {
             if (index >= 0 && index < selectedBillingItems.length) {
                 const item = selectedBillingItems[index];
-                // 如果是套票使用，且 change < 0，直接取消使用並退回次數
-                if (change < 0 && item.category === 'packageUse') {
-                    // 調用取消函式，這會自動移除該筆記錄並退回次數
-                    undoPackageUse(item.patientId, item.packageRecordId, item.id);
+                // 套票使用項目在數量變動時有特殊處理：
+                // 點擊減號時視為取消一次使用；點擊加號時視為再使用一次。
+                if (item.category === 'packageUse') {
+                    if (change < 0) {
+                        // 取消使用：退回一次套票
+                        undoPackageUse(item.patientId, item.packageRecordId, item.id);
+                    } else if (change > 0) {
+                        // 增加使用：再消耗一次套票
+                        // 呼叫 useOnePackage 會在成功後自動將新增的使用記錄加入 selectedBillingItems 並更新介面。
+                        useOnePackage(item.patientId, item.packageRecordId);
+                    }
                     return;
                 }
+                // 非套票使用項目：按照一般邏輯增減數量
                 const newQuantity = item.quantity + change;
                 if (newQuantity > 0) {
                     selectedBillingItems[index].quantity = newQuantity;
@@ -6664,6 +6683,8 @@ function parseBillingItemsFromText(billingText) {
             } else {
                 // 處理套票使用項目（從舊病歷載入的情況）
                 if (itemName.includes('（使用套票）') || itemName.includes('(使用套票)')) {
+                    // 載入舊病歷中的套票使用項目。為了讓使用者在編輯病歷時仍可取消或增加套票使用，
+                    // 不再標記為歷史記錄，並保留 patientId 與 packageRecordId 為空值以便後續恢復。
                     selectedBillingItems.push({
                         id: `loaded-packageUse-${Date.now()}-${Math.random().toString(36).substr(2,5)}`,
                         name: itemName,
@@ -6672,8 +6693,7 @@ function parseBillingItemsFromText(billingText) {
                         unit: '次',
                         description: '套票抵扣一次',
                         quantity: quantity,
-                        // 標記為從舊病歷載入，無法退回
-                        isHistorical: true,
+                        // patientId 和 packageRecordId 會在編輯模式下透過 restorePackageUseMeta 恢復
                         patientId: null,
                         packageRecordId: null
                     });
