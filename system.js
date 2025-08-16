@@ -64,7 +64,7 @@ let appointments = [];
         }
         
         // 計算年齡函數
-        function calculateAge(birthDate) {
+function calculateAge(birthDate) {
             const birth = new Date(birthDate);
             const today = new Date();
             let age = today.getFullYear() - birth.getFullYear();
@@ -341,6 +341,27 @@ async function attemptMainLogin() {
         loginButton.textContent = originalText;
         loginButton.disabled = false;
     }
+}
+
+/**
+ * 取得目前用戶的顯示名稱，用於記錄 createdBy / updatedBy 欄位。
+ * 優先使用 currentUserData.name，若不存在則退回 currentUser 或預設 'system'。
+ */
+function getCurrentUserName() {
+    // 如果有完整的用戶資料且包含姓名，優先使用姓名
+    if (currentUserData && currentUserData.name) {
+        return currentUserData.name;
+    }
+    // 若有用戶資料的 username，通常是 Firebase UID 或 email 前綴，作為次選
+    if (currentUserData && currentUserData.username) {
+        return currentUserData.username;
+    }
+    // 若全域 currentUser 仍有值，也可以返回
+    if (currentUser) {
+        return currentUser;
+    }
+    // 最後返回 system
+    return 'system';
 }
 
 // 同步 Firebase 用戶數據到本地
@@ -1281,7 +1302,8 @@ async function selectPatientForRegistration(patientId) {
                 chiefComplaint: chiefComplaint || '無特殊主訴',
                 status: 'registered', // registered, waiting, consulting, completed
                 createdAt: new Date().toISOString(),
-                createdBy: currentUserData ? currentUserData.username : currentUser
+                // 使用顯示名稱作為建立者，避免顯示亂碼
+                createdBy: getCurrentUserName()
             };
 
             try {
@@ -2139,6 +2161,16 @@ async function showConsultationForm(appointment) {
         if (appointment.status === 'completed' && appointment.consultationId) {
             // 編輯模式：從 Firebase 載入現有診症記錄
             await loadConsultationForEdit(appointment.consultationId);
+            // 在編輯模式下，恢復套票使用的 meta 以便可取消或增加
+            try {
+                if (typeof window.restorePackageUseMeta === 'function') {
+                    await window.restorePackageUseMeta(patient.id);
+                    // 更新收費顯示，以便顯示「取消使用」按鈕和正確的數量控制
+                    updateBillingDisplay();
+                }
+            } catch (e) {
+                console.error('恢復套票 meta 錯誤:', e);
+            }
         } else {
             // 新診症模式：使用空白表單
             clearConsultationForm();
@@ -2441,7 +2473,7 @@ async function saveConsultation() {
                 // Update local cache if present
                 const idx = consultations.findIndex(c => c.id === appointment.consultationId);
                 if (idx >= 0) {
-                    consultations[idx] = { ...consultations[idx], ...consultationData, updatedAt: new Date(), updatedBy: currentUser };
+                    consultations[idx] = { ...consultations[idx], ...consultationData, updatedAt: new Date(), updatedBy: getCurrentUserName() };
                 }
                 showToast('診症記錄已更新！', 'success');
             } else {
@@ -6180,7 +6212,7 @@ async function initializeSystemAfterLogin() {
                         // errors when the event handler is parsed. To avoid this we wrap every
                         // argument in single quotes so that they're passed as strings. The handler
                         // itself will convert them back to the appropriate types if necessary.
-                        const canUndo = isPackageUse && item.patientId && item.packageRecordId;
+                        const canUndo = isPackageUse && item.patientId && item.packageRecordId && !item.isHistorical;
                         const undoBtn = canUndo ? `
                                     <button
                                         type="button"
@@ -6188,8 +6220,9 @@ async function initializeSystemAfterLogin() {
                                         onclick="undoPackageUse('${item.patientId}', '${item.packageRecordId}', '${item.id}')"
                                     >取消使用</button>
                                 ` : '';
-                        // 數量控制區：套票使用項目不顯示加減號
-                        const quantityControls = isPackageUse ? '' : `
+                        // 數量控制區：無論是否為套票使用皆顯示加減號。
+                        // 對於套票使用項目，「-」按鈕會取消一次使用並退回次數，而「+」按鈕會再消耗一次套票。
+                        const quantityControls = `
                                 <div class="flex items-center space-x-2 mr-3">
                                     <button onclick="updateBillingQuantity(${originalIndex}, -1)" class="w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition duration-200">-</button>
                                     <span class="w-8 text-center font-semibold">${item.quantity}</span>
@@ -6302,12 +6335,20 @@ async function initializeSystemAfterLogin() {
         function updateBillingQuantity(index, change) {
             if (index >= 0 && index < selectedBillingItems.length) {
                 const item = selectedBillingItems[index];
-                // 如果是套票使用，且 change < 0，直接取消使用並退回次數
-                if (change < 0 && item.category === 'packageUse') {
-                    // 調用取消函式，這會自動移除該筆記錄並退回次數
-                    undoPackageUse(item.patientId, item.packageRecordId, item.id);
+                // 套票使用項目在數量變動時有特殊處理：
+                // 點擊減號時視為取消一次使用；點擊加號時視為再使用一次。
+                if (item.category === 'packageUse') {
+                    if (change < 0) {
+                        // 取消使用：退回一次套票
+                        undoPackageUse(item.patientId, item.packageRecordId, item.id);
+                    } else if (change > 0) {
+                        // 增加使用：再消耗一次套票
+                        // 呼叫 useOnePackage 會在成功後自動將新增的使用記錄加入 selectedBillingItems 並更新介面。
+                        useOnePackage(item.patientId, item.packageRecordId);
+                    }
                     return;
                 }
+                // 非套票使用項目：按照一般邏輯增減數量
                 const newQuantity = item.quantity + change;
                 if (newQuantity > 0) {
                     selectedBillingItems[index].quantity = newQuantity;
@@ -6626,66 +6667,66 @@ updateBillingDisplay();
     }
         }
         
-        // 解析收費項目文字並載入
-        function parseBillingItemsFromText(billingText) {
-            if (!billingText) {
-                return;
-            }
+// 解析收費項目文字並載入
+function parseBillingItemsFromText(billingText) {
+    if (!billingText) {
+        return;
+    }
+    
+    // 解析上次收費項目
+    const billingLines = billingText.split('\n');
+    
+    billingLines.forEach(line => {
+        line = line.trim();
+        if (!line || line.includes('小計') || line.includes('總費用')) return;
+        
+        // 解析收費項目格式：項目名 x數量 = $金額 或 項目名 x數量 = -$金額
+        const itemMatch = line.match(/^(.+?)\s+x(\d+)\s+=\s+([\-\$]?\d+)$/);
+        if (itemMatch) {
+            const itemName = itemMatch[1].trim();
+            const quantity = parseInt(itemMatch[2]);
             
-            // 解析上次收費項目
-            const billingLines = billingText.split('\n');
+            // 在收費項目中尋找對應的項目
+            const billingItem = billingItems.find(item => 
+                item.active && item.name === itemName
+            );
             
-            billingLines.forEach(line => {
-                line = line.trim();
-                if (!line || line.includes('小計') || line.includes('總費用')) return;
-                
-                // 解析收費項目格式：項目名 x數量 = $金額 或 項目名 x數量 = -$金額
-                const itemMatch = line.match(/^(.+?)\s+x(\d+)\s+=\s+([\-\$]?\d+)$/);
-                if (itemMatch) {
-                    const itemName = itemMatch[1].trim();
-                    const quantity = parseInt(itemMatch[2]);
-                    
-                    // 在收費項目中尋找對應的項目
-                    const billingItem = billingItems.find(item => 
-                        item.active && item.name === itemName
-                    );
-                    
-                    if (billingItem) {
-                        const selectedItem = {
-                            id: billingItem.id,
-                            name: billingItem.name,
-                            category: billingItem.category,
-                            price: billingItem.price,
-                            unit: billingItem.unit,
-                            description: billingItem.description,
-                            quantity: quantity
-                        };
-                        selectedBillingItems.push(selectedItem);
-                    } else {
-                        // 如果在收費項目中找不到，嘗試處理動態產生的套票使用項目
-                        // 套票使用項目在保存時的格式為「名稱（使用套票） x數量 = $0」
-                        // 我們需要將此類項目重新載入到 selectedBillingItems 中，並標記為 packageUse
-                        if (itemName.includes('（使用套票）') || itemName.includes('(使用套票)')) {
-                            selectedBillingItems.push({
-                                id: `loaded-packageUse-${Date.now()}-${Math.random().toString(36).substr(2,5)}`,
-                                name: itemName,
-                                category: 'packageUse',
-                                price: 0,
-                                unit: '次',
-                                description: '套票抵扣一次',
-                                quantity: quantity,
-                                // 保存的病歷不含 patientId、packageRecordId，留空避免顯示取消使用按鈕
-                                patientId: null,
-                                packageRecordId: null
-                            });
-                        } else {
-                            // 如果在收費項目中找不到，創建一個臨時項目（用於已刪除的收費項目）
-                            console.log(`找不到收費項目：${itemName}，可能已被刪除`);
-                        }
-                    }
+            if (billingItem) {
+                const selectedItem = {
+                    id: billingItem.id,
+                    name: billingItem.name,
+                    category: billingItem.category,
+                    price: billingItem.price,
+                    unit: billingItem.unit,
+                    description: billingItem.description,
+                    quantity: quantity
+                };
+                selectedBillingItems.push(selectedItem);
+            } else {
+                // 處理套票使用項目（從舊病歷載入的情況）
+                if (itemName.includes('（使用套票）') || itemName.includes('(使用套票)')) {
+                    // 載入舊病歷中的套票使用項目。為了讓使用者在編輯病歷時仍可取消或增加套票使用，
+                    // 不再標記為歷史記錄，並保留 patientId 與 packageRecordId 為空值以便後續恢復。
+                    selectedBillingItems.push({
+                        id: `loaded-packageUse-${Date.now()}-${Math.random().toString(36).substr(2,5)}`,
+                        name: itemName,
+                        category: 'packageUse',
+                        price: 0,
+                        unit: '次',
+                        description: '套票抵扣一次',
+                        quantity: quantity,
+                        // patientId 和 packageRecordId 會在編輯模式下透過 restorePackageUseMeta 恢復
+                        patientId: null,
+                        packageRecordId: null
+                    });
+                } else {
+                    // 如果在收費項目中找不到，創建一個臨時項目（用於已刪除的收費項目）
+                    console.log(`找不到收費項目：${itemName}，可能已被刪除`);
                 }
-            });
+            }
         }
+    });
+}
         
         // 載入上次收費項目（內部函數 - 保留向後兼容）
         function loadPreviousBillingItemsFromConsultation(lastConsultation) {
@@ -6827,15 +6868,15 @@ const consultationDate = (() => {
                 // 解析並載入收費項目
                 parseBillingItemsFromText(consultation.billingItems);
 
-                // 嘗試為舊記錄補全套票使用的 meta 資訊（patientId 與 packageRecordId）
-                try {
-                    await restorePackageUseMeta(appointment.patientId);
-                } catch (e) {
-                    console.error('恢復套票使用 meta 錯誤:', e);
-                }
+// 嘗試為舊記錄補全套票使用的 meta 資訊（patientId 與 packageRecordId）
+try {
+    await restorePackageUseMeta(appointment.patientId);
+} catch (e) {
+    console.error('恢復套票使用 meta 錯誤:', e);
+}
 
-                // 更新收費顯示
-                updateBillingDisplay();
+// 更新收費顯示
+updateBillingDisplay();
             } else {
                 // 清空收費項目
                 document.getElementById('formBillingItems').value = '';
@@ -8140,23 +8181,50 @@ async function useOnePackage(patientId, packageRecordId) {
 }
 
 async function undoPackageUse(patientId, packageRecordId, usageItemId) {
+    // 嘗試恢復缺失的套票 meta，以便舊病歷也能取消使用
     try {
-        const packages = await getPatientPackages(patientId);
-        const pkg = packages.find(p => p.id === packageRecordId);
-        
+        // restorePackageUseMeta 會根據 patientId 嘗試為所有缺失的套票使用項目補全 patientId 和 packageRecordId
+        if (typeof restorePackageUseMeta === 'function') {
+            await restorePackageUseMeta(patientId);
+        }
+    } catch (e) {
+        console.error('恢復套票使用 meta 錯誤:', e);
+    }
+    // 重新取得使用項目資料
+    const item = selectedBillingItems.find(it => it.id === usageItemId);
+    if (!item) {
+        // 找不到項目，可能已被刪除
+        showToast('找不到套票使用項目', 'warning');
+        return;
+    }
+    // 如果為舊病歷(歷史)或缺少病人/套票資訊，則僅移除項目，不嘗試退回次數
+    if (item.isHistorical || !item.patientId || !item.packageRecordId) {
+        // 從選擇的收費項目中移除該項目
+        selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
+        updateBillingDisplay();
+        // 不需要刷新套票列表，因為沒有變動
+        showToast('已移除套票使用項目，未退回次數', 'info');
+        return;
+    }
+    // 以項目中的 packageRecordId 為準
+    const pkgId = item.packageRecordId;
+    try {
+        const packages = await getPatientPackages(item.patientId || patientId);
+        const pkg = packages.find(p => p.id === pkgId);
         if (!pkg) {
-            showToast('找不到對應的套票，無法取消', 'warning');
+            // 找不到對應的套票，直接移除項目
+            selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
+            updateBillingDisplay();
+            showToast('找不到對應的套票，已移除項目', 'warning');
             return;
         }
-        
         const updatedPackage = {
             ...pkg,
             remainingUses: pkg.remainingUses + 1
         };
-        
-        const result = await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
-        
+        const result = await window.firebaseDataManager.updatePatientPackage(pkgId, updatedPackage);
         if (result.success) {
+            // 從選擇的收費項目中移除該項目
             selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
             updateBillingDisplay();
             await refreshPatientPackagesUI();
@@ -8179,7 +8247,9 @@ async function restorePackageUseMeta(patientId) {
         // 遍歷已選擇的收費項目，尋找缺乏 meta 的套票使用項目
         selectedBillingItems.forEach(item => {
             const isPackageUse = item && (item.category === 'packageUse' || (item.name && (item.name.includes('（使用套票）') || item.name.includes('(使用套票)'))));
-            if (isPackageUse && (!item.patientId || !item.packageRecordId)) {
+                if (isPackageUse && (item.isHistorical || !item.patientId || !item.packageRecordId)) {
+                // 即便標記為歷史記錄，也嘗試恢復 meta 以便可以取消使用
+                
                 // 補充病人ID
                 item.patientId = patientId;
                 // 從名稱中移除後綴以找出套票名稱，例如「推拿療程（使用套票）」→「推拿療程」
@@ -8195,6 +8265,8 @@ async function restorePackageUseMeta(patientId) {
                 const candidates = packages.filter(p => p.name === baseName);
                 if (candidates.length === 1) {
                     item.packageRecordId = candidates[0].id;
+                    // 找到對應的套票，取消歷史標記
+                    item.isHistorical = false;
                 } else if (candidates.length > 1) {
                     // 如果有多個同名套票，選擇已使用次數最多的那一個
                     let chosen = candidates[0];
@@ -8206,8 +8278,12 @@ async function restorePackageUseMeta(patientId) {
                         }
                     }
                     item.packageRecordId = chosen.id;
+                    // 找到對應的套票，取消歷史標記
+                    item.isHistorical = false;
+                } else {
+                    // 找不到匹配的套票，保持歷史記錄狀態
+                    item.isHistorical = true;
                 }
-                // 如果找不到匹配，保持為 null，屆時取消時會出現找不到套票的提示
             }
         });
     } catch (error) {
@@ -8246,7 +8322,7 @@ class FirebaseDataManager {
                     ...patientData,
                     createdAt: new Date(),
                     updatedAt: new Date(),
-                    createdBy: currentUser || 'system'
+                    createdBy: getCurrentUserName()
                 }
             );
             
@@ -8287,7 +8363,7 @@ class FirebaseDataManager {
                 {
                     ...patientData,
                     updatedAt: new Date(),
-                    updatedBy: currentUser || 'system'
+                    updatedBy: getCurrentUserName()
                 }
             );
             return { success: true };
@@ -8323,7 +8399,7 @@ class FirebaseDataManager {
                 {
                     ...consultationData,
                     createdAt: new Date(),
-                    createdBy: currentUser
+                    createdBy: getCurrentUserName()
                 }
             );
             
@@ -8364,7 +8440,7 @@ class FirebaseDataManager {
                 {
                     ...consultationData,
                     updatedAt: new Date(),
-                    updatedBy: currentUser
+                    updatedBy: getCurrentUserName()
                 }
             );
             return { success: true };
@@ -8411,7 +8487,7 @@ class FirebaseDataManager {
                     ...userData,
                     createdAt: new Date(),
                     updatedAt: new Date(),
-                    createdBy: currentUser || 'system'
+                    createdBy: getCurrentUserName()
                 }
             );
             
@@ -8452,7 +8528,7 @@ class FirebaseDataManager {
                 {
                     ...userData,
                     updatedAt: new Date(),
-                    updatedBy: currentUser || 'system'
+                    updatedBy: getCurrentUserName()
                 }
             );
             return { success: true };
@@ -8551,7 +8627,7 @@ class FirebaseDataManager {
                 {
                     ...packageData,
                     createdAt: new Date(),
-                    createdBy: currentUser || 'system'
+                    createdBy: getCurrentUserName()
                 }
             );
             
@@ -8593,7 +8669,7 @@ class FirebaseDataManager {
                 {
                     ...packageData,
                     updatedAt: new Date(),
-                    updatedBy: currentUser || 'system'
+                    updatedBy: getCurrentUserName()
                 }
             );
             return { success: true };
