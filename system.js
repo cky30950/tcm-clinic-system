@@ -7992,10 +7992,18 @@ async function deleteUser(id) {
         
 // 套票管理函式
 async function getPatientPackages(patientId) {
+    // 等待數據管理器準備就緒，避免初始化過程中返回空陣列
     if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+        // 最多等待5秒（100 * 50ms），防止無限等待
+        for (let i = 0; i < 100 && (!window.firebaseDataManager || !window.firebaseDataManager.isReady); i++) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+    }
+    // 如果仍未就緒，回傳空陣列並警告
+    if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+        console.warn('FirebaseDataManager 尚未就緒，無法取得患者套票');
         return [];
     }
-    
     try {
         const result = await window.firebaseDataManager.getPatientPackages(patientId);
         return result.success ? result.data : [];
@@ -8146,6 +8154,12 @@ async function useOnePackage(patientId, packageRecordId) {
 }
 
 async function undoPackageUse(patientId, packageRecordId, usageItemId) {
+    // 等待 Firebase 數據管理器準備好，避免在初始化過程中無法更新套票
+    if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+        for (let i = 0; i < 100 && (!window.firebaseDataManager || !window.firebaseDataManager.isReady); i++) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+    }
     // 嘗試恢復缺失的套票 meta，以便舊病歷也能取消使用
     try {
         // restorePackageUseMeta 會根據 patientId 嘗試為所有缺失的套票使用項目補全 patientId 和 packageRecordId
@@ -8162,19 +8176,29 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         showToast('找不到套票使用項目', 'warning');
         return;
     }
-    // 如果為舊病歷(歷史)或缺少病人/套票資訊，則僅移除項目，不嘗試退回次數
-    if (item.isHistorical || !item.patientId || !item.packageRecordId) {
-        // 從選擇的收費項目中移除該項目
+    // 若 patientId 或 packageRecordId 缺失，嘗試使用傳入的參數填充
+    if (!item.patientId && patientId) {
+        item.patientId = patientId;
+    }
+    if (!item.packageRecordId && packageRecordId) {
+        item.packageRecordId = packageRecordId;
+    }
+    // 如果成功補齊 meta，取消歷史標記
+    if (item.isHistorical && item.patientId && item.packageRecordId) {
+        item.isHistorical = false;
+    }
+    // 如果仍然缺少 meta，則移除項目但不嘗試退回次數
+    if (!item.patientId || !item.packageRecordId) {
         selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
         updateBillingDisplay();
-        // 不需要刷新套票列表，因為沒有變動
         showToast('已移除套票使用項目，未退回次數', 'info');
         return;
     }
     // 以項目中的 packageRecordId 為準
     const pkgId = item.packageRecordId;
     try {
-        const packages = await getPatientPackages(item.patientId || patientId);
+        // 取得病人的套票，如果沒有取得則重試一次
+        const packages = await getPatientPackages(item.patientId);
         const pkg = packages.find(p => p.id === pkgId);
         if (!pkg) {
             // 找不到對應的套票，直接移除項目
@@ -8185,10 +8209,11 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         }
         const updatedPackage = {
             ...pkg,
-            remainingUses: pkg.remainingUses + 1
+            // 將剩餘次數加1，如果不存在則視為0
+            remainingUses: (pkg.remainingUses || 0) + 1
         };
         const result = await window.firebaseDataManager.updatePatientPackage(pkgId, updatedPackage);
-        if (result.success) {
+        if (result && result.success) {
             // 從選擇的收費項目中移除該項目
             selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
             updateBillingDisplay();
