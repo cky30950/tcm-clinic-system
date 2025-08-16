@@ -6180,7 +6180,7 @@ async function initializeSystemAfterLogin() {
                         // errors when the event handler is parsed. To avoid this we wrap every
                         // argument in single quotes so that they're passed as strings. The handler
                         // itself will convert them back to the appropriate types if necessary.
-                        const canUndo = isPackageUse && item.patientId && item.packageRecordId;
+                        const canUndo = isPackageUse && item.patientId && item.packageRecordId && !item.isHistorical;
                         const undoBtn = canUndo ? `
                                     <button
                                         type="button"
@@ -6626,66 +6626,65 @@ updateBillingDisplay();
     }
         }
         
-        // 解析收費項目文字並載入
-        function parseBillingItemsFromText(billingText) {
-            if (!billingText) {
-                return;
-            }
+// 解析收費項目文字並載入
+function parseBillingItemsFromText(billingText) {
+    if (!billingText) {
+        return;
+    }
+    
+    // 解析上次收費項目
+    const billingLines = billingText.split('\n');
+    
+    billingLines.forEach(line => {
+        line = line.trim();
+        if (!line || line.includes('小計') || line.includes('總費用')) return;
+        
+        // 解析收費項目格式：項目名 x數量 = $金額 或 項目名 x數量 = -$金額
+        const itemMatch = line.match(/^(.+?)\s+x(\d+)\s+=\s+([\-\$]?\d+)$/);
+        if (itemMatch) {
+            const itemName = itemMatch[1].trim();
+            const quantity = parseInt(itemMatch[2]);
             
-            // 解析上次收費項目
-            const billingLines = billingText.split('\n');
+            // 在收費項目中尋找對應的項目
+            const billingItem = billingItems.find(item => 
+                item.active && item.name === itemName
+            );
             
-            billingLines.forEach(line => {
-                line = line.trim();
-                if (!line || line.includes('小計') || line.includes('總費用')) return;
-                
-                // 解析收費項目格式：項目名 x數量 = $金額 或 項目名 x數量 = -$金額
-                const itemMatch = line.match(/^(.+?)\s+x(\d+)\s+=\s+([\-\$]?\d+)$/);
-                if (itemMatch) {
-                    const itemName = itemMatch[1].trim();
-                    const quantity = parseInt(itemMatch[2]);
-                    
-                    // 在收費項目中尋找對應的項目
-                    const billingItem = billingItems.find(item => 
-                        item.active && item.name === itemName
-                    );
-                    
-                    if (billingItem) {
-                        const selectedItem = {
-                            id: billingItem.id,
-                            name: billingItem.name,
-                            category: billingItem.category,
-                            price: billingItem.price,
-                            unit: billingItem.unit,
-                            description: billingItem.description,
-                            quantity: quantity
-                        };
-                        selectedBillingItems.push(selectedItem);
-                    } else {
-                        // 如果在收費項目中找不到，嘗試處理動態產生的套票使用項目
-                        // 套票使用項目在保存時的格式為「名稱（使用套票） x數量 = $0」
-                        // 我們需要將此類項目重新載入到 selectedBillingItems 中，並標記為 packageUse
-                        if (itemName.includes('（使用套票）') || itemName.includes('(使用套票)')) {
-                            selectedBillingItems.push({
-                                id: `loaded-packageUse-${Date.now()}-${Math.random().toString(36).substr(2,5)}`,
-                                name: itemName,
-                                category: 'packageUse',
-                                price: 0,
-                                unit: '次',
-                                description: '套票抵扣一次',
-                                quantity: quantity,
-                                // 保存的病歷不含 patientId、packageRecordId，留空避免顯示取消使用按鈕
-                                patientId: null,
-                                packageRecordId: null
-                            });
-                        } else {
-                            // 如果在收費項目中找不到，創建一個臨時項目（用於已刪除的收費項目）
-                            console.log(`找不到收費項目：${itemName}，可能已被刪除`);
-                        }
-                    }
+            if (billingItem) {
+                const selectedItem = {
+                    id: billingItem.id,
+                    name: billingItem.name,
+                    category: billingItem.category,
+                    price: billingItem.price,
+                    unit: billingItem.unit,
+                    description: billingItem.description,
+                    quantity: quantity
+                };
+                selectedBillingItems.push(selectedItem);
+            } else {
+                // 處理套票使用項目（從舊病歷載入的情況）
+                if (itemName.includes('（使用套票）') || itemName.includes('(使用套票)')) {
+                    selectedBillingItems.push({
+                        id: `loaded-packageUse-${Date.now()}-${Math.random().toString(36).substr(2,5)}`,
+                        name: itemName,
+                        category: 'packageUse',
+                        price: 0,
+                        unit: '次',
+                        description: '套票抵扣一次',
+                        quantity: quantity,
+                        // 標記為從舊病歷載入，無法退回
+                        isHistorical: true,
+                        patientId: null,
+                        packageRecordId: null
+                    });
+                } else {
+                    // 如果在收費項目中找不到，創建一個臨時項目（用於已刪除的收費項目）
+                    console.log(`找不到收費項目：${itemName}，可能已被刪除`);
                 }
-            });
+            }
         }
+    });
+}
         
         // 載入上次收費項目（內部函數 - 保留向後兼容）
         function loadPreviousBillingItemsFromConsultation(lastConsultation) {
@@ -8140,6 +8139,13 @@ async function useOnePackage(patientId, packageRecordId) {
 }
 
 async function undoPackageUse(patientId, packageRecordId, usageItemId) {
+    // 檢查是否為歷史記錄
+    const item = selectedBillingItems.find(it => it.id === usageItemId);
+    if (item && item.isHistorical) {
+        showToast('從舊病歷載入的套票使用記錄無法取消', 'warning');
+        return;
+    }
+    
     try {
         const packages = await getPatientPackages(patientId);
         const pkg = packages.find(p => p.id === packageRecordId);
