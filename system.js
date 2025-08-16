@@ -8142,8 +8142,7 @@ async function useOnePackage(patientId, packageRecordId) {
 async function undoPackageUse(patientId, packageRecordId, usageItemId) {
     try {
         const packages = await getPatientPackages(patientId);
-        // 以字串比較 ID，避免 Firebase 文件 ID 與舊資料型別不同導致找不到
-        const pkg = packages.find(p => String(p.id) === String(packageRecordId));
+        const pkg = packages.find(p => p.id === packageRecordId);
         
         if (!pkg) {
             showToast('找不到對應的套票，無法取消', 'warning');
@@ -8179,25 +8178,22 @@ async function restorePackageUseMeta(patientId) {
         const packages = await getPatientPackages(patientId);
         // 遍歷已選擇的收費項目，尋找缺乏 meta 的套票使用項目
         selectedBillingItems.forEach(item => {
-            // 判斷是否為套票使用紀錄：除了明確標記的 packageUse 類別，也容許名稱包含括號
             const isPackageUse = item && (item.category === 'packageUse' || (item.name && (item.name.includes('（使用套票）') || item.name.includes('(使用套票)'))));
-            // 僅對缺乏病人ID或套票ID的項目進行處理
             if (isPackageUse && (!item.patientId || !item.packageRecordId)) {
                 // 補充病人ID
                 item.patientId = patientId;
-                // 從名稱中移除套票使用後綴並修剪空白
-                let baseName = (item.name || '').trim();
-                // 移除全形或半形括號及其前後空白
-                baseName = baseName.replace(/（使用套票）/g, '').replace(/\(使用套票\)/g, '').trim();
-                // 若名稱包含括號但未使用上述模式仍殘留空格，進一步修剪
-                baseName = baseName.replace(/\s+$/, '');
-                // 在病人的套票中尋找名稱匹配的項目（允許部分匹配，忽略前後空白）
-                const candidates = packages.filter(p => {
-                    const pkgName = (p.name || '').trim();
-                    return pkgName === baseName || pkgName.includes(baseName) || baseName.includes(pkgName);
-                });
+                // 從名稱中移除後綴以找出套票名稱，例如「推拿療程（使用套票）」→「推拿療程」
+                let baseName = item.name;
+                const suffixFull = '（使用套票）';
+                const suffixHalf = '(使用套票)';
+                if (baseName.endsWith(suffixFull)) {
+                    baseName = baseName.substring(0, baseName.length - suffixFull.length);
+                } else if (baseName.endsWith(suffixHalf)) {
+                    baseName = baseName.substring(0, baseName.length - suffixHalf.length);
+                }
+                // 在病人的套票中尋找名稱匹配的項目
+                const candidates = packages.filter(p => p.name === baseName);
                 if (candidates.length === 1) {
-                    // 唯一匹配，直接使用
                     item.packageRecordId = candidates[0].id;
                 } else if (candidates.length > 1) {
                     // 如果有多個同名套票，選擇已使用次數最多的那一個
@@ -8211,7 +8207,7 @@ async function restorePackageUseMeta(patientId) {
                     }
                     item.packageRecordId = chosen.id;
                 }
-                // 如果找不到匹配，保持為 null；之後點擊取消按鈕時會顯示提示
+                // 如果找不到匹配，保持為 null，屆時取消時會出現找不到套票的提示
             }
         });
     } catch (error) {
