@@ -1610,25 +1610,7 @@ try {
             selectedBillingItems = [];
             if (consultation.billingItems) {
                 document.getElementById('formBillingItems').value = consultation.billingItems;
-                // 解析文本中的收費項目，這裡可能包含套票使用記錄
                 parseBillingItemsFromText(consultation.billingItems);
-
-                /*
-                 * 在舊的實作中，直接在解析後立即更新收費顯示。
-                 * 然而對於套票使用項目，文本格式中不含 patientId 和 packageRecordId 等元資料，
-                 * 會導致這些項目在編輯模式下被標記為歷史記錄而無法取消使用。
-                 * 為了讓完成病歷後再次編輯時仍可正常取消或再次使用套票，
-                 * 這裡在解析完後利用 restorePackageUseMeta 補全缺失的元資料，
-                 * 並在補全之後再重新渲染收費列表。
-                 */
-                try {
-                    if (typeof restorePackageUseMeta === 'function' && consultation.patientId) {
-                        await restorePackageUseMeta(consultation.patientId);
-                    }
-                } catch (e) {
-                    console.error('恢復套票使用 meta 錯誤:', e);
-                }
-                // 補全 meta 後再更新顯示，確保可撤銷按鈕正確顯示
                 updateBillingDisplay();
             }
             
