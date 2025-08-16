@@ -6826,15 +6826,15 @@ const consultationDate = (() => {
                 // 解析並載入收費項目
                 parseBillingItemsFromText(consultation.billingItems);
 
-                // 嘗試為舊記錄補全套票使用的 meta 資訊（patientId 與 packageRecordId）
-                try {
-                    await restorePackageUseMeta(appointment.patientId);
-                } catch (e) {
-                    console.error('恢復套票使用 meta 錯誤:', e);
-                }
+// 嘗試為舊記錄補全套票使用的 meta 資訊（patientId 與 packageRecordId）
+try {
+    await restorePackageUseMeta(appointment.patientId);
+} catch (e) {
+    console.error('恢復套票使用 meta 錯誤:', e);
+}
 
-                // 更新收費顯示
-                updateBillingDisplay();
+// 更新收費顯示
+updateBillingDisplay();
             } else {
                 // 清空收費項目
                 document.getElementById('formBillingItems').value = '';
@@ -8186,6 +8186,11 @@ async function restorePackageUseMeta(patientId) {
         selectedBillingItems.forEach(item => {
             const isPackageUse = item && (item.category === 'packageUse' || (item.name && (item.name.includes('（使用套票）') || item.name.includes('(使用套票)'))));
             if (isPackageUse && (!item.patientId || !item.packageRecordId)) {
+                // 如果已經標記為歷史記錄，不需要嘗試恢復 meta
+                if (item.isHistorical) {
+                    return;
+                }
+                
                 // 補充病人ID
                 item.patientId = patientId;
                 // 從名稱中移除後綴以找出套票名稱，例如「推拿療程（使用套票）」→「推拿療程」
@@ -8212,8 +8217,10 @@ async function restorePackageUseMeta(patientId) {
                         }
                     }
                     item.packageRecordId = chosen.id;
+                } else {
+                    // 找不到匹配的套票，標記為歷史記錄
+                    item.isHistorical = true;
                 }
-                // 如果找不到匹配，保持為 null，屆時取消時會出現找不到套票的提示
             }
         });
     } catch (error) {
