@@ -8164,11 +8164,25 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
             await new Promise(resolve => setTimeout(resolve, 50));
         }
     }
+    // 若 patientId 為空值，嘗試從當前掛號記錄推斷病人 ID
+    let resolvedPatientId = patientId;
+    if (!resolvedPatientId) {
+        try {
+            if (typeof currentConsultingAppointmentId !== 'undefined' && Array.isArray(appointments)) {
+                const currAppt = appointments.find(appt => appt && appt.id === currentConsultingAppointmentId);
+                if (currAppt) {
+                    resolvedPatientId = currAppt.patientId;
+                }
+            }
+        } catch (e) {
+            // 忽略錯誤，保持 resolvedPatientId 為 undefined
+        }
+    }
     // 嘗試恢復缺失的套票 meta，以便舊病歷也能取消使用
     try {
-        // restorePackageUseMeta 會根據 patientId 嘗試為所有缺失的套票使用項目補全 patientId 和 packageRecordId
+        // restorePackageUseMeta 會根據 resolvedPatientId 嘗試為所有缺失的套票使用項目補全 patientId 和 packageRecordId
         if (typeof restorePackageUseMeta === 'function') {
-            await restorePackageUseMeta(patientId);
+            await restorePackageUseMeta(resolvedPatientId);
         }
     } catch (e) {
         console.error('恢復套票使用 meta 錯誤:', e);
@@ -8181,8 +8195,8 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         return;
     }
     // 若 patientId 或 packageRecordId 缺失，嘗試使用傳入的參數填充
-    if (!item.patientId && patientId) {
-        item.patientId = patientId;
+    if (!item.patientId && resolvedPatientId) {
+        item.patientId = resolvedPatientId;
     }
     if (!item.packageRecordId && packageRecordId) {
         item.packageRecordId = packageRecordId;
@@ -8193,8 +8207,8 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
     }
     // 如果仍然缺少 meta，嘗試根據名稱匹配患者的套票以恢復 packageRecordId
     // 先使用傳入的 patientId 參數填補 item.patientId（若缺失）
-    if (!item.patientId && patientId) {
-        item.patientId = patientId;
+    if (!item.patientId && resolvedPatientId) {
+        item.patientId = resolvedPatientId;
     }
     // 若缺少 packageRecordId，嘗試透過名稱匹配
     if (!item.packageRecordId && item.patientId) {
