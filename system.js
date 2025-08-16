@@ -6151,6 +6151,18 @@ async function initializeSystemAfterLogin() {
             // 合併顯示：非折扣項目在前，折扣項目在後
             const displayItems = [...nonDiscountItems, ...discountItems];
             
+            // 在渲染列表前先嘗試取得當前掛號的病人 ID。這將用於後續處理舊病歷載入的套票使用項目（這些項目缺少 patientId 與 packageRecordId），
+            // 使得使用者仍然可以點擊「取消使用」按鈕以嘗試退回套票次數。
+            let currentPatientIdForDisplay = null;
+            try {
+                // 根據全域的 currentConsultingAppointmentId 從 appointments 陣列找到當前掛號資訊
+                const currentAppt = appointments.find(appt => appt.id === currentConsultingAppointmentId);
+                if (currentAppt) {
+                    currentPatientIdForDisplay = currentAppt.patientId;
+                }
+            } catch (e) {
+                // 忽略錯誤，保持 currentPatientIdForDisplay 為 null
+            }
             // 顯示已選擇的項目（非折扣項目在前，折扣項目在後）
             container.innerHTML = `
                 <div class="space-y-2">
@@ -6170,22 +6182,17 @@ async function initializeSystemAfterLogin() {
                         let subtotalDisplay;
                         // 檢查是否為套票使用
                         const isPackageUse = item.category === 'packageUse';
-                        // 取消按鈕：只有在套票使用且擁有有效的 patientId 和 packageRecordId 時顯示
-                        // When generating inline event handlers we need to ensure that any dynamic values are
-                        // properly quoted. In earlier versions patientId and packageRecordId were injected
-                        // directly into the onclick attribute. If either of these identifiers is not a
-                        // literal number (for example, Firebase document IDs are strings like
-                        // "abc-123"), the resulting HTML would contain invalid JavaScript such as
-                        // `useOnePackage(abc-123, 'pkgId')` which causes "Invalid or unexpected token"
-                        // errors when the event handler is parsed. To avoid this we wrap every
-                        // argument in single quotes so that they're passed as strings. The handler
-                        // itself will convert them back to the appropriate types if necessary.
-                        const canUndo = isPackageUse && item.patientId && item.packageRecordId && !item.isHistorical;
+                        // 決定是否顯示取消按鈕：對於所有套票使用項目均提供取消功能，
+                        // 即便是舊病歷載入（缺少 patientId 或 packageRecordId）。
+                        // 取消按鈕生成時優先使用項目自身的 patientId 與 packageRecordId，若缺失則使用當前病人 ID 與空字串。
+                        const patientIdForUndo = (item.patientId || currentPatientIdForDisplay || '').toString();
+                        const packageRecordIdForUndo = (item.packageRecordId || '').toString();
+                        const canUndo = isPackageUse;
                         const undoBtn = canUndo ? `
                                     <button
                                         type="button"
                                         class="ml-2 text-xs px-2 py-0.5 rounded border border-purple-300 text-purple-700 hover:bg-purple-50"
-                                        onclick="undoPackageUse('${item.patientId}', '${item.packageRecordId}', '${item.id}')"
+                                        onclick="undoPackageUse('${patientIdForUndo}', '${packageRecordIdForUndo}', '${item.id}')"
                                     >取消使用</button>
                                 ` : '';
                         // 數量控制區：套票使用項目不顯示加減號
