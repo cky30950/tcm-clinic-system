@@ -8185,14 +8185,10 @@ async function restorePackageUseMeta(patientId) {
         // 遍歷已選擇的收費項目，尋找缺乏 meta 的套票使用項目
         selectedBillingItems.forEach(item => {
             const isPackageUse = item && (item.category === 'packageUse' || (item.name && (item.name.includes('（使用套票）') || item.name.includes('(使用套票)'))));
-            if (isPackageUse && (!item.patientId || !item.packageRecordId)) {
-                // 如果已經標記為歷史記錄，不需要嘗試恢復 meta
-                if (item.isHistorical) {
-                    return;
-                }
-                
-                // 補充病人ID
-                item.patientId = patientId;
+                if (isPackageUse && (!item.patientId || !item.packageRecordId)) {
+                    // 即便項目被標記為歷史紀錄，也嘗試恢復對應的病人ID與套票記錄，以便可以取消使用。
+                    // 補充病人ID
+                    item.patientId = patientId;
                 // 從名稱中移除後綴以找出套票名稱，例如「推拿療程（使用套票）」→「推拿療程」
                 let baseName = item.name;
                 const suffixFull = '（使用套票）';
@@ -8204,23 +8200,27 @@ async function restorePackageUseMeta(patientId) {
                 }
                 // 在病人的套票中尋找名稱匹配的項目
                 const candidates = packages.filter(p => p.name === baseName);
-                if (candidates.length === 1) {
-                    item.packageRecordId = candidates[0].id;
-                } else if (candidates.length > 1) {
-                    // 如果有多個同名套票，選擇已使用次數最多的那一個
-                    let chosen = candidates[0];
-                    for (const c of candidates) {
-                        const usedCount = (c.totalUses || 0) - (c.remainingUses || 0);
-                        const chosenUsed = (chosen.totalUses || 0) - (chosen.remainingUses || 0);
-                        if (usedCount > chosenUsed) {
-                            chosen = c;
+                    if (candidates.length === 1) {
+                        item.packageRecordId = candidates[0].id;
+                        // 找到對應套票，解除歷史標記以允許取消使用
+                        item.isHistorical = false;
+                    } else if (candidates.length > 1) {
+                        // 如果有多個同名套票，選擇已使用次數最多的那一個
+                        let chosen = candidates[0];
+                        for (const c of candidates) {
+                            const usedCount = (c.totalUses || 0) - (c.remainingUses || 0);
+                            const chosenUsed = (chosen.totalUses || 0) - (chosen.remainingUses || 0);
+                            if (usedCount > chosenUsed) {
+                                chosen = c;
+                            }
                         }
+                        item.packageRecordId = chosen.id;
+                        // 找到對應套票，解除歷史標記以允許取消使用
+                        item.isHistorical = false;
+                    } else {
+                        // 找不到匹配的套票，保持歷史記錄狀態
+                        item.isHistorical = true;
                     }
-                    item.packageRecordId = chosen.id;
-                } else {
-                    // 找不到匹配的套票，標記為歷史記錄
-                    item.isHistorical = true;
-                }
             }
         });
     } catch (error) {
