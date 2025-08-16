@@ -1619,7 +1619,8 @@ try {
                     let pid = consultation && consultation.patientId ? consultation.patientId : null;
                     // 如果 consultation.patientId 不存在，退而使用當前掛號的病人 ID
                     if (!pid && typeof currentConsultingAppointmentId !== 'undefined' && Array.isArray(appointments)) {
-                        const appt = appointments.find(ap => ap && ap.id === currentConsultingAppointmentId);
+                        // 使用字串比較 ID，避免數字與字串不一致導致匹配失敗
+                        const appt = appointments.find(ap => ap && String(ap.id) === String(currentConsultingAppointmentId));
                         if (appt) pid = appt.patientId;
                     }
                     if (pid) {
@@ -2267,7 +2268,8 @@ async function showConsultationForm(appointment) {
                 return;
             }
             
-            const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+            // 使用字串比較 ID，避免數字與字串不一致導致匹配失敗
+            const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
             if (!appointment) {
                 closeConsultationForm();
                 currentConsultingAppointmentId = null;
@@ -2343,7 +2345,7 @@ async function saveConsultation() {
         return;
     }
     // 取得當前掛號資訊並判斷是否為編輯模式，供後續預處理和保存使用
-    const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
     // 判斷是否為編輯模式：掛號狀態為已完成且存在 consultationId
     const isEditing = appointment && appointment.status === 'completed' && appointment.consultationId;
     // 預處理套票購買和立即使用（僅在非編輯模式下處理，以免重複購買）
@@ -2672,7 +2674,7 @@ if (!patient) {
                                 ${(() => {
                                     // 檢查是否正在診症且為相同病人
                                     if (currentConsultingAppointmentId) {
-                                        const currentAppointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+                                        const currentAppointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
                                         if (currentAppointment && currentAppointment.patientId === consultation.patientId) {
                                             return `
                                                 <button onclick="loadMedicalRecordToCurrentConsultation('${consultation.id}')" 
@@ -2963,7 +2965,7 @@ function displayConsultationMedicalHistoryPage() {
                         ${(() => {
                             // 檢查是否正在診症且為相同病人
                             if (currentConsultingAppointmentId) {
-                                const currentAppointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+                                const currentAppointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
                                 if (currentAppointment && currentAppointment.patientId === consultation.patientId) {
                                     return `
                                         <button onclick="loadMedicalRecordToCurrentConsultation('${consultation.id}')" 
@@ -6174,7 +6176,8 @@ async function initializeSystemAfterLogin() {
             let currentPatientIdForDisplay = null;
             try {
                 // 根據全域的 currentConsultingAppointmentId 從 appointments 陣列找到當前掛號資訊
-                const currentAppt = appointments.find(appt => appt.id === currentConsultingAppointmentId);
+                // 使用字串比較 ID，避免類型不一致導致匹配失敗
+                const currentAppt = appointments.find(appt => appt && String(appt.id) === String(currentConsultingAppointmentId));
                 if (currentAppt) {
                     currentPatientIdForDisplay = currentAppt.patientId;
                 }
@@ -6442,7 +6445,8 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
-            const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+            // 使用字串比較 ID，避免類型不一致導致匹配失敗
+            const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
             if (!appointment) {
                 showToast('找不到當前診症記錄！', 'error');
                 return;
@@ -6602,7 +6606,8 @@ updatePrescriptionDisplay();
                 return;
             }
             
-            const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+            // 使用字串比較 ID，避免類型不一致導致匹配失敗
+            const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
             if (!appointment) {
                 showToast('找不到當前診症記錄！', 'error');
                 return;
@@ -6750,7 +6755,8 @@ function parseBillingItemsFromText(billingText) {
                 return;
             }
             
-            const currentAppointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+            // 使用字串比較 ID，避免類型不匹配
+            const currentAppointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
             if (!currentAppointment) {
                 showToast('找不到當前診症記錄！', 'error');
                 return;
@@ -8146,7 +8152,8 @@ async function renderPatientPackages(patientId) {
 }
 
 async function refreshPatientPackagesUI() {
-    const appointment = appointments.find(apt => apt.id === currentConsultingAppointmentId);
+    // 使用字串比較 ID，避免類型不一致導致匹配失敗
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
     if (!appointment) return;
     await renderPatientPackages(appointment.patientId);
 }
@@ -8187,7 +8194,8 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
     if (!resolvedPatientId) {
         try {
             if (typeof currentConsultingAppointmentId !== 'undefined' && Array.isArray(appointments)) {
-                const currAppt = appointments.find(appt => appt && appt.id === currentConsultingAppointmentId);
+                // 使用字串比較 ID，避免類型不一致導致匹配失敗
+                const currAppt = appointments.find(appt => appt && String(appt.id) === String(currentConsultingAppointmentId));
                 if (currAppt) {
                     resolvedPatientId = currAppt.patientId;
                 }
