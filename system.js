@@ -136,10 +136,14 @@ let appointments = [];
          * 從 Firestore 讀取中藥庫資料，若資料不存在則自動使用預設值初始化。
          * 此函式會等待 Firebase 初始化完成後再執行。
          */
-        async function initHerbLibrary() {
+        async function initHerbLibrary(forceRefresh = false) {
             // 等待 Firebase 初始化
             while (!window.firebase || !window.firebase.db) {
                 await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            // 若已有緩存且不要求強制刷新，直接返回以避免重複讀取
+            if (!forceRefresh && Array.isArray(herbLibrary) && herbLibrary.length > 0) {
+                return;
             }
             try {
                 // 從 Firestore 取得 herbLibrary 集合資料
@@ -170,10 +174,14 @@ let appointments = [];
          * 從 Firestore 讀取收費項目資料，若資料不存在則使用預設資料初始化。
          * 此函式會等待 Firebase 初始化完成後再執行。
          */
-        async function initBillingItems() {
+        async function initBillingItems(forceRefresh = false) {
             // 等待 Firebase 初始化
             while (!window.firebase || !window.firebase.db) {
                 await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            // 若已有緩存且不要求強制刷新，直接返回以避免重複讀取
+            if (!forceRefresh && Array.isArray(billingItems) && billingItems.length > 0) {
+                return;
             }
             try {
                 // 從 Firestore 取得 billingItems 集合資料
@@ -8806,3 +8814,143 @@ document.addEventListener('DOMContentLoaded', function() {
   window.useOnePackage = useOnePackage;
   window.undoPackageUse = undoPackageUse;
 })();
+
+// 自動覆寫 FirebaseDataManager 的讀取方法以減少重複讀取。
+// 這段程式碼會在頁面載入後等待資料管理器準備就緒，再建立簡單快取機制。
+window.addEventListener('load', function() {
+    // 定時檢查 firebaseDataManager 是否可用
+    const cacheInitInterval = setInterval(function() {
+        if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
+            clearInterval(cacheInitInterval);
+            (function() {
+                const manager = window.firebaseDataManager;
+                // 建立快取變數
+                let patientsCache = null;
+                let consultationsCache = null;
+                let appointmentsCache = null;
+                // 覆寫 getPatients 以使用快取
+                const originalGetPatients = manager.getPatients.bind(manager);
+                manager.getPatients = async function() {
+                    if (Array.isArray(patientsCache) && patientsCache.length > 0) {
+                        // 使用快取資料
+                        return { success: true, data: patientsCache };
+                    }
+                    const result = await originalGetPatients();
+                    if (result && result.success) {
+                        patientsCache = result.data;
+                    }
+                    return result;
+                };
+                // 覆寫增加/更新/刪除病人資料的方法以使快取失效
+                const originalAddPatient = manager.addPatient.bind(manager);
+                manager.addPatient = async function(patientData) {
+                    const res = await originalAddPatient(patientData);
+                    // 資料異動後清除快取，下次讀取重新查詢
+                    if (res && res.success) {
+                        patientsCache = null;
+                    }
+                    return res;
+                };
+                const originalUpdatePatient = manager.updatePatient.bind(manager);
+                manager.updatePatient = async function(patientId, patientData) {
+                    const res = await originalUpdatePatient(patientId, patientData);
+                    if (res && res.success) {
+                        patientsCache = null;
+                    }
+                    return res;
+                };
+                const originalDeletePatient = manager.deletePatient.bind(manager);
+                manager.deletePatient = async function(patientId) {
+                    const res = await originalDeletePatient(patientId);
+                    if (res && res.success) {
+                        patientsCache = null;
+                    }
+                    return res;
+                };
+                // 覆寫 getConsultations 以使用快取
+                const originalGetConsultations = manager.getConsultations.bind(manager);
+                manager.getConsultations = async function() {
+                    if (Array.isArray(consultationsCache) && consultationsCache.length > 0) {
+                        return { success: true, data: consultationsCache };
+                    }
+                    const result = await originalGetConsultations();
+                    if (result && result.success) {
+                        consultationsCache = result.data;
+                    }
+                    return result;
+                };
+                // 覆寫診症資料異動方法以清除快取
+                const originalAddConsultation = manager.addConsultation.bind(manager);
+                manager.addConsultation = async function(data) {
+                    const res = await originalAddConsultation(data);
+                    if (res && res.success) {
+                        consultationsCache = null;
+                    }
+                    return res;
+                };
+                const originalUpdateConsultation = manager.updateConsultation.bind(manager);
+                manager.updateConsultation = async function(id, data) {
+                    const res = await originalUpdateConsultation(id, data);
+                    if (res && res.success) {
+                        consultationsCache = null;
+                    }
+                    return res;
+                };
+                // 覆寫 getPatientConsultations 以利用現有快取資料
+                const originalGetPatientConsultations = manager.getPatientConsultations.bind(manager);
+                manager.getPatientConsultations = async function(patientId) {
+                    if (Array.isArray(consultationsCache) && consultationsCache.length > 0) {
+                        // 從快取資料中篩選對應病人診症記錄，並依原邏輯排序
+                        const patientConsultations = consultationsCache
+                            .filter(consultation => consultation.patientId === patientId)
+                            .sort((a, b) => {
+                                const dateA = a.date ? new Date(a.date.seconds ? a.date.seconds * 1000 : a.date) : new Date(a.createdAt.seconds ? a.createdAt.seconds * 1000 : a.createdAt);
+                                const dateB = b.date ? new Date(b.date.seconds ? b.date.seconds * 1000 : b.date) : new Date(b.createdAt.seconds ? b.createdAt.seconds * 1000 : b.createdAt);
+                                return dateB - dateA;
+                            });
+                        return { success: true, data: patientConsultations };
+                    }
+                    // 若無快取，仍呼叫原本方法
+                    return await originalGetPatientConsultations(patientId);
+                };
+                // 覆寫 getAppointments 以使用快取
+                const originalGetAppointments = manager.getAppointments.bind(manager);
+                manager.getAppointments = async function() {
+                    if (Array.isArray(appointmentsCache) && appointmentsCache.length > 0) {
+                        return { success: true, data: appointmentsCache };
+                    }
+                    const result = await originalGetAppointments();
+                    if (result && result.success) {
+                        appointmentsCache = result.data;
+                    }
+                    return result;
+                };
+                // 覆寫掛號資料異動方法以清除快取
+                const originalAddAppointment = manager.addAppointment.bind(manager);
+                manager.addAppointment = async function(data) {
+                    const res = await originalAddAppointment(data);
+                    if (res && res.success) {
+                        appointmentsCache = null;
+                    }
+                    return res;
+                };
+                const originalUpdateAppointment = manager.updateAppointment.bind(manager);
+                manager.updateAppointment = async function(id, data) {
+                    const res = await originalUpdateAppointment(id, data);
+                    if (res && res.success) {
+                        appointmentsCache = null;
+                    }
+                    return res;
+                };
+                const originalDeleteAppointment = manager.deleteAppointment.bind(manager);
+                manager.deleteAppointment = async function(id) {
+                    const res = await originalDeleteAppointment(id);
+                    if (res && res.success) {
+                        appointmentsCache = null;
+                    }
+                    return res;
+                };
+            })();
+        }
+    }, 100);
+});
