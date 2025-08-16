@@ -6195,8 +6195,12 @@ async function initializeSystemAfterLogin() {
                                         onclick="undoPackageUse('${patientIdForUndo}', '${packageRecordIdForUndo}', '${item.id}')"
                                     >取消使用</button>
                                 ` : '';
-                        // 數量控制區：套票使用項目不顯示加減號
-                        const quantityControls = isPackageUse ? '' : `
+                        // 數量控制區：套票使用項目不顯示加減號，但顯示剩餘使用次數
+                        const quantityControls = isPackageUse ? `
+                                <div class="flex items-center space-x-2 mr-3">
+                                    <span class="w-8 text-center font-semibold">${item.quantity}</span>
+                                </div>
+                        ` : `
                                 <div class="flex items-center space-x-2 mr-3">
                                     <button onclick="updateBillingQuantity(${originalIndex}, -1)" class="w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition duration-200">-</button>
                                     <span class="w-8 text-center font-semibold">${item.quantity}</span>
@@ -8251,8 +8255,20 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         };
         const result = await window.firebaseDataManager.updatePatientPackage(pkgId, updatedPackage);
         if (result && result.success) {
-            // 從選擇的收費項目中移除該項目
-            selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
+            /*
+             * 若為歷史載入的套票使用項目，數量 (quantity) 可能大於 1，代表當次診症中使用了多次。
+             * 早期實作在取消使用時直接移除整個項目並退回一次，但當數量大於 1 時這樣會導致只能退回一次次數，
+             * 其餘次數無法再透過介面退回。為了讓使用者能逐次取消使用，當 quantity > 1 時，
+             * 僅遞減數量，不移除項目；當 quantity 減至 0 時再移除項目。
+             */
+            // 重新取得當前項目（可能已在恢復 meta 過程中被修改）
+            const currentItem = selectedBillingItems.find(it => it.id === usageItemId);
+            if (currentItem && typeof currentItem.quantity === 'number' && currentItem.quantity > 1) {
+                currentItem.quantity -= 1;
+            } else {
+                // 移除該項目
+                selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
+            }
             updateBillingDisplay();
             await refreshPatientPackagesUI();
             showToast('已取消本次套票使用，次數已退回', 'success');
