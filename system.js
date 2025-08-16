@@ -1886,7 +1886,7 @@ function getOperationButtons(appointment, patient = null) {
         
 // 3. 修改確認病人到達函數，支援 Firebase
 async function confirmPatientArrival(appointmentId) {
-    const appointment = appointments.find(apt => apt.id === appointmentId);
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
         return;
@@ -1943,7 +1943,7 @@ async function confirmPatientArrival(appointmentId) {
         
  // 5. 修改移除掛號函數，支援 Firebase
 async function removeAppointment(appointmentId) {
-    const appointment = appointments.find(apt => apt.id === appointmentId);
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
         return;
@@ -2022,7 +2022,7 @@ async function removeAppointment(appointmentId) {
         
  // 4. 修改開始診症函數，支援 Firebase
 async function startConsultation(appointmentId) {
-    const appointment = appointments.find(apt => apt.id === appointmentId);
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
         return;
@@ -2070,9 +2070,11 @@ async function startConsultation(appointmentId) {
         }
         
         // 檢查是否已有其他病人在診症中（只檢查同一醫師的病人）
-        const consultingAppointment = appointments.find(apt => 
-            apt.status === 'consulting' && 
-            apt.id !== appointmentId &&
+        const consultingAppointment = appointments.find(apt =>
+            apt &&
+            apt.status === 'consulting' &&
+            // 使用字串比較避免類型不一致
+            String(apt.id) !== String(appointmentId) &&
             apt.appointmentDoctor === currentUserData.username &&
             new Date(apt.appointmentTime).toDateString() === new Date().toDateString()
         );
@@ -2126,7 +2128,7 @@ async function startConsultation(appointmentId) {
         
         // 繼續診症
         function continueConsultation(appointmentId) {
-            const appointment = appointments.find(apt => apt.id === appointmentId);
+            const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
             if (!appointment) return;
             
             currentConsultingAppointmentId = appointmentId;
@@ -3092,7 +3094,7 @@ function displayConsultationMedicalHistoryPage() {
         
 // 1. 修改從掛號記錄列印收據函數
 async function printReceiptFromAppointment(appointmentId) {
-    const appointment = appointments.find(apt => apt.id === appointmentId);
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
         return;
@@ -3129,7 +3131,7 @@ async function printReceiptFromAppointment(appointmentId) {
         
 // 2. 修改從掛號記錄列印到診證明函數
 async function printAttendanceCertificateFromAppointment(appointmentId) {
-    const appointment = appointments.find(apt => apt.id === appointmentId);
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
         return;
@@ -3165,7 +3167,7 @@ async function printAttendanceCertificateFromAppointment(appointmentId) {
         
 // 3. 修改從掛號記錄列印病假證明函數
 async function printSickLeaveFromAppointment(appointmentId) {
-    const appointment = appointments.find(apt => apt.id === appointmentId);
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
         return;
@@ -4417,7 +4419,7 @@ async function withdrawConsultation(appointmentId) {
             consultations = [];
         }
     }
-    const appointment = appointments.find(apt => apt.id === appointmentId);
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
         return;
@@ -4554,7 +4556,7 @@ async function editMedicalRecord(appointmentId) {
             consultations = [];
         }
     }
-    const appointment = appointments.find(apt => apt.id === appointmentId);
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
         return;
