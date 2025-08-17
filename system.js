@@ -141,24 +141,48 @@ async function fetchUsers(forceRefresh = false) {
         // 原始內容將儲存在 data-originalHtml 中，完成後可復原。
         function setButtonLoading(button, loadingText) {
             if (!button) return;
-            // 儲存原始 HTML 內容以便還原
+            // Save the original HTML so we can restore it later
             if (!button.dataset.originalHtml) {
                 button.dataset.originalHtml = button.innerHTML;
             }
-            // 構建載入中的內容：小圓形旋轉動畫與文本
-            const text = (loadingText !== undefined && loadingText !== null) ? loadingText : (button.textContent || '');
-            // 使用 Tailwind CSS 的 animate-spin 及邊框類別形成半透明小圈
-            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white opacity-50 mr-2"></div><span>${text}</span>`;
+            // Capture and store the button's current width the first time we set loading
+            if (!button.dataset.originalWidth) {
+                // Use offsetWidth to compute the rendered width, including padding and borders
+                const computedWidth = button.offsetWidth;
+                // If width is valid and greater than zero, store it so we can restore later
+                if (computedWidth > 0) {
+                    button.dataset.originalWidth = computedWidth + 'px';
+                    // Explicitly set the button's width so replacing the content with a spinner doesn't shrink it
+                    button.style.width = button.dataset.originalWidth;
+                }
+            }
+            // Always disable the button while loading
             button.disabled = true;
+            /*
+             * Only show a spinning indicator while loading. We intentionally do not display any
+             * loading text here (including the value passed in via `loadingText`) to satisfy
+             * the requirement of "只需顯示讀取圈" (only show the spinner). To avoid
+             * affecting the button's intrinsic size, we've captured its original width above.
+             */
+            // Add a spinner using Tailwind classes. Remove margin since there's no text to align next to it.
+            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white opacity-50"></div>`;
         }
 
         // 清除按鈕讀取狀態，還原原始內容
         function clearButtonLoading(button) {
             if (!button) return;
+            // Restore the original HTML content if we stored it
             if (button.dataset.originalHtml) {
                 button.innerHTML = button.dataset.originalHtml;
                 delete button.dataset.originalHtml;
             }
+            // Restore the button's width if we stored it previously
+            if (button.dataset.originalWidth) {
+                // Clear the inline width style so the button can size itself based on its content again
+                button.style.width = '';
+                delete button.dataset.originalWidth;
+            }
+            // Re-enable the button
             button.disabled = false;
         }
 
