@@ -6643,8 +6643,14 @@ async function initializeSystemAfterLogin() {
         
         // 載入上次處方內容（按鈕觸發）
         async function loadPreviousPrescription() {
+            // 在按鈕上顯示讀取中小圈
+            const __btn = window.__lastClickedButton;
+            if (typeof showButtonLoading === 'function') {
+                showButtonLoading(__btn);
+            }
             if (!currentConsultingAppointmentId) {
                 showToast('請先開始診症！', 'error');
+                if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
                 return;
             }
             
@@ -6652,12 +6658,14 @@ async function initializeSystemAfterLogin() {
             const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
             if (!appointment) {
                 showToast('找不到當前診症記錄！', 'error');
+                if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
                 return;
             }
     try {            
 const patientResult = await window.firebaseDataManager.getPatients();
 if (!patientResult.success) {
     showToast('無法讀取病人資料！', 'error');
+    if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
     return;
 }
 
@@ -6665,6 +6673,7 @@ if (!patientResult.success) {
 const patient = patientResult.data.find(p => p.id === appointment.patientId);
 if (!patient) {
     showToast('找不到病人資料！', 'error');
+    if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
     return;
 }
 
@@ -6672,6 +6681,7 @@ if (!patient) {
 const consultationResult = await window.firebaseDataManager.getPatientConsultations(patient.id);
 if (!consultationResult.success) {
     showToast('無法讀取診症記錄！', 'error');
+    if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
     return;
 }
 
@@ -6686,6 +6696,7 @@ const lastConsultation = patientConsultations.length > 0 ? patientConsultations[
 
 if (!lastConsultation || !lastConsultation.prescription) {
     showToast(`${patient.name} 沒有上次處方記錄可載入`, 'warning');
+    if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
     return;
 }
 
@@ -6698,11 +6709,18 @@ parsePrescriptionToItems(lastConsultation.prescription);
 
 // 更新處方顯示
 updatePrescriptionDisplay();
+// 隱藏讀取中小圈
+if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
 
 // showToast(`已載入 ${patient.name} 上次的處方內容`, 'success');
             } catch (error) {
         console.error('讀取病人資料錯誤:', error);
         showToast('讀取病人資料失敗', 'error');
+        // 隱藏讀取中小圈（錯誤時）
+        if (typeof hideButtonLoading === 'function') {
+            const __btn = window.__lastClickedButton;
+            hideButtonLoading(__btn);
+        }
     }
         }
         
@@ -6804,8 +6822,14 @@ updatePrescriptionDisplay();
         
         // 載入上次收費項目（按鈕觸發）
         async function loadPreviousBillingItems() {
+            // 在按鈕上顯示讀取中小圈
+            const __btn = window.__lastClickedButton;
+            if (typeof showButtonLoading === 'function') {
+                showButtonLoading(__btn);
+            }
             if (!currentConsultingAppointmentId) {
                 showToast('請先開始診症！', 'error');
+                if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
                 return;
             }
             
@@ -6813,12 +6837,14 @@ updatePrescriptionDisplay();
             const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
             if (!appointment) {
                 showToast('找不到當前診症記錄！', 'error');
+                if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
                 return;
             }
     try {             
 const patientResult = await window.firebaseDataManager.getPatients();
 if (!patientResult.success) {
     showToast('無法讀取病人資料！', 'error');
+    if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
     return;
 }
 
@@ -6826,6 +6852,7 @@ if (!patientResult.success) {
 const patient = patientResult.data.find(p => p.id === appointment.patientId);
 if (!patient) {
     showToast('找不到病人資料！', 'error');
+    if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
     return;
 }
 
@@ -6833,6 +6860,7 @@ if (!patient) {
 const consultationResult = await window.firebaseDataManager.getPatientConsultations(patient.id);
 if (!consultationResult.success) {
     showToast('無法讀取診症記錄！', 'error');
+    if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
     return;
 }
 
@@ -6845,6 +6873,7 @@ const lastConsultation = patientConsultations.length > 0 ? patientConsultations[
 
 if (!lastConsultation || !lastConsultation.billingItems) {
     showToast(`${patient.name} 沒有上次收費記錄可載入`, 'warning');
+    if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
     return;
 }
 
@@ -6864,9 +6893,16 @@ selectedBillingItems = [];
 
     // 更新顯示
     updateBillingDisplay();
+    // 隱藏讀取中小圈
+    if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
             } catch (error) {
         console.error('讀取病人資料錯誤:', error);
         showToast('讀取病人資料失敗', 'error');
+        // 隱藏讀取中小圈（錯誤時）
+        if (typeof hideButtonLoading === 'function') {
+            const __btn2 = window.__lastClickedButton;
+            hideButtonLoading(__btn2);
+        }
     }
         }
         
@@ -8377,41 +8413,55 @@ async function refreshPatientPackagesUI() {
 }
 
 async function useOnePackage(patientId, packageRecordId) {
-    const res = await consumePackage(patientId, packageRecordId);
-    if (!res.ok) {
-        showToast(res.msg || '套票不可用', 'warning');
-        return;
+    // 顯示讀取中小圈
+    const __btn = window.__lastClickedButton;
+    if (typeof showButtonLoading === 'function') showButtonLoading(__btn);
+    try {
+        const res = await consumePackage(patientId, packageRecordId);
+        if (!res.ok) {
+            showToast(res.msg || '套票不可用', 'warning');
+            return;
+        }
+        const usedName = `${res.record.name} (使用套票)`;
+
+        selectedBillingItems.push({
+            id: `use-${res.record.id}-${Date.now()}`,
+            name: usedName,
+            category: 'packageUse',
+            price: 0,
+            unit: '次',
+            description: '套票抵扣一次',
+            quantity: 1,
+            patientId: patientId,
+            packageRecordId: res.record.id
+        });
+        updateBillingDisplay();
+        await refreshPatientPackagesUI();
+        showToast(`已使用套票：${res.record.name}，剩餘 ${res.record.remainingUses} 次`, 'success');
+    } finally {
+        // 隱藏讀取中小圈
+        if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
     }
-    const usedName = `${res.record.name} (使用套票)`;
-    
-    selectedBillingItems.push({
-        id: `use-${res.record.id}-${Date.now()}`,
-        name: usedName,
-        category: 'packageUse',
-        price: 0,
-        unit: '次',
-        description: '套票抵扣一次',
-        quantity: 1,
-        patientId: patientId,
-        packageRecordId: res.record.id
-    });
-    updateBillingDisplay();
-    await refreshPatientPackagesUI();
-    showToast(`已使用套票：${res.record.name}，剩餘 ${res.record.remainingUses} 次`, 'success');
 }
 
 async function undoPackageUse(patientId, packageRecordId, usageItemId) {
-    // 等待 Firebase 數據管理器準備好，避免在初始化過程中無法更新套票
-    if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
-        for (let i = 0; i < 100 && (!window.firebaseDataManager || !window.firebaseDataManager.isReady); i++) {
-            await new Promise(resolve => setTimeout(resolve, 50));
+    // 顯示讀取中小圈
+    const __btn = window.__lastClickedButton;
+    if (typeof showButtonLoading === 'function') showButtonLoading(__btn);
+    
+        // 等待 Firebase 數據管理器準備好，避免在初始化過程中無法更新套票
+        if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+            for (let i = 0; i < 100 && (!window.firebaseDataManager || !window.firebaseDataManager.isReady); i++) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
         }
-    }
     // 先取得對應的項目
     const item = selectedBillingItems.find(it => it.id === usageItemId);
     if (!item) {
         // 找不到項目，可能已被刪除
         showToast('找不到套票使用項目', 'warning');
+        // 隱藏讀取中小圈（早期返回）
+        if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
         return;
     }
     // 推斷病人 ID：優先使用項目中的 patientId，其次使用傳入的參數，再退而從當前掛號推斷
@@ -8493,6 +8543,8 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
         updateBillingDisplay();
         showToast('已移除套票使用項目，未退回次數', 'info');
+        // 隱藏讀取中小圈（早期返回）
+        if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
         return;
     }
     // 以項目中的 packageRecordId 為準
@@ -8535,6 +8587,9 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
     } catch (error) {
         console.error('取消套票使用錯誤:', error);
         showToast('取消套票使用時發生錯誤', 'error');
+    } finally {
+        // 隱藏讀取中小圈
+        if (typeof hideButtonLoading === 'function') hideButtonLoading(__btn);
     }
 }
 
@@ -9102,4 +9157,82 @@ document.addEventListener('DOMContentLoaded', function() {
   window.updateRestPeriod = updateRestPeriod;
   window.useOnePackage = useOnePackage;
   window.undoPackageUse = undoPackageUse;
+})();
+
+// ==== 讀取中小圈功能與全局按鈕點擊監聽 ====
+// 此區塊負責在執行長時間操作時於按鈕上顯示小圈指示讀取中，以及提供顯示/隱藏函式。
+// 將事件掛載於 document，在點擊任何按鈕時記錄最後點擊的按鈕，供後續操作使用。
+(function() {
+    // 儲存最後點擊的按鈕
+    window.__lastClickedButton = null;
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('button');
+        if (btn) {
+            window.__lastClickedButton = btn;
+        }
+    });
+    // 注入樣式，用於顯示讀取中小圈覆蓋效果
+    const styleEl = document.createElement('style');
+    styleEl.textContent = `
+      .button-loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,0.5);
+        pointer-events: none;
+      }
+      .button-loading-overlay.active {
+        display: flex;
+      }
+      .button-loading-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(0,0,0,0.2);
+        border-top-color: rgba(0,0,0,0.6);
+        border-radius: 50%;
+        animation: button-spin 1s linear infinite;
+      }
+      @keyframes button-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      /* 隱藏取消使用按鈕旁可能存在的叉叉符號 */
+      button[onclick^="undoPackageUse"]::after {
+        content: '' !important;
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+    // 顯示按鈕讀取小圈
+    window.showButtonLoading = function(button) {
+        if (!button) return;
+        // 確保按鈕為相對定位，以便覆蓋層正確定位
+        const computed = window.getComputedStyle(button);
+        if (computed.position === 'static' || button.style.position === '') {
+            button.style.position = 'relative';
+        }
+        let overlay = button.querySelector('.button-loading-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'button-loading-overlay';
+            const spinner = document.createElement('div');
+            spinner.className = 'button-loading-spinner';
+            overlay.appendChild(spinner);
+            button.appendChild(overlay);
+        }
+        overlay.classList.add('active');
+    };
+    // 隱藏按鈕讀取小圈
+    window.hideButtonLoading = function(button) {
+        if (!button) return;
+        const overlay = button.querySelector('.button-loading-overlay');
+        if (overlay) {
+            overlay.classList.remove('active');
+        }
+    };
 })();
