@@ -3805,11 +3805,15 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                 result += line;
                             });
                             
-                            // 然後顯示所有項目（包括方劑和藥材），每行4個橫向排列
+                            // 然後顯示所有項目（包括方劑和藥材），每行最多 4 個，並平均分布整個寬度
                             if (regularItems.length > 0) {
                                 for (let j = 0; j < regularItems.length; j += 4) {
                                     const lineItems = regularItems.slice(j, j + 4);
-                                    result += `<div style="margin: 2px 0;">${lineItems.join('　')}</div>`;
+                                    // 為了讓藥名在收據中平均分佈整個可用寬度，我們使用等寬分欄的 CSS Grid。
+                                    // 計算當前行的項目數，並動態設置 grid-template-columns，使每一個藥材/方劑在一行內平分可用空間。
+                                    const columns = lineItems.length;
+                                    const itemsHtml = lineItems.map(item => `<span>${item}</span>`).join('');
+                                    result += `<div style="margin: 2px 0; display: grid; grid-template-columns: repeat(${columns}, 1fr);">${itemsHtml}</div>`;
                                 }
                             }
                             
@@ -6590,6 +6594,11 @@ async function initializeSystemAfterLogin() {
                                         onclick="undoPackageUse('${patientIdForUndo}', '${packageRecordIdForUndo}', '${item.id}')"
                                     >取消使用</button>
                                 ` : '';
+                        // 根據項目是否為套票使用決定是否顯示刪除按鈕
+                        // 若為套票使用 (packageUse)，刪除按鈕會被隱藏，以免與「取消使用」功能重複
+                        const removeBtn = isPackageUse
+                            ? ''
+                            : `<button onclick="removeBillingItem(${originalIndex})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>`;
                         // 數量控制區：套票使用項目僅顯示次數，不提供加減按鈕
                         const quantityControls = isPackageUse ? `
                                 <div class="flex items-center space-x-2 mr-3">
@@ -6638,7 +6647,7 @@ async function initializeSystemAfterLogin() {
                                 <div class="mr-3 text-right">
                                     <div class="font-bold ${subtotal < 0 ? 'text-red-600' : 'text-green-600'}">${subtotalDisplay}</div>
                                 </div>
-                                ${undoBtn}<button onclick="removeBillingItem(${originalIndex})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>
+                                ${undoBtn}${removeBtn}
                             </div>
                         `;
                     }).join('')}
