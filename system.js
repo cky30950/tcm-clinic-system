@@ -136,6 +136,32 @@ async function fetchUsers(forceRefresh = false) {
             }, 2000);
         }
         
+        // 按鈕讀取狀態控制函數
+        // 在按鈕上顯示一個半透明的旋轉小圈，以顯示正在讀取中。
+        // 原始內容將儲存在 data-originalHtml 中，完成後可復原。
+        function setButtonLoading(button, loadingText) {
+            if (!button) return;
+            // 儲存原始 HTML 內容以便還原
+            if (!button.dataset.originalHtml) {
+                button.dataset.originalHtml = button.innerHTML;
+            }
+            // 構建載入中的內容：小圓形旋轉動畫與文本
+            const text = (loadingText !== undefined && loadingText !== null) ? loadingText : (button.textContent || '');
+            // 使用 Tailwind CSS 的 animate-spin 及邊框類別形成半透明小圈
+            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white opacity-50 mr-2"></div><span>${text}</span>`;
+            button.disabled = true;
+        }
+
+        // 清除按鈕讀取狀態，還原原始內容
+        function clearButtonLoading(button) {
+            if (!button) return;
+            if (button.dataset.originalHtml) {
+                button.innerHTML = button.dataset.originalHtml;
+                delete button.dataset.originalHtml;
+            }
+            button.disabled = false;
+        }
+
         // 計算年齡函數
         function calculateAge(birthDate) {
             const birth = new Date(birthDate);
@@ -285,11 +311,9 @@ async function attemptMainLogin() {
         return;
     }
 
-    // 顯示載入狀態
+    // 顯示載入狀態：在按鈕中顯示旋轉小圈並禁用按鈕
     const loginButton = document.querySelector('button[onclick="attemptMainLogin()"]');
-    const originalText = loginButton.textContent;
-    loginButton.textContent = '登入中...';
-    loginButton.disabled = true;
+    setButtonLoading(loginButton, '登入中...');
 
     try {
         // 等待 Firebase 初始化
@@ -410,9 +434,8 @@ async function attemptMainLogin() {
         showToast(errorMessage, 'error');
         document.getElementById('mainLoginPassword').value = '';
     } finally {
-        // 恢復按鈕狀態
-        loginButton.textContent = originalText;
-        loginButton.disabled = false;
+        // 恢復按鈕狀態與內容
+        clearButtonLoading(loginButton);
     }
 }
 
@@ -749,6 +772,14 @@ async function savePatient() {
 
     // 不限制身分證字號格式，因此無需檢查格式
 
+    // 顯示載入中狀態：根據是新增或更新顯示不同文字
+    const saveButton = document.querySelector('[onclick="savePatient()"]');
+    if (saveButton) {
+        // 若正在編輯，顯示「更新中...」，否則顯示「儲存中...」
+        const loadingText = (typeof editingPatientId !== 'undefined' && editingPatientId) ? '更新中...' : '儲存中...';
+        setButtonLoading(saveButton, loadingText);
+    }
+
     try {
         if (editingPatientId) {
             // 更新現有病人
@@ -784,6 +815,11 @@ async function savePatient() {
     } catch (error) {
         console.error('保存病人資料錯誤:', error);
         showToast('保存時發生錯誤，請稍後再試', 'error');
+    } finally {
+        // 還原按鈕狀態與內容
+        if (saveButton) {
+            clearButtonLoading(saveButton);
+        }
     }
 }
 
@@ -2468,14 +2504,10 @@ async function saveConsultation() {
         }
     }
 
-    // 在進入 try 區塊之前禁用保存按鈕並記錄原始按鈕文字，
-    // 以避免 finally 區塊無法存取 originalText 的錯誤（參考語法：let/const 具有塊級作用域）
+    // 在進入 try 區塊之前禁用保存按鈕並顯示讀取中小圈
     const saveButton = document.querySelector('[onclick="saveConsultation()"]');
-    let originalText = '';
     if (saveButton) {
-        originalText = saveButton.textContent;
-        saveButton.textContent = '保存中...';
-        saveButton.disabled = true;
+        setButtonLoading(saveButton, '保存中...');
     }
     try {
         // 確認預先取得的 appointment 是否存在，若不存在則提示錯誤
@@ -2568,11 +2600,10 @@ async function saveConsultation() {
         console.error('保存診症記錄錯誤:', error);
         showToast('保存時發生錯誤', 'error');
     } finally {
-        // 恢復按鈕狀態
+        // 恢復按鈕狀態與內容
         const saveButton = document.querySelector('[onclick="saveConsultation()"]');
         if (saveButton) {
-            saveButton.textContent = originalText;
-            saveButton.disabled = false;
+            clearButtonLoading(saveButton);
         }
     }
 }
@@ -7464,11 +7495,9 @@ async function saveUser() {
         }
     }
 
-    // 顯示保存中狀態
+    // 顯示保存中狀態：在按鈕中顯示旋轉小圈並禁用按鈕
     const saveButton = document.querySelector('[onclick="saveUser()"]');
-    const originalText = saveButton.textContent;
-    saveButton.textContent = '保存中...';
-    saveButton.disabled = true;
+    setButtonLoading(saveButton, '保存中...');
 
     try {
         if (editingUserId) {
@@ -7556,9 +7585,8 @@ async function saveUser() {
         console.error('保存用戶資料錯誤:', error);
         showToast('保存時發生錯誤', 'error');
     } finally {
-        // 恢復按鈕狀態
-        saveButton.textContent = originalText;
-        saveButton.disabled = false;
+        // 恢復按鈕狀態與內容
+        clearButtonLoading(saveButton);
     }
 }
 
