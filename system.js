@@ -136,32 +136,6 @@ async function fetchUsers(forceRefresh = false) {
             }, 2000);
         }
         
-        // 按鈕讀取狀態控制函數
-        // 在按鈕上顯示一個半透明的旋轉小圈，以顯示正在讀取中。
-        // 原始內容將儲存在 data-originalHtml 中，完成後可復原。
-        function setButtonLoading(button, loadingText) {
-            if (!button) return;
-            // 儲存原始 HTML 內容以便還原
-            if (!button.dataset.originalHtml) {
-                button.dataset.originalHtml = button.innerHTML;
-            }
-            // 構建載入中的內容：小圓形旋轉動畫與文本
-            const text = (loadingText !== undefined && loadingText !== null) ? loadingText : (button.textContent || '');
-            // 使用 Tailwind CSS 的 animate-spin 及邊框類別形成半透明小圈
-            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white opacity-50 mr-2"></div><span>${text}</span>`;
-            button.disabled = true;
-        }
-
-        // 清除按鈕讀取狀態，還原原始內容
-        function clearButtonLoading(button) {
-            if (!button) return;
-            if (button.dataset.originalHtml) {
-                button.innerHTML = button.dataset.originalHtml;
-                delete button.dataset.originalHtml;
-            }
-            button.disabled = false;
-        }
-
         // 計算年齡函數
         function calculateAge(birthDate) {
             const birth = new Date(birthDate);
@@ -311,9 +285,11 @@ async function attemptMainLogin() {
         return;
     }
 
-    // 顯示載入狀態：在按鈕中顯示旋轉小圈並禁用按鈕
+    // 顯示載入狀態
     const loginButton = document.querySelector('button[onclick="attemptMainLogin()"]');
-    setButtonLoading(loginButton, '登入中...');
+    const originalText = loginButton.textContent;
+    loginButton.textContent = '登入中...';
+    loginButton.disabled = true;
 
     try {
         // 等待 Firebase 初始化
@@ -434,8 +410,9 @@ async function attemptMainLogin() {
         showToast(errorMessage, 'error');
         document.getElementById('mainLoginPassword').value = '';
     } finally {
-        // 恢復按鈕狀態與內容
-        clearButtonLoading(loginButton);
+        // 恢復按鈕狀態
+        loginButton.textContent = originalText;
+        loginButton.disabled = false;
     }
 }
 
@@ -772,14 +749,6 @@ async function savePatient() {
 
     // 不限制身分證字號格式，因此無需檢查格式
 
-    // 顯示載入中狀態：根據是新增或更新顯示不同文字
-    const saveButton = document.querySelector('[onclick="savePatient()"]');
-    if (saveButton) {
-        // 若正在編輯，顯示「更新中...」，否則顯示「儲存中...」
-        const loadingText = (typeof editingPatientId !== 'undefined' && editingPatientId) ? '更新中...' : '儲存中...';
-        setButtonLoading(saveButton, loadingText);
-    }
-
     try {
         if (editingPatientId) {
             // 更新現有病人
@@ -815,11 +784,6 @@ async function savePatient() {
     } catch (error) {
         console.error('保存病人資料錯誤:', error);
         showToast('保存時發生錯誤，請稍後再試', 'error');
-    } finally {
-        // 還原按鈕狀態與內容
-        if (saveButton) {
-            clearButtonLoading(saveButton);
-        }
     }
 }
 
@@ -2504,10 +2468,14 @@ async function saveConsultation() {
         }
     }
 
-    // 在進入 try 區塊之前禁用保存按鈕並顯示讀取中小圈
+    // 在進入 try 區塊之前禁用保存按鈕並記錄原始按鈕文字，
+    // 以避免 finally 區塊無法存取 originalText 的錯誤（參考語法：let/const 具有塊級作用域）
     const saveButton = document.querySelector('[onclick="saveConsultation()"]');
+    let originalText = '';
     if (saveButton) {
-        setButtonLoading(saveButton, '保存中...');
+        originalText = saveButton.textContent;
+        saveButton.textContent = '保存中...';
+        saveButton.disabled = true;
     }
     try {
         // 確認預先取得的 appointment 是否存在，若不存在則提示錯誤
@@ -2600,10 +2568,11 @@ async function saveConsultation() {
         console.error('保存診症記錄錯誤:', error);
         showToast('保存時發生錯誤', 'error');
     } finally {
-        // 恢復按鈕狀態與內容
+        // 恢復按鈕狀態
         const saveButton = document.querySelector('[onclick="saveConsultation()"]');
         if (saveButton) {
-            clearButtonLoading(saveButton);
+            saveButton.textContent = originalText;
+            saveButton.disabled = false;
         }
     }
 }
@@ -5335,7 +5304,8 @@ async function initializeSystemAfterLogin() {
                     </div>
                     
                     <div class="space-y-2 text-sm">
-                        <!-- 移除性味與歸經顯示 -->
+                        ${herb.nature ? `<div><span class="font-medium text-gray-700">性味：</span>${herb.nature}</div>` : ''}
+                        ${herb.meridian ? `<div><span class="font-medium text-gray-700">歸經：</span>${herb.meridian}</div>` : ''}
                         ${herb.effects ? `<div><span class="font-medium text-gray-700">功效：</span>${herb.effects}</div>` : ''}
                         ${herb.dosage ? `<div><span class="font-medium text-gray-700">劑量：</span><span class="text-blue-600 font-medium">${herb.dosage}</span></div>` : ''}
                         ${herb.cautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${herb.cautions}</span></div>` : ''}
@@ -5360,14 +5330,14 @@ async function initializeSystemAfterLogin() {
                     
                     <div class="space-y-3 text-sm">
                         ${formula.effects ? `<div><span class="font-medium text-gray-700">功效：</span>${formula.effects}</div>` : ''}
-                        <!-- 移除主治顯示 -->
+                        ${formula.indications ? `<div><span class="font-medium text-gray-700">主治：</span>${formula.indications}</div>` : ''}
                         ${formula.composition ? `
                             <div>
                                 <span class="font-medium text-gray-700">組成：</span>
                                 <div class="mt-1 p-2 bg-yellow-50 rounded text-xs whitespace-pre-line border-l-2 border-yellow-400">${formula.composition}</div>
                             </div>
                         ` : ''}
-                        <!-- 移除用法顯示 -->
+                        ${formula.usage ? `<div><span class="font-medium text-gray-700">用法：</span>${formula.usage}</div>` : ''}
                         ${formula.cautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${formula.cautions}</span></div>` : ''}
                     </div>
                 </div>
@@ -5390,8 +5360,7 @@ async function initializeSystemAfterLogin() {
         }
         
         function clearHerbForm() {
-            // 移除性味、歸經與主治欄位，僅清除仍使用的欄位
-            ['herbName', 'herbAlias', 'herbEffects', 'herbDosage', 'herbCautions'].forEach(id => {
+            ['herbName', 'herbAlias', 'herbNature', 'herbMeridian', 'herbEffects', 'herbIndications', 'herbDosage', 'herbCautions'].forEach(id => {
                 document.getElementById(id).value = '';
             });
         }
@@ -5406,9 +5375,10 @@ async function initializeSystemAfterLogin() {
             
             document.getElementById('herbName').value = herb.name || '';
             document.getElementById('herbAlias').value = herb.alias || '';
-            // 不再處理性味與歸經欄位
+            document.getElementById('herbNature').value = herb.nature || '';
+            document.getElementById('herbMeridian').value = herb.meridian || '';
             document.getElementById('herbEffects').value = herb.effects || '';
-            // 主治欄位已移除
+            document.getElementById('herbIndications').value = herb.indications || '';
             document.getElementById('herbDosage').value = herb.dosage || '';
             document.getElementById('herbCautions').value = herb.cautions || '';
             
@@ -5423,13 +5393,15 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
-            // 組合中藥物件時，不再包含性味、歸經與主治欄位
             const herb = {
                 id: editingHerbId || Date.now(),
                 type: 'herb',
                 name: name,
                 alias: document.getElementById('herbAlias').value.trim(),
+                nature: document.getElementById('herbNature').value.trim(),
+                meridian: document.getElementById('herbMeridian').value.trim(),
                 effects: document.getElementById('herbEffects').value.trim(),
+                indications: document.getElementById('herbIndications').value.trim(),
                 dosage: document.getElementById('herbDosage').value.trim(),
                 cautions: document.getElementById('herbCautions').value.trim(),
                 createdAt: editingHerbId ? herbLibrary.find(h => h.id === editingHerbId).createdAt : new Date().toISOString(),
@@ -5474,8 +5446,7 @@ async function initializeSystemAfterLogin() {
         }
         
         function clearFormulaForm() {
-            // 只清除仍使用的欄位，移除主治與用法
-            ['formulaName', 'formulaSource', 'formulaEffects', 'formulaComposition', 'formulaCautions'].forEach(id => {
+            ['formulaName', 'formulaSource', 'formulaEffects', 'formulaIndications', 'formulaComposition', 'formulaUsage', 'formulaCautions'].forEach(id => {
                 document.getElementById(id).value = '';
             });
         }
@@ -5491,8 +5462,9 @@ async function initializeSystemAfterLogin() {
             document.getElementById('formulaName').value = formula.name || '';
             document.getElementById('formulaSource').value = formula.source || '';
             document.getElementById('formulaEffects').value = formula.effects || '';
-            // 主治與用法欄位已移除，不再填入
+            document.getElementById('formulaIndications').value = formula.indications || '';
             document.getElementById('formulaComposition').value = formula.composition || '';
+            document.getElementById('formulaUsage').value = formula.usage || '';
             document.getElementById('formulaCautions').value = formula.cautions || '';
             
             document.getElementById('addFormulaModal').classList.remove('hidden');
@@ -5512,14 +5484,15 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
-            // 組合方劑物件時，不再包含主治與用法欄位
             const formula = {
                 id: editingFormulaId || Date.now(),
                 type: 'formula',
                 name: name,
                 source: document.getElementById('formulaSource').value.trim(),
                 effects: document.getElementById('formulaEffects').value.trim(),
+                indications: document.getElementById('formulaIndications').value.trim(),
                 composition: composition,
+                usage: document.getElementById('formulaUsage').value.trim(),
                 cautions: document.getElementById('formulaCautions').value.trim(),
                 createdAt: editingFormulaId ? herbLibrary.find(f => f.id === editingFormulaId).createdAt : new Date().toISOString(),
                 updatedAt: new Date().toISOString()
@@ -7491,9 +7464,11 @@ async function saveUser() {
         }
     }
 
-    // 顯示保存中狀態：在按鈕中顯示旋轉小圈並禁用按鈕
+    // 顯示保存中狀態
     const saveButton = document.querySelector('[onclick="saveUser()"]');
-    setButtonLoading(saveButton, '保存中...');
+    const originalText = saveButton.textContent;
+    saveButton.textContent = '保存中...';
+    saveButton.disabled = true;
 
     try {
         if (editingUserId) {
@@ -7581,8 +7556,9 @@ async function saveUser() {
         console.error('保存用戶資料錯誤:', error);
         showToast('保存時發生錯誤', 'error');
     } finally {
-        // 恢復按鈕狀態與內容
-        clearButtonLoading(saveButton);
+        // 恢復按鈕狀態
+        saveButton.textContent = originalText;
+        saveButton.disabled = false;
     }
 }
 
@@ -9039,20 +9015,6 @@ window.addEventListener('load', async () => {
 document.addEventListener('DOMContentLoaded', function() {
     
     updateClinicSettingsDisplay();
-
-    // 隱藏不再使用的中藥材及方劑欄位：性味、歸經、主治、用法
-    ['herbNature', 'herbMeridian', 'herbIndications', 'formulaIndications', 'formulaUsage'].forEach(function(id) {
-        const el = document.getElementById(id);
-        if (el) {
-            // 嘗試隱藏包含此輸入的父層容器（通常為欄位區塊）。
-            const container = el.closest('div');
-            if (container) {
-                container.style.display = 'none';
-            } else {
-                el.style.display = 'none';
-            }
-        }
-    });
     
     
     // 自動聚焦到電子郵件輸入框
