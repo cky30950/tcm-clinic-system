@@ -5222,60 +5222,83 @@ async function updateStatistics() {
             console.log('Firebase 數據管理器尚未準備就緒，統計資訊將稍後更新');
             return;
         }
-        // 從 Firebase 獲取病人總數
-        const result = await window.firebaseDataManager.getPatients();
-        const totalPatients = result.success ? result.data.length : 0;
-        
+
+        // 確保病人資料已載入：若目前全域 patients 為空，則從 Firebase 讀取一次
+        let totalPatients = 0;
+        if (Array.isArray(patients) && patients.length > 0) {
+            totalPatients = patients.length;
+        } else {
+            try {
+                const patientResult = await window.firebaseDataManager.getPatients();
+                if (patientResult.success) {
+                    patients = patientResult.data;
+                    totalPatients = patients.length;
+                }
+            } catch (error) {
+                console.error('獲取病人數據錯誤:', error);
+            }
+        }
+
         // 更新病人總數顯示
         const totalPatientsElement = document.getElementById('totalPatients');
         if (totalPatientsElement) {
             totalPatientsElement.textContent = totalPatients;
         }
-        
-        // 從 Firebase 獲取掛號數據
+
+        // 確保掛號資料已載入：若目前全域 appointments 為空，則從 Firebase 讀取一次
         let appointmentsData = [];
-        try {
-            const appointmentResult = await window.firebaseDataManager.getAppointments();
-            if (appointmentResult.success) {
-                appointmentsData = appointmentResult.data;
-                // 同步更新全域變數
-                appointments = appointmentsData;
+        if (Array.isArray(appointments) && appointments.length > 0) {
+            appointmentsData = appointments;
+        } else {
+            try {
+                const appointmentResult = await window.firebaseDataManager.getAppointments();
+                if (appointmentResult.success) {
+                    appointmentsData = appointmentResult.data;
+                    appointments = appointmentsData;
+                }
+            } catch (error) {
+                console.error('獲取掛號數據錯誤:', error);
             }
-        } catch (error) {
-            console.error('獲取掛號數據錯誤:', error);
         }
-        
-        // 計算今日診療數（從掛號數據計算）
+
+        // 計算今日診療數（從掛號資料計算）
         const today = new Date().toDateString();
-        const todayConsultations = appointmentsData.filter(apt => 
-            apt.status === 'completed' && 
+        const todayConsultations = appointmentsData.filter(apt =>
+            apt.status === 'completed' &&
             new Date(apt.appointmentTime).toDateString() === today
         ).length;
-        
+
         const todayConsultationsElement = document.getElementById('todayConsultations');
         if (todayConsultationsElement) {
             todayConsultationsElement.textContent = todayConsultations;
         }
-        
+
         // 計算本月診療數
         const thisMonth = new Date();
-        const monthlyConsultations = appointmentsData.filter(apt => 
-            apt.status === 'completed' && 
+        const monthlyConsultations = appointmentsData.filter(apt =>
+            apt.status === 'completed' &&
             new Date(apt.appointmentTime).getMonth() === thisMonth.getMonth() &&
             new Date(apt.appointmentTime).getFullYear() === thisMonth.getFullYear()
         ).length;
-        
+
         const monthlyConsultationsElement = document.getElementById('monthlyConsultations');
         if (monthlyConsultationsElement) {
             monthlyConsultationsElement.textContent = monthlyConsultations;
         }
-        
     } catch (error) {
         console.error('更新統計錯誤:', error);
-        // 如果 Firebase 讀取失敗，顯示 0
+        // 若更新失敗，將統計資訊顯示為 0
         const totalPatientsElement = document.getElementById('totalPatients');
         if (totalPatientsElement) {
             totalPatientsElement.textContent = '0';
+        }
+        const todayConsultationsElement = document.getElementById('todayConsultations');
+        if (todayConsultationsElement) {
+            todayConsultationsElement.textContent = '0';
+        }
+        const monthlyConsultationsElement = document.getElementById('monthlyConsultations');
+        if (monthlyConsultationsElement) {
+            monthlyConsultationsElement.textContent = '0';
         }
     }
 }
@@ -5289,13 +5312,9 @@ async function initializeSystemAfterLogin() {
         await new Promise(resolve => setTimeout(resolve, 100));
     }
     try {
-        // 載入掛號數據
-        const appointmentResult = await window.firebaseDataManager.getAppointments();
-        if (appointmentResult && appointmentResult.success) {
-            appointments = appointmentResult.data;
-        } else {
-            appointments = [];
-        }
+        // 當前進入主頁面時，暫時僅載入必要的診療記錄資料，
+        // 不再主動讀取掛號與病人資料，避免重複從 Firebase 讀取。
+
         // 載入診療記錄
         const consultationResult = await window.firebaseDataManager.getConsultations();
         if (consultationResult && consultationResult.success) {
@@ -5303,24 +5322,20 @@ async function initializeSystemAfterLogin() {
         } else {
             consultations = [];
         }
-        // 載入患者數據
-        const patientResult = await window.firebaseDataManager.getPatients();
-        if (patientResult && patientResult.success) {
-            patients = patientResult.data;
-        } else {
-            patients = [];
-        }
-        console.log('登入後系統資料初始化完成');
+
+        // 清空掛號和病人全域變數，以避免誤用未載入資料
+        appointments = [];
+        patients = [];
+
+        console.log('登入後系統資料初始化完成（已載入診療記錄，掛號及病人資料略過）');
     } catch (error) {
         console.error('初始化系統資料失敗:', error);
         appointments = [];
         consultations = [];
         patients = [];
     }
-    // 更新統計
-    updateStatistics();
-    // 啟動實時掛號監聽，無需手動更新今日掛號列表
-    subscribeToAppointments();
+
+    // 初始化完成後不立即更新統計或訂閱掛號資料，以避免不必要的讀取。
 }
 
 
