@@ -7111,9 +7111,11 @@ async function initializeSystemAfterLogin() {
                 // 清空現有收費項目並解析
                 selectedBillingItems = [];
                 parseBillingItemsFromText(lastConsultation.billingItems);
-                // 根據要求：載入上次收費時，排除任何「使用套票」的抵扣項目。
+                // 根據要求：載入上次收費時，排除任何「使用套票」的抵扣項目與套票購買項目。
+                // 原先僅排除 category 為 'packageUse' 的項目（即使用套票時產生的抵扣），
+                // 但後續需求也要排除 category 為 'package' 的項目（即購買套票的收費項目）。
                 if (Array.isArray(selectedBillingItems) && selectedBillingItems.length > 0) {
-                    selectedBillingItems = selectedBillingItems.filter(item => item.category !== 'packageUse');
+                    selectedBillingItems = selectedBillingItems.filter(item => item.category !== 'packageUse' && item.category !== 'package');
                 }
                 // 更新顯示
                 updateBillingDisplay();
@@ -7190,9 +7192,13 @@ function parseBillingItemsFromText(billingText) {
         
         // 載入上次收費項目（內部函數 - 保留向後兼容）
         function loadPreviousBillingItemsFromConsultation(lastConsultation) {
-            selectedBillingItems = [];
-            parseBillingItemsFromText(lastConsultation.billingItems);
-            updateBillingDisplay();
+    selectedBillingItems = [];
+    parseBillingItemsFromText(lastConsultation.billingItems);
+    // 排除載入舊病歷時的套票抵扣和購買項目，避免重複加載。
+    if (Array.isArray(selectedBillingItems) && selectedBillingItems.length > 0) {
+        selectedBillingItems = selectedBillingItems.filter(item => item.category !== 'packageUse' && item.category !== 'package');
+    }
+    updateBillingDisplay();
         }
         
         // 載入指定病歷記錄到當前診症
