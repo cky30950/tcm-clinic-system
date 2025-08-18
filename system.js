@@ -5328,10 +5328,7 @@ async function initializeSystemAfterLogin() {
     // 確保 Firebase 資料管理器已準備好（使用共用函式以減少重複程式碼）
     await waitForFirebaseDataManager();
     try {
-        // 當前進入主頁面時，暫時僅載入必要的診療記錄資料，
-        // 不再主動讀取掛號與病人資料，避免重複從 Firebase 讀取。
-
-        // 載入診療記錄
+        // 讀取診療記錄資料
         const consultationResult = await window.firebaseDataManager.getConsultations();
         if (consultationResult && consultationResult.success) {
             consultations = consultationResult.data;
@@ -5339,11 +5336,41 @@ async function initializeSystemAfterLogin() {
             consultations = [];
         }
 
-        // 清空掛號和病人全域變數，以避免誤用未載入資料
-        appointments = [];
-        patients = [];
+        // 讀取病人資料
+        try {
+            const patientResult = await window.firebaseDataManager.getPatients();
+            if (patientResult && patientResult.success) {
+                patients = patientResult.data;
+            } else {
+                patients = [];
+            }
+        } catch (err) {
+            console.error('讀取病人資料失敗:', err);
+            patients = [];
+        }
 
-        console.log('登入後系統資料初始化完成（已載入診療記錄，掛號及病人資料略過）');
+        // 讀取掛號資料
+        try {
+            const appointmentResult = await window.firebaseDataManager.getAppointments();
+            if (appointmentResult && appointmentResult.success) {
+                appointments = appointmentResult.data;
+            } else {
+                appointments = [];
+            }
+        } catch (err) {
+            console.error('讀取掛號資料失敗:', err);
+            appointments = [];
+        }
+
+        // 將掛號資料儲存到本地作為備份
+        try {
+            localStorage.setItem('appointments', JSON.stringify(appointments));
+        } catch (err) {
+            // 即使本地儲存失敗，也不要阻塞整體流程
+            console.warn('無法儲存掛號資料到本地:', err);
+        }
+
+        console.log('登入後系統資料初始化完成（已載入診療記錄、病人及掛號資料）');
     } catch (error) {
         console.error('初始化系統資料失敗:', error);
         appointments = [];
@@ -5351,7 +5378,24 @@ async function initializeSystemAfterLogin() {
         patients = [];
     }
 
-    // 初始化完成後不立即更新統計或訂閱掛號資料，以避免不必要的讀取。
+    // 載入今日掛號列表以顯示初始資訊
+    try {
+        await loadTodayAppointments();
+    } catch (err) {
+        console.error('載入今日掛號列表時發生錯誤:', err);
+    }
+    // 更新統計資訊
+    try {
+        await updateStatistics();
+    } catch (err) {
+        console.error('更新統計資訊時發生錯誤:', err);
+    }
+    // 訂閱掛號即時更新，以恢復掛號資料實時監聽功能
+    try {
+        subscribeToAppointments();
+    } catch (err) {
+        console.error('設定掛號即時監聽失敗:', err);
+    }
 }
 
 
