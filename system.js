@@ -14,6 +14,29 @@ let consultationCache = null;
 let userCache = null;
 
 /**
+ * 等待 Firebase 初始化完成。
+ * 某些函式需要在 Firebase SDK 準備好後才可運行，將重複的等待邏輯抽取為共用方法。
+ * @returns {Promise<void>}
+ */
+async function waitForFirebase() {
+    while (!window.firebase || !window.firebase.db) {
+        // 簡短延遲以避免阻塞主線程
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+}
+
+/**
+ * 等待 FirebaseDataManager 初始化完成。
+ * FirebaseDataManager 包含 isReady 屬性，初始化後才能呼叫其方法。
+ * @returns {Promise<void>}
+ */
+async function waitForFirebaseDataManager() {
+    while (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+}
+
+/**
  * 取得病人列表並使用本地快取。
  * @param {boolean} forceRefresh 是否強制重新從 Firestore 讀取資料
  * @returns {Promise<Array>} 病人資料陣列
@@ -302,10 +325,8 @@ async function fetchUsers(forceRefresh = false) {
          * 此函式會等待 Firebase 初始化完成後再執行。
          */
         async function initHerbLibrary() {
-            // 等待 Firebase 初始化
-            while (!window.firebase || !window.firebase.db) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
+            // 等待 Firebase 初始化（改用共用函式以減少重複程式碼）
+            await waitForFirebase();
             try {
                 // 從 Firestore 取得 herbLibrary 集合資料
                 const querySnapshot = await window.firebase.getDocs(
@@ -336,10 +357,8 @@ async function fetchUsers(forceRefresh = false) {
          * 此函式會等待 Firebase 初始化完成後再執行。
          */
         async function initBillingItems() {
-            // 等待 Firebase 初始化
-            while (!window.firebase || !window.firebase.db) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
+            // 等待 Firebase 初始化（改用共用函式以減少重複程式碼）
+            await waitForFirebase();
             try {
                 // 從 Firestore 取得 billingItems 集合資料
                 const querySnapshot = await window.firebase.getDocs(
@@ -382,10 +401,8 @@ async function attemptMainLogin() {
     setButtonLoading(loginButton, '登入中...');
 
     try {
-        // 等待 Firebase 初始化
-        while (!window.firebase) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        // 等待 Firebase 初始化（使用共用函式以減少重複程式碼）
+        await waitForFirebase();
 
         // 使用 Firebase 登入
         const userCredential = await window.firebase.signInWithEmailAndPassword(
@@ -466,13 +483,16 @@ async function attemptMainLogin() {
         // 目前中藥庫管理與收費項目管理僅在進入各頁面時會重新讀取 Firestore 資料，
         // 為了縮短首次進入功能頁面的等待時間，這裡於登入後就先行載入一次。
         try {
-            // 若有定義 initHerbLibrary 函式，則執行一次
+            // 若有定義初始化函式則建立任務陣列並併發執行，以縮短等待時間
+            const initTasks = [];
             if (typeof initHerbLibrary === 'function') {
-                await initHerbLibrary();
+                initTasks.push(initHerbLibrary());
             }
-            // 若有定義 initBillingItems 函式，則執行一次
             if (typeof initBillingItems === 'function') {
-                await initBillingItems();
+                initTasks.push(initBillingItems());
+            }
+            if (initTasks.length > 0) {
+                await Promise.all(initTasks);
             }
         } catch (error) {
             console.error('初始化中藥庫或收費項目資料失敗:', error);
@@ -508,10 +528,8 @@ async function attemptMainLogin() {
 // 同步 Firebase 用戶數據到本地
 async function syncUserDataFromFirebase() {
     try {
-        if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
-            console.log('Firebase 數據管理器尚未準備就緒，跳過同步');
-            return;
-        }
+        // 等待 FirebaseDataManager 就緒再進行同步
+        await waitForFirebaseDataManager();
 
         const result = await window.firebaseDataManager.getUsers();
         if (result.success && result.data.length > 0) {
@@ -5222,60 +5240,83 @@ async function updateStatistics() {
             console.log('Firebase 數據管理器尚未準備就緒，統計資訊將稍後更新');
             return;
         }
-        // 從 Firebase 獲取病人總數
-        const result = await window.firebaseDataManager.getPatients();
-        const totalPatients = result.success ? result.data.length : 0;
-        
+
+        // 確保病人資料已載入：若目前全域 patients 為空，則從 Firebase 讀取一次
+        let totalPatients = 0;
+        if (Array.isArray(patients) && patients.length > 0) {
+            totalPatients = patients.length;
+        } else {
+            try {
+                const patientResult = await window.firebaseDataManager.getPatients();
+                if (patientResult.success) {
+                    patients = patientResult.data;
+                    totalPatients = patients.length;
+                }
+            } catch (error) {
+                console.error('獲取病人數據錯誤:', error);
+            }
+        }
+
         // 更新病人總數顯示
         const totalPatientsElement = document.getElementById('totalPatients');
         if (totalPatientsElement) {
             totalPatientsElement.textContent = totalPatients;
         }
-        
-        // 從 Firebase 獲取掛號數據
+
+        // 確保掛號資料已載入：若目前全域 appointments 為空，則從 Firebase 讀取一次
         let appointmentsData = [];
-        try {
-            const appointmentResult = await window.firebaseDataManager.getAppointments();
-            if (appointmentResult.success) {
-                appointmentsData = appointmentResult.data;
-                // 同步更新全域變數
-                appointments = appointmentsData;
+        if (Array.isArray(appointments) && appointments.length > 0) {
+            appointmentsData = appointments;
+        } else {
+            try {
+                const appointmentResult = await window.firebaseDataManager.getAppointments();
+                if (appointmentResult.success) {
+                    appointmentsData = appointmentResult.data;
+                    appointments = appointmentsData;
+                }
+            } catch (error) {
+                console.error('獲取掛號數據錯誤:', error);
             }
-        } catch (error) {
-            console.error('獲取掛號數據錯誤:', error);
         }
-        
-        // 計算今日診療數（從掛號數據計算）
+
+        // 計算今日診療數（從掛號資料計算）
         const today = new Date().toDateString();
-        const todayConsultations = appointmentsData.filter(apt => 
-            apt.status === 'completed' && 
+        const todayConsultations = appointmentsData.filter(apt =>
+            apt.status === 'completed' &&
             new Date(apt.appointmentTime).toDateString() === today
         ).length;
-        
+
         const todayConsultationsElement = document.getElementById('todayConsultations');
         if (todayConsultationsElement) {
             todayConsultationsElement.textContent = todayConsultations;
         }
-        
+
         // 計算本月診療數
         const thisMonth = new Date();
-        const monthlyConsultations = appointmentsData.filter(apt => 
-            apt.status === 'completed' && 
+        const monthlyConsultations = appointmentsData.filter(apt =>
+            apt.status === 'completed' &&
             new Date(apt.appointmentTime).getMonth() === thisMonth.getMonth() &&
             new Date(apt.appointmentTime).getFullYear() === thisMonth.getFullYear()
         ).length;
-        
+
         const monthlyConsultationsElement = document.getElementById('monthlyConsultations');
         if (monthlyConsultationsElement) {
             monthlyConsultationsElement.textContent = monthlyConsultations;
         }
-        
     } catch (error) {
         console.error('更新統計錯誤:', error);
-        // 如果 Firebase 讀取失敗，顯示 0
+        // 若更新失敗，將統計資訊顯示為 0
         const totalPatientsElement = document.getElementById('totalPatients');
         if (totalPatientsElement) {
             totalPatientsElement.textContent = '0';
+        }
+        const todayConsultationsElement = document.getElementById('todayConsultations');
+        if (todayConsultationsElement) {
+            todayConsultationsElement.textContent = '0';
+        }
+        const monthlyConsultationsElement = document.getElementById('monthlyConsultations');
+        if (monthlyConsultationsElement) {
+            monthlyConsultationsElement.textContent = '0';
         }
     }
 }
@@ -5284,18 +5325,12 @@ async function updateStatistics() {
 // 這個函式會載入掛號、診療記錄及患者資料，
 // 並在完成後更新統計資訊以及訂閱掛號即時更新。
 async function initializeSystemAfterLogin() {
-    // 確保 Firebase 資料管理器已準備好
-    while (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-    }
+    // 確保 Firebase 資料管理器已準備好（使用共用函式以減少重複程式碼）
+    await waitForFirebaseDataManager();
     try {
-        // 載入掛號數據
-        const appointmentResult = await window.firebaseDataManager.getAppointments();
-        if (appointmentResult && appointmentResult.success) {
-            appointments = appointmentResult.data;
-        } else {
-            appointments = [];
-        }
+        // 當前進入主頁面時，暫時僅載入必要的診療記錄資料，
+        // 不再主動讀取掛號與病人資料，避免重複從 Firebase 讀取。
+
         // 載入診療記錄
         const consultationResult = await window.firebaseDataManager.getConsultations();
         if (consultationResult && consultationResult.success) {
@@ -5303,24 +5338,20 @@ async function initializeSystemAfterLogin() {
         } else {
             consultations = [];
         }
-        // 載入患者數據
-        const patientResult = await window.firebaseDataManager.getPatients();
-        if (patientResult && patientResult.success) {
-            patients = patientResult.data;
-        } else {
-            patients = [];
-        }
-        console.log('登入後系統資料初始化完成');
+
+        // 清空掛號和病人全域變數，以避免誤用未載入資料
+        appointments = [];
+        patients = [];
+
+        console.log('登入後系統資料初始化完成（已載入診療記錄，掛號及病人資料略過）');
     } catch (error) {
         console.error('初始化系統資料失敗:', error);
         appointments = [];
         consultations = [];
         patients = [];
     }
-    // 更新統計
-    updateStatistics();
-    // 啟動實時掛號監聽，無需手動更新今日掛號列表
-    subscribeToAppointments();
+
+    // 初始化完成後不立即更新統計或訂閱掛號資料，以避免不必要的讀取。
 }
 
 
@@ -8884,10 +8915,8 @@ class FirebaseDataManager {
     }
 
     async initializeWhenReady() {
-        // 等待 Firebase 初始化
-        while (!window.firebase) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        // 等待 Firebase 初始化（使用共用函式以減少重複程式碼）
+        await waitForFirebase();
         this.isReady = true;
         console.log('Firebase 數據管理器已準備就緒');
     }
