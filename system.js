@@ -141,30 +141,53 @@ async function fetchUsers(forceRefresh = false) {
         // 原始內容將儲存在 data-originalHtml 中，完成後可復原。
         function setButtonLoading(button, loadingText) {
             if (!button) return;
-            // Save the original HTML so we can restore it later
+            // Save the original HTML so we can restore it later. Preserve the button's
+            // text and any nested elements for restoration once loading is complete.
             if (!button.dataset.originalHtml) {
                 button.dataset.originalHtml = button.innerHTML;
             }
-            // Capture and store the button's current width the first time we set loading
-            if (!button.dataset.originalWidth) {
-                // Use offsetWidth to compute the rendered width, including padding and borders
+            /*
+             * Capture and store the button's current width and height the first time we set
+             * loading. Without setting these explicitly, replacing the button's content with
+             * only a small spinner element can cause the element to shrink, which in turn
+             * shifts surrounding layout and alters the button's size. By explicitly setting
+             * both dimensions, we ensure the button occupies the same space during loading.
+             */
+            if (!button.dataset.originalWidth || !button.dataset.originalHeight) {
                 const computedWidth = button.offsetWidth;
-                // If width is valid and greater than zero, store it so we can restore later
+                const computedHeight = button.offsetHeight;
+                // Store and set width if it's a valid positive number
                 if (computedWidth > 0) {
                     button.dataset.originalWidth = computedWidth + 'px';
-                    // Explicitly set the button's width so replacing the content with a spinner doesn't shrink it
                     button.style.width = button.dataset.originalWidth;
                 }
+                // Store and set height if it's a valid positive number
+                if (computedHeight > 0) {
+                    button.dataset.originalHeight = computedHeight + 'px';
+                    button.style.height = button.dataset.originalHeight;
+                }
             }
-            // Always disable the button while loading
+            // Always disable the button while loading to prevent further clicks
             button.disabled = true;
             /*
              * Only show a spinning indicator while loading. We intentionally do not display any
              * loading text here (including the value passed in via `loadingText`) to satisfy
-             * the requirement of "只需顯示讀取圈" (only show the spinner). To avoid
-             * affecting the button's intrinsic size, we've captured its original width above.
+             * the requirement of "只需顯示讀取圈" (only show the spinner). To avoid affecting
+             * the button's intrinsic size, we've captured its original width and height above.
              */
-            // Add a spinner using Tailwind classes. Remove margin since there's no text to align next to it.
+            // To avoid layout shifts, we center the spinner by converting the button into a flex container.
+            // Save existing layout-related styles so they can be restored later.
+            if (!button.dataset.originalDisplay) {
+                button.dataset.originalDisplay = button.style.display || '';
+                button.dataset.originalAlignItems = button.style.alignItems || '';
+                button.dataset.originalJustifyContent = button.style.justifyContent || '';
+            }
+            // Set up flexbox centering for the spinner
+            button.style.display = 'flex';
+            button.style.alignItems = 'center';
+            button.style.justifyContent = 'center';
+            // Replace the button's content with a spinner using Tailwind classes. Remove margin since
+            // there's no text to align next to it.
             button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white opacity-50"></div>`;
         }
 
@@ -181,6 +204,25 @@ async function fetchUsers(forceRefresh = false) {
                 // Clear the inline width style so the button can size itself based on its content again
                 button.style.width = '';
                 delete button.dataset.originalWidth;
+            }
+            // Restore the button's height if we stored it previously
+            if (button.dataset.originalHeight) {
+                // Clear the inline height style so the button can size itself based on its content again
+                button.style.height = '';
+                delete button.dataset.originalHeight;
+            }
+            // Restore display and alignment properties if they were modified
+            if (button.dataset.originalDisplay !== undefined) {
+                button.style.display = button.dataset.originalDisplay;
+                delete button.dataset.originalDisplay;
+            }
+            if (button.dataset.originalAlignItems !== undefined) {
+                button.style.alignItems = button.dataset.originalAlignItems;
+                delete button.dataset.originalAlignItems;
+            }
+            if (button.dataset.originalJustifyContent !== undefined) {
+                button.style.justifyContent = button.dataset.originalJustifyContent;
+                delete button.dataset.originalJustifyContent;
             }
             // Re-enable the button
             button.disabled = false;
