@@ -2813,16 +2813,16 @@ if (!patient) {
                         <span class="font-medium text-gray-700">性別：</span>
                         <span>${patient.gender}</span>
                     </div>
-                    ${patient.allergies ? `
-                    <div class="md:col-span-2 lg:col-span-4">
+                ${patient.allergies ? `
+                    <div class="md:col-span-1 lg:col-span-2">
                         <span class="font-medium text-red-600">過敏史：</span>
-                        <span class="text-red-700 bg-red-50 px-2 py-1 rounded">${patient.allergies}</span>
+                        <span class="medical-field text-red-700 bg-red-50 px-2 py-1 rounded">${patient.allergies}</span>
                     </div>
                     ` : ''}
-                    ${patient.history ? `
-                    <div class="md:col-span-2 lg:col-span-4">
+                ${patient.history ? `
+                    <div class="md:col-span-1 lg:col-span-2">
                         <span class="font-medium text-gray-700">病史及備註：</span>
-                        <span class="text-gray-700">${patient.history}</span>
+                        <span class="medical-field text-gray-700">${patient.history}</span>
                     </div>
                     ` : ''}
                 </div>
@@ -3134,15 +3134,15 @@ async function viewPatientMedicalHistory(patientId) {
                     <span>${patient.gender}</span>
                 </div>
                 ${patient.allergies ? `
-                <div class="md:col-span-2 lg:col-span-4">
+                <div class="md:col-span-1 lg:col-span-2">
                     <span class="font-medium text-red-600">過敏史：</span>
-                    <span class="text-red-700 bg-red-50 px-2 py-1 rounded">${patient.allergies}</span>
+                    <span class="medical-field text-red-700 bg-red-50 px-2 py-1 rounded">${patient.allergies}</span>
                 </div>
                 ` : ''}
                 ${patient.history ? `
-                <div class="md:col-span-2 lg:col-span-4">
+                <div class="md:col-span-1 lg:col-span-2">
                     <span class="font-medium text-gray-700">病史及備註：</span>
-                    <span class="text-gray-700">${patient.history}</span>
+                    <span class="medical-field text-gray-700">${patient.history}</span>
                 </div>
                 ` : ''}
             </div>
