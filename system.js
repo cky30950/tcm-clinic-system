@@ -1128,7 +1128,7 @@ async function viewPatient(id) {
                     <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">醫療資訊</h4>
                     <div class="space-y-2">
                         ${patient.allergies ? `<div><span class="font-medium">過敏史：</span><div class="mt-1 p-2 bg-red-50 rounded text-sm">${patient.allergies}</div></div>` : ''}
-                        ${patient.history ? `<div><span class="font-medium">病史：</span><div class="mt-1 p-2 bg-gray-50 rounded text-sm">${patient.history}</div></div>` : ''}
+                        ${patient.history ? `<div><span class="font-medium">病史及備註：</span><div class="mt-1 p-2 bg-gray-50 rounded text-sm">${patient.history}</div></div>` : ''}
                         <div><span class="font-medium">建檔日期：</span>${patient.createdAt ? new Date(patient.createdAt.seconds * 1000).toLocaleDateString('zh-TW') : '未知'}</div>
                         ${patient.updatedAt ? `<div><span class="font-medium">更新日期：</span>${new Date(patient.updatedAt.seconds * 1000).toLocaleDateString('zh-TW')}</div>` : ''}
                     </div>
@@ -2357,8 +2357,45 @@ async function showConsultationForm(appointment) {
         }
         
         // 設置病人資訊
+        // 顯示病人姓名與編號
         document.getElementById('formPatientName').textContent = `${patient.name} (${patient.patientNumber})`;
+        // 顯示掛號時間
         document.getElementById('formAppointmentTime').textContent = new Date(appointment.appointmentTime).toLocaleString('zh-TW');
+        // 顯示病人年齡，若沒有出生日期則顯示「未知」
+        const ageEl = document.getElementById('formPatientAge');
+        if (ageEl) {
+            ageEl.textContent = formatAge(patient.birthDate);
+        }
+        // 顯示病人性別，若沒有資料則顯示「未知」
+        const genderEl = document.getElementById('formPatientGender');
+        if (genderEl) {
+            genderEl.textContent = patient.gender || '未知';
+        }
+        // 顯示過敏史，如果有資料則填入並顯示容器，否則隱藏容器
+        const allergiesContainer = document.getElementById('allergiesContainer');
+        const allergiesEl = document.getElementById('formPatientAllergies');
+        if (allergiesContainer && allergiesEl) {
+            if (patient.allergies) {
+                allergiesEl.textContent = patient.allergies;
+                allergiesContainer.style.display = '';
+            } else {
+                allergiesEl.textContent = '';
+                allergiesContainer.style.display = 'none';
+            }
+        }
+        // 顯示病史及備註，如果有資料則填入並顯示容器，否則隱藏容器
+        const historyContainer = document.getElementById('historyContainer');
+        const historyEl = document.getElementById('formPatientHistory');
+        if (historyContainer && historyEl) {
+            if (patient.history) {
+                historyEl.textContent = patient.history;
+                historyContainer.style.display = '';
+            } else {
+                historyEl.textContent = '';
+                historyContainer.style.display = 'none';
+            }
+        }
+        // 渲染病人療程/套餐資訊
         renderPatientPackages(patient.id);
         
         // 檢查是否為編輯模式
