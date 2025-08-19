@@ -491,7 +491,7 @@
                               將診症表單中的病人基本資訊區域擴充，加入年齡、性別、過敏史以及病史備註的顯示。
                               其中過敏史與病史在無資料時會隱藏，其容器設置了對應的 ID 供 JavaScript 控制。
                             -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                                 <div>
                                     <span class="font-medium">病人：</span>
                                     <span id="formPatientName" class="text-blue-600 font-semibold"></span>
@@ -509,12 +509,12 @@
                                     <span id="formAppointmentTime"></span>
                                 </div>
                                 <!-- 過敏史：以紅色高亮顯示，若無資料則隱藏 -->
-                                <div id="allergiesContainer" class="md:col-span-2 lg:col-span-3" style="display: none;">
+                                <div id="allergiesContainer" class="md:col-span-2 lg:col-span-4" style="display: none;">
                                     <span class="font-medium text-red-600">過敏史：</span>
                                     <span id="formPatientAllergies" class="text-red-700 bg-red-50 px-2 py-1 rounded"></span>
                                 </div>
                                 <!-- 病史及備註：若無資料則隱藏 -->
-                                <div id="historyContainer" class="md:col-span-2 lg:col-span-3" style="display: none;">
+                                <div id="historyContainer" class="md:col-span-2 lg:col-span-4" style="display: none;">
                                     <span class="font-medium">病史及備註：</span>
                                     <span id="formPatientHistory" class="text-gray-700"></span>
                                 </div>

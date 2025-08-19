@@ -2360,44 +2360,6 @@ async function showConsultationForm(appointment) {
         document.getElementById('formPatientName').textContent = `${patient.name} (${patient.patientNumber})`;
         document.getElementById('formAppointmentTime').textContent = new Date(appointment.appointmentTime).toLocaleString('zh-TW');
         renderPatientPackages(patient.id);
-
-        // 顯示病人的年齡、性別、過敏史及病史備註
-        try {
-            const ageEl = document.getElementById('formPatientAge');
-            const genderEl = document.getElementById('formPatientGender');
-            const allergiesEl = document.getElementById('formPatientAllergies');
-            const allergiesContainer = document.getElementById('allergiesContainer');
-            const historyEl = document.getElementById('formPatientHistory');
-            const historyContainer = document.getElementById('historyContainer');
-            // 年齡
-            if (ageEl) {
-                ageEl.textContent = formatAge(patient.birthDate);
-            }
-            // 性別
-            if (genderEl) {
-                genderEl.textContent = patient.gender || '';
-            }
-            // 過敏史
-            if (allergiesEl && allergiesContainer) {
-                if (patient.allergies) {
-                    allergiesEl.textContent = patient.allergies;
-                    allergiesContainer.style.display = '';
-                } else {
-                    allergiesContainer.style.display = 'none';
-                }
-            }
-            // 病史及備註
-            if (historyEl && historyContainer) {
-                if (patient.history) {
-                    historyEl.textContent = patient.history;
-                    historyContainer.style.display = '';
-                } else {
-                    historyContainer.style.display = 'none';
-                }
-            }
-        } catch (_e) {
-            // 若相關元素不存在或出錯，不影響表單顯示
-        }
         
         // 檢查是否為編輯模式
         if (appointment.status === 'completed' && appointment.consultationId) {
@@ -2797,7 +2759,7 @@ if (!patient) {
             
             // 顯示病人基本資訊
             document.getElementById('patientMedicalHistoryPatientInfo').innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     <div>
                         <span class="font-medium text-gray-700">病人編號：</span>
                         <span class="text-blue-600 font-semibold">${patient.patientNumber}</span>
@@ -2815,9 +2777,15 @@ if (!patient) {
                         <span>${patient.gender}</span>
                     </div>
                     ${patient.allergies ? `
-                    <div class="md:col-span-4">
+                    <div class="md:col-span-2 lg:col-span-4">
                         <span class="font-medium text-red-600">過敏史：</span>
                         <span class="text-red-700 bg-red-50 px-2 py-1 rounded">${patient.allergies}</span>
+                    </div>
+                    ` : ''}
+                    ${patient.history ? `
+                    <div class="md:col-span-2 lg:col-span-4">
+                        <span class="font-medium text-gray-700">病史及備註：</span>
+                        <span class="text-gray-700">${patient.history}</span>
                     </div>
                     ` : ''}
                 </div>
@@ -3111,7 +3079,7 @@ async function viewPatientMedicalHistory(patientId) {
         
         // 顯示病人基本資訊
         document.getElementById('medicalHistoryPatientInfo').innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                 <div>
                     <span class="font-medium text-gray-700">病人編號：</span>
                     <span class="text-blue-600 font-semibold">${patient.patientNumber}</span>
@@ -3129,13 +3097,13 @@ async function viewPatientMedicalHistory(patientId) {
                     <span>${patient.gender}</span>
                 </div>
                 ${patient.allergies ? `
-                <div class="md:col-span-4">
+                <div class="md:col-span-2 lg:col-span-4">
                     <span class="font-medium text-red-600">過敏史：</span>
                     <span class="text-red-700 bg-red-50 px-2 py-1 rounded">${patient.allergies}</span>
                 </div>
                 ` : ''}
                 ${patient.history ? `
-                <div class="md:col-span-4">
+                <div class="md:col-span-2 lg:col-span-4">
                     <span class="font-medium text-gray-700">病史及備註：</span>
                     <span class="text-gray-700">${patient.history}</span>
                 </div>
