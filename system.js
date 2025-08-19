@@ -3681,18 +3681,20 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                         border-bottom: 1px dotted #999;
                     }
                     .total-section {
+                        /* Shrink the amount section to conserve vertical space */
                         text-align: right;
-                        margin: 8px 0;
-                        font-size: 12px;
+                        margin: 4px 0;
+                        font-size: 10px;
                         font-weight: bold;
                     }
                     .total-amount {
-                        font-size: 12px;
+                        /* Reduce padding, border and font size for the amount box */
+                        font-size: 10px;
                         color: #000;
-                        border: 2px solid #000;
-                        padding: 4px;
+                        border: 1px solid #000;
+                        padding: 2px;
                         display: inline-block;
-                        min-width: 60px;
+                        min-width: 50px;
                         text-align: center;
                     }
                     .prescription-section {
@@ -3735,8 +3737,10 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                         font-size: 10px;
                     }
                     .diagnosis-title {
+                        /* Display diagnosis title inline with result; remove bottom margin and add right margin */
                         font-weight: bold;
-                        margin-bottom: 3px;
+                        margin-bottom: 0;
+                        margin-right: 4px;
                     }
                     @media print {
                         @page {
@@ -3816,9 +3820,10 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     <!-- 診斷資訊 -->
                     ${consultation.diagnosis ? `
                     <div class="diagnosis-section">
-                        <div class="diagnosis-title">診斷：</div>
-                        <div>${consultation.diagnosis}</div>
-                        ${consultation.syndrome ? `<div>證型：${consultation.syndrome}</div>` : ''}
+                        <!-- Place diagnosis result on the same line as the label -->
+                        <span class="diagnosis-title">診斷：</span>
+                        <span>${consultation.diagnosis}</span>
+                        ${consultation.syndrome ? `<span style="margin-left: 8px;">證型：${consultation.syndrome}</span>` : ''}
                     </div>
                     ` : ''}
                     
@@ -3834,7 +3839,8 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     
                     <!-- 總金額 -->
                     <div class="total-section">
-                        <div style="margin-bottom: 8px; font-size: 10px;">應收金額：</div>
+                        <!-- Shrink the label for amount receivable -->
+                        <div style="margin-bottom: 4px; font-size: 9px;">應收金額：</div>
                         <div class="total-amount">HK$ ${totalAmount.toLocaleString()}</div>
                     </div>
                     
@@ -3929,7 +3935,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     
                     <!-- 醫囑 -->
                     ${consultation.instructions ? `
-                    <div style="margin: 10px 0; font-size: 12px; background: #fff3cd; padding: 8px; border: 1px solid #ffeaa7;">
+                    <div style="margin: 6px 0; font-size: 10px; background: #fff3cd; padding: 6px; border: 1px solid #ffeaa7;">
                         <strong>⚠️ 醫囑及注意事項：</strong><br>
                         ${consultation.instructions}
                     </div>
