@@ -3820,10 +3820,17 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     <!-- 診斷資訊 -->
                     ${consultation.diagnosis ? `
                     <div class="diagnosis-section">
-                        <!-- Place diagnosis result on the same line as the label -->
-                        <span class="diagnosis-title">診斷：</span>
-                        <span>${consultation.diagnosis}</span>
-                        ${consultation.syndrome ? `<span style="margin-left: 8px;">證型：${consultation.syndrome}</span>` : ''}
+                        <!-- 將診斷結果和證型分成兩行顯示 -->
+                        <div>
+                            <span class="diagnosis-title">診斷：</span>
+                            <span>${consultation.diagnosis}</span>
+                        </div>
+                        ${consultation.syndrome ? `
+                        <div>
+                            <span class="diagnosis-title">證型：</span>
+                            <span>${consultation.syndrome}</span>
+                        </div>
+                        ` : ''}
                     </div>
                     ` : ''}
                     
