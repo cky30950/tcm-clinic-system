@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>預先問診系統</title>
+    <!-- Import Three.js from a CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        form {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            color: #333;
+        }
+        .options-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .option-item {
+            display: flex;
+            align-items: center;
+            margin-right: 15px;
+            margin-bottom: 10px;
+        }
+        .option-item input[type="checkbox"],
+        .option-item input[type="radio"] {
+            margin-right: 5px;
+        }
+        textarea {
+            width: 100%;
+            height: 60px;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            resize: vertical;
+        }
+        .model-container {
+            width: 100%;
+            height: 400px;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+            border-radius: 4px;
+            position: relative;
+            background-color: #fafafa;
+        }
+        .color-palette {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .color-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            cursor: pointer;
+            position: relative;
+        }
+        .color-option input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .color-option.selected {
+            border-color: #000;
+        }
+        .submit-btn {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .submit-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>預先問診系統</h1>
+    <form id="form">
+        <!-- 性別 -->
+        <div class="section">
+            <h2>1. 請選擇性別</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="radio" name="gender" value="male" required> 男</label>
+                <label class="option-item"><input type="radio" name="gender" value="female" required> 女</label>
+            </div>
+        </div>
+        <!-- 主訴 -->
+        <div class="section">
+            <h2>2. 主要有什麼不舒服？</h2>
+            <textarea name="chiefComplaint" placeholder="請描述主要不舒服之處"></textarea>
+        </div>
+        <!-- 疼痛/不舒服部位 -->
+        <div class="section">
+            <h2>3. 請選擇疼痛或不舒服的部位</h2>
+            <p>點擊下方的 3D 人體圖來選擇不適位置（可旋轉），若沒有可跳過。</p>
+            <div id="pain-model" class="model-container"></div>
+            <input type="hidden" name="painArea" id="painArea">
+        </div>
+        <!-- 基礎問題 -->
+        <div class="section">
+            <h2>4. 基礎問題（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="basicSymptoms" value="口苦"> 口苦</label>
+                <label class="option-item"><input type="checkbox" name="basicSymptoms" value="口干"> 口干</label>
+                <label class="option-item"><input type="checkbox" name="basicSymptoms" value="眼乾"> 眼乾</label>
+                <label class="option-item"><input type="checkbox" name="basicSymptoms" value="耳嗚"> 耳嗚</label>
+                <label class="option-item"><input type="checkbox" name="basicSymptoms" value="頭暈"> 頭暈</label>
+                <label class="option-item"><input type="checkbox" name="basicSymptoms" value="心慌心悸"> 心慌心悸</label>
+                <label class="option-item"><input type="checkbox" name="basicSymptoms" value="心煩"> 心煩</label>
+                <label class="option-item"><input type="checkbox" name="basicSymptoms" value="情緒緊張"> 情緒緊張</label>
+            </div>
+        </div>
+        <!-- 汗出 -->
+        <div class="section">
+            <h2>5. 出汗情況（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="sweating" value="容易出汗"> 容易出汗</label>
+                <label class="option-item"><input type="checkbox" name="sweating" value="半夜盜汗"> 半夜盜汗</label>
+                <label class="option-item"><input type="checkbox" name="sweating" value="不出汗的身體"> 不出汗的身體</label>
+                <label class="option-item"><input type="checkbox" name="sweating" value="時常流汗不止"> 時常流汗不止</label>
+            </div>
+            <p>若要標註出汗部位，請點擊下方 3D 人體（可略過）。</p>
+            <div id="sweat-model" class="model-container"></div>
+            <input type="hidden" name="sweatArea" id="sweatArea">
+        </div>
+        <!-- 寒熱 -->
+        <div class="section">
+            <h2>6. 寒熱感受（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="coldHeat" value="多怕冷"> 多怕冷</label>
+                <label class="option-item"><input type="checkbox" name="coldHeat" value="多怕熱"> 多怕熱</label>
+                <label class="option-item"><input type="checkbox" name="coldHeat" value="怕冷又怕熱"> 怕冷又怕熱</label>
+                <label class="option-item"><input type="checkbox" name="coldHeat" value="不怕冷不怕熱"> 不怕冷不怕熱</label>
+                <label class="option-item"><input type="checkbox" name="coldHeat" value="寒熱交替"> 寒熱交替</label>
+                <label class="option-item"><input type="checkbox" name="coldHeat" value="多怕風"> 多怕風</label>
+                <label class="option-item"><input type="checkbox" name="coldHeat" value="手腳冰冷"> 手腳冰冷</label>
+            </div>
+        </div>
+        <!-- 胃口 -->
+        <div class="section">
+            <h2>7. 胃口狀況（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="appetite" value="食欲较差"> 食欲較差</label>
+                <label class="option-item"><input type="checkbox" name="appetite" value="食欲旺盛"> 食欲旺盛</label>
+                <label class="option-item"><input type="checkbox" name="appetite" value="食欲正常"> 食欲正常</label>
+                <label class="option-item"><input type="checkbox" name="appetite" value="容易餓"> 容易餓</label>
+                <label class="option-item"><input type="checkbox" name="appetite" value="喜歡鹹口味"> 喜歡吃鹹口味</label>
+                <label class="option-item"><input type="checkbox" name="appetite" value="喜歡甜口味"> 喜歡吃甜口味</label>
+                <label class="option-item"><input type="checkbox" name="appetite" value="喜歡辣口味"> 喜歡吃辣口味</label>
+                <label class="option-item"><input type="checkbox" name="appetite" value="喜飲冷"> 喜飲冷</label>
+                <label class="option-item"><input type="checkbox" name="appetite" value="容易肚脹"> 容易肚脹</label>
+                <label class="option-item"><input type="checkbox" name="appetite" value="容易脹氣多"> 容易脹氣多</label>
+                <label class="option-item"><input type="checkbox" name="appetite" value="反酸"> 反酸</label>
+                <label class="option-item"><input type="checkbox" name="appetite" value="容易嘔吐"> 容易嘔吐</label>
+            </div>
+        </div>
+        <!-- 飲水 -->
+        <div class="section">
+            <h2>8. 飲水偏好（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="waterPref" value="喜温热"> 喜溫熱</label>
+                <label class="option-item"><input type="checkbox" name="waterPref" value="喜冷凉"> 喜冷涼</label>
+                <label class="option-item"><input type="checkbox" name="waterPref" value="均可"> 均可</label>
+                <label class="option-item"><input type="checkbox" name="waterPref" value="渴饮"> 渴飲</label>
+                <label class="option-item"><input type="checkbox" name="waterPref" value="不渴饮"> 不渴飲</label>
+                <label class="option-item"><input type="checkbox" name="waterPref" value="忘記喝水"> 時常會忘記喝水</label>
+                <label class="option-item"><input type="checkbox" name="waterPref" value="止渴不了"> 怎麼喝也不能止渴</label>
+            </div>
+        </div>
+        <!-- 小便 -->
+        <div class="section">
+            <h2>9. 小便情況（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="urineSymptoms" value="清长"> 清長</label>
+                <label class="option-item"><input type="checkbox" name="urineSymptoms" value="短赤"> 短赤</label>
+                <label class="option-item"><input type="checkbox" name="urineSymptoms" value="易急"> 易急</label>
+                <label class="option-item"><input type="checkbox" name="urineSymptoms" value="小便痛"> 小便痛</label>
+                <label class="option-item"><input type="checkbox" name="urineSymptoms" value="小便難去"> 小便難去</label>
+                <label class="option-item"><input type="checkbox" name="urineSymptoms" value="小便緩慢量少"> 小便緩慢量少</label>
+                <label class="option-item"><input type="checkbox" name="urineSymptoms" value="尿频"> 尿頻</label>
+                <label class="option-item"><input type="checkbox" name="urineSymptoms" value="沒有尿意"> 沒有尿意</label>
+            </div>
+            <p>夜尿次數：<input type="number" name="nightUrinationTimes" min="0" max="10" style="width:60px;"> 次</p>
+            <p>平均每天小便次數：<input type="number" name="urineTimes" min="0" max="30" style="width:60px;"> 次</p>
+            <p>小便顏色：請選擇顏色（以下色塊供參考）</p>
+            <div id="urineColors" class="color-palette"></div>
+            <input type="hidden" name="urineColor" id="urineColor">
+        </div>
+        <!-- 大便 -->
+        <div class="section">
+            <h2>10. 大便情況（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="stoolSymptoms" value="成形"> 成形</label>
+                <label class="option-item"><input type="checkbox" name="stoolSymptoms" value="不成形"> 不成形</label>
+                <label class="option-item"><input type="checkbox" name="stoolSymptoms" value="干燥结块"> 干燥結塊</label>
+                <label class="option-item"><input type="checkbox" name="stoolSymptoms" value="便秘"> 便秘</label>
+                <label class="option-item"><input type="checkbox" name="stoolSymptoms" value="容易腹泻"> 容易腹瀉</label>
+                <label class="option-item"><input type="checkbox" name="stoolSymptoms" value="去完仍想去"> 去完仍想去</label>
+            </div>
+            <p>大便間隔：<input type="number" name="stoolInterval" min="0" max="7" style="width:60px;"> 天一次</p>
+            <p>大便氣味：
+                <label class="option-item"><input type="radio" name="stoolSmell" value="很臭"> 很臭</label>
+                <label class="option-item"><input type="radio" name="stoolSmell" value="無味"> 無味</label>
+            </p>
+            <p>大便顏色：請選擇顏色（以下色塊供參考）</p>
+            <div id="stoolColors" class="color-palette"></div>
+            <input type="hidden" name="stoolColor" id="stoolColor">
+        </div>
+        <!-- 睡眠 -->
+        <div class="section">
+            <h2>11. 睡眠情況（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="sleep" value="失眠"> 失眠</label>
+                <label class="option-item"><input type="checkbox" name="sleep" value="睡眠浅"> 睡眠淺</label>
+                <label class="option-item"><input type="checkbox" name="sleep" value="多梦"> 多夢</label>
+                <label class="option-item"><input type="checkbox" name="sleep" value="正常"> 正常</label>
+                <label class="option-item"><input type="checkbox" name="sleep" value="一覺到天亮"> 一覺到天亮</label>
+            </div>
+        </div>
+        <!-- 體力 -->
+        <div class="section">
+            <h2>12. 體力與精神（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="energy" value="精神好"> 精神好</label>
+                <label class="option-item"><input type="checkbox" name="energy" value="一直疲憊"> 一直疲憊</label>
+                <label class="option-item"><input type="checkbox" name="energy" value="早起精神奕奕"> 早起精神奕奕</label>
+                <label class="option-item"><input type="checkbox" name="energy" value="精神集中不佳"> 精神集中不佳</label>
+            </div>
+        </div>
+        <!-- 病史 -->
+        <div class="section">
+            <h2>13. 病史（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="history" value="高血糖"> 高血糖</label>
+                <label class="option-item"><input type="checkbox" name="history" value="高膽固醇"> 高膽固醇</label>
+                <label class="option-item"><input type="checkbox" name="history" value="高血壓"> 高血壓</label>
+                <label class="option-item"><input type="checkbox" name="history" value="慢性胃炎"> 慢性胃炎</label>
+                <label class="option-item"><input type="checkbox" name="history" value="無"> 無</label>
+            </div>
+        </div>
+        <!-- 正在服的西藥 -->
+        <div class="section">
+            <h2>14. 正在服用的西藥（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="medicine" value="胃藥"> 胃藥</label>
+                <label class="option-item"><input type="checkbox" name="medicine" value="血壓藥"> 血壓藥</label>
+                <label class="option-item"><input type="checkbox" name="medicine" value="血糖藥"> 血糖藥</label>
+                <label class="option-item"><input type="checkbox" name="medicine" value="降膽固醇藥"> 降膽固醇藥</label>
+                <label class="option-item"><input type="checkbox" name="medicine" value="無"> 無</label>
+            </div>
+        </div>
+        <!-- 過敏史 -->
+        <div class="section">
+            <h2>15. 過敏史（可複選）</h2>
+            <div class="options-list">
+                <label class="option-item"><input type="checkbox" name="allergy" value="中藥過敏"> 中藥過敏</label>
+                <label class="option-item"><input type="checkbox" name="allergy" value="G6PD"> G6PD</label>
+                <label class="option-item"><input type="checkbox" name="allergy" value="懷孕"> 懷孕</label>
+                <label class="option-item"><input type="checkbox" name="allergy" value="無"> 無</label>
+            </div>
+        </div>
+        <button type="submit" class="submit-btn">提交問卷</button>
+    </form>
+
+    <script>
+        // Utility to create color palettes for urine and stool
+        function createColorPalette(containerId, hiddenInputId, colors) {
+            const container = document.getElementById(containerId);
+            const hiddenInput = document.getElementById(hiddenInputId);
+            colors.forEach(colorItem => {
+                const div = document.createElement('div');
+                div.className = 'color-option';
+                div.style.backgroundColor = colorItem.color;
+                div.title = colorItem.label;
+                const input = document.createElement('input');
+                input.type = 'radio';
+                input.name = containerId + 'Radio';
+                input.value = colorItem.label;
+                div.appendChild(input);
+                div.addEventListener('click', () => {
+                    // Remove selected class from siblings
+                    container.querySelectorAll('.color-option').forEach(elem => elem.classList.remove('selected'));
+                    div.classList.add('selected');
+                    input.checked = true;
+                    hiddenInput.value = colorItem.label;
+                });
+                container.appendChild(div);
+            });
+        }
+        // Define typical urine colors
+        const urineColors = [
+            {label:'無色/透明', color:'#eaf4ff'},
+            {label:'淡黃', color:'#f7f0a7'},
+            {label:'黃色', color:'#f2d14a'},
+            {label:'深黃', color:'#e6ad0f'},
+            {label:'茶色', color:'#b7742c'},
+            {label:'紅色', color:'#d9534f'},
+            {label:'黑色', color:'#2e2e2e'}
+        ];
+        const stoolColors = [
+            {label:'黃褐', color:'#c6915b'},
+            {label:'深褐', color:'#8b5a2b'},
+            {label:'黑色', color:'#1c1c1c'},
+            {label:'綠色', color:'#4caf50'},
+            {label:'灰白', color:'#d5d5d5'},
+            {label:'紅色', color:'#d9534f'}
+        ];
+        // Initialize color palettes
+        createColorPalette('urineColors', 'urineColor', urineColors);
+        createColorPalette('stoolColors', 'stoolColor', stoolColors);
+
+        // 3D Human model creation and selection logic with simple rotation
+        function initHumanModel(containerId, hiddenInputId) {
+            const container = document.getElementById(containerId);
+            const hiddenInput = document.getElementById(hiddenInputId);
+            // Scene and camera
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xfafafa);
+            const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(0, 1.5, 4);
+            // Renderer
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            // Lights
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+            hemiLight.position.set(0, 2, 0);
+            scene.add(hemiLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(5, 10, 7.5);
+            scene.add(dirLight);
+            // Materials
+            const defaultMaterial = new THREE.MeshStandardMaterial({ color: 0x8faadc, roughness: 0.5, metalness: 0.1 });
+            const highlightMaterial = new THREE.MeshStandardMaterial({ color: 0xff5656, roughness: 0.4, metalness: 0.1 });
+            // Group for rotation
+            const group = new THREE.Group();
+            scene.add(group);
+            const parts = {};
+            // Head
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 32, 32), defaultMaterial.clone());
+            head.position.set(0, 1.7, 0);
+            head.name = '頭部';
+            group.add(head);
+            parts['頭部'] = head;
+            // Torso
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 1.2, 32), defaultMaterial.clone());
+            torso.position.set(0, 0.9, 0);
+            torso.name = '軀幹';
+            group.add(torso);
+            parts['軀幹'] = torso;
+            // Arms
+            const armGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.8, 32);
+            const leftArm = new THREE.Mesh(armGeo, defaultMaterial.clone());
+            leftArm.position.set(-0.55, 1.2, 0);
+            leftArm.name = '左臂';
+            group.add(leftArm);
+            parts['左臂'] = leftArm;
+            const rightArm = new THREE.Mesh(armGeo.clone(), defaultMaterial.clone());
+            rightArm.position.set(0.55, 1.2, 0);
+            rightArm.name = '右臂';
+            group.add(rightArm);
+            parts['右臂'] = rightArm;
+            // Legs
+            const legGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.1, 32);
+            const leftLeg = new THREE.Mesh(legGeo, defaultMaterial.clone());
+            leftLeg.position.set(-0.2, -0.1, 0);
+            leftLeg.name = '左腿';
+            group.add(leftLeg);
+            parts['左腿'] = leftLeg;
+            const rightLeg = new THREE.Mesh(legGeo.clone(), defaultMaterial.clone());
+            rightLeg.position.set(0.2, -0.1, 0);
+            rightLeg.name = '右腿';
+            group.add(rightLeg);
+            parts['右腿'] = rightLeg;
+            // Raycaster for selection
+            const raycaster = new THREE.Raycaster();
+            const pointer = new THREE.Vector2();
+            let selectedPart = null;
+            // Rotation state
+            let isDragging = false;
+            let prevX = 0;
+            let prevY = 0;
+            function onPointerDown(event) {
+                const rect = renderer.domElement.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                pointer.x = (x / rect.width) * 2 - 1;
+                pointer.y = -(y / rect.height) * 2 + 1;
+                raycaster.setFromCamera(pointer, camera);
+                const intersects = raycaster.intersectObjects(Object.values(parts));
+                if (intersects.length > 0) {
+                    const intersected = intersects[0].object;
+                    if (selectedPart) {
+                        selectedPart.material.color.copy(defaultMaterial.color);
+                    }
+                    intersected.material.color.copy(highlightMaterial.color);
+                    selectedPart = intersected;
+                    hiddenInput.value = selectedPart.name;
+                }
+                // start dragging
+                isDragging = true;
+                prevX = event.clientX;
+                prevY = event.clientY;
+            }
+            function onPointerMove(event) {
+                if (!isDragging) return;
+                const deltaX = event.clientX - prevX;
+                const deltaY = event.clientY - prevY;
+                group.rotation.y += deltaX * 0.01;
+                group.rotation.x += deltaY * 0.01;
+                // clamp x rotation to avoid upside down
+                const limit = Math.PI / 2;
+                group.rotation.x = Math.max(-limit, Math.min(limit, group.rotation.x));
+                prevX = event.clientX;
+                prevY = event.clientY;
+            }
+            function onPointerUp() {
+                isDragging = false;
+            }
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            renderer.domElement.addEventListener('pointermove', onPointerMove);
+            renderer.domElement.addEventListener('pointerup', onPointerUp);
+            renderer.domElement.addEventListener('pointerleave', onPointerUp);
+            // Resize handling
+            function onResize() {
+                const w = container.clientWidth;
+                const h = container.clientHeight;
+                renderer.setSize(w, h);
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+            }
+            window.addEventListener('resize', onResize);
+            // Animation loop
+            function animate() {
+                requestAnimationFrame(animate);
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+        // Initialize models
+        initHumanModel('pain-model', 'painArea');
+        initHumanModel('sweat-model', 'sweatArea');
+        // Form submission handler (demo)
+        document.getElementById('form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const entries = {};
+            for (const [key, value] of formData.entries()) {
+                if (entries[key]) {
+                    if (Array.isArray(entries[key])) {
+                        entries[key].push(value);
+                    } else {
+                        entries[key] = [entries[key], value];
+                    }
+                } else {
+                    entries[key] = value;
+                }
+            }
+            console.log('問卷結果:', entries);
+            alert('謝謝填寫！您已提交問卷。');
+        });
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"9720c2756e7af3c3","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+</body>
+</html>
