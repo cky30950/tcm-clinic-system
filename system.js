@@ -10,7 +10,7 @@ let currentUserData = null;
 const ROLE_PERMISSIONS = {
   '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement'],
   '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement'],
-  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement'],
+  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary'],
   '用戶': ['patientManagement', 'consultationSystem']
 };
 
