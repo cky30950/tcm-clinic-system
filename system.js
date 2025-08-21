@@ -4893,42 +4893,75 @@ async function withdrawConsultation(appointmentId) {
             showToast(`無法撤回診症！找不到病人 ${patient.name} 的診症記錄資料。`, 'error');
             return;
         }
-        // 確認撤回操作
-        const confirmMessage = `確定要撤回 ${patient.name} 的診症嗎？\n\n` +
-                             `此操作將會：\n` +
-                             `• 刪除該次診症記錄\n` +
-                             `• 病人狀態回到「已掛號」\n` +
-                             `• 所有診症資料將永久遺失\n\n` +
-                             `診斷：${consultation.diagnosis || '無記錄'}\n\n` +
-                             `注意：此操作無法復原！`;
-        if (confirm(confirmMessage)) {
-            // 刪除診症記錄
-            const consultationIndex = consultations.findIndex(c => c.id === appointment.consultationId);
-            if (consultationIndex !== -1) {
-                consultations.splice(consultationIndex, 1);
-                localStorage.setItem('consultations', JSON.stringify(consultations));
-            }
-            // 將掛號狀態改回已掛號
-            appointment.status = 'registered';
-            delete appointment.completedAt;
-            delete appointment.consultationId;
-            delete appointment.completedBy;
-            delete appointment.consultationStartTime;
-            delete appointment.consultingDoctor;
-            // 保存狀態變更
-            localStorage.setItem('appointments', JSON.stringify(appointments));
-            // 同步更新到 Firebase
-            await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
-            showToast(`已撤回 ${patient.name} 的診症，病人狀態回到已掛號`, 'success');
-            // 如果正在編輯該病歷，則關閉表單。使用字串比較，避免 ID 類型不一致導致無法匹配
-            if (String(currentConsultingAppointmentId) === String(appointmentId)) {
-                closeConsultationForm();
-                currentConsultingAppointmentId = null;
-            }
-            // 重新載入列表和統計
-            loadTodayAppointments();
-            updateStatistics();
+
+// 確認撤回操作
+const confirmMessage = `確定要撤回 ${patient.name} 的診症嗎？\n\n` +
+                     `此操作將會：\n` +
+                     `• 刪除該次病歷記錄\n` +
+                     `• 病人狀態回到「已掛號」\n` +
+                     `• 所有診症資料將永久遺失\n\n` +
+                     `診斷：${consultation.diagnosis || '無記錄'}\n\n` +
+                     `注意：此操作無法復原！`;
+
+if (confirm(confirmMessage)) {
+    // 刪除診症記錄
+    // 先從 Firebase 刪除該次診症記錄
+    try {
+        await window.firebase.deleteDoc(
+            window.firebase.doc(
+                window.firebase.db,
+                'consultations',
+                String(appointment.consultationId)
+            )
+        );
+        // 從本地集合中移除該診症記錄
+        const consultationIndex = consultations.findIndex(
+            (c) => c.id === appointment.consultationId
+        );
+        if (consultationIndex !== -1) {
+            consultations.splice(consultationIndex, 1);
+            localStorage.setItem(
+                'consultations',
+                JSON.stringify(consultations)
+            );
         }
+    } catch (error) {
+        console.error('刪除診症記錄失敗:', error);
+        showToast('刪除診症記錄時發生錯誤', 'error');
+    }
+
+    // 將掛號狀態改回已掛號
+    appointment.status = 'registered';
+    delete appointment.completedAt;
+    delete appointment.consultationId;
+    delete appointment.completedBy;
+    delete appointment.consultationStartTime;
+    delete appointment.consultingDoctor;
+
+    // 保存狀態變更
+    localStorage.setItem('appointments', JSON.stringify(appointments));
+    // 同步更新到 Firebase
+    await window.firebaseDataManager.updateAppointment(
+        String(appointment.id),
+        appointment
+    );
+
+    showToast(
+        `已撤回 ${patient.name} 的診症，病人狀態回到已掛號`,
+        'success'
+    );
+
+    // 如果正在編輯該病歷，則關閉表單
+    if (
+        String(currentConsultingAppointmentId) === String(appointmentId)
+    ) {
+        closeConsultationForm();
+        currentConsultingAppointmentId = null;
+    }
+    // 重新載入列表和統計
+    loadTodayAppointments();
+    updateStatistics();
+}
     } catch (error) {
         console.error('讀取病人資料錯誤:', error);
         showToast('讀取病人資料失敗', 'error');
