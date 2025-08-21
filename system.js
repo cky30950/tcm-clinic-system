@@ -8670,6 +8670,196 @@ function exportFinancialReport() {
     showToast('財務報表已匯出！', 'success');
 }
 
+// ================== 資料備份與還原相關函式 ==================
+/**
+ * 等待 Firebase DataManager 準備就緒的輔助函式。
+ * 某些情況下網頁載入時 Firebase 仍在初始化，直接讀取資料會失敗。
+ */
+async function ensureFirebaseReady() {
+    if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+        for (let i = 0; i < 100 && (!window.firebaseDataManager || !window.firebaseDataManager.isReady); i++) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+    }
+}
+
+/**
+ * 匯出診所所有資料（不包含 Realtime Database 的掛號資料）。
+ * 讀取各個集合後組成單一 JSON，提供下載。
+ */
+async function exportClinicBackup() {
+    const button = document.getElementById('backupExportBtn');
+    setButtonLoading(button);
+    try {
+        await ensureFirebaseReady();
+        // 讀取病人、診症記錄與用戶資料
+        const [patientsRes, consultationsRes, usersRes] = await Promise.all([
+            window.firebaseDataManager.getPatients(),
+            window.firebaseDataManager.getConsultations(),
+            window.firebaseDataManager.getUsers()
+        ]);
+        const patientsData = patientsRes && patientsRes.success && Array.isArray(patientsRes.data) ? patientsRes.data : [];
+        const consultationsData = consultationsRes && consultationsRes.success && Array.isArray(consultationsRes.data) ? consultationsRes.data : [];
+        const usersData = usersRes && usersRes.success && Array.isArray(usersRes.data) ? usersRes.data : [];
+        // 確保中藥庫與收費項目已載入
+        if (typeof initHerbLibrary === 'function') {
+            await initHerbLibrary();
+        }
+        if (typeof initBillingItems === 'function') {
+            await initBillingItems();
+        }
+        const herbData = Array.isArray(herbLibrary) ? herbLibrary : [];
+        const billingData = Array.isArray(billingItems) ? billingItems : [];
+        // 讀取所有套票資料
+        let packageData = [];
+        try {
+            const snapshot = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'patientPackages'));
+            snapshot.forEach((docSnap) => {
+                packageData.push({ ...docSnap.data() });
+            });
+        } catch (e) {
+            console.error('讀取套票資料失敗:', e);
+        }
+        // 組合備份資料
+        const backup = {
+            patients: patientsData,
+            consultations: consultationsData,
+            users: usersData,
+            herbLibrary: herbData,
+            billingItems: billingData,
+            patientPackages: packageData,
+            clinicSettings: clinicSettings
+        };
+        const json = JSON.stringify(backup, null, 2);
+        const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        a.download = `clinic_backup_${timestamp}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('備份資料已匯出！', 'success');
+    } catch (error) {
+        console.error('匯出備份失敗:', error);
+        showToast('匯出備份失敗，請稍後再試', 'error');
+    } finally {
+        clearButtonLoading(button);
+    }
+}
+
+/**
+ * 觸發備份檔案匯入流程：清空檔案輸入框並打開檔案選擇視窗。
+ */
+function triggerBackupImport() {
+    const input = document.getElementById('backupFileInput');
+    if (input) {
+        input.value = '';  // 重置 value，確保可重新選檔
+        input.click();
+    }
+}
+
+/**
+ * 處理使用者選擇的備份檔案，解析後進行匯入。
+ * @param {File} file 使用者選擇的 JSON 檔案
+ */
+async function handleBackupFile(file) {
+    if (!file) return;
+    if (!window.confirm('匯入備份將覆蓋現有資料，確定要繼續嗎？')) {
+        return;
+    }
+    const button = document.getElementById('backupImportBtn');
+    setButtonLoading(button);
+    try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        await importClinicBackup(data);
+        showToast('備份資料匯入完成！', 'success');
+    } catch (error) {
+        console.error('匯入備份失敗:', error);
+        showToast('匯入備份失敗，請確認檔案格式是否正確', 'error');
+    } finally {
+        clearButtonLoading(button);
+    }
+}
+
+/**
+ * 將備份資料寫回 Firestore，覆蓋現有資料。Realtime Database 資料不受影響。
+ * @param {Object} data 備份物件
+ */
+async function importClinicBackup(data) {
+    await ensureFirebaseReady();
+    // helper：清空並覆寫集合資料
+    async function replaceCollection(collectionName, items) {
+        const colRef = window.firebase.collection(window.firebase.db, collectionName);
+        try {
+            const snap = await window.firebase.getDocs(colRef);
+            const deletions = [];
+            snap.forEach((docSnap) => {
+                deletions.push(window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, collectionName, docSnap.id)));
+            });
+            if (deletions.length > 0) {
+                await Promise.all(deletions);
+            }
+        } catch (err) {
+            console.error('刪除 ' + collectionName + ' 舊資料失敗:', err);
+        }
+        const writes = [];
+        if (Array.isArray(items)) {
+            items.forEach(item => {
+                if (item && item.id !== undefined && item.id !== null) {
+                    const idStr = String(item.id);
+                    writes.push(window.firebase.setDoc(window.firebase.doc(window.firebase.db, collectionName, idStr), item));
+                }
+            });
+        }
+        if (writes.length > 0) {
+            await Promise.all(writes);
+        }
+    }
+    // 覆蓋各集合
+    await replaceCollection('patients', Array.isArray(data.patients) ? data.patients : []);
+    await replaceCollection('consultations', Array.isArray(data.consultations) ? data.consultations : []);
+    await replaceCollection('users', Array.isArray(data.users) ? data.users : []);
+    await replaceCollection('herbLibrary', Array.isArray(data.herbLibrary) ? data.herbLibrary : []);
+    await replaceCollection('billingItems', Array.isArray(data.billingItems) ? data.billingItems : []);
+    await replaceCollection('patientPackages', Array.isArray(data.patientPackages) ? data.patientPackages : []);
+    // 更新診所設定
+    if (data.clinicSettings && typeof data.clinicSettings === 'object') {
+        clinicSettings = { ...data.clinicSettings };
+        localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
+        updateClinicSettingsDisplay();
+    }
+    // 清除本地快取
+    patientCache = null;
+    consultationCache = null;
+    userCache = null;
+    herbLibrary = Array.isArray(data.herbLibrary) ? data.herbLibrary : [];
+    billingItems = Array.isArray(data.billingItems) ? data.billingItems : [];
+    // 重新載入資料
+    await fetchPatients(true);
+    await fetchConsultations(true);
+    await fetchUsers(true);
+    if (typeof initHerbLibrary === 'function') {
+        await initHerbLibrary();
+    }
+    if (typeof initBillingItems === 'function') {
+        await initBillingItems();
+    }
+    // 更新界面
+    if (typeof loadPatientList === 'function') {
+        loadPatientList();
+    }
+    if (typeof loadTodayAppointments === 'function') {
+        await loadTodayAppointments();
+    }
+    if (typeof updateStatistics === 'function') {
+        updateStatistics();
+    }
+}
+
         
 // 套票管理函式
 async function getPatientPackages(patientId) {
@@ -9561,6 +9751,9 @@ document.addEventListener('DOMContentLoaded', function() {
   window.closeRegistrationModal = closeRegistrationModal;
   window.confirmRegistration = confirmRegistration;
   window.exportFinancialReport = exportFinancialReport;
+  window.exportClinicBackup = exportClinicBackup;
+  window.triggerBackupImport = triggerBackupImport;
+  window.handleBackupFile = handleBackupFile;
   window.filterBillingItems = filterBillingItems;
   window.filterHerbLibrary = filterHerbLibrary;
   window.filterUsers = filterUsers;
