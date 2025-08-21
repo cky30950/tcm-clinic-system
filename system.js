@@ -134,7 +134,7 @@ async function fetchUsers(forceRefresh = false) {
                 toast.classList.add('show');
             }, 100);
             
-            // 2秒後淡出並移除
+            // 4秒後淡出並移除
             setTimeout(() => {
                 toast.style.opacity = '0';
                 toast.style.transform = 'translateX(100%)';
@@ -143,30 +143,34 @@ async function fetchUsers(forceRefresh = false) {
                         toast.parentNode.removeChild(toast);
                     }
                 }, 300);
-            }, 2000);
+            }, 4000);
         }
 
         // 播放候診提醒音效
         // 使用 Web Audio API 產生簡單的短促音效，避免載入外部音訊檔案。
         // 此函式在病人狀態變為候診中時被呼叫。
-        function playNotificationSound() {
-            try {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (!AudioContext) return;
-                const ctx = new AudioContext();
-                const oscillator = ctx.createOscillator();
-                const gainNode = ctx.createGain();
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(880, ctx.currentTime);
-                gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
-                oscillator.connect(gainNode);
-                gainNode.connect(ctx.destination);
-                oscillator.start();
-                oscillator.stop(ctx.currentTime + 0.3);
-            } catch (err) {
-                console.error('播放提醒音效失敗:', err);
-            }
-        }
+function playNotificationSound() {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.type = 'sine';
+        // 柔和的 440Hz 音頻
+        oscillator.frequency.setValueAtTime(440, ctx.currentTime);
+        // 初始音量較低
+        gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.start();
+        // 緩慢降低音量，營造漸漸淡出的效果
+        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+        oscillator.stop(ctx.currentTime + 0.8);
+    } catch (err) {
+        console.error('播放提醒音效失敗:', err);
+    }
+}
 
         // 按鈕讀取狀態控制函數
         // 在按鈕上顯示一個半透明的旋轉小圈，以顯示正在讀取中。
