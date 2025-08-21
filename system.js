@@ -8670,6 +8670,49 @@ function exportFinancialReport() {
     showToast('財務報表已匯出！', 'success');
 }
 
+// 系統管理：診所資料備份
+async function backupClinicData() {
+    // 等待數據管理器準備就緒
+    if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+        showToast('數據管理器尚未準備就緒', 'error');
+        return;
+    }
+    try {
+        const backup = {};
+        backup.timestamp = new Date().toISOString();
+        // 診所設定來自本地儲存
+        backup.clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
+        // 需要備份的 Firestore 集合
+        const collections = ['patients', 'consultations', 'users', 'billingItems', 'herbLibrary', 'patientPackages'];
+        for (const col of collections) {
+            backup[col] = [];
+            const snapshot = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, col));
+            snapshot.forEach(doc => {
+                backup[col].push({ id: doc.id, ...doc.data() });
+            });
+        }
+        // 不備份 Realtime Database 掛號資料
+        // 根據需求，Realtime Database 的掛號資料不需要納入備份，因此不從 Firebase 讀取 appointments
+        // 這樣備份檔將不包含 appointments 屬性
+
+        // 生成 JSON 檔案並觸發下載
+        const jsonStr = JSON.stringify(backup, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
+        a.href = url;
+        a.download = `clinic_backup_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('診所資料備份已匯出！', 'success');
+    } catch (error) {
+        console.error('備份資料失敗:', error);
+        showToast('備份資料失敗', 'error');
+    }
+}
 
         
 // 套票管理函式
