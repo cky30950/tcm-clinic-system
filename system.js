@@ -145,7 +145,29 @@ async function fetchUsers(forceRefresh = false) {
                 }, 300);
             }, 2000);
         }
-        
+
+        // 播放候診提醒音效
+        // 使用 Web Audio API 產生簡單的短促音效，避免載入外部音訊檔案。
+        // 此函式在病人狀態變為候診中時被呼叫。
+        function playNotificationSound() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                const oscillator = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+                gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
+                oscillator.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                oscillator.start();
+                oscillator.stop(ctx.currentTime + 0.3);
+            } catch (err) {
+                console.error('播放提醒音效失敗:', err);
+            }
+        }
+
         // 按鈕讀取狀態控制函數
         // 在按鈕上顯示一個半透明的旋轉小圈，以顯示正在讀取中。
         // 原始內容將儲存在 data-originalHtml 中，完成後可復原。
@@ -1658,13 +1680,49 @@ function subscribeToAppointments() {
     if (window.appointmentsListener) {
         window.firebase.off(appointmentsRef, 'value', window.appointmentsListener);
     }
-    // 建立新的監聽回調
-    window.appointmentsListener = (snapshot) => {
+    // 初始化前一次狀態記錄
+    if (!window.previousAppointmentStatuses) {
+        window.previousAppointmentStatuses = {};
+    }
+    // 建立新的監聽回調，使用 async 以便在偵測到狀態變更時讀取病人資料
+    window.appointmentsListener = async (snapshot) => {
         const data = snapshot.val() || {};
-        // 將資料轉換為陣列並保存到全域變數
-        appointments = Object.keys(data).map(key => {
+        // 取得新的掛號資料陣列
+        const newAppointments = Object.keys(data).map(key => {
             return { id: key, ...data[key] };
         });
+        try {
+            // 判斷是否有病人狀態變更為候診中需要通知
+            const toNotify = [];
+            for (const apt of newAppointments) {
+                const prevStatus = window.previousAppointmentStatuses[apt.id];
+                // 當前狀態為候診中且與先前狀態不同，視為新的候診事件
+                if (prevStatus !== undefined && prevStatus !== apt.status && apt.status === 'waiting') {
+                    toNotify.push(apt);
+                }
+                // 更新狀態紀錄
+                window.previousAppointmentStatuses[apt.id] = apt.status;
+            }
+            // 如果有需要通知的掛號並且目前使用者是醫師
+            if (toNotify.length > 0 && currentUserData && currentUserData.position === '醫師') {
+                // 讀取所有病人資訊以獲取病人姓名
+                const allPatients = await fetchPatients();
+                for (const apt of toNotify) {
+                    // 僅通知該醫師所屬的掛號
+                    if (apt.appointmentDoctor === currentUserData.username) {
+                        const patient = allPatients.find(p => p.id === apt.patientId);
+                        const patientName = patient ? patient.name : '';
+                        // 顯示提示並播放音效
+                        showToast(`病人 ${patientName} 已進入候診中，請準備診症。`, 'info');
+                        playNotificationSound();
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('處理候診通知時發生錯誤:', err);
+        }
+        // 更新全域掛號資料
+        appointments = newAppointments;
         // 儲存到本地作為備份
         localStorage.setItem('appointments', JSON.stringify(appointments));
         // 重新載入今日掛號列表
@@ -1675,6 +1733,7 @@ function subscribeToAppointments() {
     // 設置監聽器
     window.firebase.onValue(appointmentsRef, window.appointmentsListener);
 }
+
 
 
 // 新增：從 Firebase 載入診症記錄進行編輯
