@@ -8520,42 +8520,60 @@ async function deleteUser(id) {
         }
 
         // 匯出財務報表
-        function exportFinancialReport() {
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            const reportType = document.getElementById('reportType').value;
-            
-            // 準備匯出資料
-            const reportData = {
-                reportInfo: {
-                    title: `財務報表 - ${reportType}`,
-                    period: `${startDate} 至 ${endDate}`,
-                    generatedAt: new Date().toLocaleString('zh-TW')
-                },
-                summary: {
-                    totalRevenue: document.getElementById('totalRevenue').textContent,
-                    totalConsultations: document.getElementById('totalConsultations').textContent,
-                    averageRevenue: document.getElementById('averageRevenue').textContent,
-                    activeDoctors: document.getElementById('activeDoctors').textContent
-                }
-            };
+function exportFinancialReport() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const reportType = document.getElementById('reportType').value;
+    // 取得醫師篩選條件（若有）
+    let doctorFilter = '';
+    const doctorFilterInput = document.getElementById('doctorFilter');
+    if (doctorFilterInput) {
+        doctorFilter = doctorFilterInput.value;
+    }
+    // 過濾診症資料並計算統計以生成更詳細的報表
+    const filteredConsultations = filterFinancialConsultations(startDate, endDate, doctorFilter);
+    const stats = calculateFinancialStatistics(filteredConsultations);
+    // 準備各區塊文字
+    const doctorLines = Object.keys(stats.doctorStats).map(key => {
+        const data = stats.doctorStats[key];
+        const doctorName = key || '未知醫師';
+        return `${doctorName}: 次數 ${data.count.toLocaleString()}，收入 $${data.revenue.toLocaleString()}`;
+    }).join('\n');
+    const serviceLines = Object.values(stats.serviceStats).map(item => {
+        return `${item.name}: 次數 ${item.count.toLocaleString()}，收入 $${item.revenue.toLocaleString()}`;
+    }).join('\n');
+    const dailyLines = Object.keys(stats.dailyStats).map(dateKey => {
+        const data = stats.dailyStats[dateKey];
+        return `${dateKey}: 次數 ${data.count.toLocaleString()}，收入 $${data.revenue.toLocaleString()}`;
+    }).join('\n');
+    // 組合文字報表
+    let textReport = '';
+    if (doctorFilter) {
+        textReport += `選擇醫師: ${doctorFilter}\n`;
+    }
+    textReport += `報表標題: 財務報表 - ${reportType}\n`;
+    textReport += `期間: ${startDate} 至 ${endDate}\n`;
+    textReport += `生成時間: ${new Date().toLocaleString('zh-TW')}\n`;
+    textReport += `總收入: $${stats.totalRevenue.toLocaleString()}\n`;
+    textReport += `總診症數: ${stats.totalConsultations.toLocaleString()}\n`;
+    textReport += `平均收入: $${Math.round(stats.averageRevenue).toLocaleString()}\n`;
+    textReport += `有效醫師數: ${stats.activeDoctors.toLocaleString()}\n\n`;
+    textReport += `醫師統計:\n${doctorLines || '無資料'}\n\n`;
+    textReport += `服務分類統計:\n${serviceLines || '無資料'}\n\n`;
+    textReport += `每日統計:\n${dailyLines || '無資料'}\n`;
+    // 創建下載為純文字檔案
+    const blob = new Blob([textReport], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `財務報表_${startDate}_${endDate}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('財務報表已匯出！', 'success');
+}
 
-            // 轉換為 JSON 字符串
-            const jsonString = JSON.stringify(reportData, null, 2);
-            
-            // 創建下載
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `財務報表_${startDate}_${endDate}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            showToast('財務報表已匯出！', 'success');
-        }
 
         
 // 套票管理函式
