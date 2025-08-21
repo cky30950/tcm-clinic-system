@@ -1415,7 +1415,22 @@
                 <h2 class="text-2xl font-bold text-gray-800 mb-6">系統管理</h2>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
+                    <!-- 資料備份與匯入 -->
+<div class="bg-gray-50 rounded-lg p-6">
+  <h3 class="text-lg font-semibold mb-4">資料備份與匯入</h3>
+  <p class="text-gray-600 mb-4">匯出診所資料備份檔或匯入備份檔以還原資料。</p>
+  <div class="space-y-3">
+    <button onclick="backupClinicData()" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition duration-200">
+      匯出備份
+    </button>
+    <!-- 隱藏的檔案選擇，用於匯入資料 -->
+    <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="handleImportFile(event)">
+    <button onclick="document.getElementById('importFileInput').click()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200">
+      匯入資料
+    </button>
+  </div>
+</div>
+
                     <div class="bg-gray-50 rounded-lg p-6">
                         <h3 class="text-lg font-semibold mb-4">診所設定</h3>
                         <div class="space-y-3">
