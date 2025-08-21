@@ -1,6 +1,29 @@
 // 系統資料儲存
+// 用戶登入後的資料
 let currentUser = null;
 let currentUserData = null;
+
+/**
+ * 角色與對應可存取的系統區塊對照表。
+ * 每個角色可存取哪些頁面（功能），在此集中定義。
+ */
+const ROLE_PERMISSIONS = {
+  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement'],
+  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement'],
+  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement'],
+  '用戶': ['patientManagement', 'consultationSystem']
+};
+
+/**
+ * 判斷當前用戶是否具有存取指定區塊的權限。
+ * @param {string} sectionId
+ * @returns {boolean}
+ */
+function hasAccessToSection(sectionId) {
+  if (!currentUserData || !currentUserData.position) return false;
+  const allowed = ROLE_PERMISSIONS[currentUserData.position] || [];
+  return allowed.includes(sectionId);
+}
 
 // 初始化全域變數
 let patients = [];
@@ -474,20 +497,15 @@ async function attemptMainLogin() {
             currentUserData = matchingUser;
             currentUser = matchingUser.username;
         } else {
-            // 若找不到對應用戶，使用 Firebase 資訊建立臨時用戶資料
-            currentUserData = {
-                id: null,
-                uid: uid,
-                username: firebaseUser.email,
-                email: firebaseUser.email,
-                name: firebaseUser.displayName || getUserNameFromEmail(firebaseUser.email),
-                position: getUserPositionFromEmail(firebaseUser.email),
-                active: true,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                lastLogin: new Date().toISOString()
-            };
-            currentUser = currentUserData.username;
+            // 若找不到對應用戶，表示尚未授權，不允許以臨時帳號登入
+            showToast('此帳號尚未被授權，請聯繫系統管理員', 'error');
+            // 登出 Firebase 使用者，避免逕自進入系統
+            try {
+                await window.firebase.signOut(window.firebase.auth);
+            } catch (e) {
+                console.error('登出 Firebase 失敗:', e);
+            }
+            return;
         }
 
         // 在登入主系統前先載入中藥庫資料和收費項目資料
@@ -691,27 +709,9 @@ async function logout() {
                 systemManagement: { title: '系統管理', icon: '⚙️', description: '統計資料、備份匯出' }
             };
 
-            /*
-             * 根據當前用戶的職位決定可使用的功能列表。一般職位僅能查看與診療相關的資料，
-             * 「診所管理」職位可以額外存取財務報表、用戶管理與系統管理。
-             */
-            function getPermissionsForPosition(position) {
-                const basePermissions = ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement'];
-                // 「診所管理」職位可使用所有進階功能
-                if (position === '診所管理') {
-                    return [...basePermissions, 'financialReports', 'userManagement', 'systemManagement'];
-                }
-                // 醫師職位亦可管理用戶與系統，因此加入 userManagement 和 systemManagement 權限
-                if (position === '醫師') {
-                    return [...basePermissions, 'userManagement', 'systemManagement'];
-                }
-                // 其他職位僅具備基本功能
-                return basePermissions;
-            }
-
-            // 取得當前用戶職位，沒有職位預設為一般使用者
+            // 根據當前用戶職位決定可使用的功能列表
             const userPosition = (currentUserData && currentUserData.position) || '';
-            const permissions = getPermissionsForPosition(userPosition);
+            const permissions = ROLE_PERMISSIONS[userPosition] || [];
 
             // 依序建立側邊選單按鈕
             permissions.forEach(permission => {
@@ -750,26 +750,18 @@ async function logout() {
 
         // 顯示指定區域
         function showSection(sectionId) {
-            // 若為財務報表，僅限診所管理存取
-            if (sectionId === 'financialReports' && !hasPermission(['診所管理'])) {
-                showToast('權限不足，僅診所管理可使用此功能', 'error');
+            // 統一權限檢查：若沒有權限則提示並返回
+            if (!hasAccessToSection(sectionId)) {
+                showToast('權限不足，您沒有存取此功能的權限', 'error');
                 return;
             }
-            // 若為系統管理，診所管理及醫師皆可存取
-            if (sectionId === 'systemManagement' && !hasPermission(['診所管理', '醫師'])) {
-                showToast('權限不足，僅診所管理或醫師可使用此功能', 'error');
-                return;
-            }
-            // 若為用戶管理，診所管理及醫師皆可存取
-            if (sectionId === 'userManagement' && !hasPermission(['診所管理', '醫師'])) {
-                showToast('權限不足，僅診所管理或醫師可使用此功能', 'error');
-                return;
-            }
-
             hideAllSections();
+            // 隱藏歡迎頁
             document.getElementById('welcomePage').classList.add('hidden');
-            document.getElementById(sectionId).classList.remove('hidden');
-
+            // 顯示指定區域
+            const sectionEl = document.getElementById(sectionId);
+            if (sectionEl) sectionEl.classList.remove('hidden');
+            // 根據 sectionId 載入相應功能
             if (sectionId === 'patientManagement') {
                 loadPatientList();
             } else if (sectionId === 'consultationSystem') {
@@ -7791,6 +7783,11 @@ function toggleRegistrationNumberField() {
 }
 
 async function editUser(id) {
+    // 檢查權限：未具備用戶管理權限則阻止操作
+    if (!hasAccessToSection('userManagement')) {
+        showToast('權限不足，無法執行此操作', 'error');
+        return;
+    }
     const currentUsers = usersFromFirebase.length > 0 ? usersFromFirebase : users;
     const user = currentUsers.find(u => u.id === id);
     if (!user) return;
@@ -7835,6 +7832,11 @@ async function editUser(id) {
 }
 
 async function saveUser() {
+    // 檢查權限：未具備用戶管理權限則阻止操作
+    if (!hasAccessToSection('userManagement')) {
+        showToast('權限不足，無法執行此操作', 'error');
+        return;
+    }
     // 帳號及密碼欄位已移除，使用 UID 或電子郵件自動產生內部識別名稱
     const name = document.getElementById('userDisplayName').value.trim();
     const position = document.getElementById('userPosition').value.trim();
@@ -7981,6 +7983,11 @@ async function saveUser() {
 }
 
 async function toggleUserStatus(id) {
+    // 檢查權限：未具備用戶管理權限則阻止操作
+    if (!hasAccessToSection('userManagement')) {
+        showToast('權限不足，無法執行此操作', 'error');
+        return;
+    }
     const currentUsers = usersFromFirebase.length > 0 ? usersFromFirebase : users;
     const user = currentUsers.find(u => u.id === id);
     if (!user) return;
@@ -8033,6 +8040,11 @@ async function toggleUserStatus(id) {
 }
 
 async function deleteUser(id) {
+    // 檢查權限：未具備用戶管理權限則阻止操作
+    if (!hasAccessToSection('userManagement')) {
+        showToast('權限不足，無法執行此操作', 'error');
+        return;
+    }
     const currentUsers = usersFromFirebase.length > 0 ? usersFromFirebase : users;
     const user = currentUsers.find(u => u.id === id);
     if (!user) return;
