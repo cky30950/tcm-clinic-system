@@ -2788,8 +2788,8 @@ async function saveConsultation() {
     const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
     // 判斷是否為編輯模式：掛號狀態為已完成且存在 consultationId
     const isEditing = appointment && appointment.status === 'completed' && appointment.consultationId;
-        // 預處理套票購買和立即使用（僅在非編輯模式下處理，以免重複購買）
-    if (appointment && !isEditing && Array.isArray(selectedBillingItems)) {
+        // 預處理套票購買和立即使用（非編輯模式與編輯模式都需處理，編輯模式也允許購買）
+    if (appointment && Array.isArray(selectedBillingItems)) {
         try {
             // 找到所有套票項目
             const packageItems = selectedBillingItems.filter(item => item && item.category === 'package');
