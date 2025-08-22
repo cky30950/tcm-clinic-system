@@ -9979,4 +9979,41 @@ document.addEventListener('DOMContentLoaded', function() {
   window.updateRestPeriod = updateRestPeriod;
   window.useOnePackage = useOnePackage;
   window.undoPackageUse = undoPackageUse;
+
+  /**
+   * 在使用者嘗試直接關閉或重新整理網頁時提示確認，避免未保存的套票使用紀錄被誤判為取消。
+   *
+   * 先前的實作中會在取消診症或退出編輯時，將 pendingPackageChanges 中的變更回復。
+   * 但如果使用者直接關閉瀏覽器頁籤或刷新頁面，這些變更不應自動回復，
+   * 否則將導致套票次數被無意間加回。為此，加入 beforeunload 監聽器，
+   * 當存在未保存的套票變更時，提示使用者確認離開。若使用者仍選擇離開，
+   * 我們不會執行 revertPendingPackageChanges，而是保留目前資料庫中的套票狀態。
+   */
+  window.addEventListener('beforeunload', function (e) {
+    try {
+      // 若有暫存的套票使用變更尚未正式保存，則提示確認離開
+      if (pendingPackageChanges && pendingPackageChanges.length > 0) {
+        // 阻止預設行為，並設置 returnValue 以符合部分瀏覽器要求
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    } catch (_e) {
+      // 忽略意外錯誤，避免影響離開流程
+    }
+  });
+
+  /**
+   * 在頁面卸載時清空暫存的套票變更。
+   *
+   * 離開頁面後，記憶體中的 pendingPackageChanges 將會失效，不過在某些瀏覽器中
+   * 仍有可能在後續執行非同步或同步回調時引用到舊資料。為安全起見，在 unload 事件
+   * 中顯式將暫存變更清空，確保後續不會誤判為需要回復。
+   */
+  window.addEventListener('unload', function () {
+    try {
+      pendingPackageChanges = [];
+    } catch (_e) {
+      // 若無法清空，略過即可；刷新後此變數會重新初始化
+    }
+  });
 })();
