@@ -57,33 +57,74 @@ let userCache = null;
 let pendingPackageChanges = [];
 
 /**
+ * 計算指定病人和套票的暫存變更總和。
+ * @param {string} patientId
+ * @param {string} packageRecordId
+ * @returns {number}
+ */
+function getPendingPackageDelta(patientId, packageRecordId) {
+    try {
+        return pendingPackageChanges
+            .filter(ch => ch && ch.patientId === patientId && ch.packageRecordId === packageRecordId && typeof ch.delta === 'number')
+            .reduce((sum, ch) => sum + ch.delta, 0);
+    } catch (e) {
+        return 0;
+    }
+}
+
+/**
+ * 將所有暫存的套票變更同步至 Firestore。
+ * 在保存病歷時呼叫此函式，根據 pendingPackageChanges 中累積的差值
+ * 更新各套票的剩餘次數。
+ */
+async function commitPendingPackageChanges() {
+    try {
+        // 聚合變更，避免對同一筆套票重複更新
+        const aggregated = {};
+        for (const change of pendingPackageChanges) {
+            if (!change || !change.patientId || !change.packageRecordId || typeof change.delta !== 'number') continue;
+            const key = change.patientId + '||' + change.packageRecordId;
+            if (!aggregated[key]) {
+                aggregated[key] = { patientId: change.patientId, packageRecordId: change.packageRecordId, delta: 0 };
+            }
+            aggregated[key].delta += change.delta;
+        }
+        // 套用每個聚合後的變更
+        for (const key in aggregated) {
+            const { patientId, packageRecordId, delta } = aggregated[key];
+            if (!delta) continue;
+            try {
+                const packages = await getPatientPackages(patientId);
+                const pkg = packages.find(p => p.id === packageRecordId);
+                if (!pkg) continue;
+                const newRemaining = (pkg.remainingUses || 0) + delta;
+                const updatedPackage = { ...pkg, remainingUses: newRemaining };
+                await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
+            } catch (err) {
+                console.error('套用暫存套票變更時發生錯誤:', err);
+            }
+        }
+    } catch (error) {
+        console.error('提交暫存套票變更錯誤:', error);
+    }
+}
+
+/**
  * 復原所有暫存的套票使用變更。
  * 當取消診症或退出編輯且未保存時呼叫此函式，
  * 依序將 pendingPackageChanges 中的各項改變倒轉（即減去 delta），
  * 並清空 pendingPackageChanges。
  */
 async function revertPendingPackageChanges() {
+    // 取消診症或退出編輯時，不再回復資料庫中的套票次數。
+    // 只需清除暫存的變更並重新渲染套票列表，以恢復原始顯示。
     try {
-        for (const change of pendingPackageChanges) {
-            const { patientId, packageRecordId, delta } = change;
-            if (!patientId || !packageRecordId || typeof delta !== 'number') continue;
-            try {
-                const packages = await getPatientPackages(patientId);
-                const pkg = packages.find(p => p.id === packageRecordId);
-                if (!pkg) continue;
-                const updatedPackage = {
-                    ...pkg,
-                    remainingUses: (pkg.remainingUses || 0) - delta
-                };
-                await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
-            } catch (error) {
-                console.error('回復套票使用次數失敗:', error);
-            }
+        pendingPackageChanges = [];
+        if (typeof refreshPatientPackagesUI === 'function') {
+            await refreshPatientPackagesUI();
         }
     } catch (e) {
         console.error('重置暫存套票變更錯誤:', e);
-    } finally {
-        pendingPackageChanges = [];
     }
 }
 
@@ -2875,7 +2916,9 @@ async function saveConsultation() {
         }
 
         if (operationSuccess) {
-            // 保存成功時，清空暫存的套票變更，表示這些變更已經正式記錄，不需要再撤銷。
+            // 保存成功時，先提交本地暫存的套票變更至資料庫
+            await commitPendingPackageChanges();
+            // 提交後清空暫存變更，表示這些變更已經正式記錄，不需要再撤銷。
             pendingPackageChanges = [];
             // 完成後關閉診症表單並更新 UI
             closeConsultationForm();
@@ -9110,6 +9153,43 @@ async function consumePackage(patientId, packageRecordId) {
     }
 }
 
+/**
+ * 在本地消耗套票使用次數，不立即同步到資料庫。
+ * 將根據暫存變更計算可用的剩餘次數，並於保存病歷時一次性提交。
+ *
+ * @param {string} patientId 患者 ID
+ * @param {string} packageRecordId 套票記錄 ID
+ * @returns {Promise<{ok: boolean, msg?: string, record?: any}>}
+ */
+async function consumePackageLocally(patientId, packageRecordId) {
+    try {
+        const packages = await getPatientPackages(patientId);
+        const pkg = packages.find(p => p.id === packageRecordId);
+        if (!pkg) {
+            return { ok: false, msg: '找不到套票' };
+        }
+        const now = new Date();
+        const exp = new Date(pkg.expiresAt);
+        if (now > exp) {
+            return { ok: false, msg: '套票已過期' };
+        }
+        // 根據暫存變更計算可用的剩餘次數
+        const delta = pendingPackageChanges
+            .filter(change => change.patientId === patientId && change.packageRecordId === packageRecordId && typeof change.delta === 'number')
+            .reduce((sum, change) => sum + change.delta, 0);
+        const availableUses = (pkg.remainingUses || 0) + delta;
+        if (availableUses <= 0) {
+            return { ok: false, msg: '套票已用完' };
+        }
+        // 回傳剩餘次數已減 1 的模擬記錄，用於更新 UI
+        const updatedPackage = { ...pkg, remainingUses: availableUses - 1 };
+        return { ok: true, record: updatedPackage };
+    } catch (error) {
+        console.error('本地使用套票錯誤:', error);
+        return { ok: false, msg: '系統錯誤' };
+    }
+}
+
 function formatPackageStatus(pkg) {
     const exp = new Date(pkg.expiresAt);
     const now = new Date();
@@ -9126,13 +9206,18 @@ async function renderPatientPackages(patientId) {
     
     try {
         const pkgs = await getPatientPackages(patientId);
-        const activePkgs = pkgs.filter(p => p.remainingUses > 0).sort((a,b)=> new Date(a.expiresAt)-new Date(b.expiresAt));
-        
+        // 應用暫存變更，調整每個套票的剩餘次數
+        const modifiedPkgs = pkgs.map(pkg => {
+            const delta = pendingPackageChanges
+                .filter(change => change.patientId === patientId && change.packageRecordId === pkg.id && typeof change.delta === 'number')
+                .reduce((sum, change) => sum + change.delta, 0);
+            return { ...pkg, remainingUses: (pkg.remainingUses || 0) + delta };
+        });
+        const activePkgs = modifiedPkgs.filter(p => p.remainingUses > 0).sort((a,b) => new Date(a.expiresAt) - new Date(b.expiresAt));
         if (activePkgs.length === 0) {
             container.innerHTML = '<div class="text-gray-500">無已購買的套票</div>';
             return;
         }
-        
         container.innerHTML = activePkgs.map(pkg => {
             const exp = new Date(pkg.expiresAt);
             const now = new Date();
@@ -9189,7 +9274,8 @@ async function useOnePackage(patientId, packageRecordId) {
         setButtonLoading(loadingButton, '處理中...');
     }
     try {
-        const res = await consumePackage(patientId, packageRecordId);
+        // 僅在本地消耗套票次數，不立即同步到資料庫
+        const res = await consumePackageLocally(patientId, packageRecordId);
         if (!res.ok) {
             showToast(res.msg || '套票不可用', 'warning');
             return;
@@ -9354,18 +9440,14 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
                 showToast('找不到對應的套票，已移除項目', 'warning');
                 return;
             }
-            const updatedPackage = {
-                ...pkg,
-                // 將剩餘次數加 1，如果不存在則視為 0
-                remainingUses: (pkg.remainingUses || 0) + 1
-            };
-            const result = await window.firebaseDataManager.updatePatientPackage(pkgId, updatedPackage);
-            if (result && result.success) {
-                /*
-                 * 如果套票使用項目的數量大於 1，代表當次診症已抵扣多次。
-                 * 此時取消使用只應減少數量並退回一次，並保留項目；
-                 * 若數量為 1，則從列表中移除該項目。
-                 */
+            /*
+             * 不立即更新資料庫，僅在本地回復套票使用。
+             * 將剩餘次數增加 1 並更新暫存變更，保存病歷時再同步到資料庫。
+             */
+            {
+                // 如果套票使用項目的數量大於 1，代表當次診症已抵扣多次。
+                // 此時取消使用只應減少數量並退回一次，並保留項目；
+                // 若數量為 1，則從列表中移除該項目。
                 const currentItem = selectedBillingItems.find(it => it.id === usageItemId);
                 if (currentItem && typeof currentItem.quantity === 'number' && currentItem.quantity > 1) {
                     currentItem.quantity -= 1;
@@ -9374,7 +9456,7 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
                 }
                 updateBillingDisplay();
                 await refreshPatientPackagesUI();
-                // 記錄本次套票退回，以便取消診症時能夠撤銷這個動作。delta 為 +1 表示增加一次。
+                // 記錄本次套票退回，以便保存診症時同步。delta 為 +1 表示增加一次。
                 try {
                     const undoPatientId = (item && item.patientId) ? item.patientId : resolvedPatientId;
                     pendingPackageChanges.push({
@@ -9384,8 +9466,6 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
                     });
                 } catch (_e) {}
                 showToast('已取消本次套票使用，次數已退回', 'success');
-            } else {
-                showToast('取消套票使用失敗', 'error');
             }
         } catch (error) {
             console.error('取消套票使用錯誤:', error);
