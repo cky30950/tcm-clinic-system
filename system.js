@@ -9499,9 +9499,7 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
                 } else {
                     selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
                 }
-                updateBillingDisplay();
-                await refreshPatientPackagesUI();
-                // 記錄本次套票退回，以便保存診症時同步。delta 為 +1 表示增加一次。
+                // 在 UI 更新前先記錄本次套票退回，以便 renderPatientPackages 能正確反映新的剩餘次數
                 try {
                     const undoPatientIdRaw = (item && item.patientId) ? item.patientId : resolvedPatientId;
                     // 在暫存變更中統一使用字串表示 ID
@@ -9513,6 +9511,9 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
                         delta: +1
                     });
                 } catch (_e) {}
+                // 更新收費項目與套票列表顯示
+                updateBillingDisplay();
+                await refreshPatientPackagesUI();
                 showToast('已取消本次套票使用，次數已退回', 'success');
             }
         } catch (error) {
