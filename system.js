@@ -9140,7 +9140,8 @@ async function purchasePackage(patientId, item) {
 async function consumePackage(patientId, packageRecordId) {
     try {
         const packages = await getPatientPackages(patientId);
-        const pkg = packages.find(p => p.id === packageRecordId);
+        // 比對 ID 時統一轉為字串，避免類型不一致導致找不到套票
+        const pkg = packages.find(p => String(p.id) === String(packageRecordId));
         
         if (!pkg) return { ok: false, msg: '找不到套票' };
         
@@ -9178,7 +9179,8 @@ async function consumePackage(patientId, packageRecordId) {
 async function consumePackageLocally(patientId, packageRecordId) {
     try {
         const packages = await getPatientPackages(patientId);
-        const pkg = packages.find(p => p.id === packageRecordId);
+        // 比對 ID 時統一轉為字串，避免類型不一致導致找不到套票
+        const pkg = packages.find(p => String(p.id) === String(packageRecordId));
         if (!pkg) {
             return { ok: false, msg: '找不到套票' };
         }
