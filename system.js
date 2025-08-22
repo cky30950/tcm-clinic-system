@@ -97,7 +97,13 @@ async function commitPendingPackageChanges() {
                 const packages = await getPatientPackages(patientId);
                 const pkg = packages.find(p => p.id === packageRecordId);
                 if (!pkg) continue;
-                const newRemaining = (pkg.remainingUses || 0) + delta;
+                let newRemaining = (pkg.remainingUses || 0) + delta;
+                // 約束 remainingUses 不小於 0，也不超過 totalUses（若存在）
+                if (typeof pkg.totalUses === 'number') {
+                    newRemaining = Math.max(0, Math.min(pkg.totalUses, newRemaining));
+                } else {
+                    newRemaining = Math.max(0, newRemaining);
+                }
                 const updatedPackage = { ...pkg, remainingUses: newRemaining };
                 await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
             } catch (err) {
@@ -9211,7 +9217,14 @@ async function renderPatientPackages(patientId) {
             const delta = pendingPackageChanges
                 .filter(change => change.patientId === patientId && change.packageRecordId === pkg.id && typeof change.delta === 'number')
                 .reduce((sum, change) => sum + change.delta, 0);
-            return { ...pkg, remainingUses: (pkg.remainingUses || 0) + delta };
+            let newRemaining = (pkg.remainingUses || 0) + delta;
+            // 約束 remainingUses 不小於 0，也不超過 totalUses（若 totalUses 定義）
+            if (typeof pkg.totalUses === 'number') {
+                newRemaining = Math.max(0, Math.min(pkg.totalUses, newRemaining));
+            } else {
+                newRemaining = Math.max(0, newRemaining);
+            }
+            return { ...pkg, remainingUses: newRemaining };
         });
         const activePkgs = modifiedPkgs.filter(p => p.remainingUses > 0).sort((a,b) => new Date(a.expiresAt) - new Date(b.expiresAt));
         if (activePkgs.length === 0) {
