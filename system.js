@@ -7744,6 +7744,23 @@ function displayUsers() {
         
         const row = document.createElement('tr');
         row.className = 'hover:bg-gray-50';
+        // 根據是否為管理員決定操作按鈕顯示
+        let actionsHtml;
+        // 如果是診所管理（管理員），禁止編輯、刪除或停用
+        if (user.position === '診所管理') {
+            actionsHtml = `<span class="text-gray-400 text-xs">管理員不可修改</span>`;
+        } else {
+            // 如果不是當前登入用戶則顯示所有控制按鈕，否則顯示「當前用戶」提示
+            actionsHtml = user.id !== currentUserData.id ? `
+                        <button onclick="editUser('${user.id}')" class="text-blue-600 hover:text-blue-800">編輯</button>
+                        <button onclick="toggleUserStatus('${user.id}')" class="text-orange-600 hover:text-orange-800">
+                            ${user.active ? '停用' : '啟用'}
+                        </button>
+                        <button onclick="deleteUser('${user.id}')" class="text-red-600 hover:text-red-800">刪除</button>
+                    ` : `
+                        <span class="text-gray-400 text-xs">當前用戶</span>
+                    `;
+        }
         row.innerHTML = `
             <td class="px-4 py-3 text-sm text-gray-900">${user.name}</td>
             <td class="px-4 py-3 text-sm text-gray-600">${user.position || '未設定'}</td>
@@ -7755,17 +7772,7 @@ function displayUsers() {
                 </span>
             </td>
             <td class="px-4 py-3 text-sm text-gray-600">${lastLogin}</td>
-            <td class="px-4 py-3 text-sm space-x-2">
-                <button onclick="editUser('${user.id}')" class="text-blue-600 hover:text-blue-800">編輯</button>
-                ${user.id !== currentUserData.id ? `
-                    <button onclick="toggleUserStatus('${user.id}')" class="text-orange-600 hover:text-orange-800">
-                        ${user.active ? '停用' : '啟用'}
-                    </button>
-                    <button onclick="deleteUser('${user.id}')" class="text-red-600 hover:text-red-800">刪除</button>
-                ` : `
-                    <span class="text-gray-400 text-xs">當前用戶</span>
-                `}
-            </td>
+            <td class="px-4 py-3 text-sm space-x-2">${actionsHtml}</td>
         `;
         tbody.appendChild(row);
     });
@@ -7828,6 +7835,11 @@ async function editUser(id) {
     const currentUsers = usersFromFirebase.length > 0 ? usersFromFirebase : users;
     const user = currentUsers.find(u => u.id === id);
     if (!user) return;
+    // 禁止編輯管理員帳號
+    if (user.position === '診所管理') {
+        showToast('管理員帳號不可編輯！', 'error');
+        return;
+    }
     
     editingUserId = id;
     // 使用防呆處理，避免目標元素不存在時拋出錯誤
@@ -7920,6 +7932,16 @@ async function saveUser() {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             showToast('請輸入有效的電子郵件格式！', 'error');
+            return;
+        }
+    }
+
+    // 如果正在編輯，用戶為管理員則禁止編輯
+    if (editingUserId) {
+        const currentUsers = usersFromFirebase.length > 0 ? usersFromFirebase : users;
+        const editingUser = currentUsers.find(u => u.id === editingUserId);
+        if (editingUser && editingUser.position === '診所管理') {
+            showToast('管理員帳號不可編輯！', 'error');
             return;
         }
     }
@@ -8034,6 +8056,11 @@ async function toggleUserStatus(id) {
         showToast('不能停用自己的帳號！', 'error');
         return;
     }
+    // 禁止停用管理員帳號
+    if (user.position === '診所管理') {
+        showToast('管理員帳號不可停用！', 'error');
+        return;
+    }
     
     const action = user.active ? '停用' : '啟用';
     const confirmMessage = `確定要${action}用戶「${user.name}」嗎？\n\n${user.active ? '停用後該用戶將無法登入系統。' : '啟用後該用戶可以正常登入系統。'}`;
@@ -8089,6 +8116,11 @@ async function deleteUser(id) {
     // 防止刪除自己的帳號
     if (user.id === currentUserData.id) {
         showToast('不能刪除自己的帳號！', 'error');
+        return;
+    }
+    // 禁止刪除管理員帳號
+    if (user.position === '診所管理') {
+        showToast('管理員帳號不可刪除！', 'error');
         return;
     }
     
