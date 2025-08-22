@@ -65,7 +65,13 @@ let pendingPackageChanges = [];
 function getPendingPackageDelta(patientId, packageRecordId) {
     try {
         return pendingPackageChanges
-            .filter(ch => ch && ch.patientId === patientId && ch.packageRecordId === packageRecordId && typeof ch.delta === 'number')
+            .filter(ch => {
+                if (!ch || typeof ch.delta !== 'number') return false;
+                // 比較 patientId 和 packageRecordId 時統一轉為字串，以避免類型不一致導致匹配失敗
+                const pidMatches = (ch.patientId !== undefined && patientId !== undefined) ? String(ch.patientId) === String(patientId) : false;
+                const pkgMatches = (ch.packageRecordId !== undefined && packageRecordId !== undefined) ? String(ch.packageRecordId) === String(packageRecordId) : false;
+                return pidMatches && pkgMatches;
+            })
             .reduce((sum, ch) => sum + ch.delta, 0);
     } catch (e) {
         return 0;
@@ -83,7 +89,7 @@ async function commitPendingPackageChanges() {
         const aggregated = {};
         for (const change of pendingPackageChanges) {
             if (!change || !change.patientId || !change.packageRecordId || typeof change.delta !== 'number') continue;
-            const key = change.patientId + '||' + change.packageRecordId;
+            const key = String(change.patientId) + '||' + String(change.packageRecordId);
             if (!aggregated[key]) {
                 aggregated[key] = { patientId: change.patientId, packageRecordId: change.packageRecordId, delta: 0 };
             }
@@ -95,7 +101,8 @@ async function commitPendingPackageChanges() {
             if (!delta) continue;
             try {
                 const packages = await getPatientPackages(patientId);
-                const pkg = packages.find(p => p.id === packageRecordId);
+                // 確保 ID 比較時以字串進行
+                const pkg = packages.find(p => String(p.id) === String(packageRecordId));
                 if (!pkg) continue;
                 let newRemaining = (pkg.remainingUses || 0) + delta;
                 // 約束 remainingUses 不小於 0，也不超過 totalUses（若存在）
@@ -9181,7 +9188,10 @@ async function consumePackageLocally(patientId, packageRecordId) {
         }
         // 根據暫存變更計算可用的剩餘次數
         const delta = pendingPackageChanges
-            .filter(change => change.patientId === patientId && change.packageRecordId === packageRecordId && typeof change.delta === 'number')
+            .filter(change => {
+                if (!change || typeof change.delta !== 'number') return false;
+                return String(change.patientId) === String(patientId) && String(change.packageRecordId) === String(packageRecordId);
+            })
             .reduce((sum, change) => sum + change.delta, 0);
         const availableUses = (pkg.remainingUses || 0) + delta;
         if (availableUses <= 0) {
@@ -9215,7 +9225,10 @@ async function renderPatientPackages(patientId) {
         // 應用暫存變更，調整每個套票的剩餘次數
         const modifiedPkgs = pkgs.map(pkg => {
             const delta = pendingPackageChanges
-                .filter(change => change.patientId === patientId && change.packageRecordId === pkg.id && typeof change.delta === 'number')
+                .filter(change => {
+                    if (!change || typeof change.delta !== 'number') return false;
+                    return String(change.patientId) === String(patientId) && String(change.packageRecordId) === String(pkg.id);
+                })
                 .reduce((sum, change) => sum + change.delta, 0);
             let newRemaining = (pkg.remainingUses || 0) + delta;
             // 約束 remainingUses 不小於 0，也不超過 totalUses（若 totalUses 定義）
@@ -9419,15 +9432,27 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
                     item.packageRecordId = candidatesForUndo[0].id;
                     item.isHistorical = false;
                 } else if (candidatesForUndo.length > 1) {
-                    // 如果有多張同名套票，選擇已使用次數較多的那一張（較可能為原使用的套票）
-                    let chosenPkg = candidatesForUndo[0];
-                    for (const cPkg of candidatesForUndo) {
-                        const usedCount = (cPkg.totalUses || 0) - (cPkg.remainingUses || 0);
-                        const chosenUsed = (chosenPkg.totalUses || 0) - (chosenPkg.remainingUses || 0);
-                        if (usedCount > chosenUsed) {
-                            chosenPkg = cPkg;
+                    // 如果有多張同名套票，選擇使用次數較多的那一張；若使用次數相同，則選擇購買時間較早的
+                    candidatesForUndo.sort((a, b) => {
+                        const usedA = (a.totalUses || 0) - (a.remainingUses || 0);
+                        const usedB = (b.totalUses || 0) - (b.remainingUses || 0);
+                        if (usedA !== usedB) {
+                            // 使用次數多的排前面
+                            return usedB - usedA;
                         }
-                    }
+                        // 使用次數相同，按購買日期早的排前面
+                        const pa = a.purchasedAt ? new Date(a.purchasedAt).getTime() : 0;
+                        const pb = b.purchasedAt ? new Date(b.purchasedAt).getTime() : 0;
+                        if (pa !== pb) {
+                            return pa - pb;
+                        }
+                        // 若購買日期也相同，使用 ID 的字典序進行最後排序，確保 deterministic
+                        if (a.id && b.id) {
+                            return String(a.id).localeCompare(String(b.id));
+                        }
+                        return 0;
+                    });
+                    const chosenPkg = candidatesForUndo[0];
                     item.packageRecordId = chosenPkg.id;
                     item.isHistorical = false;
                 }
@@ -9522,15 +9547,27 @@ async function restorePackageUseMeta(patientId) {
                     // 找到對應的套票，取消歷史標記
                     item.isHistorical = false;
                 } else if (candidates.length > 1) {
-                    // 如果有多個同名套票，選擇已使用次數最多的那一個，較可能與原先使用的套票相符
-                    let chosen = candidates[0];
-                    for (const c of candidates) {
-                        const usedCount = (c.totalUses || 0) - (c.remainingUses || 0);
-                        const chosenUsed = (chosen.totalUses || 0) - (chosen.remainingUses || 0);
-                        if (usedCount > chosenUsed) {
-                            chosen = c;
+                    // 如果有多個同名套票，選擇使用次數較多的那一個；若使用次數相同，則選擇購買時間較早的
+                    candidates.sort((a, b) => {
+                        const usedA = (a.totalUses || 0) - (a.remainingUses || 0);
+                        const usedB = (b.totalUses || 0) - (b.remainingUses || 0);
+                        if (usedA !== usedB) {
+                            // 使用次數多的排前面
+                            return usedB - usedA;
                         }
-                    }
+                        // 使用次數相同，按購買日期早的排前面
+                        const pa = a.purchasedAt ? new Date(a.purchasedAt).getTime() : 0;
+                        const pb = b.purchasedAt ? new Date(b.purchasedAt).getTime() : 0;
+                        if (pa !== pb) {
+                            return pa - pb;
+                        }
+                        // 若購買日期也相同，使用 ID 的字典序進行最後排序，確保 deterministic
+                        if (a.id && b.id) {
+                            return String(a.id).localeCompare(String(b.id));
+                        }
+                        return 0;
+                    });
+                    const chosen = candidates[0];
                     item.packageRecordId = chosen.id;
                     // 找到對應的套票，取消歷史標記
                     item.isHistorical = false;
