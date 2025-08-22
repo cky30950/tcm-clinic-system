@@ -48,6 +48,45 @@ let patientCache = null;
 let consultationCache = null;
 let userCache = null;
 
+// 追蹤本次診症操作期間對套票使用造成的暫時變更。
+// 當使用者在開啟診症或編輯病歷時使用或取消使用套票，
+// 將對患者套票剩餘次數產生影響。若使用者最終未保存病歷或取消診症，
+// 應當將這些變更回復，以避免套票次數不正確。
+// 每個項目包含 patientId、packageRecordId 以及 delta，
+// delta 為負數表示消耗一次，為正數表示退回一次。
+let pendingPackageChanges = [];
+
+/**
+ * 復原所有暫存的套票使用變更。
+ * 當取消診症或退出編輯且未保存時呼叫此函式，
+ * 依序將 pendingPackageChanges 中的各項改變倒轉（即減去 delta），
+ * 並清空 pendingPackageChanges。
+ */
+async function revertPendingPackageChanges() {
+    try {
+        for (const change of pendingPackageChanges) {
+            const { patientId, packageRecordId, delta } = change;
+            if (!patientId || !packageRecordId || typeof delta !== 'number') continue;
+            try {
+                const packages = await getPatientPackages(patientId);
+                const pkg = packages.find(p => p.id === packageRecordId);
+                if (!pkg) continue;
+                const updatedPackage = {
+                    ...pkg,
+                    remainingUses: (pkg.remainingUses || 0) - delta
+                };
+                await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
+            } catch (error) {
+                console.error('回復套票使用次數失敗:', error);
+            }
+        }
+    } catch (e) {
+        console.error('重置暫存套票變更錯誤:', e);
+    } finally {
+        pendingPackageChanges = [];
+    }
+}
+
 /**
  * 通用的資料快取器。
  *
@@ -1747,6 +1786,8 @@ function subscribeToAppointments() {
 
 // 新增：從 Firebase 載入診症記錄進行編輯
 async function loadConsultationForEdit(consultationId) {
+    // 清除上一個診症操作遺留的套票變更記錄。
+    pendingPackageChanges = [];
     try {
         // 先嘗試從本地找
         let consultation = null;
@@ -2274,6 +2315,9 @@ async function removeAppointment(appointmentId) {
         
  // 4. 修改開始診症函數，支援 Firebase
 async function startConsultation(appointmentId) {
+    // 在開始新的診症前，清除先前留存的套票變更記錄，
+    // 以免不同病人的操作互相影響。
+    pendingPackageChanges = [];
     const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
@@ -2558,7 +2602,15 @@ async function showConsultationForm(appointment) {
         }
         
         // 關閉診症表單
-        function closeConsultationForm() {
+        async function closeConsultationForm() {
+            // 在關閉表單前，如有暫存的套票使用變更且尚未保存，嘗試回復。
+            try {
+                if (pendingPackageChanges && pendingPackageChanges.length > 0) {
+                    await revertPendingPackageChanges();
+                }
+            } catch (_e) {
+                // 若回復失敗，仍繼續關閉表單
+            }
             // 隱藏診症表單
             document.getElementById('consultationForm').classList.add('hidden');
             
@@ -2617,14 +2669,15 @@ if (!patient) {
                     appointment.status = 'waiting';
                     delete appointment.consultationStartTime;
                     delete appointment.consultingDoctor;
-                    
+
                     // 保存狀態變更
                     localStorage.setItem('appointments', JSON.stringify(appointments));
                     // 同步更新到 Firebase
                     await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
-                    
+                    // 在關閉診症前回復所有暫存的套票使用變更
+                    await revertPendingPackageChanges();
                     showToast(`已取消 ${patient.name} 的診症，病人回到候診狀態`, 'info');
-                    
+
                     // 關閉表單並清理
                     closeConsultationForm();
                     currentConsultingAppointmentId = null;
@@ -2632,11 +2685,15 @@ if (!patient) {
                 }
             } else if (appointment.status === 'completed') {
                 // 如果是已完成的診症，只是關閉編輯模式
+                // 回復暫存的套票變更（可能在編輯模式下使用或取消了套票，但未保存）
+                await revertPendingPackageChanges();
                 showToast('已退出病歷編輯模式', 'info');
                 closeConsultationForm();
                 currentConsultingAppointmentId = null;
             } else {
                 // 其他狀態直接關閉
+                // 亦回復暫存的套票變更
+                await revertPendingPackageChanges();
                 closeConsultationForm();
                 currentConsultingAppointmentId = null;
             }
@@ -2801,7 +2858,8 @@ async function saveConsultation() {
         }
 
         if (operationSuccess) {
-
+            // 保存成功時，清空暫存的套票變更，表示這些變更已經正式記錄，不需要再撤銷。
+            pendingPackageChanges = [];
             // 完成後關閉診症表單並更新 UI
             closeConsultationForm();
             loadTodayAppointments();
@@ -9131,6 +9189,14 @@ async function useOnePackage(patientId, packageRecordId) {
             patientId: patientId,
             packageRecordId: res.record.id
         });
+        // 記錄本次套票消耗，以便取消診症時回復。此處 delta 設為 -1 表示減少一次。
+        try {
+            pendingPackageChanges.push({
+                patientId: patientId,
+                packageRecordId: packageRecordId,
+                delta: -1
+            });
+        } catch (_e) {}
         updateBillingDisplay();
         await refreshPatientPackagesUI();
         showToast(`已使用套票：${res.record.name}，剩餘 ${res.record.remainingUses} 次`, 'success');
@@ -9291,6 +9357,15 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
                 }
                 updateBillingDisplay();
                 await refreshPatientPackagesUI();
+                // 記錄本次套票退回，以便取消診症時能夠撤銷這個動作。delta 為 +1 表示增加一次。
+                try {
+                    const undoPatientId = (item && item.patientId) ? item.patientId : resolvedPatientId;
+                    pendingPackageChanges.push({
+                        patientId: undoPatientId,
+                        packageRecordId: pkgId,
+                        delta: +1
+                    });
+                } catch (_e) {}
                 showToast('已取消本次套票使用，次數已退回', 'success');
             } else {
                 showToast('取消套票使用失敗', 'error');
