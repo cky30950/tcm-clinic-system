@@ -2627,75 +2627,92 @@ async function showConsultationForm(appointment) {
         
         // 取消診症
         async function cancelConsultation() {
-            if (!currentConsultingAppointmentId) {
-                closeConsultationForm();
-                return;
+            // 顯示讀取圈：嘗試取得觸發按鈕，如果無法從事件取得，則透過查詢尋找具有 cancelConsultation() 的按鈕
+            let loadingButton = null;
+            try {
+                if (typeof event !== 'undefined' && event && event.currentTarget) {
+                    loadingButton = event.currentTarget;
+                }
+            } catch (_e) {
+                // 忽略錯誤
             }
-            
-            // 使用字串比較 ID，避免數字與字串不一致導致匹配失敗
-            const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
-            if (!appointment) {
-                closeConsultationForm();
-                currentConsultingAppointmentId = null;
-                return;
+            if (!loadingButton) {
+                try {
+                    loadingButton = document.querySelector('button[onclick="cancelConsultation()"]');
+                } catch (_e) {
+                    loadingButton = null;
+                }
             }
-            
-const patientResult = await window.firebaseDataManager.getPatients();
-if (!patientResult.success) {
-    showToast('無法讀取病人資料！', 'error');
-    closeConsultationForm();
-    currentConsultingAppointmentId = null;
-    return;
-}
-
-const patient = patientResult.data.find(p => p.id === appointment.patientId);
-if (!patient) {
-    showToast('找不到病人資料！', 'error');
-    closeConsultationForm();
-    currentConsultingAppointmentId = null;
-    return;
-}
-            
-            // 詳細狀態檢查
-            console.log(`取消診症狀態檢查 - 病人: ${patient.name}, 當前狀態: ${appointment.status}`);
-            
-            if (appointment.status === 'consulting') {
-                const confirmMessage = `確定要取消 ${patient.name} 的診症嗎？\n\n` +
-                                     `病人狀態將回到候診中，已填寫的診症內容將會遺失。\n\n` +
-                                     `注意：此操作無法復原！`;
-                
-                if (confirm(confirmMessage)) {
-                    // 將狀態改回候診中
-                    appointment.status = 'waiting';
-                    delete appointment.consultationStartTime;
-                    delete appointment.consultingDoctor;
-
-                    // 保存狀態變更
-                    localStorage.setItem('appointments', JSON.stringify(appointments));
-                    // 同步更新到 Firebase
-                    await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
-                    // 在關閉診症前回復所有暫存的套票使用變更
-                    await revertPendingPackageChanges();
-                    showToast(`已取消 ${patient.name} 的診症，病人回到候診狀態`, 'info');
-
-                    // 關閉表單並清理
+            if (loadingButton) {
+                // 顯示讀取圈，不顯示文字
+                setButtonLoading(loadingButton, '處理中...');
+            }
+            try {
+                if (!currentConsultingAppointmentId) {
+                    closeConsultationForm();
+                    return;
+                }
+                // 使用字串比較 ID，避免數字與字串不一致導致匹配失敗
+                const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
+                if (!appointment) {
                     closeConsultationForm();
                     currentConsultingAppointmentId = null;
-                    loadTodayAppointments();
+                    return;
                 }
-            } else if (appointment.status === 'completed') {
-                // 如果是已完成的診症，只是關閉編輯模式
-                // 回復暫存的套票變更（可能在編輯模式下使用或取消了套票，但未保存）
-                await revertPendingPackageChanges();
-                showToast('已退出病歷編輯模式', 'info');
-                closeConsultationForm();
-                currentConsultingAppointmentId = null;
-            } else {
-                // 其他狀態直接關閉
-                // 亦回復暫存的套票變更
-                await revertPendingPackageChanges();
-                closeConsultationForm();
-                currentConsultingAppointmentId = null;
+                const patientResult = await window.firebaseDataManager.getPatients();
+                if (!patientResult.success) {
+                    showToast('無法讀取病人資料！', 'error');
+                    closeConsultationForm();
+                    currentConsultingAppointmentId = null;
+                    return;
+                }
+                const patient = patientResult.data.find(p => p.id === appointment.patientId);
+                if (!patient) {
+                    showToast('找不到病人資料！', 'error');
+                    closeConsultationForm();
+                    currentConsultingAppointmentId = null;
+                    return;
+                }
+                // 詳細狀態檢查
+                console.log(`取消診症狀態檢查 - 病人: ${patient.name}, 當前狀態: ${appointment.status}`);
+                if (appointment.status === 'consulting') {
+                    const confirmMessage = `確定要取消 ${patient.name} 的診症嗎？\n\n` +
+                        `病人狀態將回到候診中，已填寫的診症內容將會遺失。\n\n` +
+                        `注意：此操作無法復原！`;
+                    if (confirm(confirmMessage)) {
+                        // 將狀態改回候診中
+                        appointment.status = 'waiting';
+                        delete appointment.consultationStartTime;
+                        delete appointment.consultingDoctor;
+                        // 保存狀態變更
+                        localStorage.setItem('appointments', JSON.stringify(appointments));
+                        // 同步更新到 Firebase
+                        await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
+                        // 回復暫存套票變更
+                        await revertPendingPackageChanges();
+                        showToast(`已取消 ${patient.name} 的診症，病人回到候診狀態`, 'info');
+                        // 關閉表單並清理
+                        closeConsultationForm();
+                        currentConsultingAppointmentId = null;
+                        loadTodayAppointments();
+                    }
+                } else if (appointment.status === 'completed') {
+                    // 如果是已完成的診症，只是關閉編輯模式
+                    await revertPendingPackageChanges();
+                    showToast('已退出病歷編輯模式', 'info');
+                    closeConsultationForm();
+                    currentConsultingAppointmentId = null;
+                } else {
+                    // 其他狀態直接關閉
+                    await revertPendingPackageChanges();
+                    closeConsultationForm();
+                    currentConsultingAppointmentId = null;
+                }
+            } finally {
+                // 移除讀取圈，恢復按鈕
+                if (loadingButton) {
+                    clearButtonLoading(loadingButton);
+                }
             }
         }
         
