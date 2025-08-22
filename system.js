@@ -9307,9 +9307,11 @@ async function useOnePackage(patientId, packageRecordId) {
         });
         // 記錄本次套票消耗，以便取消診症時回復。此處 delta 設為 -1 表示減少一次。
         try {
+            // 使用 res.record.id 來記錄套票變更，避免因外部傳入的 packageRecordId 與實際套票 ID 不一致
+            // 導致之後退回套票時發生錯誤或套票錯亂的情況。
             pendingPackageChanges.push({
                 patientId: patientId,
-                packageRecordId: packageRecordId,
+                packageRecordId: res.record && res.record.id ? res.record.id : packageRecordId,
                 delta: -1
             });
         } catch (_e) {}
@@ -9403,21 +9405,21 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         if (!item.packageRecordId && item.patientId) {
             try {
                 const pkgsForUndo = await getPatientPackages(item.patientId);
-                let baseName = item.name;
-                // 移除名稱中的「使用套票」及前一個括號（若存在）
-                const idx = baseName.indexOf('使用套票');
-                if (idx !== -1) {
-                    if (idx > 0 && (baseName[idx - 1] === '(' || baseName[idx - 1] === '（')) {
-                        baseName = baseName.substring(0, idx - 1).trim();
-                    } else {
-                        baseName = baseName.substring(0, idx).trim();
-                    }
-                }
+                // 從品項名稱中移除「(使用套票)」或「（使用套票）」，並處理可能出現的全形或半形括號與額外空格
+                let baseName = item.name || '';
+                baseName = baseName
+                    // 移除括號包裹的使用套票字串，例如「推拿療程 (使用套票)」或「推拿療程（使用套票）」
+                    .replace(/\s*[\(（]\s*使用套票\s*[\)）]\s*/g, '')
+                    // 移除未被括號包裹的「使用套票」字串
+                    .replace(/\s*使用套票\s*/g, '')
+                    .trim();
+                // 依名稱完全匹配當前病人的套票
                 const candidatesForUndo = pkgsForUndo.filter(p => p.name === baseName);
                 if (candidatesForUndo.length === 1) {
                     item.packageRecordId = candidatesForUndo[0].id;
                     item.isHistorical = false;
                 } else if (candidatesForUndo.length > 1) {
+                    // 如果有多張同名套票，選擇已使用次數較多的那一張（較可能為原使用的套票）
                     let chosenPkg = candidatesForUndo[0];
                     for (const cPkg of candidatesForUndo) {
                         const usedCount = (cPkg.totalUses || 0) - (cPkg.remainingUses || 0);
@@ -9506,26 +9508,21 @@ async function restorePackageUseMeta(patientId) {
                 
                 // 補充病人ID
                 item.patientId = patientId;
-                // 從名稱中移除後綴以找出套票名稱，例如「推拿療程（使用套票）」→「推拿療程」
-                // 根據名稱推斷套票名稱：移除括號及「使用套票」字樣
-                let baseName = item.name;
-                const idx = baseName.indexOf('使用套票');
-                if (idx !== -1) {
-                    // 如果「使用套票」前有半形或全形括號，將其一併移除
-                    if (idx > 0 && (baseName[idx - 1] === '(' || baseName[idx - 1] === '（')) {
-                        baseName = baseName.substring(0, idx - 1).trim();
-                    } else {
-                        baseName = baseName.substring(0, idx).trim();
-                    }
-                }
-                // 在病人的套票中尋找名稱匹配的項目
+                // 從名稱中移除後綴以找出套票名稱，例如「推拿療程 (使用套票)」或「推拿療程（使用套票）」→「推拿療程」
+                // 使用正則處理全形、半形括號及可能的空格，並移除未被括號包裹的「使用套票」字樣
+                let baseName = item.name || '';
+                baseName = baseName
+                    .replace(/\s*[\(（]\s*使用套票\s*[\)）]\s*/g, '')
+                    .replace(/\s*使用套票\s*/g, '')
+                    .trim();
+                // 在病人的套票中尋找名稱完全匹配的項目
                 const candidates = packages.filter(p => p.name === baseName);
                 if (candidates.length === 1) {
                     item.packageRecordId = candidates[0].id;
                     // 找到對應的套票，取消歷史標記
                     item.isHistorical = false;
                 } else if (candidates.length > 1) {
-                    // 如果有多個同名套票，選擇已使用次數最多的那一個
+                    // 如果有多個同名套票，選擇已使用次數最多的那一個，較可能與原先使用的套票相符
                     let chosen = candidates[0];
                     for (const c of candidates) {
                         const usedCount = (c.totalUses || 0) - (c.remainingUses || 0);
