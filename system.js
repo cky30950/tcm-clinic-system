@@ -7744,21 +7744,24 @@ function displayUsers() {
         
         const row = document.createElement('tr');
         row.className = 'hover:bg-gray-50';
-        // 根據是否為管理員決定操作按鈕顯示
+        // 根據是否為主管理員決定操作按鈕顯示
         let actionsHtml;
-        // 如果是診所管理（管理員），禁止編輯、刪除或停用
-        if (user.position === '診所管理') {
-            actionsHtml = `<span class="text-gray-400 text-xs">管理員不可修改</span>`;
+        // 定義主管理員電子郵件
+        const superAdminEmail = 'admin@clinic.com';
+        // 如果是主管理員（根據電子郵件），禁止編輯、刪除或停用
+        if (user.email && user.email.toLowerCase() === superAdminEmail) {
+            actionsHtml = `<span class="text-gray-400 text-xs">主管理員不可修改</span>`;
+        } else if (user.id === currentUserData.id) {
+            // 如果是當前登入用戶顯示提示
+            actionsHtml = `<span class="text-gray-400 text-xs">當前用戶</span>`;
         } else {
-            // 如果不是當前登入用戶則顯示所有控制按鈕，否則顯示「當前用戶」提示
-            actionsHtml = user.id !== currentUserData.id ? `
+            // 其他用戶顯示所有控制按鈕
+            actionsHtml = `
                         <button onclick="editUser('${user.id}')" class="text-blue-600 hover:text-blue-800">編輯</button>
                         <button onclick="toggleUserStatus('${user.id}')" class="text-orange-600 hover:text-orange-800">
                             ${user.active ? '停用' : '啟用'}
                         </button>
                         <button onclick="deleteUser('${user.id}')" class="text-red-600 hover:text-red-800">刪除</button>
-                    ` : `
-                        <span class="text-gray-400 text-xs">當前用戶</span>
                     `;
         }
         row.innerHTML = `
@@ -7835,9 +7838,10 @@ async function editUser(id) {
     const currentUsers = usersFromFirebase.length > 0 ? usersFromFirebase : users;
     const user = currentUsers.find(u => u.id === id);
     if (!user) return;
-    // 禁止編輯管理員帳號
-    if (user.position === '診所管理') {
-        showToast('管理員帳號不可編輯！', 'error');
+    // 禁止編輯主管理員帳號（使用電子郵件判斷）
+    const superAdminEmail = 'admin@clinic.com';
+    if (user.email && user.email.toLowerCase() === superAdminEmail) {
+        showToast('主管理員帳號不可編輯！', 'error');
         return;
     }
     
@@ -7936,12 +7940,13 @@ async function saveUser() {
         }
     }
 
-    // 如果正在編輯，用戶為管理員則禁止編輯
+    // 如果正在編輯，且用戶為主管理員則禁止編輯
     if (editingUserId) {
         const currentUsers = usersFromFirebase.length > 0 ? usersFromFirebase : users;
         const editingUser = currentUsers.find(u => u.id === editingUserId);
-        if (editingUser && editingUser.position === '診所管理') {
-            showToast('管理員帳號不可編輯！', 'error');
+        const superAdminEmail = 'admin@clinic.com';
+        if (editingUser && editingUser.email && editingUser.email.toLowerCase() === superAdminEmail) {
+            showToast('主管理員帳號不可編輯！', 'error');
             return;
         }
     }
@@ -8056,9 +8061,10 @@ async function toggleUserStatus(id) {
         showToast('不能停用自己的帳號！', 'error');
         return;
     }
-    // 禁止停用管理員帳號
-    if (user.position === '診所管理') {
-        showToast('管理員帳號不可停用！', 'error');
+    // 禁止停用主管理員帳號（使用電子郵件判斷）
+    const superAdminEmail = 'admin@clinic.com';
+    if (user.email && user.email.toLowerCase() === superAdminEmail) {
+        showToast('主管理員帳號不可停用！', 'error');
         return;
     }
     
@@ -8118,9 +8124,10 @@ async function deleteUser(id) {
         showToast('不能刪除自己的帳號！', 'error');
         return;
     }
-    // 禁止刪除管理員帳號
-    if (user.position === '診所管理') {
-        showToast('管理員帳號不可刪除！', 'error');
+    // 禁止刪除主管理員帳號（使用電子郵件判斷）
+    const superAdminEmail = 'admin@clinic.com';
+    if (user.email && user.email.toLowerCase() === superAdminEmail) {
+        showToast('主管理員帳號不可刪除！', 'error');
         return;
     }
     
