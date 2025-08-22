@@ -7753,8 +7753,10 @@ function displayUsers() {
         if (user.email && user.email.toLowerCase() === superAdminEmail) {
             actionsHtml = `<span class="text-gray-400 text-xs">主管理員不可修改</span>`;
         } else if (user.id === currentUserData.id) {
-            // 如果是當前登入用戶顯示提示
-            actionsHtml = `<span class="text-gray-400 text-xs">當前用戶</span>`;
+            // 如果是當前登入用戶，僅提供編輯按鈕
+            actionsHtml = `
+                        <button onclick="editUser('${user.id}')" class="text-blue-600 hover:text-blue-800">編輯</button>
+                    `;
         } else {
             // 其他用戶顯示所有控制按鈕
             actionsHtml = `
