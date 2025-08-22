@@ -259,7 +259,8 @@ function playNotificationSound() {
             button.style.justifyContent = 'center';
             // Replace the button's content with a spinner using Tailwind classes. Remove margin since
             // there's no text to align next to it.
-            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white opacity-50"></div>`;
+            // 使用 border-current 讓讀取圓圈的顏色繼承按鈕字體顏色，使其在淺色背景上仍然可見
+            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-current opacity-50"></div>`;
         }
 
         // 清除按鈕讀取狀態，還原原始內容
