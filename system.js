@@ -20,7 +20,19 @@ const ROLE_PERMISSIONS = {
  * @returns {boolean}
  */
 function hasAccessToSection(sectionId) {
+  // 若尚未取得用戶資料或未設定職位，則直接拒絕存取
   if (!currentUserData || !currentUserData.position) return false;
+
+  // 額外規則：收費項目管理僅限診所管理者或醫師使用
+  // 即使在 ROLE_PERMISSIONS 中配置不當，也能確保護理師無法進入
+  if (sectionId === 'billingManagement') {
+    const pos = currentUserData.position.trim ? currentUserData.position.trim() : currentUserData.position;
+    if (pos !== '診所管理' && pos !== '醫師') {
+      return false;
+    }
+  }
+
+  // 根據角色權限定義判斷
   const allowed = ROLE_PERMISSIONS[currentUserData.position] || [];
   return allowed.includes(sectionId);
 }
@@ -5938,6 +5950,11 @@ async function initializeSystemAfterLogin() {
         let currentBillingFilter = 'all';
         
         async function loadBillingManagement() {
+    // 權限檢查：護理師或一般用戶不得訪問收費項目管理
+    if (!hasAccessToSection('billingManagement')) {
+        showToast('權限不足，無法存取收費項目管理', 'error');
+        return;
+    }
             // 若尚未載入收費項目資料，才從 Firestore 重新載入
             if (typeof initBillingItems === 'function' && (!Array.isArray(billingItems) || billingItems.length === 0)) {
                 await initBillingItems();
@@ -6081,6 +6098,11 @@ async function initializeSystemAfterLogin() {
         
         // 收費項目表單功能
         function showAddBillingItemForm() {
+    // 若沒有管理收費項目的權限，阻止開啟表單
+    if (!hasAccessToSection('billingManagement')) {
+        showToast('權限不足，無法新增收費項目', 'error');
+        return;
+    }
             editingBillingItemId = null;
             document.getElementById('billingItemFormTitle').textContent = '新增收費項目';
             document.getElementById('billingItemSaveButtonText').textContent = '儲存';
@@ -6107,6 +6129,11 @@ async function initializeSystemAfterLogin() {
         }
         
         function editBillingItem(id) {
+    // 權限檢查：無權限者不得編輯
+    if (!hasAccessToSection('billingManagement')) {
+        showToast('權限不足，無法編輯收費項目', 'error');
+        return;
+    }
             const item = billingItems.find(b => b.id === id);
             if (!item) return;
             
@@ -6131,6 +6158,11 @@ async function initializeSystemAfterLogin() {
         }
         
         async function saveBillingItem() {
+    // 權限檢查：無權限者不得儲存
+    if (!hasAccessToSection('billingManagement')) {
+        showToast('權限不足，無法保存收費項目', 'error');
+        return;
+    }
             const name = document.getElementById('billingItemName').value.trim();
             const category = document.getElementById('billingItemCategory').value;
             let price = parseFloat(document.getElementById('billingItemPrice').value);
@@ -6218,6 +6250,11 @@ async function initializeSystemAfterLogin() {
         }
         
         async function deleteBillingItem(id) {
+    // 權限檢查：無權限者不得刪除
+    if (!hasAccessToSection('billingManagement')) {
+        showToast('權限不足，無法刪除收費項目', 'error');
+        return;
+    }
             const item = billingItems.find(b => b.id === id);
             if (!item) return;
             
