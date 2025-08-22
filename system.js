@@ -2812,6 +2812,7 @@ async function saveConsultation() {
                             if (useResult.ok) {
                                 // 添加套票使用記錄到收費項目中
                                 const usedName = `${item.name} (使用套票)`;
+                                // 將 patientId 與 packageRecordId 轉為字串儲存，以避免後續比較時類型不一致導致匹配錯誤
                                 selectedBillingItems.push({
                                     // 包含索引避免在快速迴圈中生成相同的時間戳導致重複 ID
                                     id: `use-${purchasedPackage.id}-${Date.now()}-${i}`,
@@ -2821,8 +2822,8 @@ async function saveConsultation() {
                                     unit: '次',
                                     description: '套票抵扣一次',
                                     quantity: 1,
-                                    patientId: appointment.patientId,
-                                    packageRecordId: purchasedPackage.id
+                                    patientId: (appointment.patientId !== undefined && appointment.patientId !== null) ? String(appointment.patientId) : '',
+                                    packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : ''
                                 });
                                 showToast(
                                     `已使用套票：${item.name}，剩餘 ${useResult.record.remainingUses} 次`,
@@ -9315,16 +9316,17 @@ async function useOnePackage(patientId, packageRecordId) {
             unit: '次',
             description: '套票抵扣一次',
             quantity: 1,
-            patientId: patientId,
-            packageRecordId: res.record.id
+            // 以字串保存 patientId 及 packageRecordId，避免類型不一致導致匹配錯誤
+            patientId: patientId !== undefined && patientId !== null ? String(patientId) : '',
+            packageRecordId: res.record && res.record.id ? String(res.record.id) : ''
         });
         // 記錄本次套票消耗，以便取消診症時回復。此處 delta 設為 -1 表示減少一次。
         try {
             // 使用 res.record.id 來記錄套票變更，避免因外部傳入的 packageRecordId 與實際套票 ID 不一致
             // 導致之後退回套票時發生錯誤或套票錯亂的情況。
             pendingPackageChanges.push({
-                patientId: patientId,
-                packageRecordId: res.record && res.record.id ? res.record.id : packageRecordId,
+                patientId: patientId !== undefined && patientId !== null ? String(patientId) : '',
+                packageRecordId: res.record && res.record.id ? String(res.record.id) : String(packageRecordId),
                 delta: -1
             });
         } catch (_e) {}
@@ -9472,7 +9474,8 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         try {
             // 取得病人的套票，如果沒有取得則重試一次
             const packages = await getPatientPackages(item.patientId);
-            const pkg = packages.find(p => p.id === pkgId);
+            // 比較套票 ID 時統一轉為字串，以避免類型不一致導致匹配失敗
+            const pkg = packages.find(p => String(p.id) === String(pkgId));
             if (!pkg) {
                 // 找不到對應的套票，直接移除項目
                 selectedBillingItems = selectedBillingItems.filter(it => it.id !== usageItemId);
@@ -9498,10 +9501,13 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
                 await refreshPatientPackagesUI();
                 // 記錄本次套票退回，以便保存診症時同步。delta 為 +1 表示增加一次。
                 try {
-                    const undoPatientId = (item && item.patientId) ? item.patientId : resolvedPatientId;
+                    const undoPatientIdRaw = (item && item.patientId) ? item.patientId : resolvedPatientId;
+                    // 在暫存變更中統一使用字串表示 ID
+                    const undoPatientIdStr = (undoPatientIdRaw !== undefined && undoPatientIdRaw !== null) ? String(undoPatientIdRaw) : '';
+                    const pkgIdStr = (pkgId !== undefined && pkgId !== null) ? String(pkgId) : '';
                     pendingPackageChanges.push({
-                        patientId: undoPatientId,
-                        packageRecordId: pkgId,
+                        patientId: undoPatientIdStr,
+                        packageRecordId: pkgIdStr,
                         delta: +1
                     });
                 } catch (_e) {}
@@ -9531,8 +9537,8 @@ async function restorePackageUseMeta(patientId) {
                 if (isPackageUse && (item.isHistorical || !item.patientId || !item.packageRecordId)) {
                 // 即便標記為歷史記錄，也嘗試恢復 meta 以便可以取消使用
                 
-                // 補充病人ID
-                item.patientId = patientId;
+                // 補充病人ID，統一轉為字串
+                item.patientId = (patientId !== undefined && patientId !== null) ? String(patientId) : '';
                 // 從名稱中移除後綴以找出套票名稱，例如「推拿療程 (使用套票)」或「推拿療程（使用套票）」→「推拿療程」
                 // 使用正則處理全形、半形括號及可能的空格，並移除未被括號包裹的「使用套票」字樣
                 let baseName = item.name || '';
@@ -9543,7 +9549,8 @@ async function restorePackageUseMeta(patientId) {
                 // 在病人的套票中尋找名稱完全匹配的項目
                 const candidates = packages.filter(p => p.name === baseName);
                 if (candidates.length === 1) {
-                    item.packageRecordId = candidates[0].id;
+                    // 將匹配到的套票 ID 轉為字串
+                    item.packageRecordId = (candidates[0] && candidates[0].id) ? String(candidates[0].id) : '';
                     // 找到對應的套票，取消歷史標記
                     item.isHistorical = false;
                 } else if (candidates.length > 1) {
@@ -9568,7 +9575,8 @@ async function restorePackageUseMeta(patientId) {
                         return 0;
                     });
                     const chosen = candidates[0];
-                    item.packageRecordId = chosen.id;
+                    // 將匹配到的套票 ID 轉為字串
+                    item.packageRecordId = (chosen && chosen.id) ? String(chosen.id) : '';
                     // 找到對應的套票，取消歷史標記
                     item.isHistorical = false;
                 } else {
