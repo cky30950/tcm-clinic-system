@@ -7655,10 +7655,10 @@ const consultationDate = (() => {
                 // 解析並載入收費項目
                 parseBillingItemsFromText(consultation.billingItems);
 
-                // 根據要求：載入病歷時，排除任何「使用套票」的抵扣項目。
-                // 這些項目在 parseBillingItemsFromText 中會被標記為 category === 'packageUse'。
+                // 根據要求：載入病歷時，排除任何「使用套票」的抵扣項目與套票購買項目。
+                // 這些項目在 parseBillingItemsFromText 中會被標記為 category === 'packageUse' 或 category === 'package'。
                 if (Array.isArray(selectedBillingItems) && selectedBillingItems.length > 0) {
-                    selectedBillingItems = selectedBillingItems.filter(item => item.category !== 'packageUse');
+                    selectedBillingItems = selectedBillingItems.filter(item => item.category !== 'packageUse' && item.category !== 'package');
                 }
 
                 // 嘗試為舊記錄補全套票使用的 meta 資訊（patientId 與 packageRecordId）。
