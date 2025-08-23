@@ -1380,12 +1380,31 @@ async function loadInquiryOptions(patient) {
         console.error('清除過期問診資料時發生錯誤:', err);
     }
     try {
-        // 從 Firebase 取得病人問診資料。將姓名去除首尾空白，避免無法查詢到。
-        const patientName = patient && typeof patient.name === 'string' ? patient.name.trim() : patient.name;
-        const result = await window.firebaseDataManager.getInquiryRecords(patientName);
+        // 從 Firebase 取得病人問診資料
+        let result = await window.firebaseDataManager.getInquiryRecords(patient.name);
         inquiryOptionsData = {};
-        if (result.success && result.data && result.data.length > 0) {
-            result.data.forEach(rec => {
+        let records = [];
+        if (result && result.success && Array.isArray(result.data)) {
+            records = result.data;
+        }
+        // 如果沒有查詢到資料，嘗試從全部問診資料中篩選
+        if (records.length === 0 && window.firebaseDataManager.getInquiryRecords) {
+            try {
+                const allResult = await window.firebaseDataManager.getInquiryRecords();
+                if (allResult && allResult.success && Array.isArray(allResult.data)) {
+                    const targetName = (patient.name || '').toString().trim();
+                    records = allResult.data.filter(rec => {
+                        const recName = (rec.patientName || '').toString().trim();
+                        return recName === targetName;
+                    });
+                }
+            } catch (_ignore) {
+                // 忽略備用查詢的錯誤
+            }
+        }
+        // 將結果填入選單
+        if (records && records.length > 0) {
+            records.forEach(rec => {
                 let createdAt = rec.createdAt;
                 let dateStr = '';
                 if (createdAt && createdAt.seconds !== undefined) {
@@ -10226,29 +10245,13 @@ class FirebaseDataManager {
     async getInquiryRecords(patientName) {
         if (!this.isReady) return { success: false, data: [] };
         try {
-            // 決定使用 collectionGroup 或 collection 查詢問診資料。
-            // 若環境支持 collectionGroup，則查詢所有名稱為 "inquiries" 的集合；
-            // 否則退回至頂層集合，以避免函式不存在導致錯誤。
-            let baseRef;
-            if (window.firebase && typeof window.firebase.collectionGroup === 'function') {
-                baseRef = window.firebase.collectionGroup(window.firebase.db, 'inquiries');
-            } else if (
-                window.firebase &&
-                window.firebase.db &&
-                typeof window.firebase.db.collectionGroup === 'function'
-            ) {
-                baseRef = window.firebase.db.collectionGroup('inquiries');
-            } else {
-                baseRef = window.firebase.collection(window.firebase.db, 'inquiries');
-            }
-
-            // 若有提供 patientName，則使用 where 條件。統一去除姓名首尾空白以避免不匹配
+            let baseRef = window.firebase.collection(window.firebase.db, 'inquiries');
+            // 若有提供 patientName，則使用 where 條件
             let q;
-            const normalizedName = patientName && typeof patientName === 'string' ? patientName.trim() : patientName;
-            if (normalizedName) {
+            if (patientName) {
                 q = window.firebase.query(
                     baseRef,
-                    window.firebase.where('patientName', '==', normalizedName),
+                    window.firebase.where('patientName', '==', patientName),
                     window.firebase.orderBy('createdAt', 'desc')
                 );
             } else {
@@ -10305,20 +10308,9 @@ class FirebaseDataManager {
     async clearOldInquiries() {
         if (!this.isReady) return { success: false };
         try {
-            // 使用 collectionGroup 或 collection 讀取問診資料。與 getInquiryRecords 中的邏輯一致。
-            let baseRef;
-            if (window.firebase && typeof window.firebase.collectionGroup === 'function') {
-                baseRef = window.firebase.collectionGroup(window.firebase.db, 'inquiries');
-            } else if (
-                window.firebase &&
-                window.firebase.db &&
-                typeof window.firebase.db.collectionGroup === 'function'
-            ) {
-                baseRef = window.firebase.db.collectionGroup('inquiries');
-            } else {
-                baseRef = window.firebase.collection(window.firebase.db, 'inquiries');
-            }
-            const snapshot = await window.firebase.getDocs(baseRef);
+            const snapshot = await window.firebase.getDocs(
+                window.firebase.collection(window.firebase.db, 'inquiries')
+            );
             const now = new Date();
             const deletions = [];
             snapshot.forEach(doc => {
@@ -10332,19 +10324,9 @@ class FirebaseDataManager {
                     }
                 }
                 if (expireDate && expireDate < now) {
-                    try {
-                        // 若文檔引用存在，直接刪除。這樣即使在子集合中也能正常刪除。
-                        if (doc.ref) {
-                            deletions.push(window.firebase.deleteDoc(doc.ref));
-                        } else {
-                            // 後備方案：使用頂層路徑，可能會失敗但避免崩潰
-                            deletions.push(window.firebase.deleteDoc(
-                                window.firebase.doc(window.firebase.db, 'inquiries', doc.id)
-                            ));
-                        }
-                    } catch (_err) {
-                        // 如果刪除過程出錯則忽略，避免阻止其他文檔刪除
-                    }
+                    deletions.push(window.firebase.deleteDoc(
+                        window.firebase.doc(window.firebase.db, 'inquiries', doc.id)
+                    ));
                 }
             });
             let count = 0;
