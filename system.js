@@ -41,6 +41,8 @@ function hasAccessToSection(sectionId) {
 let patients = [];
 let consultations = [];
 let appointments = [];
+// 問診選項快取。鍵為問診記錄 ID，值為完整紀錄供後續使用
+let inquiryOptionsData = {};
 // 快取病人列表，避免重複從 Firestore 讀取
 let patientCache = null;
 
@@ -1489,6 +1491,13 @@ async function selectPatientForRegistration(patientId) {
             
             // 載入醫師選項
             loadDoctorOptions();
+
+            // 載入問診資料選項（不限制姓名一致）
+            try {
+                loadInquiryOptions(patient);
+            } catch (e) {
+                console.error('載入問診資料時出現錯誤:', e);
+            }
             
             // 設置預設掛號時間為當前時間（加5分鐘避免時間過期）
             const now = new Date();
@@ -1546,6 +1555,77 @@ async function selectPatientForRegistration(patientId) {
         function clearRegistrationForm() {
             document.getElementById('appointmentDoctor').value = '';
             document.getElementById('quickChiefComplaint').value = '';
+            // 重置問診下拉選單
+            const inquirySelectEl = document.getElementById('inquirySelect');
+            if (inquirySelectEl) inquirySelectEl.value = '';
+        }
+
+        // 主要症狀摘要函式：自問診記錄擷取摘要用於預填主訴
+        function getMainSymptomFromResult(result) {
+            if (!result) return '';
+            const bodyPartNames = {
+                head: '頭部', neck: '頸部', chest: '胸部', abdomen: '腹部', back: '背部', arms: '手臂', legs: '腿部', joints: '關節', skin: '皮膚', internal: '內科症狀', gynecology: '婦科', andrology: '男科', other: '其他'
+            };
+            let summary = '';
+            if (result.bodyPart && bodyPartNames[result.bodyPart]) {
+                summary += bodyPartNames[result.bodyPart];
+            }
+            if (result.detailedLocation) {
+                summary += (summary ? ' - ' : '') + result.detailedLocation;
+            }
+            // 收集所有陣列症狀
+            let symptoms = [];
+            for (const key in result) {
+                const val = result[key];
+                if (Array.isArray(val)) {
+                    symptoms = symptoms.concat(val);
+                }
+            }
+            if (symptoms.length > 0) {
+                summary += (summary ? '：' : '') + symptoms.slice(0, 3).join('、');
+            }
+            return summary;
+        }
+
+        // 載入問診資料至下拉選單；不再限制姓名一致
+        async function loadInquiryOptions(patient) {
+            const selectEl = document.getElementById('inquirySelect');
+            if (!selectEl) return;
+            selectEl.innerHTML = '<option value="">（若有）請選擇問診資料</option>';
+            inquiryOptionsData = {};
+            try {
+                if (window.firebaseDataManager && typeof window.firebaseDataManager.clearOldInquiries === 'function') {
+                    await window.firebaseDataManager.clearOldInquiries();
+                }
+                if (!window.firebaseDataManager || typeof window.firebaseDataManager.getInquiryRecords !== 'function') {
+                    return;
+                }
+                const res = await window.firebaseDataManager.getInquiryRecords();
+                if (!res.success) {
+                    showToast('讀取問診資料失敗', 'error');
+                    return;
+                }
+                let records = res.data || [];
+                records.sort((a, b) => {
+                    const aDate = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate() : new Date(a.createdAt);
+                    const bDate = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate() : new Date(b.createdAt);
+                    return bDate - aDate;
+                });
+                records.forEach(record => {
+                    const id = record.id;
+                    const summary = getMainSymptomFromResult(record.data || {});
+                    const createdAt = record.createdAt && typeof record.createdAt.toDate === 'function' ? record.createdAt.toDate() : new Date(record.createdAt);
+                    const dateStr = createdAt ? createdAt.toLocaleString('zh-TW') : '';
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = `${dateStr} - ${summary || '無症狀摘要'}`;
+                    selectEl.appendChild(option);
+                    inquiryOptionsData[id] = record;
+                });
+            } catch (e) {
+                console.error('載入問診資料失敗:', e);
+                showToast('讀取問診資料失敗', 'error');
+            }
         }
         
         // 確認掛號
@@ -1558,6 +1638,15 @@ async function selectPatientForRegistration(patientId) {
             const appointmentDateTime = document.getElementById('appointmentDateTime').value;
             const appointmentDoctor = document.getElementById('appointmentDoctor').value;
             const chiefComplaint = document.getElementById('quickChiefComplaint').value.trim();
+
+            // 讀取下拉選單中的問診資料
+            const inquirySelectElReg = document.getElementById('inquirySelect');
+            const selectedInquiryId = inquirySelectElReg ? inquirySelectElReg.value : '';
+            let selectedInquiry = null;
+            if (selectedInquiryId && inquiryOptionsData && inquiryOptionsData[selectedInquiryId]) {
+                selectedInquiry = inquiryOptionsData[selectedInquiryId];
+            }
+            const inquirySummary = selectedInquiry ? getMainSymptomFromResult(selectedInquiry.data || {}) : '';
             
             if (!appointmentDateTime) {
                 showToast('請選擇掛號時間！', 'error');
@@ -1595,11 +1684,18 @@ async function selectPatientForRegistration(patientId) {
                 patientId: selectedPatientForRegistration.id,
                 appointmentTime: selectedTime.toISOString(),
                 appointmentDoctor: appointmentDoctor,
-                chiefComplaint: chiefComplaint || '無特殊主訴',
+                // 如果主訴未輸入，則使用問診摘要，否則預設為無特殊主訴
+                chiefComplaint: chiefComplaint || inquirySummary || '無特殊主訴',
                 status: 'registered', // registered, waiting, consulting, completed
                 createdAt: new Date().toISOString(),
                 createdBy: currentUserData ? currentUserData.username : currentUser
             };
+            // 將選擇的問診資料附加在掛號資訊中
+            if (selectedInquiry) {
+                appointment.inquiryId = selectedInquiry.id;
+                appointment.inquirySummary = inquirySummary;
+                appointment.inquiryData = selectedInquiry.data;
+            }
 
             try {
                 // 加入本地陣列
@@ -2617,9 +2713,11 @@ async function showConsultationForm(appointment) {
             document.getElementById('formRestEndDate').value = endDateStr;
             updateRestPeriod();
             
-            // 如果掛號時有填寫主訴，則預填到主訴欄位
+            // 如果掛號時有填寫主訴，則預填到主訴欄位；若無主訴但有問診摘要，也預填
             if (appointment.chiefComplaint && appointment.chiefComplaint !== '無特殊主訴') {
                 document.getElementById('formSymptoms').value = appointment.chiefComplaint;
+            } else if (appointment.inquirySummary) {
+                document.getElementById('formSymptoms').value = appointment.inquirySummary;
             }
             
             // 自動添加預設診金收費項目
@@ -10036,153 +10134,6 @@ class FirebaseDataManager {
             return { success: true };
         } catch (error) {
             console.error('更新患者套票失敗:', error);
-            return { success: false, error: error.message };
-        }
-    }
-
-    /**
-     * 新增一筆問診資料。
-     * 此方法主要用於後端或其他管理介面，如在問診表單頁面可直接使用 Firebase API。
-     *
-     * @param {string} patientName 病人姓名
-     * @param {Object} data 問診資料內容
-     * @returns {Promise<{success: boolean, id?: string, error?: string}>}
-     */
-    async addInquiryRecord(patientName, data) {
-        if (!this.isReady) {
-            showToast('數據管理器尚未準備就緒', 'error');
-            return { success: false };
-        }
-        try {
-            const now = new Date();
-            const expireDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 小時後過期
-            const docRef = await window.firebase.addDoc(
-                window.firebase.collection(window.firebase.db, 'inquiries'),
-                {
-                    patientName: patientName,
-                    data: data,
-                    createdAt: now,
-                    expireAt: expireDate
-                }
-            );
-            return { success: true, id: docRef.id };
-        } catch (error) {
-            console.error('添加問診資料失敗:', error);
-            return { success: false, error: error.message };
-        }
-    }
-
-    /**
-     * 讀取指定病人姓名的問診資料。
-     * 僅返回尚未過期的資料，並依照創建時間降序排列（本地排序）。
-     *
-     * @param {string} patientName 病人姓名
-     * @returns {Promise<{success: boolean, data: Array}>}
-     */
-    async getInquiryRecords(patientName) {
-        if (!this.isReady) return { success: false, data: [] };
-        try {
-            let baseRef = window.firebase.collection(window.firebase.db, 'inquiries');
-            let q;
-            if (patientName) {
-                // 只使用 where 條件，不帶 orderBy，避免索引需求
-                q = window.firebase.query(
-                    baseRef,
-                    window.firebase.where('patientName', '==', patientName)
-                );
-            } else {
-                // 無條件時可以使用單一 orderBy
-                q = window.firebase.query(
-                    baseRef,
-                    window.firebase.orderBy('createdAt', 'desc')
-                );
-            }
-            const snapshot = await window.firebase.getDocs(q);
-            const now = new Date();
-            const records = [];
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                let expireDate = null;
-                if (data.expireAt) {
-                    if (data.expireAt.seconds !== undefined) {
-                        expireDate = new Date(data.expireAt.seconds * 1000);
-                    } else {
-                        expireDate = new Date(data.expireAt);
-                    }
-                }
-                // 若無 expireAt 或未過期則加入
-                if (!expireDate || expireDate >= now) {
-                    records.push({ id: doc.id, ...data });
-                }
-            });
-            // 按 createdAt 降序排序
-            records.sort((a, b) => {
-                const aTime = a.createdAt && a.createdAt.seconds !== undefined ? a.createdAt.seconds * 1000 : new Date(a.createdAt).getTime();
-                const bTime = b.createdAt && b.createdAt.seconds !== undefined ? b.createdAt.seconds * 1000 : new Date(b.createdAt).getTime();
-                return bTime - aTime;
-            });
-            return { success: true, data: records };
-        } catch (error) {
-            console.error('讀取問診資料失敗:', error);
-            return { success: false, data: [] };
-        }
-    }
-
-    /**
-     * 刪除指定問診資料。
-     *
-     * @param {string} inquiryId 問診紀錄 ID
-     */
-    async deleteInquiryRecord(inquiryId) {
-        try {
-            await window.firebase.deleteDoc(
-                window.firebase.doc(window.firebase.db, 'inquiries', inquiryId)
-            );
-            return { success: true };
-        } catch (error) {
-            console.error('刪除問診資料失敗:', error);
-            return { success: false, error: error.message };
-        }
-    }
-
-    /**
-     * 清除過期的問診資料。
-     * 遍歷 inquiries 集合，刪除 expireAt 早於當前時間的記錄。
-     *
-     * @returns {Promise<{success: boolean, deletedCount?: number}>}
-     */
-    async clearOldInquiries() {
-        if (!this.isReady) return { success: false };
-        try {
-            const snapshot = await window.firebase.getDocs(
-                window.firebase.collection(window.firebase.db, 'inquiries')
-            );
-            const now = new Date();
-            const deletions = [];
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                let expireDate = null;
-                if (data.expireAt) {
-                    if (data.expireAt.seconds !== undefined) {
-                        expireDate = new Date(data.expireAt.seconds * 1000);
-                    } else {
-                        expireDate = new Date(data.expireAt);
-                    }
-                }
-                if (expireDate && expireDate < now) {
-                    deletions.push(window.firebase.deleteDoc(
-                        window.firebase.doc(window.firebase.db, 'inquiries', doc.id)
-                    ));
-                }
-            });
-            let count = 0;
-            if (deletions.length > 0) {
-                await Promise.all(deletions);
-                count = deletions.length;
-            }
-            return { success: true, deletedCount: count };
-        } catch (error) {
-            console.error('清除過期問診資料失敗:', error);
             return { success: false, error: error.message };
         }
     }
