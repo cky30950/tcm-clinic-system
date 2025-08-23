@@ -1357,6 +1357,104 @@ function getMainSymptomFromResult(results) {
 }
 
 /**
+ * 根據問診資料生成完整的主訴摘要。
+ * 此摘要會包含主要症狀、補充描述及相關症狀，
+ * 以便填入診症表單的主訴欄位。
+ *
+ * @param {Object} data 問診資料中的 data 欄位
+ * @returns {string} 完整主訴摘要
+ */
+function generateSymptomSummaryFromInquiry(data) {
+    if (!data) return '';
+    // 首先使用內建函式生成主要症狀摘要
+    let summary = getMainSymptomFromResult(data) || '';
+    const parts = [];
+    // 補充描述
+    if (data.additionalSymptoms && typeof data.additionalSymptoms === 'string' && data.additionalSymptoms.trim()) {
+        parts.push('補充描述: ' + data.additionalSymptoms.trim());
+    }
+    // 相關症狀
+    if (data.relatedSymptoms) {
+        let relatedList = [];
+        if (Array.isArray(data.relatedSymptoms)) {
+            relatedList = data.relatedSymptoms;
+        } else if (typeof data.relatedSymptoms === 'string') {
+            relatedList = [data.relatedSymptoms];
+        }
+        if (relatedList.length > 0) {
+            parts.push('相關症狀: ' + relatedList.join('、'));
+        }
+    }
+    if (parts.length > 0) {
+        if (summary) {
+            summary += '；' + parts.join('；');
+        } else {
+            summary = parts.join('；');
+        }
+    }
+    return summary;
+}
+
+/**
+ * 根據問診資料生成現病史摘要。
+ * 將問診表中的其他條目整理成多行文字，每行包含欄位標籤與值。
+ *
+ * @param {Object} data 問診資料中的 data 欄位
+ * @returns {string} 現病史摘要，用換行符號分隔各項
+ */
+function generateHistorySummaryFromInquiry(data) {
+    if (!data) return '';
+    const labels = {
+        sweating: '汗出情況',
+        '出汗部位': '出汗部位',
+        temperature: '寒熱',
+        coldHands: '手腳冰冷',
+        appetite: '食慾',
+        appetiteSymptoms: '胃口症狀',
+        foodPreference: '食物偏好',
+        drinkingPreference: '飲水偏好',
+        drinkingHabits: '飲水習慣',
+        urination: '小便症狀',
+        nightUrination: '夜尿次數',
+        dailyUrination: '日間小便次數',
+        urineColor: '小便顏色',
+        stoolForm: '大便形狀',
+        stoolSymptoms: '大便症狀',
+        stoolFrequency: '大便頻率',
+        stoolOdor: '大便氣味',
+        stoolColor: '大便顏色',
+        sleep: '睡眠',
+        energy: '精神狀態',
+        morningEnergy: '晨起精神',
+        concentration: '注意力',
+        medicalHistory: '病史',
+        detailedMedicalHistory: '詳細病史',
+        currentMeds: '目前用藥',
+        allergies: '過敏史',
+        otherAllergies: '其他過敏'
+    };
+    const lines = [];
+    Object.keys(labels).forEach(key => {
+        const label = labels[key];
+        const value = data[key];
+        if (value === undefined || value === null) return;
+        // Skip empty strings or arrays with no content
+        if (Array.isArray(value)) {
+            if (value.length === 0) return;
+            const joined = value.join('、');
+            if (joined.trim()) {
+                lines.push(label + '：' + joined.trim());
+            }
+        } else {
+            const valStr = String(value).trim();
+            if (!valStr || valStr === '無') return;
+            lines.push(label + '：' + valStr);
+        }
+    });
+    return lines.join('\n');
+}
+
+/**
  * 從 Firebase 載入指定病人名稱對應的問診資料列表，並填充至掛號彈窗的下拉選單。
  * 若有過期的問診資料會在讀取前清除。
  *
@@ -1367,7 +1465,10 @@ async function loadInquiryOptions(patient) {
     if (!select) return;
     // 清空現有選項並加入預設選項
     select.innerHTML = '<option value="">不使用問診資料</option>';
-    // 取消僅依病人名稱載入的限制，無論是否傳入 patient 皆載入所有問診資料
+    // 若病人名稱不存在則不載入資料
+    if (!patient || !patient.name) {
+        return;
+    }
     try {
         // 清除過期問診資料
         if (window.firebaseDataManager && window.firebaseDataManager.clearOldInquiries) {
@@ -1377,10 +1478,10 @@ async function loadInquiryOptions(patient) {
         console.error('清除過期問診資料時發生錯誤:', err);
     }
     try {
-        // 從 Firebase 取得所有問診資料，不再限制病人名稱
-        const result = await window.firebaseDataManager.getInquiryRecords();
+        // 從 Firebase 取得病人問診資料
+        const result = await window.firebaseDataManager.getInquiryRecords(patient.name);
         inquiryOptionsData = {};
-        if (result && result.success && Array.isArray(result.data) && result.data.length > 0) {
+        if (result.success && result.data && result.data.length > 0) {
             result.data.forEach(rec => {
                 let createdAt = rec.createdAt;
                 let dateStr = '';
@@ -1396,17 +1497,7 @@ async function loadInquiryOptions(patient) {
                 }
                 const opt = document.createElement('option');
                 opt.value = rec.id;
-                // 顯示病人名稱及時間，以便辨識問診資料
-                const nameLabel = (rec.patientName || '').toString().trim() || '未填姓名';
-                const timeLabel = dateStr || '';
-                // 組合顯示：若有時間則顯示姓名 (時間)，否則僅顯示姓名
-                let label = '';
-                if (timeLabel) {
-                    label = `${nameLabel} (${timeLabel}) 問診資料`;
-                } else {
-                    label = `${nameLabel} 問診資料`;
-                }
-                opt.textContent = label;
+                opt.textContent = dateStr ? `${dateStr} 問診資料` : `問診資料 (${rec.id})`;
                 select.appendChild(opt);
                 inquiryOptionsData[rec.id] = rec;
             });
@@ -2766,12 +2857,42 @@ async function showConsultationForm(appointment) {
             
             // 如果掛號時有問診摘要且未填寫主訴或主訴為預設，優先使用問診摘要
             const symptomsField = document.getElementById('formSymptoms');
-            if (appointment && appointment.inquirySummary && (!appointment.chiefComplaint || appointment.chiefComplaint === '無特殊主訴')) {
-                symptomsField.value = appointment.inquirySummary;
-            } else if (appointment.chiefComplaint && appointment.chiefComplaint !== '無特殊主訴') {
-                symptomsField.value = appointment.chiefComplaint;
+            if (symptomsField) {
+                if (appointment && appointment.inquirySummary && (!appointment.chiefComplaint || appointment.chiefComplaint === '無特殊主訴')) {
+                    symptomsField.value = appointment.inquirySummary;
+                } else if (appointment.chiefComplaint && appointment.chiefComplaint !== '無特殊主訴') {
+                    symptomsField.value = appointment.chiefComplaint;
+                }
+                // 根據問診資料進一步完善主訴摘要
+                if (appointment && appointment.inquiryData) {
+                    const newSummary = generateSymptomSummaryFromInquiry(appointment.inquiryData);
+                    if (newSummary) {
+                        const currentVal = symptomsField.value ? symptomsField.value.trim() : '';
+                        // 如果目前為空或與問診摘要/主訴一致，則直接覆蓋；否則附加在後
+                        if (!currentVal || currentVal === appointment.inquirySummary || currentVal === appointment.chiefComplaint || currentVal === '無特殊主訴') {
+                            symptomsField.value = newSummary;
+                        } else {
+                            symptomsField.value = currentVal + '\n' + newSummary;
+                        }
+                    }
+                }
             }
-            
+            // 根據問診資料填充現病史欄位
+            if (appointment && appointment.inquiryData) {
+                const historyField = document.getElementById('formCurrentHistory');
+                if (historyField) {
+                    const historySummary = generateHistorySummaryFromInquiry(appointment.inquiryData);
+                    if (historySummary) {
+                        const currentHistory = historyField.value ? historyField.value.trim() : '';
+                        if (!currentHistory) {
+                            historyField.value = historySummary;
+                        } else {
+                            historyField.value = currentHistory + '\n' + historySummary;
+                        }
+                    }
+                }
+            }
+
             // 自動添加預設診金收費項目
             addDefaultConsultationFee(patient);
             
