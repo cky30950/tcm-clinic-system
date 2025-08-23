@@ -1828,10 +1828,10 @@ async function selectPatientForRegistration(patientId) {
                 createdBy: currentUserData ? currentUserData.username : currentUser
             };
 
-            // 若有選擇問診資料，將其加入掛號資料中
+            // 若有選擇問診資料，僅保存問診 ID 與摘要。避免將完整問診內容存入掛號資料，
+            // 以便在不同裝置上都能從 Firestore 取得問診詳情。保存摘要方便快速展示。
             if (inquiryDataForAppointment) {
                 appointment.inquiryId = selectedInquiryId;
-                appointment.inquiryData = inquiryDataForAppointment;
                 appointment.inquirySummary = inquirySummaryForAppointment || '';
                 // 若未輸入主訴或主訴為預設值，使用問診摘要作為主訴
                 if (!chiefComplaint || chiefComplaint === '無特殊主訴') {
@@ -2855,6 +2855,23 @@ async function showConsultationForm(appointment) {
             document.getElementById('formRestEndDate').value = endDateStr;
             updateRestPeriod();
             
+            // 嘗試從 Firestore 取得問診資料，用於預填主訴與現病史。
+            // 這裡不再使用 appointment.inquiryData，本地僅保存 inquiryId 與摘要。
+            let inquiryDataForPrefill = null;
+            if (appointment && appointment.inquiryId) {
+                try {
+                    const inquiryResult = await window.firebaseDataManager.getInquiryRecords(patient.name);
+                    if (inquiryResult && inquiryResult.success && Array.isArray(inquiryResult.data)) {
+                        const rec = inquiryResult.data.find(r => String(r.id) === String(appointment.inquiryId));
+                        if (rec && rec.data) {
+                            inquiryDataForPrefill = rec.data;
+                        }
+                    }
+                } catch (err) {
+                    console.error('取得問診資料時發生錯誤:', err);
+                }
+            }
+
             // 如果掛號時有問診摘要且未填寫主訴或主訴為預設，優先使用問診摘要
             const symptomsField = document.getElementById('formSymptoms');
             if (symptomsField) {
@@ -2864,8 +2881,8 @@ async function showConsultationForm(appointment) {
                     symptomsField.value = appointment.chiefComplaint;
                 }
                 // 根據問診資料進一步完善主訴摘要
-                if (appointment && appointment.inquiryData) {
-                    const newSummary = generateSymptomSummaryFromInquiry(appointment.inquiryData);
+                if (inquiryDataForPrefill) {
+                    const newSummary = generateSymptomSummaryFromInquiry(inquiryDataForPrefill);
                     if (newSummary) {
                         const currentVal = symptomsField.value ? symptomsField.value.trim() : '';
                         // 如果目前為空或與問診摘要/主訴一致，則直接覆蓋；否則附加在後
@@ -2878,10 +2895,10 @@ async function showConsultationForm(appointment) {
                 }
             }
             // 根據問診資料填充現病史欄位
-            if (appointment && appointment.inquiryData) {
+            if (inquiryDataForPrefill) {
                 const historyField = document.getElementById('formCurrentHistory');
                 if (historyField) {
-                    const historySummary = generateHistorySummaryFromInquiry(appointment.inquiryData);
+                    const historySummary = generateHistorySummaryFromInquiry(inquiryDataForPrefill);
                     if (historySummary) {
                         const currentHistory = historyField.value ? historyField.value.trim() : '';
                         if (!currentHistory) {
