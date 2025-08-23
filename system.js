@@ -1367,10 +1367,7 @@ async function loadInquiryOptions(patient) {
     if (!select) return;
     // 清空現有選項並加入預設選項
     select.innerHTML = '<option value="">不使用問診資料</option>';
-    // 若病人名稱不存在則不載入資料
-    if (!patient || !patient.name) {
-        return;
-    }
+    // 取消僅依病人名稱載入的限制，無論是否傳入 patient 皆載入所有問診資料
     try {
         // 清除過期問診資料
         if (window.firebaseDataManager && window.firebaseDataManager.clearOldInquiries) {
@@ -1380,31 +1377,11 @@ async function loadInquiryOptions(patient) {
         console.error('清除過期問診資料時發生錯誤:', err);
     }
     try {
-        // 從 Firebase 取得病人問診資料
-        let result = await window.firebaseDataManager.getInquiryRecords(patient.name);
+        // 從 Firebase 取得所有問診資料，不再限制病人名稱
+        const result = await window.firebaseDataManager.getInquiryRecords();
         inquiryOptionsData = {};
-        let records = [];
-        if (result && result.success && Array.isArray(result.data)) {
-            records = result.data;
-        }
-        // 如果沒有查詢到資料，嘗試從全部問診資料中篩選
-        if (records.length === 0 && window.firebaseDataManager.getInquiryRecords) {
-            try {
-                const allResult = await window.firebaseDataManager.getInquiryRecords();
-                if (allResult && allResult.success && Array.isArray(allResult.data)) {
-                    const targetName = (patient.name || '').toString().trim();
-                    records = allResult.data.filter(rec => {
-                        const recName = (rec.patientName || '').toString().trim();
-                        return recName === targetName;
-                    });
-                }
-            } catch (_ignore) {
-                // 忽略備用查詢的錯誤
-            }
-        }
-        // 將結果填入選單
-        if (records && records.length > 0) {
-            records.forEach(rec => {
+        if (result && result.success && Array.isArray(result.data) && result.data.length > 0) {
+            result.data.forEach(rec => {
                 let createdAt = rec.createdAt;
                 let dateStr = '';
                 if (createdAt && createdAt.seconds !== undefined) {
@@ -1419,7 +1396,17 @@ async function loadInquiryOptions(patient) {
                 }
                 const opt = document.createElement('option');
                 opt.value = rec.id;
-                opt.textContent = dateStr ? `${dateStr} 問診資料` : `問診資料 (${rec.id})`;
+                // 顯示病人名稱及時間，以便辨識問診資料
+                const nameLabel = (rec.patientName || '').toString().trim() || '未填姓名';
+                const timeLabel = dateStr || '';
+                // 組合顯示：若有時間則顯示姓名 (時間)，否則僅顯示姓名
+                let label = '';
+                if (timeLabel) {
+                    label = `${nameLabel} (${timeLabel}) 問診資料`;
+                } else {
+                    label = `${nameLabel} 問診資料`;
+                }
+                opt.textContent = label;
                 select.appendChild(opt);
                 inquiryOptionsData[rec.id] = rec;
             });
