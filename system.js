@@ -1381,7 +1381,9 @@ async function loadInquiryOptions(patient) {
     }
     try {
         // 從 Firebase 取得病人問診資料
-        const result = await window.firebaseDataManager.getInquiryRecords(patient.name);
+        // 為避免患者姓名前後有空格導致查詢不到，統一去除空白
+        const name = (patient.name && typeof patient.name === 'string') ? patient.name.trim() : patient.name;
+        const result = await window.firebaseDataManager.getInquiryRecords(name);
         inquiryOptionsData = {};
         if (result.success && result.data && result.data.length > 0) {
             result.data.forEach(rec => {
@@ -10199,10 +10201,12 @@ class FirebaseDataManager {
         try {
             const now = new Date();
             const expireDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 小時後過期
+            // 將病人姓名去除首尾空白，避免存儲不一致
+            const normalizedName = patientName && typeof patientName === 'string' ? patientName.trim() : patientName;
             const docRef = await window.firebase.addDoc(
                 window.firebase.collection(window.firebase.db, 'inquiries'),
                 {
-                    patientName: patientName,
+                    patientName: normalizedName,
                     data: data,
                     createdAt: now,
                     expireAt: expireDate
@@ -10226,12 +10230,13 @@ class FirebaseDataManager {
         if (!this.isReady) return { success: false, data: [] };
         try {
             let baseRef = window.firebase.collection(window.firebase.db, 'inquiries');
-            // 若有提供 patientName，則使用 where 條件
+            // 若有提供 patientName，則使用 where 條件。為避免姓名首尾空白導致不匹配，統一去除空白後再比較
             let q;
-            if (patientName) {
+            const normalizedName = patientName && typeof patientName === 'string' ? patientName.trim() : patientName;
+            if (normalizedName) {
                 q = window.firebase.query(
                     baseRef,
-                    window.firebase.where('patientName', '==', patientName),
+                    window.firebase.where('patientName', '==', normalizedName),
                     window.firebase.orderBy('createdAt', 'desc')
                 );
             } else {
