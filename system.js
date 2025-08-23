@@ -2628,7 +2628,7 @@ async function showConsultationForm(appointment) {
             // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
             const saveButtonTextElNew = document.getElementById('consultationSaveButtonText');
             if (saveButtonTextElNew) {
-                saveButtonTextElNew.textContent = '保存病歷';
+                saveButtonTextElNew.textContent = '完成診症';
             } else {
                 // 若找不到元素，則紀錄警告並跳過，不造成程式崩潰
                 console.warn('consultationSaveButtonText element not found when starting consultation. Skipping text update.');
