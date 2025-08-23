@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>中醫預診系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Firebase 初始化腳本，供問診結果上傳使用 -->
+    <script type="module" src="firebase_init.js"></script>
     <style>
         /* Mobile-first responsive design */
         @media (max-width: 768px) {
@@ -1550,6 +1552,13 @@
         });
 
         function displayResults(results) {
+            // 在顯示結果之前，將問診資料上傳至 Firestore（非同步執行）
+            try {
+                uploadInquiryData(results);
+            } catch (_e) {
+                // 忽略上傳錯誤以免影響 UI 顯示
+            }
+
             // Hide the form container
             document.querySelector('.section-card').style.display = 'none';
             
@@ -1701,6 +1710,38 @@
             });
             
             return html;
+        }
+
+        /**
+         * 將問診資料上傳至 Firestore。
+         * 使用 firebase_init.js 中初始化的 window.firebase 物件。
+         *
+         * @param {Object} results 問診結果物件
+         */
+        async function uploadInquiryData(results) {
+            try {
+                // 確保 Firebase 已初始化
+                if (!window.firebase || !window.firebase.db) {
+                    console.warn('Firebase 未初始化，無法上傳問診資料');
+                    return;
+                }
+                // 設置創建和過期時間
+                const timestamp = new Date();
+                const expireAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                // 新增至 inquiries 集合
+                await window.firebase.addDoc(
+                    window.firebase.collection(window.firebase.db, 'inquiries'),
+                    {
+                        patientName: results.patientName || '',
+                        data: results,
+                        createdAt: timestamp,
+                        expireAt: expireAt
+                    }
+                );
+                console.log('問診資料已成功儲存');
+            } catch (err) {
+                console.error('上傳問診資料發生錯誤:', err);
+            }
         }
 
         function getFieldLabel(field) {
@@ -1956,5 +1997,6 @@
             modal.classList.remove('flex');
         }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'973827d9177a09dc',t:'MTc1NTkyNjM3My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'973827d9177a09dc',t:'MTc1NTkyNjM3My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
 </html>
