@@ -1455,20 +1455,17 @@ function generateHistorySummaryFromInquiry(data) {
 }
 
 /**
- * 從 Firebase 載入指定病人名稱對應的問診資料列表，並填充至掛號彈窗的下拉選單。
- * 若有過期的問診資料會在讀取前清除。
+ * 從 Firebase 載入問診資料列表，並填充至掛號彈窗的下拉選單。
+ * 不再限制必須與病人姓名匹配，將載入所有未過期的問診資料。
+ * 每個選項會標示問診創建時間與病人姓名，方便辨識。
  *
- * @param {Object} patient 病人資料物件
+ * @param {Object} patient 病人資料物件（可選，不使用時依然會載入所有資料）
  */
 async function loadInquiryOptions(patient) {
     const select = document.getElementById('inquirySelect');
     if (!select) return;
     // 清空現有選項並加入預設選項
     select.innerHTML = '<option value="">不使用問診資料</option>';
-    // 若病人名稱不存在則不載入資料
-    if (!patient || !patient.name) {
-        return;
-    }
     try {
         // 清除過期問診資料
         if (window.firebaseDataManager && window.firebaseDataManager.clearOldInquiries) {
@@ -1478,11 +1475,19 @@ async function loadInquiryOptions(patient) {
         console.error('清除過期問診資料時發生錯誤:', err);
     }
     try {
-        // 從 Firebase 取得病人問診資料
-        const result = await window.firebaseDataManager.getInquiryRecords(patient.name);
+        // 從 Firebase 取得問診資料；不傳入 patientName 以取得全部未過期的問診紀錄
+        let result;
+        try {
+            result = await window.firebaseDataManager.getInquiryRecords('');
+        } catch (e) {
+            console.error('讀取全部問診資料失敗，嘗試使用病人名稱查詢:', e);
+            const nameForSearch = patient && patient.name ? String(patient.name).trim() : '';
+            result = await window.firebaseDataManager.getInquiryRecords(nameForSearch);
+        }
         inquiryOptionsData = {};
-        if (result.success && result.data && result.data.length > 0) {
+        if (result && result.success && Array.isArray(result.data)) {
             result.data.forEach(rec => {
+                // 取出問診記錄創建時間
                 let createdAt = rec.createdAt;
                 let dateStr = '';
                 if (createdAt && createdAt.seconds !== undefined) {
@@ -1497,7 +1502,13 @@ async function loadInquiryOptions(patient) {
                 }
                 const opt = document.createElement('option');
                 opt.value = rec.id;
-                opt.textContent = dateStr ? `${dateStr} 問診資料` : `問診資料 (${rec.id})`;
+                // 加入病人姓名以便辨識
+                const patientName = rec.patientName || '';
+                if (dateStr) {
+                    opt.textContent = `${dateStr} ${patientName} 問診資料`;
+                } else {
+                    opt.textContent = `${patientName} 問診資料 (${rec.id})`;
+                }
                 select.appendChild(opt);
                 inquiryOptionsData[rec.id] = rec;
             });
@@ -2860,12 +2871,26 @@ async function showConsultationForm(appointment) {
             let inquiryDataForPrefill = null;
             if (appointment && appointment.inquiryId) {
                 try {
-                    const inquiryResult = await window.firebaseDataManager.getInquiryRecords(patient.name);
+                    // 對病人姓名進行修剪，避免前後空白導致查詢不到
+                    const nameForSearch = patient && patient.name ? String(patient.name).trim() : '';
+                    let inquiryResult = await window.firebaseDataManager.getInquiryRecords(nameForSearch);
+                    let rec = null;
                     if (inquiryResult && inquiryResult.success && Array.isArray(inquiryResult.data)) {
-                        const rec = inquiryResult.data.find(r => String(r.id) === String(appointment.inquiryId));
-                        if (rec && rec.data) {
-                            inquiryDataForPrefill = rec.data;
+                        rec = inquiryResult.data.find(r => String(r.id) === String(appointment.inquiryId));
+                    }
+                    // 如果按姓名查詢找不到，改為查詢所有記錄再搜尋 id
+                    if (!rec) {
+                        try {
+                            const allResult = await window.firebaseDataManager.getInquiryRecords('');
+                            if (allResult && allResult.success && Array.isArray(allResult.data)) {
+                                rec = allResult.data.find(r => String(r.id) === String(appointment.inquiryId));
+                            }
+                        } catch (e2) {
+                            console.warn('取得全部問診記錄時發生錯誤:', e2);
                         }
+                    }
+                    if (rec && rec.data) {
+                        inquiryDataForPrefill = rec.data;
                     }
                 } catch (err) {
                     console.error('取得問診資料時發生錯誤:', err);
