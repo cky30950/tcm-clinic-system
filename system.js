@@ -2124,8 +2124,8 @@ try {
                 consultation = consultationResult.data.find(c => c.id === consultationId);
                 if (consultation) {
                     // 同步到本地
+                    // 將查詢到的診症記錄放入記憶體中供後續使用，不再寫入 localStorage
                     consultations.push(consultation);
-                    localStorage.setItem('consultations', JSON.stringify(consultations));
                 }
             }
         }
@@ -5315,8 +5315,8 @@ async function withdrawConsultation(appointmentId) {
             if (consResult && consResult.success) {
                 consultation = consResult.data.find(c => c.id === appointment.consultationId);
                 if (consultation) {
+                    // 將查詢到的診症記錄放入記憶體中供後續使用，不再寫入 localStorage
                     consultations.push(consultation);
-                    localStorage.setItem('consultations', JSON.stringify(consultations));
                 }
             }
         }
@@ -5350,11 +5350,8 @@ if (confirm(confirmMessage)) {
             (c) => c.id === appointment.consultationId
         );
         if (consultationIndex !== -1) {
+            // 從記憶體中移除該筆診症記錄即可，不再同步到 localStorage
             consultations.splice(consultationIndex, 1);
-            localStorage.setItem(
-                'consultations',
-                JSON.stringify(consultations)
-            );
         }
     } catch (error) {
         console.error('刪除診症記錄失敗:', error);
@@ -5502,9 +5499,8 @@ async function editMedicalRecord(appointmentId) {
             if (consResult && consResult.success) {
                 consultation = consResult.data.find(c => c.id === appointment.consultationId);
                 if (consultation) {
-                    // 將查找到的診症記錄寫入本地緩存，以便後續使用
+                    // 將查詢到的診症記錄放入記憶體中供後續使用，不再寫入 localStorage
                     consultations.push(consultation);
-                    localStorage.setItem('consultations', JSON.stringify(consultations));
                 }
             }
         }
