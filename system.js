@@ -1381,9 +1381,7 @@ async function loadInquiryOptions(patient) {
     }
     try {
         // 從 Firebase 取得病人問診資料
-        // 為避免患者姓名前後有空格導致查詢不到，統一去除空白
-        const name = (patient.name && typeof patient.name === 'string') ? patient.name.trim() : patient.name;
-        const result = await window.firebaseDataManager.getInquiryRecords(name);
+        const result = await window.firebaseDataManager.getInquiryRecords(patient.name);
         inquiryOptionsData = {};
         if (result.success && result.data && result.data.length > 0) {
             result.data.forEach(rec => {
@@ -10201,12 +10199,10 @@ class FirebaseDataManager {
         try {
             const now = new Date();
             const expireDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 小時後過期
-            // 將病人姓名去除首尾空白，避免存儲不一致
-            const normalizedName = patientName && typeof patientName === 'string' ? patientName.trim() : patientName;
             const docRef = await window.firebase.addDoc(
                 window.firebase.collection(window.firebase.db, 'inquiries'),
                 {
-                    patientName: normalizedName,
+                    patientName: patientName,
                     data: data,
                     createdAt: now,
                     expireAt: expireDate
@@ -10229,14 +10225,14 @@ class FirebaseDataManager {
     async getInquiryRecords(patientName) {
         if (!this.isReady) return { success: false, data: [] };
         try {
-            let baseRef = window.firebase.collection(window.firebase.db, 'inquiries');
-            // 若有提供 patientName，則使用 where 條件。為避免姓名首尾空白導致不匹配，統一去除空白後再比較
+            // 由於問診資料可能存放於多個患者檔案的子集合中，使用 collectionGroup 以查詢所有名稱為 "inquiries" 的集合
+            let baseRef = window.firebase.collectionGroup(window.firebase.db, 'inquiries');
+            // 若有提供 patientName，則使用 where 條件
             let q;
-            const normalizedName = patientName && typeof patientName === 'string' ? patientName.trim() : patientName;
-            if (normalizedName) {
+            if (patientName) {
                 q = window.firebase.query(
                     baseRef,
-                    window.firebase.where('patientName', '==', normalizedName),
+                    window.firebase.where('patientName', '==', patientName),
                     window.firebase.orderBy('createdAt', 'desc')
                 );
             } else {
@@ -10293,8 +10289,9 @@ class FirebaseDataManager {
     async clearOldInquiries() {
         if (!this.isReady) return { success: false };
         try {
+            // 使用 collectionGroup 搜尋所有名為 "inquiries" 的集合，以刪除任何層級中過期的問診資料
             const snapshot = await window.firebase.getDocs(
-                window.firebase.collection(window.firebase.db, 'inquiries')
+                window.firebase.collectionGroup(window.firebase.db, 'inquiries')
             );
             const now = new Date();
             const deletions = [];
