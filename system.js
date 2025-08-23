@@ -2751,11 +2751,14 @@ async function showConsultationForm(appointment) {
                         loadTodayAppointments();
                     }
                 } else if (appointment.status === 'completed') {
-                    // 如果是已完成的診症，只是關閉編輯模式
-                    await revertPendingPackageChanges();
-                    showToast('已退出病歷編輯模式', 'info');
-                    closeConsultationForm();
-                    currentConsultingAppointmentId = null;
+                    /*
+                     * 當使用者正處於修改病歷模式（掛號狀態為 completed）時，不允許取消。
+                     * 原本的邏輯會退出編輯模式並回復暫存的套票變更，這相當於放棄此次編輯。
+                     * 依照新的需求，在編輯病歷期間，使用者應完成並保存修改，而非取消。
+                     * 因此這裡僅提示用戶無法取消，並保留當前編輯狀態。
+                     */
+                    showToast('修改病歷期間無法取消，請保存後退出', 'warning');
+                    return;
                 } else {
                     // 其他狀態直接關閉
                     await revertPendingPackageChanges();
@@ -2788,8 +2791,8 @@ async function saveConsultation() {
     const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
     // 判斷是否為編輯模式：掛號狀態為已完成且存在 consultationId
     const isEditing = appointment && appointment.status === 'completed' && appointment.consultationId;
-        // 預處理套票購買和立即使用（非編輯模式與編輯模式都需處理，編輯模式也允許購買）
-    if (appointment && Array.isArray(selectedBillingItems)) {
+        // 預處理套票購買和立即使用（僅在非編輯模式下處理，以免重複購買）
+    if (appointment && !isEditing && Array.isArray(selectedBillingItems)) {
         try {
             // 找到所有套票項目
             const packageItems = selectedBillingItems.filter(item => item && item.category === 'package');
@@ -9109,12 +9112,28 @@ async function getPatientPackages(patientId) {
 }
 
 async function purchasePackage(patientId, item) {
+    /*
+     * 在修改已完成的病歷時（即 appointment 狀態為 completed），禁止購買新套票。
+     * 檢查當前診症 ID 與 appointments 陣列中的狀態，若正處於編輯模式則提示並返回 null。
+     */
+    try {
+        if (currentConsultingAppointmentId && Array.isArray(appointments)) {
+            const appt = appointments.find(a => a && String(a.id) === String(currentConsultingAppointmentId));
+            if (appt && appt.status === 'completed') {
+                showToast('修改病歷期間無法購買套票', 'warning');
+                return null;
+            }
+        }
+    } catch (err) {
+        // 若判斷過程發生錯誤，不影響後續購買流程
+    }
+
     const totalUses = Number(item.packageUses || item.totalUses || 0);
     const validityDays = Number(item.validityDays || 0);
     const purchasedAt = new Date();
     const expiresAt = new Date(purchasedAt);
     expiresAt.setDate(expiresAt.getDate() + validityDays);
-    
+
     const record = {
         patientId: patientId,
         packageItemId: item.id,
@@ -9124,7 +9143,7 @@ async function purchasePackage(patientId, item) {
         purchasedAt: purchasedAt.toISOString(),
         expiresAt: expiresAt.toISOString()
     };
-    
+
     try {
         const result = await window.firebaseDataManager.addPatientPackage(record);
         if (result.success) {
