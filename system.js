@@ -1311,6 +1311,29 @@ async function viewPatient(id) {
         // 診症系統功能
         let selectedPatientForRegistration = null;
         let currentConsultingAppointmentId = null;
+
+        /**
+         * 判斷當前是否可以對套票進行操作（新增、刪除或調整數量）。
+         * 當掛號已標記為完成（appointment.status === 'completed'）時，
+         * 應禁止後續對套票的任何修改，以避免診症完成後仍更動收費項目。
+         *
+         * @returns {boolean} 如果允許修改套票則回傳 true；若已完成則回傳 false
+         */
+        function canModifyPackageItems() {
+            try {
+                // 從全域 appointments 中取得當前掛號資訊
+                if (Array.isArray(appointments) && currentConsultingAppointmentId !== null && currentConsultingAppointmentId !== undefined) {
+                    const appt = appointments.find(ap => ap && String(ap.id) === String(currentConsultingAppointmentId));
+                    // 如果存在且狀態為已完成，則不允許修改套票
+                    if (appt && appt.status === 'completed') {
+                        return false;
+                    }
+                }
+            } catch (e) {
+                // 發生錯誤時保持允許狀態，避免阻塞其他操作
+            }
+            return true;
+        }
         
         function loadConsultationSystem() {
             loadTodayAppointments();
@@ -2751,14 +2774,11 @@ async function showConsultationForm(appointment) {
                         loadTodayAppointments();
                     }
                 } else if (appointment.status === 'completed') {
-                    /*
-                     * 當使用者正處於修改病歷模式（掛號狀態為 completed）時，不允許取消。
-                     * 原本的邏輯會退出編輯模式並回復暫存的套票變更，這相當於放棄此次編輯。
-                     * 依照新的需求，在編輯病歷期間，使用者應完成並保存修改，而非取消。
-                     * 因此這裡僅提示用戶無法取消，並保留當前編輯狀態。
-                     */
-                    showToast('修改病歷期間無法取消，請保存後退出', 'warning');
-                    return;
+                    // 如果是已完成的診症，只是關閉編輯模式
+                    await revertPendingPackageChanges();
+                    showToast('已退出病歷編輯模式', 'info');
+                    closeConsultationForm();
+                    currentConsultingAppointmentId = null;
                 } else {
                     // 其他狀態直接關閉
                     await revertPendingPackageChanges();
@@ -6849,7 +6869,15 @@ async function initializeSystemAfterLogin() {
         function addToBilling(itemId) {
             const item = billingItems.find(b => b.id === itemId);
             if (!item) return;
-            
+
+            // 如為套票項目且目前不允許修改套票，則停止並顯示警告
+            if (item.category === 'package' && !canModifyPackageItems()) {
+                showToast('診症完成後無法新增套票', 'warning');
+                // 清理搜尋結果避免殘留
+                clearBillingSearch();
+                return;
+            }
+
             // 檢查是否已經添加過
             const existingIndex = selectedBillingItems.findIndex(b => b.id === itemId);
             if (existingIndex !== -1) {
@@ -6870,13 +6898,13 @@ async function initializeSystemAfterLogin() {
                 };
                 selectedBillingItems.push(billingItem);
             }
-            
+
             // 更新顯示
             updateBillingDisplay();
-            
+
             // 清除搜索
             clearBillingSearch();
-            
+
             showToast(`已添加收費項目：${item.name}`, 'success');
         }
         
@@ -6984,13 +7012,16 @@ async function initializeSystemAfterLogin() {
                                         onclick="undoPackageUse('${patientIdForUndo}', '${packageRecordIdForUndo}', '${item.id}')"
                                     >取消使用</button>
                                 ` : '';
-                        // 根據項目是否為套票使用決定是否顯示刪除按鈕
-                        // 若為套票使用 (packageUse)，刪除按鈕會被隱藏，以免與「取消使用」功能重複
-                        const removeBtn = isPackageUse
+                        // 判斷是否為套票項目，且當前是否禁止修改套票
+                        const isPackageItem = item.category === 'package';
+                        const packageLocked = isPackageItem && !canModifyPackageItems();
+                        // 根據項目是否為套票使用或套票鎖定決定是否顯示刪除按鈕
+                        // 套票使用項目 (packageUse) 或鎖定的套票 (package) 不提供刪除功能
+                        const removeBtn = (isPackageUse || packageLocked)
                             ? ''
                             : `<button onclick="removeBillingItem(${originalIndex})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>`;
-                        // 數量控制區：套票使用項目僅顯示次數，不提供加減按鈕
-                        const quantityControls = isPackageUse ? `
+                        // 數量控制區：套票使用或鎖定的套票僅顯示次數，不提供加減按鈕
+                        const quantityControls = (isPackageUse || packageLocked) ? `
                                 <div class="flex items-center space-x-2 mr-3">
                                     <span class="w-8 text-center font-semibold">${item.quantity}</span>
                                 </div>
@@ -7113,6 +7144,11 @@ async function initializeSystemAfterLogin() {
                     undoPackageUse(item.patientId, item.packageRecordId, item.id);
                     return;
                 }
+                // 若為套票項目且不允許修改套票，則不調整數量
+                if (item && item.category === 'package' && !canModifyPackageItems()) {
+                    showToast('診症完成後無法調整套票數量', 'warning');
+                    return;
+                }
                 const newQuantity = item.quantity + change;
                 if (newQuantity > 0) {
                     selectedBillingItems[index].quantity = newQuantity;
@@ -7128,6 +7164,11 @@ async function initializeSystemAfterLogin() {
         function removeBillingItem(index) {
             if (index >= 0 && index < selectedBillingItems.length) {
                 const removedItem = selectedBillingItems[index];
+                // 如果為套票項目且目前不允許修改套票，則不允許移除
+                if (removedItem && removedItem.category === 'package' && !canModifyPackageItems()) {
+                    showToast('診症完成後無法刪除套票', 'warning');
+                    return;
+                }
                 // 如果是套票使用，移除時需要退回剩餘次數
                 if (removedItem.category === 'packageUse') {
                     // 直接調用取消函式，它會自動從陣列移除並處理次數
@@ -9112,28 +9153,12 @@ async function getPatientPackages(patientId) {
 }
 
 async function purchasePackage(patientId, item) {
-    /*
-     * 在修改已完成的病歷時（即 appointment 狀態為 completed），禁止購買新套票。
-     * 檢查當前診症 ID 與 appointments 陣列中的狀態，若正處於編輯模式則提示並返回 null。
-     */
-    try {
-        if (currentConsultingAppointmentId && Array.isArray(appointments)) {
-            const appt = appointments.find(a => a && String(a.id) === String(currentConsultingAppointmentId));
-            if (appt && appt.status === 'completed') {
-                showToast('修改病歷期間無法購買套票', 'warning');
-                return null;
-            }
-        }
-    } catch (err) {
-        // 若判斷過程發生錯誤，不影響後續購買流程
-    }
-
     const totalUses = Number(item.packageUses || item.totalUses || 0);
     const validityDays = Number(item.validityDays || 0);
     const purchasedAt = new Date();
     const expiresAt = new Date(purchasedAt);
     expiresAt.setDate(expiresAt.getDate() + validityDays);
-
+    
     const record = {
         patientId: patientId,
         packageItemId: item.id,
@@ -9143,7 +9168,7 @@ async function purchasePackage(patientId, item) {
         purchasedAt: purchasedAt.toISOString(),
         expiresAt: expiresAt.toISOString()
     };
-
+    
     try {
         const result = await window.firebaseDataManager.addPatientPackage(record);
         if (result.success) {
