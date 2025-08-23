@@ -41,7 +41,7 @@ function hasAccessToSection(sectionId) {
 let patients = [];
 let consultations = [];
 let appointments = [];
-// 問診選項快取。鍵為問診記錄 ID，值為完整紀錄供後續使用
+// 問診選項快取。鍵為問診紀錄的 ID，值為完整紀錄（包含 data、createdAt 等）。
 let inquiryOptionsData = {};
 // 快取病人列表，避免重複從 Firestore 讀取
 let patientCache = null;
@@ -445,6 +445,121 @@ function playNotificationSound() {
                 } else {
                     return `${days}天`;
                 }
+            }
+        }
+
+        /**
+         * 從問診資料中萃取主要症狀摘要。
+         * 根據問診選擇的身體部位、細節部位以及第一到第三個症狀組合簡易摘要。
+         * 如沒有症狀資料，則回傳空字串。
+         * @param {Object} result 問診記錄中的 data 欄位
+         * @returns {string} 摘要文字，例如 "頭部 - 偏頭痛、頭暈"
+         */
+        function getMainSymptomFromResult(result) {
+            if (!result) return '';
+            // 身體部位對照表
+            const bodyPartNames = {
+                head: '頭部',
+                neck: '頸部',
+                chest: '胸部',
+                abdomen: '腹部',
+                back: '背部',
+                arms: '手臂',
+                legs: '腿部',
+                joints: '關節',
+                skin: '皮膚',
+                internal: '內科症狀',
+                gynecology: '婦科',
+                andrology: '男科',
+                other: '其他'
+            };
+            let summary = '';
+            if (result.bodyPart && bodyPartNames[result.bodyPart]) {
+                summary += bodyPartNames[result.bodyPart];
+            }
+            if (result.detailedLocation) {
+                summary += (summary ? ' - ' : '') + result.detailedLocation;
+            }
+            // 搜集所有症狀陣列欄位，合併成一個陣列
+            const symptomFields = [
+                'relatedSymptoms', 'sweating', 'temperature', 'coldHands', 'appetite', 'appetiteSymptoms',
+                'foodPreference', 'drinkingPreference', 'drinkingHabits', 'urination', 'nightUrination',
+                'dailyUrination', 'urineColor', 'stoolForm', 'stoolSymptoms', 'stoolFrequency',
+                'stoolOdor', 'stoolColor', 'sleep', 'energy', 'morningEnergy', 'concentration',
+                'medicalHistory', 'detailedMedicalHistory', 'currentMeds', 'allergies', 'otherAllergies'
+            ];
+            let symptoms = [];
+            for (const key of symptomFields) {
+                const value = result[key];
+                if (Array.isArray(value)) {
+                    symptoms = symptoms.concat(value);
+                }
+            }
+            // 如果症狀欄位未記錄，嘗試遍歷其他屬性尋找陣列
+            if (symptoms.length === 0) {
+                for (const key in result) {
+                    const value = result[key];
+                    if (Array.isArray(value)) {
+                        symptoms = symptoms.concat(value);
+                    }
+                }
+            }
+            if (symptoms.length > 0) {
+                const firstThree = symptoms.slice(0, 3);
+                summary += (summary ? '：' : '') + firstThree.join('、');
+            }
+            return summary;
+        }
+
+        /**
+         * 根據患者名稱載入可用的問診資料，並填充至掛號視窗中的下拉選單。
+         * 同時更新 inquiryOptionsData 快取供後續使用。
+         * 若 Firebase 或資料管理器未準備就緒，則不執行任何操作。
+         * @param {Object} patient 病患資料物件，至少需包含 name 屬性
+         */
+        async function loadInquiryOptions(patient) {
+            const selectEl = document.getElementById('inquirySelect');
+            if (!selectEl) return;
+            // 清空選項並添加預設選項
+            selectEl.innerHTML = '<option value="">（若有）請選擇問診資料</option>';
+            inquiryOptionsData = {};
+            if (!patient || !patient.name) return;
+            try {
+                // 嘗試清理過期問診資料
+                if (window.firebaseDataManager && typeof window.firebaseDataManager.clearOldInquiries === 'function') {
+                    await window.firebaseDataManager.clearOldInquiries();
+                }
+                // 取得問診紀錄
+                if (!window.firebaseDataManager || typeof window.firebaseDataManager.getInquiryRecords !== 'function') {
+                    return;
+                }
+                const result = await window.firebaseDataManager.getInquiryRecords(patient.name);
+                if (!result.success) {
+                    showToast('讀取問診資料失敗', 'error');
+                    return;
+                }
+                let records = result.data || [];
+                // 前端依照 createdAt 字段排序：最新在前
+                records.sort((a, b) => {
+                    const aDate = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate() : (a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt));
+                    const bDate = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate() : (b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt));
+                    return bDate - aDate;
+                });
+                records.forEach(record => {
+                    const id = record.id;
+                    const data = record.data || {};
+                    const summary = getMainSymptomFromResult(data);
+                    const createdAt = record.createdAt && typeof record.createdAt.toDate === 'function' ? record.createdAt.toDate() : (record.createdAt instanceof Date ? record.createdAt : new Date(record.createdAt));
+                    const dateStr = createdAt ? createdAt.toLocaleString('zh-TW') : '';
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = `${dateStr} - ${summary || '無症狀摘要'}`;
+                    selectEl.appendChild(option);
+                    inquiryOptionsData[id] = record;
+                });
+            } catch (error) {
+                console.error('載入問診資料失敗:', error);
+                showToast('讀取問診資料失敗', 'error');
             }
         }
         
@@ -1492,7 +1607,7 @@ async function selectPatientForRegistration(patientId) {
             // 載入醫師選項
             loadDoctorOptions();
 
-            // 載入問診資料選項（不限制姓名一致）
+            // 載入對應患者的問診紀錄選項
             try {
                 loadInquiryOptions(patient);
             } catch (e) {
@@ -1557,74 +1672,8 @@ async function selectPatientForRegistration(patientId) {
             document.getElementById('quickChiefComplaint').value = '';
             // 重置問診下拉選單
             const inquirySelectEl = document.getElementById('inquirySelect');
-            if (inquirySelectEl) inquirySelectEl.value = '';
-        }
-
-        // 主要症狀摘要函式：自問診記錄擷取摘要用於預填主訴
-        function getMainSymptomFromResult(result) {
-            if (!result) return '';
-            const bodyPartNames = {
-                head: '頭部', neck: '頸部', chest: '胸部', abdomen: '腹部', back: '背部', arms: '手臂', legs: '腿部', joints: '關節', skin: '皮膚', internal: '內科症狀', gynecology: '婦科', andrology: '男科', other: '其他'
-            };
-            let summary = '';
-            if (result.bodyPart && bodyPartNames[result.bodyPart]) {
-                summary += bodyPartNames[result.bodyPart];
-            }
-            if (result.detailedLocation) {
-                summary += (summary ? ' - ' : '') + result.detailedLocation;
-            }
-            // 收集所有陣列症狀
-            let symptoms = [];
-            for (const key in result) {
-                const val = result[key];
-                if (Array.isArray(val)) {
-                    symptoms = symptoms.concat(val);
-                }
-            }
-            if (symptoms.length > 0) {
-                summary += (summary ? '：' : '') + symptoms.slice(0, 3).join('、');
-            }
-            return summary;
-        }
-
-        // 載入問診資料至下拉選單；不再限制姓名一致
-        async function loadInquiryOptions(patient) {
-            const selectEl = document.getElementById('inquirySelect');
-            if (!selectEl) return;
-            selectEl.innerHTML = '<option value="">（若有）請選擇問診資料</option>';
-            inquiryOptionsData = {};
-            try {
-                if (window.firebaseDataManager && typeof window.firebaseDataManager.clearOldInquiries === 'function') {
-                    await window.firebaseDataManager.clearOldInquiries();
-                }
-                if (!window.firebaseDataManager || typeof window.firebaseDataManager.getInquiryRecords !== 'function') {
-                    return;
-                }
-                const res = await window.firebaseDataManager.getInquiryRecords();
-                if (!res.success) {
-                    showToast('讀取問診資料失敗', 'error');
-                    return;
-                }
-                let records = res.data || [];
-                records.sort((a, b) => {
-                    const aDate = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate() : new Date(a.createdAt);
-                    const bDate = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate() : new Date(b.createdAt);
-                    return bDate - aDate;
-                });
-                records.forEach(record => {
-                    const id = record.id;
-                    const summary = getMainSymptomFromResult(record.data || {});
-                    const createdAt = record.createdAt && typeof record.createdAt.toDate === 'function' ? record.createdAt.toDate() : new Date(record.createdAt);
-                    const dateStr = createdAt ? createdAt.toLocaleString('zh-TW') : '';
-                    const option = document.createElement('option');
-                    option.value = id;
-                    option.textContent = `${dateStr} - ${summary || '無症狀摘要'}`;
-                    selectEl.appendChild(option);
-                    inquiryOptionsData[id] = record;
-                });
-            } catch (e) {
-                console.error('載入問診資料失敗:', e);
-                showToast('讀取問診資料失敗', 'error');
+            if (inquirySelectEl) {
+                inquirySelectEl.value = '';
             }
         }
         
@@ -1639,13 +1688,14 @@ async function selectPatientForRegistration(patientId) {
             const appointmentDoctor = document.getElementById('appointmentDoctor').value;
             const chiefComplaint = document.getElementById('quickChiefComplaint').value.trim();
 
-            // 讀取下拉選單中的問診資料
-            const inquirySelectElReg = document.getElementById('inquirySelect');
-            const selectedInquiryId = inquirySelectElReg ? inquirySelectElReg.value : '';
+            // 取得選擇的問診資料
+            const inquirySelectEl = document.getElementById('inquirySelect');
+            const selectedInquiryId = inquirySelectEl ? inquirySelectEl.value : '';
             let selectedInquiry = null;
             if (selectedInquiryId && inquiryOptionsData && inquiryOptionsData[selectedInquiryId]) {
                 selectedInquiry = inquiryOptionsData[selectedInquiryId];
             }
+            // 根據問診資料產生摘要
             const inquirySummary = selectedInquiry ? getMainSymptomFromResult(selectedInquiry.data || {}) : '';
             
             if (!appointmentDateTime) {
@@ -1684,13 +1734,13 @@ async function selectPatientForRegistration(patientId) {
                 patientId: selectedPatientForRegistration.id,
                 appointmentTime: selectedTime.toISOString(),
                 appointmentDoctor: appointmentDoctor,
-                // 如果主訴未輸入，則使用問診摘要，否則預設為無特殊主訴
+                // 若有自填主訴則使用之，否則使用問診摘要，若皆無則設定為預設值
                 chiefComplaint: chiefComplaint || inquirySummary || '無特殊主訴',
                 status: 'registered', // registered, waiting, consulting, completed
                 createdAt: new Date().toISOString(),
                 createdBy: currentUserData ? currentUserData.username : currentUser
             };
-            // 將選擇的問診資料附加在掛號資訊中
+            // 如果選擇了問診資料，則一併存入掛號資訊
             if (selectedInquiry) {
                 appointment.inquiryId = selectedInquiry.id;
                 appointment.inquirySummary = inquirySummary;
@@ -2713,7 +2763,7 @@ async function showConsultationForm(appointment) {
             document.getElementById('formRestEndDate').value = endDateStr;
             updateRestPeriod();
             
-            // 如果掛號時有填寫主訴，則預填到主訴欄位；若無主訴但有問診摘要，也預填
+            // 如果掛號時有填寫主訴，則預填到主訴欄位；若沒有但有問診摘要，則填入摘要
             if (appointment.chiefComplaint && appointment.chiefComplaint !== '無特殊主訴') {
                 document.getElementById('formSymptoms').value = appointment.chiefComplaint;
             } else if (appointment.inquirySummary) {
@@ -9741,6 +9791,16 @@ class FirebaseDataManager {
     constructor() {
         this.isReady = false;
         this.initializeWhenReady();
+        // 設置定時器，每日清理過期問診資料
+        try {
+            setInterval(() => {
+                if (this.isReady && typeof this.clearOldInquiries === 'function') {
+                    this.clearOldInquiries().catch((e) => console.error('定時清理問診資料失敗:', e));
+                }
+            }, 24 * 60 * 60 * 1000);
+        } catch (_e) {
+            // 忽略定時器設定錯誤
+        }
     }
 
     async initializeWhenReady() {
@@ -9750,6 +9810,15 @@ class FirebaseDataManager {
         }
         this.isReady = true;
         console.log('Firebase 數據管理器已準備就緒');
+
+        // 初始化完成後立即清理過期問診資料
+        try {
+            if (typeof this.clearOldInquiries === 'function') {
+                await this.clearOldInquiries();
+            }
+        } catch (err) {
+            console.error('初始化清理問診資料失敗:', err);
+        }
     }
 
     // 病人數據管理
@@ -10135,6 +10204,82 @@ class FirebaseDataManager {
         } catch (error) {
             console.error('更新患者套票失敗:', error);
             return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * 讀取問診資料記錄。
+     * 可傳入病患姓名以篩選特定患者的問診紀錄。
+     * 回傳物件陣列，每個包含 id、patientName、data、createdAt、expireAt 等欄位。
+     * @param {string|null} patientName
+     * @returns {Promise<{success:boolean,data:Array}>}
+     */
+    async getInquiryRecords(patientName = null) {
+        if (!this.isReady) return { success: false, data: [] };
+        try {
+            let collectionRef = window.firebase.collection(window.firebase.db, 'inquiries');
+            let q = collectionRef;
+            if (patientName) {
+                q = window.firebase.query(collectionRef, window.firebase.where('patientName', '==', patientName));
+            }
+            const snapshot = await window.firebase.getDocs(q);
+            const records = [];
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                records.push({ id: docSnap.id, ...data });
+            });
+            return { success: true, data: records };
+        } catch (error) {
+            console.error('讀取問診資料失敗:', error);
+            return { success: false, data: [] };
+        }
+    }
+
+    /**
+     * 刪除指定的問診資料記錄。
+     * @param {string} id
+     */
+    async deleteInquiryRecord(id) {
+        if (!this.isReady) return { success: false };
+        try {
+            await window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, 'inquiries', id));
+            return { success: true };
+        } catch (error) {
+            console.error('刪除問診資料失敗:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * 清除過期的問診資料。若 expireAt 早於現在時間即視為過期。
+     */
+    async clearOldInquiries() {
+        if (!this.isReady) return { success: false };
+        try {
+            const now = new Date();
+            const res = await this.getInquiryRecords();
+            if (res.success) {
+                for (const record of res.data) {
+                    const expire = record.expireAt;
+                    let expireDate = null;
+                    if (expire) {
+                        if (expire instanceof Date) {
+                            expireDate = expire;
+                        } else if (typeof expire.toDate === 'function') {
+                            expireDate = expire.toDate();
+                        } else {
+                            expireDate = new Date(expire);
+                        }
+                    }
+                    if (expireDate && expireDate < now) {
+                        await this.deleteInquiryRecord(record.id);
+                    }
+                }
+            }
+            return { success: true };
+        } catch (error) {
+            console.error('清除過期問診資料失敗:', error);
+            return { success: false };
         }
     }
 }
