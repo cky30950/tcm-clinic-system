@@ -1539,8 +1539,50 @@
                 }
             });
             
+            // 將問診資料儲存到 Firestore 或本地儲存
+            sendInquiryToFirestore(results);
+
             displayResults(results);
         });
+
+        /**
+         * 將問診資料送至 Firebase Firestore 或儲存至本地。
+         * 此函式會檢查不同的 Firebase 物件是否存在並採用對應的寫入方式。
+         * 若 Firebase 無法使用，則退回至 localStorage 儲存。
+         * @param {Object} data 問診資料物件
+         */
+        async function sendInquiryToFirestore(data) {
+            try {
+                // 若有 firebaseDataManager，可直接調用其 addInquiry 方法
+                if (window.firebaseDataManager && typeof window.firebaseDataManager.addInquiry === 'function') {
+                    await window.firebaseDataManager.addInquiry(data);
+                    return;
+                }
+                // 若全域 Firebase SDK 可用
+                if (window.firebase && window.firebase.db && typeof window.firebase.addDoc === 'function') {
+                    await window.firebase.addDoc(
+                        window.firebase.collection(window.firebase.db, 'inquiries'),
+                        {
+                            ...data,
+                            createdAt: new Date(),
+                            createdBy: data.gender || 'anonymous'
+                        }
+                    );
+                    return;
+                }
+            } catch (err) {
+                console.error('儲存問診資料至 Firebase 失敗:', err);
+            }
+            // 若 Firebase 無法使用，使用 localStorage 做為退備
+            try {
+                const existing = JSON.parse(localStorage.getItem('inquiries') || '[]');
+                existing.push({ ...data, createdAt: new Date().toISOString() });
+                localStorage.setItem('inquiries', JSON.stringify(existing));
+                console.log('問診資料已存至本地');
+            } catch (err) {
+                console.error('問診資料儲存至本地失敗:', err);
+            }
+        }
 
         function displayResults(results) {
             const modal = document.getElementById('resultsModal');
@@ -1803,5 +1845,6 @@
             modal.classList.remove('flex');
         }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97295eb912addd63',t:'MTc1NTc3MTMzNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97295eb912addd63',t:'MTc1NTc3MTMzNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
 </html>
