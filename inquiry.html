@@ -245,94 +245,89 @@
         </div>
 
 
-        <!-- Guidelines Container -->
-        <div class="section-card bg-white rounded-2xl shadow-xl p-4 sm:p-8">
-            <div class="instructions-container">
-                
-                <!-- 預診須知 -->
-                <div class="instructions-content slide-in">
-                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-8">
-                        <h3 class="text-xl font-bold text-blue-800 mb-4 flex items-center">
-                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            預診須知
-                        </h3>
-                        
-                        <div class="grid md:grid-cols-2 gap-6 text-sm">
-                            <div class="space-y-3">
-                                <div class="bg-white rounded-lg p-4 border border-blue-100">
-                                    <h4 class="font-semibold text-gray-800 mb-2 flex items-center">
-                                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                                        填寫目的
-                                    </h4>
-                                    <ul class="text-gray-600 space-y-1">
-                                        <li>• 協助中醫師了解您的身體狀況</li>
-                                        <li>• 提供完整的症狀描述</li>
-                                        <li>• 節省看診時間，提高診療效率</li>
-                                    </ul>
-                                </div>
-                                
-                                <div class="bg-white rounded-lg p-4 border border-blue-100">
-                                    <h4 class="font-semibold text-gray-800 mb-2 flex items-center">
-                                        <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                                        填寫說明
-                                    </h4>
-                                    <ul class="text-gray-600 space-y-1">
-                                        <li>• <span class="text-red-500 font-medium">紅色*</span> 為必填項目</li>
-                                        <li>• <span class="text-green-500 font-medium">綠色○</span> 為選填項目</li>
-                                        <li>• 請根據近期狀況如實填寫</li>
-                                        <li>• 不確定的項目可以跳過</li>
-                                    </ul>
-                                </div>
-                            </div>
-                            
-                            <div class="space-y-3">
-                                <div class="bg-white rounded-lg p-4 border border-blue-100">
-                                    <h4 class="font-semibold text-gray-800 mb-2 flex items-center">
-                                        <span class="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
-                                        注意事項
-                                    </h4>
-                                    <ul class="text-gray-600 space-y-1">
-                                        <li>• 請在安靜環境下仔細填寫</li>
-                                        <li>• 如有不適症狀請詳細描述</li>
-                                        <li>• 過敏史和用藥史請務必告知</li>
-                                        <li>• 填寫時間約需 10-15 分鐘</li>
-                                    </ul>
-                                </div>
-                                
-                                <div class="bg-white rounded-lg p-4 border border-yellow-100 bg-yellow-50">
-                                    <h4 class="font-semibold text-yellow-800 mb-2 flex items-center">
-                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                                        </svg>
-                                        重要提醒
-                                    </h4>
-                                    <ul class="text-yellow-700 space-y-1">
-                                        <li>• 此問診不能替代醫師診斷</li>
-                                        <li>• 緊急症狀請立即就醫</li>
-                                        <li>• 資料僅供醫療參考使用</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-6 p-4 bg-white rounded-lg border border-blue-100">
-                            <p class="text-center text-gray-600 text-sm">
-                                <span class="font-medium text-blue-600">溫馨提示：</span>
-                                請放心填寫，您的個人資料將受到嚴格保護，僅用於醫療診斷參考
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+        <!-- Guidelines moved into Section 1 -->
         <!-- Form Container -->
         <div class="section-card bg-white rounded-2xl shadow-xl p-4 sm:p-8 form-container">
             <form id="diagnosisForm">
                 
                 <!-- Section 1: Basic Info -->
                 <div class="section slide-in" id="section1">
+                    <!-- 預診須知僅在第一頁顯示 -->
+                    <div class="section-card bg-white rounded-2xl shadow-xl p-4 sm:p-8" id="guidelines">
+                        <div class="instructions-container">
+                            <!-- 預診須知 -->
+                            <div class="instructions-content slide-in">
+                                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-8">
+                                    <h3 class="text-xl font-bold text-blue-800 mb-4 flex items-center">
+                                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        預診須知
+                                    </h3>
+                                    <div class="grid md:grid-cols-2 gap-6 text-sm">
+                                        <div class="space-y-3">
+                                            <div class="bg-white rounded-lg p-4 border border-blue-100">
+                                                <h4 class="font-semibold text-gray-800 mb-2 flex items-center">
+                                                    <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                                    填寫目的
+                                                </h4>
+                                                <ul class="text-gray-600 space-y-1">
+                                                    <li>• 協助中醫師了解您的身體狀況</li>
+                                                    <li>• 提供完整的症狀描述</li>
+                                                    <li>• 節省看診時間，提高診療效率</li>
+                                                </ul>
+                                            </div>
+                                            <div class="bg-white rounded-lg p-4 border border-blue-100">
+                                                <h4 class="font-semibold text-gray-800 mb-2 flex items-center">
+                                                    <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                                                    填寫說明
+                                                </h4>
+                                                <ul class="text-gray-600 space-y-1">
+                                                    <li>• <span class="text-red-500 font-medium">紅色*</span> 為必填項目</li>
+                                                    <li>• <span class="text-green-500 font-medium">綠色○</span> 為選填項目</li>
+                                                    <li>• 請根據近期狀況如實填寫</li>
+                                                    <li>• 不確定的項目可以跳過</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        <div class="space-y-3">
+                                            <div class="bg-white rounded-lg p-4 border border-blue-100">
+                                                <h4 class="font-semibold text-gray-800 mb-2 flex items-center">
+                                                    <span class="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
+                                                    注意事項
+                                                </h4>
+                                                <ul class="text-gray-600 space-y-1">
+                                                    <li>• 請在安靜環境下仔細填寫</li>
+                                                    <li>• 如有不適症狀請詳細描述</li>
+                                                    <li>• 過敏史和用藥史請務必告知</li>
+                                                    <li>• 填寫時間約需 10-15 分鐘</li>
+                                                </ul>
+                                            </div>
+                                            <div class="bg-white rounded-lg p-4 border border-yellow-100 bg-yellow-50">
+                                                <h4 class="font-semibold text-yellow-800 mb-2 flex items-center">
+                                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                                    </svg>
+                                                    重要提醒
+                                                </h4>
+                                                <ul class="text-yellow-700 space-y-1">
+                                                    <li>• 此問診不能替代醫師診斷</li>
+                                                    <li>• 緊急症狀請立即就醫</li>
+                                                    <li>• 資料僅供醫療參考使用</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-6 p-4 bg-white rounded-lg border border-blue-100">
+                                        <p class="text-center text-gray-600 text-sm">
+                                            <span class="font-medium text-blue-600">溫馨提示：</span>
+                                            請放心填寫，您的個人資料將受到嚴格保護，僅用於醫療診斷參考
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="form-section">
                         <h2 class="section-title text-2xl sm:text-3xl font-bold text-gray-800 mb-6 flex items-center">
                             <span class="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">1</span>
@@ -1225,6 +1220,18 @@
             const progress = (sectionNum / totalSections) * 100;
             document.getElementById('progressBar').style.width = progress + '%';
             document.getElementById('progressText').textContent = `${sectionNum}/${totalSections}`;
+
+            // Show or hide guidelines based on current section
+            const guidelines = document.getElementById('guidelines');
+            if (guidelines) {
+                if (sectionNum === 1) {
+                    // Display guidelines on the first page
+                    guidelines.style.display = '';
+                } else {
+                    // Hide guidelines on other pages
+                    guidelines.style.display = 'none';
+                }
+            }
             
             // Update buttons
             const prevBtn = document.getElementById('prevBtn');
@@ -2098,6 +2105,7 @@
         }
     </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'973827d9177a09dc',t:'MTc1NTkyNjM3My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
