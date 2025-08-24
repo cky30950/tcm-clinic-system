@@ -2978,7 +2978,8 @@ async function showConsultationForm(appointment) {
             document.getElementById('restPeriodDisplay').className = 'text-sm text-gray-500 font-medium';
             
             // 設置預設值
-            document.getElementById('formUsage').value = '早晚一次，飯後服';
+            // 將預設服用方法由「早晚一次，飯後服」改為「溫水化開，飯後服」
+            document.getElementById('formUsage').value = '溫水化開，飯後服';
             document.getElementById('formInstructions').value = '注意休息，飲食清淡';
             document.getElementById('formTreatmentCourse').value = '一周';
             
@@ -4137,6 +4138,33 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         } else {
             consultationDate = new Date();
         }
+
+        // 取得服藥天數與每日次數，供收據顯示使用
+        let medDays = '';
+        let medFreq = '';
+        try {
+            const daysEl = document.getElementById('medicationDays');
+            if (daysEl) {
+                medDays = daysEl.value;
+            }
+            const freqEl = document.getElementById('medicationFrequency');
+            if (freqEl) {
+                medFreq = freqEl.value;
+            }
+        } catch (_e) {
+            // 若無法取得元素，保持預設空值
+        }
+        // 組合顯示字串：若天數或次數存在，分別加上標籤與單位；若有服用方法則附加。
+        let medInfoHtml = '';
+        if (medDays) {
+            medInfoHtml += '<strong>服藥天數：</strong>' + medDays + '天　';
+        }
+        if (medFreq) {
+            medInfoHtml += '<strong>每日次數：</strong>' + medFreq + '次　';
+        }
+        if (consultation.usage) {
+            medInfoHtml += '<strong>服用方法：</strong>' + consultation.usage;
+        }
         
         // 創建中醫診所收據格式
         const printContent = `
@@ -4470,10 +4498,8 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                             
                             return result || consultation.prescription.replace(/\n/g, '<br>');
                         })()}</div>
-                        ${consultation.usage ? `
-                        <div style="margin-top: 8px; font-size: 12px;">
-                            <strong>服用方法：</strong>${consultation.usage}
-                        </div>
+                        ${medInfoHtml ? `
+                        <div style="margin-top: 8px; font-size: 12px;">${medInfoHtml}</div>
                         ` : ''}
                     </div>
                     ` : ''}
