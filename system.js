@@ -10451,7 +10451,12 @@ class FirebaseDataManager {
 
     /**
      * 清除過期的問診資料。
-     * 遍歷 inquiries 集合，刪除 expireAt 早於當前時間的記錄。
+     *
+     * 此函式會遍歷 `inquiries` 集合，並刪除那些
+     * `createdAt` 發生在今日 00:00 之前（即昨天或更早）的問診紀錄。
+     * 若某筆記錄缺少 `createdAt` 欄位，則會改用 `expireAt` 作為判斷依據。
+     * 因為系統設計與 Realtime Database 的掛號清理邏輯一致，
+     * 只保留今天及未來的資料，所有舊資料將被移除。
      *
      * @returns {Promise<{success: boolean, deletedCount?: number}>}
      */
@@ -10462,18 +10467,31 @@ class FirebaseDataManager {
                 window.firebase.collection(window.firebase.db, 'inquiries')
             );
             const now = new Date();
+            // 計算今日凌晨時間（本地時區）。任何發生在此時間之前的紀錄將被視為過期。
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const deletions = [];
             snapshot.forEach(doc => {
                 const data = doc.data();
-                let expireDate = null;
-                if (data.expireAt) {
-                    if (data.expireAt.seconds !== undefined) {
-                        expireDate = new Date(data.expireAt.seconds * 1000);
+                let createdDate = null;
+                // 解析 createdAt。Firestore 的 Timestamp 物件包含 seconds 屬性，其他情況視為 ISO 字串。
+                if (data.createdAt) {
+                    if (data.createdAt.seconds !== undefined) {
+                        createdDate = new Date(data.createdAt.seconds * 1000);
                     } else {
-                        expireDate = new Date(data.expireAt);
+                        createdDate = new Date(data.createdAt);
                     }
                 }
-                if (expireDate && expireDate < now) {
+                // 若缺少 createdAt，則使用 expireAt 作為備援依據
+                let targetDate = createdDate;
+                if (!targetDate && data.expireAt) {
+                    if (data.expireAt.seconds !== undefined) {
+                        targetDate = new Date(data.expireAt.seconds * 1000);
+                    } else {
+                        targetDate = new Date(data.expireAt);
+                    }
+                }
+                // 如果目標日期存在且早於今日凌晨，則視為過期，待刪除
+                if (targetDate && targetDate < startOfToday) {
                     deletions.push(window.firebase.deleteDoc(
                         window.firebase.doc(window.firebase.db, 'inquiries', doc.id)
                     ));
