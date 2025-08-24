@@ -1371,7 +1371,8 @@ function generateSymptomSummaryFromInquiry(data) {
     const parts = [];
     // 補充描述
     if (data.additionalSymptoms && typeof data.additionalSymptoms === 'string' && data.additionalSymptoms.trim()) {
-        parts.push('補充描述: ' + data.additionalSymptoms.trim());
+        // 使用中文全形冒號，避免預診系統填入英文字元
+        parts.push('補充描述：' + data.additionalSymptoms.trim());
     }
     // 相關症狀
     if (data.relatedSymptoms) {
@@ -1382,7 +1383,8 @@ function generateSymptomSummaryFromInquiry(data) {
             relatedList = [data.relatedSymptoms];
         }
         if (relatedList.length > 0) {
-            parts.push('相關症狀: ' + relatedList.join('、'));
+            // 使用中文全形冒號，避免預診系統填入英文字元
+            parts.push('相關症狀：' + relatedList.join('、'));
         }
     }
     if (parts.length > 0) {
