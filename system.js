@@ -1896,6 +1896,16 @@ async function selectPatientForRegistration(patientId) {
             if (inquirySelect) {
                 inquirySelect.value = '';
             }
+
+            // 重設主訴欄位顯示狀態（若已有問診資料則隱藏，反之顯示）
+            try {
+                const toggler = window.toggleChiefComplaintVisibility;
+                if (typeof toggler === 'function') {
+                    toggler();
+                }
+            } catch (_e) {
+                // 若未定義切換函式，忽略錯誤
+            }
         }
         
         // 確認掛號
@@ -10755,6 +10765,36 @@ document.addEventListener('DOMContentLoaded', function() {
         searchInput.addEventListener('input', function() {
             loadPatientList();
         });
+    }
+
+    // 當選擇問診資料時，自動隱藏主訴症狀輸入欄位。
+    // 由於主訴欄位與其標籤位於同一父層 <div>，使用 parentElement/closest('div')
+    // 將容器切換 display。當問診資料未選擇時則顯示主訴欄位。
+    const inquirySelectElem = document.getElementById('inquirySelect');
+    const quickChiefComplaintElem = document.getElementById('quickChiefComplaint');
+    if (inquirySelectElem && quickChiefComplaintElem) {
+        // 嘗試取得最近的 div 作為容器，如果找不到則退而求其次使用 parentElement
+        const complaintContainer = quickChiefComplaintElem.closest('div') || quickChiefComplaintElem.parentElement;
+        function toggleChiefComplaintVisibility() {
+            try {
+                // 根據問診下拉選擇值決定顯示或隱藏
+                if (inquirySelectElem.value && inquirySelectElem.value !== '') {
+                    // 已選擇問診資料，隱藏主訴欄位
+                    complaintContainer.style.display = 'none';
+                } else {
+                    // 無問診資料或清空選擇，顯示主訴欄位
+                    complaintContainer.style.display = '';
+                }
+            } catch (_e) {
+                // 若容器不存在或遇到錯誤則忽略，避免影響其他邏輯
+            }
+        }
+        // 綁定下拉變更事件
+        inquirySelectElem.addEventListener('change', toggleChiefComplaintVisibility);
+        // 將函式掛到全域，供其他函式（例如清空表單時）呼叫
+        window.toggleChiefComplaintVisibility = toggleChiefComplaintVisibility;
+        // 根據預設值初始化顯示狀態
+        toggleChiefComplaintVisibility();
     }
 });
 
