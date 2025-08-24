@@ -1422,7 +1422,7 @@ function generateHistorySummaryFromInquiry(data) {
         urineColor: '小便顏色',
         stoolForm: '大便形狀',
         stoolSymptoms: '大便症狀',
-        stoolFrequency: '大便多少日一次',
+        stoolFrequency: '大便頻率',
         stoolOdor: '大便氣味',
         stoolColor: '大便顏色',
         sleep: '睡眠',
