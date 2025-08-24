@@ -792,8 +792,28 @@
 
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
-                                    <label class="block text-lg font-medium text-gray-700 mb-3">大便多少日一次</label>
-                                    <input type="text" name="stoolFrequency" class="input-enhanced w-full p-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg" placeholder="例如：每天1次、2天1次">
+                                    <label class="block text-lg font-medium text-gray-700 mb-3">大便情況</label>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <select id="stoolDays" class="input-enhanced w-full p-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg">
+                                            <option value="">選擇天數</option>
+                                            <option value="1">1 天</option>
+                                            <option value="2">2 天</option>
+                                            <option value="3">3 天</option>
+                                            <option value="4">4 天</option>
+                                            <option value="5">5 天</option>
+                                            <option value="6">6 天</option>
+                                            <option value="7">7 天</option>
+                                        </select>
+                                        <select id="stoolTimes" class="input-enhanced w-full p-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg">
+                                            <option value="">選擇次數</option>
+                                            <option value="1">1 次</option>
+                                            <option value="2">2 次</option>
+                                            <option value="3">3 次</option>
+                                            <option value="4">4 次</option>
+                                            <option value="5">5 次</option>
+                                        </select>
+                                    </div>
+                                    <input type="hidden" name="stoolFrequency" id="stoolFrequency">
                                 </div>
                                 <div>
                                     <label class="block text-lg font-medium text-gray-700 mb-3">大便氣味</label>
@@ -1587,6 +1607,26 @@
             }
         }
 
+        // Bowel Movement frequency selection: combine stool days and times into hidden input
+        const stoolDaysSelect = document.getElementById('stoolDays');
+        const stoolTimesSelect = document.getElementById('stoolTimes');
+        const stoolFrequencyInput = document.getElementById('stoolFrequency');
+
+        function updateStoolFrequency() {
+            const days = stoolDaysSelect.value;
+            const times = stoolTimesSelect.value;
+            if (days && times) {
+                stoolFrequencyInput.value = `${days}天${times}次`;
+            } else {
+                stoolFrequencyInput.value = '';
+            }
+        }
+
+        if (stoolDaysSelect && stoolTimesSelect && stoolFrequencyInput) {
+            stoolDaysSelect.addEventListener('change', updateStoolFrequency);
+            stoolTimesSelect.addEventListener('change', updateStoolFrequency);
+        }
+
         // Navigation
         document.getElementById('nextBtn').addEventListener('click', function() {
             if (validateCurrentSection()) {
@@ -1874,7 +1914,7 @@
                 'urineColor': '小便顏色',
                 'stoolForm': '大便形狀',
                 'stoolSymptoms': '大便症狀',
-                'stoolFrequency': '大便頻率',
+                'stoolFrequency': '大便情況',
                 'stoolOdor': '大便氣味',
                 'stoolColor': '大便顏色',
                 'sleep': '睡眠',
@@ -2105,6 +2145,7 @@
         }
     </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'973827d9177a09dc',t:'MTc1NTkyNjM3My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
