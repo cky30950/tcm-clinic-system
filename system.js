@@ -1325,6 +1325,7 @@ let inquiryOptionsData = {};
  */
 function getMainSymptomFromResult(results) {
     if (!results) return '';
+    // 將身體部位英文代碼轉換為中文名稱
     const bodyPartNames = {
         head: '頭部',
         neck: '頸部',
@@ -1340,17 +1341,141 @@ function getMainSymptomFromResult(results) {
         andrology: '男科',
         other: '其他'
     };
+    // 將詳細部位英文代碼轉換為中文名稱。
+    // 這裡彙整各身體部位的對應值，避免預診資料產生英文代碼。
+    const detailedLocationNames = {
+        // 頭部
+        forehead: '前額',
+        temples: '太陽穴',
+        top_head: '頭頂',
+        back_head: '後腦勺',
+        eyes: '眼部',
+        nose: '鼻部',
+        ears: '耳部',
+        mouth: '口部',
+        jaw: '下顎',
+        whole_head: '整個頭部',
+        // 頸部
+        front_neck: '前頸',
+        back_neck: '後頸',
+        side_neck: '側頸',
+        throat: '喉嚨',
+        whole_neck: '整個頸部',
+        // 胸部
+        upper_chest: '上胸部',
+        lower_chest: '下胸部',
+        left_chest: '左胸',
+        right_chest: '右胸',
+        heart_area: '心臟部位',
+        ribs: '肋骨',
+        whole_chest: '整個胸部',
+        // 腹部
+        upper_abdomen: '上腹部',
+        lower_abdomen: '下腹部',
+        left_abdomen: '左腹部',
+        right_abdomen: '右腹部',
+        navel: '肚臍周圍',
+        stomach: '胃部',
+        liver_area: '肝區',
+        whole_abdomen: '整個腹部',
+        // 背部
+        upper_back: '上背部',
+        middle_back: '中背部',
+        lower_back: '下背部/腰部',
+        left_back: '左背',
+        right_back: '右背',
+        spine: '脊椎',
+        shoulder_blade: '肩胛骨',
+        whole_back: '整個背部',
+        // 手臂
+        shoulders: '肩膀',
+        upper_arms: '上臂',
+        elbows: '手肘',
+        forearms: '前臂',
+        wrists: '手腕',
+        hands: '手掌',
+        fingers: '手指',
+        left_arm: '左手臂',
+        right_arm: '右手臂',
+        both_arms: '雙手臂',
+        // 腿部
+        hips: '臀部',
+        thighs: '大腿',
+        knees: '膝蓋',
+        calves: '小腿',
+        ankles: '腳踝',
+        feet: '腳掌',
+        toes: '腳趾',
+        left_leg: '左腿',
+        right_leg: '右腿',
+        both_legs: '雙腿',
+        // 關節
+        shoulder_joint: '肩關節',
+        elbow_joint: '肘關節',
+        wrist_joint: '腕關節',
+        hip_joint: '髖關節',
+        knee_joint: '膝關節',
+        ankle_joint: '踝關節',
+        spine_joint: '脊椎關節',
+        multiple_joints: '多個關節',
+        // 皮膚
+        face_skin: '面部皮膚',
+        body_skin: '身體皮膚',
+        hands_skin: '手部皮膚',
+        feet_skin: '足部皮膚',
+        scalp: '頭皮',
+        widespread_skin: '全身皮膚',
+        // 內科
+        breathing: '呼吸系統',
+        digestion: '消化系統',
+        circulation: '循環系統',
+        nervous: '神經系統',
+        urinary: '泌尿系統',
+        reproductive: '生殖系統',
+        general_weakness: '全身無力',
+        fever: '發熱',
+        // 婦科
+        menstrual_issues: '月經問題',
+        vaginal_discharge: '白帶異常',
+        pelvic_pain: '骨盆腔疼痛',
+        breast_issues: '乳房問題',
+        menopause_symptoms: '更年期症狀',
+        fertility_issues: '生育相關',
+        urinary_gyneco: '泌尿婦科',
+        postpartum_issues: '產後問題',
+        // 男科
+        erectile_dysfunction: '勃起功能',
+        prostate_issues: '前列腺問題',
+        urinary_male: '泌尿問題',
+        testicular_pain: '睪丸疼痛',
+        fertility_male: '生育能力',
+        hormonal_male: '荷爾蒙問題',
+        sexual_function: '性功能障礙',
+        genital_issues: '生殖器問題',
+        // 其他
+        multiple_areas: '多個部位',
+        unclear_location: '位置不明確',
+        whole_body: '全身',
+        other_specify: '其他（請在補充描述中說明）'
+    };
+    // 先轉換身體部位名稱
     let symptom = bodyPartNames[results.bodyPart] || (results.bodyPart || '未指定部位');
+    // 如果有詳細部位則轉換為中文
     if (results.detailedLocation) {
-        symptom += ' - ' + results.detailedLocation;
+        const locKey = results.detailedLocation;
+        const locName = detailedLocationNames[locKey] || results.detailedLocation;
+        symptom += ' - ' + locName;
     }
+    // 整理相關症狀，移除重複後取前三項
     let related = results.relatedSymptoms;
     if (related) {
         if (!Array.isArray(related)) {
             related = [related];
         }
-        if (related.length > 0) {
-            symptom += '：' + related.slice(0, 3).join('、');
+        // 使用 Set 移除重複的症狀
+        const uniqueRelated = Array.from(new Set(related));
+        if (uniqueRelated.length > 0) {
+            symptom += '：' + uniqueRelated.slice(0, 3).join('、');
         }
     }
     return symptom;
@@ -1374,7 +1499,7 @@ function generateSymptomSummaryFromInquiry(data) {
         // 使用中文全形冒號，避免預診系統填入英文字元
         parts.push('補充描述：' + data.additionalSymptoms.trim());
     }
-    // 相關症狀
+    // 相關症狀：避免與主要症狀重複顯示。若相關症狀超過三個，前三個已在主症狀摘要中呈現，剩餘項目於此顯示。
     if (data.relatedSymptoms) {
         let relatedList = [];
         if (Array.isArray(data.relatedSymptoms)) {
@@ -1383,8 +1508,14 @@ function generateSymptomSummaryFromInquiry(data) {
             relatedList = [data.relatedSymptoms];
         }
         if (relatedList.length > 0) {
-            // 使用中文全形冒號，避免預診系統填入英文字元
-            parts.push('相關症狀：' + relatedList.join('、'));
+            // 移除重複值
+            const uniqueRelated = Array.from(new Set(relatedList));
+            // 取前三項已在主要症狀摘要呈現
+            const remaining = uniqueRelated.slice(3);
+            if (remaining.length > 0) {
+                // 使用中文全形冒號，避免預診系統填入英文字元
+                parts.push('相關症狀：' + remaining.join('、'));
+            }
         }
     }
     if (parts.length > 0) {
