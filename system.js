@@ -2321,7 +2321,8 @@ try {
                 // 使用預設值
                 const startDate = new Date();
                 const endDate = new Date();
-                endDate.setDate(startDate.getDate() + 2);
+                // 將結束日期設為與開始日期相同，預設休息 1 天
+                endDate.setDate(startDate.getDate());
                 
                 const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
                 const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
@@ -3001,7 +3002,8 @@ async function showConsultationForm(appointment) {
             // 設置預設休息期間
             const startDate = new Date();
             const endDate = new Date();
-            endDate.setDate(startDate.getDate() + 2);
+            // 預設休息期間為一天，結束日期與開始日期相同
+            endDate.setDate(startDate.getDate());
             
             const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
             const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
@@ -3009,6 +3011,20 @@ async function showConsultationForm(appointment) {
             document.getElementById('formRestStartDate').value = startDateStr;
             document.getElementById('formRestEndDate').value = endDateStr;
             updateRestPeriod();
+
+            // 設置預設複診時間為診症當天的 7 天後，時間保持與到診時間一致
+            try {
+                const followUp = new Date(now);
+                followUp.setDate(followUp.getDate() + 7);
+                const fYear = followUp.getFullYear();
+                const fMonth = String(followUp.getMonth() + 1).padStart(2, '0');
+                const fDay = String(followUp.getDate()).padStart(2, '0');
+                const fHours = String(followUp.getHours()).padStart(2, '0');
+                const fMinutes = String(followUp.getMinutes()).padStart(2, '0');
+                document.getElementById('formFollowUpDate').value = `${fYear}-${fMonth}-${fDay}T${fHours}:${fMinutes}`;
+            } catch (_e) {
+                console.warn('無法設定預設複診時間', _e);
+            }
             
             // 嘗試從 Firestore 取得問診資料，用於預填主訴與現病史。
             // 這裡不再使用 appointment.inquiryData，本地僅保存 inquiryId 與摘要。
@@ -5336,7 +5352,8 @@ async function printSickLeave(consultationId, consultationData = null) {
                                 }
                                 
                                 // 如果沒有設定休息期間，使用舊的邏輯
-                                let restDays = consultation.restDays ? parseInt(consultation.restDays) : 3;
+                                // 將預設休息天數由 3 天調整為 1 天
+                                let restDays = consultation.restDays ? parseInt(consultation.restDays) : 1;
                                 
                                 // 如果沒有設定休息天數，則根據治療療程推算
                                 if (!consultation.restDays) {
@@ -8130,10 +8147,11 @@ const consultationDate = (() => {
                 document.getElementById('formRestEndDate').value = consultation.restEndDate;
                 updateRestPeriod();
             } else {
-                // 使用預設休息期間（今天到後天）
+                // 使用預設休息期間（今天），預設建議休息 1 天
                 const startDate = new Date();
                 const endDate = new Date();
-                endDate.setDate(startDate.getDate() + 2);
+                // 預設休息期間為一天，結束日期與開始日期相同
+                endDate.setDate(startDate.getDate());
                 
                 const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
                 const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
