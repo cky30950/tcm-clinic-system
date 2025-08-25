@@ -3319,8 +3319,8 @@ async function saveConsultation() {
                                     unit: '次',
                                     description: '套票抵扣一次',
                                     quantity: 1,
-                                    // 套票使用預設可參與折扣（雖然金額為 0）
-                                    includedInDiscount: true,
+                                    // 套票使用不參與折扣
+                                    includedInDiscount: false,
                                     patientId: (appointment.patientId !== undefined && appointment.patientId !== null) ? String(appointment.patientId) : '',
                                     packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : ''
                                 });
@@ -7380,11 +7380,30 @@ async function initializeSystemAfterLogin() {
                 return;
             }
 
-            // 檢查是否已經添加過
+            // 檢查是否已經添加過相同折扣名稱：折扣項目同名僅能使用一次
+            if (item.category === 'discount') {
+                // 如果已有同名折扣，禁止再添加
+                const duplicateDiscount = selectedBillingItems.some(b => b.category === 'discount' && b.name === item.name);
+                if (duplicateDiscount) {
+                    showToast('同名折扣項目僅能使用一項', 'warning');
+                    // 清理搜尋結果避免殘留
+                    clearBillingSearch();
+                    return;
+                }
+            }
+
+            // 檢查是否已經添加過相同 ID
             const existingIndex = selectedBillingItems.findIndex(b => b.id === itemId);
             if (existingIndex !== -1) {
-                // 如果已存在，增加數量
-                selectedBillingItems[existingIndex].quantity += 1;
+                // 如果已存在
+                const existingItem = selectedBillingItems[existingIndex];
+                // 折扣項目不允許增加數量
+                if (existingItem.category === 'discount') {
+                    showToast('折扣項目已存在，無法重複使用', 'warning');
+                } else {
+                    // 其他類別項目增加數量
+                    existingItem.quantity += 1;
+                }
             } else {
                 // 添加新項目
                 const billingItem = {
@@ -7516,6 +7535,8 @@ async function initializeSystemAfterLogin() {
                         let subtotalDisplay;
                         // 檢查是否為套票使用
                         const isPackageUse = item.category === 'packageUse';
+                        // 檢查是否為折扣項目
+                        const isDiscountItem = item.category === 'discount';
                         // 決定是否顯示取消按鈕：對於所有套票使用項目均提供取消功能，
                         // 即便是舊病歷載入（缺少 patientId 或 packageRecordId）。
                         // 取消按鈕生成時優先使用項目自身的 patientId 與 packageRecordId，若缺失則使用當前病人 ID 與空字串。
@@ -7537,8 +7558,8 @@ async function initializeSystemAfterLogin() {
                         const removeBtn = (isPackageUse || packageLocked)
                             ? ''
                             : `<button onclick="removeBillingItem(${originalIndex})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>`;
-                        // 數量控制區：套票使用或鎖定的套票僅顯示次數，不提供加減按鈕
-                        const quantityControls = (isPackageUse || packageLocked) ? `
+                        // 數量控制區：套票使用、鎖定的套票或折扣項目僅顯示次數，不提供加減按鈕
+                        const quantityControls = (isPackageUse || packageLocked || isDiscountItem) ? `
                                 <div class="flex items-center space-x-2 mr-3">
                                     <span class="w-8 text-center font-semibold">${item.quantity}</span>
                                 </div>
@@ -7550,8 +7571,9 @@ async function initializeSystemAfterLogin() {
                                 </div>
                         `;
                         
-                        // 決定是否顯示折扣勾選框：有折扣項目且當前項目不是折扣項
-                        const checkboxHtml = (hasDiscount && item.category !== 'discount') ? `<div class="mr-2 flex items-center"><input type="checkbox" ${item.includedInDiscount === false ? '' : 'checked'} onchange="toggleDiscountEligibility(${originalIndex})"></div>` : '';
+                        // 決定是否顯示折扣勾選框：有折扣項目且當前項目不是折扣項亦不是套票使用
+                        const showDiscountCheckbox = hasDiscount && item.category !== 'discount' && item.category !== 'packageUse';
+                        const checkboxHtml = showDiscountCheckbox ? `<div class="mr-2 flex items-center"><input type="checkbox" ${item.includedInDiscount === false ? '' : 'checked'} onchange="toggleDiscountEligibility(${originalIndex})"></div>` : '';
                         // 計算每一列的金額顯示
                         if (item.category === 'discount' && item.price > 0 && item.price < 1) {
                             // 百分比折扣：顯示折扣金額，以折扣適用小計為基準
@@ -7659,6 +7681,11 @@ async function initializeSystemAfterLogin() {
         function updateBillingQuantity(index, change) {
             if (index >= 0 && index < selectedBillingItems.length) {
                 const item = selectedBillingItems[index];
+                // 如果是折扣項目，不允許修改數量
+                if (item.category === 'discount') {
+                    showToast('折扣項目不允許修改數量', 'warning');
+                    return;
+                }
                 // 如果是套票使用，且 change < 0，直接取消使用並退回次數
                 if (change < 0 && item.category === 'packageUse') {
                     // 調用取消函式，這會自動移除該筆記錄並退回次數
@@ -8091,7 +8118,8 @@ function parseBillingItemsFromText(billingText) {
                         unit: '次',
                         description: '套票抵扣一次',
                         quantity: quantity,
-                        includedInDiscount: true,
+                        // 套票使用不參與折扣
+                        includedInDiscount: false,
                         // 標記為從舊病歷載入，待恢復 meta 後可取消使用
                         isHistorical: true,
                         patientId: null,
@@ -9935,8 +9963,8 @@ async function useOnePackage(patientId, packageRecordId) {
             unit: '次',
             description: '套票抵扣一次',
             quantity: 1,
-            // 套票使用預設可參與折扣（雖然金額為 0）
-            includedInDiscount: true,
+            // 套票使用不參與折扣
+            includedInDiscount: false,
             // 以字串保存 patientId 及 packageRecordId，避免類型不一致導致匹配錯誤
             patientId: patientId !== undefined && patientId !== null ? String(patientId) : '',
             packageRecordId: res.record && res.record.id ? String(res.record.id) : ''
