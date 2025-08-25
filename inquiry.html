@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>中醫預診系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Firebase 初始化腳本，供問診結果上傳使用 -->
+    <!-- 引入 Firebase 初始化腳本，供預診結果上傳使用 -->
     <script type="module" src="firebase_init.js"></script>
     <style>
         /* Mobile-first responsive design */
@@ -226,13 +226,13 @@
         <!-- Header -->
         <div class="text-center mb-6 sm:mb-8">
             <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">中醫預診系統</h1>
-            <p class="text-gray-600 text-sm sm:text-base px-4">請詳細填寫以下問診資料，幫助醫師更好地了解您的狀況</p>
+            <p class="text-gray-600 text-sm sm:text-base px-4">請詳細填寫以下預診資料，幫助醫師更好地了解您的狀況</p>
         </div>
 
         <!-- Progress Bar -->
         <div class="progress-container mb-6 sm:mb-8">
             <div class="flex items-center justify-between mb-3">
-                <span class="text-sm font-medium text-gray-600">問診進度</span>
+                <span class="text-sm font-medium text-gray-600">預診進度</span>
                 <span class="text-sm font-bold text-blue-600" id="progressText">1/12</span>
             </div>
             <div class="bg-gray-200 rounded-full h-4 overflow-hidden">
@@ -311,7 +311,7 @@
                                                     重要提醒
                                                 </h4>
                                                 <ul class="text-yellow-700 space-y-1">
-                                                    <li>• 此問診不能替代醫師診斷</li>
+                                                    <li>• 此預診不能替代醫師診斷</li>
                                                     <li>• 緊急症狀請立即就醫</li>
                                                     <li>• 資料僅供醫療參考使用</li>
                                                 </ul>
@@ -1143,7 +1143,7 @@
                         下一步
                     </button>
                     <button type="submit" id="submitBtn" class="btn-success px-6 py-4 text-white rounded-xl font-semibold text-lg hidden flex items-center">
-                        提交問診
+                        提交預診
                     </button>
                 </div>
             </form>
@@ -1156,8 +1156,8 @@
                     <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <span class="text-3xl">✅</span>
                     </div>
-                    <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">問診完成！</h2>
-                    <p class="text-gray-600">您的問診資料已成功收集</p>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">預診完成！</h2>
+                    <p class="text-gray-600">您的預診資料已成功收集</p>
                 </div>
                 <div id="resultsContent" class="space-y-4"></div>
                 <div class="flex justify-center mt-8 space-x-4">
@@ -1686,7 +1686,7 @@
         });
 
         function displayResults(results) {
-            // 在顯示結果之前，將問診資料上傳至 Firestore（非同步執行）
+            // 在顯示結果之前，將預診資料上傳至 Firestore（非同步執行）
             try {
                 uploadInquiryData(results);
             } catch (_e) {
@@ -1709,9 +1709,9 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                         </svg>
                     </div>
-                    <h2 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">問診完成！</h2>
-                    <p class="text-lg text-gray-600 mb-2">感謝您 <span class="font-semibold text-blue-600">${results.patientName || '患者'}</span> 完成詳細的問診</p>
-                    <p class="text-gray-600">您的問診資料已成功收集，此結果將提供給您的中醫師參考</p>
+                    <h2 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">預診完成！</h2>
+                    <p class="text-lg text-gray-600 mb-2">感謝您 <span class="font-semibold text-blue-600">${results.patientName || '患者'}</span> 完成詳細的預診</p>
+                    <p class="text-gray-600">您的預診資料已成功收集，此結果將提供給您的中醫師參考</p>
                 </div>
 
                 <div class="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-xl p-6 mb-8">
@@ -1719,7 +1719,7 @@
                         <svg class="w-6 h-6 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
-                        問診摘要
+                        預診摘要
                     </h3>
                     <div class="grid md:grid-cols-2 gap-4 text-sm">
                         <div class="bg-white rounded-lg p-4">
@@ -1745,8 +1745,8 @@
                         重要提醒
                     </h3>
                     <ul class="text-yellow-700 text-sm space-y-1">
-                        <li>• 此問診結果將會供中醫師參考，不能替代正式醫療診斷</li>
-                        <li>• 預先問診填寫後請稍等片刻，正在處理你提交的資料</li>
+                        <li>• 此預診結果將會供中醫師參考，不能替代正式醫療診斷</li>
+                        <li>• 預先預診填寫後請稍等片刻，正在處理你提交的資料</li>
                         <li>• 如有緊急症狀，請立即就醫</li>
                     </ul>
                 </div>
@@ -1762,7 +1762,7 @@
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
         </svg>
-        重新問診
+        重新預診
     </button>
     <a href="index.html" class="btn-secondary px-8 py-4 text-white rounded-xl font-semibold text-lg flex items-center justify-center">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1787,7 +1787,7 @@
             let symptom = bodyPartNames[results.bodyPart] || '未指定部位';
             // 當使用者有選擇詳細位置時，嘗試將英文代碼轉換為對應的中文名稱。
             // 部位選項的值（value）是英文，但顯示文本是中文；
-            // 若直接使用英文字串顯示會導致問診摘要出現英文主訴。
+            // 若直接使用英文字串顯示會導致預診摘要出現英文主訴。
             if (results.detailedLocation) {
                 // 在表單的詳細位置下拉選單中尋找符合值的選項，取得其顯示文字
                 const optionEl = document.querySelector(`#detailedLocation option[value="${results.detailedLocation}"]`);
@@ -1870,16 +1870,16 @@
         }
 
         /**
-         * 將問診資料上傳至 Firestore。
+         * 將預診資料上傳至 Firestore。
          * 使用 firebase_init.js 中初始化的 window.firebase 物件。
          *
-         * @param {Object} results 問診結果物件
+         * @param {Object} results 預診結果物件
          */
         async function uploadInquiryData(results) {
             try {
                 // 確保 Firebase 已初始化
                 if (!window.firebase || !window.firebase.db) {
-                    console.warn('Firebase 未初始化，無法上傳問診資料');
+                    console.warn('Firebase 未初始化，無法上傳預診資料');
                     return;
                 }
                 // 設置創建和過期時間
@@ -1895,9 +1895,9 @@
                         expireAt: expireAt
                     }
                 );
-                console.log('問診資料已成功儲存');
+                console.log('預診資料已成功儲存');
             } catch (err) {
-                console.error('上傳問診資料發生錯誤:', err);
+                console.error('上傳預診資料發生錯誤:', err);
             }
         }
 
