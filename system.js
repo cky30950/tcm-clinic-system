@@ -8107,14 +8107,13 @@ function parseBillingItemsFromText(billingText) {
             return;
         }
     });
-    // 如果解析出了折扣適用於行，根據其中的名稱調整各項目的折扣適用狀態
-    // 注意：即使解析結果為空陣列（表示所有非折扣項目皆不適用折扣），
-    // 也應調整 includedInDiscount 屬性；若未偵測到折扣適用行（null），則保留預設值。
+    // 如果解析到了折扣適用於行，根據其中的名稱調整各項目的折扣適用狀態
+    // 注意：即使折扣名單為空（表示沒有項目適用折扣），也應該調整 includedInDiscount 屬性；
+    // 若 discountApplicableNames 為 null，表示原文本沒有該行，則保留預設狀態。
     if (discountApplicableNames !== null) {
         selectedBillingItems.forEach(item => {
             if (item.category !== 'discount') {
-                // 若該項目名稱出現在折扣適用名單中，設為 true；否則設為 false。
-                // 當 discountApplicableNames 為空陣列時，所有項目名稱皆不在名單中，因此 includedInDiscount 會被設為 false。
+                // 若名稱在折扣適用名單中則標記為可參與折扣，否則標記為不可參與折扣
                 item.includedInDiscount = discountApplicableNames.includes(item.name);
             }
         });
