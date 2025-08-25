@@ -8058,8 +8058,13 @@ function parseBillingItemsFromText(billingText) {
         }
         // 略過小計與總費用行
         if (line.includes('小計') || line.includes('總費用')) return;
-        // 解析收費項目格式：項目名 x數量 = $金額 或 項目名 x數量 = -$金額
-        const itemMatch = line.match(/^(.+?)\s+x(\d+)\s+=\s+([\-\$]?\d+)$/);
+        // 解析收費項目格式：項目名 x數量 = 金額
+        // 原來的邏輯只匹配前綴為一個負號或貨幣符號的整數，例如 "$30" 或 "-30"，
+        // 但對於折扣項目來說，金額可能出現組合符號，例如 "-$30" 或 "$-30"，甚至含有小數部分，例如 "-$30.5"。
+        // 如果正則無法匹配這些形式，折扣項目就會被忽略，進而導致無法還原當時的折扣狀態。
+        // 因此改用更寬鬆的正則式來截取項目名稱與數量，允許金額部分包含任意的「-」與「$」順序以及小數點。
+        // 此處只關心前兩個群組（項目名與數量），第三個群組捕獲金額字串，但後續邏輯不使用這個值。
+        const itemMatch = line.match(/^(.+?)\s+x(\d+)\s+=\s+(-?\$?-?\d+(?:\.\d+)?)$/);
         if (itemMatch) {
             const itemName = itemMatch[1].trim();
             const quantity = parseInt(itemMatch[2]);
@@ -8275,7 +8280,12 @@ const consultationDate = (() => {
                 // 嘗試為舊記錄補全套票使用的 meta 資訊（patientId 與 packageRecordId）。
                 // 此步驟在移除套票使用項目後依然呼叫，不會對結果造成影響。
                 try {
-                    await restorePackageUseMeta(appointment.patientId);
+                    // 以前的程式碼中直接使用未宣告的 appointment 變數，導致 ReferenceError。
+                    // 改為使用前面取得的 currentAppointment（當前掛號）來取得病人 ID。
+                    const pidForRestore = (currentAppointment && currentAppointment.patientId) ? currentAppointment.patientId : null;
+                    if (pidForRestore) {
+                        await restorePackageUseMeta(pidForRestore);
+                    }
                 } catch (e) {
                     console.error('恢復套票使用 meta 錯誤:', e);
                 }
