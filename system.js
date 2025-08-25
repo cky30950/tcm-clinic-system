@@ -634,7 +634,21 @@ async function attemptMainLogin() {
         performLogin(currentUserData);
         // 登入後初始化系統資料（載入掛號、診療記錄、患者等）
         await initializeSystemAfterLogin();
-        
+
+        // 登入後清除過期問診資料。由於刪除操作需要已登入的權限，
+        // 因此將其移至登入成功後執行，避免在未登入狀態時觸發權限錯誤。
+        try {
+            // 確保 FirebaseDataManager 已準備好
+            while (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            if (window.firebaseDataManager && typeof window.firebaseDataManager.clearOldInquiries === 'function') {
+                await window.firebaseDataManager.clearOldInquiries();
+            }
+        } catch (error) {
+            console.error('登入後清除過期問診資料失敗:', error);
+        }
+
         showToast('登入成功！', 'success');
 
     } catch (error) {
@@ -1599,9 +1613,10 @@ async function loadInquiryOptions(patient) {
     if (!select) return;
     // 清空現有選項並加入預設選項
     select.innerHTML = '<option value="">不使用問診資料</option>';
-    try {
-        // 清除過期問診資料
-        if (window.firebaseDataManager && window.firebaseDataManager.clearOldInquiries) {
+        try {
+        // 清除過期問診資料。僅在使用者已登入時執行刪除，避免未授權錯誤
+        if (window.firebaseDataManager && window.firebaseDataManager.clearOldInquiries &&
+            window.firebase && window.firebase.auth && window.firebase.auth.currentUser) {
             await window.firebaseDataManager.clearOldInquiries();
         }
     } catch (err) {
@@ -10691,9 +10706,14 @@ window.addEventListener('load', async () => {
     }
 
     // 系統載入後即清除過期的問診資料，避免累積舊資料。
+    // 由於刪除過期問診資料需要使用者登入的權限，因此此處僅在已登入時才執行。
     try {
-        if (firebaseDataManager && typeof firebaseDataManager.clearOldInquiries === 'function') {
+        // 只有當前 Firebase 使用者存在時才進行清理，否則在登入後再清理
+        if (firebaseDataManager && typeof firebaseDataManager.clearOldInquiries === 'function' &&
+            window.firebase && window.firebase.auth && window.firebase.auth.currentUser) {
             await firebaseDataManager.clearOldInquiries();
+        } else {
+            console.log('尚未登入，將在登入後再清理過期問診資料');
         }
     } catch (err) {
         console.error('系統初始化時清理問診資料失敗:', err);
