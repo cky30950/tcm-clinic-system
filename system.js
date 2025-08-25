@@ -634,7 +634,18 @@ async function attemptMainLogin() {
         performLogin(currentUserData);
         // 登入後初始化系統資料（載入掛號、診療記錄、患者等）
         await initializeSystemAfterLogin();
-        
+
+        // 在使用者已登入的情況下清除過期的問診資料。
+        // 這樣可確保僅在具備適當權限時執行刪除動作，
+        // 避免未授權狀態下觸發 Firebase 的權限錯誤。
+        try {
+            if (window.firebaseDataManager && typeof window.firebaseDataManager.clearOldInquiries === 'function') {
+                await window.firebaseDataManager.clearOldInquiries();
+            }
+        } catch (err) {
+            console.error('登入後清理問診資料失敗:', err);
+        }
+
         showToast('登入成功！', 'success');
 
     } catch (error) {
@@ -1601,8 +1612,10 @@ async function loadInquiryOptions(patient) {
     // 清空現有選項並加入預設選項
     select.innerHTML = '<option value="">不使用問診資料</option>';
     try {
-        // 清除過期問診資料
-        if (window.firebaseDataManager && window.firebaseDataManager.clearOldInquiries) {
+        // 清除過期問診資料：僅當使用者已登入時才執行，以避免未授權錯誤
+        const userLoggedIn = (window.firebase && window.firebase.auth && window.firebase.auth.currentUser) ||
+                             (typeof currentUserData !== 'undefined' && currentUserData);
+        if (userLoggedIn && window.firebaseDataManager && window.firebaseDataManager.clearOldInquiries) {
             await window.firebaseDataManager.clearOldInquiries();
         }
     } catch (err) {
@@ -10829,21 +10842,18 @@ window.addEventListener('load', async () => {
         await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // 系統載入後即清除過期的問診資料，避免累積舊資料。
-    try {
-        if (firebaseDataManager && typeof firebaseDataManager.clearOldInquiries === 'function') {
-            await firebaseDataManager.clearOldInquiries();
-        }
-    } catch (err) {
-        console.error('系統初始化時清理問診資料失敗:', err);
-    }
+    // 移除系統載入時清除過期問診資料的邏輯，改為在使用者登入後執行。
+    // 這是為了避免在未授權狀態下呼叫刪除資料而導致權限錯誤。
 
-    // 設置定時任務：每日自動清理一次過期的問診資料
+    // 設置定時任務：每日自動清理一次過期的問診資料，但僅在使用者已登入時執行
     try {
         const dayMs = 24 * 60 * 60 * 1000;
         setInterval(() => {
             try {
-                if (firebaseDataManager && typeof firebaseDataManager.clearOldInquiries === 'function') {
+                // 確認使用者已登入（透過 Firebase auth 或本地 currentUserData）
+                const userLoggedIn = (window.firebase && window.firebase.auth && window.firebase.auth.currentUser) ||
+                                     (typeof currentUserData !== 'undefined' && currentUserData);
+                if (userLoggedIn && firebaseDataManager && typeof firebaseDataManager.clearOldInquiries === 'function') {
                     firebaseDataManager.clearOldInquiries().catch(err => {
                         console.error('定時清理問診資料失敗:', err);
                     });
