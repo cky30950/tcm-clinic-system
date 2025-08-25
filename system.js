@@ -7385,6 +7385,7 @@ async function initializeSystemAfterLogin() {
                 selectedBillingItems[existingIndex].quantity += 1;
             } else {
                 // 添加新項目
+                // 新增 applyDiscount 屬性：對於非折扣項目預設為 true，折扣項目不設定此屬性
                 const billingItem = {
                     id: itemId,
                     name: item.name,
@@ -7394,7 +7395,8 @@ async function initializeSystemAfterLogin() {
                     description: item.description,
                     packageUses: item.packageUses,
                     validityDays: item.validityDays,
-                    quantity: 1
+                    quantity: 1,
+                    applyDiscount: item.category === 'discount' ? undefined : true
                 };
                 selectedBillingItems.push(billingItem);
             }
@@ -7435,22 +7437,36 @@ async function initializeSystemAfterLogin() {
                     subtotalBeforeDiscount += item.price * item.quantity;
                 }
             });
-            
+
+            // 判斷是否有折扣項目
+            const hasDiscount = selectedBillingItems.some(item => item.category === 'discount');
+
+            // 計算可套用折扣的小計：僅累加 applyDiscount 為 true（預設為 true）的非折扣項目
+            let discountableSubtotal = 0;
+            selectedBillingItems.forEach(item => {
+                if (item.category !== 'discount') {
+                    const apply = (item.applyDiscount === undefined ? true : item.applyDiscount);
+                    if (apply) {
+                        discountableSubtotal += item.price * item.quantity;
+                    }
+                }
+            });
+
             // 計算折扣後的總金額
             totalAmount = subtotalBeforeDiscount;
             selectedBillingItems.forEach(item => {
                 if (item.category === 'discount') {
                     if (item.price > 0 && item.price < 1) {
-                        // 百分比折扣：對小計進行折扣計算
-                        const discountAmount = subtotalBeforeDiscount * (1 - item.price) * item.quantity;
+                        // 百分比折扣：對可折扣小計進行折扣計算
+                        const discountAmount = discountableSubtotal * (1 - item.price) * item.quantity;
                         totalAmount -= discountAmount;
                     } else {
-                        // 固定金額折扣
+                        // 固定金額折扣或特殊折扣
                         totalAmount += item.price * item.quantity;
                     }
                 }
             });
-            totalAmountSpan.textContent = `$${totalAmount}`;
+            totalAmountSpan.textContent = `$${Math.round(totalAmount)}`;
             
             // 分離折扣項目和非折扣項目，但保持各自的添加順序
             const nonDiscountItems = [];
@@ -7533,9 +7549,10 @@ async function initializeSystemAfterLogin() {
                                 </div>
                         `;
                         
+                        // 計算各項的小計與折扣顯示
                         if (item.category === 'discount' && item.price > 0 && item.price < 1) {
-                            // 百分比折扣：顯示折扣金額
-                            const discountAmount = subtotalBeforeDiscount * (1 - item.price) * item.quantity;
+                            // 百分比折扣：顯示折扣金額，使用可折扣小計
+                            const discountAmount = discountableSubtotal * (1 - item.price) * item.quantity;
                             subtotal = -discountAmount;
                             subtotalDisplay = `-$${discountAmount.toFixed(0)}`;
                         } else {
@@ -7543,9 +7560,10 @@ async function initializeSystemAfterLogin() {
                             subtotal = item.price * item.quantity;
                             subtotalDisplay = `$${subtotal}`;
                         }
-                        
+
                         return `
                             <div class="flex items-center ${bgColor} border rounded-lg p-3">
+                                ${hasDiscount && item.category !== 'discount' ? `<input type="checkbox" class="mr-2" onchange="toggleItemDiscount(${originalIndex})" ${item.applyDiscount === false ? '' : 'checked'}>` : ''}
                                 <div class="flex-1">
                                     <div class="font-semibold text-gray-900">${item.name}</div>
                                     <div class="text-xs text-gray-600">${categoryName}</div>
@@ -7583,7 +7601,7 @@ async function initializeSystemAfterLogin() {
                             </div>
                             ${selectedBillingItems.filter(item => item.category === 'discount').map(item => {
                                 if (item.price > 0 && item.price < 1) {
-                                    const discountAmount = subtotalBeforeDiscount * (1 - item.price) * item.quantity;
+                                    const discountAmount = discountableSubtotal * (1 - item.price) * item.quantity;
                                     return `<div class="text-sm text-red-600">
                                         ${item.name}：<span class="font-medium">-$${discountAmount.toFixed(0)}</span>
                                     </div>`;
@@ -7621,7 +7639,7 @@ async function initializeSystemAfterLogin() {
                 if (item.category === 'discount') {
                     if (item.price > 0 && item.price < 1) {
                         // 百分比折扣
-                        const discountAmount = subtotalBeforeDiscount * (1 - item.price) * item.quantity;
+                        const discountAmount = discountableSubtotal * (1 - item.price) * item.quantity;
                         billingText += `${item.name} x${item.quantity} = -$${discountAmount.toFixed(0)}\n`;
                     } else {
                         // 固定金額折扣
@@ -7656,6 +7674,21 @@ async function initializeSystemAfterLogin() {
                 } else if (newQuantity === 0) {
                     // 數量為0時移除項目
                     removeBillingItem(index);
+                }
+            }
+        }
+
+        // 切換非折扣項目的折扣適用狀態
+        // 勾選框會觸發此函式，決定該項目是否計入折扣
+        function toggleItemDiscount(index) {
+            if (index >= 0 && index < selectedBillingItems.length) {
+                const item = selectedBillingItems[index];
+                // 只處理非折扣項目；折扣項目本身不參與切換
+                if (item && item.category !== 'discount') {
+                    // 如果未設置 applyDiscount，視為 true
+                    const current = (item.applyDiscount === undefined ? true : item.applyDiscount);
+                    item.applyDiscount = !current;
+                    updateBillingDisplay();
                 }
             }
         }
@@ -8025,7 +8058,9 @@ function parseBillingItemsFromText(billingText) {
                     price: billingItem.price,
                     unit: billingItem.unit,
                     description: billingItem.description,
-                    quantity: quantity
+                    quantity: quantity,
+                    // 為舊紀錄的非折扣項目預設允許參與折扣；折扣項目不設置
+                    applyDiscount: billingItem.category === 'discount' ? undefined : true
                 };
                 selectedBillingItems.push(selectedItem);
             } else {
@@ -8043,7 +8078,9 @@ function parseBillingItemsFromText(billingText) {
                         // 標記為從舊病歷載入，待恢復 meta 後可取消使用
                         isHistorical: true,
                         patientId: null,
-                        packageRecordId: null
+                        packageRecordId: null,
+                        // 套票使用項目不參與折扣
+                        applyDiscount: false
                     });
                 } else {
                     // 如果在收費項目中找不到，創建一個臨時項目（用於已刪除的收費項目）
