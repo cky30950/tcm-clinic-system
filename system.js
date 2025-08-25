@@ -4620,13 +4620,14 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                         
                                         // 方劑顯示格式：方劑名 劑量g (組成)
                                         if (composition) {
+                                            // 方劑保留名稱與劑量之間的空格，並以小字體標示組成
                                             allItems.push(`${itemName} ${dosage}g <span style="font-size: 8px;">(${composition})</span>`);
                                         } else {
                                             allItems.push(`${itemName} ${dosage}g`);
                                         }
                                     } else {
-                                        // 普通藥材
-                                        allItems.push(`${itemName} ${dosage}g`);
+                                        // 普通藥材：為節省空間，藥名與劑量之間不加空格
+                                        allItems.push(`${itemName}${dosage}g`);
                                     }
                                 } else {
                                     // 非標準格式的行，可能是獨立的說明
@@ -4641,24 +4642,19 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                             const specialLines = allItems.filter(item => typeof item === 'string' && item.includes('<div'));
                             
                             let result = '';
-                            
+
                             // 先顯示特殊行
                             specialLines.forEach(line => {
                                 result += line;
                             });
-                            
-                            // 然後顯示所有項目（包括方劑和藥材），每行最多 4 個，並平均分布整個寬度
+
+                            // 接著顯示所有藥材及方劑，用頓號「、」連接，節省空間
                             if (regularItems.length > 0) {
-                                for (let j = 0; j < regularItems.length; j += 4) {
-                                    const lineItems = regularItems.slice(j, j + 4);
-                                    // 為了讓藥名在收據中平均分佈整個可用寬度，我們使用等寬分欄的 CSS Grid。
-                                    // 計算當前行的項目數，並動態設置 grid-template-columns，使每一個藥材/方劑在一行內平分可用空間。
-                                    const columns = lineItems.length;
-                                    const itemsHtml = lineItems.map(item => `<span>${item}</span>`).join('');
-                                    result += `<div style="margin: 2px 0; display: grid; grid-template-columns: repeat(${columns}, 1fr);">${itemsHtml}</div>`;
-                                }
+                                // 將所有藥材及方劑按照原順序用頓號連接
+                                const joined = regularItems.join('、');
+                                result += `<div style="margin: 2px 0;">${joined}</div>`;
                             }
-                            
+
                             return result || consultation.prescription.replace(/\n/g, '<br>');
                         })()}</div>
                         ${medInfoHtml ? `
