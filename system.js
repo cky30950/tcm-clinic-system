@@ -8046,7 +8046,8 @@ function parseBillingItemsFromText(billingText) {
         let line = (rawLine || '').trim();
         if (!line) return;
         // 檢查折扣適用於行，格式如：折扣適用於: 項目1,項目2
-        const applicabilityMatch = line.match(/^折扣適用於[:：]\s*(.+)$/);
+        // 使用 (.*) 允許捕獲空字串，以支援無項目適用折扣（全部排除）的情況
+        const applicabilityMatch = line.match(/^折扣適用於[:：]\s*(.*)$/);
         if (applicabilityMatch) {
             // 解析所有名稱並去除空白
             discountApplicableNames = applicabilityMatch[1]
@@ -8106,16 +8107,15 @@ function parseBillingItemsFromText(billingText) {
             return;
         }
     });
-    // 如果有折扣適用於行，根據其中的名稱調整各項目的折扣適用狀態
-    if (discountApplicableNames && discountApplicableNames.length > 0) {
+    // 如果解析出了折扣適用於行，根據其中的名稱調整各項目的折扣適用狀態
+    // 注意：即使解析結果為空陣列（表示所有非折扣項目皆不適用折扣），
+    // 也應調整 includedInDiscount 屬性；若未偵測到折扣適用行（null），則保留預設值。
+    if (discountApplicableNames !== null) {
         selectedBillingItems.forEach(item => {
             if (item.category !== 'discount') {
-                // 對比名稱是否在折扣適用名單中
-                if (discountApplicableNames.includes(item.name)) {
-                    item.includedInDiscount = true;
-                } else {
-                    item.includedInDiscount = false;
-                }
+                // 若該項目名稱出現在折扣適用名單中，設為 true；否則設為 false。
+                // 當 discountApplicableNames 為空陣列時，所有項目名稱皆不在名單中，因此 includedInDiscount 會被設為 false。
+                item.includedInDiscount = discountApplicableNames.includes(item.name);
             }
         });
     }
