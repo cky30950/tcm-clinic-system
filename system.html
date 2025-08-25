@@ -69,9 +69,14 @@
             word-break: break-all;
             overflow-wrap: break-word;
         }
+
+        /* 採用 index.html 的柔和琥珀色漸層作為背景 */
+        .system-gradient-bg {
+            background: linear-gradient(135deg, #f3e8d3 0%, #e8d5b7 100%);
+        }
     </style>
 </head>
-<body class="bg-gradient-to-br from-green-50 to-blue-50 min-h-screen">
+<body class="system-gradient-bg min-h-screen">
     <!-- 登入頁面 -->
     <div id="loginPage" class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
@@ -86,18 +91,18 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">電子郵件</label>
                     <input type="email" id="mainLoginUsername" placeholder="請輸入電子郵件" 
-                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                            onkeypress="if(event.key==='Enter') document.getElementById('mainLoginPassword').focus()">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">密碼</label>
                     <input type="password" id="mainLoginPassword" placeholder="請輸入密碼" 
-                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                            onkeypress="if(event.key==='Enter') attemptMainLogin()">
                 </div>
                 
                 <button onclick="attemptMainLogin()" 
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200">
+                        class="w-full bg-amber-700 hover:bg-amber-800 text-white font-semibold py-3 px-6 rounded-lg transition duration-200">
                     登入系統
                 </button>
                 
@@ -121,18 +126,17 @@
         <div id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out">
             <div class="flex flex-col h-full">
                 <!-- 選單標題 -->
-                <!-- 側邊選單頂部使用與首頁相同的琥珀色系，搭配淡琥珀文字，統一整體視覺風格 -->
-                <div class="bg-amber-900 text-amber-50 p-6">
+                <div class="bg-green-600 text-white p-6">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center">
                             <span class="text-2xl mr-3">🏥</span>
                             <h2 class="text-lg font-bold">診所功能</h2>
                         </div>
-                        <button onclick="toggleSidebar()" class="text-amber-50 hover:text-amber-200 text-xl">
+                        <button onclick="toggleSidebar()" class="text-white hover:text-gray-200 text-xl">
                             ×
                         </button>
                     </div>
-                    <div id="sidebarUserRole" class="text-sm text-amber-200 mt-2"></div>
+                    <div id="sidebarUserRole" class="text-sm text-green-100 mt-2"></div>
                 </div>
                 <!-- 功能選單項目 -->
                 <div class="flex-1 py-4 overflow-y-auto">
@@ -152,8 +156,8 @@
         <!-- 遮罩層 -->
         <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden" onclick="toggleSidebar()"></div>
         <!-- 頂部導航 -->
-        <!-- 將原本的綠色邊框改為 index.html 的琥珀色調，營造一致的品牌形象 -->
-        <nav class="bg-white shadow-lg border-b-4 border-amber-700">
+        <!-- 以 index.html 深色琥珀配色呈現頂部導覽條，並保持固定在頂端 -->
+        <nav class="bg-amber-900 text-amber-50 shadow-lg sticky top-0 z-50 border-b-4 border-amber-700">
             <div class="max-w-7xl mx-auto px-4">
                 <div class="flex justify-between items-center py-4">
                     <div class="flex items-center">
@@ -166,12 +170,12 @@
                         </button>
                         <span class="text-2xl mr-3">🏥</span>
                         <div>
-                            <h1 id="systemTitle" class="text-xl font-bold text-gray-800">湛凌診所系統</h1>
-                            <p id="systemEnglishTitle" class="text-xs text-gray-500">TCM Clinic</p>
+                            <h1 id="systemTitle" class="text-xl font-bold text-amber-200">湛凌診所系統</h1>
+                            <p id="systemEnglishTitle" class="text-xs text-amber-300">TCM Clinic</p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
-                        <span id="userRole" class="text-sm text-gray-600"></span>
+                        <span id="userRole" class="text-sm text-amber-200"></span>
                         <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
                             登出
                         </button>
@@ -510,8 +514,7 @@
                 </div>
                 <!-- 診症表單區域 -->
                 <div id="consultationForm" class="hidden bg-white border border-gray-200 rounded-lg mt-6">
-                    <!-- 將診症表單標題區改為琥珀色系，與首頁配色一致 -->
-                    <div class="bg-amber-700 text-white px-6 py-4 rounded-t-lg">
+                    <div class="bg-green-600 text-white px-6 py-4 rounded-t-lg">
                         <h3 class="text-xl font-bold">診症記錄</h3>
                     </div>
                     
