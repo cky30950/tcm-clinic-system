@@ -7380,10 +7380,18 @@ async function initializeSystemAfterLogin() {
                 return;
             }
 
-            // 檢查是否已經添加過相同折扣名稱：折扣項目同名僅能使用一次
+            // 檢查折扣使用限制：每個診症僅能有一個折扣項目。
             if (item.category === 'discount') {
-                // 如果已有同名折扣，禁止再添加
-                const duplicateDiscount = selectedBillingItems.some(b => b.category === 'discount' && b.name === item.name);
+                // 如果列表中已經存在任何折扣項目，則禁止再添加其他折扣
+                const hasAnyDiscount = selectedBillingItems.some(b => b && b.category === 'discount');
+                if (hasAnyDiscount) {
+                    showToast('每個診症僅能使用一項折扣優惠', 'warning');
+                    // 清理搜尋結果避免殘留
+                    clearBillingSearch();
+                    return;
+                }
+                // 如果已有同名折扣，禁止再添加（名稱重複仍不可）
+                const duplicateDiscount = selectedBillingItems.some(b => b && b.category === 'discount' && b.name === item.name);
                 if (duplicateDiscount) {
                     showToast('同名折扣項目僅能使用一項', 'warning');
                     // 清理搜尋結果避免殘留
@@ -7558,18 +7566,28 @@ async function initializeSystemAfterLogin() {
                         const removeBtn = (isPackageUse || packageLocked)
                             ? ''
                             : `<button onclick="removeBillingItem(${originalIndex})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>`;
-                        // 數量控制區：套票使用、鎖定的套票或折扣項目僅顯示次數，不提供加減按鈕
-                        const quantityControls = (isPackageUse || packageLocked || isDiscountItem) ? `
+                        // 數量控制區：套票使用或鎖定的套票僅顯示次數；折扣項目不顯示數量；其他類型可增減數量
+                        let quantityControls;
+                        if (isDiscountItem) {
+                            // 折扣項目不需顯示數量
+                            quantityControls = '';
+                        } else if (isPackageUse || packageLocked) {
+                            // 套票使用或鎖定的套票僅顯示次數
+                            quantityControls = `
                                 <div class="flex items-center space-x-2 mr-3">
                                     <span class="w-8 text-center font-semibold">${item.quantity}</span>
                                 </div>
-                        ` : `
+                            `;
+                        } else {
+                            // 其他類別項目可增減數量
+                            quantityControls = `
                                 <div class="flex items-center space-x-2 mr-3">
                                     <button onclick="updateBillingQuantity(${originalIndex}, -1)" class="w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition duration-200">-</button>
                                     <span class="w-8 text-center font-semibold">${item.quantity}</span>
                                     <button onclick="updateBillingQuantity(${originalIndex}, 1)" class="w-6 h-6 bg-green-500 text-white rounded-full text-xs hover:bg-green-600 transition duration-200">+</button>
                                 </div>
-                        `;
+                            `;
+                        }
                         
                         // 決定是否顯示折扣勾選框：有折扣項目且當前項目不是折扣項亦不是套票使用
                         const showDiscountCheckbox = hasDiscount && item.category !== 'discount' && item.category !== 'packageUse';
