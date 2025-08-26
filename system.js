@@ -2619,6 +2619,8 @@ function getOperationButtons(appointment, patient = null) {
         case 'completed':
             // 列印收據功能不受診症狀態限制
             buttons.push(`<button onclick="printReceiptFromAppointment(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs transition duration-200">列印收據</button>`);
+            // 新增方藥醫囑列印功能，位於列印收據旁
+            buttons.push(`<button onclick="printPrescriptionInstructionsFromAppointment(${appointment.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs transition duration-200">方藥醫囑</button>`);
             buttons.push(`<button onclick="printAttendanceCertificateFromAppointment(${appointment.id})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs transition duration-200">到診證明</button>`);
             buttons.push(`<button onclick="printSickLeaveFromAppointment(${appointment.id})" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition duration-200">病假證明</button>`);
             
@@ -4342,6 +4344,15 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             medInfoHtml += '<strong>服用方法：</strong>' + consultation.usage;
         }
         
+        // 將處方內容、醫囑、複診日期、服藥天數、每日次數與服用方法移至方藥醫囑功能
+        // 在收據中不顯示這些資料，因此暫時將這些屬性設為空
+        const originalPrescription = consultation.prescription;
+        const originalInstructions  = consultation.instructions;
+        const originalFollowUpDate  = consultation.followUpDate;
+        consultation.prescription = null;
+        consultation.instructions = null;
+        consultation.followUpDate = null;
+
         // 創建中醫診所收據格式
         const printContent = `
             <!DOCTYPE html>
@@ -4723,7 +4734,12 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         printWindow.document.close();
         printWindow.focus();
         printWindow.print();
-        
+
+        // 列印完成後恢復原本的處方、醫囑與複診資料
+        consultation.prescription = originalPrescription;
+        consultation.instructions = originalInstructions;
+        consultation.followUpDate = originalFollowUpDate;
+
         showToast('中醫診所收據已準備列印！', 'success');
         
     } catch (error) {
@@ -5469,6 +5485,351 @@ async function printSickLeave(consultationId, consultationData = null) {
     } catch (error) {
         console.error('讀取病人資料錯誤:', error);
         showToast('讀取病人資料失敗', 'error');
+    }
+}
+
+// 新增：從掛號記錄列印方藥醫囑
+async function printPrescriptionInstructionsFromAppointment(appointmentId) {
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
+    if (!appointment) {
+        showToast('找不到掛號記錄！', 'error');
+        return;
+    }
+    // 只能列印已完成診症的方藥醫囑
+    if (appointment.status !== 'completed' || !appointment.consultationId) {
+        showToast('只能列印已完成診症的方藥醫囑！', 'error');
+        return;
+    }
+    // 取得觸發按鈕，優先使用事件目標，其次透過 DOM 查找
+    let loadingButton = null;
+    try {
+        if (typeof event !== 'undefined' && event && event.currentTarget) {
+            loadingButton = event.currentTarget;
+        }
+    } catch (_e) {}
+    if (!loadingButton) {
+        try {
+            loadingButton = document.querySelector('button[onclick="printPrescriptionInstructionsFromAppointment(' + appointmentId + ')"]');
+        } catch (_e) {
+            loadingButton = null;
+        }
+    }
+    if (loadingButton) {
+        setButtonLoading(loadingButton, '列印中...');
+    }
+    try {
+        // 從 Firebase 獲取診症記錄
+        const consultationResult = await window.firebaseDataManager.getConsultations();
+        if (!consultationResult.success) {
+            showToast('無法讀取診症記錄！', 'error');
+            return;
+        }
+        const consultation = consultationResult.data.find(c => c.id === appointment.consultationId);
+        if (!consultation) {
+            showToast('找不到對應的診症記錄！', 'error');
+            return;
+        }
+        // 調用方藥醫囑列印功能
+        await printPrescriptionInstructions(consultation.id, consultation);
+    } catch (error) {
+        console.error('列印方藥醫囑錯誤:', error);
+        showToast('列印方藥醫囑時發生錯誤', 'error');
+    } finally {
+        if (loadingButton) {
+            clearButtonLoading(loadingButton);
+        }
+    }
+}
+
+/**
+ * 列印方藥醫囑收據頁面。
+ * 內容包含處方內容、服藥天數、每日次數、服用方法、醫囑及注意事項以及建議複診時間。
+ * @param {number|string} consultationId 診症 ID
+ * @param {object|null} consultationData 可選，若已提供診症資料則直接使用
+ */
+async function printPrescriptionInstructions(consultationId, consultationData = null) {
+    let consultation = consultationData;
+    const idToFind = String(consultationId);
+    // 若未提供診症資料，從 Firebase 讀取
+    if (!consultation) {
+        try {
+            const consultationResult = await window.firebaseDataManager.getConsultations();
+            if (!consultationResult.success) {
+                showToast('無法讀取診症記錄！', 'error');
+                return;
+            }
+            consultation = consultationResult.data.find(c => String(c.id) === idToFind);
+            if (!consultation) {
+                showToast('找不到診症記錄！', 'error');
+                return;
+            }
+        } catch (error) {
+            console.error('讀取診症記錄錯誤:', error);
+            showToast('讀取診症記錄失敗', 'error');
+            return;
+        }
+    }
+    try {
+        // 讀取病人資料
+        const patientResult = await window.firebaseDataManager.getPatients();
+        if (!patientResult.success) {
+            showToast('無法讀取病人資料！', 'error');
+            return;
+        }
+        const patient = patientResult.data.find(p => p.id === consultation.patientId);
+        if (!patient) {
+            showToast('找不到病人資料！', 'error');
+            return;
+        }
+        // 解析診療日期
+        let consultationDate;
+        if (consultation.date && consultation.date.seconds) {
+            consultationDate = new Date(consultation.date.seconds * 1000);
+        } else if (consultation.date) {
+            consultationDate = new Date(consultation.date);
+        } else {
+            consultationDate = new Date();
+        }
+        // 組合處方內容
+        let prescriptionHtml = '';
+        if (consultation.prescription) {
+            try {
+                const lines = consultation.prescription.split('\n').filter(line => line.trim());
+                const allItems = [];
+                let i = 0;
+                while (i < lines.length) {
+                    const line = lines[i].trim();
+                    if (!line) {
+                        i++;
+                        continue;
+                    }
+                    const itemMatch = line.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
+                    if (itemMatch) {
+                        const itemName = itemMatch[1].trim();
+                        const dosage = itemMatch[2];
+                        const isFormula = ['湯', '散', '丸', '膏', '飲', '丹', '煎', '方', '劑'].some(suffix => itemName.includes(suffix));
+                        if (isFormula) {
+                            let composition = '';
+                            if (i + 1 < lines.length) {
+                                const nextLine = lines[i + 1].trim();
+                                if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
+                                    composition = nextLine.replace(/\n/g, '、').replace(/、/g, ',');
+                                    i++;
+                                }
+                            }
+                            if (composition) {
+                                allItems.push(`${itemName} ${dosage}g <span style="font-size: 8px;">(${composition})</span>`);
+                            } else {
+                                allItems.push(`${itemName} ${dosage}g`);
+                            }
+                        } else {
+                            allItems.push(`${itemName}${dosage}g`);
+                        }
+                    } else {
+                        allItems.push(`<div style="margin: 2px 0; font-size: 9px; color: #666;">${line}</div>`);
+                    }
+                    i++;
+                }
+                // 分離普通項目與特殊行
+                const regularItems = allItems.filter(item => typeof item === 'string' && !item.includes('<div'));
+                const specialLines = allItems.filter(item => typeof item === 'string' && item.includes('<div'));
+                let result = '';
+                specialLines.forEach(line => {
+                    result += line;
+                });
+                if (regularItems.length > 0) {
+                    const joined = regularItems.join('、');
+                    result += `<div style="margin: 2px 0;">${joined}</div>`;
+                }
+                prescriptionHtml = result || consultation.prescription.replace(/\n/g, '<br>');
+            } catch (_e) {
+                prescriptionHtml = consultation.prescription.replace(/\n/g, '<br>');
+            }
+        } else {
+            prescriptionHtml = '無記錄';
+        }
+        // 組合服藥資訊
+        let medDays = '';
+        let medFreq = '';
+        try {
+            const daysEl = document.getElementById('medicationDays');
+            if (daysEl) {
+                medDays = daysEl.value;
+            }
+            const freqEl = document.getElementById('medicationFrequency');
+            if (freqEl) {
+                medFreq = freqEl.value;
+            }
+        } catch (_e) {
+            // 若無法取得元素，保持預設空值
+        }
+        let medInfoHtml = '';
+        if (medDays) {
+            medInfoHtml += '<strong>服藥天數：</strong>' + medDays + '天　';
+        }
+        if (medFreq) {
+            medInfoHtml += '<strong>每日次數：</strong>' + medFreq + '次　';
+        }
+        if (consultation.usage) {
+            medInfoHtml += '<strong>服用方法：</strong>' + consultation.usage;
+        }
+        // 醫囑及注意事項
+        const instructionsHtml = consultation.instructions ? consultation.instructions.replace(/\n/g, '<br>') : '';
+        // 建議複診時間
+        let followUpHtml = '';
+        if (consultation.followUpDate) {
+            try {
+                if (consultation.followUpDate.seconds) {
+                    followUpHtml = new Date(consultation.followUpDate.seconds * 1000).toLocaleString('zh-TW');
+                } else {
+                    followUpHtml = new Date(consultation.followUpDate).toLocaleString('zh-TW');
+                }
+            } catch (_err) {
+                try {
+                    followUpHtml = formatConsultationDateTime(consultation.followUpDate);
+                } catch (_e2) {
+                    followUpHtml = '';
+                }
+            }
+        }
+        // 構建列印內容
+        const printContent = `
+            <!DOCTYPE html>
+            <html lang="zh-TW">
+            <head>
+                <meta charset="UTF-8">
+                <title>方藥醫囑 - ${patient.name}</title>
+                <style>
+                    body { 
+                        font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif; 
+                        margin: 0; 
+                        padding: 10px; 
+                        line-height: 1.3;
+                        font-size: 11px;
+                    }
+                    .advice-container {
+                        width: 148mm;
+                        height: 210mm;
+                        margin: 0 auto;
+                        border: 2px solid #000;
+                        padding: 8px;
+                        background: white;
+                        box-sizing: border-box;
+                    }
+                    .clinic-header {
+                        text-align: center;
+                        border-bottom: 2px double #000;
+                        padding-bottom: 10px;
+                        margin-bottom: 15px;
+                    }
+                    .clinic-name {
+                        font-size: 14px;
+                        font-weight: bold;
+                        margin-bottom: 2px;
+                        letter-spacing: 1px;
+                    }
+                    .clinic-subtitle {
+                        font-size: 10px;
+                        color: #666;
+                        margin-bottom: 3px;
+                    }
+                    .advice-title {
+                        font-size: 14px;
+                        font-weight: bold;
+                        text-align: center;
+                        margin: 6px 0;
+                        letter-spacing: 2px;
+                    }
+                    .patient-info {
+                        margin-bottom: 10px;
+                        font-size: 11px;
+                    }
+                    .info-row {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 3px;
+                        font-size: 11px;
+                    }
+                    .info-label {
+                        font-weight: bold;
+                    }
+                    .section-title {
+                        font-weight: bold;
+                        margin-top: 10px;
+                        margin-bottom: 4px;
+                        font-size: 12px;
+                    }
+                    .section-content {
+                        background: #f9f9f9;
+                        padding: 4px;
+                        border: 1px solid #ddd;
+                        font-size: 10px;
+                        line-height: 1.3;
+                        border-radius: 3px;
+                    }
+                    .thank-you {
+                        text-align: center;
+                        margin: 12px 0;
+                        font-size: 11px;
+                        font-weight: bold;
+                        color: #333;
+                    }
+                    @media print {
+                        @page {
+                            size: A5;
+                            margin: 10mm;
+                        }
+                        body { 
+                            margin: 0; 
+                            padding: 0; 
+                            font-size: 11px;
+                        }
+                        .advice-container { 
+                            width: 100%;
+                            height: 100%;
+                            padding: 8mm;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="advice-container">
+                    <!-- 診所標題 -->
+                    <div class="clinic-header">
+                        <div class="clinic-name">${clinicSettings.chineseName || '湛凌診所系統'}</div>
+                        <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
+                        <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
+                    </div>
+                    <!-- 標題 -->
+                    <div class="advice-title">方藥醫囑</div>
+                    <!-- 病人及診療資訊 -->
+                    <div class="patient-info">
+                        <div class="info-row"><span class="info-label">病人姓名：</span><span>${patient.name}</span></div>
+                        <div class="info-row"><span class="info-label">診療日期：</span><span>${consultationDate.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span></div>
+                        <div class="info-row"><span class="info-label">診療時間：</span><span>${consultationDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</span></div>
+                        <div class="info-row"><span class="info-label">主治醫師：</span><span>${getDoctorDisplayName(consultation.doctor)}</span></div>
+                    </div>
+                    <!-- 處方內容 -->
+                    <div class="section-title">📋 處方內容</div>
+                    <div class="section-content">${prescriptionHtml}</div>
+                    ${medInfoHtml ? `<div class="section-title">💊 服藥資訊</div><div class="section-content">${medInfoHtml}</div>` : ''}
+                    ${instructionsHtml ? `<div class="section-title">📝 醫囑及注意事項</div><div class="section-content">${instructionsHtml}</div>` : ''}
+                    ${followUpHtml ? `<div class="section-title">📅 建議複診時間</div><div class="section-content">${followUpHtml}</div>` : ''}
+                    <div class="thank-you">祝您早日康復！</div>
+                </div>
+            </body>
+            </html>
+        `;
+        // 開啟新視窗並列印
+        const printWindow = window.open('', '_blank', 'width=500,height=700');
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+        showToast('方藥醫囑已準備列印！', 'success');
+    } catch (error) {
+        console.error('列印方藥醫囑錯誤:', error);
+        showToast('列印方藥醫囑時發生錯誤', 'error');
     }
 }
 
