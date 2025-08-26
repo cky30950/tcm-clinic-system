@@ -69,6 +69,306 @@
             word-break: break-all;
             overflow-wrap: break-word;
         }
+
+        /* 個人設置頁面樣式 */
+        #personalSettings * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        #personalSettings .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #personalSettings .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #personalSettings .header h1 {
+            color: #2c5530;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+        }
+        #personalSettings .header h1::before {
+            content: "👤";
+            margin-right: 15px;
+            font-size: 30px;
+        }
+        #personalSettings .user-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        /* 將選單改為上方顯示 */
+        #personalSettings .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        #personalSettings .sidebar {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            width: 100%;
+            position: static;
+            top: auto;
+        }
+        #personalSettings .nav-menu {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        #personalSettings .nav-menu li {
+            margin-bottom: 0;
+        }
+        #personalSettings .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            color: #666;
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            font-size: 15px;
+            background: #f8f8f8;
+        }
+        #personalSettings .nav-item:hover,
+        #personalSettings .nav-item.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: none;
+        }
+        #personalSettings .nav-item::before {
+            margin-right: 12px;
+            font-size: 18px;
+        }
+        #personalSettings .nav-item[data-section="profile"]::before { content: "👤"; }
+        #personalSettings .nav-item[data-section="constitution"]::before { content: "⚖️"; }
+        #personalSettings .nav-item[data-section="herbs"]::before { content: "🌿"; }
+        #personalSettings .nav-item[data-section="acupoints"]::before { content: "📍"; }
+        #personalSettings .nav-item[data-section="prescriptions"]::before { content: "📋"; }
+        #personalSettings .nav-item[data-section="records"]::before { content: "📖"; }
+        #personalSettings .nav-item[data-section="appointments"]::before { content: "📅"; }
+        #personalSettings .nav-item[data-section="diagnosis-system"]::before { content: "🩺"; }
+        #personalSettings .nav-item[data-section="allergies"]::before { content: "⚠️"; }
+        #personalSettings .nav-item[data-section="family-history"]::before { content: "👨‍👩‍👧‍👦"; }
+        #personalSettings .nav-item[data-section="reminders"]::before { content: "🔔"; }
+        #personalSettings .nav-item[data-section="privacy"]::before { content: "🔒"; }
+        #personalSettings .content-area {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            min-height: 600px;
+            width: 100%;
+        }
+        #personalSettings .section {
+            display: none;
+        }
+        #personalSettings .section.active {
+            display: block;
+            animation: personalFadeIn 0.3s ease-in;
+        }
+        @keyframes personalFadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        #personalSettings .section-title {
+            font-size: 24px;
+            color: #2c5530;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e8f5e8;
+        }
+        #personalSettings .form-group {
+            margin-bottom: 20px;
+        }
+        #personalSettings .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        #personalSettings label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        #personalSettings input,
+        #personalSettings select,
+        #personalSettings textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e8f5e8;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        #personalSettings input:focus,
+        #personalSettings select:focus,
+        #personalSettings textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        #personalSettings .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+        }
+        #personalSettings .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        #personalSettings .btn-secondary {
+            background: #6c757d;
+        }
+        #personalSettings .btn-success {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+        }
+        #personalSettings .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ffa8a8 100%);
+        }
+        #personalSettings .card {
+            border: 1px solid #e8f5e8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+        #personalSettings .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        #personalSettings .card-title {
+            font-size: 18px;
+            color: #2c5530;
+            margin: 0;
+        }
+        #personalSettings .badge {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        #personalSettings .constitution-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        #personalSettings .constitution-item {
+            text-align: center;
+            padding: 15px;
+            border: 2px solid #e8f5e8;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        #personalSettings .constitution-item:hover,
+        #personalSettings .constitution-item.selected {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+        #personalSettings .constitution-icon {
+            font-size: 30px;
+            margin-bottom: 10px;
+        }
+        #personalSettings .tag {
+            display: inline-block;
+            background: #e8f5e8;
+            color: #2c5530;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin: 2px;
+        }
+        #personalSettings .reminder-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid #e8f5e8;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        #personalSettings .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        #personalSettings .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        #personalSettings .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        #personalSettings .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        #personalSettings input:checked + .slider {
+            background-color: #667eea;
+        }
+        #personalSettings input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        @media (max-width: 768px) {
+            #personalSettings .main-content {
+                flex-direction: column;
+            }
+            #personalSettings .form-row {
+                grid-template-columns: 1fr;
+            }
+            #personalSettings .constitution-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-green-50 to-blue-50 min-h-screen">
@@ -1473,6 +1773,148 @@
                 </div>
             </div>
         </div>
+            <!-- 個人設置 -->
+            <div id="personalSettings" class="hidden">
+                <div class="container">
+                    <div class="header">
+                        <h1>個人設置</h1>
+                        <div class="user-avatar" id="personalUserAvatar">李</div>
+                    </div>
+                    <div class="main-content">
+                        <nav class="sidebar">
+                            <ul class="nav-menu">
+                                <li><a href="#" class="nav-item active" data-section="profile">個人資料</a></li>
+                                <li><a href="#" class="nav-item" data-section="constitution">體質管理</a></li>
+                                <li><a href="#" class="nav-item" data-section="herbs">慣用中藥組合</a></li>
+                                <li><a href="#" class="nav-item" data-section="acupoints">慣用穴位組合</a></li>
+                                <li><a href="#" class="nav-item" data-section="prescriptions">醫囑管理</a></li>
+                                <li><a href="#" class="nav-item" data-section="records">就診記錄</a></li>
+                                <li><a href="#" class="nav-item" data-section="appointments">預約管理</a></li>
+                                <li><a href="#" class="nav-item" data-section="diagnosis-system">診症系統設置</a></li>
+                                <li><a href="#" class="nav-item" data-section="allergies">過敏史管理</a></li>
+                                <li><a href="#" class="nav-item" data-section="family-history">家族病史</a></li>
+                                <li><a href="#" class="nav-item" data-section="reminders">提醒設置</a></li>
+                                <li><a href="#" class="nav-item" data-section="privacy">隱私設置</a></li>
+                            </ul>
+                        </nav>
+                        <main class="content-area">
+                            <!-- 個人資料 -->
+                            <div id="profile" class="section active">
+                                <h2 class="section-title">個人資料</h2>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>姓名</label>
+                                        <input type="text" id="personalName" placeholder="請輸入姓名">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>性別</label>
+                                        <select id="personalGender">
+                                            <option value="">請選擇</option>
+                                            <option value="男">男</option>
+                                            <option value="女">女</option>
+                                            <option value="其他">其他</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>出生日期</label>
+                                        <input type="date" id="personalBirthdate">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>電子郵件</label>
+                                        <input type="email" id="personalEmail" placeholder="請輸入電子郵件">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>電話</label>
+                                        <input type="tel" id="personalPhone" placeholder="請輸入電話">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>地址</label>
+                                        <input type="text" id="personalAddress" placeholder="請輸入地址">
+                                    </div>
+                                </div>
+                                <button class="btn" id="personalSaveProfile">保存</button>
+                            </div>
+                            <!-- 體質管理 -->
+                            <div id="constitution" class="section">
+                                <h2 class="section-title">體質管理</h2>
+                                <div class="constitution-grid">
+                                    <div class="constitution-item" data-value="平和"><div class="constitution-icon">😊</div>平和</div>
+                                    <div class="constitution-item" data-value="陰虛"><div class="constitution-icon">🥵</div>陰虛</div>
+                                    <div class="constitution-item" data-value="陽虛"><div class="constitution-icon">🥶</div>陽虛</div>
+                                    <div class="constitution-item" data-value="痰濕"><div class="constitution-icon">💧</div>痰濕</div>
+                                    <div class="constitution-item" data-value="濕熱"><div class="constitution-icon">🔥</div>濕熱</div>
+                                    <div class="constitution-item" data-value="血虛"><div class="constitution-icon">😴</div>血虛</div>
+                                    <div class="constitution-item" data-value="血瘀"><div class="constitution-icon">🩸</div>血瘀</div>
+                                    <div class="constitution-item" data-value="氣虛"><div class="constitution-icon">😮‍💨</div>氣虛</div>
+                                    <div class="constitution-item" data-value="氣鬱"><div class="constitution-icon">😤</div>氣鬱</div>
+                                </div>
+                                <button class="btn btn-success mt-4" id="personalSaveConstitution">保存</button>
+                            </div>
+                            <!-- 慣用中藥組合 -->
+                            <div id="herbs" class="section">
+                                <h2 class="section-title">慣用中藥組合</h2>
+                                <div id="herbsList"></div>
+                                <button class="btn" id="personalAddHerb">新增中藥</button>
+                            </div>
+                            <!-- 慣用穴位組合 -->
+                            <div id="acupoints" class="section">
+                                <h2 class="section-title">慣用穴位組合</h2>
+                                <div id="acupointsList"></div>
+                                <button class="btn" id="personalAddAcupoint">新增穴位</button>
+                            </div>
+                            <!-- 醫囑管理 -->
+                            <div id="prescriptions" class="section">
+                                <h2 class="section-title">醫囑管理</h2>
+                                <div id="prescriptionsList"></div>
+                                <button class="btn" id="personalAddPrescription">新增醫囑</button>
+                            </div>
+                            <!-- 就診記錄 -->
+                            <div id="records" class="section">
+                                <h2 class="section-title">就診記錄</h2>
+                                <div id="recordsList"></div>
+                            </div>
+                            <!-- 預約管理 -->
+                            <div id="appointments" class="section">
+                                <h2 class="section-title">預約管理</h2>
+                                <div id="appointmentsList"></div>
+                            </div>
+                            <!-- 診症系統設置 -->
+                            <div id="diagnosis-system" class="section">
+                                <h2 class="section-title">診症系統設置</h2>
+                                <p>這裡可以設定診症系統偏好。</p>
+                            </div>
+                            <!-- 過敏史管理 -->
+                            <div id="allergies" class="section">
+                                <h2 class="section-title">過敏史管理</h2>
+                                <div id="allergiesList"></div>
+                                <button class="btn" id="personalAddAllergy">新增過敏項目</button>
+                            </div>
+                            <!-- 家族病史 -->
+                            <div id="family-history" class="section">
+                                <h2 class="section-title">家族病史</h2>
+                                <div id="familyHistoryList"></div>
+                                <button class="btn" id="personalAddFamilyHistory">新增家族病史</button>
+                            </div>
+                            <!-- 提醒設置 -->
+                            <div id="reminders" class="section">
+                                <h2 class="section-title">提醒設置</h2>
+                                <div id="remindersList"></div>
+                                <button class="btn" id="personalAddReminder">新增提醒</button>
+                            </div>
+                            <!-- 隱私設置 -->
+                            <div id="privacy" class="section">
+                                <h2 class="section-title">隱私設置</h2>
+                                <p>這裡可以調整隱私相關的設定。</p>
+                            </div>
+                        </main>
+                    </div>
+                </div>
+            </div>
+
         <!-- 主系統頁面版權聲明 -->
         <!-- 在主系統頁面結尾加入版權聲明，置於主要內容容器與主系統外層之間。 -->
         <div class="max-w-7xl mx-auto px-4 py-4 mt-8">
@@ -1530,67 +1972,8 @@
             </div>
         </div>
     </div>
-        <!-- 個人設置覆蓋層 -->
-        <!-- 
-            此覆蓋層會在用戶點擊「個人設置」選單時顯示。
-            內容使用 iframe 內嵌 tcm_user_settings.html，並提供關閉按鈕返回系統主畫面。
-        --> 
-        <div id="personalSettingsOverlay" class="fixed inset-0 bg-white z-50 hidden overflow-y-auto">
-            <div class="flex justify-between items-center p-4 border-b border-gray-200">
-                <h2 class="text-xl font-bold text-gray-800 flex items-center">
-                    <span class="mr-2">👤</span>
-                    個人設置
-                </h2>
-                <button id="closePersonalSettings" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
-            </div>
-            <div class="p-4">
-                <!-- 使用 iframe 嵌入個人設置頁面 -->
-                <iframe src="tcm_user_settings.html" class="w-full" style="height: calc(100vh - 72px);" frameborder="0"></iframe>
-            </div>
-        </div>
-
     <script src="system.js"></script>
     <script src="system.js"></script>
-
-    <!-- 自定義腳本：新增「個人設置」選單及相關事件 -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // 在側邊選單加入「個人設置」按鈕
-            const sidebarMenu = document.getElementById('sidebarMenu');
-            if (sidebarMenu) {
-                const btn = document.createElement('button');
-                btn.id = 'personalSettingsButton';
-                // 使用與其他選單相同的樣式
-                btn.className = 'w-full flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition';
-                btn.innerHTML = '<span class="mr-2">👤</span>個人設置';
-                btn.addEventListener('click', () => {
-                    // 顯示個人設置覆蓋層並關閉側邊欄
-                    showPersonalSettingsOverlay();
-                    try {
-                        if (typeof toggleSidebar === 'function') {
-                            toggleSidebar();
-                        }
-                    } catch (e) {
-                        console.warn('toggleSidebar not defined', e);
-                    }
-                });
-                sidebarMenu.appendChild(btn);
-            }
-            // 關閉按鈕綁定事件
-            const closeBtn = document.getElementById('closePersonalSettings');
-            if (closeBtn) {
-                closeBtn.addEventListener('click', hidePersonalSettingsOverlay);
-            }
-        });
-        function showPersonalSettingsOverlay() {
-            const overlay = document.getElementById('personalSettingsOverlay');
-            if (overlay) overlay.classList.remove('hidden');
-        }
-        function hidePersonalSettingsOverlay() {
-            const overlay = document.getElementById('personalSettingsOverlay');
-            if (overlay) overlay.classList.add('hidden');
-        }
-    </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>

@@ -8,10 +8,11 @@ let currentUserData = null;
  * 每個角色可存取哪些頁面（功能），在此集中定義。
  */
 const ROLE_PERMISSIONS = {
-  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement'],
-  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement'],
-  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary'],
-  '用戶': ['patientManagement', 'consultationSystem']
+  // 新增 personalSettings 權限，所有角色皆可存取個人設置功能
+  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings'],
+  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement', 'personalSettings'],
+  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'personalSettings'],
+  '用戶': ['patientManagement', 'consultationSystem', 'personalSettings']
 };
 
 /**
@@ -823,7 +824,9 @@ async function logout() {
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
                 financialReports: { title: '財務報表', icon: '📊', description: '收入分析與財務統計' },
-                systemManagement: { title: '系統管理', icon: '⚙️', description: '統計資料、備份匯出' }
+                systemManagement: { title: '系統管理', icon: '⚙️', description: '統計資料、備份匯出' },
+                // 個人設置功能
+                personalSettings: { title: '個人設置', icon: '👤', description: '管理個人資料與偏好設定' }
             };
 
             // 根據當前用戶職位決定可使用的功能列表
@@ -892,14 +895,77 @@ async function logout() {
                 loadFinancialReports();
             } else if (sectionId === 'userManagement') {
                 loadUserManagement();
+            } else if (sectionId === 'personalSettings') {
+                // 初始化個人設置頁面
+                initPersonalSettings();
             }
         }
 
         // 隱藏所有區域
         function hideAllSections() {
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'welcomePage'].forEach(id => {
+            ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'welcomePage'].forEach(id => {
                 document.getElementById(id).classList.add('hidden');
             });
+        }
+
+        /**
+         * 初始化個人設置頁面。此函式只會執行一次，設定好個人設置頁面的各種事件處理。
+         * 包含：
+         *   - 左上方導覽列切換不同的分頁內容
+         *   - 體質選擇項目的高亮與反選
+         *   - 各保存或新增按鈕顯示提示訊息
+         */
+        function initPersonalSettings() {
+            // 防止重複初始化
+            if (window._personalSettingsInitialized) return;
+            window._personalSettingsInitialized = true;
+
+            try {
+                // 導覽項目切換
+                const navItems = document.querySelectorAll('#personalSettings .nav-item');
+                navItems.forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        navItems.forEach(i => i.classList.remove('active'));
+                        item.classList.add('active');
+                        const sectionId = item.getAttribute('data-section');
+                        const sections = document.querySelectorAll('#personalSettings .section');
+                        sections.forEach(sec => sec.classList.remove('active'));
+                        const target = document.querySelector('#personalSettings #' + sectionId);
+                        if (target) target.classList.add('active');
+                    });
+                });
+
+                // 體質選擇項目
+                const constitutionItems = document.querySelectorAll('#personalSettings .constitution-item');
+                constitutionItems.forEach(ci => {
+                    ci.addEventListener('click', () => {
+                        ci.classList.toggle('selected');
+                    });
+                });
+
+                // 按鈕與提示訊息對應表
+                const btnMapping = [
+                    { id: 'personalSaveProfile', msg: '個人資料已更新' },
+                    { id: 'personalSaveConstitution', msg: '體質偏好已儲存' },
+                    { id: 'personalAddHerb', msg: '新增中藥功能尚未實作' },
+                    { id: 'personalAddAcupoint', msg: '新增穴位功能尚未實作' },
+                    { id: 'personalAddPrescription', msg: '新增醫囑功能尚未實作' },
+                    { id: 'personalAddAllergy', msg: '新增過敏項目功能尚未實作' },
+                    { id: 'personalAddFamilyHistory', msg: '新增家族病史功能尚未實作' },
+                    { id: 'personalAddReminder', msg: '新增提醒功能尚未實作' }
+                ];
+                btnMapping.forEach(({ id, msg }) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.addEventListener('click', () => {
+                            showToast(msg, 'success');
+                        });
+                    }
+                });
+            } catch (e) {
+                console.error('初始化個人設置頁面失敗:', e);
+            }
         }
 
         // 病人管理功能
