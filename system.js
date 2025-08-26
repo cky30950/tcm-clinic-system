@@ -2620,7 +2620,7 @@ function getOperationButtons(appointment, patient = null) {
             // 列印收據功能不受診症狀態限制
             buttons.push(`<button onclick="printReceiptFromAppointment(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs transition duration-200">列印收據</button>`);
             // 新增方藥醫囑列印功能，位於列印收據旁
-            buttons.push(`<button onclick="printPrescriptionInstructionsFromAppointment(${appointment.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs transition duration-200">方藥醫囑</button>`);
+            buttons.push(`<button onclick="printPrescriptionInstructionsFromAppointment(${appointment.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs transition duration-200">藥單醫囑</button>`);
             buttons.push(`<button onclick="printAttendanceCertificateFromAppointment(${appointment.id})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs transition duration-200">到診證明</button>`);
             buttons.push(`<button onclick="printSickLeaveFromAppointment(${appointment.id})" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition duration-200">病假證明</button>`);
             
@@ -5497,7 +5497,7 @@ async function printPrescriptionInstructionsFromAppointment(appointmentId) {
     }
     // 只能列印已完成診症的方藥醫囑
     if (appointment.status !== 'completed' || !appointment.consultationId) {
-        showToast('只能列印已完成診症的方藥醫囑！', 'error');
+        showToast('只能列印已完成診症的藥單醫囑！', 'error');
         return;
     }
     // 取得觸發按鈕，優先使用事件目標，其次透過 DOM 查找
@@ -5532,8 +5532,8 @@ async function printPrescriptionInstructionsFromAppointment(appointmentId) {
         // 調用方藥醫囑列印功能
         await printPrescriptionInstructions(consultation.id, consultation);
     } catch (error) {
-        console.error('列印方藥醫囑錯誤:', error);
-        showToast('列印方藥醫囑時發生錯誤', 'error');
+        console.error('列印藥單醫囑錯誤:', error);
+        showToast('列印藥單醫囑時發生錯誤', 'error');
     } finally {
         if (loadingButton) {
             clearButtonLoading(loadingButton);
@@ -5698,7 +5698,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             <html lang="zh-TW">
             <head>
                 <meta charset="UTF-8">
-                <title>方藥醫囑 - ${patient.name}</title>
+                <title>藥單醫囑 - ${patient.name}</title>
                 <style>
                     body { 
                         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif; 
@@ -5801,7 +5801,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                     </div>
                     <!-- 標題 -->
-                    <div class="advice-title">方藥醫囑</div>
+                    <div class="advice-title">藥單醫囑</div>
                     <!-- 病人及診療資訊 -->
                     <div class="patient-info">
                         <div class="info-row"><span class="info-label">病人姓名：</span><span>${patient.name}</span></div>
@@ -5826,10 +5826,10 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         printWindow.document.close();
         printWindow.focus();
         printWindow.print();
-        showToast('方藥醫囑已準備列印！', 'success');
+        showToast('藥單醫囑已準備列印！', 'success');
     } catch (error) {
-        console.error('列印方藥醫囑錯誤:', error);
-        showToast('列印方藥醫囑時發生錯誤', 'error');
+        console.error('列印藥單醫囑錯誤:', error);
+        showToast('列印藥單醫囑時發生錯誤', 'error');
     }
 }
 
