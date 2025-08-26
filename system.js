@@ -5590,12 +5590,12 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         } else {
             consultationDate = new Date();
         }
-        // 組合處方內容
+        // 組合處方內容 - 使用整齊格式，每項換行顯示，方劑的組成另起一行顯示於方劑下方
         let prescriptionHtml = '';
         if (consultation.prescription) {
             try {
                 const lines = consultation.prescription.split('\n').filter(line => line.trim());
-                const allItems = [];
+                const resultLines = [];
                 let i = 0;
                 while (i < lines.length) {
                     const line = lines[i].trim();
@@ -5603,45 +5603,39 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         i++;
                         continue;
                     }
+                    // 檢查是否為藥材/方劑格式：名稱+空格+劑量g
                     const itemMatch = line.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
                     if (itemMatch) {
                         const itemName = itemMatch[1].trim();
                         const dosage = itemMatch[2];
-                        const isFormula = ['湯', '散', '丸', '膏', '飲', '丹', '煎', '方', '劑'].some(suffix => itemName.includes(suffix));
+                        const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
                         if (isFormula) {
                             let composition = '';
+                            // 若下一行不是藥材格式，視為方劑組成
                             if (i + 1 < lines.length) {
                                 const nextLine = lines[i + 1].trim();
                                 if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
-                                    composition = nextLine.replace(/\n/g, '、').replace(/、/g, ',');
+                                    composition = nextLine;
                                     i++;
                                 }
                             }
+                            // 方劑名稱與劑量
+                            resultLines.push(`<div>${itemName} ${dosage}g</div>`);
+                            // 組成放在方劑下方並略為縮排
                             if (composition) {
-                                allItems.push(`${itemName} ${dosage}g <span style="font-size: 8px;">(${composition})</span>`);
-                            } else {
-                                allItems.push(`${itemName} ${dosage}g`);
+                                resultLines.push(`<div style="margin-left: 10px; font-size: 9px;">(${composition})</div>`);
                             }
                         } else {
-                            allItems.push(`${itemName}${dosage}g`);
+                            // 普通藥材：名稱與劑量換行顯示
+                            resultLines.push(`<div>${itemName} ${dosage}g</div>`);
                         }
                     } else {
-                        allItems.push(`<div style="margin: 2px 0; font-size: 9px; color: #666;">${line}</div>`);
+                        // 非標準行，直接顯示
+                        resultLines.push(`<div style="margin: 2px 0; font-size: 9px; color: #666;">${line}</div>`);
                     }
                     i++;
                 }
-                // 分離普通項目與特殊行
-                const regularItems = allItems.filter(item => typeof item === 'string' && !item.includes('<div'));
-                const specialLines = allItems.filter(item => typeof item === 'string' && item.includes('<div'));
-                let result = '';
-                specialLines.forEach(line => {
-                    result += line;
-                });
-                if (regularItems.length > 0) {
-                    const joined = regularItems.join('、');
-                    result += `<div style="margin: 2px 0;">${joined}</div>`;
-                }
-                prescriptionHtml = result || consultation.prescription.replace(/\n/g, '<br>');
+                prescriptionHtml = resultLines.join('') || consultation.prescription.replace(/\n/g, '<br>');
             } catch (_e) {
                 prescriptionHtml = consultation.prescription.replace(/\n/g, '<br>');
             }
@@ -5818,10 +5812,10 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     <!-- 病人及診療資訊 -->
                     <div class="patient-info">
                         <div class="info-row"><span class="info-label">病人姓名：</span><span>${patient.name}</span></div>
+                        ${patient.patientNumber ? `<div class="info-row"><span class="info-label">病歷號碼：</span><span>${patient.patientNumber}</span></div>` : ''}
                         <div class="info-row"><span class="info-label">診療日期：</span><span>${consultationDate.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span></div>
                         <div class="info-row"><span class="info-label">診療時間：</span><span>${consultationDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</span></div>
                         <div class="info-row"><span class="info-label">主治醫師：</span><span>${getDoctorDisplayName(consultation.doctor)}</span></div>
-                        ${patient.patientNumber ? `<div class="info-row"><span class="info-label">病歷號碼：</span><span>${patient.patientNumber}</span></div>` : ''}
                         ${(() => {
                             // 顯示註冊編號（如有）
                             const regNumber = getDoctorRegistrationNumber(consultation.doctor);
