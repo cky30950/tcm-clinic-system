@@ -941,13 +941,7 @@ async function logout() {
                     });
                 });
 
-                // 體質選擇項目
-                const constitutionItems = document.querySelectorAll('#personalSettings .constitution-item');
-                constitutionItems.forEach(ci => {
-                    ci.addEventListener('click', () => {
-                        ci.classList.toggle('selected');
-                    });
-                });
+                // 已移除體質管理，因此不需要綁定體質選擇項目點擊事件
 
                 // 按鈕與提示訊息對應表，移除個人資料、體質及組合按鈕，改用自定義事件
                 const btnMapping = [
@@ -964,15 +958,7 @@ async function logout() {
                         });
                     }
                 });
-                // 為個人資料、體質與中藥/穴位組合按鈕綁定自定義事件
-                const saveProfileBtn = document.getElementById('personalSaveProfile');
-                if (saveProfileBtn) {
-                    saveProfileBtn.addEventListener('click', savePersonalProfile);
-                }
-                const saveConstitutionBtn = document.getElementById('personalSaveConstitution');
-                if (saveConstitutionBtn) {
-                    saveConstitutionBtn.addEventListener('click', saveConstitutionPreferences);
-                }
+                // 已移除個人資料與體質管理，故不再綁定對應的保存按鈕
                 const addHerbBtn = document.getElementById('personalAddHerb');
                 if (addHerbBtn) {
                     addHerbBtn.addEventListener('click', showHerbComboModal);
@@ -1012,19 +998,34 @@ async function logout() {
                 }
                 const docRef = window.firebase.doc(window.firebase.db, 'userSettings', userId);
                 userSettingsDocRef = docRef;
-                const docSnap = await window.firebase.getDoc(docRef);
-                if (docSnap.exists()) {
+                let docSnap = null;
+                try {
+                    if (window.firebase && typeof window.firebase.getDoc === 'function') {
+                        docSnap = await window.firebase.getDoc(docRef);
+                    }
+                } catch (_e) {
+                    // 若 getDoc 不存在或執行失敗，忽略錯誤，將視為無初始設定
+                    docSnap = null;
+                }
+                if (docSnap && typeof docSnap.exists === 'function' && docSnap.exists()) {
                     userSettings = docSnap.data() || {};
                 } else {
-                    // 若不存在，初始化空設定
+                    // 若不存在或無法取得，初始化空設定
                     userSettings = {
                         profile: {},
                         constitution: [],
                         herbalCombinations: [],
                         acupointCombinations: []
                     };
-                    await window.firebase.setDoc(docRef, userSettings);
+                    if (window.firebase && typeof window.firebase.setDoc === 'function') {
+                        try {
+                            await window.firebase.setDoc(docRef, userSettings);
+                        } catch (_e) {
+                            // 若 setDoc 不存在或失敗，保持本地設定即可
+                        }
+                    }
                 }
+                // 依據新的設定渲染畫面
                 populatePersonalSettingsForm();
             } catch (e) {
                 console.error('載入個人設定資料失敗:', e);
@@ -1037,27 +1038,7 @@ async function logout() {
         function populatePersonalSettingsForm() {
             try {
                 if (!userSettings) return;
-                // 個人資料
-                const profile = userSettings.profile || {};
-                const fallbackName = currentUserData && currentUserData.name ? currentUserData.name : '';
-                document.getElementById('personalName').value = profile.name || fallbackName;
-                document.getElementById('personalGender').value = profile.gender || '';
-                document.getElementById('personalBirthdate').value = profile.birthdate || '';
-                document.getElementById('personalEmail').value = profile.email || (currentUserData && currentUserData.email ? currentUserData.email : '');
-                document.getElementById('personalPhone').value = profile.phone || '';
-                document.getElementById('personalAddress').value = profile.address || '';
-                // 體質
-                const constitutionSelected = userSettings.constitution || [];
-                const constitutionItems = document.querySelectorAll('#personalSettings .constitution-item');
-                constitutionItems.forEach(item => {
-                    const val = item.getAttribute('data-value');
-                    if (constitutionSelected.includes(val)) {
-                        item.classList.add('selected');
-                    } else {
-                        item.classList.remove('selected');
-                    }
-                });
-                // 渲染慣用中藥和穴位組合列表
+                // 個人資料、體質管理功能已移除，僅需渲染慣用中藥和穴位組合列表
                 renderHerbCombinations();
                 renderAcupointCombinations();
             } catch (e) {
@@ -1175,7 +1156,9 @@ async function logout() {
                     userSettings.herbalCombinations = [];
                 }
                 userSettings.herbalCombinations.push({ name: name, herbs: selectedIds });
-                await window.firebase.updateDoc(userSettingsDocRef, { herbalCombinations: userSettings.herbalCombinations });
+                if (window.firebase && typeof window.firebase.updateDoc === 'function') {
+                    await window.firebase.updateDoc(userSettingsDocRef, { herbalCombinations: userSettings.herbalCombinations });
+                }
                 renderHerbCombinations();
                 closeHerbComboModal();
                 showToast('新增中藥組合成功', 'success');
@@ -1195,7 +1178,9 @@ async function logout() {
                 const confirmDelete = window.confirm ? window.confirm('確定要刪除此中藥組合嗎？') : true;
                 if (!confirmDelete) return;
                 userSettings.herbalCombinations.splice(index, 1);
-                await window.firebase.updateDoc(userSettingsDocRef, { herbalCombinations: userSettings.herbalCombinations });
+                if (window.firebase && typeof window.firebase.updateDoc === 'function') {
+                    await window.firebase.updateDoc(userSettingsDocRef, { herbalCombinations: userSettings.herbalCombinations });
+                }
                 renderHerbCombinations();
             } catch (e) {
                 console.error('刪除中藥組合失敗:', e);
@@ -1306,7 +1291,9 @@ async function logout() {
                     userSettings.acupointCombinations = [];
                 }
                 userSettings.acupointCombinations.push({ name: name, points: pointsArr });
-                await window.firebase.updateDoc(userSettingsDocRef, { acupointCombinations: userSettings.acupointCombinations });
+                if (window.firebase && typeof window.firebase.updateDoc === 'function') {
+                    await window.firebase.updateDoc(userSettingsDocRef, { acupointCombinations: userSettings.acupointCombinations });
+                }
                 renderAcupointCombinations();
                 closeAcupointComboModal();
                 showToast('新增穴位組合成功', 'success');
@@ -1326,7 +1313,9 @@ async function logout() {
                 const confirmDelete = window.confirm ? window.confirm('確定要刪除此穴位組合嗎？') : true;
                 if (!confirmDelete) return;
                 userSettings.acupointCombinations.splice(index, 1);
-                await window.firebase.updateDoc(userSettingsDocRef, { acupointCombinations: userSettings.acupointCombinations });
+                if (window.firebase && typeof window.firebase.updateDoc === 'function') {
+                    await window.firebase.updateDoc(userSettingsDocRef, { acupointCombinations: userSettings.acupointCombinations });
+                }
                 renderAcupointCombinations();
             } catch (e) {
                 console.error('刪除穴位組合失敗:', e);
@@ -11508,8 +11497,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // 將個人設置相關函式暴露到全域，以供 HTML 按鈕與其他模塊呼叫
   window.loadUserSettings = loadUserSettings;
   window.populatePersonalSettingsForm = populatePersonalSettingsForm;
-  window.savePersonalProfile = savePersonalProfile;
-  window.saveConstitutionPreferences = saveConstitutionPreferences;
   window.showHerbComboModal = showHerbComboModal;
   window.closeHerbComboModal = closeHerbComboModal;
   window.saveHerbCombo = saveHerbCombo;

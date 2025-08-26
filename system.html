@@ -1782,79 +1782,23 @@
                     <div class="main-content">
                         <nav class="sidebar">
                             <ul class="nav-menu">
-                                <li><a href="#" class="nav-item active" data-section="profile">個人資料</a></li>
-                                <li><a href="#" class="nav-item" data-section="constitution">體質管理</a></li>
-                                <li><a href="#" class="nav-item" data-section="herbs">慣用中藥組合</a></li>
+                                <!-- 移除個人資料、體質管理功能，將慣用中藥組合作為預設選單 -->
+                                <li><a href="#" class="nav-item active" data-section="herbs">慣用中藥組合</a></li>
                                 <li><a href="#" class="nav-item" data-section="acupoints">慣用穴位組合</a></li>
                                 <li><a href="#" class="nav-item" data-section="prescriptions">醫囑管理</a></li>
                                 <li><a href="#" class="nav-item" data-section="records">就診記錄</a></li>
                                 <li><a href="#" class="nav-item" data-section="appointments">預約管理</a></li>
                                 <li><a href="#" class="nav-item" data-section="diagnosis-system">診症系統設置</a></li>
                                 <li><a href="#" class="nav-item" data-section="allergies">過敏史管理</a></li>
-                                <li><a href="#" class="nav-item" data-section="family-history">家族病史</a></li>
+                                <!-- 已移除家族病史選項 -->
                                 <li><a href="#" class="nav-item" data-section="reminders">提醒設置</a></li>
                                 <li><a href="#" class="nav-item" data-section="privacy">隱私設置</a></li>
                             </ul>
                         </nav>
                         <main class="content-area">
-                            <!-- 個人資料 -->
-                            <div id="profile" class="section active">
-                                <h2 class="section-title">個人資料</h2>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>姓名</label>
-                                        <input type="text" id="personalName" placeholder="請輸入姓名">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>性別</label>
-                                        <select id="personalGender">
-                                            <option value="">請選擇</option>
-                                            <option value="男">男</option>
-                                            <option value="女">女</option>
-                                            <option value="其他">其他</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>出生日期</label>
-                                        <input type="date" id="personalBirthdate">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>電子郵件</label>
-                                        <input type="email" id="personalEmail" placeholder="請輸入電子郵件">
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>電話</label>
-                                        <input type="tel" id="personalPhone" placeholder="請輸入電話">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>地址</label>
-                                        <input type="text" id="personalAddress" placeholder="請輸入地址">
-                                    </div>
-                                </div>
-                                <button class="btn" id="personalSaveProfile">保存</button>
-                            </div>
-                            <!-- 體質管理 -->
-                            <div id="constitution" class="section">
-                                <h2 class="section-title">體質管理</h2>
-                                <div class="constitution-grid">
-                                    <div class="constitution-item" data-value="平和"><div class="constitution-icon">😊</div>平和</div>
-                                    <div class="constitution-item" data-value="陰虛"><div class="constitution-icon">🥵</div>陰虛</div>
-                                    <div class="constitution-item" data-value="陽虛"><div class="constitution-icon">🥶</div>陽虛</div>
-                                    <div class="constitution-item" data-value="痰濕"><div class="constitution-icon">💧</div>痰濕</div>
-                                    <div class="constitution-item" data-value="濕熱"><div class="constitution-icon">🔥</div>濕熱</div>
-                                    <div class="constitution-item" data-value="血虛"><div class="constitution-icon">😴</div>血虛</div>
-                                    <div class="constitution-item" data-value="血瘀"><div class="constitution-icon">🩸</div>血瘀</div>
-                                    <div class="constitution-item" data-value="氣虛"><div class="constitution-icon">😮‍💨</div>氣虛</div>
-                                    <div class="constitution-item" data-value="氣鬱"><div class="constitution-icon">😤</div>氣鬱</div>
-                                </div>
-                                <button class="btn btn-success mt-4" id="personalSaveConstitution">保存</button>
-                            </div>
+                            <!-- 已移除個人資料與體質管理區塊 -->
                             <!-- 慣用中藥組合 -->
-                            <div id="herbs" class="section">
+                            <div id="herbs" class="section active">
                                 <h2 class="section-title">慣用中藥組合</h2>
                                 <div id="herbsList"></div>
                                 <button class="btn" id="personalAddHerb">新增中藥組合</button>
@@ -1892,12 +1836,7 @@
                                 <div id="allergiesList"></div>
                                 <button class="btn" id="personalAddAllergy">新增過敏項目</button>
                             </div>
-                            <!-- 家族病史 -->
-                            <div id="family-history" class="section">
-                                <h2 class="section-title">家族病史</h2>
-                                <div id="familyHistoryList"></div>
-                                <button class="btn" id="personalAddFamilyHistory">新增家族病史</button>
-                            </div>
+                            <!-- 家族病史區塊已移除 -->
                             <!-- 提醒設置 -->
                             <div id="reminders" class="section">
                                 <h2 class="section-title">提醒設置</h2>
@@ -2014,6 +1953,7 @@
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
