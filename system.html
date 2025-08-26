@@ -1775,11 +1775,10 @@
         </div>
             <!-- 個人設置 -->
             <div id="personalSettings" class="hidden">
-                <div class="container">
-                    <div class="header">
-                        <h1>個人設置</h1>
-                        <div class="user-avatar" id="personalUserAvatar">李</div>
-                    </div>
+                <!-- 將個人設置容器改為與其他系統頁面一致的卡片風格 -->
+                <div class="container bg-white rounded-xl shadow-lg p-6">
+                    <!-- 個人設置標題：移除原有的框與頭像，只保留標題，風格與主系統一致 -->
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">個人設置</h2>
                     <div class="main-content">
                         <nav class="sidebar">
                             <ul class="nav-menu">
@@ -1858,13 +1857,13 @@
                             <div id="herbs" class="section">
                                 <h2 class="section-title">慣用中藥組合</h2>
                                 <div id="herbsList"></div>
-                                <button class="btn" id="personalAddHerb">新增中藥</button>
+                                <button class="btn" id="personalAddHerb">新增中藥組合</button>
                             </div>
                             <!-- 慣用穴位組合 -->
                             <div id="acupoints" class="section">
                                 <h2 class="section-title">慣用穴位組合</h2>
                                 <div id="acupointsList"></div>
-                                <button class="btn" id="personalAddAcupoint">新增穴位</button>
+                                <button class="btn" id="personalAddAcupoint">新增穴位組合</button>
                             </div>
                             <!-- 醫囑管理 -->
                             <div id="prescriptions" class="section">
@@ -1911,6 +1910,45 @@
                                 <p>這裡可以調整隱私相關的設定。</p>
                             </div>
                         </main>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中藥組合建立彈窗 -->
+            <div id="herbComboModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl shadow-lg max-w-lg w-full p-6">
+                    <h3 class="text-lg font-semibold mb-4">新增中藥組合</h3>
+                    <div class="mb-3">
+                        <label class="block text-sm font-semibold mb-1">組合名稱</label>
+                        <input type="text" id="herbComboName" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    </div>
+                    <div class="mb-3 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                        <div id="herbComboList" class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <!-- 動態生成中藥選項 -->
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-2 mt-4">
+                        <button class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded" onclick="closeHerbComboModal()">取消</button>
+                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded" onclick="saveHerbCombo()">保存</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 穴位組合建立彈窗 -->
+            <div id="acupointComboModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl shadow-lg max-w-lg w-full p-6">
+                    <h3 class="text-lg font-semibold mb-4">新增穴位組合</h3>
+                    <div class="mb-3">
+                        <label class="block text-sm font-semibold mb-1">組合名稱</label>
+                        <input type="text" id="acupointComboName" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    </div>
+                    <div class="mb-3">
+                        <label class="block text-sm font-semibold mb-1">穴位列表 (請用逗號或空格分隔)</label>
+                        <textarea id="acupointListInput" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="例如：百會、合谷、內關"></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-2 mt-4">
+                        <button class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded" onclick="closeAcupointComboModal()">取消</button>
+                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded" onclick="saveAcupointCombo()">保存</button>
                     </div>
                 </div>
             </div>
@@ -1976,6 +2014,7 @@
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>

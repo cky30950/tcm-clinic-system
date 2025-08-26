@@ -49,6 +49,11 @@ let patientCache = null;
 let consultationCache = null;
 let userCache = null;
 
+// 個人設置相關全域變數
+// 用於儲存當前用戶的個人設定資料及其在 Firestore 的文件參考
+let userSettings = null;
+let userSettingsDocRef = null;
+
 // 追蹤本次診症操作期間對套票使用造成的暫時變更。
 // 當使用者在開啟診症或編輯病歷時使用或取消使用套票，
 // 將對患者套票剩餘次數產生影響。若使用者最終未保存病歷或取消診症，
@@ -944,12 +949,8 @@ async function logout() {
                     });
                 });
 
-                // 按鈕與提示訊息對應表
+                // 按鈕與提示訊息對應表，移除個人資料、體質及組合按鈕，改用自定義事件
                 const btnMapping = [
-                    { id: 'personalSaveProfile', msg: '個人資料已更新' },
-                    { id: 'personalSaveConstitution', msg: '體質偏好已儲存' },
-                    { id: 'personalAddHerb', msg: '新增中藥功能尚未實作' },
-                    { id: 'personalAddAcupoint', msg: '新增穴位功能尚未實作' },
                     { id: 'personalAddPrescription', msg: '新增醫囑功能尚未實作' },
                     { id: 'personalAddAllergy', msg: '新增過敏項目功能尚未實作' },
                     { id: 'personalAddFamilyHistory', msg: '新增家族病史功能尚未實作' },
@@ -963,8 +964,440 @@ async function logout() {
                         });
                     }
                 });
+                // 為個人資料、體質與中藥/穴位組合按鈕綁定自定義事件
+                const saveProfileBtn = document.getElementById('personalSaveProfile');
+                if (saveProfileBtn) {
+                    saveProfileBtn.addEventListener('click', savePersonalProfile);
+                }
+                const saveConstitutionBtn = document.getElementById('personalSaveConstitution');
+                if (saveConstitutionBtn) {
+                    saveConstitutionBtn.addEventListener('click', saveConstitutionPreferences);
+                }
+                const addHerbBtn = document.getElementById('personalAddHerb');
+                if (addHerbBtn) {
+                    addHerbBtn.addEventListener('click', showHerbComboModal);
+                }
+                const addAcupointBtn = document.getElementById('personalAddAcupoint');
+                if (addAcupointBtn) {
+                    addAcupointBtn.addEventListener('click', showAcupointComboModal);
+                }
+                // 載入用戶個人設定資料
+                loadUserSettings();
             } catch (e) {
                 console.error('初始化個人設置頁面失敗:', e);
+            }
+        }
+
+        // ========= 個人設置：使用者設定與組合功能 =========
+
+        /**
+         * 載入當前用戶的個人設定資料。
+         * 若首次使用則在 Firestore 中建立個人設定文檔。
+         */
+        async function loadUserSettings() {
+            try {
+                // 等待 Firebase 初始化
+                while (!window.firebase || !window.firebase.db) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                if (!currentUserData) {
+                    console.warn('尚未取得用戶資料，無法載入個人設定');
+                    return;
+                }
+                // 使用 uid（若存在）或使用者資料庫 ID 作為文件 ID，確保每個用戶都有獨立設定
+                const userId = currentUserData.uid ? String(currentUserData.uid) : (currentUserData.id ? String(currentUserData.id) : String(currentUserData.username || ''));
+                if (!userId) {
+                    console.warn('無有效的用戶識別符，無法載入個人設定');
+                    return;
+                }
+                const docRef = window.firebase.doc(window.firebase.db, 'userSettings', userId);
+                userSettingsDocRef = docRef;
+                const docSnap = await window.firebase.getDoc(docRef);
+                if (docSnap.exists()) {
+                    userSettings = docSnap.data() || {};
+                } else {
+                    // 若不存在，初始化空設定
+                    userSettings = {
+                        profile: {},
+                        constitution: [],
+                        herbalCombinations: [],
+                        acupointCombinations: []
+                    };
+                    await window.firebase.setDoc(docRef, userSettings);
+                }
+                populatePersonalSettingsForm();
+            } catch (e) {
+                console.error('載入個人設定資料失敗:', e);
+            }
+        }
+
+        /**
+         * 根據 userSettings 將資料填入個人設置表單。
+         */
+        function populatePersonalSettingsForm() {
+            try {
+                if (!userSettings) return;
+                // 個人資料
+                const profile = userSettings.profile || {};
+                const fallbackName = currentUserData && currentUserData.name ? currentUserData.name : '';
+                document.getElementById('personalName').value = profile.name || fallbackName;
+                document.getElementById('personalGender').value = profile.gender || '';
+                document.getElementById('personalBirthdate').value = profile.birthdate || '';
+                document.getElementById('personalEmail').value = profile.email || (currentUserData && currentUserData.email ? currentUserData.email : '');
+                document.getElementById('personalPhone').value = profile.phone || '';
+                document.getElementById('personalAddress').value = profile.address || '';
+                // 體質
+                const constitutionSelected = userSettings.constitution || [];
+                const constitutionItems = document.querySelectorAll('#personalSettings .constitution-item');
+                constitutionItems.forEach(item => {
+                    const val = item.getAttribute('data-value');
+                    if (constitutionSelected.includes(val)) {
+                        item.classList.add('selected');
+                    } else {
+                        item.classList.remove('selected');
+                    }
+                });
+                // 渲染慣用中藥和穴位組合列表
+                renderHerbCombinations();
+                renderAcupointCombinations();
+            } catch (e) {
+                console.error('填入個人設定表單失敗:', e);
+            }
+        }
+
+        /**
+         * 儲存個人資料到 Firestore。
+         */
+        async function savePersonalProfile() {
+            try {
+                if (!userSettingsDocRef) {
+                    showToast('無法保存：尚未載入個人設定', 'error');
+                    return;
+                }
+                const profile = {
+                    name: document.getElementById('personalName').value.trim(),
+                    gender: document.getElementById('personalGender').value,
+                    birthdate: document.getElementById('personalBirthdate').value,
+                    email: document.getElementById('personalEmail').value.trim(),
+                    phone: document.getElementById('personalPhone').value.trim(),
+                    address: document.getElementById('personalAddress').value.trim()
+                };
+                userSettings.profile = profile;
+                await window.firebase.updateDoc(userSettingsDocRef, { profile: userSettings.profile });
+                showToast('個人資料已更新', 'success');
+            } catch (e) {
+                console.error('儲存個人資料失敗:', e);
+                showToast('儲存個人資料失敗', 'error');
+            }
+        }
+
+        /**
+         * 儲存體質偏好到 Firestore。
+         */
+        async function saveConstitutionPreferences() {
+            try {
+                if (!userSettingsDocRef) {
+                    showToast('無法保存：尚未載入個人設定', 'error');
+                    return;
+                }
+                const selected = [];
+                const items = document.querySelectorAll('#personalSettings .constitution-item.selected');
+                items.forEach(it => {
+                    const val = it.getAttribute('data-value');
+                    if (val) selected.push(val);
+                });
+                userSettings.constitution = selected;
+                await window.firebase.updateDoc(userSettingsDocRef, { constitution: userSettings.constitution });
+                showToast('體質偏好已儲存', 'success');
+            } catch (e) {
+                console.error('儲存體質偏好失敗:', e);
+                showToast('儲存體質偏好失敗', 'error');
+            }
+        }
+
+        /**
+         * 顯示慣用中藥組合建立彈窗並生成中藥選項。
+         */
+        function showHerbComboModal() {
+            try {
+                // 清空名稱與選項
+                document.getElementById('herbComboName').value = '';
+                const listContainer = document.getElementById('herbComboList');
+                listContainer.innerHTML = '';
+                // 生成中藥勾選清單
+                if (Array.isArray(herbLibrary)) {
+                    herbLibrary.forEach(item => {
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'flex items-center space-x-2';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.value = String(item.id);
+                        checkbox.id = 'herbOption-' + item.id;
+                        const label = document.createElement('label');
+                        label.setAttribute('for', 'herbOption-' + item.id);
+                        label.textContent = item.name;
+                        wrapper.appendChild(checkbox);
+                        wrapper.appendChild(label);
+                        listContainer.appendChild(wrapper);
+                    });
+                }
+                document.getElementById('herbComboModal').classList.remove('hidden');
+            } catch (e) {
+                console.error('顯示中藥組合彈窗失敗:', e);
+            }
+        }
+
+        /**
+         * 關閉中藥組合建立彈窗。
+         */
+        function closeHerbComboModal() {
+            document.getElementById('herbComboModal').classList.add('hidden');
+        }
+
+        /**
+         * 保存新的中藥組合並更新 Firestore。
+         */
+        async function saveHerbCombo() {
+            try {
+                const nameInput = document.getElementById('herbComboName');
+                const name = nameInput.value.trim();
+                if (!name) {
+                    showToast('請輸入組合名稱', 'warning');
+                    return;
+                }
+                const checkboxes = document.querySelectorAll('#herbComboList input[type="checkbox"]:checked');
+                const selectedIds = Array.from(checkboxes).map(cb => String(cb.value));
+                if (selectedIds.length === 0) {
+                    showToast('請選擇至少一個中藥', 'warning');
+                    return;
+                }
+                if (!userSettings.herbalCombinations) {
+                    userSettings.herbalCombinations = [];
+                }
+                userSettings.herbalCombinations.push({ name: name, herbs: selectedIds });
+                await window.firebase.updateDoc(userSettingsDocRef, { herbalCombinations: userSettings.herbalCombinations });
+                renderHerbCombinations();
+                closeHerbComboModal();
+                showToast('新增中藥組合成功', 'success');
+            } catch (e) {
+                console.error('保存中藥組合失敗:', e);
+                showToast('保存中藥組合失敗', 'error');
+            }
+        }
+
+        /**
+         * 刪除指定索引的中藥組合。
+         * @param {number} index
+         */
+        async function deleteHerbCombination(index) {
+            try {
+                if (!userSettings.herbalCombinations || index < 0 || index >= userSettings.herbalCombinations.length) return;
+                const confirmDelete = window.confirm ? window.confirm('確定要刪除此中藥組合嗎？') : true;
+                if (!confirmDelete) return;
+                userSettings.herbalCombinations.splice(index, 1);
+                await window.firebase.updateDoc(userSettingsDocRef, { herbalCombinations: userSettings.herbalCombinations });
+                renderHerbCombinations();
+            } catch (e) {
+                console.error('刪除中藥組合失敗:', e);
+                showToast('刪除中藥組合失敗', 'error');
+            }
+        }
+
+        /**
+         * 將指定索引的中藥組合載入到處方中。
+         * @param {number} index
+         */
+        function applyHerbCombination(index) {
+            try {
+                if (!userSettings.herbalCombinations || index < 0 || index >= userSettings.herbalCombinations.length) return;
+                const combo = userSettings.herbalCombinations[index];
+                if (!combo || !Array.isArray(combo.herbs)) return;
+                combo.herbs.forEach(id => {
+                    addToPrescription('herb', id);
+                });
+                showToast('已載入中藥組合', 'success');
+            } catch (e) {
+                console.error('載入中藥組合失敗:', e);
+            }
+        }
+
+        /**
+         * 重新渲染中藥組合列表。
+         */
+        function renderHerbCombinations() {
+            try {
+                const listEl = document.getElementById('herbsList');
+                if (!listEl) return;
+                listEl.innerHTML = '';
+                const combos = userSettings && Array.isArray(userSettings.herbalCombinations) ? userSettings.herbalCombinations : [];
+                if (combos.length === 0) {
+                    listEl.innerHTML = '<p class="text-gray-500">尚未新增中藥組合</p>';
+                    return;
+                }
+                combos.forEach((combo, idx) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'p-3 border border-gray-200 rounded-lg mb-3 flex flex-col';
+                    const nameDiv = document.createElement('div');
+                    nameDiv.className = 'font-medium text-gray-800 mb-1';
+                    nameDiv.textContent = combo.name;
+                    itemDiv.appendChild(nameDiv);
+                    const herbsDiv = document.createElement('div');
+                    herbsDiv.className = 'text-sm text-gray-500 mb-2';
+                    // 取得中藥名稱，若找不到則顯示ID
+                    const herbNames = (combo.herbs || []).map(hid => {
+                        const found = Array.isArray(herbLibrary) ? herbLibrary.find(h => String(h.id) === String(hid)) : null;
+                        return found ? found.name : hid;
+                    });
+                    herbsDiv.textContent = herbNames.join('、');
+                    itemDiv.appendChild(herbsDiv);
+                    const btnContainer = document.createElement('div');
+                    btnContainer.className = 'flex gap-2';
+                    const applyBtn = document.createElement('button');
+                    applyBtn.className = 'bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-sm';
+                    applyBtn.textContent = '載入';
+                    applyBtn.addEventListener('click', () => applyHerbCombination(idx));
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-sm';
+                    delBtn.textContent = '刪除';
+                    delBtn.addEventListener('click', () => deleteHerbCombination(idx));
+                    btnContainer.appendChild(applyBtn);
+                    btnContainer.appendChild(delBtn);
+                    itemDiv.appendChild(btnContainer);
+                    listEl.appendChild(itemDiv);
+                });
+            } catch (e) {
+                console.error('渲染中藥組合列表失敗:', e);
+            }
+        }
+
+        /**
+         * 顯示穴位組合建立彈窗。
+         */
+        function showAcupointComboModal() {
+            document.getElementById('acupointComboName').value = '';
+            document.getElementById('acupointListInput').value = '';
+            document.getElementById('acupointComboModal').classList.remove('hidden');
+        }
+
+        /**
+         * 關閉穴位組合建立彈窗。
+         */
+        function closeAcupointComboModal() {
+            document.getElementById('acupointComboModal').classList.add('hidden');
+        }
+
+        /**
+         * 保存新的穴位組合並更新 Firestore。
+         */
+        async function saveAcupointCombo() {
+            try {
+                const name = document.getElementById('acupointComboName').value.trim();
+                const rawPoints = document.getElementById('acupointListInput').value.trim();
+                if (!name) {
+                    showToast('請輸入組合名稱', 'warning');
+                    return;
+                }
+                if (!rawPoints) {
+                    showToast('請輸入穴位列表', 'warning');
+                    return;
+                }
+                const pointsArr = rawPoints.split(/[，,\s]+/).map(p => p.trim()).filter(p => p);
+                if (!userSettings.acupointCombinations) {
+                    userSettings.acupointCombinations = [];
+                }
+                userSettings.acupointCombinations.push({ name: name, points: pointsArr });
+                await window.firebase.updateDoc(userSettingsDocRef, { acupointCombinations: userSettings.acupointCombinations });
+                renderAcupointCombinations();
+                closeAcupointComboModal();
+                showToast('新增穴位組合成功', 'success');
+            } catch (e) {
+                console.error('保存穴位組合失敗:', e);
+                showToast('保存穴位組合失敗', 'error');
+            }
+        }
+
+        /**
+         * 刪除指定索引的穴位組合。
+         * @param {number} index
+         */
+        async function deleteAcupointCombination(index) {
+            try {
+                if (!userSettings.acupointCombinations || index < 0 || index >= userSettings.acupointCombinations.length) return;
+                const confirmDelete = window.confirm ? window.confirm('確定要刪除此穴位組合嗎？') : true;
+                if (!confirmDelete) return;
+                userSettings.acupointCombinations.splice(index, 1);
+                await window.firebase.updateDoc(userSettingsDocRef, { acupointCombinations: userSettings.acupointCombinations });
+                renderAcupointCombinations();
+            } catch (e) {
+                console.error('刪除穴位組合失敗:', e);
+                showToast('刪除穴位組合失敗', 'error');
+            }
+        }
+
+        /**
+         * 將指定索引的穴位組合載入至針灸備註欄位。
+         * @param {number} index
+         */
+        function applyAcupointCombination(index) {
+            try {
+                if (!userSettings.acupointCombinations || index < 0 || index >= userSettings.acupointCombinations.length) return;
+                const combo = userSettings.acupointCombinations[index];
+                if (!combo || !Array.isArray(combo.points)) return;
+                const notesField = document.getElementById('formAcupunctureNotes');
+                if (!notesField) {
+                    showToast('找不到針灸備註欄位', 'error');
+                    return;
+                }
+                const existing = notesField.value || '';
+                const newNotes = combo.points.join('、');
+                notesField.value = existing ? (existing + '\n' + newNotes) : newNotes;
+                showToast('已載入穴位組合', 'success');
+            } catch (e) {
+                console.error('載入穴位組合失敗:', e);
+            }
+        }
+
+        /**
+         * 重新渲染穴位組合列表。
+         */
+        function renderAcupointCombinations() {
+            try {
+                const listEl = document.getElementById('acupointsList');
+                if (!listEl) return;
+                listEl.innerHTML = '';
+                const combos = userSettings && Array.isArray(userSettings.acupointCombinations) ? userSettings.acupointCombinations : [];
+                if (combos.length === 0) {
+                    listEl.innerHTML = '<p class="text-gray-500">尚未新增穴位組合</p>';
+                    return;
+                }
+                combos.forEach((combo, idx) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'p-3 border border-gray-200 rounded-lg mb-3 flex flex-col';
+                    const nameDiv = document.createElement('div');
+                    nameDiv.className = 'font-medium text-gray-800 mb-1';
+                    nameDiv.textContent = combo.name;
+                    itemDiv.appendChild(nameDiv);
+                    const pointsDiv = document.createElement('div');
+                    pointsDiv.className = 'text-sm text-gray-500 mb-2';
+                    pointsDiv.textContent = (combo.points || []).join('、');
+                    itemDiv.appendChild(pointsDiv);
+                    const btnContainer = document.createElement('div');
+                    btnContainer.className = 'flex gap-2';
+                    const applyBtn = document.createElement('button');
+                    applyBtn.className = 'bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-sm';
+                    applyBtn.textContent = '載入';
+                    applyBtn.addEventListener('click', () => applyAcupointCombination(idx));
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-sm';
+                    delBtn.textContent = '刪除';
+                    delBtn.addEventListener('click', () => deleteAcupointCombination(idx));
+                    btnContainer.appendChild(applyBtn);
+                    btnContainer.appendChild(delBtn);
+                    itemDiv.appendChild(btnContainer);
+                    listEl.appendChild(itemDiv);
+                });
+            } catch (e) {
+                console.error('渲染穴位組合列表失敗:', e);
             }
         }
 
@@ -11071,6 +11504,24 @@ document.addEventListener('DOMContentLoaded', function() {
   window.updateRestPeriod = updateRestPeriod;
   window.useOnePackage = useOnePackage;
   window.undoPackageUse = undoPackageUse;
+
+  // 將個人設置相關函式暴露到全域，以供 HTML 按鈕與其他模塊呼叫
+  window.loadUserSettings = loadUserSettings;
+  window.populatePersonalSettingsForm = populatePersonalSettingsForm;
+  window.savePersonalProfile = savePersonalProfile;
+  window.saveConstitutionPreferences = saveConstitutionPreferences;
+  window.showHerbComboModal = showHerbComboModal;
+  window.closeHerbComboModal = closeHerbComboModal;
+  window.saveHerbCombo = saveHerbCombo;
+  window.deleteHerbCombination = deleteHerbCombination;
+  window.applyHerbCombination = applyHerbCombination;
+  window.renderHerbCombinations = renderHerbCombinations;
+  window.showAcupointComboModal = showAcupointComboModal;
+  window.closeAcupointComboModal = closeAcupointComboModal;
+  window.saveAcupointCombo = saveAcupointCombo;
+  window.deleteAcupointCombination = deleteAcupointCombination;
+  window.applyAcupointCombination = applyAcupointCombination;
+  window.renderAcupointCombinations = renderAcupointCombinations;
 
   /**
    * 在使用者嘗試直接關閉或重新整理網頁時提示確認，避免未保存的套票使用紀錄被誤判為取消。
