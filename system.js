@@ -5774,6 +5774,19 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         font-weight: bold;
                         color: #333;
                     }
+                    /* 頁尾資訊與行排版 */
+                    .footer-info {
+                        margin-top: 10px;
+                        border-top: 1px dashed #666;
+                        padding-top: 6px;
+                        font-size: 9px;
+                        color: #666;
+                    }
+                    .footer-row {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 2px;
+                    }
                     @media print {
                         @page {
                             size: A5;
@@ -5808,14 +5821,38 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         <div class="info-row"><span class="info-label">診療日期：</span><span>${consultationDate.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span></div>
                         <div class="info-row"><span class="info-label">診療時間：</span><span>${consultationDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</span></div>
                         <div class="info-row"><span class="info-label">主治醫師：</span><span>${getDoctorDisplayName(consultation.doctor)}</span></div>
+                        ${patient.patientNumber ? `<div class="info-row"><span class="info-label">病歷號碼：</span><span>${patient.patientNumber}</span></div>` : ''}
+                        ${(() => {
+                            // 顯示註冊編號（如有）
+                            const regNumber = getDoctorRegistrationNumber(consultation.doctor);
+                            return regNumber ? `
+                                <div class="info-row"><span class="info-label">註冊編號：</span><span>${regNumber}</span></div>
+                            ` : '';
+                        })()}
+                        ${consultation.diagnosis ? `<div class="info-row"><span class="info-label">診斷：</span><span>${consultation.diagnosis}</span></div>` : ''}
                     </div>
                     <!-- 處方內容 -->
-                    <div class="section-title">📋 處方內容</div>
+                    <div class="section-title">處方內容</div>
                     <div class="section-content">${prescriptionHtml}</div>
-                    ${medInfoHtml ? `<div class="section-title">💊 服藥資訊</div><div class="section-content">${medInfoHtml}</div>` : ''}
-                    ${instructionsHtml ? `<div class="section-title">📝 醫囑及注意事項</div><div class="section-content">${instructionsHtml}</div>` : ''}
-                    ${followUpHtml ? `<div class="section-title">📅 建議複診時間</div><div class="section-content">${followUpHtml}</div>` : ''}
-                    <div class="thank-you">祝您早日康復！</div>
+                    ${medInfoHtml ? `<div class="section-title">服藥資訊</div><div class="section-content">${medInfoHtml}</div>` : ''}
+                    ${instructionsHtml ? `<div class="section-title">醫囑及注意事項</div><div class="section-content">${instructionsHtml}</div>` : ''}
+                    ${followUpHtml ? `<div class="section-title">建議複診時間</div><div class="section-content">${followUpHtml}</div>` : ''}
+                    <div class="thank-you">謝謝您的光臨，祝您身體健康！</div>
+                    <!-- 頁尾資訊（參考收據的應收金額下方內容） -->
+                    <div class="footer-info">
+                        <div class="footer-row">
+                            <span>列印時間：</span>
+                            <span>${new Date().toLocaleString('zh-TW')}</span>
+                        </div>
+                        <div class="footer-row">
+                            <span>診所營業時間：</span>
+                            <span>${clinicSettings.businessHours || '週一至週五 09:00-18:00'}</span>
+                        </div>
+                        <div class="footer-row">
+                            <span>本醫囑請妥善保存</span>
+                            <span>如有疑問請洽櫃檯</span>
+                        </div>
+                    </div>
                 </div>
             </body>
             </html>
