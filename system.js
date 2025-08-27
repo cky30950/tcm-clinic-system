@@ -12458,6 +12458,22 @@ document.addEventListener('DOMContentLoaded', function() {
             modal.classList.remove('hidden');
             // 根據不同類型渲染編輯內容
             if (itemType === 'herb') {
+              // 動態產生藥材選項列表，從 herbLibrary 中篩選 type 為 'herb' 的資料
+              const herbOptionsAll = Array.isArray(herbLibrary)
+                ? herbLibrary.filter(h => h.type === 'herb').map(h => '<option value="' + h.name + '">' + h.name + '</option>').join('')
+                : '';
+              // 為每個現有的藥材產生選擇框與劑量輸入
+              const herbIngredientsHtml = Array.isArray(item.ingredients)
+                ? item.ingredients.map(ing => {
+                    const options = Array.isArray(herbLibrary)
+                      ? herbLibrary.filter(h => h.type === 'herb').map(h => {
+                          const selected = (h.name === ing.name) ? ' selected' : '';
+                          return '<option value="' + h.name + '"' + selected + '>' + h.name + '</option>';
+                        }).join('')
+                      : herbOptionsAll;
+                    return '<div class="grid grid-cols-2 gap-2"><select class="px-2 py-1 border border-gray-300 rounded">' + options + '</select><input type="text" value="' + (ing.dosage || '') + '" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded"></div>';
+                  }).join('')
+                : '';
               modalContent.innerHTML = `
                 <div class="space-y-4">
                   <div>
@@ -12477,7 +12493,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">藥材</label>
                     <div id="herbIngredients" class="space-y-2">
-                      ${item.ingredients.map((ing, idx) => '<div class="grid grid-cols-2 gap-2"><input type="text" value="' + (ing.name || '') + '" placeholder="藥材名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + (ing.dosage || '') + '" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded"></div>').join('')}
+                      ${herbIngredientsHtml}
                     </div>
                     <button onclick="addHerbIngredientField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增藥材</button>
                   </div>
@@ -12589,8 +12605,24 @@ document.addEventListener('DOMContentLoaded', function() {
               item.description = document.getElementById('herbDescriptionTextarea').value;
               const ingredientRows = document.querySelectorAll('#herbIngredients > div');
               item.ingredients = Array.from(ingredientRows).map(row => {
+                const select = row.querySelector('select');
                 const inputs = row.querySelectorAll('input');
-                return { name: inputs[0].value, dosage: inputs[1].value };
+                let name = '';
+                let dosage = '';
+                if (select) {
+                  // 若存在下拉選單，名稱取自 select，劑量取自第一個 input
+                  name = select.value;
+                  dosage = inputs[0] ? inputs[0].value : '';
+                } else {
+                  // 兼容舊資料結構：使用兩個輸入框分別代表名稱與劑量
+                  if (inputs.length >= 2) {
+                    name = inputs[0].value;
+                    dosage = inputs[1].value;
+                  } else if (inputs.length === 1) {
+                    name = inputs[0].value;
+                  }
+                }
+                return { name: name, dosage: dosage };
               });
               item.lastModified = new Date().toISOString().split('T')[0];
               renderHerbCombinations();
@@ -12646,7 +12678,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const container = document.getElementById('herbIngredients');
             const div = document.createElement('div');
             div.className = 'grid grid-cols-2 gap-2';
-            div.innerHTML = '<input type="text" placeholder="藥材名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded">';
+            // 為新增欄位產生中藥庫下拉選單
+            let options = '';
+            if (Array.isArray(herbLibrary)) {
+              herbLibrary.forEach(h => {
+                if (h.type === 'herb') {
+                  options += '<option value="' + h.name + '">' + h.name + '</option>';
+                }
+              });
+            }
+            div.innerHTML = '<select class="px-2 py-1 border border-gray-300 rounded">' + options + '</select><input type="text" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded">';
             container.appendChild(div);
           }
 
