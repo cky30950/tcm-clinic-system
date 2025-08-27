@@ -1,7 +1,9 @@
 // 系統資料儲存
 // 用戶登入後的資料
-let currentUser = null;
-let currentUserData = null;
+// 使用 var 搭配保護性檢查來避免在重複載入腳本時發生「Identifier has already been declared」的錯誤。
+// 如果變數已存在則沿用，否則初始化為預設值。
+var currentUser = typeof currentUser !== 'undefined' ? currentUser : null;
+var currentUserData = typeof currentUserData !== 'undefined' ? currentUserData : null;
 
 /**
  * 角色與對應可存取的系統區塊對照表。
@@ -42,15 +44,16 @@ function hasAccessToSection(sectionId) {
 }
 
 // 初始化全域變數
-let patients = [];
-let consultations = [];
-let appointments = [];
+// 在重複載入腳本時，使用已存在的變數以避免重新宣告錯誤
+var patients = typeof patients !== 'undefined' ? patients : [];
+var consultations = typeof consultations !== 'undefined' ? consultations : [];
+var appointments = typeof appointments !== 'undefined' ? appointments : [];
 // 快取病人列表，避免重複從 Firestore 讀取
-let patientCache = null;
+var patientCache = typeof patientCache !== 'undefined' ? patientCache : null;
 
 // 快取診症記錄和用戶列表，避免重複從 Firestore 讀取
-let consultationCache = null;
-let userCache = null;
+var consultationCache = typeof consultationCache !== 'undefined' ? consultationCache : null;
+var userCache = typeof userCache !== 'undefined' ? userCache : null;
 
 // 追蹤本次診症操作期間對套票使用造成的暫時變更。
 // 當使用者在開啟診症或編輯病歷時使用或取消使用套票，
@@ -58,7 +61,7 @@ let userCache = null;
 // 應當將這些變更回復，以避免套票次數不正確。
 // 每個項目包含 patientId、packageRecordId 以及 delta，
 // delta 為負數表示消耗一次，為正數表示退回一次。
-let pendingPackageChanges = [];
+var pendingPackageChanges = typeof pendingPackageChanges !== 'undefined' ? pendingPackageChanges : [];
 
 /**
  * 計算指定病人和套票的暫存變更總和。
@@ -455,7 +458,8 @@ function playNotificationSound() {
 
 
         // 初始化中藥庫資料
-        let herbLibrary = [];
+        // 使用 var 搭配保護性檢查，若已存在則延用，避免重複宣告
+        var herbLibrary = typeof herbLibrary !== 'undefined' ? herbLibrary : [];
         /**
          * 從 Firestore 讀取中藥庫資料，若資料不存在則自動使用預設值初始化。
          * 此函式會等待 Firebase 初始化完成後再執行。
@@ -490,7 +494,8 @@ function playNotificationSound() {
         // 移除未使用的預設收費項目陣列以減少程式碼冗餘
 
         // 初始化收費項目資料
-        let billingItems = [];
+        // 使用 var 搭配保護性檢查，若已存在則延用，避免重複宣告
+        var billingItems = typeof billingItems !== 'undefined' ? billingItems : [];
         /**
          * 從 Firestore 讀取收費項目資料，若資料不存在則使用預設資料初始化。
          * 此函式會等待 Firebase 初始化完成後再執行。
@@ -524,7 +529,8 @@ function playNotificationSound() {
         // 移除未使用的預設用戶陣列以減少程式碼冗餘
 
         // 初始化用戶資料：不使用本地預設，用空陣列代替，待由 Firebase 載入
-        let users = [];
+        // 使用 var 搭配保護性檢查，若已存在則延用，避免重複宣告
+        var users = typeof users !== 'undefined' ? users : [];
 
     
 
@@ -913,8 +919,9 @@ async function logout() {
         }
 
         // 病人管理功能
-        let editingPatientId = null;
-        let filteredPatients = [];
+        // 使用 var 搭配保護性檢查，若已存在則延用，避免重複宣告
+        var editingPatientId = typeof editingPatientId !== 'undefined' ? editingPatientId : null;
+        var filteredPatients = typeof filteredPatients !== 'undefined' ? filteredPatients : [];
         
         // 更新病人年齡顯示
         function updatePatientAge() {
@@ -8861,9 +8868,9 @@ const consultationDate = (() => {
         }
         
 // 用戶管理功能
-let editingUserId = null;
-let currentUserFilter = 'all';
-let usersFromFirebase = []; // 儲存從 Firebase 讀取的用戶數據
+var editingUserId = typeof editingUserId !== 'undefined' ? editingUserId : null;
+var currentUserFilter = typeof currentUserFilter !== 'undefined' ? currentUserFilter : 'all';
+var usersFromFirebase = typeof usersFromFirebase !== 'undefined' ? usersFromFirebase : []; // 儲存從 Firebase 讀取的用戶數據
 
 async function loadUserManagement() {
     await loadUsersFromFirebase();
@@ -11482,7 +11489,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
           // 數據存儲
           // 使用 var 宣告避免重複宣告錯誤
-          var herbCombinations = [
+          // 使用 var 搭配保護性檢查，若已存在則延用，避免重複宣告
+          var herbCombinations = typeof herbCombinations !== 'undefined' ? herbCombinations : [
             {
               id: 1,
               name: '小柴胡湯加減',
@@ -11514,7 +11522,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           ];
 
-          var acupointCombinations = [
+          // 使用 var 搭配保護性檢查，若已存在則延用，避免重複宣告
+          var acupointCombinations = typeof acupointCombinations !== 'undefined' ? acupointCombinations : [
             {
               id: 1,
               name: '腹痛針灸組合',
@@ -11532,7 +11541,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           ];
 
-          var prescriptionTemplates = [
+          // 使用 var 搭配保護性檢查，若已存在則延用，避免重複宣告
+          var prescriptionTemplates = typeof prescriptionTemplates !== 'undefined' ? prescriptionTemplates : [
             {
               id: 1,
               name: '感冒用藥指導模板',
