@@ -199,7 +199,7 @@
                             <div class="text-gray-600 mt-1">記錄症狀、診斷、開立處方</div>
                         </div>
                         <div class="text-center p-4 bg-purple-50 rounded-lg">
-                            <!-- 使用多人圖示以代表診所用戶管理 -->
+                            <!-- 使用多人圖示代表診所用戶管理 -->
                             <div class="text-2xl mb-2">👥</div>
                             <div class="font-semibold">用戶管理</div>
                             <div class="text-gray-600 mt-1">管理診所用戶權限</div>
@@ -1084,7 +1084,11 @@
             <!-- 診所用戶管理 -->
             <div id="userManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800">診所用戶管理</h2>
+                    <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                        <!-- 使用多人圖示代表診所用戶管理 -->
+                        <span class="text-3xl mr-3">👥</span>
+                        診所用戶管理
+                    </h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchUser" placeholder="搜尋用戶名稱或電子郵件..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
@@ -1481,7 +1485,7 @@
         <!-- 個人設置與模板庫管理內容 -->
         <!-- 個人設置區 -->
         <div id="personalSettings" class="hidden">
-          <!-- 調整背景框樣式以與其他功能頁面保持一致 -->
+          <!-- 將背景框樣式調整為與其他功能頁面一致 -->
           <div class="bg-white rounded-xl shadow-lg p-6">
             <h2 class="text-2xl font-bold text-amber-800 mb-6 flex items-center">
               <span class="text-3xl mr-3">👤</span>
@@ -1574,7 +1578,7 @@
 
         <!-- 模板庫管理區 -->
         <div id="templateLibrary" class="hidden">
-          <!-- 調整背景框樣式以與其他功能頁面保持一致 -->
+          <!-- 將背景框樣式調整為與其他功能頁面一致 -->
           <div class="bg-white rounded-xl shadow-lg p-6">
             <h2 class="text-2xl font-bold text-amber-800 mb-6 flex items-center">
               <span class="text-3xl mr-3">📚</span>
