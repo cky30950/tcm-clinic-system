@@ -11553,6 +11553,15 @@ document.addEventListener('DOMContentLoaded', function() {
           } catch (e) {
             console.error('刷新個人組合分類失敗:', e);
           }
+
+          // 更新分類後，重新建立個人組合搜尋與分類介面，以反映最新的分類資料
+          try {
+            if (typeof setupPersonalComboSearchAndFilter === 'function') {
+              setupPersonalComboSearchAndFilter();
+            }
+          } catch (_e) {
+            // 若初始化失敗，不阻斷流程
+          }
         }
 
         /**
@@ -12002,6 +12011,128 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           }
 
+        /**
+         * 初始化個人常用中藥與穴位組合的搜尋與分類篩選界面。
+         * 此函式會在個人設定介面上動態插入搜尋框與分類下拉選單，
+         * 並根據當前的個人分類（herbComboCategories、acupointComboCategories）
+         * 產生選項。若已存在對應的元素，將會更新其選項內容。
+         *
+         * 調用本函式可確保搜尋與分類介面與最新分類保持同步。
+         */
+        function setupPersonalComboSearchAndFilter() {
+          try {
+            // 中藥組合區域：建立或更新搜尋欄與分類下拉選單
+            const herbContainer = document.getElementById('herbCombinationsContainer');
+            if (herbContainer) {
+              let herbWrapper = document.getElementById('herbComboSearchWrapper');
+              // 若尚未建立搜尋區塊，則插入於容器之前
+              if (!herbWrapper) {
+                herbWrapper = document.createElement('div');
+                herbWrapper.id = 'herbComboSearchWrapper';
+                herbWrapper.className = 'flex flex-wrap gap-2 mb-4';
+                // 插入於容器之前
+                herbContainer.parentNode.insertBefore(herbWrapper, herbContainer);
+              }
+              // 清空現有內容以便重建
+              herbWrapper.innerHTML = '';
+              // 建立搜尋輸入框
+              const herbSearchInput = document.createElement('input');
+              herbSearchInput.id = 'herbComboSearchInput';
+              herbSearchInput.className = 'px-3 py-2 border border-gray-300 rounded flex-1';
+              herbSearchInput.placeholder = '搜索常用藥方...';
+              herbWrapper.appendChild(herbSearchInput);
+              // 建立分類下拉選單
+              const herbSelect = document.createElement('select');
+              herbSelect.id = 'herbComboCategoryFilter';
+              herbSelect.className = 'px-3 py-2 border border-gray-300 rounded';
+              // 預設「全部」選項
+              const defaultOpt = document.createElement('option');
+              defaultOpt.value = 'all';
+              defaultOpt.textContent = '全部分類';
+              herbSelect.appendChild(defaultOpt);
+              // 依據個人分類或全域分類產生選項
+              const herbCats = (typeof herbComboCategories !== 'undefined' && Array.isArray(herbComboCategories) && herbComboCategories.length > 0)
+                ? herbComboCategories
+                : ((categories && Array.isArray(categories.herbs)) ? categories.herbs : []);
+              herbCats.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                herbSelect.appendChild(opt);
+              });
+              herbWrapper.appendChild(herbSelect);
+
+              // 為新建立的搜尋與分類選單綁定事件，以即時刷新列表
+              try {
+                herbSearchInput.addEventListener('input', function() {
+                  if (typeof renderHerbCombinations === 'function') {
+                    renderHerbCombinations();
+                  }
+                });
+              } catch (_e) {}
+              try {
+                herbSelect.addEventListener('change', function() {
+                  if (typeof renderHerbCombinations === 'function') {
+                    renderHerbCombinations();
+                  }
+                });
+              } catch (_e) {}
+            }
+            // 穴位組合區域：建立或更新搜尋欄與分類下拉選單
+            const acupointContainer = document.getElementById('acupointCombinationsContainer');
+            if (acupointContainer) {
+              let acuWrapper = document.getElementById('acupointComboSearchWrapper');
+              if (!acuWrapper) {
+                acuWrapper = document.createElement('div');
+                acuWrapper.id = 'acupointComboSearchWrapper';
+                acuWrapper.className = 'flex flex-wrap gap-2 mb-4';
+                acupointContainer.parentNode.insertBefore(acuWrapper, acupointContainer);
+              }
+              acuWrapper.innerHTML = '';
+              const acuSearchInput = document.createElement('input');
+              acuSearchInput.id = 'acupointComboSearchInput';
+              acuSearchInput.className = 'px-3 py-2 border border-gray-300 rounded flex-1';
+              acuSearchInput.placeholder = '搜索常用穴位組合...';
+              acuWrapper.appendChild(acuSearchInput);
+              const acuSelect = document.createElement('select');
+              acuSelect.id = 'acupointComboCategoryFilter';
+              acuSelect.className = 'px-3 py-2 border border-gray-300 rounded';
+              const acuDefaultOpt = document.createElement('option');
+              acuDefaultOpt.value = 'all';
+              acuDefaultOpt.textContent = '全部分類';
+              acuSelect.appendChild(acuDefaultOpt);
+              const acuCats = (typeof acupointComboCategories !== 'undefined' && Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0)
+                ? acupointComboCategories
+                : ((categories && Array.isArray(categories.acupoints)) ? categories.acupoints : []);
+              acuCats.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                acuSelect.appendChild(opt);
+              });
+              acuWrapper.appendChild(acuSelect);
+
+              // 綁定事件至新建立的穴位搜尋與分類選單
+              try {
+                acuSearchInput.addEventListener('input', function() {
+                  if (typeof renderAcupointCombinations === 'function') {
+                    renderAcupointCombinations();
+                  }
+                });
+              } catch (_e) {}
+              try {
+                acuSelect.addEventListener('change', function() {
+                  if (typeof renderAcupointCombinations === 'function') {
+                    renderAcupointCombinations();
+                  }
+                });
+              } catch (_e) {}
+            }
+          } catch (error) {
+            console.error('初始化個人組合搜尋分類介面錯誤:', error);
+          }
+        }
+
           // -----------------------------------------------------------------------------
           // 個人設置相關函式與常用組合載入
           //
@@ -12074,6 +12205,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 if (typeof renderAcupointCombinations === 'function') {
                   renderAcupointCombinations();
+                }
+                // 在載入個人設定後刷新搜尋與分類介面，確保選單與最新資料同步
+                if (typeof setupPersonalComboSearchAndFilter === 'function') {
+                  try {
+                    setupPersonalComboSearchAndFilter();
+                  } catch (_e) {}
                 }
               } catch (e) {
                 console.error('渲染個人設置失敗:', e);
@@ -12817,6 +12954,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.body.appendChild(modal);
                 }
             });
+
+            // 在添加事件監聽前，先初始化個人常用組合的搜尋與分類篩選介面
+            try {
+                if (typeof setupPersonalComboSearchAndFilter === 'function') {
+                    setupPersonalComboSearchAndFilter();
+                }
+            } catch (_e) {
+                // 若初始化失敗，不影響後續流程
+            }
 
             // 監聽個人慣用藥方與穴位組合的搜尋與分類變更，以即時刷新列表
             try {
