@@ -12712,7 +12712,8 @@ document.addEventListener('DOMContentLoaded', function() {
              * 當這些父容器被切換為 hidden 時，彈窗也會隨之被隱藏，導致使用者在其他功能頁無法彈出對話框。
              * 為解決此問題，將這些彈窗節點移動到 body 底下，避免受父層顯示狀態影響。
              */
-            ['categoryModal', 'editModal'].forEach(function(id) {
+            // 將需要在診症系統中使用的彈窗節點移動到 body 底下，避免被隱藏區域遮蔽
+            ['categoryModal', 'editModal', 'herbComboModal', 'acupointComboModal'].forEach(function(id) {
                 const modal = document.getElementById(id);
                 if (modal && modal.parentElement !== document.body) {
                     document.body.appendChild(modal);
