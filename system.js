@@ -11558,9 +11558,35 @@ document.addEventListener('DOMContentLoaded', function() {
          * 讀取成功後會更新 categories 物件以及 window.categories。
          */
         async function initCategoryData() {
+          // 優先從本地 localStorage 載入分類資料，以提供離線支援
+          try {
+            const stored = localStorage.getItem('categories');
+            if (stored) {
+              const localData = JSON.parse(stored);
+              if (localData && typeof localData === 'object') {
+                if (Array.isArray(localData.herbs)) {
+                  categories.herbs = localData.herbs;
+                }
+                if (Array.isArray(localData.acupoints)) {
+                  categories.acupoints = localData.acupoints;
+                }
+                if (Array.isArray(localData.prescriptions)) {
+                  categories.prescriptions = localData.prescriptions;
+                }
+                if (Array.isArray(localData.diagnosis)) {
+                  categories.diagnosis = localData.diagnosis;
+                }
+                // 更新全域引用
+                window.categories = categories;
+              }
+            }
+          } catch (err) {
+            console.error('從本地載入分類資料失敗:', err);
+          }
           // 等待 Firebase 初始化完成
           while (!window.firebase || !window.firebase.db) {
             await new Promise(resolve => setTimeout(resolve, 100));
+            // 如果 Firebase 尚未初始化，直接嘗試下一輪，保持非阻塞
           }
           try {
             const docRef = window.firebase.doc(window.firebase.db, 'categories', 'default');
@@ -11603,19 +11629,36 @@ document.addEventListener('DOMContentLoaded', function() {
          */
         async function saveCategoriesToFirebase() {
           try {
-            // 確保 Firebase 已經初始化
-            while (!window.firebase || !window.firebase.db) {
-              await new Promise(resolve => setTimeout(resolve, 100));
+            // 若 Firebase 可用，保存至 Firestore
+            if (window.firebase && window.firebase.db) {
+              // 確保 Firebase 已經初始化
+              while (!window.firebase || !window.firebase.db) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+              const docRef = window.firebase.doc(window.firebase.db, 'categories', 'default');
+              await window.firebase.setDoc(docRef, {
+                herbs: categories.herbs,
+                acupoints: categories.acupoints,
+                prescriptions: categories.prescriptions,
+                diagnosis: categories.diagnosis
+              });
+            } else {
+              // 若 Firebase 不可用，退而求其次保存至 localStorage
+              try {
+                localStorage.setItem('categories', JSON.stringify(categories));
+              } catch (err) {
+                console.error('保存分類資料至本地失敗:', err);
+              }
+              return;
             }
-            const docRef = window.firebase.doc(window.firebase.db, 'categories', 'default');
-            await window.firebase.setDoc(docRef, {
-              herbs: categories.herbs,
-              acupoints: categories.acupoints,
-              prescriptions: categories.prescriptions,
-              diagnosis: categories.diagnosis
-            });
           } catch (error) {
             console.error('保存分類資料至 Firebase 失敗:', error);
+            // 嘗試使用本地儲存作為後備機制
+            try {
+              localStorage.setItem('categories', JSON.stringify(categories));
+            } catch (err2) {
+              console.error('保存分類資料至本地失敗:', err2);
+            }
           }
         }
 
