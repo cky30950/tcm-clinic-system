@@ -7107,7 +7107,7 @@ async function initializeSystemAfterLogin() {
             }
             
             // 按類別分組顯示
-            const categories = {
+            const billingCategories = {
                 consultation: { name: '診療費', icon: '🩺', items: [] },
                 medicine: { name: '藥費', icon: '💊', items: [] },
                 treatment: { name: '治療費', icon: '🔧', items: [] },
@@ -7115,17 +7115,19 @@ async function initializeSystemAfterLogin() {
                 discount: { name: '折扣項目', icon: '💸', items: [] },
                 package: { name: '套票項目', icon: '🎫', items: [] }
             };
-            
+
+            // 將過濾後的項目分配到對應的帳單分類中
             filteredItems.forEach(item => {
-                if (categories[item.category]) {
-                    categories[item.category].items.push(item);
+                if (billingCategories[item.category]) {
+                    billingCategories[item.category].items.push(item);
                 }
             });
-            
+
             let html = '';
-            
-            Object.keys(categories).forEach(categoryKey => {
-                const category = categories[categoryKey];
+
+            // 建立各分類的顯示內容
+            Object.keys(billingCategories).forEach(categoryKey => {
+                const category = billingCategories[categoryKey];
                 if (category.items.length > 0 && (currentBillingFilter === 'all' || currentBillingFilter === categoryKey)) {
                     html += `
                         <div class="mb-8">
@@ -11435,21 +11437,6 @@ document.addEventListener('DOMContentLoaded', function() {
   window.useOnePackage = useOnePackage;
   window.undoPackageUse = undoPackageUse;
 
-  // 個人與模板分類管理相關函式
-  window.switchPersonalTab = switchPersonalTab;
-  window.switchTemplateTab = switchTemplateTab;
-  window.showCategoryModal = showCategoryModal;
-  window.hideCategoryModal = hideCategoryModal;
-  window.addCategory = addCategory;
-  window.removeCategory = removeCategory;
-  // 編輯彈窗相關函式
-  window.showEditModal = showEditModal;
-  window.hideEditModal = hideEditModal;
-  window.saveEdit = saveEdit;
-  // 動態新增欄位函式
-  window.addHerbIngredientField = addHerbIngredientField;
-  window.addAcupointPointField = addAcupointPointField;
-
   /**
    * 在使用者嘗試直接關閉或重新整理網頁時提示確認，避免未保存的套票使用紀錄被誤判為取消。
    *
@@ -11494,6 +11481,9 @@ document.addEventListener('DOMContentLoaded', function() {
             prescriptions: ['用藥指導', '生活調理', '飲食建議', '運動指導', '復診提醒', '慢性病管理', '婦科調理'],
             diagnosis: ['內科', '婦科', '兒科', '皮膚科', '骨傷科']
           };
+
+          // 將分類資料公開到全域，讓其他模組能夠讀取與更新
+          window.categories = categories;
 
           // 數據存儲
           let herbCombinations = [
