@@ -11472,8 +11472,8 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 })();
           // 分類數據
-          // 使用專用名稱避免與其他作用域中的 categories 衝突
-          let templateCategories = {
+          // 使用專用名稱避免與其他作用域中的 categories 變數衝突
+          var templateCategories = {
             herbs: ['感冒類', '消化系統', '婦科調理', '補益類', '清熱類'],
             acupoints: ['頭面部', '胸腹部', '四肢部', '背腰部', '內科疾病', '婦科疾病'],
             prescriptions: ['用藥指導', '生活調理', '飲食建議', '運動指導', '復診提醒', '慢性病管理', '婦科調理'],
@@ -11481,7 +11481,8 @@ document.addEventListener('DOMContentLoaded', function() {
           };
 
           // 數據存儲
-          let herbCombinations = [
+          // 使用 var 宣告避免重複宣告錯誤
+          var herbCombinations = [
             {
               id: 1,
               name: '小柴胡湯加減',
@@ -11513,7 +11514,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           ];
 
-          let acupointCombinations = [
+          var acupointCombinations = [
             {
               id: 1,
               name: '腹痛針灸組合',
@@ -11531,7 +11532,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           ];
 
-          let prescriptionTemplates = [
+          var prescriptionTemplates = [
             {
               id: 1,
               name: '感冒用藥指導模板',
@@ -11544,7 +11545,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           ];
 
-          let diagnosisTemplates = [
+          var diagnosisTemplates = [
             {
               id: 1,
               name: '感冒診斷模板',
