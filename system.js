@@ -5590,28 +5590,30 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         } else {
             consultationDate = new Date();
         }
-        // 組合處方內容 - 使用整齊格式，每項換行顯示，方劑的組成另起一行顯示於方劑下方
+        // 組合處方內容 - 將處方項目分為三欄顯示以節省空間，方劑的組成使用較小字體顯示於方劑名稱下方
         let prescriptionHtml = '';
         if (consultation.prescription) {
             try {
+                // 解析處方內容行並移除空行
                 const lines = consultation.prescription.split('\n').filter(line => line.trim());
-                const resultLines = [];
+                const itemsList = [];
                 let i = 0;
+                // 將每個條目處理為單獨的 HTML 區塊
                 while (i < lines.length) {
-                    const line = lines[i].trim();
-                    if (!line) {
+                    const raw = lines[i].trim();
+                    if (!raw) {
                         i++;
                         continue;
                     }
-                    // 檢查是否為藥材/方劑格式：名稱+空格+劑量g
-                    const itemMatch = line.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
-                    if (itemMatch) {
-                        const itemName = itemMatch[1].trim();
-                        const dosage = itemMatch[2];
+                    // 判斷是否符合「名稱 劑量g」格式
+                    const match = raw.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
+                    if (match) {
+                        const itemName = match[1].trim();
+                        const dosage = match[2];
                         const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
                         if (isFormula) {
+                            // 如果是方劑，檢查下一行是否為組成說明，非藥材格式的行視為組成
                             let composition = '';
-                            // 若下一行不是藥材格式，視為方劑組成
                             if (i + 1 < lines.length) {
                                 const nextLine = lines[i + 1].trim();
                                 if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
@@ -5619,27 +5621,50 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                                     i++;
                                 }
                             }
-                            // 方劑名稱與劑量
-                            resultLines.push(`<div>${itemName} ${dosage}g</div>`);
-                            // 組成放在方劑下方並略為縮排
-                            if (composition) {
-                                resultLines.push(`<div style="margin-left: 10px; font-size: 9px;">(${composition})</div>`);
-                            }
+                            // 建立方劑區塊，組成文字使用半尺寸字體並置於下一行
+                            const compHtml = composition ? `<br><span style="font-size: 5px;">(${composition})</span>` : '';
+                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g${compHtml}</div>`);
                         } else {
-                            // 普通藥材：名稱與劑量換行顯示
-                            resultLines.push(`<div>${itemName} ${dosage}g</div>`);
+                            // 普通藥材區塊
+                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
                         }
                     } else {
-                        // 非標準行，直接顯示
-                        resultLines.push(`<div style="margin: 2px 0; font-size: 9px; color: #666;">${line}</div>`);
+                        // 其他說明行直接以較小字體顯示
+                        itemsList.push(`<div style="margin-bottom: 4px; font-size: 9px; color: #666;">${raw}</div>`);
                     }
                     i++;
                 }
-                prescriptionHtml = resultLines.join('') || consultation.prescription.replace(/\n/g, '<br>');
+                if (itemsList.length > 0) {
+                    // 將條目平均分配到三欄（直行）以節省垂直空間
+                    const total = itemsList.length;
+                    const columnsCount = 3;
+                    const rows = Math.ceil(total / columnsCount);
+                    const columns = [[], [], []];
+                    for (let col = 0; col < columnsCount; col++) {
+                        for (let row = 0; row < rows; row++) {
+                            const idx = col * rows + row;
+                            if (idx < total) {
+                                columns[col].push(itemsList[idx]);
+                            }
+                        }
+                    }
+                    // 組合三欄的 HTML 內容
+                    let html = '<div style="display: flex;">';
+                    columns.forEach((colItems) => {
+                        html += `<div style="flex: 1; padding-right: 4px;">${colItems.join('')}</div>`;
+                    });
+                    html += '</div>';
+                    prescriptionHtml = html;
+                } else {
+                    // 若未能解析任何項目，直接以換行顯示原始內容
+                    prescriptionHtml = consultation.prescription.replace(/\n/g, '<br>');
+                }
             } catch (_e) {
+                // 解析出錯時，退回顯示原始處方內容
                 prescriptionHtml = consultation.prescription.replace(/\n/g, '<br>');
             }
         } else {
+            // 無處方內容
             prescriptionHtml = '無記錄';
         }
         // 組合服藥資訊
@@ -5827,7 +5852,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     </div>
                     <!-- 處方內容 -->
                     <div class="section-title">處方內容</div>
-                    <div class="section-content">${prescriptionHtml}</div>
+                    <!-- 將處方內容分為三欄顯示，並在下方以小字提示不可重配 -->
+                    <div class="section-content">${prescriptionHtml}<div style="margin-top: 4px; font-size: 8px;">此藥方不可重配</div></div>
                     ${medInfoHtml ? `<div class="section-title">服藥資訊</div><div class="section-content">${medInfoHtml}</div>` : ''}
                     ${instructionsHtml ? `<div class="section-title">醫囑及注意事項</div><div class="section-content">${instructionsHtml}</div>` : ''}
                     ${followUpHtml ? `<div class="section-title">建議複診時間</div><div class="section-content">${followUpHtml}</div>` : ''}
