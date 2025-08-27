@@ -8,9 +8,13 @@ let currentUserData = null;
  * 每個角色可存取哪些頁面（功能），在此集中定義。
  */
 const ROLE_PERMISSIONS = {
+  // 診所管理者擁有全部功能權限，包括個人設置與模板庫管理
   '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary'],
+  // 醫師可存取大部分功能，包含個人設置與模板庫管理
   '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement', 'personalSettings', 'templateLibrary'],
+  // 護理師僅能使用診症相關功能，不包括個人設置或模板庫管理
   '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary'],
+  // 一般用戶只能進入病患管理與診症系統
   '用戶': ['patientManagement', 'consultationSystem']
 };
 
@@ -824,7 +828,9 @@ async function logout() {
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
                 financialReports: { title: '財務報表', icon: '📊', description: '收入分析與財務統計' },
                 systemManagement: { title: '系統管理', icon: '⚙️', description: '統計資料、備份匯出' },
-                personalSettings: { title: '個人設置', icon: '👤', description: '管理慣用藥方與穴位組合' },
+                // 新增：個人設置
+                personalSettings: { title: '個人設置', icon: '👤', description: '管理慣用藥方及穴位組合' },
+                // 新增：模板庫管理
                 templateLibrary: { title: '模板庫管理', icon: '📚', description: '管理醫囑與診斷模板' }
             };
 
@@ -899,8 +905,10 @@ async function logout() {
 
         // 隱藏所有區域
         function hideAllSections() {
+            // 隱藏所有區域，包括新增的個人設置與模板庫管理
             ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary', 'welcomePage'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
             });
         }
 
