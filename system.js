@@ -11639,6 +11639,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 prescriptions: categories.prescriptions,
                 diagnosis: categories.diagnosis
               });
+
+              // 無論是否使用 Firebase，均在本地保存一份副本
+              try {
+                localStorage.setItem('categories', JSON.stringify(categories));
+              } catch (err) {
+                console.error('保存分類資料至本地失敗:', err);
+              }
             } else {
               // 若 Firebase 不可用，退而求其次保存至 localStorage
               try {
@@ -11656,6 +11663,18 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (err2) {
               console.error('保存分類資料至本地失敗:', err2);
             }
+          }
+        }
+
+        /**
+         * 將當前分類資料寫入瀏覽器的 localStorage。
+         * Firebase 若不可用或寫入失敗，仍可通過此函式確保分類設定不會遺失。
+         */
+        function persistCategoriesLocally() {
+          try {
+            localStorage.setItem('categories', JSON.stringify(categories));
+          } catch (err) {
+            console.error('本地保存分類資料失敗:', err);
           }
         }
 
@@ -12351,10 +12370,16 @@ document.addEventListener('DOMContentLoaded', function() {
               }
               showCategoryModal(type);
               input.value = '';
-              // 將更新後的分類儲存至 Firebase
+              // 將更新後的分類儲存至 Firebase 或本地
               if (typeof saveCategoriesToFirebase === 'function') {
                 try {
                   saveCategoriesToFirebase().catch(err => console.error('保存分類資料失敗:', err));
+                } catch (_e) {}
+              }
+              // 立即在 localStorage 中保存分類，避免非同步或 Firebase 不可用時資料遺失
+              if (typeof persistCategoriesLocally === 'function') {
+                try {
+                  persistCategoriesLocally();
                 } catch (_e) {}
               }
               // 如屬 herbs 或 acupoints，同步保存個人設定中的分類資料
@@ -12374,10 +12399,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 refreshComboCategories(type);
               }
               showCategoryModal(type);
-              // 將更新後的分類儲存至 Firebase
+              // 將更新後的分類儲存至 Firebase 或本地
               if (typeof saveCategoriesToFirebase === 'function') {
                 try {
                   saveCategoriesToFirebase().catch(err => console.error('保存分類資料失敗:', err));
+                } catch (_e) {}
+              }
+              // 立即在 localStorage 中保存分類，避免非同步或 Firebase 不可用時資料遺失
+              if (typeof persistCategoriesLocally === 'function') {
+                try {
+                  persistCategoriesLocally();
                 } catch (_e) {}
               }
               // 如屬 herbs 或 acupoints，同步保存個人設定中的分類資料
