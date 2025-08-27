@@ -11741,14 +11741,34 @@ document.addEventListener('DOMContentLoaded', function() {
               while (!window.firebase || !window.firebase.db) {
                 await new Promise(resolve => setTimeout(resolve, 100));
               }
+              // 等待數據管理器初始化
+              while (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+              // 若沒有當前用戶資料，直接結束
               if (!currentUserData || !currentUserData.id) {
                 return;
               }
-              const userDocRef = window.firebase.doc(window.firebase.db, 'users', String(currentUserData.id));
-              const userSnapshot = await window.firebase.getDoc(userDocRef);
-              if (userSnapshot && userSnapshot.exists()) {
-                const data = userSnapshot.data();
-                const personal = data.personalSettings || {};
+              /*
+               * Firebase 模組化版本中沒有全域 getDoc 函式。原本的程式碼
+               * 嘗試呼叫 window.firebase.getDoc 會導致錯誤。為了讀取當前
+               * 用戶的個人設定，我們改為透過 FirebaseDataManager 取得用戶
+               * 清單，並於其中尋找匹配的用戶紀錄。這避免了對不存在 API
+               * 的依賴。*/
+              let userRecord = null;
+              try {
+                const usersResult = await window.firebaseDataManager.getUsers();
+                if (usersResult && usersResult.success && Array.isArray(usersResult.data)) {
+                  userRecord = usersResult.data.find(u => {
+                    const idMatches = u && u.id !== undefined && currentUserData.id !== undefined;
+                    return idMatches && String(u.id) === String(currentUserData.id);
+                  });
+                }
+              } catch (err) {
+                console.error('讀取用戶資料時發生錯誤:', err);
+              }
+              if (userRecord && userRecord.personalSettings) {
+                const personal = userRecord.personalSettings;
                 if (Array.isArray(personal.herbCombinations)) {
                   herbCombinations = personal.herbCombinations;
                 }
