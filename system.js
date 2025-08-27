@@ -12020,6 +12020,9 @@ document.addEventListener('DOMContentLoaded', function() {
          * 調用本函式可確保搜尋與分類介面與最新分類保持同步。
          */
         function setupPersonalComboSearchAndFilter() {
+          // 自從介面上已經存在搜尋與篩選欄位，取消在此函式中動態產生搜尋欄。
+          // 新增的 early return 將阻止下方程式碼執行，避免插入重複的搜尋框。
+          return;
           try {
             // 中藥組合區域：建立或更新搜尋欄與分類下拉選單
             const herbContainer = document.getElementById('herbCombinationsContainer');
