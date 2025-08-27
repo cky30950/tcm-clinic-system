@@ -199,7 +199,7 @@
                             <div class="text-gray-600 mt-1">記錄症狀、診斷、開立處方</div>
                         </div>
                         <div class="text-center p-4 bg-purple-50 rounded-lg">
-                            <div class="text-2xl mb-2">👤</div>
+                            <div class="text-2xl mb-2">👫</div>
                             <div class="font-semibold">用戶管理</div>
                             <div class="text-gray-600 mt-1">管理診所用戶權限</div>
                         </div>
@@ -1480,7 +1480,7 @@
         <!-- 個人設置與模板庫管理內容 -->
         <!-- 個人設置區 -->
         <div id="personalSettings" class="hidden">
-          <div class="section-card rounded-xl p-8">
+          <div class="bg-white rounded-xl shadow-lg p-6">
             <h2 class="text-2xl font-bold text-amber-800 mb-6 flex items-center">
               <span class="text-3xl mr-3">👤</span>
               個人設置
@@ -1572,7 +1572,7 @@
 
         <!-- 模板庫管理區 -->
         <div id="templateLibrary" class="hidden">
-          <div class="section-card rounded-xl p-8">
+          <div class="bg-white rounded-xl shadow-lg p-6">
             <h2 class="text-2xl font-bold text-amber-800 mb-6 flex items-center">
               <span class="text-3xl mr-3">📚</span>
               模板庫管理
@@ -1722,7 +1722,640 @@
           </div>
         </div>
 
- 
+        <!-- 個人設置及模板庫管理腳本 -->
+        <script>
+          // 分類數據
+          let categories = {
+            herbs: ['感冒類', '消化系統', '婦科調理', '補益類', '清熱類'],
+            acupoints: ['頭面部', '胸腹部', '四肢部', '背腰部', '內科疾病', '婦科疾病'],
+            prescriptions: ['用藥指導', '生活調理', '飲食建議', '運動指導', '復診提醒', '慢性病管理', '婦科調理'],
+            diagnosis: ['內科', '婦科', '兒科', '皮膚科', '骨傷科']
+          };
+
+          // 數據存儲
+          let herbCombinations = [
+            {
+              id: 1,
+              name: '小柴胡湯加減',
+              category: '感冒類',
+              description: '適用：少陽證、往來寒熱、胸脅苦滿',
+              ingredients: [
+                { name: '柴胡', dosage: '12g' },
+                { name: '黃芩', dosage: '9g' },
+                { name: '半夏', dosage: '9g' },
+                { name: '人參', dosage: '6g' },
+                { name: '甘草', dosage: '6g' }
+              ],
+              frequency: '高',
+              lastModified: '2024-01-10'
+            },
+            {
+              id: 2,
+              name: '四君子湯',
+              category: '補益類',
+              description: '適用：脾胃氣虛、食少便溏、面色萎白',
+              ingredients: [
+                { name: '人參', dosage: '9g' },
+                { name: '白朮', dosage: '9g' },
+                { name: '茯苓', dosage: '9g' },
+                { name: '甘草', dosage: '6g' }
+              ],
+              frequency: '中',
+              lastModified: '2024-03-18'
+            }
+          ];
+
+          let acupointCombinations = [
+            {
+              id: 1,
+              name: '腹痛針灸組合',
+              category: '內科疾病',
+              points: [
+                { name: '中脘穴', type: '主穴' },
+                { name: '足三里', type: '主穴' },
+                { name: '合谷穴', type: '配穴' },
+                { name: '內關穴', type: '配穴' },
+                { name: '胃俞穴', type: '配穴' }
+              ],
+              technique: '補法為主，可配合艾灸',
+              frequency: '高',
+              lastModified: '2024-02-01'
+            }
+          ];
+
+          let prescriptionTemplates = [
+            {
+              id: 1,
+              name: '感冒用藥指導模板',
+              category: '用藥指導',
+              duration: '7天',
+              followUp: '3天後',
+              content: '服藥方法：每日三次，飯後30分鐘溫服。服藥期間多喝溫開水。避免生冷、油膩、辛辣食物。注意事項：充分休息，避免熬夜。如症狀加重或持續發燒請立即回診。療程安排：建議療程7天，服藥3天後回診評估。',
+              frequency: '高',
+              lastModified: '2024-02-15'
+            }
+          ];
+
+          let diagnosisTemplates = [
+            {
+              id: 1,
+              name: '感冒診斷模板',
+              category: '內科',
+              content: '症狀描述：患者表現為鼻塞、喉嚨痛、咳嗽等症狀。檢查建議：觀察咽部紅腫狀況，測量體溫。治療建議：建議使用疏風解表類中藥，搭配休息和多喝水。復診安排：3天後回診。',
+              frequency: '中',
+              lastModified: '2024-01-20'
+            }
+          ];
+
+          // 渲染中藥組合
+          function renderHerbCombinations() {
+            const container = document.getElementById('herbCombinationsContainer');
+            container.innerHTML = '';
+            herbCombinations.forEach(item => {
+              const card = document.createElement('div');
+              card.className = 'bg-white p-6 rounded-lg border-2 border-green-200';
+              card.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                  <h3 class="text-lg font-semibold text-green-800">${item.name}</h3>
+                  <div class="flex gap-2">
+                    <button class="text-blue-600 hover:text-blue-800 text-sm" onclick="showEditModal('herb', '${item.name}')">編輯</button>
+                    <button class="text-green-600 hover:text-green-800 text-sm" onclick="duplicateHerbCombination(${item.id})">複製</button>
+                    <button class="text-red-600 hover:text-red-800 text-sm" onclick="deleteHerbCombination(${item.id})">刪除</button>
+                  </div>
+                </div>
+                <p class="text-gray-600 mb-3">${item.description}</p>
+                <div class="text-sm text-gray-700 space-y-1">
+                  ${item.ingredients.map(ing => '<div class="flex justify-between"><span>' + ing.name + '</span><span>' + ing.dosage + '</span></div>').join('')}
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-200">
+                  <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">使用頻率: ${item.frequency}</span>
+                </div>
+              `;
+              container.appendChild(card);
+            });
+          }
+
+          function addNewHerbCombination() {
+            const name = prompt('請輸入新藥方名稱:');
+            if (!name) return;
+            const newItem = {
+              id: Date.now(),
+              name,
+              category: '',
+              description: '',
+              ingredients: [],
+              frequency: '低',
+              lastModified: new Date().toISOString().split('T')[0]
+            };
+            herbCombinations.push(newItem);
+            renderHerbCombinations();
+          }
+
+          function duplicateHerbCombination(id) {
+            const item = herbCombinations.find(h => h.id === id);
+            if (!item) return;
+            const copy = JSON.parse(JSON.stringify(item));
+            copy.id = Date.now();
+            copy.name += ' (複製)';
+            herbCombinations.push(copy);
+            renderHerbCombinations();
+          }
+
+          function deleteHerbCombination(id) {
+            if (!confirm('確定要刪除此藥方組合嗎？')) return;
+            herbCombinations = herbCombinations.filter(h => h.id !== id);
+            renderHerbCombinations();
+          }
+
+          // 渲染穴位組合
+          function renderAcupointCombinations() {
+            const container = document.getElementById('acupointCombinationsContainer');
+            container.innerHTML = '';
+            acupointCombinations.forEach(item => {
+              const card = document.createElement('div');
+              card.className = 'bg-white p-6 rounded-lg border-2 border-blue-200';
+              card.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                  <h3 class="text-lg font-semibold text-blue-800">${item.name}</h3>
+                  <div class="flex gap-2">
+                    <button class="text-blue-600 hover:text-blue-800 text-sm" onclick="showEditModal('acupoint', '${item.name}')">編輯</button>
+                    <button class="text-green-600 hover:text-green-800 text-sm" onclick="duplicateAcupointCombination(${item.id})">複製</button>
+                    <button class="text-red-600 hover:text-red-800 text-sm" onclick="deleteAcupointCombination(${item.id})">刪除</button>
+                  </div>
+                </div>
+                <div class="text-sm text-gray-700 space-y-1">
+                  ${item.points.map(pt => '<div class="flex justify-between items-center"><span class="text-gray-700">' + pt.name + '</span><span class="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded">' + pt.type + '</span></div>').join('')}
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-200 text-sm text-gray-600">
+                  <p>針法：${item.technique}</p>
+                </div>
+              `;
+              container.appendChild(card);
+            });
+          }
+
+          function addNewAcupointCombination() {
+            const name = prompt('請輸入新穴位組合名稱:');
+            if (!name) return;
+            const newItem = {
+              id: Date.now(),
+              name,
+              category: '',
+              points: [],
+              technique: '',
+              frequency: '低',
+              lastModified: new Date().toISOString().split('T')[0]
+            };
+            acupointCombinations.push(newItem);
+            renderAcupointCombinations();
+          }
+
+          function duplicateAcupointCombination(id) {
+            const item = acupointCombinations.find(a => a.id === id);
+            if (!item) return;
+            const copy = JSON.parse(JSON.stringify(item));
+            copy.id = Date.now();
+            copy.name += ' (複製)';
+            acupointCombinations.push(copy);
+            renderAcupointCombinations();
+          }
+
+          function deleteAcupointCombination(id) {
+            if (!confirm('確定要刪除此穴位組合嗎？')) return;
+            acupointCombinations = acupointCombinations.filter(a => a.id !== id);
+            renderAcupointCombinations();
+          }
+
+          // 渲染醫囑模板
+          function renderPrescriptionTemplates() {
+            const container = document.getElementById('prescriptionTemplatesContainer');
+            container.innerHTML = '';
+            prescriptionTemplates.forEach(item => {
+              const card = document.createElement('div');
+              card.className = 'bg-white p-6 rounded-lg border-2 border-purple-200';
+              card.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 class="text-lg font-semibold text-purple-800">${item.name}</h3>
+                    <div class="flex gap-2 mt-1">
+                      <span class="text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded">${item.category}</span>
+                      <span class="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">療程: ${item.duration}</span>
+                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">複診: ${item.followUp}</span>
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="text-blue-600 hover:text-blue-800" onclick="showEditModal('prescription', '${item.name}')">編輯</button>
+                    <button class="text-green-600 hover:text-green-800" onclick="duplicatePrescriptionTemplate(${item.id})">複製</button>
+                    <button class="text-red-600 hover:text-red-800" onclick="deletePrescriptionTemplate(${item.id})">刪除</button>
+                  </div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
+                  ${item.content.split('\n').map(p => '<p class="mb-2">' + p + '</p>').join('')}
+                </div>
+              `;
+              container.appendChild(card);
+            });
+          }
+
+          function addNewPrescriptionTemplate() {
+            const name = prompt('請輸入新醫囑模板名稱:');
+            if (!name) return;
+            const newItem = {
+              id: Date.now(),
+              name,
+              category: '',
+              duration: '',
+              followUp: '',
+              content: '',
+              frequency: '低',
+              lastModified: new Date().toISOString().split('T')[0]
+            };
+            prescriptionTemplates.push(newItem);
+            renderPrescriptionTemplates();
+          }
+
+          function duplicatePrescriptionTemplate(id) {
+            const item = prescriptionTemplates.find(p => p.id === id);
+            if (!item) return;
+            const copy = JSON.parse(JSON.stringify(item));
+            copy.id = Date.now();
+            copy.name += ' (複製)';
+            prescriptionTemplates.push(copy);
+            renderPrescriptionTemplates();
+          }
+
+          function deletePrescriptionTemplate(id) {
+            if (!confirm('確定要刪除此醫囑模板嗎？')) return;
+            prescriptionTemplates = prescriptionTemplates.filter(p => p.id !== id);
+            renderPrescriptionTemplates();
+          }
+
+          // 渲染診斷模板
+          function renderDiagnosisTemplates() {
+            const container = document.getElementById('diagnosisTemplatesContainer');
+            container.innerHTML = '';
+            diagnosisTemplates.forEach(item => {
+              const card = document.createElement('div');
+              card.className = 'bg-white p-6 rounded-lg border-2 border-orange-200';
+              card.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 class="text-lg font-semibold text-orange-800">${item.name}</h3>
+                    <div class="flex gap-2 mt-1">
+                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">${item.category}</span>
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="text-blue-600 hover:text-blue-800" onclick="showEditModal('diagnosis', '${item.name}')">編輯</button>
+                    <button class="text-green-600 hover:text-green-800" onclick="duplicateDiagnosisTemplate(${item.id})">複製</button>
+                    <button class="text-red-600 hover:text-red-800" onclick="deleteDiagnosisTemplate(${item.id})">刪除</button>
+                  </div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
+                  ${item.content.split('\n').map(p => '<p class="mb-2">' + p + '</p>').join('')}
+                </div>
+              `;
+              container.appendChild(card);
+            });
+          }
+
+          function addNewDiagnosisTemplate() {
+            const name = prompt('請輸入新診斷模板名稱:');
+            if (!name) return;
+            const newItem = {
+              id: Date.now(),
+              name,
+              category: '',
+              content: '',
+              frequency: '低',
+              lastModified: new Date().toISOString().split('T')[0]
+            };
+            diagnosisTemplates.push(newItem);
+            renderDiagnosisTemplates();
+          }
+
+          function duplicateDiagnosisTemplate(id) {
+            const item = diagnosisTemplates.find(d => d.id === id);
+            if (!item) return;
+            const copy = JSON.parse(JSON.stringify(item));
+            copy.id = Date.now();
+            copy.name += ' (複製)';
+            diagnosisTemplates.push(copy);
+            renderDiagnosisTemplates();
+          }
+
+          function deleteDiagnosisTemplate(id) {
+            if (!confirm('確定要刪除此診斷模板嗎？')) return;
+            diagnosisTemplates = diagnosisTemplates.filter(d => d.id !== id);
+            renderDiagnosisTemplates();
+          }
+
+          // 切換個人設置標籤
+          function switchPersonalTab(tabId) {
+            const tabContents = document.querySelectorAll('.personal-tab-content');
+            tabContents.forEach(content => content.classList.add('hidden'));
+            if (tabId === 'herbs') {
+              document.getElementById('herbsContent').classList.remove('hidden');
+            } else if (tabId === 'acupoints') {
+              document.getElementById('acupointsContent').classList.remove('hidden');
+            }
+            const tabButtons = ['herbsTab', 'acupointsTab'];
+            tabButtons.forEach(buttonId => {
+              const button = document.getElementById(buttonId);
+              if (buttonId === tabId + 'Tab') {
+                button.className = 'px-6 py-3 text-amber-700 border-b-2 border-amber-500 font-medium';
+              } else {
+                button.className = 'px-6 py-3 text-gray-500 hover:text-amber-700 font-medium';
+              }
+            });
+          }
+
+          // 切換模板庫標籤
+          function switchTemplateTab(tabId) {
+            const tabContents = document.querySelectorAll('.template-tab-content');
+            tabContents.forEach(content => content.classList.add('hidden'));
+            if (tabId === 'prescriptions') {
+              document.getElementById('prescriptionsContent').classList.remove('hidden');
+            } else if (tabId === 'diagnosis') {
+              document.getElementById('diagnosisContent').classList.remove('hidden');
+            }
+            const tabButtons = ['prescriptionsTab', 'diagnosisTab'];
+            tabButtons.forEach(buttonId => {
+              const button = document.getElementById(buttonId);
+              if (buttonId === tabId + 'Tab') {
+                button.className = 'px-6 py-3 text-amber-700 border-b-2 border-amber-500 font-medium';
+              } else {
+                button.className = 'px-6 py-3 text-gray-500 hover:text-amber-700 font-medium';
+              }
+            });
+          }
+
+          // 顯示分類管理彈窗
+          function showCategoryModal(type) {
+            const modal = document.getElementById('categoryModal');
+            const titleEl = document.getElementById('categoryModalTitle');
+            const listEl = document.getElementById('categoryList');
+            const titles = {
+              herbs: '管理中藥分類',
+              acupoints: '管理穴位分類',
+              prescriptions: '管理醫囑分類',
+              diagnosis: '管理診斷分類'
+            };
+            titleEl.textContent = titles[type] || '管理分類';
+            modal.classList.remove('hidden');
+            modal.dataset.type = type;
+            // 渲染分類列表
+            listEl.innerHTML = '';
+            categories[type].forEach((cat, idx) => {
+              const div = document.createElement('div');
+              div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
+              div.innerHTML = `
+                <span class="text-gray-700">${cat}</span>
+                <button onclick="removeCategory('${type}', ${idx})" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
+              `;
+              listEl.appendChild(div);
+            });
+          }
+
+          function hideCategoryModal() {
+            document.getElementById('categoryModal').classList.add('hidden');
+            document.getElementById('newCategoryInput').value = '';
+          }
+
+          function addCategory() {
+            const input = document.getElementById('newCategoryInput');
+            const type = document.getElementById('categoryModal').dataset.type;
+            const newCategory = input.value.trim();
+            if (newCategory && !categories[type].includes(newCategory)) {
+              categories[type].push(newCategory);
+              showCategoryModal(type);
+              input.value = '';
+            }
+          }
+
+          function removeCategory(type, index) {
+            if (confirm('確定要刪除此分類嗎？')) {
+              categories[type].splice(index, 1);
+              showCategoryModal(type);
+            }
+          }
+
+          // 顯示編輯彈窗
+          function showEditModal(itemType, title) {
+            const modal = document.getElementById('editModal');
+            const modalTitle = document.getElementById('editModalTitle');
+            const modalContent = document.getElementById('editModalContent');
+            modalTitle.textContent = '編輯' + title;
+            modal.classList.remove('hidden');
+            if (itemType === 'herb') {
+              const item = herbCombinations.find(h => h.name === title);
+              if (!item) return;
+              modalContent.innerHTML = `
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">組合名稱</label>
+                    <input type="text" id="herbNameInput" value="${item.name}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">分類</label>
+                    <select id="herbCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                      ${categories.herbs.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">適應症描述</label>
+                    <textarea id="herbDescriptionTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="3">${item.description}</textarea>
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">藥材</label>
+                    <div id="herbIngredients" class="space-y-2">
+                      ${item.ingredients.map((ing, idx) => '<div class="grid grid-cols-2 gap-2"><input type="text" value="' + ing.name + '" placeholder="藥材名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + ing.dosage + '" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded"></div>').join('')}
+                    </div>
+                    <button onclick="addHerbIngredientField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增藥材</button>
+                  </div>
+                </div>
+              `;
+            } else if (itemType === 'acupoint') {
+              const item = acupointCombinations.find(a => a.name === title);
+              if (!item) return;
+              modalContent.innerHTML = `
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">組合名稱</label>
+                    <input type="text" id="acupointNameInput" value="${item.name}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">分類</label>
+                    <select id="acupointCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                      ${categories.acupoints.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">穴位列表</label>
+                    <div id="acupointPoints" class="space-y-2">
+                      ${item.points.map(pt => '<div class="grid grid-cols-2 gap-2"><input type="text" value="' + pt.name + '" placeholder="穴位名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + pt.type + '" placeholder="主穴/配穴" class="px-2 py-1 border border-gray-300 rounded"></div>').join('')}
+                    </div>
+                    <button onclick="addAcupointPointField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增穴位</button>
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">針法</label>
+                    <input type="text" id="acupointTechniqueInput" value="${item.technique}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                  </div>
+                </div>
+              `;
+            } else if (itemType === 'prescription') {
+              const item = prescriptionTemplates.find(p => p.name === title);
+              if (!item) return;
+              modalContent.innerHTML = `
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">模板名稱</label>
+                    <input type="text" id="prescriptionNameInput" value="${item.name}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-gray-700 font-medium mb-2">分類</label>
+                      <select id="prescriptionCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                        ${categories.prescriptions.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-gray-700 font-medium mb-2">療程時間</label>
+                      <input type="text" id="prescriptionDurationInput" value="${item.duration}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-gray-700 font-medium mb-2">複診時間</label>
+                      <input type="text" id="prescriptionFollowUpInput" value="${item.followUp}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    </div>
+                    <div>
+                      <label class="block text-gray-700 font-medium mb-2">注意事項</label>
+                      <input type="text" id="prescriptionNoteInput" placeholder="如：服藥完畢後" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">醫囑內容</label>
+                    <textarea id="prescriptionContentTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="5">${item.content}</textarea>
+                  </div>
+                </div>
+              `;
+            } else if (itemType === 'diagnosis') {
+              const item = diagnosisTemplates.find(d => d.name === title);
+              if (!item) return;
+              modalContent.innerHTML = `
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">模板名稱</label>
+                    <input type="text" id="diagnosisNameInput" value="${item.name}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">科別</label>
+                    <select id="diagnosisCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                      ${categories.diagnosis.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">診斷內容</label>
+                    <textarea id="diagnosisContentTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="5">${item.content}</textarea>
+                  </div>
+                </div>
+              `;
+            }
+          }
+
+          function hideEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+          }
+
+          function saveEdit() {
+            const modalTitle = document.getElementById('editModalTitle').textContent;
+            if (modalTitle.includes('組合')) {
+              const nameInput = document.querySelector('#herbNameInput, #acupointNameInput');
+              if (nameInput) {
+                const itemName = nameInput.value;
+                if (modalTitle.includes('藥方')) {
+                  const item = herbCombinations.find(h => h.name === itemName);
+                  if (!item) return;
+                  item.name = document.getElementById('herbNameInput').value;
+                  item.category = document.getElementById('herbCategorySelect').value;
+                  item.description = document.getElementById('herbDescriptionTextarea').value;
+                  const ingredientRows = document.querySelectorAll('#herbIngredients > div');
+                  item.ingredients = Array.from(ingredientRows).map(row => {
+                    const inputs = row.querySelectorAll('input');
+                    return { name: inputs[0].value, dosage: inputs[1].value };
+                  });
+                  item.lastModified = new Date().toISOString().split('T')[0];
+                  renderHerbCombinations();
+                } else {
+                  const item = acupointCombinations.find(a => a.name === itemName);
+                  if (!item) return;
+                  item.name = document.getElementById('acupointNameInput').value;
+                  item.category = document.getElementById('acupointCategorySelect').value;
+                  const pointRows = document.querySelectorAll('#acupointPoints > div');
+                  item.points = Array.from(pointRows).map(row => {
+                    const inputs = row.querySelectorAll('input');
+                    return { name: inputs[0].value, type: inputs[1].value };
+                  });
+                  item.technique = document.getElementById('acupointTechniqueInput').value;
+                  item.lastModified = new Date().toISOString().split('T')[0];
+                  renderAcupointCombinations();
+                }
+              }
+            } else if (modalTitle.includes('模板')) {
+              if (modalTitle.includes('醫囑')) {
+                const nameInput = document.getElementById('prescriptionNameInput');
+                const item = prescriptionTemplates.find(p => p.name === nameInput.value);
+                if (!item) return;
+                item.name = nameInput.value;
+                item.category = document.getElementById('prescriptionCategorySelect').value;
+                item.duration = document.getElementById('prescriptionDurationInput').value;
+                item.followUp = document.getElementById('prescriptionFollowUpInput').value;
+                item.content = document.getElementById('prescriptionContentTextarea').value;
+                item.lastModified = new Date().toISOString().split('T')[0];
+                renderPrescriptionTemplates();
+              } else {
+                const nameInput = document.getElementById('diagnosisNameInput');
+                const item = diagnosisTemplates.find(d => d.name === nameInput.value);
+                if (!item) return;
+                item.name = nameInput.value;
+                item.category = document.getElementById('diagnosisCategorySelect').value;
+                item.content = document.getElementById('diagnosisContentTextarea').value;
+                item.lastModified = new Date().toISOString().split('T')[0];
+                renderDiagnosisTemplates();
+              }
+            }
+            alert('保存成功！');
+            hideEditModal();
+          }
+
+          function addHerbIngredientField() {
+            const container = document.getElementById('herbIngredients');
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-2 gap-2';
+            div.innerHTML = '<input type="text" placeholder="藥材名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded">';
+            container.appendChild(div);
+          }
+
+          function addAcupointPointField() {
+            const container = document.getElementById('acupointPoints');
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-2 gap-2';
+            div.innerHTML = '<input type="text" placeholder="穴位名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="主穴/配穴" class="px-2 py-1 border border-gray-300 rounded">';
+            container.appendChild(div);
+          }
+
+          // 初始化
+          document.addEventListener('DOMContentLoaded', function() {
+            renderHerbCombinations();
+            renderAcupointCombinations();
+            renderPrescriptionTemplates();
+            renderDiagnosisTemplates();
+          });
+        </script>
+
+        <!-- 主系統頁面版權聲明 -->
+        <!-- 在主系統頁面結尾加入版權聲明，置於主要內容容器與主系統外層之間。 -->
         <div class="max-w-7xl mx-auto px-4 py-4 mt-8">
             <div class="text-center border-t border-gray-200 pt-4">
                 <div class="text-xs text-gray-400">
@@ -1778,6 +2411,7 @@
             </div>
         </div>
     </div>
+    <script src="system.js"></script>
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
