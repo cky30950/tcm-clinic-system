@@ -7107,47 +7107,39 @@ async function initializeSystemAfterLogin() {
             }
             
             // 按類別分組顯示
-            // 將類別對應的資料結構命名為 billingCategories 以避免與全域分類設定衝突
-            const billingCategories = {
+            const categories = {
                 consultation: { name: '診療費', icon: '🩺', items: [] },
-                medicine:     { name: '藥費',   icon: '💊', items: [] },
-                treatment:    { name: '治療費', icon: '🔧', items: [] },
-                other:        { name: '其他',   icon: '📋', items: [] },
-                discount:     { name: '折扣項目', icon: '💸', items: [] },
-                package:      { name: '套票項目', icon: '🎫', items: [] }
+                medicine: { name: '藥費', icon: '💊', items: [] },
+                treatment: { name: '治療費', icon: '🔧', items: [] },
+                other: { name: '其他', icon: '📋', items: [] },
+                discount: { name: '折扣項目', icon: '💸', items: [] },
+                package: { name: '套票項目', icon: '🎫', items: [] }
             };
-
-            // 將過濾後的項目放入對應的分類陣列
+            
             filteredItems.forEach(item => {
-                if (billingCategories[item.category]) {
-                    billingCategories[item.category].items.push(item);
+                if (categories[item.category]) {
+                    categories[item.category].items.push(item);
                 }
             });
-
+            
             let html = '';
-
-            // 產生每個分類區塊
-            Object.keys(billingCategories).forEach(categoryKey => {
-                const category = billingCategories[categoryKey];
-                if (
-                    category.items.length > 0 &&
-                    (currentBillingFilter === 'all' || currentBillingFilter === categoryKey)
-                ) {
+            
+            Object.keys(categories).forEach(categoryKey => {
+                const category = categories[categoryKey];
+                if (category.items.length > 0 && (currentBillingFilter === 'all' || currentBillingFilter === categoryKey)) {
                     html += `
                         <div class="mb-8">
                             <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                                 <span class="mr-2">${category.icon}</span>${category.name} (${category.items.length})
                             </h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                ${category.items
-                                    .map(item => createBillingItemCard(item))
-                                    .join('')}
+                                ${category.items.map(item => createBillingItemCard(item)).join('')}
                             </div>
                         </div>
                     `;
                 }
             });
-
+            
             listContainer.innerHTML = html;
         }
         
@@ -11443,6 +11435,21 @@ document.addEventListener('DOMContentLoaded', function() {
   window.useOnePackage = useOnePackage;
   window.undoPackageUse = undoPackageUse;
 
+  // 個人與模板分類管理相關函式
+  window.switchPersonalTab = switchPersonalTab;
+  window.switchTemplateTab = switchTemplateTab;
+  window.showCategoryModal = showCategoryModal;
+  window.hideCategoryModal = hideCategoryModal;
+  window.addCategory = addCategory;
+  window.removeCategory = removeCategory;
+  // 編輯彈窗相關函式
+  window.showEditModal = showEditModal;
+  window.hideEditModal = hideEditModal;
+  window.saveEdit = saveEdit;
+  // 動態新增欄位函式
+  window.addHerbIngredientField = addHerbIngredientField;
+  window.addAcupointPointField = addAcupointPointField;
+
   /**
    * 在使用者嘗試直接關閉或重新整理網頁時提示確認，避免未保存的套票使用紀錄被誤判為取消。
    *
@@ -12108,20 +12115,3 @@ document.addEventListener('DOMContentLoaded', function() {
             renderPrescriptionTemplates();
             renderDiagnosisTemplates();
           });
-
-  /**
-   * 將分類相關及頁籤切換函式綁定至全域物件。
-   *
-   * HTML 中使用 onclick="..." 語法時，瀏覽器會嘗試在全域作用域尋找對應的函式。
-   * 若函式未掛載到 window 上，將無法正確呼叫，導致點擊事件沒有反應。
-   *
-   * 這裡將 showCategoryModal、hideCategoryModal、addCategory、removeCategory、
-   * switchPersonalTab 和 switchTemplateTab 等函式掛載到 window 物件上，
-   * 以確保於個人設置和模板庫管理頁面中點擊「管理分類」按鈕時能正確顯示彈窗。
-   */
-  window.showCategoryModal = showCategoryModal;
-  window.hideCategoryModal = hideCategoryModal;
-  window.addCategory = addCategory;
-  window.removeCategory = removeCategory;
-  window.switchPersonalTab = switchPersonalTab;
-  window.switchTemplateTab = switchTemplateTab;
