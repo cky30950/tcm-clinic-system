@@ -12117,4 +12117,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.body.appendChild(modal);
                 }
             });
+
+            // 動態新增頁面底部的版權資訊。若頁腳元素不存在則創建，確保所有頁面底部都顯示版權。
+            (function() {
+                try {
+                    let footer = document.getElementById('pageFooter');
+                    if (!footer) {
+                        footer = document.createElement('div');
+                        footer.id = 'pageFooter';
+                        // 基本樣式：居中顯示、字體大小和顏色以及適當的邊距
+                        footer.style.textAlign = 'center';
+                        footer.style.fontSize = '12px';
+                        footer.style.color = '#888';
+                        footer.style.margin = '20px 0 10px 0';
+                        // 使用診所中文名稱（若未設定則使用預設值），並動態帶入今年年份
+                        const year = new Date().getFullYear();
+                        const clinicName = (typeof clinicSettings !== 'undefined' && clinicSettings && clinicSettings.chineseName) ? clinicSettings.chineseName : '湛凌診所系統';
+                        footer.innerHTML = `&copy; ${year} ${clinicName} 版權所有`;
+                        document.body.appendChild(footer);
+                    } else {
+                        // 若已存在頁腳，更新其年份與診所名稱（防止重複）
+                        const year = new Date().getFullYear();
+                        const clinicName = (typeof clinicSettings !== 'undefined' && clinicSettings && clinicSettings.chineseName) ? clinicSettings.chineseName : '湛凌診所系統';
+                        footer.innerHTML = `&copy; ${year} ${clinicName} 版權所有`;
+                    }
+                } catch (e) {
+                    console.error('建立頁腳版權資訊時發生錯誤', e);
+                }
+            })();
           });
