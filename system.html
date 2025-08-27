@@ -599,9 +599,10 @@
                                 </div>
                                 
                                 <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        針灸備註
-                                    </label>
+                                    <div class="flex justify-between items-center mb-2">
+                                        <label class="block text-sm font-semibold text-gray-700">針灸備註</label>
+                                        <button type="button" onclick="showAcupointComboModal()" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200">📍 載入常用穴位</button>
+                                    </div>
                                     <textarea id="formAcupunctureNotes" placeholder="針灸穴位、手法、注意事項等..." rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
                                 </div>
                             </div>
@@ -612,13 +613,17 @@
                                 
                                 <div>
                                     <div class="flex justify-between items-center mb-2">
-                                        <label class="block text-sm font-semibold text-gray-700">
-                                            處方內容
-                                        </label>
-                                        <button type="button" onclick="loadPreviousPrescription()" 
-                                                class="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded transition duration-200">
-                                            📋 載入上次處方
-                                        </button>
+                                        <label class="block text-sm font-semibold text-gray-700">處方內容</label>
+                                        <div class="flex gap-2">
+                                            <button type="button" onclick="loadPreviousPrescription()" 
+                                                    class="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded transition duration-200">
+                                                📋 載入上次處方
+                                            </button>
+                                            <button type="button" onclick="showHerbComboModal()" 
+                                                    class="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded transition duration-200">
+                                                🌿 載入常用藥方
+                                            </button>
+                                        </div>
                                     </div>
                                     
                                     <!-- 中藥庫搜索區域 -->
@@ -1732,6 +1737,39 @@
           </div>
         </div>
 
+        <!--
+            以下為常用藥方和穴位組合選擇彈窗。這兩個彈窗在診症頁面中
+            讓醫師快速載入個人慣用的中藥方或針灸穴位組合。彈窗
+            預設為隱藏(hidden)，當使用者點擊對應的按鈕時會透過
+            JavaScript 函式 showHerbComboModal() 或 showAcupointComboModal()
+            顯示。內部的列表內容會由系統.js 動態渲染。
+        -->
+        <!-- 常用藥方組合彈窗 -->
+        <div id="herbComboModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl">
+                    <h3 class="text-lg font-bold text-gray-800">常用藥方組合</h3>
+                    <button onclick="hideHerbComboModal()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+                </div>
+                <div id="herbComboList" class="p-4 space-y-3">
+                    <!-- 動態載入藥方組合 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 常用穴位組合彈窗 -->
+        <div id="acupointComboModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl">
+                    <h3 class="text-lg font-bold text-gray-800">常用穴位組合</h3>
+                    <button onclick="hideAcupointComboModal()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+                </div>
+                <div id="acupointComboList" class="p-4 space-y-3">
+                    <!-- 動態載入穴位組合 -->
+                </div>
+            </div>
+        </div>
+
         <div class="max-w-7xl mx-auto px-4 py-4 mt-8">
             <div class="text-center border-t border-gray-200 pt-4">
                 <div class="text-xs text-gray-400">
@@ -1790,6 +1828,7 @@
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
