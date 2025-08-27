@@ -5852,8 +5852,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     </div>
                     <!-- 處方內容 -->
                     <div class="section-title">處方內容</div>
-                    <!-- 將處方內容分為三欄顯示，並在下方以小字提示不可重配 -->
-                    <div class="section-content">${prescriptionHtml}<div style="margin-top: 4px; font-size: 8px;">此藥方不可重配</div></div>
+                    <!-- 將處方內容分為三欄顯示 -->
+                    <div class="section-content">${prescriptionHtml}</div>
                     ${medInfoHtml ? `<div class="section-title">服藥資訊</div><div class="section-content">${medInfoHtml}</div>` : ''}
                     ${instructionsHtml ? `<div class="section-title">醫囑及注意事項</div><div class="section-content">${instructionsHtml}</div>` : ''}
                     ${followUpHtml ? `<div class="section-title">建議複診時間</div><div class="section-content">${followUpHtml}</div>` : ''}
@@ -5869,7 +5869,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                             <span>${clinicSettings.businessHours || '週一至週五 09:00-18:00'}</span>
                         </div>
                         <div class="footer-row">
-                            <span>本醫囑請妥善保存</span>
+                            <span>本醫囑請妥善保存<span style="font-size: 8px;">，此藥方不可重配</span></span>
                             <span>如有疑問請洽櫃檯</span>
                         </div>
                     </div>
