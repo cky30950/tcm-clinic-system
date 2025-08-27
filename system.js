@@ -11523,6 +11523,36 @@ document.addEventListener('DOMContentLoaded', function() {
           window.acupointComboCategories = acupointComboCategories;
 
         /**
+         * 同步個人慣用組合分類與全域分類。
+         * 當更新 categories.herbs 或 categories.acupoints 時，
+         * 如果個人分類尚未設定或者與全域分類保持一致，
+         * 則以最新的全域分類覆蓋個人分類。此函式也會更新對應的 window
+         * 變數，以便其他模組立即取得正確的分類資料。
+         *
+         * @param {string} type - 要同步的分類類型（'herbs' 或 'acupoints'）
+         */
+        function refreshComboCategories(type) {
+          try {
+            if (type === 'herbs') {
+              // 僅在尚未自訂分類或與全域資料完全一致時刷新
+              if (!Array.isArray(herbComboCategories) || herbComboCategories.length === 0 ||
+                  herbComboCategories.every((c, idx) => categories.herbs[idx] === c)) {
+                herbComboCategories = Array.isArray(categories.herbs) ? [...categories.herbs] : [];
+                window.herbComboCategories = herbComboCategories;
+              }
+            } else if (type === 'acupoints') {
+              if (!Array.isArray(acupointComboCategories) || acupointComboCategories.length === 0 ||
+                  acupointComboCategories.every((c, idx) => categories.acupoints[idx] === c)) {
+                acupointComboCategories = Array.isArray(categories.acupoints) ? [...categories.acupoints] : [];
+                window.acupointComboCategories = acupointComboCategories;
+              }
+            }
+          } catch (e) {
+            console.error('刷新個人組合分類失敗:', e);
+          }
+        }
+
+        /**
          * 從 Firebase 初始化分類資料。
          * 嘗試讀取位於 'categories/default' 的文檔，若不存在則寫入當前預設分類。
          * 讀取成功後會更新 categories 物件以及 window.categories。
@@ -12275,6 +12305,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const newCategory = input.value.trim();
             if (newCategory && !categories[type].includes(newCategory)) {
               categories[type].push(newCategory);
+              // 若修改的是中藥或穴位分類，更新個人慣用分類
+              if (typeof refreshComboCategories === 'function') {
+                refreshComboCategories(type);
+              }
               showCategoryModal(type);
               input.value = '';
               // 將更新後的分類儲存至 Firebase
@@ -12283,17 +12317,33 @@ document.addEventListener('DOMContentLoaded', function() {
                   saveCategoriesToFirebase().catch(err => console.error('保存分類資料失敗:', err));
                 } catch (_e) {}
               }
+              // 如屬 herbs 或 acupoints，同步保存個人設定中的分類資料
+              if ((type === 'herbs' || type === 'acupoints') && typeof updatePersonalSettings === 'function') {
+                try {
+                  updatePersonalSettings().catch(err => console.error('更新個人設置失敗:', err));
+                } catch (_e) {}
+              }
             }
           }
 
           function removeCategory(type, index) {
             if (confirm('確定要刪除此分類嗎？')) {
               categories[type].splice(index, 1);
+              // 若修改的是中藥或穴位分類，更新個人慣用分類
+              if (typeof refreshComboCategories === 'function') {
+                refreshComboCategories(type);
+              }
               showCategoryModal(type);
               // 將更新後的分類儲存至 Firebase
               if (typeof saveCategoriesToFirebase === 'function') {
                 try {
                   saveCategoriesToFirebase().catch(err => console.error('保存分類資料失敗:', err));
+                } catch (_e) {}
+              }
+              // 如屬 herbs 或 acupoints，同步保存個人設定中的分類資料
+              if ((type === 'herbs' || type === 'acupoints') && typeof updatePersonalSettings === 'function') {
+                try {
+                  updatePersonalSettings().catch(err => console.error('更新個人設置失敗:', err));
                 } catch (_e) {}
               }
             }
