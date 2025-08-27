@@ -630,6 +630,14 @@ async function attemptMainLogin() {
             if (typeof initBillingItems === 'function') {
                 await initBillingItems();
             }
+            // 讀取或初始化分類資料，避免在後續使用時未同步 Firebase 分類
+            if (typeof initCategoryData === 'function') {
+                try {
+                    await initCategoryData();
+                } catch (err) {
+                    console.error('初始化分類資料失敗:', err);
+                }
+            }
         } catch (error) {
             console.error('初始化中藥庫或收費項目資料失敗:', error);
         }
@@ -11502,6 +11510,85 @@ document.addEventListener('DOMContentLoaded', function() {
           // 將分類資料公開到全域，讓其他模組能夠讀取與更新
           window.categories = categories;
 
+          // -----------------------------------------------------------------------------
+          // 個人慣用藥方組合及穴位組合的分類（管理分類）
+          //
+          // 這些分類用於常用中藥組合與穴位組合的管理，可依個人偏好調整。
+          // 預設值取自全域 categories.herbs 與 categories.acupoints，
+          // 但當用戶在個人設定中另行指定時會被覆蓋。
+          // 透過 window 曝露讓其他模組可以存取與更新。
+          let herbComboCategories = Array.isArray(categories.herbs) ? [...categories.herbs] : [];
+          let acupointComboCategories = Array.isArray(categories.acupoints) ? [...categories.acupoints] : [];
+          window.herbComboCategories = herbComboCategories;
+          window.acupointComboCategories = acupointComboCategories;
+
+        /**
+         * 從 Firebase 初始化分類資料。
+         * 嘗試讀取位於 'categories/default' 的文檔，若不存在則寫入當前預設分類。
+         * 讀取成功後會更新 categories 物件以及 window.categories。
+         */
+        async function initCategoryData() {
+          // 等待 Firebase 初始化完成
+          while (!window.firebase || !window.firebase.db) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          try {
+            const docRef = window.firebase.doc(window.firebase.db, 'categories', 'default');
+            const docSnap = await window.firebase.getDoc(docRef);
+            if (docSnap && docSnap.exists()) {
+              const data = docSnap.data();
+              if (data && typeof data === 'object') {
+                if (Array.isArray(data.herbs)) {
+                  categories.herbs = data.herbs;
+                }
+                if (Array.isArray(data.acupoints)) {
+                  categories.acupoints = data.acupoints;
+                }
+                if (Array.isArray(data.prescriptions)) {
+                  categories.prescriptions = data.prescriptions;
+                }
+                if (Array.isArray(data.diagnosis)) {
+                  categories.diagnosis = data.diagnosis;
+                }
+              }
+            } else {
+              // 若文件不存在，初始化一份包含當前分類的文檔
+              await window.firebase.setDoc(docRef, {
+                herbs: categories.herbs,
+                acupoints: categories.acupoints,
+                prescriptions: categories.prescriptions,
+                diagnosis: categories.diagnosis
+              });
+            }
+            // 更新全域引用
+            window.categories = categories;
+          } catch (error) {
+            console.error('讀取/初始化分類資料失敗:', error);
+          }
+        }
+
+        /**
+         * 將最新的分類資料寫入 Firebase。
+         * 這會覆蓋存儲在 'categories/default' 文檔中的 existing 資料。
+         */
+        async function saveCategoriesToFirebase() {
+          try {
+            // 確保 Firebase 已經初始化
+            while (!window.firebase || !window.firebase.db) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            const docRef = window.firebase.doc(window.firebase.db, 'categories', 'default');
+            await window.firebase.setDoc(docRef, {
+              herbs: categories.herbs,
+              acupoints: categories.acupoints,
+              prescriptions: categories.prescriptions,
+              diagnosis: categories.diagnosis
+            });
+          } catch (error) {
+            console.error('保存分類資料至 Firebase 失敗:', error);
+          }
+        }
+
           // 數據存儲
           let herbCombinations = [
             {
@@ -11611,8 +11698,10 @@ document.addEventListener('DOMContentLoaded', function() {
               id: Date.now(),
               // 新項目預設名稱為空，使用者可在編輯視窗中填寫
               name: '',
-              // 預設分類為第一個分類，如果沒有分類則空字串
-              category: (typeof categories !== 'undefined' && categories.herbs && categories.herbs.length > 0) ? categories.herbs[0] : '',
+              // 預設分類採用個人慣用藥方組合分類，若無則回退至全域分類，如果兩者皆無則空字串
+              category: (typeof herbComboCategories !== 'undefined' && herbComboCategories.length > 0)
+                ? herbComboCategories[0]
+                : ((typeof categories !== 'undefined' && categories.herbs && categories.herbs.length > 0) ? categories.herbs[0] : ''),
               description: '',
               ingredients: [],
               frequency: '低',
@@ -11684,7 +11773,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const newItem = {
               id: Date.now(),
               name: '',
-              category: (typeof categories !== 'undefined' && categories.acupoints && categories.acupoints.length > 0) ? categories.acupoints[0] : '',
+              // 預設分類採用個人慣用穴位組合分類，若無則回退至全域分類，如果兩者皆無則空字串
+              category: (typeof acupointComboCategories !== 'undefined' && acupointComboCategories.length > 0)
+                ? acupointComboCategories[0]
+                : ((typeof categories !== 'undefined' && categories.acupoints && categories.acupoints.length > 0) ? categories.acupoints[0] : ''),
               points: [],
               technique: '',
               frequency: '低',
@@ -11775,6 +11867,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (Array.isArray(personal.acupointCombinations)) {
                   acupointCombinations = personal.acupointCombinations;
                 }
+                // 個人慣用組合分類載入：若 personalSettings 中包含分類，則覆蓋預設值
+                if (Array.isArray(personal.herbComboCategories)) {
+                  herbComboCategories = personal.herbComboCategories;
+                  window.herbComboCategories = herbComboCategories;
+                }
+                if (Array.isArray(personal.acupointComboCategories)) {
+                  acupointComboCategories = personal.acupointComboCategories;
+                  window.acupointComboCategories = acupointComboCategories;
+                }
               }
             } catch (error) {
               console.error('讀取個人設置失敗:', error);
@@ -11810,7 +11911,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 {
                   personalSettings: {
                     herbCombinations: Array.isArray(herbCombinations) ? herbCombinations : [],
-                    acupointCombinations: Array.isArray(acupointCombinations) ? acupointCombinations : []
+                    acupointCombinations: Array.isArray(acupointCombinations) ? acupointCombinations : [],
+                    // 保存個人分類：中藥組合分類與穴位組合分類
+                    herbComboCategories: Array.isArray(herbComboCategories) ? herbComboCategories : [],
+                    acupointComboCategories: Array.isArray(acupointComboCategories) ? acupointComboCategories : []
                   },
                   updatedAt: new Date(),
                   updatedBy: currentUser || 'system'
@@ -12173,6 +12277,12 @@ document.addEventListener('DOMContentLoaded', function() {
               categories[type].push(newCategory);
               showCategoryModal(type);
               input.value = '';
+              // 將更新後的分類儲存至 Firebase
+              if (typeof saveCategoriesToFirebase === 'function') {
+                try {
+                  saveCategoriesToFirebase().catch(err => console.error('保存分類資料失敗:', err));
+                } catch (_e) {}
+              }
             }
           }
 
@@ -12180,6 +12290,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (confirm('確定要刪除此分類嗎？')) {
               categories[type].splice(index, 1);
               showCategoryModal(type);
+              // 將更新後的分類儲存至 Firebase
+              if (typeof saveCategoriesToFirebase === 'function') {
+                try {
+                  saveCategoriesToFirebase().catch(err => console.error('保存分類資料失敗:', err));
+                } catch (_e) {}
+              }
             }
           }
 
@@ -12230,7 +12346,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
                     <select id="herbCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${categories.herbs.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                      ${(Array.isArray(herbComboCategories) && herbComboCategories.length > 0 ? herbComboCategories : categories.herbs).map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                     </select>
                   </div>
                   <div>
@@ -12256,7 +12372,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
                     <select id="acupointCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${categories.acupoints.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                      ${(Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0 ? acupointComboCategories : categories.acupoints).map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                     </select>
                   </div>
                   <div>
