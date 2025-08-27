@@ -12187,12 +12187,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 // 個人慣用組合分類載入：若 personalSettings 中包含分類，則覆蓋預設值
                 if (Array.isArray(personal.herbComboCategories)) {
+                  // 更新個人慣用分類
                   herbComboCategories = personal.herbComboCategories;
                   window.herbComboCategories = herbComboCategories;
+                  try {
+                    // 同步至全域 categories，確保管理分類彈窗能顯示已保存分類
+                    categories.herbs = [...herbComboCategories];
+                    if (window.categories && Array.isArray(window.categories.herbs)) {
+                      window.categories.herbs = categories.herbs;
+                    }
+                  } catch (_e) {}
                 }
                 if (Array.isArray(personal.acupointComboCategories)) {
+                  // 更新個人慣用分類
                   acupointComboCategories = personal.acupointComboCategories;
                   window.acupointComboCategories = acupointComboCategories;
+                  try {
+                    // 同步至全域 categories，確保管理分類彈窗能顯示已保存分類
+                    categories.acupoints = [...acupointComboCategories];
+                    if (window.categories && Array.isArray(window.categories.acupoints)) {
+                      window.categories.acupoints = categories.acupoints;
+                    }
+                  } catch (_e) {}
                 }
               }
             } catch (error) {
@@ -12577,7 +12593,35 @@ document.addEventListener('DOMContentLoaded', function() {
             modal.dataset.type = type;
             // 渲染分類列表
             listEl.innerHTML = '';
-            categories[type].forEach((cat, idx) => {
+            // 為 herbs 和 acupoints 選擇來源：若全域 categories 中有值則使用，否則使用個人分類
+            let sourceList = [];
+            try {
+              if (type === 'herbs') {
+                if (Array.isArray(categories.herbs) && categories.herbs.length > 0) {
+                  sourceList = categories.herbs;
+                } else if (Array.isArray(herbComboCategories) && herbComboCategories.length > 0) {
+                  sourceList = herbComboCategories;
+                }
+              } else if (type === 'acupoints') {
+                if (Array.isArray(categories.acupoints) && categories.acupoints.length > 0) {
+                  sourceList = categories.acupoints;
+                } else if (Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0) {
+                  sourceList = acupointComboCategories;
+                }
+              } else {
+                // 其他分類（prescriptions, diagnosis）直接讀取全域 categories
+                if (categories[type] && Array.isArray(categories[type])) {
+                  sourceList = categories[type];
+                }
+              }
+            } catch (_e) {
+              // 若出現錯誤則保持空列表
+            }
+            // fallback: 若來源列表仍為空，嘗試使用 categories[type]
+            if ((!sourceList || sourceList.length === 0) && categories[type] && Array.isArray(categories[type])) {
+              sourceList = categories[type];
+            }
+            sourceList.forEach((cat, idx) => {
               const div = document.createElement('div');
               div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
               div.innerHTML = `
