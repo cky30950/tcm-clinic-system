@@ -8,8 +8,8 @@ let currentUserData = null;
  * 每個角色可存取哪些頁面（功能），在此集中定義。
  */
 const ROLE_PERMISSIONS = {
-  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement'],
-  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement'],
+  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary'],
+  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement', 'personalSettings', 'templateLibrary'],
   '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary'],
   '用戶': ['patientManagement', 'consultationSystem']
 };
@@ -823,7 +823,9 @@ async function logout() {
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
                 financialReports: { title: '財務報表', icon: '📊', description: '收入分析與財務統計' },
-                systemManagement: { title: '系統管理', icon: '⚙️', description: '統計資料、備份匯出' }
+                systemManagement: { title: '系統管理', icon: '⚙️', description: '統計資料、備份匯出' },
+                personalSettings: { title: '個人設置', icon: '👤', description: '管理慣用藥方與穴位組合' },
+                templateLibrary: { title: '模板庫管理', icon: '📚', description: '管理醫囑與診斷模板' }
             };
 
             // 根據當前用戶職位決定可使用的功能列表
@@ -897,7 +899,7 @@ async function logout() {
 
         // 隱藏所有區域
         function hideAllSections() {
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'welcomePage'].forEach(id => {
+            ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary', 'welcomePage'].forEach(id => {
                 document.getElementById(id).classList.add('hidden');
             });
         }
