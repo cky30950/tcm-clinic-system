@@ -11583,19 +11583,8 @@ document.addEventListener('DOMContentLoaded', function() {
           }
 
           function addNewHerbCombination() {
-            const name = prompt('請輸入新藥方名稱:');
-            if (!name) return;
-            const newItem = {
-              id: Date.now(),
-              name,
-              category: '',
-              description: '',
-              ingredients: [],
-              frequency: '低',
-              lastModified: new Date().toISOString().split('T')[0]
-            };
-            herbCombinations.push(newItem);
-            renderHerbCombinations();
+            // 打開新增介面，使用與編輯相同的表單
+            showAddModal('herb');
           }
 
           function duplicateHerbCombination(id) {
@@ -11642,19 +11631,8 @@ document.addEventListener('DOMContentLoaded', function() {
           }
 
           function addNewAcupointCombination() {
-            const name = prompt('請輸入新穴位組合名稱:');
-            if (!name) return;
-            const newItem = {
-              id: Date.now(),
-              name,
-              category: '',
-              points: [],
-              technique: '',
-              frequency: '低',
-              lastModified: new Date().toISOString().split('T')[0]
-            };
-            acupointCombinations.push(newItem);
-            renderAcupointCombinations();
+            // 打開新增介面
+            showAddModal('acupoint');
           }
 
           function duplicateAcupointCombination(id) {
@@ -11705,20 +11683,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
 
           function addNewPrescriptionTemplate() {
-            const name = prompt('請輸入新醫囑模板名稱:');
-            if (!name) return;
-            const newItem = {
-              id: Date.now(),
-              name,
-              category: '',
-              duration: '',
-              followUp: '',
-              content: '',
-              frequency: '低',
-              lastModified: new Date().toISOString().split('T')[0]
-            };
-            prescriptionTemplates.push(newItem);
-            renderPrescriptionTemplates();
+            showAddModal('prescription');
           }
 
           function duplicatePrescriptionTemplate(id) {
@@ -11767,18 +11732,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
 
           function addNewDiagnosisTemplate() {
-            const name = prompt('請輸入新診斷模板名稱:');
-            if (!name) return;
-            const newItem = {
-              id: Date.now(),
-              name,
-              category: '',
-              content: '',
-              frequency: '低',
-              lastModified: new Date().toISOString().split('T')[0]
-            };
-            diagnosisTemplates.push(newItem);
-            renderDiagnosisTemplates();
+            showAddModal('diagnosis');
           }
 
           function duplicateDiagnosisTemplate(id) {
@@ -11892,6 +11846,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const modal = document.getElementById('editModal');
             const modalTitle = document.getElementById('editModalTitle');
             const modalContent = document.getElementById('editModalContent');
+            // 設定模式與類型，供保存時判斷
+            modal.dataset.mode = 'edit';
+            modal.dataset.type = itemType;
+            // 重新綁定保存按鈕至編輯函式，並顯示保存文字
+            const saveBtn = document.getElementById('editModalSaveBtn');
+            if (saveBtn) {
+              saveBtn.onclick = saveEdit;
+              saveBtn.textContent = '保存';
+            }
             modalTitle.textContent = '編輯' + title;
             modal.classList.remove('hidden');
             if (itemType === 'herb') {
@@ -12075,6 +12038,231 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('保存成功！');
             hideEditModal();
           }
+
+        /**
+         * 顯示新增彈窗。用於新增中藥組合、穴位組合、醫囑模板或診斷模板。
+         * 會根據 itemType 準備對應的空白表單，並將保存按鈕綁定至 saveAdd 函式。
+         *
+         * @param {string} itemType - 種類，可為 'herb'、'acupoint'、'prescription' 或 'diagnosis'
+         */
+        function showAddModal(itemType) {
+          const modal = document.getElementById('editModal');
+          const modalTitle = document.getElementById('editModalTitle');
+          const modalContent = document.getElementById('editModalContent');
+          const saveBtn = document.getElementById('editModalSaveBtn');
+          // 設定模式與類型
+          modal.dataset.mode = 'add';
+          modal.dataset.type = itemType;
+          // 綁定保存按鈕至新增函式
+          if (saveBtn) {
+            saveBtn.onclick = saveAdd;
+            saveBtn.textContent = '新增';
+          }
+          // 決定標題與內容
+          if (itemType === 'herb') {
+            modalTitle.textContent = '新增藥方組合';
+            modalContent.innerHTML = `
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">組合名稱</label>
+                  <input type="text" id="herbNameInput" value="" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">分類</label>
+                  <select id="herbCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    ${categories.herbs.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">適應症描述</label>
+                  <textarea id="herbDescriptionTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="3"></textarea>
+                </div>
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">藥材</label>
+                  <div id="herbIngredients" class="space-y-2">
+                    <!-- 預設提供一行空欄位 -->
+                    <div class="grid grid-cols-2 gap-2"><input type="text" placeholder="藥材名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded"></div>
+                  </div>
+                  <button onclick="addHerbIngredientField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增藥材</button>
+                </div>
+              </div>
+            `;
+          } else if (itemType === 'acupoint') {
+            modalTitle.textContent = '新增穴位組合';
+            modalContent.innerHTML = `
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">組合名稱</label>
+                  <input type="text" id="acupointNameInput" value="" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">分類</label>
+                  <select id="acupointCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    ${categories.acupoints.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">穴位列表</label>
+                  <div id="acupointPoints" class="space-y-2">
+                    <div class="grid grid-cols-2 gap-2"><input type="text" placeholder="穴位名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="主穴/配穴" class="px-2 py-1 border border-gray-300 rounded"></div>
+                  </div>
+                  <button onclick="addAcupointPointField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增穴位</button>
+                </div>
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">針法</label>
+                  <input type="text" id="acupointTechniqueInput" value="" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                </div>
+              </div>
+            `;
+          } else if (itemType === 'prescription') {
+            modalTitle.textContent = '新增醫囑模板';
+            modalContent.innerHTML = `
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">模板名稱</label>
+                  <input type="text" id="prescriptionNameInput" value="" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">分類</label>
+                    <select id="prescriptionCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                      ${categories.prescriptions.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">療程時間</label>
+                    <input type="text" id="prescriptionDurationInput" value="" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">複診時間</label>
+                    <input type="text" id="prescriptionFollowUpInput" value="" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">注意事項</label>
+                    <input type="text" id="prescriptionNoteInput" placeholder="如：服藥完畢後" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">醫囑內容</label>
+                  <textarea id="prescriptionContentTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="5"></textarea>
+                </div>
+              </div>
+            `;
+          } else if (itemType === 'diagnosis') {
+            modalTitle.textContent = '新增診斷模板';
+            modalContent.innerHTML = `
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">模板名稱</label>
+                  <input type="text" id="diagnosisNameInput" value="" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">科別</label>
+                  <select id="diagnosisCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    ${categories.diagnosis.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-gray-700 font-medium mb-2">診斷內容</label>
+                  <textarea id="diagnosisContentTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="5"></textarea>
+                </div>
+              </div>
+            `;
+          }
+          // 顯示彈窗
+          modal.classList.remove('hidden');
+        }
+
+        /**
+         * 保存新增資料。根據彈窗上的類型，從表單中取得資料並建立新項目。
+         * 建立後會重新渲染列表並關閉彈窗。
+         */
+        function saveAdd() {
+          const modal = document.getElementById('editModal');
+          const type = modal.dataset.type;
+          if (!type) return;
+          if (type === 'herb') {
+            const name = document.getElementById('herbNameInput').value.trim();
+            if (!name) { alert('請輸入組合名稱'); return; }
+            const category = document.getElementById('herbCategorySelect').value;
+            const description = document.getElementById('herbDescriptionTextarea').value;
+            const ingredientRows = document.querySelectorAll('#herbIngredients > div');
+            const ingredients = Array.from(ingredientRows).map(row => {
+              const inputs = row.querySelectorAll('input');
+              return { name: inputs[0].value.trim(), dosage: inputs[1].value.trim() };
+            }).filter(item => item.name || item.dosage);
+            const newItem = {
+              id: Date.now(),
+              name,
+              category,
+              description,
+              ingredients,
+              frequency: '低',
+              lastModified: new Date().toISOString().split('T')[0]
+            };
+            herbCombinations.push(newItem);
+            renderHerbCombinations();
+          } else if (type === 'acupoint') {
+            const name = document.getElementById('acupointNameInput').value.trim();
+            if (!name) { alert('請輸入組合名稱'); return; }
+            const category = document.getElementById('acupointCategorySelect').value;
+            const technique = document.getElementById('acupointTechniqueInput').value;
+            const pointRows = document.querySelectorAll('#acupointPoints > div');
+            const points = Array.from(pointRows).map(row => {
+              const inputs = row.querySelectorAll('input');
+              return { name: inputs[0].value.trim(), type: inputs[1].value.trim() };
+            }).filter(item => item.name || item.type);
+            const newItem = {
+              id: Date.now(),
+              name,
+              category,
+              points,
+              technique,
+              frequency: '低',
+              lastModified: new Date().toISOString().split('T')[0]
+            };
+            acupointCombinations.push(newItem);
+            renderAcupointCombinations();
+          } else if (type === 'prescription') {
+            const name = document.getElementById('prescriptionNameInput').value.trim();
+            if (!name) { alert('請輸入模板名稱'); return; }
+            const category = document.getElementById('prescriptionCategorySelect').value;
+            const duration = document.getElementById('prescriptionDurationInput').value;
+            const followUp = document.getElementById('prescriptionFollowUpInput').value;
+            const content = document.getElementById('prescriptionContentTextarea').value;
+            const newItem = {
+              id: Date.now(),
+              name,
+              category,
+              duration,
+              followUp,
+              content,
+              frequency: '低',
+              lastModified: new Date().toISOString().split('T')[0]
+            };
+            prescriptionTemplates.push(newItem);
+            renderPrescriptionTemplates();
+          } else if (type === 'diagnosis') {
+            const name = document.getElementById('diagnosisNameInput').value.trim();
+            if (!name) { alert('請輸入模板名稱'); return; }
+            const category = document.getElementById('diagnosisCategorySelect').value;
+            const content = document.getElementById('diagnosisContentTextarea').value;
+            const newItem = {
+              id: Date.now(),
+              name,
+              category,
+              content,
+              frequency: '低',
+              lastModified: new Date().toISOString().split('T')[0]
+            };
+            diagnosisTemplates.push(newItem);
+            renderDiagnosisTemplates();
+          }
+          alert('新增成功！');
+          hideEditModal();
+        }
 
           function addHerbIngredientField() {
             const container = document.getElementById('herbIngredients');
