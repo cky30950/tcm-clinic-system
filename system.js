@@ -11472,7 +11472,8 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 })();
           // 分類數據
-          let categories = {
+          // 使用專用名稱避免與其他作用域中的 categories 衝突
+          let templateCategories = {
             herbs: ['感冒類', '消化系統', '婦科調理', '補益類', '清熱類'],
             acupoints: ['頭面部', '胸腹部', '四肢部', '背腰部', '內科疾病', '婦科疾病'],
             prescriptions: ['用藥指導', '生活調理', '飲食建議', '運動指導', '復診提醒', '慢性病管理', '婦科調理'],
@@ -11807,7 +11808,8 @@ document.addEventListener('DOMContentLoaded', function() {
             modal.dataset.type = type;
             // 渲染分類列表
             listEl.innerHTML = '';
-            categories[type].forEach((cat, idx) => {
+            // 使用 templateCategories 以避免與其他同名變數衝突
+            templateCategories[type].forEach((cat, idx) => {
               const div = document.createElement('div');
               div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
               div.innerHTML = `
@@ -11827,8 +11829,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const input = document.getElementById('newCategoryInput');
             const type = document.getElementById('categoryModal').dataset.type;
             const newCategory = input.value.trim();
-            if (newCategory && !categories[type].includes(newCategory)) {
-              categories[type].push(newCategory);
+            if (newCategory && !templateCategories[type].includes(newCategory)) {
+              templateCategories[type].push(newCategory);
               showCategoryModal(type);
               input.value = '';
             }
@@ -11836,7 +11838,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
           function removeCategory(type, index) {
             if (confirm('確定要刪除此分類嗎？')) {
-              categories[type].splice(index, 1);
+              templateCategories[type].splice(index, 1);
               showCategoryModal(type);
             }
           }
@@ -11869,7 +11871,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
                     <select id="herbCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${categories.herbs.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                      ${templateCategories.herbs.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                     </select>
                   </div>
                   <div>
@@ -11897,7 +11899,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
                     <select id="acupointCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${categories.acupoints.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                      ${templateCategories.acupoints.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                     </select>
                   </div>
                   <div>
@@ -11926,7 +11928,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">分類</label>
                       <select id="prescriptionCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                        ${categories.prescriptions.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                        ${templateCategories.prescriptions.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                       </select>
                     </div>
                     <div>
@@ -11962,7 +11964,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">科別</label>
                     <select id="diagnosisCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${categories.diagnosis.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                      ${templateCategories.diagnosis.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                     </select>
                   </div>
                   <div>
@@ -12070,7 +12072,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div>
                   <label class="block text-gray-700 font-medium mb-2">分類</label>
                   <select id="herbCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                    ${categories.herbs.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
+                    ${templateCategories.herbs.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
                   </select>
                 </div>
                 <div>
@@ -12098,7 +12100,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div>
                   <label class="block text-gray-700 font-medium mb-2">分類</label>
                   <select id="acupointCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                    ${categories.acupoints.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
+                    ${templateCategories.acupoints.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
                   </select>
                 </div>
                 <div>
@@ -12126,7 +12128,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
                     <select id="prescriptionCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${categories.prescriptions.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
+                      ${templateCategories.prescriptions.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
                     </select>
                   </div>
                   <div>
@@ -12161,7 +12163,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div>
                   <label class="block text-gray-700 font-medium mb-2">科別</label>
                   <select id="diagnosisCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                    ${categories.diagnosis.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
+                    ${templateCategories.diagnosis.map(cat => '<option value="' + cat + '">' + cat + '</option>').join('')}
                   </select>
                 </div>
                 <div>
