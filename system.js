@@ -11558,24 +11558,16 @@ document.addEventListener('DOMContentLoaded', function() {
          * 讀取成功後會更新 categories 物件以及 window.categories。
          */
         async function initCategoryData() {
-          // 優先從本地 localStorage 載入分類資料，以提供離線支援
+          // 優先從本地載入分類資料
           try {
             const stored = localStorage.getItem('categories');
             if (stored) {
               const localData = JSON.parse(stored);
               if (localData && typeof localData === 'object') {
-                if (Array.isArray(localData.herbs)) {
-                  categories.herbs = localData.herbs;
-                }
-                if (Array.isArray(localData.acupoints)) {
-                  categories.acupoints = localData.acupoints;
-                }
-                if (Array.isArray(localData.prescriptions)) {
-                  categories.prescriptions = localData.prescriptions;
-                }
-                if (Array.isArray(localData.diagnosis)) {
-                  categories.diagnosis = localData.diagnosis;
-                }
+                if (Array.isArray(localData.herbs)) categories.herbs = localData.herbs;
+                if (Array.isArray(localData.acupoints)) categories.acupoints = localData.acupoints;
+                if (Array.isArray(localData.prescriptions)) categories.prescriptions = localData.prescriptions;
+                if (Array.isArray(localData.diagnosis)) categories.diagnosis = localData.diagnosis;
                 // 更新全域引用
                 window.categories = categories;
               }
@@ -11583,10 +11575,15 @@ document.addEventListener('DOMContentLoaded', function() {
           } catch (err) {
             console.error('從本地載入分類資料失敗:', err);
           }
+
+          // 若 Firebase 未定義或缺少 getDoc，則直接結束，使用預設或本地資料
+          if (!window.firebase || !window.firebase.getDoc || !window.firebase.doc || !window.firebase.db) {
+            return;
+          }
+
           // 等待 Firebase 初始化完成
           while (!window.firebase || !window.firebase.db) {
             await new Promise(resolve => setTimeout(resolve, 100));
-            // 如果 Firebase 尚未初始化，直接嘗試下一輪，保持非阻塞
           }
           try {
             const docRef = window.firebase.doc(window.firebase.db, 'categories', 'default');
@@ -11629,8 +11626,8 @@ document.addEventListener('DOMContentLoaded', function() {
          */
         async function saveCategoriesToFirebase() {
           try {
-            // 若 Firebase 可用，保存至 Firestore
-            if (window.firebase && window.firebase.db) {
+            // 如果 Firebase 可用，則將分類資料寫入 Firestore
+            if (window.firebase && window.firebase.db && window.firebase.setDoc && window.firebase.doc) {
               // 確保 Firebase 已經初始化
               while (!window.firebase || !window.firebase.db) {
                 await new Promise(resolve => setTimeout(resolve, 100));
