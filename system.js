@@ -825,7 +825,8 @@ async function logout() {
                 consultationSystem: { title: '診症系統', icon: '🩺', description: '記錄症狀、診斷、開立處方' },
                 herbLibrary: { title: '中藥庫管理', icon: '🌿', description: '管理中藥材及方劑資料' },
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
-                userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
+                // 將診所用戶管理的圖示由單人符號更換為雙人符號，以符合需求
+                userManagement: { title: '診所用戶管理', icon: '👥', description: '管理診所用戶權限' },
                 financialReports: { title: '財務報表', icon: '📊', description: '收入分析與財務統計' },
                 systemManagement: { title: '系統管理', icon: '⚙️', description: '統計資料、備份匯出' },
                 // 新增：個人設置
