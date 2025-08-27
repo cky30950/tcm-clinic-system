@@ -11448,6 +11448,9 @@ document.addEventListener('DOMContentLoaded', function() {
   window.updateMedicationDaysFromInput = updateMedicationDaysFromInput;
   window.updateMedicationFrequency = updateMedicationFrequency;
   window.updatePatientAge = updatePatientAge;
+  // 將個人慣用組合的渲染函式公開至全域，方便在搜尋或分類變更時呼叫
+  window.renderHerbCombinations = renderHerbCombinations;
+  window.renderAcupointCombinations = renderAcupointCombinations;
   window.updateRestPeriod = updateRestPeriod;
   window.useOnePackage = useOnePackage;
   window.undoPackageUse = undoPackageUse;
@@ -11756,8 +11759,51 @@ document.addEventListener('DOMContentLoaded', function() {
           // 渲染中藥組合
           function renderHerbCombinations() {
             const container = document.getElementById('herbCombinationsContainer');
+            if (!container) return;
             container.innerHTML = '';
-            herbCombinations.forEach(item => {
+            // 根據搜尋關鍵字與分類篩選清單
+            let searchTerm = '';
+            ['herbComboSearch', 'searchHerbCombo', 'searchHerbCombination', 'herbComboSearchInput'].some(id => {
+              const el = document.getElementById(id);
+              if (el) {
+                searchTerm = (el.value || '').trim().toLowerCase();
+                return true;
+              }
+              return false;
+            });
+            let selectedCategory = 'all';
+            ['herbComboCategoryFilter', 'herbComboCategory', 'herbComboCategorySelect'].some(id => {
+              const el = document.getElementById(id);
+              if (el) {
+                selectedCategory = el.value;
+                return true;
+              }
+              return false;
+            });
+            let list = herbCombinations;
+            if (searchTerm || (selectedCategory && selectedCategory !== 'all' && selectedCategory !== '')) {
+              list = herbCombinations.filter(item => {
+                let matchesSearch = true;
+                if (searchTerm) {
+                  const nameMatch = item.name && item.name.toLowerCase().includes(searchTerm);
+                  const descMatch = item.description && item.description.toLowerCase().includes(searchTerm);
+                  const ingredientsMatch = Array.isArray(item.ingredients) && item.ingredients.some(ing => {
+                    return ing && ing.name && ing.name.toLowerCase().includes(searchTerm);
+                  });
+                  matchesSearch = nameMatch || descMatch || ingredientsMatch;
+                }
+                let matchesCategory = true;
+                if (selectedCategory && selectedCategory !== 'all' && selectedCategory !== '') {
+                  matchesCategory = item.category === selectedCategory;
+                }
+                return matchesSearch && matchesCategory;
+              });
+            }
+            if (!Array.isArray(list) || list.length === 0) {
+              container.innerHTML = '<div class="text-center text-gray-500">尚未設定常用藥方組合</div>';
+              return;
+            }
+            list.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-green-200';
               card.innerHTML = `
@@ -11832,9 +11878,61 @@ document.addEventListener('DOMContentLoaded', function() {
 
           // 渲染穴位組合
           function renderAcupointCombinations() {
+            // 根據搜尋關鍵字與分類篩選並渲染個人慣用穴位組合。
             const container = document.getElementById('acupointCombinationsContainer');
+            if (!container) return;
             container.innerHTML = '';
-            acupointCombinations.forEach(item => {
+            // 取得搜尋字串，支援多個可能的輸入框 ID。
+            let searchTerm = '';
+            ['acupointComboSearch', 'searchAcupointCombo', 'acupointComboSearchInput'].some(id => {
+              const el = document.getElementById(id);
+              if (el) {
+                searchTerm = (el.value || '').trim().toLowerCase();
+                return true;
+              }
+              return false;
+            });
+            // 取得分類篩選值，預設為 'all'。
+            let selectedCategory = 'all';
+            ['acupointComboCategoryFilter', 'acupointComboCategory', 'acupointComboCategorySelect'].some(id => {
+              const el = document.getElementById(id);
+              if (el) {
+                selectedCategory = el.value;
+                return true;
+              }
+              return false;
+            });
+            // 篩選資料：依據搜尋字串和分類。
+            let list = acupointCombinations;
+            if (searchTerm || (selectedCategory && selectedCategory !== 'all' && selectedCategory !== '')) {
+              list = acupointCombinations.filter(item => {
+                // 搜尋：比對名稱、針法與穴位名稱或類型。
+                let matchesSearch = true;
+                if (searchTerm) {
+                  const nameMatch = (item.name && item.name.toLowerCase().includes(searchTerm));
+                  const techniqueMatch = (item.technique && item.technique.toLowerCase().includes(searchTerm));
+                  const pointsMatch = Array.isArray(item.points) && item.points.some(pt => {
+                    const nm = pt && pt.name && pt.name.toLowerCase().includes(searchTerm);
+                    const ty = pt && pt.type && pt.type.toLowerCase().includes(searchTerm);
+                    return nm || ty;
+                  });
+                  matchesSearch = nameMatch || techniqueMatch || pointsMatch;
+                }
+                // 分類條件：只有在選定特定分類時才生效。
+                let matchesCategory = true;
+                if (selectedCategory && selectedCategory !== 'all' && selectedCategory !== '') {
+                  matchesCategory = item.category === selectedCategory;
+                }
+                return matchesSearch && matchesCategory;
+              });
+            }
+            // 若無資料顯示提示。
+            if (!Array.isArray(list) || list.length === 0) {
+              container.innerHTML = '<div class="text-center text-gray-500">尚未設定常用穴位組合</div>';
+              return;
+            }
+            // 渲染篩選後的結果。
+            list.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-blue-200';
               card.innerHTML = `
@@ -12719,6 +12817,52 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.body.appendChild(modal);
                 }
             });
+
+            // 監聽個人慣用藥方與穴位組合的搜尋與分類變更，以即時刷新列表
+            try {
+                // 搜尋輸入框：對應不同可能的 ID
+                const herbSearchIds = ['herbComboSearch', 'searchHerbCombo', 'searchHerbCombination', 'herbComboSearchInput'];
+                herbSearchIds.forEach(function(id) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.addEventListener('input', function() {
+                            renderHerbCombinations();
+                        });
+                    }
+                });
+                // 藥方分類下拉選單
+                const herbCatIds = ['herbComboCategoryFilter', 'herbComboCategory', 'herbComboCategorySelect'];
+                herbCatIds.forEach(function(id) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.addEventListener('change', function() {
+                            renderHerbCombinations();
+                        });
+                    }
+                });
+                // 穴位搜尋輸入
+                const acuSearchIds = ['acupointComboSearch', 'searchAcupointCombo', 'acupointComboSearchInput'];
+                acuSearchIds.forEach(function(id) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.addEventListener('input', function() {
+                            renderAcupointCombinations();
+                        });
+                    }
+                });
+                // 穴位分類下拉選單
+                const acuCatIds = ['acupointComboCategoryFilter', 'acupointComboCategory', 'acupointComboCategorySelect'];
+                acuCatIds.forEach(function(id) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.addEventListener('change', function() {
+                            renderAcupointCombinations();
+                        });
+                    }
+                });
+            } catch (e) {
+                console.error('初始化搜尋與分類監聽器時發生錯誤:', e);
+            }
 
             // 動態新增頁面底部的版權資訊。若頁腳元素不存在則創建，確保所有頁面底部都顯示版權。
             (function() {
