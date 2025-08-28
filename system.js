@@ -11824,7 +11824,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <h3 class="text-lg font-semibold text-green-800">${item.name}</h3>
                   <div class="flex gap-2">
                     <button class="text-blue-600 hover:text-blue-800 text-sm" onclick="showEditModal('herb', '${item.name}')">編輯</button>
-                    <button class="text-green-600 hover:text-green-800 text-sm" onclick="duplicateHerbCombination(${item.id})">複製</button>
+                    <!-- 移除複製功能：僅保留編輯與刪除按鈕 -->
                     <button class="text-red-600 hover:text-red-800 text-sm" onclick="deleteHerbCombination(${item.id})">刪除</button>
                   </div>
                 </div>
@@ -11958,7 +11958,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <h3 class="text-lg font-semibold text-blue-800">${item.name}</h3>
                   <div class="flex gap-2">
                     <button class="text-blue-600 hover:text-blue-800 text-sm" onclick="showEditModal('acupoint', '${item.name}')">編輯</button>
-                    <button class="text-green-600 hover:text-green-800 text-sm" onclick="duplicateAcupointCombination(${item.id})">複製</button>
+                    <!-- 移除複製功能：僅保留編輯與刪除按鈕 -->
                     <button class="text-red-600 hover:text-red-800 text-sm" onclick="deleteAcupointCombination(${item.id})">刪除</button>
                   </div>
                 </div>
@@ -12814,7 +12814,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">組合名稱</label>
-                    <input type="text" id="herbNameInput" value="${item.name}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="herbNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
@@ -12849,7 +12849,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">組合名稱</label>
-                    <input type="text" id="acupointNameInput" value="${item.name}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="acupointNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
@@ -12968,8 +12968,19 @@ document.addEventListener('DOMContentLoaded', function() {
             if (editType === 'herb') {
               const item = herbCombinations.find(h => h.id === itemId);
               if (!item) return;
+              // 檢查名稱必填
+              const nameVal = (document.getElementById('herbNameInput').value || '').trim();
+              if (!nameVal) {
+                // 若名稱為空，提示錯誤並停止保存
+                if (typeof showToast === 'function') {
+                  showToast('請輸入組合名稱！', 'error');
+                } else {
+                  alert('請輸入組合名稱！');
+                }
+                return;
+              }
               // 更新資料
-              item.name = document.getElementById('herbNameInput').value;
+              item.name = nameVal;
               item.category = document.getElementById('herbCategorySelect').value;
               item.description = document.getElementById('herbDescriptionTextarea').value;
               const ingredientRows = document.querySelectorAll('#herbIngredients > div');
@@ -13010,7 +13021,17 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (editType === 'acupoint') {
               const item = acupointCombinations.find(a => a.id === itemId);
               if (!item) return;
-              item.name = document.getElementById('acupointNameInput').value;
+              // 檢查名稱必填
+              const acupointNameVal = (document.getElementById('acupointNameInput').value || '').trim();
+              if (!acupointNameVal) {
+                if (typeof showToast === 'function') {
+                  showToast('請輸入組合名稱！', 'error');
+                } else {
+                  alert('請輸入組合名稱！');
+                }
+                return;
+              }
+              item.name = acupointNameVal;
               item.category = document.getElementById('acupointCategorySelect').value;
               const pointRows = document.querySelectorAll('#acupointPoints > div');
               item.points = Array.from(pointRows).map(row => {
