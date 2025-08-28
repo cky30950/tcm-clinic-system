@@ -12875,7 +12875,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">模板名稱</label>
-                    <input type="text" id="prescriptionNameInput" value="${item.name}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="prescriptionNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -12910,7 +12910,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">模板名稱</label>
-                    <input type="text" id="diagnosisNameInput" value="${item.name}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="diagnosisNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">科別</label>
@@ -13056,7 +13056,17 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (editType === 'prescription') {
               const item = prescriptionTemplates.find(p => p.id === itemId);
               if (!item) return;
-              item.name = document.getElementById('prescriptionNameInput').value;
+              // 檢查模板名稱必填
+              const presNameVal = (document.getElementById('prescriptionNameInput').value || '').trim();
+              if (!presNameVal) {
+                if (typeof showToast === 'function') {
+                  showToast('請輸入模板名稱！', 'error');
+                } else {
+                  alert('請輸入模板名稱！');
+                }
+                return;
+              }
+              item.name = presNameVal;
               item.category = document.getElementById('prescriptionCategorySelect').value;
               item.duration = document.getElementById('prescriptionDurationInput').value;
               item.followUp = document.getElementById('prescriptionFollowUpInput').value;
@@ -13066,7 +13076,17 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (editType === 'diagnosis') {
               const item = diagnosisTemplates.find(d => d.id === itemId);
               if (!item) return;
-              item.name = document.getElementById('diagnosisNameInput').value;
+              // 檢查模板名稱必填
+              const diagNameVal = (document.getElementById('diagnosisNameInput').value || '').trim();
+              if (!diagNameVal) {
+                if (typeof showToast === 'function') {
+                  showToast('請輸入模板名稱！', 'error');
+                } else {
+                  alert('請輸入模板名稱！');
+                }
+                return;
+              }
+              item.name = diagNameVal;
               item.category = document.getElementById('diagnosisCategorySelect').value;
               item.content = document.getElementById('diagnosisContentTextarea').value;
               item.lastModified = new Date().toISOString().split('T')[0];
