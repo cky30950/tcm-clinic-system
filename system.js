@@ -9,15 +9,43 @@ let currentUserData = null;
  */
 const ROLE_PERMISSIONS = {
   // 診所管理者擁有全部功能權限，包括個人設置與模板庫管理
-  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary'],
-  // 醫師可存取大部分功能，包含個人設置與模板庫管理
-  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement', 'personalSettings', 'templateLibrary'],
+  // 調整功能列表順序：模板庫管理移至診症系統下方
+  '診所管理': [
+    'patientManagement',
+    'consultationSystem',
+    'templateLibrary',
+    'herbLibrary',
+    'billingManagement',
+    'userManagement',
+    'financialReports',
+    'systemManagement',
+    'personalSettings'
+  ],
+  // 醫師可存取大部分功能，將模板庫管理置於診症系統下方
+  '醫師': [
+    'patientManagement',
+    'consultationSystem',
+    'templateLibrary',
+    'herbLibrary',
+    'billingManagement',
+    'userManagement',
+    'systemManagement',
+    'personalSettings'
+  ],
   // 護理師原本僅能使用診症相關功能。為了讓模板庫管理變成公用功能，
-  // 將 templateLibrary 新增到護理師的權限清單，讓護理師也能瀏覽與使用模板庫。
-  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'templateLibrary'],
-  // 一般用戶原本只能進入病患管理與診症系統。為了讓模板庫管理變成公用功能，
-  // 也將 templateLibrary 新增到一般用戶的權限清單，使所有登入用戶都可存取模板庫。
-  '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary']
+  // 將 templateLibrary 新增到護理師的權限清單並放置在診症系統後方。
+  '護理師': [
+    'patientManagement',
+    'consultationSystem',
+    'templateLibrary',
+    'herbLibrary'
+  ],
+  // 一般用戶：病患管理、診症系統與模板庫管理，模板庫管理位於診症系統下方。
+  '用戶': [
+    'patientManagement',
+    'consultationSystem',
+    'templateLibrary'
+  ]
 };
 
 /**
@@ -11544,6 +11572,14 @@ document.addEventListener('DOMContentLoaded', function() {
   window.hideAcupointComboModal = hideAcupointComboModal;
   window.selectAcupointCombo = selectAcupointCombo;
 
+  // 將診斷模板及醫囑模板相關函式掛載至全域，讓診症頁面的按鈕可以直接調用。
+  window.showDiagnosisTemplateModal = showDiagnosisTemplateModal;
+  window.hideDiagnosisTemplateModal = hideDiagnosisTemplateModal;
+  window.selectDiagnosisTemplate = selectDiagnosisTemplate;
+  window.showPrescriptionTemplateModal = showPrescriptionTemplateModal;
+  window.hidePrescriptionTemplateModal = hidePrescriptionTemplateModal;
+  window.selectPrescriptionTemplate = selectPrescriptionTemplate;
+
   /**
    * 在使用者嘗試直接關閉或重新整理網頁時提示確認，避免未保存的套票使用紀錄被誤判為取消。
    *
@@ -12641,17 +12677,206 @@ function refreshTemplateCategoryFilters() {
               if (Array.isArray(combo.points) && combo.points.length > 0) {
                 note += combo.points.map(pt => pt.name + (pt.type ? '(' + pt.type + ')' : '')).join('、');
               }
-              if (combo.technique) {
-                if (note.length > 0) note += '，';
-                note += '針法：' + combo.technique;
+              // 補足針法及顯示邏輯，並結束 selectAcupointCombo 函式
+
+
+          /**
+           * 顯示診斷模板選擇彈窗。在彈窗中列出所有可用的診斷模板供選擇。
+           * 點擊某一模板後，會將其資料載入當前診症表單。
+           */
+          function showDiagnosisTemplateModal() {
+            try {
+              const modal = document.getElementById('diagnosisTemplateModal');
+              const listContainer = document.getElementById('diagnosisTemplateList');
+              if (!modal || !listContainer) return;
+              listContainer.innerHTML = '';
+              // 取得可顯示的診斷模板列表，過濾掉新建尚未保存的項目
+              const list = Array.isArray(diagnosisTemplates)
+                ? diagnosisTemplates.filter(t => !t.isNew)
+                : [];
+              if (list.length === 0) {
+                listContainer.innerHTML = '<div class="text-center text-gray-500">尚未設定診斷模板</div>';
+              } else {
+                list.forEach(item => {
+                  const div = document.createElement('div');
+                  div.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
+                  // 簡單摘要：顯示主訴或內容前幾字
+                  let summary = '';
+                  if (item.chiefComplaint) {
+                    summary = String(item.chiefComplaint).split('\n')[0];
+                  } else if (item.content) {
+                    summary = String(item.content).substring(0, 50) + (item.content.length > 50 ? '...' : '');
+                  }
+                  div.innerHTML = `
+                    <div class="font-semibold text-gray-800 mb-1">${item.name || ''}</div>
+                    <div class="text-sm text-gray-600">${summary || ''}</div>
+                  `;
+                  div.onclick = function () {
+                    selectDiagnosisTemplate(item.id);
+                  };
+                  listContainer.appendChild(div);
+                });
               }
-              const textarea = document.getElementById('formAcupunctureNotes');
-              if (textarea) {
-                textarea.value = note;
+              modal.classList.remove('hidden');
+            } catch (err) {
+              console.error('顯示診斷模板彈窗錯誤:', err);
+            }
+          }
+
+          /**
+           * 隱藏診斷模板選擇彈窗。
+           */
+          function hideDiagnosisTemplateModal() {
+            const modal = document.getElementById('diagnosisTemplateModal');
+            if (modal) modal.classList.add('hidden');
+          }
+
+          /**
+           * 選擇特定診斷模板並將其內容填入診症表單。
+           * @param {number|string} templateId 模板的 ID
+           */
+          function selectDiagnosisTemplate(templateId) {
+            try {
+              const idStr = String(templateId);
+              const template = Array.isArray(diagnosisTemplates)
+                ? diagnosisTemplates.find(t => String(t.id) === idStr)
+                : null;
+              hideDiagnosisTemplateModal();
+              if (!template) return;
+              // 填入主訴
+              const symptomsEl = document.getElementById('formSymptoms');
+              if (symptomsEl) {
+                if (typeof template.chiefComplaint === 'string' && template.chiefComplaint.trim() !== '') {
+                  symptomsEl.value = template.chiefComplaint;
+                } else if (template.content) {
+                  symptomsEl.value = template.content;
+                }
               }
-              showToast('已載入常用穴位組合：' + combo.name, 'success');
-            } catch (error) {
-              console.error('載入常用穴位組合錯誤:', error);
+              // 現病史
+              const historyEl = document.getElementById('formCurrentHistory');
+              if (historyEl && typeof template.currentHistory === 'string') {
+                historyEl.value = template.currentHistory;
+              }
+              // 舌象
+              const tongueEl = document.getElementById('formTongue');
+              if (tongueEl && typeof template.tongue === 'string') {
+                tongueEl.value = template.tongue;
+              }
+              // 脈象
+              const pulseEl = document.getElementById('formPulse');
+              if (pulseEl && typeof template.pulse === 'string') {
+                pulseEl.value = template.pulse;
+              }
+              // 中醫診斷
+              const diagEl = document.getElementById('formDiagnosis');
+              if (diagEl && typeof template.tcmDiagnosis === 'string') {
+                diagEl.value = template.tcmDiagnosis;
+              }
+              // 證型診斷
+              const syndromeEl = document.getElementById('formSyndrome');
+              if (syndromeEl && typeof template.syndromeDiagnosis === 'string') {
+                syndromeEl.value = template.syndromeDiagnosis;
+              }
+              showToast('已載入診斷模板：' + (template.name || ''), 'success');
+            } catch (err) {
+              console.error('載入診斷模板錯誤:', err);
+            }
+          }
+
+          /**
+           * 顯示醫囑模板選擇彈窗。列出醫囑模板供快速載入中藥服用方法及醫囑欄位。
+           */
+          function showPrescriptionTemplateModal() {
+            try {
+              const modal = document.getElementById('prescriptionTemplateModal');
+              const listContainer = document.getElementById('prescriptionTemplateList');
+              if (!modal || !listContainer) return;
+              listContainer.innerHTML = '';
+              const list = Array.isArray(prescriptionTemplates)
+                ? prescriptionTemplates.filter(t => !t.isNew)
+                : [];
+              if (list.length === 0) {
+                listContainer.innerHTML = '<div class="text-center text-gray-500">尚未設定醫囑模板</div>';
+              } else {
+                list.forEach(item => {
+                  const div = document.createElement('div');
+                  div.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
+                  // 摘要：內容前幾字
+                  let summary = '';
+                  if (item.content) {
+                    summary = String(item.content).substring(0, 50) + (item.content.length > 50 ? '...' : '');
+                  }
+                  div.innerHTML = `
+                    <div class="font-semibold text-gray-800 mb-1">${item.name || ''}</div>
+                    <div class="text-sm text-gray-600">${summary || ''}</div>
+                  `;
+                  div.onclick = function () {
+                    selectPrescriptionTemplate(item.id);
+                  };
+                  listContainer.appendChild(div);
+                });
+              }
+              modal.classList.remove('hidden');
+            } catch (err) {
+              console.error('顯示醫囑模板彈窗錯誤:', err);
+            }
+          }
+
+          /**
+           * 隱藏醫囑模板選擇彈窗。
+           */
+          function hidePrescriptionTemplateModal() {
+            const modal = document.getElementById('prescriptionTemplateModal');
+            if (modal) modal.classList.add('hidden');
+          }
+
+          /**
+           * 選擇醫囑模板並將其中資訊填入診症表單。
+           * @param {number|string} templateId 模板 ID
+           */
+          function selectPrescriptionTemplate(templateId) {
+            try {
+              const idStr = String(templateId);
+              const template = Array.isArray(prescriptionTemplates)
+                ? prescriptionTemplates.find(t => String(t.id) === idStr)
+                : null;
+              hidePrescriptionTemplateModal();
+              if (!template) return;
+              // 解析內容填入使用方法與醫囑欄位
+              let content = template.content || '';
+              // 嘗試從內容中擷取服用方法，關鍵詞包括「服藥方法」或「服用方法」
+              let usageText = '';
+              try {
+                const match = content.match(/(?:服用方法|服藥方法)：([\s\S]*?)(?:注意事項|療程安排|療程|$)/);
+                if (match && match[1]) {
+                  usageText = match[1].trim();
+                }
+              } catch (_e) {
+                // ignore parsing errors
+              }
+              // 填入中藥服用方法
+              const usageEl = document.getElementById('formUsage');
+              if (usageEl) {
+                if (usageText) {
+                  usageEl.value = usageText;
+                } else {
+                  usageEl.value = content;
+                }
+              }
+              // 將完整內容填入醫囑及注意事項欄位
+              const instructionsEl = document.getElementById('formInstructions');
+              if (instructionsEl) {
+                instructionsEl.value = content;
+              }
+              // 療程
+              const courseEl = document.getElementById('formTreatmentCourse');
+              if (courseEl && template.duration) {
+                courseEl.value = template.duration;
+              }
+              // 目前不自動填入複診時間，因為模板中的 followUp 多為相對描述（如 3天後）
+              showToast('已載入醫囑模板：' + (template.name || ''), 'success');
+            } catch (err) {
+              console.error('載入醫囑模板錯誤:', err);
             }
           }
 
