@@ -615,13 +615,13 @@
                                     <div class="flex justify-between items-center mb-2">
                                         <label class="block text-sm font-semibold text-gray-700">處方內容</label>
                                         <div class="flex gap-2">
-                                            <button type="button" onclick="loadPreviousPrescription()" 
-                                                    class="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded transition duration-200">
-                                                📋 載入上次處方
-                                            </button>
                                             <button type="button" onclick="showHerbComboModal()" 
                                                     class="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded transition duration-200">
                                                 🌿 載入常用藥方
+                                            </button>
+                                            <button type="button" onclick="loadPreviousPrescription()" 
+                                                    class="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded transition duration-200">
+                                                📋 載入上次處方
                                             </button>
                                         </div>
                                     </div>
@@ -1090,8 +1090,8 @@
             <div id="userManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h2 class="text-2xl font-bold text-gray-800 flex items-center">
-                        <!-- 使用多人圖示代表診所用戶管理 -->
-                        <span class="text-3xl mr-3">👥</span>
+                        <!-- 使用單人圖示代表診所用戶管理 -->
+                        <span class="text-3xl mr-3">👤</span>
                         診所用戶管理
                     </h2>
                     <div class="flex flex-col md:flex-row gap-3">
@@ -1494,7 +1494,7 @@
             <!-- 移除內層多餘的背景框，避免重複包裹 -->
             <div>
             <h2 class="text-2xl font-bold text-amber-800 mb-6 flex items-center">
-              <span class="text-3xl mr-3">👤</span>
+              <span class="text-3xl mr-3">🔧</span>
               個人設置
             </h2>
             
@@ -1825,6 +1825,7 @@
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
