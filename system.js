@@ -11643,6 +11643,69 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         }
 
+/**
+ * 刷新模板庫的分類篩選下拉選單。
+ * 此函式會根據最新的 categories.prescriptions 和 categories.diagnosis
+ * 更新醫囑模板與診斷模板的分類選擇器，以便在模板庫頁面能夠顯示所有
+ * 可用分類進行篩選。若當前選中的值仍存在於新的分類清單中，則維持選中；
+ * 否則恢復到預設的「全部類別」或「全部科別」。
+ */
+function refreshTemplateCategoryFilters() {
+  try {
+    // 醫囑模板分類篩選
+    const pFilter = document.getElementById('prescriptionTemplateCategoryFilter');
+    if (pFilter) {
+      // 保存目前選中值
+      const prevValue = pFilter.value;
+      // 清空並添加預設選項
+      pFilter.innerHTML = '';
+      const defaultOpt = document.createElement('option');
+      defaultOpt.value = '全部類別';
+      defaultOpt.textContent = '全部類別';
+      pFilter.appendChild(defaultOpt);
+      // 加入所有醫囑分類
+      const pCats = (categories && Array.isArray(categories.prescriptions)) ? categories.prescriptions : [];
+      pCats.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        pFilter.appendChild(opt);
+      });
+      // 恢復先前選項（若仍存在）
+      if (prevValue && Array.from(pFilter.options).some(o => o.value === prevValue)) {
+        pFilter.value = prevValue;
+      } else {
+        pFilter.value = '全部類別';
+      }
+    }
+    // 診斷模板分類篩選
+    const dFilter = document.getElementById('diagnosisTemplateCategoryFilter');
+    if (dFilter) {
+      const prevValue2 = dFilter.value;
+      dFilter.innerHTML = '';
+      const defaultOpt2 = document.createElement('option');
+      // 使用原本的預設文案為「全部科別」，若需要亦可使用「全部分類」
+      defaultOpt2.value = '全部科別';
+      defaultOpt2.textContent = '全部科別';
+      dFilter.appendChild(defaultOpt2);
+      const dCats = (categories && Array.isArray(categories.diagnosis)) ? categories.diagnosis : [];
+      dCats.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        dFilter.appendChild(opt);
+      });
+      if (prevValue2 && Array.from(dFilter.options).some(o => o.value === prevValue2)) {
+        dFilter.value = prevValue2;
+      } else {
+        dFilter.value = '全部科別';
+      }
+    }
+  } catch (e) {
+    console.error('刷新模板分類篩選下拉選單失敗:', e);
+  }
+}
+
         /**
          * 從 Firebase 初始化分類資料。
          * 嘗試讀取位於 'categories/default' 的文檔，若不存在則寫入當前預設分類。
@@ -11661,6 +11724,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (Array.isArray(localData.diagnosis)) categories.diagnosis = localData.diagnosis;
                 // 更新全域引用
                 window.categories = categories;
+                // 更新模板庫分類篩選下拉選單，以顯示最新的醫囑與診斷分類
+                if (typeof refreshTemplateCategoryFilters === 'function') {
+                  try {
+                    refreshTemplateCategoryFilters();
+                  } catch (_e) {}
+                }
               }
             }
           } catch (err) {
@@ -11706,6 +11775,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             // 更新全域引用
             window.categories = categories;
+            // 更新模板庫分類篩選下拉選單，以顯示最新的醫囑與診斷分類
+            if (typeof refreshTemplateCategoryFilters === 'function') {
+              try {
+                refreshTemplateCategoryFilters();
+              } catch (_e) {}
+            }
           } catch (error) {
             console.error('讀取/初始化分類資料失敗:', error);
           }
@@ -12885,6 +12960,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const newCategory = input.value.trim();
             if (newCategory && !categories[type].includes(newCategory)) {
               categories[type].push(newCategory);
+              // 如為醫囑或診斷分類，刷新模板分類篩選下拉選單
+              if (type === 'prescriptions' || type === 'diagnosis') {
+                if (typeof refreshTemplateCategoryFilters === 'function') {
+                  try {
+                    refreshTemplateCategoryFilters();
+                  } catch (_e) {}
+                }
+              }
               // 若修改的是中藥或穴位分類，更新個人慣用分類
               if (typeof refreshComboCategories === 'function') {
                 refreshComboCategories(type);
@@ -12945,6 +13028,14 @@ document.addEventListener('DOMContentLoaded', function() {
                   setupPersonalComboSearchAndFilter();
                 }
               } catch (_e) {}
+              // 若刪除的是醫囑或診斷分類，刷新模板分類篩選下拉選單
+              if (type === 'prescriptions' || type === 'diagnosis') {
+                if (typeof refreshTemplateCategoryFilters === 'function') {
+                  try {
+                    refreshTemplateCategoryFilters();
+                  } catch (_e) {}
+                }
+              }
               // 重新渲染分類管理彈窗
               showCategoryModal(type);
               // 將更新後的分類儲存至 Firebase 或本地
