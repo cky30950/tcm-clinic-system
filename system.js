@@ -520,6 +520,57 @@ function playNotificationSound() {
             }
         }
 
+        // 初始化模板庫資料
+        /**
+         * 從 Firestore 讀取模板庫資料，包含醫囑模板與診斷模板。
+         * 若資料存在於 Firestore，則取代本地目前的模板列表；否則保留現有資料。
+         * 此函式會等待 Firebase 初始化完成後再執行，並在讀取後重新渲染模板列表。
+         */
+        async function initTemplateLibrary() {
+            // 等待 Firebase 初始化
+            while (!window.firebase || !window.firebase.db) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            try {
+                // 從 Firestore 讀取醫囑模板
+                const presSnapshot = await window.firebase.getDocs(
+                    window.firebase.collection(window.firebase.db, 'prescriptionTemplates')
+                );
+                const presFromFirestore = [];
+                presSnapshot.forEach(docSnap => {
+                    presFromFirestore.push({ ...docSnap.data() });
+                });
+                if (presFromFirestore.length > 0) {
+                    prescriptionTemplates = presFromFirestore;
+                }
+
+                // 從 Firestore 讀取診斷模板
+                const diagSnapshot = await window.firebase.getDocs(
+                    window.firebase.collection(window.firebase.db, 'diagnosisTemplates')
+                );
+                const diagFromFirestore = [];
+                diagSnapshot.forEach(docSnap => {
+                    diagFromFirestore.push({ ...docSnap.data() });
+                });
+                if (diagFromFirestore.length > 0) {
+                    diagnosisTemplates = diagFromFirestore;
+                }
+            } catch (error) {
+                console.error('讀取/初始化模板庫資料失敗:', error);
+            }
+            // 渲染模板內容
+            try {
+                if (typeof renderPrescriptionTemplates === 'function') {
+                    renderPrescriptionTemplates();
+                }
+                if (typeof renderDiagnosisTemplates === 'function') {
+                    renderDiagnosisTemplates();
+                }
+            } catch (err) {
+                console.error('渲染模板庫內容失敗:', err);
+            }
+        }
+
         // 預設用戶資料（目前未使用，但保留以備日後擴充）
         // 移除未使用的預設用戶陣列以減少程式碼冗餘
 
@@ -636,6 +687,15 @@ async function attemptMainLogin() {
                     await initCategoryData();
                 } catch (err) {
                     console.error('初始化分類資料失敗:', err);
+                }
+            }
+
+            // 初始化模板庫資料
+            if (typeof initTemplateLibrary === 'function') {
+                try {
+                    await initTemplateLibrary();
+                } catch (err) {
+                    console.error('初始化模板庫資料失敗:', err);
                 }
             }
         } catch (error) {
@@ -12579,9 +12639,17 @@ document.addEventListener('DOMContentLoaded', function() {
             renderPrescriptionTemplates();
           }
 
-          function deletePrescriptionTemplate(id) {
+          async function deletePrescriptionTemplate(id) {
             if (!confirm('確定要刪除此醫囑模板嗎？')) return;
             prescriptionTemplates = prescriptionTemplates.filter(p => p.id !== id);
+            // 從 Firestore 中刪除該醫囑模板
+            try {
+              await window.firebase.deleteDoc(
+                window.firebase.doc(window.firebase.db, 'prescriptionTemplates', String(id))
+              );
+            } catch (error) {
+              console.error('刪除醫囑模板資料至 Firestore 失敗:', error);
+            }
             renderPrescriptionTemplates();
           }
 
@@ -12639,9 +12707,17 @@ document.addEventListener('DOMContentLoaded', function() {
             renderDiagnosisTemplates();
           }
 
-          function deleteDiagnosisTemplate(id) {
+          async function deleteDiagnosisTemplate(id) {
             if (!confirm('確定要刪除此診斷模板嗎？')) return;
             diagnosisTemplates = diagnosisTemplates.filter(d => d.id !== id);
+            // 從 Firestore 中刪除該診斷模板
+            try {
+              await window.firebase.deleteDoc(
+                window.firebase.doc(window.firebase.db, 'diagnosisTemplates', String(id))
+              );
+            } catch (error) {
+              console.error('刪除診斷模板資料至 Firestore 失敗:', error);
+            }
             renderDiagnosisTemplates();
           }
 
@@ -13036,7 +13112,7 @@ document.addEventListener('DOMContentLoaded', function() {
             modal.classList.add('hidden');
           }
 
-          function saveEdit() {
+          async function saveEdit() {
             const modal = document.getElementById('editModal');
             const editType = modal.dataset.editType;
             const itemIdStr = modal.dataset.itemId;
@@ -13153,6 +13229,15 @@ document.addEventListener('DOMContentLoaded', function() {
               item.followUp = document.getElementById('prescriptionFollowUpInput').value;
               item.content = document.getElementById('prescriptionContentTextarea').value;
               item.lastModified = new Date().toISOString().split('T')[0];
+              // 將資料保存至 Firestore
+              try {
+                await window.firebase.setDoc(
+                  window.firebase.doc(window.firebase.db, 'prescriptionTemplates', String(item.id)),
+                  item
+                );
+              } catch (error) {
+                console.error('儲存醫囑模板資料至 Firestore 失敗:', error);
+              }
               renderPrescriptionTemplates();
             } else if (editType === 'diagnosis') {
               const item = diagnosisTemplates.find(d => d.id === itemId);
@@ -13171,6 +13256,15 @@ document.addEventListener('DOMContentLoaded', function() {
               item.category = document.getElementById('diagnosisCategorySelect').value;
               item.content = document.getElementById('diagnosisContentTextarea').value;
               item.lastModified = new Date().toISOString().split('T')[0];
+              // 將資料保存至 Firestore
+              try {
+                await window.firebase.setDoc(
+                  window.firebase.doc(window.firebase.db, 'diagnosisTemplates', String(item.id)),
+                  item
+                );
+              } catch (error) {
+                console.error('儲存診斷模板資料至 Firestore 失敗:', error);
+              }
               renderDiagnosisTemplates();
             }
             alert('保存成功！');
