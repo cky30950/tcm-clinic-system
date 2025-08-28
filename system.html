@@ -1522,7 +1522,7 @@
                   </button>
                 </div>
                 <div class="flex gap-4 flex-wrap">
-                  <!-- 指定 ID 以便 JS 監聽輸入與分類變更 -->
+                  <!-- 個人慣用中藥組合：底層搜尋欄與分類篩選 -->
                   <input id="herbComboSearchInput" type="text" placeholder="搜尋藥方組合名稱..." class="px-4 py-2 border-2 border-green-200 rounded-lg focus:border-green-400 focus:outline-none flex-1 min-w-64">
                   <select id="herbComboCategoryFilter" class="px-4 py-2 border-2 border-green-200 rounded-lg focus:border-green-400 focus:outline-none">
                     <option>全部分類</option>
@@ -1532,7 +1532,7 @@
                     <option>補益類</option>
                     <option>清熱類</option>
                   </select>
-                  <select id="herbComboFrequencyFilter" class="px-4 py-2 border-2 border-green-200 rounded-lg focus:border-green-400 focus:outline-none">
+                  <select class="px-4 py-2 border-2 border-green-200 rounded-lg focus:border-green-400 focus:outline-none">
                     <option>全部頻率</option>
                     <option>高頻使用</option>
                     <option>中頻使用</option>
@@ -1557,7 +1557,7 @@
                   </button>
                 </div>
                 <div class="flex gap-4 flex-wrap">
-                  <!-- 指定 ID 以便 JS 監聽輸入與分類變更 -->
+                  <!-- 個人慣用穴位組合：底層搜尋欄與分類篩選 -->
                   <input id="acupointComboSearchInput" type="text" placeholder="搜尋穴位組合名稱..." class="px-4 py-2 border-2 border-blue-200 rounded-lg focus:border-blue-400 focus:outline-none flex-1 min-w-64">
                   <select id="acupointComboCategoryFilter" class="px-4 py-2 border-2 border-blue-200 rounded-lg focus:border-blue-400 focus:outline-none">
                     <option>全部分類</option>
@@ -1568,7 +1568,7 @@
                     <option>內科疾病</option>
                     <option>婦科疾病</option>
                   </select>
-                  <select id="acupointComboMethodFilter" class="px-4 py-2 border-2 border-blue-200 rounded-lg focus:border-blue-400 focus:outline-none">
+                  <select class="px-4 py-2 border-2 border-blue-200 rounded-lg focus:border-blue-400 focus:outline-none">
                     <option>全部針法</option>
                     <option>補法</option>
                     <option>瀉法</option>
@@ -1830,6 +1830,7 @@
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
