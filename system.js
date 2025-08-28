@@ -12,10 +12,12 @@ const ROLE_PERMISSIONS = {
   '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary'],
   // 醫師可存取大部分功能，包含個人設置與模板庫管理
   '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement', 'personalSettings', 'templateLibrary'],
-  // 護理師僅能使用診症相關功能，不包括個人設置或模板庫管理
-  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary'],
-  // 一般用戶只能進入病患管理與診症系統
-  '用戶': ['patientManagement', 'consultationSystem']
+  // 護理師原本僅能使用診症相關功能。為了讓模板庫管理變成公用功能，
+  // 將 templateLibrary 新增到護理師的權限清單，讓護理師也能瀏覽與使用模板庫。
+  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'templateLibrary'],
+  // 一般用戶原本只能進入病患管理與診症系統。為了讓模板庫管理變成公用功能，
+  // 也將 templateLibrary 新增到一般用戶的權限清單，使所有登入用戶都可存取模板庫。
+  '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary']
 };
 
 /**
@@ -12600,7 +12602,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   </div>
                   <div class="flex gap-2">
                     <button class="text-blue-600 hover:text-blue-800" onclick="showEditModal('prescription', '${item.name}')">編輯</button>
-                    <button class="text-green-600 hover:text-green-800" onclick="duplicatePrescriptionTemplate(${item.id})">複製</button>
+                    <!-- 移除複製按鈕，避免模板被重複複製。僅保留編輯與刪除操作 -->
                     <button class="text-red-600 hover:text-red-800" onclick="deletePrescriptionTemplate(${item.id})">刪除</button>
                   </div>
                 </div>
@@ -12671,7 +12673,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   </div>
                   <div class="flex gap-2">
                     <button class="text-blue-600 hover:text-blue-800" onclick="showEditModal('diagnosis', '${item.name}')">編輯</button>
-                    <button class="text-green-600 hover:text-green-800" onclick="duplicateDiagnosisTemplate(${item.id})">複製</button>
+                    <!-- 移除複製按鈕，避免模板被重複複製。僅保留編輯與刪除操作 -->
                     <button class="text-red-600 hover:text-red-800" onclick="deleteDiagnosisTemplate(${item.id})">刪除</button>
                   </div>
                 </div>
