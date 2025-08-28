@@ -12771,7 +12771,11 @@ document.addEventListener('DOMContentLoaded', function() {
               // 使用輸入框而非下拉選單顯示既有藥材，並提供搜尋功能新增藥材
               const herbIngredientsHtml = Array.isArray(item.ingredients)
                 ? item.ingredients.map(ing => {
-                    return '<div class="grid grid-cols-2 gap-2"><input type="text" value="' + (ing.name || '') + '" placeholder="藥材名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + (ing.dosage || '') + '" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded"></div>';
+                    // 既有藥材名稱固定顯示於輸入欄，不可編輯，劑量可調整
+                    return '<div class="grid grid-cols-2 gap-2">' +
+                      '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="px-2 py-1 border border-gray-300 rounded">' +
+                      '<input type="text" value="' + (ing.dosage || '') + '" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded">' +
+                      '</div>';
                   }).join('')
                 : '';
               modalContent.innerHTML = `
@@ -12795,10 +12799,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div id="herbIngredients" class="space-y-2">
                       ${herbIngredientsHtml}
                     </div>
-                    <button onclick="addHerbIngredientField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增藥材</button>
+                    <!-- 移除新增藥材按鈕，改為僅使用搜尋欄新增藥材 -->
                     <div class="mt-4">
-                      <label class="block text-gray-700 font-medium mb-2">搜尋藥材</label>
-                      <input type="text" id="herbIngredientSearch" placeholder="搜尋中藥材名稱..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" oninput="searchHerbForCombo()">
+                      <label class="block text-gray-700 font-medium mb-2">搜尋藥材或方劑</label>
+                      <input type="text" id="herbIngredientSearch" placeholder="搜尋中藥材或方劑名稱..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" oninput="searchHerbForCombo()">
                       <div id="herbIngredientSearchResults" class="hidden">
                         <div class="bg-white border border-green-200 rounded max-h-40 overflow-y-auto">
                           <div id="herbIngredientSearchList" class="grid grid-cols-1 md:grid-cols-2 gap-2 p-2"></div>
@@ -13015,8 +13019,8 @@ document.addEventListener('DOMContentLoaded', function() {
               resultsContainer.classList.add('hidden');
               return;
             }
-            // 搜索 herbLibrary 中 type 為 'herb' 的項目，名稱、別名或功效中包含搜尋字串
-            const matched = (Array.isArray(herbLibrary) ? herbLibrary : []).filter(item => item && item.type === 'herb' && (
+            // 搜索 herbLibrary 中的中藥材與方劑，名稱、別名或功效中包含搜尋字串
+            const matched = (Array.isArray(herbLibrary) ? herbLibrary : []).filter(item => item && (item.type === 'herb' || item.type === 'formula') && (
               (item.name && item.name.toLowerCase().includes(searchTerm)) ||
               (item.alias && item.alias.toLowerCase().includes(searchTerm)) ||
               (item.effects && item.effects.toLowerCase().includes(searchTerm))
@@ -13049,6 +13053,8 @@ document.addEventListener('DOMContentLoaded', function() {
             nameInput.type = 'text';
             nameInput.value = name || '';
             nameInput.placeholder = '藥材名稱';
+            // 新增後的藥材名稱固定顯示，不可編輯
+            nameInput.readOnly = true;
             nameInput.className = 'px-2 py-1 border border-gray-300 rounded';
             const dosageInput = document.createElement('input');
             dosageInput.type = 'text';
