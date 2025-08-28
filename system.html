@@ -1590,49 +1590,23 @@
               模板庫管理
             </h2>
             
-            <!-- 標籤切換 -->
+            <!-- 標籤切換：診斷模板與醫囑模板位置互換 -->
             <div class="mb-6">
               <div class="flex border-b border-gray-200">
-                <button class="px-6 py-3 text-amber-700 border-b-2 border-amber-500 font-medium" onclick="switchTemplateTab('prescriptions')" id="prescriptionsTab">
-                  📋 醫囑模板
-                </button>
-                <button class="px-6 py-3 text-gray-500 hover:text-amber-700 font-medium" onclick="switchTemplateTab('diagnosis')" id="diagnosisTab">
+                <!-- 將診斷模板放在前面，並預設為啟用狀態 -->
+                <button class="px-6 py-3 text-amber-700 border-b-2 border-amber-500 font-medium"
+                        onclick="switchTemplateTab('diagnosis')" id="diagnosisTab">
                   🔍 診斷模板
                 </button>
+                <button class="px-6 py-3 text-gray-500 hover:text-amber-700 font-medium"
+                        onclick="switchTemplateTab('prescriptions')" id="prescriptionsTab">
+                  📋 醫囑模板
+                </button>
               </div>
             </div>
 
-            <!-- 醫囑模板內容 -->
-            <div id="prescriptionsContent" class="template-tab-content">
-              <div class="mb-6 space-y-4">
-                <div class="flex gap-4 flex-wrap">
-                  <button class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors font-medium shadow-md flex items-center gap-2" onclick="addNewPrescriptionTemplate()">
-                    <span class="text-lg">➕</span>
-                    新增醫囑模板
-                  </button>
-                  <button class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md flex items-center gap-2" onclick="showCategoryModal('prescriptions')">
-                    <span class="text-lg">🏷️</span>
-                    管理分類
-                  </button>
-                </div>
-                <div class="flex gap-4 flex-wrap">
-                  <!-- 搜尋醫囑模板名稱 -->
-                  <input type="text" id="prescriptionTemplateSearch" placeholder="搜尋醫囑模板名稱..." class="px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-400 focus:outline-none flex-1 min-w-64">
-                  <!-- 醫囑分類篩選 -->
-                  <select id="prescriptionTemplateCategoryFilter" class="px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-400 focus:outline-none">
-                    <!-- 為了避免顯示已儲存的分類，此下拉選單僅提供整體類別篩選選項 -->
-                    <option>全部類別</option>
-                  </select>
-                  <!-- 使用頻率篩選已移除 -->
-                </div>
-              </div>
-              <div class="space-y-4" id="prescriptionTemplatesContainer">
-                <!-- 動態載入醫囑模板 -->
-              </div>
-            </div>
-
-            <!-- 診斷模板內容 -->
-            <div id="diagnosisContent" class="template-tab-content hidden">
+            <!-- 診斷模板內容放在前面 -->
+            <div id="diagnosisContent" class="template-tab-content">
               <div class="mb-6 space-y-4">
                 <div class="flex gap-4 flex-wrap">
                   <button class="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700 transition-colors font-medium shadow-md flex items-center gap-2" onclick="addNewDiagnosisTemplate()">
@@ -1657,6 +1631,35 @@
               </div>
               <div class="space-y-4" id="diagnosisTemplatesContainer">
                 <!-- 動態載入診斷模板 -->
+              </div>
+            </div>
+
+            <!-- 醫囑模板內容放在後面，預設隱藏 -->
+            <div id="prescriptionsContent" class="template-tab-content hidden">
+              <div class="mb-6 space-y-4">
+                <div class="flex gap-4 flex-wrap">
+                  <button class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors font-medium shadow-md flex items-center gap-2" onclick="addNewPrescriptionTemplate()">
+                    <span class="text-lg">➕</span>
+                    新增醫囑模板
+                  </button>
+                  <button class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md flex items-center gap-2" onclick="showCategoryModal('prescriptions')">
+                    <span class="text-lg">🏷️</span>
+                    管理分類
+                  </button>
+                </div>
+                <div class="flex gap-4 flex-wrap">
+                  <!-- 搜尋醫囑模板名稱 -->
+                  <input type="text" id="prescriptionTemplateSearch" placeholder="搜尋醫囑模板名稱..." class="px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-400 focus:outline-none flex-1 min-w-64">
+                  <!-- 醫囑分類篩選 -->
+                  <select id="prescriptionTemplateCategoryFilter" class="px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-400 focus:outline-none">
+                    <!-- 為了避免顯示已儲存的分類，此下拉選單僅提供整體類別篩選選項 -->
+                    <option>全部類別</option>
+                  </select>
+                  <!-- 使用頻率篩選已移除 -->
+                </div>
+              </div>
+              <div class="space-y-4" id="prescriptionTemplatesContainer">
+                <!-- 動態載入醫囑模板 -->
               </div>
             </div>
           </div>
@@ -1809,6 +1812,7 @@
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>

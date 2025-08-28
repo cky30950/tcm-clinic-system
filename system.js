@@ -12698,7 +12698,9 @@ function refreshTemplateCategoryFilters() {
               duration: '',
               followUp: '',
               content: '',
-              lastModified: new Date().toISOString().split('T')[0]
+              lastModified: new Date().toISOString().split('T')[0],
+              // 標記為新建項目，用於取消時移除
+              isNew: true
             };
             prescriptionTemplates.push(newItem);
             renderPrescriptionTemplates();
@@ -12767,7 +12769,9 @@ function refreshTemplateCategoryFilters() {
               name: '',
               category: (typeof categories !== 'undefined' && categories.diagnosis && categories.diagnosis.length > 0) ? categories.diagnosis[0] : '',
               content: '',
-              lastModified: new Date().toISOString().split('T')[0]
+              lastModified: new Date().toISOString().split('T')[0],
+              // 標記為新建項目，用於取消時移除
+              isNew: true
             };
             diagnosisTemplates.push(newItem);
             renderDiagnosisTemplates();
@@ -13079,9 +13083,37 @@ function refreshTemplateCategoryFilters() {
             } else if (itemType === 'acupoint') {
               item = acupointCombinations.find(a => a.name === title);
             } else if (itemType === 'prescription') {
-              item = prescriptionTemplates.find(p => p.name === title);
+              // 當標題為空時，優先尋找標記為新建的項目，避免取錯對象
+              if (title && title.trim()) {
+                item = prescriptionTemplates.find(p => p.name === title);
+              } else {
+                item = prescriptionTemplates.find(p => p.isNew);
+                // fallback：若仍找不到，則從後往前尋找名稱為空白的項目
+                if (!item) {
+                  for (let i = prescriptionTemplates.length - 1; i >= 0; i--) {
+                    const candidate = prescriptionTemplates[i];
+                    if (!candidate.name) {
+                      item = candidate;
+                      break;
+                    }
+                  }
+                }
+              }
             } else if (itemType === 'diagnosis') {
-              item = diagnosisTemplates.find(d => d.name === title);
+              if (title && title.trim()) {
+                item = diagnosisTemplates.find(d => d.name === title);
+              } else {
+                item = diagnosisTemplates.find(d => d.isNew);
+                if (!item) {
+                  for (let i = diagnosisTemplates.length - 1; i >= 0; i--) {
+                    const candidate = diagnosisTemplates[i];
+                    if (!candidate.name) {
+                      item = candidate;
+                      break;
+                    }
+                  }
+                }
+              }
             }
             // 若找不到項目則返回，不顯示編輯窗
             if (!item) return;
@@ -13180,7 +13212,7 @@ function refreshTemplateCategoryFilters() {
               modalContent.innerHTML = `
                 <div class="space-y-4">
                   <div>
-                    <label class="block text-gray-700 font-medium mb-2">模板名稱</label>
+                    <label class="block text-gray-700 font-medium mb-2">模板名稱 *</label>
                     <input type="text" id="prescriptionNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div class="grid grid-cols-2 gap-4">
@@ -13215,7 +13247,7 @@ function refreshTemplateCategoryFilters() {
               modalContent.innerHTML = `
                 <div class="space-y-4">
                   <div>
-                    <label class="block text-gray-700 font-medium mb-2">模板名稱</label>
+                    <label class="block text-gray-700 font-medium mb-2">模板名稱 *</label>
                     <input type="text" id="diagnosisNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div>
@@ -13248,14 +13280,24 @@ function refreshTemplateCategoryFilters() {
               } else if (editType === 'acupoint') {
                 acupointCombinations = acupointCombinations.filter(a => a.id !== itemId);
                 renderAcupointCombinations();
+              } else if (editType === 'prescription') {
+                // 如果取消新建的醫囑模板，移除該項
+                prescriptionTemplates = prescriptionTemplates.filter(p => p.id !== itemId);
+                renderPrescriptionTemplates();
+              } else if (editType === 'diagnosis') {
+                // 如果取消新建的診斷模板，移除該項
+                diagnosisTemplates = diagnosisTemplates.filter(d => d.id !== itemId);
+                renderDiagnosisTemplates();
               }
               // 重置 dataset 標記
               delete modal.dataset.isNew;
-              // 將變更保存
-              if (typeof updatePersonalSettings === 'function') {
-                try {
-                  updatePersonalSettings().catch((err) => console.error('更新個人設置失敗:', err));
-                } catch (_e) {}
+              // 針對 herb 與 acupoint 保存個人設定
+              if (editType === 'herb' || editType === 'acupoint') {
+                if (typeof updatePersonalSettings === 'function') {
+                  try {
+                    updatePersonalSettings().catch((err) => console.error('更新個人設置失敗:', err));
+                  } catch (_e) {}
+                }
               }
             }
             modal.classList.add('hidden');
@@ -13378,6 +13420,11 @@ function refreshTemplateCategoryFilters() {
               item.followUp = document.getElementById('prescriptionFollowUpInput').value;
               item.content = document.getElementById('prescriptionContentTextarea').value;
               item.lastModified = new Date().toISOString().split('T')[0];
+              // 標記為已保存（非新建），避免取消時被移除
+              if (item.isNew) {
+                item.isNew = false;
+              }
+              modal.dataset.isNew = 'false';
               // 將資料保存至 Firestore
               try {
                 await window.firebase.setDoc(
@@ -13405,6 +13452,11 @@ function refreshTemplateCategoryFilters() {
               item.category = document.getElementById('diagnosisCategorySelect').value;
               item.content = document.getElementById('diagnosisContentTextarea').value;
               item.lastModified = new Date().toISOString().split('T')[0];
+              // 標記為已保存（非新建），避免取消時被移除
+              if (item.isNew) {
+                item.isNew = false;
+              }
+              modal.dataset.isNew = 'false';
               // 將資料保存至 Firestore
               try {
                 await window.firebase.setDoc(
