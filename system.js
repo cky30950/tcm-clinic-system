@@ -12751,6 +12751,32 @@ function refreshTemplateCategoryFilters() {
             displayTemplates.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-orange-200';
+              // Build display content for diagnosis template fields.
+              let contentHtml = '';
+              if (item.chiefComplaint || item.currentHistory || item.tongue || item.pulse || item.tcmDiagnosis || item.syndromeDiagnosis) {
+                const parts = [];
+                if (item.chiefComplaint) {
+                  parts.push('<p class="mb-2"><strong>主訴：</strong>' + String(item.chiefComplaint).split('\n').map(l => l).join('<br>') + '</p>');
+                }
+                if (item.currentHistory) {
+                  parts.push('<p class="mb-2"><strong>現病史：</strong>' + String(item.currentHistory).split('\n').map(l => l).join('<br>') + '</p>');
+                }
+                if (item.tongue) {
+                  parts.push('<p class="mb-2"><strong>舌象：</strong>' + String(item.tongue).split('\n').map(l => l).join('<br>') + '</p>');
+                }
+                if (item.pulse) {
+                  parts.push('<p class="mb-2"><strong>脈象：</strong>' + String(item.pulse).split('\n').map(l => l).join('<br>') + '</p>');
+                }
+                if (item.tcmDiagnosis) {
+                  parts.push('<p class="mb-2"><strong>中醫診斷：</strong>' + String(item.tcmDiagnosis).split('\n').map(l => l).join('<br>') + '</p>');
+                }
+                if (item.syndromeDiagnosis) {
+                  parts.push('<p class="mb-2"><strong>證型診斷：</strong>' + String(item.syndromeDiagnosis).split('\n').map(l => l).join('<br>') + '</p>');
+                }
+                contentHtml = parts.join('');
+              } else if (item.content) {
+                contentHtml = item.content.split('\n').map(p => '<p class="mb-2">' + p + '</p>').join('');
+              }
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
                   <div>
@@ -12766,7 +12792,7 @@ function refreshTemplateCategoryFilters() {
                   </div>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
-                  ${item.content.split('\n').map(p => '<p class="mb-2">' + p + '</p>').join('')}
+                  ${contentHtml}
                 </div>
               `;
               container.appendChild(card);
@@ -12779,7 +12805,13 @@ function refreshTemplateCategoryFilters() {
               id: Date.now(),
               name: '',
               category: (typeof categories !== 'undefined' && categories.diagnosis && categories.diagnosis.length > 0) ? categories.diagnosis[0] : '',
-              content: '',
+              // 新增診斷模板欄位：主訴、現病史、舌象、脈象、中醫診斷、證型診斷
+              chiefComplaint: '',
+              currentHistory: '',
+              tongue: '',
+              pulse: '',
+              tcmDiagnosis: '',
+              syndromeDiagnosis: '',
               lastModified: new Date().toISOString().split('T')[0],
               // 標記為新建項目，用於取消時移除
               isNew: true
@@ -13259,17 +13291,41 @@ function refreshTemplateCategoryFilters() {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">模板名稱 *</label>
-                    <input type="text" id="diagnosisNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="diagnosisNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">科別</label>
-                    <select id="diagnosisCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <select id="diagnosisCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                       ${categories.diagnosis.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                     </select>
                   </div>
                   <div>
-                    <label class="block text-gray-700 font-medium mb-2">診斷內容</label>
-                    <textarea id="diagnosisContentTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="5">${item.content || ''}</textarea>
+                    <label class="block text-gray-700 font-medium mb-2">主訴</label>
+                    <textarea id="diagnosisChiefComplaintInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="3">${item.chiefComplaint || ''}</textarea>
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">現病史</label>
+                    <textarea id="diagnosisCurrentHistoryInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="6">${item.currentHistory || ''}</textarea>
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-gray-700 font-medium mb-2">舌象</label>
+                      <textarea id="diagnosisTongueInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.tongue || ''}</textarea>
+                    </div>
+                    <div>
+                      <label class="block text-gray-700 font-medium mb-2">脈象</label>
+                      <textarea id="diagnosisPulseInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.pulse || ''}</textarea>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-gray-700 font-medium mb-2">中醫診斷</label>
+                      <textarea id="diagnosisTcmDiagnosisInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.tcmDiagnosis || ''}</textarea>
+                    </div>
+                    <div>
+                      <label class="block text-gray-700 font-medium mb-2">證型診斷</label>
+                      <textarea id="diagnosisSyndromeDiagnosisInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.syndromeDiagnosis || ''}</textarea>
+                    </div>
                   </div>
                 </div>
               `;
@@ -13461,7 +13517,15 @@ function refreshTemplateCategoryFilters() {
               }
               item.name = diagNameVal;
               item.category = document.getElementById('diagnosisCategorySelect').value;
-              item.content = document.getElementById('diagnosisContentTextarea').value;
+              // 儲存各診斷欄位內容
+              item.chiefComplaint = document.getElementById('diagnosisChiefComplaintInput').value;
+              item.currentHistory = document.getElementById('diagnosisCurrentHistoryInput').value;
+              item.tongue = document.getElementById('diagnosisTongueInput').value;
+              item.pulse = document.getElementById('diagnosisPulseInput').value;
+              item.tcmDiagnosis = document.getElementById('diagnosisTcmDiagnosisInput').value;
+              item.syndromeDiagnosis = document.getElementById('diagnosisSyndromeDiagnosisInput').value;
+              // 移除舊診斷內容欄位，避免混淆（若存在）
+              item.content = '';
               item.lastModified = new Date().toISOString().split('T')[0];
               // 標記為已保存（非新建），避免取消時被移除
               if (item.isNew) {
