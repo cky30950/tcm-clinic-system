@@ -11819,9 +11819,14 @@ document.addEventListener('DOMContentLoaded', function() {
             list.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-green-200';
+              // 在卡片標題下方加入分類顯示。若沒有分類則顯示空字串。
+              const category = item && item.category ? item.category : '';
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
-                  <h3 class="text-lg font-semibold text-green-800">${item.name}</h3>
+                  <div>
+                    <h3 class="text-lg font-semibold text-green-800">${item.name}</h3>
+                    <div class="text-xs text-green-600 mt-1">${category}</div>
+                  </div>
                   <div class="flex gap-2">
                     <button class="text-blue-600 hover:text-blue-800 text-sm" onclick="showEditModal('herb', '${item.name}')">編輯</button>
                     <!-- 移除複製功能：僅保留編輯與刪除按鈕 -->
@@ -11958,9 +11963,14 @@ document.addEventListener('DOMContentLoaded', function() {
             list.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-blue-200';
+              // 在標題下方加入分類顯示。若沒有分類則顯示空字串。
+              const category = item && item.category ? item.category : '';
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
-                  <h3 class="text-lg font-semibold text-blue-800">${item.name}</h3>
+                  <div>
+                    <h3 class="text-lg font-semibold text-blue-800">${item.name}</h3>
+                    <div class="text-xs text-blue-600 mt-1">${category}</div>
+                  </div>
                   <div class="flex gap-2">
                     <button class="text-blue-600 hover:text-blue-800 text-sm" onclick="showEditModal('acupoint', '${item.name}')">編輯</button>
                     <!-- 移除複製功能：僅保留編輯與刪除按鈕 -->
