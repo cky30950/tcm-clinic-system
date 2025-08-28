@@ -11826,7 +11826,6 @@ document.addEventListener('DOMContentLoaded', function() {
               duration: '7天',
               followUp: '3天後',
               content: '服藥方法：每日三次，飯後30分鐘溫服。服藥期間多喝溫開水。避免生冷、油膩、辛辣食物。注意事項：充分休息，避免熬夜。如症狀加重或持續發燒請立即回診。療程安排：建議療程7天，服藥3天後回診評估。',
-              frequency: '高',
               lastModified: '2024-02-15'
             }
           ];
@@ -11837,7 +11836,6 @@ document.addEventListener('DOMContentLoaded', function() {
               name: '感冒診斷模板',
               category: '內科',
               content: '症狀描述：患者表現為鼻塞、喉嚨痛、咳嗽等症狀。檢查建議：觀察咽部紅腫狀況，測量體溫。治療建議：建議使用疏風解表類中藥，搭配休息和多喝水。復診安排：3天後回診。',
-              frequency: '中',
               lastModified: '2024-01-20'
             }
           ];
@@ -12582,10 +12580,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
           // 渲染醫囑模板
-          function renderPrescriptionTemplates() {
+          function renderPrescriptionTemplates(list) {
             const container = document.getElementById('prescriptionTemplatesContainer');
             container.innerHTML = '';
-            prescriptionTemplates.forEach(item => {
+            // 使用傳入的列表，若未提供則使用全域列表
+            const templates = Array.isArray(list) ? list : prescriptionTemplates;
+            templates.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-purple-200';
               card.innerHTML = `
@@ -12621,7 +12621,6 @@ document.addEventListener('DOMContentLoaded', function() {
               duration: '',
               followUp: '',
               content: '',
-              frequency: '低',
               lastModified: new Date().toISOString().split('T')[0]
             };
             prescriptionTemplates.push(newItem);
@@ -12654,10 +12653,12 @@ document.addEventListener('DOMContentLoaded', function() {
           }
 
           // 渲染診斷模板
-          function renderDiagnosisTemplates() {
+          function renderDiagnosisTemplates(list) {
             const container = document.getElementById('diagnosisTemplatesContainer');
             container.innerHTML = '';
-            diagnosisTemplates.forEach(item => {
+            // 使用傳入的列表，若未提供則使用全域列表
+            const templates = Array.isArray(list) ? list : diagnosisTemplates;
+            templates.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-orange-200';
               card.innerHTML = `
@@ -12689,7 +12690,6 @@ document.addEventListener('DOMContentLoaded', function() {
               name: '',
               category: (typeof categories !== 'undefined' && categories.diagnosis && categories.diagnosis.length > 0) ? categories.diagnosis[0] : '',
               content: '',
-              frequency: '低',
               lastModified: new Date().toISOString().split('T')[0]
             };
             diagnosisTemplates.push(newItem);
@@ -12719,6 +12719,62 @@ document.addEventListener('DOMContentLoaded', function() {
               console.error('刪除診斷模板資料至 Firestore 失敗:', error);
             }
             renderDiagnosisTemplates();
+          }
+
+          /**
+           * 初始化模板庫搜尋功能，綁定搜尋和分類變更事件。
+           * 根據輸入的名稱關鍵字和選擇的分類篩選醫囑或診斷模板，並重新渲染列表。
+           * 使用者輸入或選擇變更時即時觸發。
+           */
+          function setupTemplateLibrarySearch() {
+            try {
+              // 醫囑模板搜尋與分類
+              const pInput = document.getElementById('prescriptionTemplateSearch');
+              const pCategory = document.getElementById('prescriptionTemplateCategoryFilter');
+              const filterPrescriptions = function() {
+                const term = pInput ? pInput.value.trim().toLowerCase() : '';
+                const cat = pCategory ? pCategory.value : '';
+                let filtered = Array.isArray(prescriptionTemplates) ? prescriptionTemplates.filter(item => {
+                  const name = (item.name || '').toLowerCase();
+                  return name.includes(term);
+                }) : [];
+                // 若選擇非全部類別，則依據類別進一步篩選
+                if (cat && cat !== '全部類別' && cat !== '全部分類') {
+                  filtered = filtered.filter(item => item.category === cat);
+                }
+                renderPrescriptionTemplates(filtered);
+              };
+              if (pInput) {
+                pInput.addEventListener('input', filterPrescriptions);
+              }
+              if (pCategory) {
+                pCategory.addEventListener('change', filterPrescriptions);
+              }
+
+              // 診斷模板搜尋與分類
+              const dInput = document.getElementById('diagnosisTemplateSearch');
+              const dCategory = document.getElementById('diagnosisTemplateCategoryFilter');
+              const filterDiagnosis = function() {
+                const term = dInput ? dInput.value.trim().toLowerCase() : '';
+                const cat = dCategory ? dCategory.value : '';
+                let filtered = Array.isArray(diagnosisTemplates) ? diagnosisTemplates.filter(item => {
+                  const name = (item.name || '').toLowerCase();
+                  return name.includes(term);
+                }) : [];
+                if (cat && cat !== '全部科別' && cat !== '全部分類') {
+                  filtered = filtered.filter(item => item.category === cat);
+                }
+                renderDiagnosisTemplates(filtered);
+              };
+              if (dInput) {
+                dInput.addEventListener('input', filterDiagnosis);
+              }
+              if (dCategory) {
+                dCategory.addEventListener('change', filterDiagnosis);
+              }
+            } catch (e) {
+              console.error('初始化模板庫搜尋功能失敗:', e);
+            }
           }
 
           // 切換個人設置標籤
@@ -13388,6 +13444,14 @@ document.addEventListener('DOMContentLoaded', function() {
             renderAcupointCombinations();
             renderPrescriptionTemplates();
             renderDiagnosisTemplates();
+            // 在渲染模板後初始化搜尋功能，確保可找到相關元素
+            try {
+                if (typeof setupTemplateLibrarySearch === 'function') {
+                    setupTemplateLibrarySearch();
+                }
+            } catch (_e) {
+                console.error('初始化模板庫搜尋功能失敗:', _e);
+            }
 
             /**
              * 一些彈窗（例如分類管理與編輯彈窗）原本是在個別功能區塊下的容器中定義。
