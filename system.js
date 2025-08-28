@@ -12661,8 +12661,14 @@ function refreshTemplateCategoryFilters() {
             const container = document.getElementById('prescriptionTemplatesContainer');
             container.innerHTML = '';
             // 使用傳入的列表，若未提供則使用全域列表
+            // 取得要顯示的模板列表；若傳入特定列表則使用之，否則使用全域列表。
+            // 為避免在使用新增功能時未按保存便顯示空白模板，
+            // 我們過濾掉標記為 isNew 的項目。這些項目僅在保存後才顯示。
             const templates = Array.isArray(list) ? list : prescriptionTemplates;
-            templates.forEach(item => {
+            const displayTemplates = Array.isArray(templates)
+              ? templates.filter(t => !t.isNew)
+              : [];
+            displayTemplates.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-purple-200';
               card.innerHTML = `
@@ -12736,8 +12742,13 @@ function refreshTemplateCategoryFilters() {
             const container = document.getElementById('diagnosisTemplatesContainer');
             container.innerHTML = '';
             // 使用傳入的列表，若未提供則使用全域列表
+            // 取得要顯示的診斷模板列表；若傳入特定列表則使用之，否則使用全域列表。
+            // 過濾掉尚未儲存（isNew 為 true）的項目，避免在點擊新增後立即顯示空白模板。
             const templates = Array.isArray(list) ? list : diagnosisTemplates;
-            templates.forEach(item => {
+            const displayTemplates = Array.isArray(templates)
+              ? templates.filter(t => !t.isNew)
+              : [];
+            displayTemplates.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-orange-200';
               card.innerHTML = `
