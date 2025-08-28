@@ -11830,7 +11830,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <p class="text-gray-600 mb-3">${item.description}</p>
                 <div class="text-sm text-gray-700 space-y-1">
-                  ${item.ingredients.map(ing => '<div class="flex justify-between"><span>' + ing.name + '</span><span>' + ing.dosage + '</span></div>').join('')}
+                  ${item.ingredients.map(ing => {
+                    // 始終在劑量後顯示單位「克」，如果劑量為空則不顯示單位
+                    const dosage = ing && ing.dosage ? String(ing.dosage).trim() : '';
+                    const displayDosage = dosage ? dosage + '克' : '';
+                    return '<div class="flex justify-between"><span>' + (ing && ing.name ? ing.name : '') + '</span><span>' + displayDosage + '</span></div>';
+                  }).join('')}
                 </div>
                 <!-- 使用頻率顯示已移除 -->
               `;
@@ -12331,7 +12336,14 @@ document.addEventListener('DOMContentLoaded', function() {
                   const itemDiv = document.createElement('div');
                   itemDiv.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
                   const ingredientsText = (combo.ingredients && combo.ingredients.length > 0)
-                    ? combo.ingredients.map(ing => ing.name + (ing.dosage ? '(' + ing.dosage + ')' : '')).join('、')
+                    ? combo.ingredients.map(ing => {
+                        const name = ing && ing.name ? ing.name : '';
+                        // 若有劑量，於括號內加上單位「克」
+                        if (ing && ing.dosage) {
+                          return name + '(' + ing.dosage + '克)';
+                        }
+                        return name;
+                      }).join('、')
                     : '';
                   itemDiv.innerHTML = `
                     <div class="font-semibold text-gray-800 mb-1">${combo.name}</div>
