@@ -691,13 +691,30 @@ async function syncUserDataFromFirebase() {
         const result = await window.firebaseDataManager.getUsers();
         if (result.success && result.data.length > 0) {
             // 更新本地 users 變數
-            users = result.data.map(user => ({
-                ...user,
-                // 確保數據格式兼容性
-                createdAt: user.createdAt ? (user.createdAt.seconds ? new Date(user.createdAt.seconds * 1000).toISOString() : user.createdAt) : new Date().toISOString(),
-                updatedAt: user.updatedAt ? (user.updatedAt.seconds ? new Date(user.updatedAt.seconds * 1000).toISOString() : user.updatedAt) : new Date().toISOString(),
-                lastLogin: user.lastLogin ? (user.lastLogin.seconds ? new Date(user.lastLogin.seconds * 1000).toISOString() : user.lastLogin) : null
-            }));
+            // 只同步必要欄位，不包含 personalSettings，以避免將其他用戶的個人設置保存到本地
+            users = result.data.map(user => {
+                // 排除個人設定欄位
+                const { personalSettings, ...rest } = user || {};
+                return {
+                    ...rest,
+                    // 確保數據格式兼容性
+                    createdAt: user.createdAt
+                      ? (user.createdAt.seconds
+                        ? new Date(user.createdAt.seconds * 1000).toISOString()
+                        : user.createdAt)
+                      : new Date().toISOString(),
+                    updatedAt: user.updatedAt
+                      ? (user.updatedAt.seconds
+                        ? new Date(user.updatedAt.seconds * 1000).toISOString()
+                        : user.updatedAt)
+                      : new Date().toISOString(),
+                    lastLogin: user.lastLogin
+                      ? (user.lastLogin.seconds
+                        ? new Date(user.lastLogin.seconds * 1000).toISOString()
+                        : user.lastLogin)
+                      : null
+                };
+            });
             
             // 保存到本地存儲作為備用
             localStorage.setItem('users', JSON.stringify(users));
@@ -12221,22 +12238,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
               }
               /*
-               * Firebase 模組化版本中沒有全域 getDoc 函式。原本的程式碼
-               * 嘗試呼叫 window.firebase.getDoc 會導致錯誤。為了讀取當前
-               * 用戶的個人設定，我們改為透過 FirebaseDataManager 取得用戶
-               * 清單，並於其中尋找匹配的用戶紀錄。這避免了對不存在 API
-               * 的依賴。*/
+               * 優先嘗試利用 Firestore 的 getDoc API 直接讀取當前用戶的文件，
+               * 以避免拉取所有用戶資料。如果 getDoc 不存在或失敗，則退回
+               * 到透過 FirebaseDataManager.getUsers() 取得用戶清單後再篩選，
+               * 以確保兼容舊環境。
+               */
               let userRecord = null;
+              // 嘗試直接讀取當前用戶的文件
               try {
-                const usersResult = await window.firebaseDataManager.getUsers();
-                if (usersResult && usersResult.success && Array.isArray(usersResult.data)) {
-                  userRecord = usersResult.data.find(u => {
-                    const idMatches = u && u.id !== undefined && currentUserData.id !== undefined;
-                    return idMatches && String(u.id) === String(currentUserData.id);
-                  });
+                if (window.firebase && window.firebase.getDoc && window.firebase.doc) {
+                  const docRef = window.firebase.doc(window.firebase.db, 'users', String(currentUserData.id));
+                  const docSnap = await window.firebase.getDoc(docRef);
+                  if (docSnap && docSnap.exists()) {
+                    userRecord = { id: docSnap.id, ...docSnap.data() };
+                  }
                 }
               } catch (err) {
-                console.error('讀取用戶資料時發生錯誤:', err);
+                console.error('直接讀取用戶文件時發生錯誤:', err);
+              }
+              // 若無法直接取得，改為從用戶清單中篩選
+              if (!userRecord) {
+                try {
+                  const usersResult = await window.firebaseDataManager.getUsers();
+                  if (usersResult && usersResult.success && Array.isArray(usersResult.data)) {
+                    userRecord = usersResult.data.find(u => {
+                      const idMatches = u && u.id !== undefined && currentUserData.id !== undefined;
+                      return idMatches && String(u.id) === String(currentUserData.id);
+                    });
+                  }
+                } catch (err) {
+                  console.error('讀取用戶資料時發生錯誤:', err);
+                }
               }
               if (userRecord && userRecord.personalSettings) {
                 const personal = userRecord.personalSettings;
