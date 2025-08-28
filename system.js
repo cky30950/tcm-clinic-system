@@ -12860,7 +12860,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">穴位列表</label>
                     <div id="acupointPoints" class="space-y-2">
-                      ${item.points.map(pt => '<div class="grid grid-cols-2 gap-2"><input type="text" value="' + (pt.name || '') + '" placeholder="穴位名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + (pt.type || '') + '" placeholder="主穴/配穴" class="px-2 py-1 border border-gray-300 rounded"></div>').join('')}
+                      ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text" value="' + (pt.name || '') + '" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + (pt.type || '') + '" placeholder="主穴/配穴" class="w-28 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button></div>').join('')}
                     </div>
                     <button onclick="addAcupointPointField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增穴位</button>
                   </div>
@@ -13088,8 +13088,10 @@ document.addEventListener('DOMContentLoaded', function() {
           function addAcupointPointField() {
             const container = document.getElementById('acupointPoints');
             const div = document.createElement('div');
-            div.className = 'grid grid-cols-2 gap-2';
-            div.innerHTML = '<input type="text" placeholder="穴位名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="主穴/配穴" class="px-2 py-1 border border-gray-300 rounded">';
+            // 使用 flex 布局讓刪除按鈕置於右側
+            div.className = 'flex items-center gap-2';
+            // 建立名稱與類型輸入框以及刪除按鈕，刪除按鈕點擊後可移除所在行
+            div.innerHTML = '<input type="text" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="主穴/配穴" class="w-28 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>';
             container.appendChild(div);
           }
 
