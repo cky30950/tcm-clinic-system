@@ -11808,6 +11808,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return matchesSearch && matchesCategory;
               });
             }
+            // 過濾掉未命名的新建組合，避免顯示空白卡片
+            list = Array.isArray(list)
+              ? list.filter(item => item && item.name && String(item.name).trim() !== '')
+              : [];
             if (!Array.isArray(list) || list.length === 0) {
               container.innerHTML = '<div class="text-center text-gray-500">尚未設定常用藥方組合</div>';
               return;
@@ -11836,6 +11840,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
           function addNewHerbCombination() {
             // 使用編輯介面新增藥方組合：建立一個空白項目並立即打開編輯視窗
+            // 建立一個新的藥方組合，標記為 isNew 以便取消時移除
             const newItem = {
               id: Date.now(),
               // 新項目預設名稱為空，使用者可在編輯視窗中填寫
@@ -11846,8 +11851,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 : ((typeof categories !== 'undefined' && categories.herbs && categories.herbs.length > 0) ? categories.herbs[0] : ''),
               description: '',
               ingredients: [],
-              lastModified: new Date().toISOString().split('T')[0]
+              lastModified: new Date().toISOString().split('T')[0],
+              // 標記此組合為新建，用於取消時回收
+              isNew: true
             };
+            // 將新組合暫存到列表
             herbCombinations.push(newItem);
             // 渲染並立即開啟編輯介面，讓使用者填寫詳細資料
             renderHerbCombinations();
@@ -11932,6 +11940,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return matchesSearch && matchesCategory;
               });
             }
+            // 過濾掉未命名的新建組合，避免顯示空白卡片
+            list = Array.isArray(list)
+              ? list.filter(item => item && item.name && String(item.name).trim() !== '')
+              : [];
             // 若無資料顯示提示。
             if (!Array.isArray(list) || list.length === 0) {
               container.innerHTML = '<div class="text-center text-gray-500">尚未設定常用穴位組合</div>';
@@ -11963,6 +11975,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
           function addNewAcupointCombination() {
             // 使用編輯介面新增穴位組合：建立一個空白項目並立即打開編輯視窗
+            // 建立一個新的穴位組合，標記為 isNew 以便取消時移除
             const newItem = {
               id: Date.now(),
               name: '',
@@ -11973,8 +11986,10 @@ document.addEventListener('DOMContentLoaded', function() {
               points: [],
               technique: '',
               frequency: '低',
-              lastModified: new Date().toISOString().split('T')[0]
+              lastModified: new Date().toISOString().split('T')[0],
+              isNew: true
             };
+            // 將新組合暫存到列表
             acupointCombinations.push(newItem);
             renderAcupointCombinations();
             showEditModal('acupoint', newItem.name);
@@ -12305,10 +12320,14 @@ document.addEventListener('DOMContentLoaded', function() {
               const listContainer = document.getElementById('herbComboList');
               if (!modal || !listContainer) return;
               listContainer.innerHTML = '';
-              if (!Array.isArray(herbCombinations) || herbCombinations.length === 0) {
+              // 過濾掉名稱為空白或未命名的組合，避免顯示錯誤資料
+              const combos = Array.isArray(herbCombinations)
+                ? herbCombinations.filter(c => c && c.name && String(c.name).trim() !== '')
+                : [];
+              if (combos.length === 0) {
                 listContainer.innerHTML = '<div class="text-center text-gray-500">尚未設定常用藥方組合</div>';
               } else {
-                herbCombinations.forEach(combo => {
+                combos.forEach(combo => {
                   const itemDiv = document.createElement('div');
                   itemDiv.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
                   const ingredientsText = (combo.ingredients && combo.ingredients.length > 0)
@@ -12318,10 +12337,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="font-semibold text-gray-800 mb-1">${combo.name}</div>
                     <div class="text-sm text-gray-600">${ingredientsText}</div>
                   `;
-                  itemDiv.onclick = function() {
-                    selectHerbCombo(combo.id);
-                  };
-                  listContainer.appendChild(itemDiv);
+                    itemDiv.onclick = function() {
+                      selectHerbCombo(combo.id);
+                    };
+                    listContainer.appendChild(itemDiv);
                 });
               }
               modal.classList.remove('hidden');
@@ -12386,10 +12405,14 @@ document.addEventListener('DOMContentLoaded', function() {
               const listContainer = document.getElementById('acupointComboList');
               if (!modal || !listContainer) return;
               listContainer.innerHTML = '';
-              if (!Array.isArray(acupointCombinations) || acupointCombinations.length === 0) {
+              // 過濾掉名稱為空白或未命名的組合，避免顯示錯誤資料
+              const combos = Array.isArray(acupointCombinations)
+                ? acupointCombinations.filter(c => c && c.name && String(c.name).trim() !== '')
+                : [];
+              if (combos.length === 0) {
                 listContainer.innerHTML = '<div class="text-center text-gray-500">尚未設定常用穴位組合</div>';
               } else {
-                acupointCombinations.forEach(combo => {
+                combos.forEach(combo => {
                   const itemDiv = document.createElement('div');
                   itemDiv.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
                   const pointsText = (combo.points && combo.points.length > 0)
@@ -12399,10 +12422,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="font-semibold text-gray-800 mb-1">${combo.name}</div>
                     <div class="text-sm text-gray-600">${pointsText}</div>
                   `;
-                  itemDiv.onclick = function() {
-                    selectAcupointCombo(combo.id);
-                  };
-                  listContainer.appendChild(itemDiv);
+                    itemDiv.onclick = function() {
+                      selectAcupointCombo(combo.id);
+                    };
+                    listContainer.appendChild(itemDiv);
                 });
               }
               modal.classList.remove('hidden');
@@ -12764,6 +12787,13 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
               modalTitle.textContent = '新增' + (typeNames[itemType] || '項目');
             }
+            // 標記當前是否為新建，用於取消時清除
+            if (item && item.isNew) {
+              modal.dataset.isNew = 'true';
+            } else {
+              // 若不是新建，確保標記被清除
+              delete modal.dataset.isNew;
+            }
             // 顯示 modal
             modal.classList.remove('hidden');
             // 根據不同類型渲染編輯內容
@@ -12898,7 +12928,31 @@ document.addEventListener('DOMContentLoaded', function() {
           }
 
           function hideEditModal() {
-            document.getElementById('editModal').classList.add('hidden');
+            const modal = document.getElementById('editModal');
+            if (!modal) return;
+            // 檢查是否為新建項目，如果取消則從陣列中移除
+            const isNew = modal.dataset.isNew === 'true';
+            const editType = modal.dataset.editType;
+            const itemIdStr = modal.dataset.itemId;
+            if (isNew && editType && itemIdStr) {
+              const itemId = parseInt(itemIdStr, 10);
+              if (editType === 'herb') {
+                herbCombinations = herbCombinations.filter(h => h.id !== itemId);
+                renderHerbCombinations();
+              } else if (editType === 'acupoint') {
+                acupointCombinations = acupointCombinations.filter(a => a.id !== itemId);
+                renderAcupointCombinations();
+              }
+              // 重置 dataset 標記
+              delete modal.dataset.isNew;
+              // 將變更保存
+              if (typeof updatePersonalSettings === 'function') {
+                try {
+                  updatePersonalSettings().catch((err) => console.error('更新個人設置失敗:', err));
+                } catch (_e) {}
+              }
+            }
+            modal.classList.add('hidden');
           }
 
           function saveEdit() {
@@ -12940,6 +12994,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 return { name: name, dosage: dosage };
               });
               item.lastModified = new Date().toISOString().split('T')[0];
+              // 標記為已保存（非新建），避免取消時被移除
+              if (item.isNew) {
+                item.isNew = false;
+              }
+              // 也更新 modal 的 isNew 標記
+              modal.dataset.isNew = 'false';
               renderHerbCombinations();
               // Persist changes for personal herb combinations to Firestore
               if (typeof updatePersonalSettings === 'function') {
@@ -12959,6 +13019,12 @@ document.addEventListener('DOMContentLoaded', function() {
               });
               item.technique = document.getElementById('acupointTechniqueInput').value;
               item.lastModified = new Date().toISOString().split('T')[0];
+              // 標記為已保存（非新建），避免取消時被移除
+              if (item.isNew) {
+                item.isNew = false;
+              }
+              // 更新 modal 的 isNew 標記
+              modal.dataset.isNew = 'false';
               renderAcupointCombinations();
               // Persist changes for personal acupoint combinations to Firestore
               if (typeof updatePersonalSettings === 'function') {
