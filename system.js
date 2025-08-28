@@ -12738,11 +12738,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
           function removeCategory(type, index) {
             if (confirm('確定要刪除此分類嗎？')) {
-              categories[type].splice(index, 1);
-              // 若修改的是中藥或穴位分類，更新個人慣用分類
-              if (typeof refreshComboCategories === 'function') {
-                refreshComboCategories(type);
+              // 先從全域分類中移除目標分類並取得被移除的名稱
+              let removedArr = [];
+              try {
+                removedArr = categories[type].splice(index, 1);
+              } catch (_e) {
+                removedArr = [];
               }
+              const removed = Array.isArray(removedArr) ? removedArr[0] : undefined;
+              // 若修改的是中藥或穴位分類，則需同步更新個人慣用分類，移除已刪除的分類
+              try {
+                if (type === 'herbs' && Array.isArray(herbComboCategories)) {
+                  if (removed !== undefined) {
+                    herbComboCategories = herbComboCategories.filter(cat => cat !== removed);
+                    window.herbComboCategories = herbComboCategories;
+                  }
+                } else if (type === 'acupoints' && Array.isArray(acupointComboCategories)) {
+                  if (removed !== undefined) {
+                    acupointComboCategories = acupointComboCategories.filter(cat => cat !== removed);
+                    window.acupointComboCategories = acupointComboCategories;
+                  }
+                }
+              } catch (_e) {}
+              // 更新搜尋與分類選單，使 UI 立即反映最新的分類
+              try {
+                if (typeof refreshComboCategories === 'function') {
+                  refreshComboCategories(type);
+                }
+                if (typeof setupPersonalComboSearchAndFilter === 'function') {
+                  setupPersonalComboSearchAndFilter();
+                }
+              } catch (_e) {}
+              // 重新渲染分類管理彈窗
               showCategoryModal(type);
               // 將更新後的分類儲存至 Firebase 或本地
               if (typeof saveCategoriesToFirebase === 'function') {
