@@ -11828,9 +11828,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="text-sm text-gray-700 space-y-1">
                   ${item.ingredients.map(ing => '<div class="flex justify-between"><span>' + ing.name + '</span><span>' + ing.dosage + '</span></div>').join('')}
                 </div>
-                <div class="mt-3 pt-3 border-t border-gray-200">
-                  <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">使用頻率: ${item.frequency}</span>
-                </div>
+                <!-- 使用頻率顯示已移除 -->
               `;
               container.appendChild(card);
             });
@@ -11848,7 +11846,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 : ((typeof categories !== 'undefined' && categories.herbs && categories.herbs.length > 0) ? categories.herbs[0] : ''),
               description: '',
               ingredients: [],
-              frequency: '低',
               lastModified: new Date().toISOString().split('T')[0]
             };
             herbCombinations.push(newItem);
@@ -12771,20 +12768,10 @@ document.addEventListener('DOMContentLoaded', function() {
             modal.classList.remove('hidden');
             // 根據不同類型渲染編輯內容
             if (itemType === 'herb') {
-              // 動態產生藥材選項列表，從 herbLibrary 中篩選 type 為 'herb' 的資料
-              const herbOptionsAll = Array.isArray(herbLibrary)
-                ? herbLibrary.filter(h => h.type === 'herb').map(h => '<option value="' + h.name + '">' + h.name + '</option>').join('')
-                : '';
-              // 為每個現有的藥材產生選擇框與劑量輸入
+              // 使用輸入框而非下拉選單顯示既有藥材，並提供搜尋功能新增藥材
               const herbIngredientsHtml = Array.isArray(item.ingredients)
                 ? item.ingredients.map(ing => {
-                    const options = Array.isArray(herbLibrary)
-                      ? herbLibrary.filter(h => h.type === 'herb').map(h => {
-                          const selected = (h.name === ing.name) ? ' selected' : '';
-                          return '<option value="' + h.name + '"' + selected + '>' + h.name + '</option>';
-                        }).join('')
-                      : herbOptionsAll;
-                    return '<div class="grid grid-cols-2 gap-2"><select class="px-2 py-1 border border-gray-300 rounded">' + options + '</select><input type="text" value="' + (ing.dosage || '') + '" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded"></div>';
+                    return '<div class="grid grid-cols-2 gap-2"><input type="text" value="' + (ing.name || '') + '" placeholder="藥材名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + (ing.dosage || '') + '" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded"></div>';
                   }).join('')
                 : '';
               modalContent.innerHTML = `
@@ -12809,6 +12796,15 @@ document.addEventListener('DOMContentLoaded', function() {
                       ${herbIngredientsHtml}
                     </div>
                     <button onclick="addHerbIngredientField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增藥材</button>
+                    <div class="mt-4">
+                      <label class="block text-gray-700 font-medium mb-2">搜尋藥材</label>
+                      <input type="text" id="herbIngredientSearch" placeholder="搜尋中藥材名稱..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" oninput="searchHerbForCombo()">
+                      <div id="herbIngredientSearchResults" class="hidden">
+                        <div class="bg-white border border-green-200 rounded max-h-40 overflow-y-auto">
+                          <div id="herbIngredientSearchList" class="grid grid-cols-1 md:grid-cols-2 gap-2 p-2"></div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               `;
@@ -12991,16 +12987,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const container = document.getElementById('herbIngredients');
             const div = document.createElement('div');
             div.className = 'grid grid-cols-2 gap-2';
-            // 為新增欄位產生中藥庫下拉選單
-            let options = '';
-            if (Array.isArray(herbLibrary)) {
-              herbLibrary.forEach(h => {
-                if (h.type === 'herb') {
-                  options += '<option value="' + h.name + '">' + h.name + '</option>';
-                }
-              });
-            }
-            div.innerHTML = '<select class="px-2 py-1 border border-gray-300 rounded">' + options + '</select><input type="text" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded">';
+            // 新增的藥材欄位改為兩個輸入框：藥材名稱與劑量
+            div.innerHTML = '<input type="text" placeholder="藥材名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded">';
             container.appendChild(div);
           }
 
@@ -13011,6 +12999,78 @@ document.addEventListener('DOMContentLoaded', function() {
             div.innerHTML = '<input type="text" placeholder="穴位名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="主穴/配穴" class="px-2 py-1 border border-gray-300 rounded">';
             container.appendChild(div);
           }
+
+          /*
+           * 搜索並新增藥材至個人慣用藥方組合。
+           * 在編輯藥方時，使用者可以在搜尋欄輸入關鍵字搜尋中藥庫中的藥材，並點擊結果將其加入藥材列表。
+           */
+          function searchHerbForCombo() {
+            const input = document.getElementById('herbIngredientSearch');
+            if (!input) return;
+            const searchTerm = input.value.trim().toLowerCase();
+            const resultsContainer = document.getElementById('herbIngredientSearchResults');
+            const resultsList = document.getElementById('herbIngredientSearchList');
+            if (!resultsContainer || !resultsList) return;
+            if (searchTerm.length < 1) {
+              resultsContainer.classList.add('hidden');
+              return;
+            }
+            // 搜索 herbLibrary 中 type 為 'herb' 的項目，名稱、別名或功效中包含搜尋字串
+            const matched = (Array.isArray(herbLibrary) ? herbLibrary : []).filter(item => item && item.type === 'herb' && (
+              (item.name && item.name.toLowerCase().includes(searchTerm)) ||
+              (item.alias && item.alias.toLowerCase().includes(searchTerm)) ||
+              (item.effects && item.effects.toLowerCase().includes(searchTerm))
+            )).slice(0, 10);
+            if (matched.length === 0) {
+              resultsList.innerHTML = '<div class="p-2 text-center text-gray-500 text-sm">找不到符合條件的藥材</div>';
+              resultsContainer.classList.remove('hidden');
+              return;
+            }
+            resultsList.innerHTML = matched.map(item => {
+              const safeName = (item.name || '').replace(/'/g, "\\'");
+              const safeDosage = (item.dosage || '').replace(/'/g, "\\'");
+              return '<div class="p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded cursor-pointer text-center text-sm" onclick="addHerbToCombo(\'' + safeName + '\', \'' + safeDosage + '\')">' + item.name + '</div>';
+            }).join('');
+            resultsContainer.classList.remove('hidden');
+          }
+
+          /**
+           * 將指定藥材名稱與劑量加入目前編輯的藥材列表。
+           * 新增後會清空搜尋欄並隱藏搜尋結果。
+           * @param {string} name 藥材名稱
+           * @param {string} dosage 預設劑量
+           */
+          function addHerbToCombo(name, dosage) {
+            const container = document.getElementById('herbIngredients');
+            if (!container) return;
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-2 gap-2';
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.value = name || '';
+            nameInput.placeholder = '藥材名稱';
+            nameInput.className = 'px-2 py-1 border border-gray-300 rounded';
+            const dosageInput = document.createElement('input');
+            dosageInput.type = 'text';
+            dosageInput.value = dosage || '';
+            dosageInput.placeholder = '劑量';
+            dosageInput.className = 'px-2 py-1 border border-gray-300 rounded';
+            div.appendChild(nameInput);
+            div.appendChild(dosageInput);
+            container.appendChild(div);
+            const resultsContainer = document.getElementById('herbIngredientSearchResults');
+            if (resultsContainer) {
+              resultsContainer.classList.add('hidden');
+            }
+            const searchInput = document.getElementById('herbIngredientSearch');
+            if (searchInput) {
+              searchInput.value = '';
+            }
+          }
+
+          // 將自訂函式掛載至 window，使其可於內嵌事件處理器中被呼叫
+          window.searchHerbForCombo = searchHerbForCombo;
+          window.addHerbToCombo = addHerbToCombo;
 
           // 初始化
 document.addEventListener('DOMContentLoaded', function() {
