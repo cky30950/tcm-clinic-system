@@ -11796,12 +11796,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (instructionsField) instructionsField.value = '';
         if (treatmentField) treatmentField.value = template.duration || '';
       }
-      // 自動填入複診時間：先嘗試解析模板的 followUp 屬性，若未成功則從內容與備註中解析「回診/複診/復診」字樣。
+      // 自動填入複診時間：先嘗試解析模板的 followUp 屬性，若未能解析成功，則從模板內容 (content) 與備註 (note) 中搜尋「回診／複診／复诊」等字樣，再依據解析結果計算實際日期。
       try {
         const followUpField = document.getElementById('formFollowUpDate');
         if (followUpField) {
           let days = 0;
-          // 1. 解析模板的 followUp 屬性，例如「3天」、「2週」、「1個月」
+          // 1. 解析 template.followUp 欄位，如「3天」、「2週」、「1個月」
           if (template.followUp && typeof template.followUp === 'string') {
             const dayMatch = template.followUp.match(/(\d+)\s*(?:天|日)/);
             if (dayMatch) {
@@ -11816,18 +11816,19 @@ document.addEventListener('DOMContentLoaded', function() {
               days = parseInt(monthMatch[1], 10) * 30;
             }
           }
-          // 2. 若 followUp 屬性未能解析出天數，從 content 中搜尋「回診/複診/復診」字樣
+          // 2. 若 followUp 欄位未能解析出有效天數，從模板內容 content 全域搜索回診/複診字樣
           if (!days && template.content && typeof template.content === 'string') {
             const contentStr = template.content;
-            // 匹配格式包含「後」，如「3天後回診」
-            let match = contentStr.match(/(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*[^\n]{0,10}?(?:回診|複診|復診)/);
-            if (!match) {
-              // 匹配不包含「後」的寫法，如「3天回診」
-              match = contentStr.match(/(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*(?:回診|複診|復診)/);
+            const reFU = /(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*(?:後)?\s*[回複復复][診诊]/g;
+            let matchesFU = [];
+            let mFU;
+            while ((mFU = reFU.exec(contentStr)) !== null) {
+              matchesFU.push(mFU);
             }
-            if (match) {
-              const num = parseInt(match[1], 10);
-              const unit = match[2];
+            if (matchesFU.length > 0) {
+              const last = matchesFU[matchesFU.length - 1];
+              const num = parseInt(last[1], 10);
+              const unit = last[2];
               if (!isNaN(num)) {
                 if (unit === '天' || unit === '日') {
                   days = num;
@@ -11839,16 +11840,19 @@ document.addEventListener('DOMContentLoaded', function() {
               }
             }
           }
-          // 3. 若 content 中仍未找到，從 note 中搜尋
+          // 3. 若 content 中仍未找到，從備註 note 中搜尋
           if (!days && template.note && typeof template.note === 'string') {
             const noteStr = template.note;
-            let match = noteStr.match(/(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*[^\n]{0,10}?(?:回診|複診|復診)/);
-            if (!match) {
-              match = noteStr.match(/(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*(?:回診|複診|復診)/);
+            const reFU = /(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*(?:後)?\s*[回複復复][診诊]/g;
+            let matchesFU = [];
+            let mFU;
+            while ((mFU = reFU.exec(noteStr)) !== null) {
+              matchesFU.push(mFU);
             }
-            if (match) {
-              const num = parseInt(match[1], 10);
-              const unit = match[2];
+            if (matchesFU.length > 0) {
+              const last = matchesFU[matchesFU.length - 1];
+              const num = parseInt(last[1], 10);
+              const unit = last[2];
               if (!isNaN(num)) {
                 if (unit === '天' || unit === '日') {
                   days = num;
@@ -11860,7 +11864,7 @@ document.addEventListener('DOMContentLoaded', function() {
               }
             }
           }
-          // 4. 若成功取得天數，則依據到診時間或當前時間計算複診日期
+          // 4. 如果找到了合理的天數，則依據到診時間或當前時間計算複診日期並填入
           if (days > 0) {
             let base = new Date();
             const visitField = document.getElementById('formVisitTime');
@@ -11872,11 +11876,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             const followDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
             const y = followDate.getFullYear();
-            const m = String(followDate.getMonth() + 1).padStart(2, '0');
-            const d = String(followDate.getDate()).padStart(2, '0');
-            const h = String(followDate.getHours()).padStart(2, '0');
-            const min = String(followDate.getMinutes()).padStart(2, '0');
-            followUpField.value = `${y}-${m}-${d}T${h}:${min}`;
+            const mStr = String(followDate.getMonth() + 1).padStart(2, '0');
+            const dStr = String(followDate.getDate()).padStart(2, '0');
+            const hStr = String(followDate.getHours()).padStart(2, '0');
+            const minStr = String(followDate.getMinutes()).padStart(2, '0');
+            followUpField.value = `${y}-${mStr}-${dStr}T${hStr}:${minStr}`;
           }
         }
       } catch (_e) {
