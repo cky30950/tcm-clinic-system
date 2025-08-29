@@ -11750,31 +11750,45 @@ document.addEventListener('DOMContentLoaded', function() {
           const parseSections = text => {
             if (!text || typeof text !== 'string') return;
             const contentStr = String(text);
-            // 搜尋標題的起始位置，如果不存在則為 -1
-            const usageIdx = contentStr.indexOf('服藥方法');
-            const noteIdx = contentStr.indexOf('注意事項');
-            // 支援「療程安排」或單純「療程」
-            const treatmentIdx = contentStr.indexOf('療程');
-            // 解析用藥方法
-            if (usageIdx !== -1) {
-              const afterUsage = contentStr.substring(usageIdx).replace(/服藥方法[:：]/, '');
-              // 節錄到下一個標題為止
-              let endPos = contentStr.length;
-              if (noteIdx !== -1 && noteIdx > usageIdx) endPos = noteIdx;
-              else if (treatmentIdx !== -1 && treatmentIdx > usageIdx) endPos = treatmentIdx;
-              usage = afterUsage.substring(0, endPos - usageIdx).trim();
-            }
-            // 解析注意事項
-            if (noteIdx !== -1) {
-              const afterNote = contentStr.substring(noteIdx).replace(/注意事項[:：]/, '');
-              let endPos = contentStr.length;
-              if (treatmentIdx !== -1 && treatmentIdx > noteIdx) endPos = treatmentIdx;
-              instructions = afterNote.substring(0, endPos - noteIdx).trim();
-            }
-            // 解析療程安排
-            if (treatmentIdx !== -1) {
-              const afterTreatment = contentStr.substring(treatmentIdx).replace(/療程安排[:：]?/, '').replace(/療程[:：]?/, '');
-              treatment = afterTreatment.trim();
+            // 定義各區塊標題的多個候選關鍵字，支援繁簡體與可能的同義詞
+            const usageMarkers = ['服藥方法', '服用方法', '服用方式', '用藥指導', '服藥指南', '服用指南', '中藥服用方法', '西藥服用方法'];
+            const instructionMarkers = ['注意事項', '注意事项', '注意要點', '注意要点', '注意事項及叮嚀', '醫囑', '医嘱', '注意'];
+            const treatmentMarkers = ['療程安排', '疗程安排', '療程', '疗程', '治療計劃', '治疗计划', '治療安排', '治疗安排'];
+            // 收集所有標題位置
+            let positions = [];
+            const collectPositions = (markers, type) => {
+              markers.forEach(mk => {
+                const pos = contentStr.indexOf(mk);
+                if (pos !== -1) {
+                  positions.push({ pos, marker: mk, type });
+                }
+              });
+            };
+            collectPositions(usageMarkers, 'usage');
+            collectPositions(instructionMarkers, 'instructions');
+            collectPositions(treatmentMarkers, 'treatment');
+            if (positions.length === 0) return;
+            // 按位置排序，從前到後
+            positions.sort((a, b) => a.pos - b.pos);
+            // 紀錄已處理的類型，避免同類型多次分割後覆蓋
+            const assigned = { usage: false, instructions: false, treatment: false };
+            for (let i = 0; i < positions.length; i++) {
+              const { pos, marker, type } = positions[i];
+              let start = pos + marker.length;
+              // 移除冒號等符號
+              const afterMarker = contentStr.substring(start).replace(/^[\s:：]+/, '');
+              start = pos + marker.length + (contentStr.substring(start).length - afterMarker.length);
+              let end = contentStr.length;
+              if (i + 1 < positions.length) {
+                end = positions[i + 1].pos;
+              }
+              if (!assigned[type]) {
+                const extracted = contentStr.substring(start, end).trim();
+                if (type === 'usage') usage = extracted;
+                if (type === 'instructions') instructions = extracted;
+                if (type === 'treatment') treatment = extracted;
+                assigned[type] = true;
+              }
             }
           };
 
@@ -11896,23 +11910,31 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           }
           // 4. 如果找到了合理的天數，則依據到診時間或當前時間計算複診日期並填入
-          if (days > 0) {
-            let base = new Date();
-            const visitField = document.getElementById('formVisitTime');
-            if (visitField && visitField.value) {
-              const parsed = new Date(visitField.value);
-              if (!isNaN(parsed.getTime())) {
-                base = parsed;
+              if (days > 0) {
+                let base = new Date();
+                const visitField = document.getElementById('formVisitTime');
+                if (visitField && visitField.value) {
+                  const parsed = new Date(visitField.value);
+                  if (!isNaN(parsed.getTime())) {
+                    base = parsed;
+                  }
+                }
+                // 根據天數計算複診日期，並保留時間部份與到診時間或當前時間一致
+                const followDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+                const y = followDate.getFullYear();
+                const mStr = String(followDate.getMonth() + 1).padStart(2, '0');
+                const dStr = String(followDate.getDate()).padStart(2, '0');
+                const hStr = String(followDate.getHours()).padStart(2, '0');
+                const minStr = String(followDate.getMinutes()).padStart(2, '0');
+                followUpField.value = `${y}-${mStr}-${dStr}T${hStr}:${minStr}`;
+                // 觸發 change 事件以通知可能的監聽器
+                try {
+                  followUpField.dispatchEvent(new Event('change'));
+                  followUpField.dispatchEvent(new Event('input'));
+                } catch (everr) {
+                  // ignore
+                }
               }
-            }
-            const followDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
-            const y = followDate.getFullYear();
-            const mStr = String(followDate.getMonth() + 1).padStart(2, '0');
-            const dStr = String(followDate.getDate()).padStart(2, '0');
-            const hStr = String(followDate.getHours()).padStart(2, '0');
-            const minStr = String(followDate.getMinutes()).padStart(2, '0');
-            followUpField.value = `${y}-${mStr}-${dStr}T${hStr}:${minStr}`;
-          }
         }
       } catch (_e) {
         // 若解析複診時間發生錯誤，略過自動填寫
