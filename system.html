@@ -555,14 +555,9 @@
                             <!-- 左側 -->
                             <div class="space-y-4">
                                 <div>
-                                    <!-- 在主訴標籤旁新增載入診斷模板按鈕 -->
-                                    <div class="flex justify-between items-center mb-2">
-                                        <label class="block text-sm font-semibold text-gray-700">主訴 *</label>
-                                        <button type="button" onclick="showDiagnosisTemplateModal()"
-                                                class="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded transition duration-200">
-                                            🔍 載入診斷模板
-                                        </button>
-                                    </div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        主訴 *
+                                    </label>
                                     <textarea id="formSymptoms" placeholder="病人主要不適症狀、發病時間、症狀特點等..." rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
                                 </div>
 
@@ -764,15 +759,11 @@
                                     </div>
                                 </div>
                                 
-                                <!-- 新增「中藥服用方法」欄位，移到療程欄位上方，並增加載入醫囑模板按鈕 -->
+                                <!-- 新增「中藥服用方法」欄位，移到療程欄位上方 -->
                                 <div>
-                                    <div class="flex justify-between items-center mb-2">
-                                        <label class="block text-sm font-semibold text-gray-700">中藥服用方法</label>
-                                        <button type="button" onclick="showPrescriptionTemplateModal()"
-                                                class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded transition duration-200">
-                                            📋 載入醫囑模板
-                                        </button>
-                                    </div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        中藥服用方法
+                                    </label>
                                     <textarea id="formUsage" placeholder="煎煮方法、服用時間、劑量等..." rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
                                 </div>
 
@@ -1759,32 +1750,6 @@
                 </div>
                 <div id="acupointComboList" class="p-4 space-y-3">
                     <!-- 動態載入穴位組合 -->
-                </div>
-            </div>
-        </div>
-
-        <!-- 診斷模板選擇彈窗 -->
-        <div id="diagnosisTemplateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-                <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl">
-                    <h3 class="text-lg font-bold text-gray-800">診斷模板</h3>
-                    <button onclick="hideDiagnosisTemplateModal()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
-                </div>
-                <div id="diagnosisTemplateList" class="p-4 space-y-3">
-                    <!-- 動態載入診斷模板 -->
-                </div>
-            </div>
-        </div>
-
-        <!-- 醫囑模板選擇彈窗 -->
-        <div id="prescriptionTemplateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-                <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl">
-                    <h3 class="text-lg font-bold text-gray-800">醫囑模板</h3>
-                    <button onclick="hidePrescriptionTemplateModal()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
-                </div>
-                <div id="prescriptionTemplateList" class="p-4 space-y-3">
-                    <!-- 動態載入醫囑模板 -->
                 </div>
             </div>
         </div>
