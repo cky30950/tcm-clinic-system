@@ -11771,17 +11771,24 @@ document.addEventListener('DOMContentLoaded', function() {
           const afterTreatment = contentStr.substring(treatmentIdx).replace(/療程安排[:：]?/, '').replace(/療程[:：]?/, '');
           treatment = afterTreatment.trim();
         }
-        if (usageField && !usageField.value) usageField.value = usage || template.content || '';
-        if (instructionsField && !instructionsField.value) instructionsField.value = instructions || '';
-        if (treatmentField && !treatmentField.value) treatmentField.value = treatment || template.duration || '';
+        // Always override the form fields with the values parsed from the template.
+        // Previously these assignments only occurred when the field was empty (value == ''), which prevented
+        // users from loading a template if they had typed something or if the field contained stale data.
+        // To ensure the selected medical order template is always applied, we remove the checks on existing values.
+        if (usageField) usageField.value = usage || template.content || '';
+        if (instructionsField) instructionsField.value = instructions || '';
+        if (treatmentField) treatmentField.value = treatment || template.duration || '';
       } else {
-        if (usageField && !usageField.value) usageField.value = template.content || '';
-        if (treatmentField && !treatmentField.value) treatmentField.value = template.duration || '';
+        // If the template does not have structured content, apply the raw content and duration directly.
+        if (usageField) usageField.value = template.content || '';
+        if (treatmentField) treatmentField.value = template.duration || '';
       }
       // 若模板定義了 followUp 屬性，嘗試解析並自動填入複診時間欄位。
       try {
         const followUpField = document.getElementById('formFollowUpDate');
-        if (followUpField && !followUpField.value && template.followUp && typeof template.followUp === 'string') {
+        // Always populate the follow‑up date based on the template. Previously this only occurred when the
+        // input was empty, but users expect the template value to override any existing date.
+        if (followUpField && template.followUp && typeof template.followUp === 'string') {
           let days = 0;
           const dayMatch = template.followUp.match(/(\d+)\s*天/);
           if (dayMatch) {
