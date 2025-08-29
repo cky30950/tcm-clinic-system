@@ -11699,6 +11699,72 @@ document.addEventListener('DOMContentLoaded', function() {
   window.hidePrescriptionTemplateModal = hidePrescriptionTemplateModal;
   window.selectPrescriptionTemplate = selectPrescriptionTemplate;
 
+    /**
+     * 包裝載入診斷模板按鈕：按下時顯示讀取圈，稍作延遲後顯示診斷模板彈窗。
+     * 此函式透過 setButtonLoading/clearButtonLoading 控制按鈕大小及讀取效果，
+     * 讓其與其他載入類按鈕一致。事件對象會傳入以取得觸發按鈕。
+     * @param {Event} ev 點擊事件
+     */
+    async function openDiagnosisTemplate(ev) {
+      let btn = null;
+      try {
+        // 優先使用事件中的 currentTarget 作為按鈕
+        if (ev && ev.currentTarget) btn = ev.currentTarget;
+        // 後援：從 DOM 查找 openDiagnosisTemplate 對應的按鈕
+        if (!btn) {
+          btn = document.querySelector('button[onclick*="openDiagnosisTemplate"]');
+        }
+        if (btn) {
+          setButtonLoading(btn);
+        }
+        // 短暫延遲，讓讀取圈顯示一段時間
+        await new Promise(resolve => setTimeout(resolve, 200));
+        // 顯示診斷模板彈窗
+        if (typeof showDiagnosisTemplateModal === 'function') {
+          showDiagnosisTemplateModal();
+        }
+      } catch (err) {
+        console.error('開啟診斷模板按鈕錯誤:', err);
+      } finally {
+        if (btn) {
+          clearButtonLoading(btn);
+        }
+      }
+    }
+
+    /**
+     * 包裝載入醫囑模板按鈕：按下時顯示讀取圈，稍作延遲後顯示醫囑模板彈窗。
+     * 與 openDiagnosisTemplate 類似，使用 setButtonLoading/clearButtonLoading
+     * 以保持按鈕大小並顯示旋轉圈。
+     * @param {Event} ev 點擊事件
+     */
+    async function openPrescriptionTemplate(ev) {
+      let btn = null;
+      try {
+        if (ev && ev.currentTarget) btn = ev.currentTarget;
+        if (!btn) {
+          btn = document.querySelector('button[onclick*="openPrescriptionTemplate"]');
+        }
+        if (btn) {
+          setButtonLoading(btn);
+        }
+        await new Promise(resolve => setTimeout(resolve, 200));
+        if (typeof showPrescriptionTemplateModal === 'function') {
+          showPrescriptionTemplateModal();
+        }
+      } catch (err) {
+        console.error('開啟醫囑模板按鈕錯誤:', err);
+      } finally {
+        if (btn) {
+          clearButtonLoading(btn);
+        }
+      }
+    }
+
+    // 將包裝函式掛載到 window 以供 HTML 按鈕呼叫
+    window.openDiagnosisTemplate = openDiagnosisTemplate;
+    window.openPrescriptionTemplate = openPrescriptionTemplate;
+
   /**
    * 在使用者嘗試直接關閉或重新整理網頁時提示確認，避免未保存的套票使用紀錄被誤判為取消。
    *

@@ -559,9 +559,13 @@
                                     <div class="flex justify-between items-center mb-2">
                                         <label class="block text-sm font-semibold text-gray-700">主訴 *</label>
                                         <!-- 診斷模板按鈕：點擊後開啟診斷模板選擇彈窗 -->
-                                        <button type="button" onclick="showDiagnosisTemplateModal()" class="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded transition duration-200 flex items-center gap-1">
-                                            <span class="text-lg">🔍</span>
-                                            載入診斷模板
+                                        <!-- 診斷模板載入按鈕：使用新的 openDiagnosisTemplate 包裝函式以顯示載入圈效果 -->
+                                        <button
+                                            type="button"
+                                            onclick="openDiagnosisTemplate(event)"
+                                            class="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded transition duration-200"
+                                        >
+                                            🔍 載入診斷模板
                                         </button>
                                     </div>
                                     <textarea id="formSymptoms" placeholder="病人主要不適症狀、發病時間、症狀特點等..." rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
@@ -771,9 +775,13 @@
                                     <div class="flex justify-between items-center mb-2">
                                         <label class="block text-sm font-semibold text-gray-700">中藥服用方法</label>
                                         <!-- 醫囑模板按鈕：點擊後開啟醫囑模板選擇彈窗 -->
-                                        <button type="button" onclick="showPrescriptionTemplateModal()" class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded transition duration-200 flex items-center gap-1">
-                                            <span class="text-lg">📋</span>
-                                            載入醫囑模板
+                                        <!-- 醫囑模板載入按鈕：使用新的 openPrescriptionTemplate 包裝函式以顯示載入圈效果 -->
+                                        <button
+                                            type="button"
+                                            onclick="openPrescriptionTemplate(event)"
+                                            class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded transition duration-200"
+                                        >
+                                            📋 載入醫囑模板
                                         </button>
                                     </div>
                                     <textarea id="formUsage" placeholder="煎煮方法、服用時間、劑量等..." rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
@@ -1850,6 +1858,7 @@
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
