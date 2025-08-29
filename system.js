@@ -11796,15 +11796,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (instructionsField) instructionsField.value = '';
         if (treatmentField) treatmentField.value = template.duration || '';
       }
-      // 自動填入複診時間
-      // 此功能會先嘗試解析模板的 followUp 屬性取得數字與單位（天、週、月），
-      // 若無法取得，則進一步從模板的內容 (content) 以及備註 (note) 字串中搜尋類似「3天後回診」或「2週複診」的字樣。
-      // 解析結果會依據到診時間或當前時間計算出具體的複診日期，並填入對應欄位。
+      // 自動填入複診時間：先嘗試解析模板的 followUp 屬性，若未成功則從內容與備註中解析「回診/複診/復診」字樣。
       try {
         const followUpField = document.getElementById('formFollowUpDate');
         if (followUpField) {
           let days = 0;
-          // 1. 先處理模板 followUp 屬性
+          // 1. 解析模板的 followUp 屬性，例如「3天」、「2週」、「1個月」
           if (template.followUp && typeof template.followUp === 'string') {
             const dayMatch = template.followUp.match(/(\d+)\s*(?:天|日)/);
             if (dayMatch) {
@@ -11816,16 +11813,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             const monthMatch = template.followUp.match(/(\d+)\s*個?月/);
             if (!days && monthMatch) {
-              days = parseInt(monthMatch[1], 10) * 30; // 以30天為一個月計算
+              days = parseInt(monthMatch[1], 10) * 30;
             }
           }
-          // 2. 若 followUp 未指定或無法解析天數，嘗試從 content 中找尋「回診/複診/復診」字串
+          // 2. 若 followUp 屬性未能解析出天數，從 content 中搜尋「回診/複診/復診」字樣
           if (!days && template.content && typeof template.content === 'string') {
             const contentStr = template.content;
-            // 嘗試匹配「3天後回診」、「2週後複診」、「1個月後復診」等寫法
+            // 匹配格式包含「後」，如「3天後回診」
             let match = contentStr.match(/(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*[^\n]{0,10}?(?:回診|複診|復診)/);
             if (!match) {
-              // 如果沒有包含「後」字樣，匹配類似「3天回診」
+              // 匹配不包含「後」的寫法，如「3天回診」
               match = contentStr.match(/(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*(?:回診|複診|復診)/);
             }
             if (match) {
@@ -11842,7 +11839,7 @@ document.addEventListener('DOMContentLoaded', function() {
               }
             }
           }
-          // 3. 再從備註 note 中搜尋關鍵字
+          // 3. 若 content 中仍未找到，從 note 中搜尋
           if (!days && template.note && typeof template.note === 'string') {
             const noteStr = template.note;
             let match = noteStr.match(/(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*[^\n]{0,10}?(?:回診|複診|復診)/);
@@ -11863,9 +11860,8 @@ document.addEventListener('DOMContentLoaded', function() {
               }
             }
           }
-          // 4. 若成功解析出天數，計算複診日期並填入
+          // 4. 若成功取得天數，則依據到診時間或當前時間計算複診日期
           if (days > 0) {
-            // 以到診時間為基準，如果未填入到診時間則使用當前時間
             let base = new Date();
             const visitField = document.getElementById('formVisitTime');
             if (visitField && visitField.value) {
@@ -11884,7 +11880,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         }
       } catch (_e) {
-        // 若解析 followUp 發生錯誤，略過自動填寫
+        // 若解析複診時間發生錯誤，略過自動填寫
       }
 
       hidePrescriptionTemplateModal();
