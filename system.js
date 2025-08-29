@@ -13610,15 +13610,20 @@ function refreshTemplateCategoryFilters() {
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">複診時間</label>
-                      <input type="text" id="prescriptionFollowUpInput" value="${item.followUp || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                      <!-- 將複診時間改為下拉選單，可選擇天數、周數或月數 -->
+                      <select id="prescriptionFollowUpInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                        <option value="天數" ${item.followUp === '天數' ? 'selected' : ''}>天數</option>
+                        <option value="周數" ${item.followUp === '周數' ? 'selected' : ''}>周數</option>
+                        <option value="月數" ${item.followUp === '月數' ? 'selected' : ''}>月數</option>
+                      </select>
                     </div>
                     <div>
-                      <label class="block text-gray-700 font-medium mb-2">注意事項</label>
+                      <label class="block text-gray-700 font-medium mb-2">中藥服用方法</label>
                       <input type="text" id="prescriptionNoteInput" placeholder="如：服藥完畢後" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                     </div>
                   </div>
                   <div>
-                    <label class="block text-gray-700 font-medium mb-2">醫囑內容</label>
+                    <label class="block text-gray-700 font-medium mb-2">醫囑內容及注意事項</label>
                     <textarea id="prescriptionContentTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="5">${item.content || ''}</textarea>
                   </div>
                 </div>
