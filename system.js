@@ -14641,7 +14641,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('初始化搜尋與分類監聽器時發生錯誤:', e);
             }
 
-            // 動態新增頁面底部的版權資訊。若頁腳元素不存在則創建，確保所有頁面底部都顯示版權。
+            // 動態新增頁面底部的版權資訊功能已停用。
+            // 根據需求，我們在 HTML 中靜態定義了包含細線的版權區塊，
+            // 因此不再透過 JavaScript 動態插入中文版權宣告。
+            // 如果需要重新啟用或更新此功能，請參考原始實作如下（已註解）：
+            /*
             (function() {
                 try {
                     let footer = document.getElementById('pageFooter');
@@ -14668,4 +14672,5 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error('建立頁腳版權資訊時發生錯誤', e);
                 }
             })();
+            */
           });
