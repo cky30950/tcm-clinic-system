@@ -12031,25 +12031,42 @@ function _oldSelectPrescriptionTemplate(id) {
           let days = 0;
           // 1. 解析 template.followUp
           if (template.followUp && typeof template.followUp === 'string') {
-            const fu = template.followUp;
-            // 支援「後」或無「後」字
-            const dayMatch = fu.match(/(\d+)\s*(?:個)?\s*(天|日)/);
-            if (dayMatch) {
-              const num = parseInt(dayMatch[1], 10);
-              if (!isNaN(num)) days = num;
-            }
-            if (!days) {
-              const weekMatch = fu.match(/(\d+)\s*(?:個)?\s*[週周]/);
-              if (weekMatch) {
-                const num = parseInt(weekMatch[1], 10);
-                if (!isNaN(num)) days = num * 7;
+            // 先移除括號以支援格式如「3（週）」或「7（天）」
+            const fuClean = template.followUp.replace(/[()（）]/g, '');
+            const numMatch = fuClean.match(/(\d+)/);
+            if (numMatch) {
+              const num = parseInt(numMatch[1], 10);
+              if (!isNaN(num)) {
+                if (/天|日/.test(fuClean)) {
+                  days = num;
+                } else if (/週|周/.test(fuClean)) {
+                  days = num * 7;
+                } else if (/月/.test(fuClean)) {
+                  days = num * 30;
+                }
               }
             }
+            // 如果還無法解析，仍採用舊有正則作為後備
             if (!days) {
-              const monthMatch = fu.match(/(\d+)\s*(?:個)?\s*月/);
-              if (monthMatch) {
-                const num = parseInt(monthMatch[1], 10);
-                if (!isNaN(num)) days = num * 30;
+              let match;
+              match = fuClean.match(/(\d+)\s*(?:個)?\s*(天|日)/);
+              if (match) {
+                const num = parseInt(match[1], 10);
+                if (!isNaN(num)) days = num;
+              }
+              if (!days) {
+                match = fuClean.match(/(\d+)\s*(?:個)?\s*[週周]/);
+                if (match) {
+                  const num = parseInt(match[1], 10);
+                  if (!isNaN(num)) days = num * 7;
+                }
+              }
+              if (!days) {
+                match = fuClean.match(/(\d+)\s*(?:個)?\s*月/);
+                if (match) {
+                  const num = parseInt(match[1], 10);
+                  if (!isNaN(num)) days = num * 30;
+                }
               }
             }
           }
@@ -12149,8 +12166,27 @@ function _oldSelectPrescriptionTemplate(id) {
       }
       try {
         if (followUpField) {
+          // 先嘗試解析含括號的複診時間。例如「3（週）」應解析為 21 天。
           let days = 0;
           if (template.followUp && typeof template.followUp === 'string') {
+            // 移除中英文括號，避免像「7（天）」這樣的格式無法解析
+            const fuClean = template.followUp.replace(/[()（）]/g, '');
+            const numMatch = fuClean.match(/(\d+)/);
+            if (numMatch) {
+              const num = parseInt(numMatch[1], 10);
+              if (!isNaN(num)) {
+                if (/天|日/.test(fuClean)) {
+                  days = num;
+                } else if (/週|周/.test(fuClean)) {
+                  days = num * 7;
+                } else if (/月/.test(fuClean)) {
+                  days = num * 30;
+                }
+              }
+            }
+          }
+          // 若尚未解析出天數，退回原本的正則匹配邏輯
+          if (days === 0 && template.followUp && typeof template.followUp === 'string') {
             let match;
             const fu = template.followUp;
             match = fu.match(/(\d+)\s*(?:個)?\s*(天|日)/);
@@ -12174,6 +12210,7 @@ function _oldSelectPrescriptionTemplate(id) {
             }
           }
           if (days > 0) {
+            // 取得基準日期：優先使用 formVisitTime，否則為當前時間
             let baseDate = new Date();
             const visitField = document.getElementById('formVisitTime');
             if (visitField && visitField.value) {
@@ -12190,9 +12227,12 @@ function _oldSelectPrescriptionTemplate(id) {
             const minStr = String(followDate.getMinutes()).padStart(2, '0');
             followUpField.value = `${y}-${mStr}-${dStr}T${hStr}:${minStr}`;
             try {
+              // 派發事件，讓可能的監聽器能捕捉到變化
               followUpField.dispatchEvent(new Event('change'));
               followUpField.dispatchEvent(new Event('input'));
-            } catch (e) {}
+            } catch (e) {
+              // 忽略事件派發錯誤
+            }
           }
         }
       } catch (fuErr) {
