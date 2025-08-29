@@ -13589,6 +13589,21 @@ function refreshTemplateCategoryFilters() {
                 </div>
               `;
             } else if (itemType === 'prescription') {
+              // 解析複診時間，擷取數量與單位（天、周、月）供預設值使用
+              let followNum = '';
+              let followUnit = '';
+              if (item && item.followUp) {
+                const matchFU = String(item.followUp).match(/(\d+)\s*[（(]?([天周月])[^)）]*[)）]?/);
+                if (matchFU) {
+                  followNum = matchFU[1] || '';
+                  followUnit = matchFU[2] || '';
+                } else {
+                  // 若未包含數字，僅解析單位
+                  if (String(item.followUp).includes('天')) followUnit = '天';
+                  else if (String(item.followUp).includes('周')) followUnit = '周';
+                  else if (String(item.followUp).includes('月')) followUnit = '月';
+                }
+              }
               modalContent.innerHTML = `
                 <div class="space-y-4">
                   <div>
@@ -13610,12 +13625,14 @@ function refreshTemplateCategoryFilters() {
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">複診時間</label>
-                      <!-- 將複診時間改為下拉選單，可選擇天數、周數或月數 -->
-                      <select id="prescriptionFollowUpInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                        <option value="天數" ${item.followUp === '天數' ? 'selected' : ''}>天數</option>
-                        <option value="周數" ${item.followUp === '周數' ? 'selected' : ''}>周數</option>
-                        <option value="月數" ${item.followUp === '月數' ? 'selected' : ''}>月數</option>
-                      </select>
+                      <div class="flex gap-2">
+                        <input type="number" id="prescriptionFollowUpNumberInput" value="${followNum}" min="1" class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                        <select id="prescriptionFollowUpUnitInput" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                          <option value="天" ${followUnit === '天' ? 'selected' : ''}>天</option>
+                          <option value="周" ${followUnit === '周' ? 'selected' : ''}>周</option>
+                          <option value="月" ${followUnit === '月' ? 'selected' : ''}>月</option>
+                        </select>
+                      </div>
                     </div>
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">中藥服用方法</label>
@@ -13826,7 +13843,16 @@ function refreshTemplateCategoryFilters() {
               item.name = presNameVal;
               item.category = document.getElementById('prescriptionCategorySelect').value;
               item.duration = document.getElementById('prescriptionDurationInput').value;
-              item.followUp = document.getElementById('prescriptionFollowUpInput').value;
+              // 取得複診時間的數量與單位，組合為「數量（單位）」的格式
+              const fuNumEl = document.getElementById('prescriptionFollowUpNumberInput');
+              const fuUnitEl = document.getElementById('prescriptionFollowUpUnitInput');
+              const fuNumVal = fuNumEl ? (fuNumEl.value || '').trim() : '';
+              const fuUnitVal = fuUnitEl ? fuUnitEl.value : '';
+              if (fuNumVal) {
+                item.followUp = fuNumVal + '（' + fuUnitVal + '）';
+              } else {
+                item.followUp = fuUnitVal;
+              }
               item.content = document.getElementById('prescriptionContentTextarea').value;
               item.lastModified = new Date().toISOString().split('T')[0];
               // 標記為已保存（非新建），避免取消時被移除
