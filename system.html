@@ -555,9 +555,15 @@
                             <!-- 左側 -->
                             <div class="space-y-4">
                                 <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        主訴 *
-                                    </label>
+                                    <div class="flex justify-between items-center mb-2">
+                                        <label class="block text-sm font-semibold text-gray-700">
+                                            主訴 *
+                                        </label>
+                                        <!-- 新增：診斷模板載入按鈕，位於主訴欄旁 -->
+                                        <button type="button" onclick="showDiagnosisTemplateModal()" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200">
+                                            🧾 載入診斷模板
+                                        </button>
+                                    </div>
                                     <textarea id="formSymptoms" placeholder="病人主要不適症狀、發病時間、症狀特點等..." rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
                                 </div>
 
@@ -761,9 +767,15 @@
                                 
                                 <!-- 新增「中藥服用方法」欄位，移到療程欄位上方 -->
                                 <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        中藥服用方法
-                                    </label>
+                                    <div class="flex justify-between items-center mb-2">
+                                        <label class="block text-sm font-semibold text-gray-700">
+                                            中藥服用方法
+                                        </label>
+                                        <!-- 新增：醫囑模板載入按鈕，位於中藥服用方法欄旁 -->
+                                        <button type="button" onclick="showPrescriptionTemplateModal()" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200">
+                                            📋 載入醫囑模板
+                                        </button>
+                                    </div>
                                     <textarea id="formUsage" placeholder="煎煮方法、服用時間、劑量等..." rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
                                 </div>
 
@@ -1754,6 +1766,32 @@
             </div>
         </div>
 
+        <!-- 診斷模板選擇彈窗 -->
+        <div id="diagnosisTemplateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl">
+                    <h3 class="text-lg font-bold text-gray-800">診斷模板</h3>
+                    <button onclick="hideDiagnosisTemplateModal()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+                </div>
+                <div id="diagnosisTemplateList" class="p-4 space-y-3">
+                    <!-- 動態載入診斷模板 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 醫囑模板選擇彈窗 -->
+        <div id="prescriptionTemplateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl">
+                    <h3 class="text-lg font-bold text-gray-800">醫囑模板</h3>
+                    <button onclick="hidePrescriptionTemplateModal()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+                </div>
+                <div id="prescriptionTemplateList" class="p-4 space-y-3">
+                    <!-- 動態載入醫囑模板 -->
+                </div>
+            </div>
+        </div>
+
         <div class="max-w-7xl mx-auto px-4 py-4 mt-8">
             <div class="text-center border-t border-gray-200 pt-4">
                 <div class="text-xs text-gray-400">
@@ -1812,6 +1850,7 @@
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
