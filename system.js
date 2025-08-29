@@ -9,12 +9,15 @@ let currentUserData = null;
  */
 const ROLE_PERMISSIONS = {
   // 診所管理者擁有全部功能權限，包括個人設置與模板庫管理
-  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary'],
+  // 診所管理：將模板庫管理放在診症系統之後，其餘順序保持一致
+  '診所管理': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings'],
   // 醫師可存取大部分功能，包含個人設置與模板庫管理
-  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement', 'personalSettings', 'templateLibrary'],
+  // 醫師：模板庫管理放在診症系統之後
+  '醫師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement', 'personalSettings'],
   // 護理師原本僅能使用診症相關功能。為了讓模板庫管理變成公用功能，
   // 將 templateLibrary 新增到護理師的權限清單，讓護理師也能瀏覽與使用模板庫。
-  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'templateLibrary'],
+  // 護理師：模板庫管理放在診症系統之後
+  '護理師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary'],
   // 一般用戶原本只能進入病患管理與診症系統。為了讓模板庫管理變成公用功能，
   // 也將 templateLibrary 新增到一般用戶的權限清單，使所有登入用戶都可存取模板庫。
   '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary']
@@ -539,10 +542,8 @@ function playNotificationSound() {
                     window.firebase.collection(window.firebase.db, 'prescriptionTemplates')
                 );
                 const presFromFirestore = [];
-                // 將 Firestore 文件的 ID 一併存入本地模板陣列。
-                // 若僅取用 data()，將導致缺乏 id 欄位，後續無法辨識並套用模板。
                 presSnapshot.forEach(docSnap => {
-                    presFromFirestore.push({ id: docSnap.id, ...docSnap.data() });
+                    presFromFirestore.push({ ...docSnap.data() });
                 });
                 if (presFromFirestore.length > 0) {
                     prescriptionTemplates = presFromFirestore;
@@ -553,9 +554,8 @@ function playNotificationSound() {
                     window.firebase.collection(window.firebase.db, 'diagnosisTemplates')
                 );
                 const diagFromFirestore = [];
-                // 同理，將診斷模板的 Firestore 文件 ID 存入本地資料，供選擇模板時使用。
                 diagSnapshot.forEach(docSnap => {
-                    diagFromFirestore.push({ id: docSnap.id, ...docSnap.data() });
+                    diagFromFirestore.push({ ...docSnap.data() });
                 });
                 if (diagFromFirestore.length > 0) {
                     diagnosisTemplates = diagFromFirestore;
@@ -11547,7 +11547,151 @@ document.addEventListener('DOMContentLoaded', function() {
   window.hideAcupointComboModal = hideAcupointComboModal;
   window.selectAcupointCombo = selectAcupointCombo;
 
-  // 將診斷與醫囑模板選擇相關函式掛載至全域，讓診症表單按鈕可以調用。
+  // 模板庫：診斷模板與醫囑模板彈窗
+  // 顯示診斷模板選擇彈窗，並動態生成模板列表
+  function showDiagnosisTemplateModal() {
+    try {
+      const modal = document.getElementById('diagnosisTemplateModal');
+      const listEl = document.getElementById('diagnosisTemplateList');
+      if (!modal || !listEl) return;
+      // 清空現有列表
+      listEl.innerHTML = '';
+      const templates = Array.isArray(diagnosisTemplates) ? diagnosisTemplates : [];
+      templates.forEach(template => {
+        if (!template) return;
+        const div = document.createElement('div');
+        div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
+        const categoryLine = template.category ? `<div class="text-sm text-gray-500">${template.category}</div>` : '';
+        div.innerHTML = `
+            <div>
+              <div class="font-medium text-gray-800">${template.name || ''}</div>
+              ${categoryLine}
+            </div>
+            <button type="button" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded" onclick="selectDiagnosisTemplate('${template.id}')">套用</button>
+        `;
+        listEl.appendChild(div);
+      });
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('顯示診斷模板彈窗失敗:', err);
+    }
+  }
+
+  function hideDiagnosisTemplateModal() {
+    const modal = document.getElementById('diagnosisTemplateModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function selectDiagnosisTemplate(id) {
+    try {
+      const templates = Array.isArray(diagnosisTemplates) ? diagnosisTemplates : [];
+      const template = templates.find(t => String(t.id) === String(id));
+      if (!template) return;
+      // 填入主訴與診斷相關欄位
+      const content = template.content || '';
+      const formSymptoms = document.getElementById('formSymptoms');
+      const formCurrentHistory = document.getElementById('formCurrentHistory');
+      const formTongue = document.getElementById('formTongue');
+      const formPulse = document.getElementById('formPulse');
+      const formDiagnosis = document.getElementById('formDiagnosis');
+      const formSyndrome = document.getElementById('formSyndrome');
+      // 若欄位尚未填寫則填入，避免覆蓋使用者已輸入內容
+      if (formSymptoms && !formSymptoms.value) formSymptoms.value = content;
+      if (formDiagnosis && !formDiagnosis.value) formDiagnosis.value = template.name || '';
+      // 其他欄位留空由醫師自行填寫
+      hideDiagnosisTemplateModal();
+      showToast('已載入診斷模板', 'success');
+    } catch (err) {
+      console.error('選擇診斷模板錯誤:', err);
+    }
+  }
+
+  // 顯示醫囑模板選擇彈窗，並動態生成列表
+  function showPrescriptionTemplateModal() {
+    try {
+      const modal = document.getElementById('prescriptionTemplateModal');
+      const listEl = document.getElementById('prescriptionTemplateList');
+      if (!modal || !listEl) return;
+      listEl.innerHTML = '';
+      const templates = Array.isArray(prescriptionTemplates) ? prescriptionTemplates : [];
+      templates.forEach(template => {
+        if (!template) return;
+        const div = document.createElement('div');
+        div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
+        const categoryLine = template.category ? `<div class="text-sm text-gray-500">${template.category}</div>` : '';
+        div.innerHTML = `
+            <div>
+              <div class="font-medium text-gray-800">${template.name || ''}</div>
+              ${categoryLine}
+            </div>
+            <button type="button" class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded" onclick="selectPrescriptionTemplate('${template.id}')">套用</button>
+        `;
+        listEl.appendChild(div);
+      });
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('顯示醫囑模板彈窗失敗:', err);
+    }
+  }
+
+  function hidePrescriptionTemplateModal() {
+    const modal = document.getElementById('prescriptionTemplateModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function selectPrescriptionTemplate(id) {
+    try {
+      const templates = Array.isArray(prescriptionTemplates) ? prescriptionTemplates : [];
+      const template = templates.find(t => String(t.id) === String(id));
+      if (!template) return;
+      const usageField = document.getElementById('formUsage');
+      const treatmentField = document.getElementById('formTreatmentCourse');
+      const instructionsField = document.getElementById('formInstructions');
+      if (template.content && typeof template.content === 'string') {
+        let usage = '';
+        let instructions = '';
+        let treatment = '';
+        const contentStr = template.content;
+        const usageIdx = contentStr.indexOf('服藥方法');
+        const noteIdx = contentStr.indexOf('注意事項');
+        const treatmentIdx = contentStr.indexOf('療程');
+        if (usageIdx !== -1) {
+          const afterUsage = contentStr.substring(usageIdx).replace(/服藥方法[:：]/, '');
+          if (noteIdx !== -1 && noteIdx > usageIdx) {
+            usage = afterUsage.substring(0, noteIdx - usageIdx).trim();
+          } else if (treatmentIdx !== -1 && treatmentIdx > usageIdx) {
+            usage = afterUsage.substring(0, treatmentIdx - usageIdx).trim();
+          } else {
+            usage = afterUsage.trim();
+          }
+        }
+        if (noteIdx !== -1) {
+          const afterNote = contentStr.substring(noteIdx).replace(/注意事項[:：]/, '');
+          if (treatmentIdx !== -1 && treatmentIdx > noteIdx) {
+            instructions = afterNote.substring(0, treatmentIdx - noteIdx).trim();
+          } else {
+            instructions = afterNote.trim();
+          }
+        }
+        if (treatmentIdx !== -1) {
+          const afterTreatment = contentStr.substring(treatmentIdx).replace(/療程安排[:：]?/, '').replace(/療程[:：]?/, '');
+          treatment = afterTreatment.trim();
+        }
+        if (usageField && !usageField.value) usageField.value = usage || template.content || '';
+        if (instructionsField && !instructionsField.value) instructionsField.value = instructions || '';
+        if (treatmentField && !treatmentField.value) treatmentField.value = treatment || template.duration || '';
+      } else {
+        if (usageField && !usageField.value) usageField.value = template.content || '';
+        if (treatmentField && !treatmentField.value) treatmentField.value = template.duration || '';
+      }
+      hidePrescriptionTemplateModal();
+      showToast('已載入醫囑模板', 'success');
+    } catch (err) {
+      console.error('選擇醫囑模板錯誤:', err);
+    }
+  }
+
+  // 將模板相關函式掛載至全域，供 HTML 按鈕調用
   window.showDiagnosisTemplateModal = showDiagnosisTemplateModal;
   window.hideDiagnosisTemplateModal = hideDiagnosisTemplateModal;
   window.selectDiagnosisTemplate = selectDiagnosisTemplate;
@@ -12665,187 +12809,6 @@ function refreshTemplateCategoryFilters() {
               console.error('載入常用穴位組合錯誤:', error);
             }
           }
-
-
-      /**
-       * 顯示診斷模板選擇彈窗。
-       * 此功能列出所有已定義的診斷模板，允許醫師點擊一項模板以載入對應內容。
-       */
-      function showDiagnosisTemplateModal() {
-        try {
-          const modal = document.getElementById('diagnosisTemplateModal');
-          const listContainer = document.getElementById('diagnosisTemplateList');
-          if (!modal || !listContainer) return;
-          listContainer.innerHTML = '';
-          const list = Array.isArray(diagnosisTemplates)
-            ? diagnosisTemplates.filter(t => t && t.name && String(t.name).trim() !== '')
-            : [];
-          if (list.length === 0) {
-            listContainer.innerHTML = '<div class="text-center text-gray-500">尚未設定診斷模板</div>';
-          } else {
-            list.forEach((item, index) => {
-              const div = document.createElement('div');
-              div.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
-              const catSpan = item.category ? `<span class="ml-2 text-sm text-gray-500">(${item.category})</span>` : '';
-              div.innerHTML = `<div class="font-semibold text-gray-800">${item.name}${catSpan}</div>`;
-              // 若模板沒有 id，改以索引值作為參數，以便於後續查找
-              div.onclick = function() {
-                const idToUse = (item.id !== undefined && item.id !== null) ? item.id : index;
-                selectDiagnosisTemplate(idToUse);
-              };
-              listContainer.appendChild(div);
-            });
-          }
-          modal.classList.remove('hidden');
-        } catch (error) {
-          console.error('顯示診斷模板彈窗錯誤:', error);
-        }
-      }
-
-      /**
-       * 隱藏診斷模板選擇彈窗。
-       */
-      function hideDiagnosisTemplateModal() {
-        const modal = document.getElementById('diagnosisTemplateModal');
-        if (modal) modal.classList.add('hidden');
-      }
-
-      /**
-       * 選擇診斷模板並填入診症表單欄位。
-       * 根據模板的欄位內容對應填充診症表單中的主訴、現病史、舌象、脈象、中醫診斷與證型診斷。
-       * 若模板僅包含 content 而無分欄位內容，將全部內容填入主訴欄位。
-       * @param {number|string} id 模板 ID
-       */
-      function selectDiagnosisTemplate(id) {
-        try {
-          let template = null;
-          // 先根據 id 屬性查找模板，部分模板可能缺少 id 屬性。
-          if (id !== undefined && id !== null) {
-            template = diagnosisTemplates.find(t => String(t.id) === String(id));
-          }
-          // 若找不到，且傳入值可解析為數字，則視為索引尋找
-          if (!template) {
-            const idx = parseInt(id, 10);
-            if (!isNaN(idx) && idx >= 0 && idx < diagnosisTemplates.length) {
-              template = diagnosisTemplates[idx];
-            }
-          }
-          if (!template) return;
-          hideDiagnosisTemplateModal();
-          // 對應模板欄位與表單欄位
-          const mapping = [
-            { key: 'chiefComplaint', elementId: 'formSymptoms' },
-            { key: 'currentHistory', elementId: 'formCurrentHistory' },
-            { key: 'tongue', elementId: 'formTongue' },
-            { key: 'pulse', elementId: 'formPulse' },
-            { key: 'tcmDiagnosis', elementId: 'formDiagnosis' },
-            { key: 'syndromeDiagnosis', elementId: 'formSyndrome' }
-          ];
-          let anyFieldFilled = false;
-          mapping.forEach(({ key, elementId }) => {
-            if (template[key]) {
-              const el = document.getElementById(elementId);
-              if (el) {
-                el.value = template[key];
-                anyFieldFilled = true;
-              }
-            }
-          });
-          // 若沒有分欄位內容但有 content，填入主訴欄位
-          if (!anyFieldFilled && template.content) {
-            const el = document.getElementById('formSymptoms');
-            if (el) {
-              el.value = template.content;
-            }
-          }
-          showToast('已載入診斷模板：' + template.name, 'success');
-        } catch (error) {
-          console.error('載入診斷模板錯誤:', error);
-        }
-      }
-
-      /**
-       * 顯示醫囑模板選擇彈窗。
-       * 此功能列出所有已定義的醫囑模板，允許醫師點擊一項模板以載入對應內容。
-       */
-      function showPrescriptionTemplateModal() {
-        try {
-          const modal = document.getElementById('prescriptionTemplateModal');
-          const listContainer = document.getElementById('prescriptionTemplateList');
-          if (!modal || !listContainer) return;
-          listContainer.innerHTML = '';
-          const list = Array.isArray(prescriptionTemplates)
-            ? prescriptionTemplates.filter(t => t && t.name && String(t.name).trim() !== '')
-            : [];
-          if (list.length === 0) {
-            listContainer.innerHTML = '<div class="text-center text-gray-500">尚未設定醫囑模板</div>';
-          } else {
-            list.forEach((item, index) => {
-              const div = document.createElement('div');
-              div.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
-              const catSpan = item.category ? `<span class="ml-2 text-sm text-gray-500">(${item.category})</span>` : '';
-              div.innerHTML = `<div class="font-semibold text-gray-800">${item.name}${catSpan}</div>`;
-              // 若模板沒有 id 屬性，則傳遞索引值以便後續查找
-              div.onclick = function() {
-                const idToUse = (item.id !== undefined && item.id !== null) ? item.id : index;
-                selectPrescriptionTemplate(idToUse);
-              };
-              listContainer.appendChild(div);
-            });
-          }
-          modal.classList.remove('hidden');
-        } catch (error) {
-          console.error('顯示醫囑模板彈窗錯誤:', error);
-        }
-      }
-
-      /**
-       * 隱藏醫囑模板選擇彈窗。
-       */
-      function hidePrescriptionTemplateModal() {
-        const modal = document.getElementById('prescriptionTemplateModal');
-        if (modal) modal.classList.add('hidden');
-      }
-
-      /**
-       * 選擇醫囑模板並填入中藥服用方法欄位及相關欄位。
-       * 主要將模板中的 content 填入 formUsage；若存在 duration，則填入療程欄位。
-       * @param {number|string} id 模板 ID
-       */
-      function selectPrescriptionTemplate(id) {
-        try {
-          let template = null;
-          // 先嘗試以 id 屬性尋找模板
-          if (id !== undefined && id !== null) {
-            template = prescriptionTemplates.find(t => String(t.id) === String(id));
-          }
-          // 若找不到，且 id 可解析為數字，則視為索引處理
-          if (!template) {
-            const idx = parseInt(id, 10);
-            if (!isNaN(idx) && idx >= 0 && idx < prescriptionTemplates.length) {
-              template = prescriptionTemplates[idx];
-            }
-          }
-          if (!template) return;
-          hidePrescriptionTemplateModal();
-          if (template.content) {
-            const usageEl = document.getElementById('formUsage');
-            if (usageEl) {
-              usageEl.value = template.content;
-            }
-          }
-          // 若模板包含療程（duration），填入療程欄
-          if (template.duration) {
-            const courseEl = document.getElementById('formTreatmentCourse');
-            if (courseEl) {
-              courseEl.value = template.duration;
-            }
-          }
-          showToast('已載入醫囑模板：' + template.name, 'success');
-        } catch (error) {
-          console.error('載入醫囑模板錯誤:', error);
-        }
-      }
 
 
           // 渲染醫囑模板
