@@ -11772,22 +11772,35 @@ document.addEventListener('DOMContentLoaded', function() {
           treatment = afterTreatment.trim();
         }
         // Always override the form fields with the values parsed from the template.
-        // Previously these assignments only occurred when the field was empty (value == ''), which prevented
-        // users from loading a template if they had typed something or if the field contained stale data.
-        // To ensure the selected medical order template is always applied, we remove the checks on existing values.
-        if (usageField) usageField.value = usage || template.content || '';
+        // If the template defines a note (中藥服用方法), use it as the usage; otherwise fall back to the parsed usage or the full content.
+        if (usageField) {
+          let finalUsage = usage;
+          if (template.note && typeof template.note === 'string' && template.note.trim()) {
+            finalUsage = template.note.trim();
+          }
+          usageField.value = finalUsage || template.content || '';
+        }
         if (instructionsField) instructionsField.value = instructions || '';
         if (treatmentField) treatmentField.value = treatment || template.duration || '';
       } else {
-        // If the template does not have structured content, apply the raw content and duration directly.
-        if (usageField) usageField.value = template.content || '';
+        // No structured content present; assign usage from note if available, otherwise use the raw content
+        if (usageField) {
+          let finalUsage = '';
+          if (template.note && typeof template.note === 'string' && template.note.trim()) {
+            finalUsage = template.note.trim();
+          } else if (typeof template.content === 'string') {
+            finalUsage = template.content;
+          }
+          usageField.value = finalUsage || '';
+        }
+        if (instructionsField) instructionsField.value = '';
         if (treatmentField) treatmentField.value = template.duration || '';
       }
       // 若模板定義了 followUp 屬性，嘗試解析並自動填入複診時間欄位。
       try {
         const followUpField = document.getElementById('formFollowUpDate');
-        // Always populate the follow‑up date based on the template. Previously this only occurred when the
-        // input was empty, but users expect the template value to override any existing date.
+        // Always populate the follow-up date based on the template. If the template defines a followUp string,
+        // compute the date relative to the visit time or current time and override any existing value.
         if (followUpField && template.followUp && typeof template.followUp === 'string') {
           let days = 0;
           const dayMatch = template.followUp.match(/(\d+)\s*天/);
@@ -12247,6 +12260,7 @@ function refreshTemplateCategoryFilters() {
               duration: '7天',
               followUp: '3天後',
               content: '服藥方法：每日三次，飯後30分鐘溫服。服藥期間多喝溫開水。避免生冷、油膩、辛辣食物。注意事項：充分休息，避免熬夜。如症狀加重或持續發燒請立即回診。療程安排：建議療程7天，服藥3天後回診評估。',
+              note: '',
               lastModified: '2024-02-15'
             }
           ];
@@ -13048,6 +13062,7 @@ function refreshTemplateCategoryFilters() {
               duration: '',
               followUp: '',
               content: '',
+              note: '',
               lastModified: new Date().toISOString().split('T')[0],
               // 標記為新建項目，用於取消時移除
               isNew: true
@@ -13643,7 +13658,7 @@ function refreshTemplateCategoryFilters() {
                     </div>
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">中藥服用方法</label>
-                      <input type="text" id="prescriptionNoteInput" placeholder="如：服藥完畢後" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                      <input type="text" id="prescriptionNoteInput" value="${item.note || ''}" placeholder="如：服藥完畢後" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                     </div>
                   </div>
                   <div>
@@ -13861,6 +13876,9 @@ function refreshTemplateCategoryFilters() {
                 item.followUp = fuUnitVal;
               }
               item.content = document.getElementById('prescriptionContentTextarea').value;
+              // 儲存中藥服用方法（note）到模板項。若無輸入則存為空字串。
+              const noteVal = document.getElementById('prescriptionNoteInput') ? document.getElementById('prescriptionNoteInput').value : '';
+              item.note = noteVal;
               item.lastModified = new Date().toISOString().split('T')[0];
               // 標記為已保存（非新建），避免取消時被移除
               if (item.isNew) {
