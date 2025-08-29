@@ -11588,17 +11588,111 @@ document.addEventListener('DOMContentLoaded', function() {
       const template = templates.find(t => String(t.id) === String(id));
       if (!template) return;
       // 填入主訴與診斷相關欄位
-      const content = template.content || '';
       const formSymptoms = document.getElementById('formSymptoms');
       const formCurrentHistory = document.getElementById('formCurrentHistory');
       const formTongue = document.getElementById('formTongue');
       const formPulse = document.getElementById('formPulse');
       const formDiagnosis = document.getElementById('formDiagnosis');
       const formSyndrome = document.getElementById('formSyndrome');
-      // 若欄位尚未填寫則填入，避免覆蓋使用者已輸入內容
-      if (formSymptoms && !formSymptoms.value) formSymptoms.value = content;
-      if (formDiagnosis && !formDiagnosis.value) formDiagnosis.value = template.name || '';
-      // 其他欄位留空由醫師自行填寫
+
+      /**
+       * 嘗試從模板的 content 欄位解析特定的診斷欄目，例如「主訴」、「現病史」、「舌象」等。
+       * 若模板已有對應屬性（如 chiefComplaint 等）則優先使用該屬性。
+       * 解析順序：
+       *   - 先檢查模板對應欄位是否有資料。
+       *   - 再從 content 中以關鍵字切割獲取。
+       *   - 最後退而求其次使用整段 content 或模板名稱。
+       */
+      const tmplContent = typeof template.content === 'string' ? template.content : '';
+      // 解析 content 中指定標題後的內容，使用非貪婪匹配，直到下一個已知標題或字串結尾
+      function parseSection(keyword) {
+        try {
+          const pattern = new RegExp(String(keyword) + '[：:]\\s*([\\s\\S]*?)(?:\\n|$|主訴|現病史|舌象|脈象|中醫診斷|證型診斷|症狀描述|檢查建議|治療建議|復診安排)', 'i');
+          const match = tmplContent.match(pattern);
+          return match ? match[1].trim() : '';
+        } catch (_e) {
+          return '';
+        }
+      }
+
+      // 主訴
+      if (formSymptoms && !formSymptoms.value) {
+        let value = '';
+        if (template.chiefComplaint) {
+          value = template.chiefComplaint;
+        } else {
+          // 嘗試從 content 解析「主訴」或「症狀描述」
+          value = parseSection('主訴');
+          if (!value) {
+            value = parseSection('症狀描述');
+          }
+          // 若仍無法取得，使用整段 content
+          if (!value && tmplContent) {
+            value = tmplContent;
+          }
+        }
+        formSymptoms.value = value;
+      }
+
+      // 現病史
+      if (formCurrentHistory && !formCurrentHistory.value) {
+        let value = '';
+        if (template.currentHistory) {
+          value = template.currentHistory;
+        } else {
+          value = parseSection('現病史');
+        }
+        if (value) formCurrentHistory.value = value;
+      }
+
+      // 舌象
+      if (formTongue && !formTongue.value) {
+        let value = '';
+        if (template.tongue) {
+          value = template.tongue;
+        } else {
+          value = parseSection('舌象');
+        }
+        if (value) formTongue.value = value;
+      }
+
+      // 脈象
+      if (formPulse && !formPulse.value) {
+        let value = '';
+        if (template.pulse) {
+          value = template.pulse;
+        } else {
+          value = parseSection('脈象');
+        }
+        if (value) formPulse.value = value;
+      }
+
+      // 中醫診斷
+      if (formDiagnosis && !formDiagnosis.value) {
+        let value = '';
+        if (template.tcmDiagnosis) {
+          value = template.tcmDiagnosis;
+        } else {
+          value = parseSection('中醫診斷');
+        }
+        // 若仍無內容，使用模板名稱作為診斷
+        if (!value && template.name) {
+          value = template.name;
+        }
+        formDiagnosis.value = value;
+      }
+
+      // 證型診斷
+      if (formSyndrome && !formSyndrome.value) {
+        let value = '';
+        if (template.syndromeDiagnosis) {
+          value = template.syndromeDiagnosis;
+        } else {
+          value = parseSection('證型診斷');
+        }
+        if (value) formSyndrome.value = value;
+      }
+
       hideDiagnosisTemplateModal();
       showToast('已載入診斷模板', 'success');
     } catch (err) {
@@ -11684,6 +11778,42 @@ document.addEventListener('DOMContentLoaded', function() {
         if (usageField && !usageField.value) usageField.value = template.content || '';
         if (treatmentField && !treatmentField.value) treatmentField.value = template.duration || '';
       }
+      // 若模板定義了 followUp 屬性，嘗試解析並自動填入複診時間欄位。
+      try {
+        const followUpField = document.getElementById('formFollowUpDate');
+        if (followUpField && !followUpField.value && template.followUp && typeof template.followUp === 'string') {
+          let days = 0;
+          const dayMatch = template.followUp.match(/(\d+)\s*天/);
+          if (dayMatch) {
+            days = parseInt(dayMatch[1], 10);
+          }
+          const weekMatch = template.followUp.match(/(\d+)\s*[週周]/);
+          if (!days && weekMatch) {
+            days = parseInt(weekMatch[1], 10) * 7;
+          }
+          if (days > 0) {
+            // 以到診時間為基準，如果未填入到診時間則使用當前時間
+            let base = new Date();
+            const visitField = document.getElementById('formVisitTime');
+            if (visitField && visitField.value) {
+              const parsed = new Date(visitField.value);
+              if (!isNaN(parsed.getTime())) {
+                base = parsed;
+              }
+            }
+            const followDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+            const y = followDate.getFullYear();
+            const m = String(followDate.getMonth() + 1).padStart(2, '0');
+            const d = String(followDate.getDate()).padStart(2, '0');
+            const h = String(followDate.getHours()).padStart(2, '0');
+            const min = String(followDate.getMinutes()).padStart(2, '0');
+            followUpField.value = `${y}-${m}-${d}T${h}:${min}`;
+          }
+        }
+      } catch (_e) {
+        // 若解析 followUp 發生錯誤，略過自動填寫
+      }
+
       hidePrescriptionTemplateModal();
       showToast('已載入醫囑模板', 'success');
     } catch (err) {
