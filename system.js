@@ -11699,71 +11699,57 @@ document.addEventListener('DOMContentLoaded', function() {
   window.hidePrescriptionTemplateModal = hidePrescriptionTemplateModal;
   window.selectPrescriptionTemplate = selectPrescriptionTemplate;
 
-    /**
-     * 包裝載入診斷模板按鈕：按下時顯示讀取圈，稍作延遲後顯示診斷模板彈窗。
-     * 此函式透過 setButtonLoading/clearButtonLoading 控制按鈕大小及讀取效果，
-     * 讓其與其他載入類按鈕一致。事件對象會傳入以取得觸發按鈕。
-     * @param {Event} ev 點擊事件
-     */
-    async function openDiagnosisTemplate(ev) {
-      let btn = null;
-      try {
-        // 優先使用事件中的 currentTarget 作為按鈕
-        if (ev && ev.currentTarget) btn = ev.currentTarget;
-        // 後援：從 DOM 查找 openDiagnosisTemplate 對應的按鈕
-        if (!btn) {
-          btn = document.querySelector('button[onclick*="openDiagnosisTemplate"]');
-        }
-        if (btn) {
-          setButtonLoading(btn);
-        }
-        // 短暫延遲，讓讀取圈顯示一段時間
-        await new Promise(resolve => setTimeout(resolve, 200));
-        // 顯示診斷模板彈窗
-        if (typeof showDiagnosisTemplateModal === 'function') {
-          showDiagnosisTemplateModal();
-        }
-      } catch (err) {
-        console.error('開啟診斷模板按鈕錯誤:', err);
-      } finally {
-        if (btn) {
-          clearButtonLoading(btn);
-        }
+  // 以下為封裝診斷模板與醫囑模板載入按鈕的函式。
+  // 按下載入按鈕時顯示讀取圈，稍作延遲後再打開對應的模板彈窗，並於完成後恢復原始按鈕內容。
+  async function openDiagnosisTemplate(ev) {
+    let btn = null;
+    try {
+      if (ev && ev.currentTarget) btn = ev.currentTarget;
+      if (!btn) {
+        btn = document.querySelector('button[onclick*="openDiagnosisTemplate"]');
+      }
+      if (btn) {
+        setButtonLoading(btn);
+      }
+      await new Promise(resolve => setTimeout(resolve, 200));
+      if (typeof showDiagnosisTemplateModal === 'function') {
+        showDiagnosisTemplateModal();
+      }
+    } catch (err) {
+      console.error('開啟診斷模板按鈕錯誤:', err);
+    } finally {
+      if (btn) {
+        clearButtonLoading(btn);
       }
     }
+  }
 
-    /**
-     * 包裝載入醫囑模板按鈕：按下時顯示讀取圈，稍作延遲後顯示醫囑模板彈窗。
-     * 與 openDiagnosisTemplate 類似，使用 setButtonLoading/clearButtonLoading
-     * 以保持按鈕大小並顯示旋轉圈。
-     * @param {Event} ev 點擊事件
-     */
-    async function openPrescriptionTemplate(ev) {
-      let btn = null;
-      try {
-        if (ev && ev.currentTarget) btn = ev.currentTarget;
-        if (!btn) {
-          btn = document.querySelector('button[onclick*="openPrescriptionTemplate"]');
-        }
-        if (btn) {
-          setButtonLoading(btn);
-        }
-        await new Promise(resolve => setTimeout(resolve, 200));
-        if (typeof showPrescriptionTemplateModal === 'function') {
-          showPrescriptionTemplateModal();
-        }
-      } catch (err) {
-        console.error('開啟醫囑模板按鈕錯誤:', err);
-      } finally {
-        if (btn) {
-          clearButtonLoading(btn);
-        }
+  async function openPrescriptionTemplate(ev) {
+    let btn = null;
+    try {
+      if (ev && ev.currentTarget) btn = ev.currentTarget;
+      if (!btn) {
+        btn = document.querySelector('button[onclick*="openPrescriptionTemplate"]');
+      }
+      if (btn) {
+        setButtonLoading(btn);
+      }
+      await new Promise(resolve => setTimeout(resolve, 200));
+      if (typeof showPrescriptionTemplateModal === 'function') {
+        showPrescriptionTemplateModal();
+      }
+    } catch (err) {
+      console.error('開啟醫囑模板按鈕錯誤:', err);
+    } finally {
+      if (btn) {
+        clearButtonLoading(btn);
       }
     }
+  }
 
-    // 將包裝函式掛載到 window 以供 HTML 按鈕呼叫
-    window.openDiagnosisTemplate = openDiagnosisTemplate;
-    window.openPrescriptionTemplate = openPrescriptionTemplate;
+  // 將封裝函式掛載至全域，供 HTML 直接調用
+  window.openDiagnosisTemplate = openDiagnosisTemplate;
+  window.openPrescriptionTemplate = openPrescriptionTemplate;
 
   /**
    * 在使用者嘗試直接關閉或重新整理網頁時提示確認，避免未保存的套票使用紀錄被誤判為取消。
@@ -13900,7 +13886,17 @@ document.addEventListener('DOMContentLoaded', function() {
              * 為解決此問題，將這些彈窗節點移動到 body 底下，避免受父層顯示狀態影響。
              */
             // 將需要在診症系統中使用的彈窗節點移動到 body 底下，避免被隱藏區域遮蔽
-            ['categoryModal', 'editModal', 'herbComboModal', 'acupointComboModal'].forEach(function(id) {
+            // 將需要在診症系統中使用的彈窗節點移動到 body 底下，避免受父容器顯示狀態影響
+            // 包含診斷模板與醫囑模板彈窗在內的所有模態框
+            [
+                'categoryModal',
+                'editModal',
+                'herbComboModal',
+                'acupointComboModal',
+                // 新增將診斷模板與醫囑模板彈窗移至 body，避免因父層隱藏而無法顯示
+                'diagnosisTemplateModal',
+                'prescriptionTemplateModal'
+            ].forEach(function(id) {
                 const modal = document.getElementById(id);
                 if (modal && modal.parentElement !== document.body) {
                     document.body.appendChild(modal);
