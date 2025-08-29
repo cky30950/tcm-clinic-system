@@ -11868,7 +11868,10 @@ document.addEventListener('DOMContentLoaded', function() {
         buttons.forEach(btn => {
           btn.addEventListener('click', function (evt) {
             const tid = evt.currentTarget.getAttribute('data-id');
-            selectPrescriptionTemplate(tid);
+            // 使用全域掛載的新版函式載入醫囑模板
+            if (window && typeof window.selectPrescriptionTemplate === 'function') {
+              window.selectPrescriptionTemplate(tid);
+            }
           });
         });
       }
@@ -11884,7 +11887,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (modal) modal.classList.add('hidden');
   }
 
-  function selectPrescriptionTemplate(id) {
+// 將舊版醫囑模板載入函式重新命名為 _oldSelectPrescriptionTemplate，避免與新版衝突
+function _oldSelectPrescriptionTemplate(id) {
     /**
      * 選擇醫囑模板並套用到表單中。此函式會依序嘗試從模板的 content、note、
      * duration 以及 followUp 中解析出服藥方法、注意事項、療程與複診天數。
@@ -12120,6 +12124,81 @@ document.addEventListener('DOMContentLoaded', function() {
   window.selectDiagnosisTemplate = selectDiagnosisTemplate;
   window.showPrescriptionTemplateModal = showPrescriptionTemplateModal;
   window.hidePrescriptionTemplateModal = hidePrescriptionTemplateModal;
+  // 定義新版載入醫囑模板函式，僅處理療程、中藥服用方法、複診時間、醫囑及注意事項
+  function selectPrescriptionTemplate(id) {
+    try {
+      const templates = Array.isArray(prescriptionTemplates) ? prescriptionTemplates : [];
+      const template = templates.find(t => String(t.id) === String(id));
+      if (!template) {
+        showToast('找不到選定的醫囑模板', 'warning');
+        return;
+      }
+      const usageField = document.getElementById('formUsage');
+      const treatmentField = document.getElementById('formTreatmentCourse');
+      const instructionsField = document.getElementById('formInstructions');
+      const followUpField = document.getElementById('formFollowUpDate');
+      if (treatmentField) treatmentField.value = (template.duration && typeof template.duration === 'string') ? template.duration.trim() : '';
+      if (usageField) usageField.value = (template.content && typeof template.content === 'string') ? template.content.trim() : '';
+      if (instructionsField) instructionsField.value = (template.note && typeof template.note === 'string') ? template.note.trim() : '';
+      try {
+        if (followUpField) {
+          let days = 0;
+          if (template.followUp && typeof template.followUp === 'string') {
+            let match;
+            const fu = template.followUp;
+            match = fu.match(/(\d+)\s*(?:個)?\s*(天|日)/);
+            if (match) {
+              const num = parseInt(match[1], 10);
+              if (!isNaN(num)) days = num;
+            }
+            if (!days) {
+              match = fu.match(/(\d+)\s*(?:個)?\s*[週周]/);
+              if (match) {
+                const num = parseInt(match[1], 10);
+                if (!isNaN(num)) days = num * 7;
+              }
+            }
+            if (!days) {
+              match = fu.match(/(\d+)\s*(?:個)?\s*月/);
+              if (match) {
+                const num = parseInt(match[1], 10);
+                if (!isNaN(num)) days = num * 30;
+              }
+            }
+          }
+          if (days > 0) {
+            let baseDate = new Date();
+            const visitField = document.getElementById('formVisitTime');
+            if (visitField && visitField.value) {
+              const parsed = new Date(visitField.value);
+              if (!isNaN(parsed.getTime())) {
+                baseDate = parsed;
+              }
+            }
+            const followDate = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000);
+            const y = followDate.getFullYear();
+            const mStr = String(followDate.getMonth() + 1).padStart(2, '0');
+            const dStr = String(followDate.getDate()).padStart(2, '0');
+            const hStr = String(followDate.getHours()).padStart(2, '0');
+            const minStr = String(followDate.getMinutes()).padStart(2, '0');
+            followUpField.value = `${y}-${mStr}-${dStr}T${hStr}:${minStr}`;
+            try {
+              followUpField.dispatchEvent(new Event('change'));
+              followUpField.dispatchEvent(new Event('input'));
+            } catch (e) {}
+          }
+        }
+      } catch (fuErr) {
+        console.warn('解析複診日期失敗：', fuErr);
+      }
+      hidePrescriptionTemplateModal();
+      showToast('已載入醫囑模板', 'success');
+    } catch (err) {
+      console.error('選擇醫囑模板錯誤:', err);
+      showToast('載入醫囑模板失敗', 'error');
+    }
+  }
+  // 將新版函式掛載到全域
   window.selectPrescriptionTemplate = selectPrescriptionTemplate;
 
   // 以下為封裝診斷模板與醫囑模板載入按鈕的函式。
