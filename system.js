@@ -11926,8 +11926,21 @@ document.addEventListener('DOMContentLoaded', function() {
         collectPositions(instructionMarkers, 'instructions');
         collectPositions(treatmentMarkers, 'treatment');
         if (positions.length > 0) {
-          // 依位置排序
-          positions.sort((a, b) => a.pos - b.pos);
+          // 依位置排序，如位置相同則較長的標題優先（避免較短的關鍵字覆蓋掉完整標題）
+          positions.sort((a, b) => {
+            if (a.pos === b.pos) {
+              return b.marker.length - a.marker.length;
+            }
+            return a.pos - b.pos;
+          });
+          // 移除同一位置的重複標題，只保留最長的那個，避免像「注意」與「注意事項」重複解析
+          const unique = [];
+          positions.forEach(item => {
+            if (unique.length === 0 || unique[unique.length - 1].pos !== item.pos) {
+              unique.push(item);
+            }
+          });
+          positions = unique;
           const assigned = { usage: false, instructions: false, treatment: false };
           for (let i = 0; i < positions.length; i++) {
             const { pos, marker, type } = positions[i];
@@ -11961,14 +11974,25 @@ document.addEventListener('DOMContentLoaded', function() {
         instructions = parsed.instructions;
         treatment = parsed.treatment;
       }
-      // 接著使用 note 覆寫或補充
+      // 接著使用 note 補充資料：不覆寫服藥方法，僅補充療程與將整段注意事項合併至醫囑欄
       if (template.note && typeof template.note === 'string' && template.note.trim()) {
-        const prev = { usage, instructions, treatment };
+        const noteStr = template.note.trim();
+        // 解析 note 以取得療程資訊，若 treatment 尚未填寫則使用
         const parsedNote = parseSections(template.note);
-        // 若 note 解析有值則覆寫，否則保留原結果
-        usage = parsedNote.usage || prev.usage;
-        instructions = parsedNote.instructions || prev.instructions;
-        treatment = parsedNote.treatment || prev.treatment;
+        if (!treatment && parsedNote.treatment) {
+          treatment = parsedNote.treatment;
+        }
+        // 將 note 內容合併到 instructions 欄位，避免覆寫原本的服藥方法
+        if (noteStr) {
+          if (instructions) {
+            // 若 existing instructions 中尚未包含 note，則以換行分隔後追加
+            if (!instructions.includes(noteStr)) {
+              instructions = instructions + (instructions.endsWith('\n') ? '' : '\n') + noteStr;
+            }
+          } else {
+            instructions = noteStr;
+          }
+        }
       }
       // 若仍為空，直接使用 note 或 content 作為 usage
       if (!usage) {
