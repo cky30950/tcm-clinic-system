@@ -571,6 +571,13 @@ function playNotificationSound() {
                 if (typeof renderDiagnosisTemplates === 'function') {
                     renderDiagnosisTemplates();
                 }
+                // 在初次初始化模板庫後刷新分類篩選下拉選單，
+                // 以確保「診斷模板」與「醫囑模板」篩選器顯示最新的分類
+                if (typeof refreshTemplateCategoryFilters === 'function') {
+                    try {
+                        refreshTemplateCategoryFilters();
+                    } catch (_e) {}
+                }
             } catch (err) {
                 console.error('渲染模板庫內容失敗:', err);
             }
@@ -13780,6 +13787,14 @@ function refreshTemplateCategoryFilters() {
                 button.className = 'px-6 py-3 text-gray-500 hover:text-amber-700 font-medium';
               }
             });
+
+            // 每次切換模板標籤時更新分類下拉選單，
+            // 以便立即反映新增或刪除後的分類
+            if (typeof refreshTemplateCategoryFilters === 'function') {
+              try {
+                refreshTemplateCategoryFilters();
+              } catch (_e) {}
+            }
           }
 
           // 顯示分類管理彈窗
