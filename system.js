@@ -17,10 +17,10 @@ const ROLE_PERMISSIONS = {
   // 護理師原本僅能使用診症相關功能。為了讓模板庫管理變成公用功能，
   // 將 templateLibrary 新增到護理師的權限清單，讓護理師也能瀏覽與使用模板庫。
   // 護理師：模板庫管理放在診症系統之後
-  '護理師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary'],
+  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary'],
   // 一般用戶原本只能進入病患管理與診症系統。為了讓模板庫管理變成公用功能，
   // 也將 templateLibrary 新增到一般用戶的權限清單，使所有登入用戶都可存取模板庫。
-  '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary']
+  '用戶': ['patientManagement', 'consultationSystem']
 };
 
 /**
