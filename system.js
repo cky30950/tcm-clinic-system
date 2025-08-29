@@ -12138,8 +12138,15 @@ function _oldSelectPrescriptionTemplate(id) {
       const instructionsField = document.getElementById('formInstructions');
       const followUpField = document.getElementById('formFollowUpDate');
       if (treatmentField) treatmentField.value = (template.duration && typeof template.duration === 'string') ? template.duration.trim() : '';
-      if (usageField) usageField.value = (template.content && typeof template.content === 'string') ? template.content.trim() : '';
-      if (instructionsField) instructionsField.value = (template.note && typeof template.note === 'string') ? template.note.trim() : '';
+      // 修正載入醫囑模板時將「中藥服用方法」與「醫囑及注意事項」欄位對應錯置的問題
+      // 在編輯模板介面中，`note` 對應的是「中藥服用方法」，`content` 對應的是「醫囑內容及注意事項」。
+      // 因此在套用模板時，應將 note 填入使用方式欄位，content 填入醫囑欄位。
+      if (usageField) {
+        usageField.value = (template.note && typeof template.note === 'string') ? template.note.trim() : '';
+      }
+      if (instructionsField) {
+        instructionsField.value = (template.content && typeof template.content === 'string') ? template.content.trim() : '';
+      }
       try {
         if (followUpField) {
           let days = 0;
