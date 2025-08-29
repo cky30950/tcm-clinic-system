@@ -11701,30 +11701,69 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // 顯示醫囑模板選擇彈窗，並動態生成列表
-  function showPrescriptionTemplateModal() {
+  async function showPrescriptionTemplateModal() {
+    /**
+     * 顯示醫囑模板選擇彈窗。此函式會在必要時先初始化模板庫資料，
+     * 然後根據目前的醫囑模板清單動態產生列表。若無可用模板，
+     * 將顯示提示訊息。所有操作包含在 try/catch 中，以避免意外錯誤破壞 UI。
+     */
     try {
       const modal = document.getElementById('prescriptionTemplateModal');
       const listEl = document.getElementById('prescriptionTemplateList');
       if (!modal || !listEl) return;
+      // 如果模板尚未載入，嘗試從資料庫初始化。
+      if (!Array.isArray(prescriptionTemplates) || prescriptionTemplates.length === 0) {
+        if (typeof initTemplateLibrary === 'function') {
+          try {
+            await initTemplateLibrary();
+          } catch (e) {
+            console.error('初始化模板庫資料失敗:', e);
+          }
+        }
+      }
       listEl.innerHTML = '';
       const templates = Array.isArray(prescriptionTemplates) ? prescriptionTemplates : [];
-      templates.forEach(template => {
-        if (!template) return;
-        const div = document.createElement('div');
-        div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
-        const categoryLine = template.category ? `<div class="text-sm text-gray-500">${template.category}</div>` : '';
-        div.innerHTML = `
+      if (!templates || templates.length === 0) {
+        // 若沒有任何模板，顯示提示文字
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'text-sm text-gray-500 text-center p-4';
+        emptyDiv.textContent = '目前尚無醫囑模板，請先建立或同步模板資料。';
+        listEl.appendChild(emptyDiv);
+      } else {
+        // 依模板名稱排序，改善搜尋體驗
+        const sorted = templates.slice().sort((a, b) => {
+          const an = (a && a.name) ? a.name : '';
+          const bn = (b && b.name) ? b.name : '';
+          return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
+        });
+        sorted.forEach(template => {
+          if (!template) return;
+          const div = document.createElement('div');
+          div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
+          const categoryLine = template.category ? `<div class="text-sm text-gray-500">${template.category}</div>` : '';
+          // 使用 data-id 儲存識別字，並改以 dataset 傳遞，避免在 HTML 字串中嵌入引號造成斷行
+          div.innerHTML = `
             <div>
               <div class="font-medium text-gray-800">${template.name || ''}</div>
               ${categoryLine}
             </div>
-            <button type="button" class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded" onclick="selectPrescriptionTemplate('${template.id}')">套用</button>
-        `;
-        listEl.appendChild(div);
-      });
+            <button type="button" class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded select-prescription-btn" data-id="${template.id}">套用</button>
+          `;
+          listEl.appendChild(div);
+        });
+        // 為每個按鈕掛上事件監聽，而不是在 HTML 中寫入 onclick，以避免序列化出現問題
+        const buttons = listEl.querySelectorAll('.select-prescription-btn');
+        buttons.forEach(btn => {
+          btn.addEventListener('click', function (evt) {
+            const tid = evt.currentTarget.getAttribute('data-id');
+            selectPrescriptionTemplate(tid);
+          });
+        });
+      }
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('顯示醫囑模板彈窗失敗:', err);
+      showToast('無法顯示醫囑模板', 'error');
     }
   }
 
@@ -11734,216 +11773,208 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function selectPrescriptionTemplate(id) {
+    /**
+     * 選擇醫囑模板並套用到表單中。此函式會依序嘗試從模板的 content、note、
+     * duration 以及 followUp 中解析出服藥方法、注意事項、療程與複診天數。
+     * 完成後將值填入對應表單欄位，並更新複診日期。
+     */
     try {
       const templates = Array.isArray(prescriptionTemplates) ? prescriptionTemplates : [];
+      // 以 String 比較，確保不同類型的識別值也能匹配
       const template = templates.find(t => String(t.id) === String(id));
-      if (!template) return;
+      if (!template) {
+        showToast('找不到選定的醫囑模板', 'warning');
+        return;
+      }
       const usageField = document.getElementById('formUsage');
       const treatmentField = document.getElementById('formTreatmentCourse');
       const instructionsField = document.getElementById('formInstructions');
-          // 解析用藥內容、注意事項與療程。部份模板可能未使用固定標題（如「服藥方法」、「注意事項」、「療程」），
-          // 因此需要更具彈性地處理 content 與 note。首先優先解析 content 中的標題，再用 note 作為補充。
-          let usage = '';
-          let instructions = '';
-          let treatment = '';
-
-          const parseSections = text => {
-            if (!text || typeof text !== 'string') return;
-            const contentStr = String(text);
-            // 定義各區塊標題的多個候選關鍵字，支援繁簡體與可能的同義詞
-            const usageMarkers = ['服藥方法', '服用方法', '服用方式', '用藥指導', '服藥指南', '服用指南', '中藥服用方法', '西藥服用方法'];
-            const instructionMarkers = ['注意事項', '注意事项', '注意要點', '注意要点', '注意事項及叮嚀', '醫囑', '医嘱', '注意'];
-            const treatmentMarkers = ['療程安排', '疗程安排', '療程', '疗程', '治療計劃', '治疗计划', '治療安排', '治疗安排'];
-            // 收集所有標題位置
-            let positions = [];
-            const collectPositions = (markers, type) => {
-              markers.forEach(mk => {
-                const pos = contentStr.indexOf(mk);
-                if (pos !== -1) {
-                  positions.push({ pos, marker: mk, type });
-                }
-              });
-            };
-            collectPositions(usageMarkers, 'usage');
-            collectPositions(instructionMarkers, 'instructions');
-            collectPositions(treatmentMarkers, 'treatment');
-            if (positions.length === 0) return;
-            // 按位置排序，從前到後
-            positions.sort((a, b) => a.pos - b.pos);
-            // 紀錄已處理的類型，避免同類型多次分割後覆蓋
-            const assigned = { usage: false, instructions: false, treatment: false };
-            for (let i = 0; i < positions.length; i++) {
-              const { pos, marker, type } = positions[i];
-              let start = pos + marker.length;
-              // 移除冒號等符號
-              const afterMarker = contentStr.substring(start).replace(/^[\s:：]+/, '');
-              start = pos + marker.length + (contentStr.substring(start).length - afterMarker.length);
-              let end = contentStr.length;
-              if (i + 1 < positions.length) {
-                end = positions[i + 1].pos;
-              }
-              if (!assigned[type]) {
-                const extracted = contentStr.substring(start, end).trim();
-                if (type === 'usage') usage = extracted;
-                if (type === 'instructions') instructions = extracted;
-                if (type === 'treatment') treatment = extracted;
-                assigned[type] = true;
-              }
+      // 定義解析器：解析文字以取得 usage、instructions、treatment
+      const parseSections = text => {
+        let usage = '';
+        let instructions = '';
+        let treatment = '';
+        if (!text || typeof text !== 'string') return { usage, instructions, treatment };
+        const contentStr = String(text);
+        // 定義各區塊標題的候選關鍵字
+        const usageMarkers = ['服藥方法', '服用方法', '服用方式', '用藥指導', '服藥指南', '服用指南', '中藥服用方法', '西藥服用方法'];
+        const instructionMarkers = ['注意事項', '注意事项', '注意要點', '注意要点', '注意事項及叮嚀', '醫囑', '医嘱', '注意'];
+        const treatmentMarkers = ['療程安排', '疗程安排', '療程', '疗程', '治療計劃', '治疗计划', '治療安排', '治疗安排'];
+        // 收集所有標題位置
+        let positions = [];
+        const collectPositions = (markers, type) => {
+          markers.forEach(mk => {
+            const pos = contentStr.indexOf(mk);
+            if (pos !== -1) {
+              positions.push({ pos, marker: mk, type });
             }
-          };
-
-          // 先解析模板內容 content
-          if (template.content && typeof template.content === 'string') {
-            parseSections(template.content);
-          }
-          // 再解析模板備註 note，以補充或覆寫缺少的欄位
-          if (template.note && typeof template.note === 'string' && template.note.trim()) {
-            // 暫存當前解析結果
-            const prevUsage = usage;
-            const prevInstructions = instructions;
-            const prevTreatment = treatment;
-            // 重置暫存值
-            usage = '';
-            instructions = '';
-            treatment = '';
-            parseSections(template.note);
-            // 如果 note 中解析出值，優先使用；若無則保留 content 的解析結果
-            if (!usage) usage = prevUsage;
-            if (!instructions) instructions = prevInstructions;
-            if (!treatment) treatment = prevTreatment;
-          }
-
-          // 如果使用上述標題解析仍沒有抓到內容，則嘗試以備註或內容作為整段使用說明/注意事項
-          if (!usage) {
-            if (template.note && typeof template.note === 'string' && template.note.trim()) {
-              usage = template.note.trim();
-            } else if (template.content && typeof template.content === 'string') {
-              usage = template.content.trim();
+          });
+        };
+        collectPositions(usageMarkers, 'usage');
+        collectPositions(instructionMarkers, 'instructions');
+        collectPositions(treatmentMarkers, 'treatment');
+        if (positions.length > 0) {
+          // 依位置排序
+          positions.sort((a, b) => a.pos - b.pos);
+          const assigned = { usage: false, instructions: false, treatment: false };
+          for (let i = 0; i < positions.length; i++) {
+            const { pos, marker, type } = positions[i];
+            let start = pos + marker.length;
+            // 去除冒號、全角冒號以及空白
+            const afterMarker = contentStr.substring(start).replace(/^[\s:：]+/, '');
+            start = pos + marker.length + (contentStr.substring(start).length - afterMarker.length);
+            let end = contentStr.length;
+            if (i + 1 < positions.length) {
+              end = positions[i + 1].pos;
+            }
+            if (!assigned[type]) {
+              const extracted = contentStr.substring(start, end).trim();
+              if (type === 'usage') usage = extracted;
+              if (type === 'instructions') instructions = extracted;
+              if (type === 'treatment') treatment = extracted;
+              assigned[type] = true;
             }
           }
-          // 如果注意事項依然為空，嘗試從備註取得
-          if (!instructions) {
-            if (template.note && typeof template.note === 'string' && template.note.trim()) {
-              // 若備註已被用作 usage，不重覆賦值
-              if (template.note.trim() !== usage) {
-                instructions = template.note.trim();
-              }
-            }
+        }
+        return { usage, instructions, treatment };
+      };
+      // 儲存最終解析結果
+      let usage = '';
+      let instructions = '';
+      let treatment = '';
+      // 先從 content 解析
+      if (template.content && typeof template.content === 'string') {
+        const parsed = parseSections(template.content);
+        usage = parsed.usage;
+        instructions = parsed.instructions;
+        treatment = parsed.treatment;
+      }
+      // 接著使用 note 覆寫或補充
+      if (template.note && typeof template.note === 'string' && template.note.trim()) {
+        const prev = { usage, instructions, treatment };
+        const parsedNote = parseSections(template.note);
+        // 若 note 解析有值則覆寫，否則保留原結果
+        usage = parsedNote.usage || prev.usage;
+        instructions = parsedNote.instructions || prev.instructions;
+        treatment = parsedNote.treatment || prev.treatment;
+      }
+      // 若仍為空，直接使用 note 或 content 作為 usage
+      if (!usage) {
+        if (template.note && typeof template.note === 'string' && template.note.trim()) {
+          usage = template.note.trim();
+        } else if (template.content && typeof template.content === 'string') {
+          usage = template.content.trim();
+        }
+      }
+      // 若 instructions 為空，且 note 不等於 usage，使用 note 作為 instructions
+      if (!instructions) {
+        if (template.note && typeof template.note === 'string' && template.note.trim()) {
+          if (template.note.trim() !== usage) {
+            instructions = template.note.trim();
           }
-          // 處理療程，若仍為空則使用 duration
-          if (!treatment) {
-            if (template.duration && typeof template.duration === 'string') {
-              treatment = template.duration;
-            }
-          }
-
-          // 將解析結果填入對應欄位
-          if (usageField) usageField.value = usage || '';
-          if (instructionsField) instructionsField.value = instructions || '';
-          if (treatmentField) treatmentField.value = treatment || '';
-      // 自動填入複診時間：先嘗試解析模板的 followUp 屬性，若未能解析成功，則從模板內容 (content) 與備註 (note) 中搜尋「回診／複診／复诊」等字樣，再依據解析結果計算實際日期。
+        }
+      }
+      // 若 treatment 為空，使用 duration
+      if (!treatment) {
+        if (template.duration && typeof template.duration === 'string') {
+          treatment = template.duration;
+        }
+      }
+      // 將值填入表單欄位
+      if (usageField) usageField.value = usage || '';
+      if (instructionsField) instructionsField.value = instructions || '';
+      if (treatmentField) treatmentField.value = treatment || '';
+      // 自動填入複診日期
       try {
         const followUpField = document.getElementById('formFollowUpDate');
         if (followUpField) {
           let days = 0;
-          // 1. 解析 template.followUp 欄位，如「3天」、「2週」、「1個月」
+          // 1. 解析 template.followUp
           if (template.followUp && typeof template.followUp === 'string') {
-            const dayMatch = template.followUp.match(/(\d+)\s*(?:天|日)/);
+            const fu = template.followUp;
+            // 支援「後」或無「後」字
+            const dayMatch = fu.match(/(\d+)\s*(?:個)?\s*(天|日)/);
             if (dayMatch) {
-              days = parseInt(dayMatch[1], 10);
+              const num = parseInt(dayMatch[1], 10);
+              if (!isNaN(num)) days = num;
             }
-            const weekMatch = template.followUp.match(/(\d+)\s*[週周]/);
-            if (!days && weekMatch) {
-              days = parseInt(weekMatch[1], 10) * 7;
+            if (!days) {
+              const weekMatch = fu.match(/(\d+)\s*(?:個)?\s*[週周]/);
+              if (weekMatch) {
+                const num = parseInt(weekMatch[1], 10);
+                if (!isNaN(num)) days = num * 7;
+              }
             }
-            const monthMatch = template.followUp.match(/(\d+)\s*個?月/);
-            if (!days && monthMatch) {
-              days = parseInt(monthMatch[1], 10) * 30;
+            if (!days) {
+              const monthMatch = fu.match(/(\d+)\s*(?:個)?\s*月/);
+              if (monthMatch) {
+                const num = parseInt(monthMatch[1], 10);
+                if (!isNaN(num)) days = num * 30;
+              }
             }
           }
-          // 2. 若 followUp 欄位未能解析出有效天數，從模板內容 content 全域搜索回診/複診字樣
-          if (!days && template.content && typeof template.content === 'string') {
-            const contentStr = template.content;
-            const reFU = /(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*(?:後)?\s*[回複復复][診诊]/g;
-            let matchesFU = [];
-            let mFU;
-            while ((mFU = reFU.exec(contentStr)) !== null) {
-              matchesFU.push(mFU);
+          // 2. 若未得出結果，從 content 搜尋回/複診
+          const searchFollowUp = (str) => {
+            if (!str || typeof str !== 'string') return 0;
+            const re = /(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*(?:後)?\s*[回複復复][診诊]/g;
+            let matches = [];
+            let m;
+            while ((m = re.exec(str)) !== null) {
+              matches.push(m);
             }
-            if (matchesFU.length > 0) {
-              const last = matchesFU[matchesFU.length - 1];
+            if (matches.length > 0) {
+              const last = matches[matches.length - 1];
               const num = parseInt(last[1], 10);
               const unit = last[2];
               if (!isNaN(num)) {
-                if (unit === '天' || unit === '日') {
-                  days = num;
-                } else if (unit === '週' || unit === '周') {
-                  days = num * 7;
-                } else if (unit === '月') {
-                  days = num * 30;
-                }
+                if (unit === '天' || unit === '日') return num;
+                if (unit === '週' || unit === '周') return num * 7;
+                if (unit === '月') return num * 30;
               }
+            }
+            return 0;
+          };
+          if (days <= 0 && template.content && typeof template.content === 'string') {
+            days = searchFollowUp(template.content);
+          }
+          if (days <= 0 && template.note && typeof template.note === 'string') {
+            days = searchFollowUp(template.note);
+          }
+          if (days > 0) {
+            // 取得基準日期：優先使用 formVisitTime，否則為當前時間
+            let baseDate = new Date();
+            const visitField = document.getElementById('formVisitTime');
+            if (visitField && visitField.value) {
+              const parsed = new Date(visitField.value);
+              if (!isNaN(parsed.getTime())) {
+                baseDate = parsed;
+              }
+            }
+            const followDate = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000);
+            const y = followDate.getFullYear();
+            const mStr = String(followDate.getMonth() + 1).padStart(2, '0');
+            const dStr = String(followDate.getDate()).padStart(2, '0');
+            const hStr = String(followDate.getHours()).padStart(2, '0');
+            const minStr = String(followDate.getMinutes()).padStart(2, '0');
+            followUpField.value = `${y}-${mStr}-${dStr}T${hStr}:${minStr}`;
+            try {
+              // 派發事件通知可能的監聽器
+              followUpField.dispatchEvent(new Event('change'));
+              followUpField.dispatchEvent(new Event('input'));
+            } catch (e) {
+              // ignore event dispatch errors
             }
           }
-          // 3. 若 content 中仍未找到，從備註 note 中搜尋
-          if (!days && template.note && typeof template.note === 'string') {
-            const noteStr = template.note;
-            const reFU = /(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*(?:後)?\s*[回複復复][診诊]/g;
-            let matchesFU = [];
-            let mFU;
-            while ((mFU = reFU.exec(noteStr)) !== null) {
-              matchesFU.push(mFU);
-            }
-            if (matchesFU.length > 0) {
-              const last = matchesFU[matchesFU.length - 1];
-              const num = parseInt(last[1], 10);
-              const unit = last[2];
-              if (!isNaN(num)) {
-                if (unit === '天' || unit === '日') {
-                  days = num;
-                } else if (unit === '週' || unit === '周') {
-                  days = num * 7;
-                } else if (unit === '月') {
-                  days = num * 30;
-                }
-              }
-            }
-          }
-          // 4. 如果找到了合理的天數，則依據到診時間或當前時間計算複診日期並填入
-              if (days > 0) {
-                let base = new Date();
-                const visitField = document.getElementById('formVisitTime');
-                if (visitField && visitField.value) {
-                  const parsed = new Date(visitField.value);
-                  if (!isNaN(parsed.getTime())) {
-                    base = parsed;
-                  }
-                }
-                // 根據天數計算複診日期，並保留時間部份與到診時間或當前時間一致
-                const followDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
-                const y = followDate.getFullYear();
-                const mStr = String(followDate.getMonth() + 1).padStart(2, '0');
-                const dStr = String(followDate.getDate()).padStart(2, '0');
-                const hStr = String(followDate.getHours()).padStart(2, '0');
-                const minStr = String(followDate.getMinutes()).padStart(2, '0');
-                followUpField.value = `${y}-${mStr}-${dStr}T${hStr}:${minStr}`;
-                // 觸發 change 事件以通知可能的監聽器
-                try {
-                  followUpField.dispatchEvent(new Event('change'));
-                  followUpField.dispatchEvent(new Event('input'));
-                } catch (everr) {
-                  // ignore
-                }
-              }
         }
-      } catch (_e) {
-        // 若解析複診時間發生錯誤，略過自動填寫
+      } catch (fuErr) {
+        // 若解析複診日期失敗則忽略，不提示使用者
+        console.warn('解析複診日期失敗：', fuErr);
       }
-
       hidePrescriptionTemplateModal();
       showToast('已載入醫囑模板', 'success');
     } catch (err) {
       console.error('選擇醫囑模板錯誤:', err);
+      showToast('載入醫囑模板失敗', 'error');
     }
   }
 
@@ -11983,19 +12014,34 @@ document.addEventListener('DOMContentLoaded', function() {
   async function openPrescriptionTemplate(ev) {
     let btn = null;
     try {
+      // 找到觸發按鈕
       if (ev && ev.currentTarget) btn = ev.currentTarget;
       if (!btn) {
+        // 後備搜尋頁面中的按鈕
         btn = document.querySelector('button[onclick*="openPrescriptionTemplate"]');
       }
       if (btn) {
         setButtonLoading(btn);
       }
+      // 若模板尚未載入，嘗試初始化模板庫
+      if (!Array.isArray(prescriptionTemplates) || prescriptionTemplates.length === 0) {
+        if (typeof initTemplateLibrary === 'function') {
+          try {
+            await initTemplateLibrary();
+          } catch (initErr) {
+            console.error('初始化模板庫失敗:', initErr);
+          }
+        }
+      }
+      // 小延遲讓使用者感受讀取反饋
       await new Promise(resolve => setTimeout(resolve, 200));
       if (typeof showPrescriptionTemplateModal === 'function') {
-        showPrescriptionTemplateModal();
+        // 使用 await 以確保如有異步操作完成後再繼續
+        await showPrescriptionTemplateModal();
       }
     } catch (err) {
       console.error('開啟醫囑模板按鈕錯誤:', err);
+      showToast('載入醫囑模板失敗', 'error');
     } finally {
       if (btn) {
         clearButtonLoading(btn);
