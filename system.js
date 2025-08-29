@@ -11796,21 +11796,74 @@ document.addEventListener('DOMContentLoaded', function() {
         if (instructionsField) instructionsField.value = '';
         if (treatmentField) treatmentField.value = template.duration || '';
       }
-      // 若模板定義了 followUp 屬性，嘗試解析並自動填入複診時間欄位。
+      // 自動填入複診時間
+      // 此功能會先嘗試解析模板的 followUp 屬性取得數字與單位（天、週、月），
+      // 若無法取得，則進一步從模板的內容 (content) 以及備註 (note) 字串中搜尋類似「3天後回診」或「2週複診」的字樣。
+      // 解析結果會依據到診時間或當前時間計算出具體的複診日期，並填入對應欄位。
       try {
         const followUpField = document.getElementById('formFollowUpDate');
-        // Always populate the follow-up date based on the template. If the template defines a followUp string,
-        // compute the date relative to the visit time or current time and override any existing value.
-        if (followUpField && template.followUp && typeof template.followUp === 'string') {
+        if (followUpField) {
           let days = 0;
-          const dayMatch = template.followUp.match(/(\d+)\s*天/);
-          if (dayMatch) {
-            days = parseInt(dayMatch[1], 10);
+          // 1. 先處理模板 followUp 屬性
+          if (template.followUp && typeof template.followUp === 'string') {
+            const dayMatch = template.followUp.match(/(\d+)\s*(?:天|日)/);
+            if (dayMatch) {
+              days = parseInt(dayMatch[1], 10);
+            }
+            const weekMatch = template.followUp.match(/(\d+)\s*[週周]/);
+            if (!days && weekMatch) {
+              days = parseInt(weekMatch[1], 10) * 7;
+            }
+            const monthMatch = template.followUp.match(/(\d+)\s*個?月/);
+            if (!days && monthMatch) {
+              days = parseInt(monthMatch[1], 10) * 30; // 以30天為一個月計算
+            }
           }
-          const weekMatch = template.followUp.match(/(\d+)\s*[週周]/);
-          if (!days && weekMatch) {
-            days = parseInt(weekMatch[1], 10) * 7;
+          // 2. 若 followUp 未指定或無法解析天數，嘗試從 content 中找尋「回診/複診/復診」字串
+          if (!days && template.content && typeof template.content === 'string') {
+            const contentStr = template.content;
+            // 嘗試匹配「3天後回診」、「2週後複診」、「1個月後復診」等寫法
+            let match = contentStr.match(/(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*[^\n]{0,10}?(?:回診|複診|復診)/);
+            if (!match) {
+              // 如果沒有包含「後」字樣，匹配類似「3天回診」
+              match = contentStr.match(/(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*(?:回診|複診|復診)/);
+            }
+            if (match) {
+              const num = parseInt(match[1], 10);
+              const unit = match[2];
+              if (!isNaN(num)) {
+                if (unit === '天' || unit === '日') {
+                  days = num;
+                } else if (unit === '週' || unit === '周') {
+                  days = num * 7;
+                } else if (unit === '月') {
+                  days = num * 30;
+                }
+              }
+            }
           }
+          // 3. 再從備註 note 中搜尋關鍵字
+          if (!days && template.note && typeof template.note === 'string') {
+            const noteStr = template.note;
+            let match = noteStr.match(/(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*[^\n]{0,10}?(?:回診|複診|復診)/);
+            if (!match) {
+              match = noteStr.match(/(\d+)\s*(?:個)?\s*(天|日|週|周|月)\s*(?:回診|複診|復診)/);
+            }
+            if (match) {
+              const num = parseInt(match[1], 10);
+              const unit = match[2];
+              if (!isNaN(num)) {
+                if (unit === '天' || unit === '日') {
+                  days = num;
+                } else if (unit === '週' || unit === '周') {
+                  days = num * 7;
+                } else if (unit === '月') {
+                  days = num * 30;
+                }
+              }
+            }
+          }
+          // 4. 若成功解析出天數，計算複診日期並填入
           if (days > 0) {
             // 以到診時間為基準，如果未填入到診時間則使用當前時間
             let base = new Date();
