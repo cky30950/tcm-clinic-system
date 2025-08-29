@@ -11741,61 +11741,92 @@ document.addEventListener('DOMContentLoaded', function() {
       const usageField = document.getElementById('formUsage');
       const treatmentField = document.getElementById('formTreatmentCourse');
       const instructionsField = document.getElementById('formInstructions');
-      if (template.content && typeof template.content === 'string') {
-        let usage = '';
-        let instructions = '';
-        let treatment = '';
-        const contentStr = template.content;
-        const usageIdx = contentStr.indexOf('服藥方法');
-        const noteIdx = contentStr.indexOf('注意事項');
-        const treatmentIdx = contentStr.indexOf('療程');
-        if (usageIdx !== -1) {
-          const afterUsage = contentStr.substring(usageIdx).replace(/服藥方法[:：]/, '');
-          if (noteIdx !== -1 && noteIdx > usageIdx) {
-            usage = afterUsage.substring(0, noteIdx - usageIdx).trim();
-          } else if (treatmentIdx !== -1 && treatmentIdx > usageIdx) {
-            usage = afterUsage.substring(0, treatmentIdx - usageIdx).trim();
-          } else {
-            usage = afterUsage.trim();
+          // 解析用藥內容、注意事項與療程。部份模板可能未使用固定標題（如「服藥方法」、「注意事項」、「療程」），
+          // 因此需要更具彈性地處理 content 與 note。首先優先解析 content 中的標題，再用 note 作為補充。
+          let usage = '';
+          let instructions = '';
+          let treatment = '';
+
+          const parseSections = text => {
+            if (!text || typeof text !== 'string') return;
+            const contentStr = String(text);
+            // 搜尋標題的起始位置，如果不存在則為 -1
+            const usageIdx = contentStr.indexOf('服藥方法');
+            const noteIdx = contentStr.indexOf('注意事項');
+            // 支援「療程安排」或單純「療程」
+            const treatmentIdx = contentStr.indexOf('療程');
+            // 解析用藥方法
+            if (usageIdx !== -1) {
+              const afterUsage = contentStr.substring(usageIdx).replace(/服藥方法[:：]/, '');
+              // 節錄到下一個標題為止
+              let endPos = contentStr.length;
+              if (noteIdx !== -1 && noteIdx > usageIdx) endPos = noteIdx;
+              else if (treatmentIdx !== -1 && treatmentIdx > usageIdx) endPos = treatmentIdx;
+              usage = afterUsage.substring(0, endPos - usageIdx).trim();
+            }
+            // 解析注意事項
+            if (noteIdx !== -1) {
+              const afterNote = contentStr.substring(noteIdx).replace(/注意事項[:：]/, '');
+              let endPos = contentStr.length;
+              if (treatmentIdx !== -1 && treatmentIdx > noteIdx) endPos = treatmentIdx;
+              instructions = afterNote.substring(0, endPos - noteIdx).trim();
+            }
+            // 解析療程安排
+            if (treatmentIdx !== -1) {
+              const afterTreatment = contentStr.substring(treatmentIdx).replace(/療程安排[:：]?/, '').replace(/療程[:：]?/, '');
+              treatment = afterTreatment.trim();
+            }
+          };
+
+          // 先解析模板內容 content
+          if (template.content && typeof template.content === 'string') {
+            parseSections(template.content);
           }
-        }
-        if (noteIdx !== -1) {
-          const afterNote = contentStr.substring(noteIdx).replace(/注意事項[:：]/, '');
-          if (treatmentIdx !== -1 && treatmentIdx > noteIdx) {
-            instructions = afterNote.substring(0, treatmentIdx - noteIdx).trim();
-          } else {
-            instructions = afterNote.trim();
-          }
-        }
-        if (treatmentIdx !== -1) {
-          const afterTreatment = contentStr.substring(treatmentIdx).replace(/療程安排[:：]?/, '').replace(/療程[:：]?/, '');
-          treatment = afterTreatment.trim();
-        }
-        // Always override the form fields with the values parsed from the template.
-        // If the template defines a note (中藥服用方法), use it as the usage; otherwise fall back to the parsed usage or the full content.
-        if (usageField) {
-          let finalUsage = usage;
+          // 再解析模板備註 note，以補充或覆寫缺少的欄位
           if (template.note && typeof template.note === 'string' && template.note.trim()) {
-            finalUsage = template.note.trim();
+            // 暫存當前解析結果
+            const prevUsage = usage;
+            const prevInstructions = instructions;
+            const prevTreatment = treatment;
+            // 重置暫存值
+            usage = '';
+            instructions = '';
+            treatment = '';
+            parseSections(template.note);
+            // 如果 note 中解析出值，優先使用；若無則保留 content 的解析結果
+            if (!usage) usage = prevUsage;
+            if (!instructions) instructions = prevInstructions;
+            if (!treatment) treatment = prevTreatment;
           }
-          usageField.value = finalUsage || template.content || '';
-        }
-        if (instructionsField) instructionsField.value = instructions || '';
-        if (treatmentField) treatmentField.value = treatment || template.duration || '';
-      } else {
-        // No structured content present; assign usage from note if available, otherwise use the raw content
-        if (usageField) {
-          let finalUsage = '';
-          if (template.note && typeof template.note === 'string' && template.note.trim()) {
-            finalUsage = template.note.trim();
-          } else if (typeof template.content === 'string') {
-            finalUsage = template.content;
+
+          // 如果使用上述標題解析仍沒有抓到內容，則嘗試以備註或內容作為整段使用說明/注意事項
+          if (!usage) {
+            if (template.note && typeof template.note === 'string' && template.note.trim()) {
+              usage = template.note.trim();
+            } else if (template.content && typeof template.content === 'string') {
+              usage = template.content.trim();
+            }
           }
-          usageField.value = finalUsage || '';
-        }
-        if (instructionsField) instructionsField.value = '';
-        if (treatmentField) treatmentField.value = template.duration || '';
-      }
+          // 如果注意事項依然為空，嘗試從備註取得
+          if (!instructions) {
+            if (template.note && typeof template.note === 'string' && template.note.trim()) {
+              // 若備註已被用作 usage，不重覆賦值
+              if (template.note.trim() !== usage) {
+                instructions = template.note.trim();
+              }
+            }
+          }
+          // 處理療程，若仍為空則使用 duration
+          if (!treatment) {
+            if (template.duration && typeof template.duration === 'string') {
+              treatment = template.duration;
+            }
+          }
+
+          // 將解析結果填入對應欄位
+          if (usageField) usageField.value = usage || '';
+          if (instructionsField) instructionsField.value = instructions || '';
+          if (treatmentField) treatmentField.value = treatment || '';
       // 自動填入複診時間：先嘗試解析模板的 followUp 屬性，若未能解析成功，則從模板內容 (content) 與備註 (note) 中搜尋「回診／複診／复诊」等字樣，再依據解析結果計算實際日期。
       try {
         const followUpField = document.getElementById('formFollowUpDate');
