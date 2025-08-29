@@ -542,7 +542,6 @@ function playNotificationSound() {
                 // 將 Firestore 文件的 ID 一併存入本地模板陣列。
                 // 若僅取用 data()，將導致缺乏 id 欄位，後續無法辨識並套用模板。
                 presSnapshot.forEach(docSnap => {
-                    // 包含 docSnap.id 作為模板的 id 屬性
                     presFromFirestore.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 if (presFromFirestore.length > 0) {
@@ -554,7 +553,7 @@ function playNotificationSound() {
                     window.firebase.collection(window.firebase.db, 'diagnosisTemplates')
                 );
                 const diagFromFirestore = [];
-                // 同理，將診斷模板的 Firestore 文件 ID 存入本地資料，供選擇模板時使用
+                // 同理，將診斷模板的 Firestore 文件 ID 存入本地資料，供選擇模板時使用。
                 diagSnapshot.forEach(docSnap => {
                     diagFromFirestore.push({ id: docSnap.id, ...docSnap.data() });
                 });
@@ -12689,7 +12688,7 @@ function refreshTemplateCategoryFilters() {
               div.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
               const catSpan = item.category ? `<span class="ml-2 text-sm text-gray-500">(${item.category})</span>` : '';
               div.innerHTML = `<div class="font-semibold text-gray-800">${item.name}${catSpan}</div>`;
-              // 若模板沒有 id，傳遞索引值以便於後續查找
+              // 若模板沒有 id，改以索引值作為參數，以便於後續查找
               div.onclick = function() {
                 const idToUse = (item.id !== undefined && item.id !== null) ? item.id : index;
                 selectDiagnosisTemplate(idToUse);
@@ -12720,18 +12719,17 @@ function refreshTemplateCategoryFilters() {
       function selectDiagnosisTemplate(id) {
         try {
           let template = null;
-          // 先根據 id 屬性查找模板。部分情況下從 Firestore 讀取的模板可能沒有 id，或 id 為 undefined。
+          // 先根據 id 屬性查找模板，部分模板可能缺少 id 屬性。
           if (id !== undefined && id !== null) {
             template = diagnosisTemplates.find(t => String(t.id) === String(id));
           }
-          // 若找不到，且傳入的 id 可解析為數字，則視為索引處理
+          // 若找不到，且傳入值可解析為數字，則視為索引尋找
           if (!template) {
             const idx = parseInt(id, 10);
             if (!isNaN(idx) && idx >= 0 && idx < diagnosisTemplates.length) {
               template = diagnosisTemplates[idx];
             }
           }
-          // 若仍未找到，則不處理
           if (!template) return;
           hideDiagnosisTemplateModal();
           // 對應模板欄位與表單欄位
@@ -12787,6 +12785,7 @@ function refreshTemplateCategoryFilters() {
               div.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
               const catSpan = item.category ? `<span class="ml-2 text-sm text-gray-500">(${item.category})</span>` : '';
               div.innerHTML = `<div class="font-semibold text-gray-800">${item.name}${catSpan}</div>`;
+              // 若模板沒有 id 屬性，則傳遞索引值以便後續查找
               div.onclick = function() {
                 const idToUse = (item.id !== undefined && item.id !== null) ? item.id : index;
                 selectPrescriptionTemplate(idToUse);
@@ -12820,7 +12819,7 @@ function refreshTemplateCategoryFilters() {
           if (id !== undefined && id !== null) {
             template = prescriptionTemplates.find(t => String(t.id) === String(id));
           }
-          // 若找不到，且 id 為數字或可解析為數字，則視為索引處理
+          // 若找不到，且 id 可解析為數字，則視為索引處理
           if (!template) {
             const idx = parseInt(id, 10);
             if (!isNaN(idx) && idx >= 0 && idx < prescriptionTemplates.length) {
