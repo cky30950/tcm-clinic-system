@@ -11940,8 +11940,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     .replace(/\bthis\b/g, '__THIS__');
                 let args;
                 try {
+                    /*
+                     * 直接 eval 包含 __EVENT__/__THIS__ 標記的字串會導致 ReferenceError，
+                     * 因為這些標記並非實際定義的變數。為了避免此問題，先將這些標記
+                     * 轉換成帶引號的字串，讓 eval 得到的是字串占位符陣列，再於後續
+                     * 將其映射回正確的 event 或元素物件。這樣能避免在開發階段於控制台
+                     * 輸出 "__EVENT__ is not defined" 的錯誤訊息。
+                     */
+                    const replacedForEval = replaced
+                        .replace(/__EVENT__/g, '"__EVENT__"')
+                        .replace(/__THIS__/g, '"__THIS__"');
                     // 以陣列字面量包覆，使用 eval 將字串解析為實際值
-                    args = eval(`[${replaced}]`);
+                    args = eval(`[${replacedForEval}]`);
                 } catch (e) {
                     console.error('解析 inline 事件參數失敗:', argsStr, e);
                     args = [];
