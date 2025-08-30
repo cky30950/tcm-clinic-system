@@ -1287,13 +1287,19 @@ async function loadPatientListFromFirebase() {
         filteredPatients.forEach(patient => {
             const row = document.createElement('tr');
             row.className = 'hover:bg-gray-50';
-                // 建立病人資料列表行，新增「查看病歷」按鈕觸發病歷查看彈窗
-                row.innerHTML = `
-                <td class="px-4 py-3 text-sm text-blue-600 font-medium">${patient.patientNumber || '未設定'}</td>
-                <td class="px-4 py-3 text-sm text-gray-900 font-medium">${patient.name}</td>
-                <td class="px-4 py-3 text-sm text-gray-900">${formatAge(patient.birthDate)}</td>
-                <td class="px-4 py-3 text-sm text-gray-900">${patient.gender}</td>
-                <td class="px-4 py-3 text-sm text-gray-900">${patient.phone}</td>
+            // 轉義顯示的值，避免 XSS
+            const safeNumber = window.escapeHtml(patient.patientNumber || '未設定');
+            const safeName = window.escapeHtml(patient.name);
+            const safeAge = window.escapeHtml(formatAge(patient.birthDate));
+            const safeGender = window.escapeHtml(patient.gender);
+            const safePhone = window.escapeHtml(patient.phone);
+            // 建立病人資料列表行，新增「查看病歷」按鈕觸發病歷查看彈窗
+            row.innerHTML = `
+                <td class="px-4 py-3 text-sm text-blue-600 font-medium">${safeNumber}</td>
+                <td class="px-4 py-3 text-sm text-gray-900 font-medium">${safeName}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${safeAge}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${safeGender}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${safePhone}</td>
                 <td class="px-4 py-3 text-sm space-x-2">
                     <button onclick="viewPatient('${patient.id}')" class="text-blue-600 hover:text-blue-800">查看</button>
                     <!-- 新增查看病歷功能 -->
@@ -1421,7 +1427,7 @@ async function viewPatient(id) {
         }
 
         // 顯示病人詳細資料
-        const content = `
+        let content = `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-4">
                     <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">基本資料</h4>
@@ -1463,6 +1469,48 @@ async function viewPatient(id) {
             </div>
         `;
 
+        // 為避免 XSS，建立替換後的 content
+        {
+            const safePatientNumber = window.escapeHtml(patient.patientNumber || '未設定');
+            const safeName = window.escapeHtml(patient.name);
+            const safeAge = window.escapeHtml(formatAge(patient.birthDate));
+            const safeGender = window.escapeHtml(patient.gender);
+            const safePhone = window.escapeHtml(patient.phone);
+            const safeIdCard = patient.idCard ? window.escapeHtml(patient.idCard) : null;
+            const safeAddress = patient.address ? window.escapeHtml(patient.address) : null;
+            const safeHistory = patient.history ? window.escapeHtml(patient.history) : null;
+            const safeAllergies = patient.allergies ? window.escapeHtml(patient.allergies) : null;
+            const birthDateString = patient.birthDate ? new Date(patient.birthDate).toLocaleDateString('zh-TW') : '';
+            const createdAtStr = patient.createdAt ? new Date(patient.createdAt.seconds * 1000).toLocaleDateString('zh-TW') : '未知';
+            const updatedAtStr = patient.updatedAt ? new Date(patient.updatedAt.seconds * 1000).toLocaleDateString('zh-TW') : '';
+            content = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-4">
+                    <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">基本資料</h4>
+                    <div class="space-y-2">
+                        <div><span class="font-medium">病人編號：</span><span class="text-blue-600 font-semibold">${safePatientNumber}</span></div>
+                        <div><span class="font-medium">姓名：</span>${safeName}</div>
+                        <div><span class="font-medium">年齡：</span>${safeAge}</div>
+                        <div><span class="font-medium">性別：</span>${safeGender}</div>
+                        <div><span class="font-medium">電話：</span>${safePhone}</div>
+                        ${safeIdCard ? `<div><span class="font-medium">身分證：</span>${safeIdCard}</div>` : ''}
+                        ${birthDateString ? `<div><span class="font-medium">出生日期：</span>${birthDateString}</div>` : ''}
+                        ${safeAddress ? `<div><span class="font-medium">地址：</span>${safeAddress}</div>` : ''}
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">醫療資訊</h4>
+                    <div class="space-y-2">
+                        ${safeHistory ? `<div><span class="font-medium">病史及備註：</span><div class="mt-1 p-2 bg-gray-50 rounded text-sm medical-field">${safeHistory}</div></div>` : ''}
+                        ${safeAllergies ? `<div><span class="font-medium">過敏史：</span><div class="mt-1 p-2 bg-red-50 rounded text-sm medical-field">${safeAllergies}</div></div>` : ''}
+                        <div><span class="font-medium">建檔日期：</span>${createdAtStr}</div>
+                        ${updatedAtStr ? `<div><span class="font-medium">更新日期：</span>${updatedAtStr}</div>` : ''}
+                    </div>
+                </div>
+            </div>
+            `;
+        }
         // 先將內容插入並顯示模態框
         const detailContainer = document.getElementById('patientDetailContent');
         if (detailContainer) {
@@ -1961,16 +2009,24 @@ async function searchPatientsForRegistration() {
             return;
         }
         
-        // 顯示搜索結果
-        resultsList.innerHTML = matchedPatients.map(patient => `
-            <div class="p-4 hover:bg-gray-50 cursor-pointer transition duration-200" onclick="selectPatientForRegistration('${patient.id}')">
+        // 顯示搜索結果，使用 escapeHtml 轉義顯示內容
+        resultsList.innerHTML = matchedPatients.map(patient => {
+            const safeId = String(patient.id).replace(/"/g, '&quot;');
+            const safeName = window.escapeHtml(patient.name);
+            const safeNumber = window.escapeHtml(patient.patientNumber || '');
+            const safeAge = window.escapeHtml(formatAge(patient.birthDate));
+            const safeGender = window.escapeHtml(patient.gender);
+            const safePhone = window.escapeHtml(patient.phone);
+            return `
+            <div class="p-4 hover:bg-gray-50 cursor-pointer transition duration-200" onclick="selectPatientForRegistration('${safeId}')">
                 <div>
-                    <div class="font-semibold text-gray-900">${patient.name}</div>
-                    <div class="text-sm text-gray-600">編號：${patient.patientNumber} | 年齡：${formatAge(patient.birthDate)} | 性別：${patient.gender}</div>
-                    <div class="text-sm text-gray-500">電話：${patient.phone}</div>
+                    <div class="font-semibold text-gray-900">${safeName}</div>
+                    <div class="text-sm text-gray-600">編號：${safeNumber} | 年齡：${safeAge} | 性別：${safeGender}</div>
+                    <div class="text-sm text-gray-500">電話：${safePhone}</div>
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
         
         resultsContainer.classList.remove('hidden');
         
@@ -2049,13 +2105,18 @@ async function selectPatientForRegistration(patientId) {
         function showRegistrationModal(patient) {
             if (!patient) return;
             
-            // 顯示選中的病人資訊
+            // 顯示選中的病人資訊，對文字進行轉義避免 XSS
+            const safeName = window.escapeHtml(patient.name);
+            const safeNumber = window.escapeHtml(patient.patientNumber || '');
+            const safeAge = window.escapeHtml(formatAge(patient.birthDate));
+            const safeGender = window.escapeHtml(patient.gender);
+            const safePhone = window.escapeHtml(patient.phone);
             document.getElementById('selectedPatientInfo').innerHTML = `
                 <div class="space-y-1">
-                    <div><span class="font-medium">姓名：</span>${patient.name}</div>
-                    <div><span class="font-medium">編號：</span>${patient.patientNumber}</div>
-                    <div><span class="font-medium">年齡：</span>${formatAge(patient.birthDate)} | <span class="font-medium">性別：</span>${patient.gender}</div>
-                    <div><span class="font-medium">電話：</span>${patient.phone}</div>
+                    <div><span class="font-medium">姓名：</span>${safeName}</div>
+                    <div><span class="font-medium">編號：</span>${safeNumber}</div>
+                    <div><span class="font-medium">年齡：</span>${safeAge} | <span class="font-medium">性別：</span>${safeGender}</div>
+                    <div><span class="font-medium">電話：</span>${safePhone}</div>
                 </div>
             `;
             
@@ -4078,38 +4139,38 @@ async function viewPatientMedicalHistory(patientId) {
         // 預設顯示最新的病歷（最近一次診症在最右）
         currentConsultationHistoryPage = currentConsultationConsultations.length - 1;
         
-        // 設置標題
-        document.getElementById('medicalHistoryTitle').textContent = `${patient.name} 的診症記錄`;
+        // 設置標題（轉義使用者輸入，避免 XSS）
+        document.getElementById('medicalHistoryTitle').textContent = `${window.escapeHtml(patient.name)} 的診症記錄`;
         
         // 顯示病人基本資訊
         document.getElementById('medicalHistoryPatientInfo').innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                 <div>
                     <span class="font-medium text-gray-700">病人編號：</span>
-                    <span class="text-blue-600 font-semibold">${patient.patientNumber}</span>
+            <span class="text-blue-600 font-semibold">${window.escapeHtml(patient.patientNumber)}</span>
                 </div>
                 <div>
                     <span class="font-medium text-gray-700">姓名：</span>
-                    <span class="font-semibold">${patient.name}</span>
+            <span class="font-semibold">${window.escapeHtml(patient.name)}</span>
                 </div>
                 <div>
                     <span class="font-medium text-gray-700">年齡：</span>
-                    <span>${formatAge(patient.birthDate)}</span>
+            <span>${window.escapeHtml(formatAge(patient.birthDate))}</span>
                 </div>
                 <div>
                     <span class="font-medium text-gray-700">性別：</span>
-                    <span>${patient.gender}</span>
+            <span>${window.escapeHtml(patient.gender)}</span>
                 </div>
                 ${patient.history ? `
                 <div class="md:col-span-1 lg:col-span-2">
                     <span class="font-medium text-gray-700">病史及備註：</span>
-                    <span class="medical-field text-gray-700">${patient.history}</span>
+                    <span class="medical-field text-gray-700">${window.escapeHtml(patient.history)}</span>
                 </div>
                 ` : ''}
                 ${patient.allergies ? `
                 <div class="md:col-span-1 lg:col-span-2">
                     <span class="font-medium text-red-600">過敏史：</span>
-                    <span class="medical-field text-red-700 bg-red-50 px-2 py-1 rounded">${patient.allergies}</span>
+                    <span class="medical-field text-red-700 bg-red-50 px-2 py-1 rounded">${window.escapeHtml(patient.allergies)}</span>
                 </div>
                 ` : ''}
             </div>
@@ -7065,12 +7126,18 @@ async function initializeSystemAfterLogin() {
         }
         
         function createHerbCard(herb) {
+            // 為避免 XSS，對文字內容進行轉義
+            const safeName = window.escapeHtml(herb.name);
+            const safeAlias = herb.alias ? window.escapeHtml(herb.alias) : null;
+            const safeEffects = herb.effects ? window.escapeHtml(herb.effects) : null;
+            const safeDosage = herb.dosage ? window.escapeHtml(String(herb.dosage)) : null;
+            const safeCautions = herb.cautions ? window.escapeHtml(herb.cautions) : null;
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
                         <div>
-                            <h4 class="text-lg font-semibold text-gray-900">${herb.name}</h4>
-                            ${herb.alias ? `<p class="text-sm text-gray-600">${herb.alias}</p>` : ''}
+                            <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
+                            ${safeAlias ? `<p class="text-sm text-gray-600">${safeAlias}</p>` : ''}
                         </div>
                         <div class="flex space-x-1">
                             <button onclick="editHerb(${herb.id})" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
@@ -7080,21 +7147,27 @@ async function initializeSystemAfterLogin() {
                     
                     <div class="space-y-2 text-sm">
                         <!-- 移除性味與歸經顯示 -->
-                        ${herb.effects ? `<div><span class="font-medium text-gray-700">功效：</span>${herb.effects}</div>` : ''}
-                        ${herb.dosage ? `<div><span class="font-medium text-gray-700">劑量：</span><span class="text-blue-600 font-medium">${herb.dosage}</span></div>` : ''}
-                        ${herb.cautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${herb.cautions}</span></div>` : ''}
+                        ${safeEffects ? `<div><span class="font-medium text-gray-700">功效：</span>${safeEffects}</div>` : ''}
+                        ${safeDosage ? `<div><span class="font-medium text-gray-700">劑量：</span><span class="text-blue-600 font-medium">${safeDosage}</span></div>` : ''}
+                        ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
                 </div>
             `;
         }
         
         function createFormulaCard(formula) {
+            // 為避免 XSS，對文字內容進行轉義
+            const safeName = window.escapeHtml(formula.name);
+            const safeSource = formula.source ? window.escapeHtml(formula.source) : null;
+            const safeEffects = formula.effects ? window.escapeHtml(formula.effects) : null;
+            const safeComposition = formula.composition ? window.escapeHtml(formula.composition).replace(/\n/g, '<br>') : null;
+            const safeCautions = formula.cautions ? window.escapeHtml(formula.cautions) : null;
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
                         <div>
-                            <h4 class="text-lg font-semibold text-gray-900">${formula.name}</h4>
-                            ${formula.source ? `<p class="text-sm text-gray-600">出處：${formula.source}</p>` : ''}
+                            <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
+                            ${safeSource ? `<p class="text-sm text-gray-600">出處：${safeSource}</p>` : ''}
                         </div>
                         <div class="flex space-x-1">
                             <button onclick="editFormula(${formula.id})" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
@@ -7103,16 +7176,16 @@ async function initializeSystemAfterLogin() {
                     </div>
                     
                     <div class="space-y-3 text-sm">
-                        ${formula.effects ? `<div><span class="font-medium text-gray-700">功效：</span>${formula.effects}</div>` : ''}
+                        ${safeEffects ? `<div><span class="font-medium text-gray-700">功效：</span>${safeEffects}</div>` : ''}
                         <!-- 移除主治顯示 -->
-                        ${formula.composition ? `
+                        ${safeComposition ? `
                             <div>
                                 <span class="font-medium text-gray-700">組成：</span>
-                                <div class="mt-1 p-2 bg-yellow-50 rounded text-xs whitespace-pre-line border-l-2 border-yellow-400">${formula.composition}</div>
+                                <div class="mt-1 p-2 bg-yellow-50 rounded text-xs whitespace-pre-line border-l-2 border-yellow-400">${safeComposition}</div>
                             </div>
                         ` : ''}
                         <!-- 移除用法顯示 -->
-                        ${formula.cautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${formula.cautions}</span></div>` : ''}
+                        ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
                 </div>
             `;
@@ -7435,14 +7508,18 @@ async function initializeSystemAfterLogin() {
                 }
             }
             
+            // 為避免 XSS，對文字內容進行轉義
+            const safeName = window.escapeHtml(item.name);
+            const safeUnit = item.unit ? window.escapeHtml(item.unit) : null;
+            const safeDescription = item.description ? window.escapeHtml(item.description) : null;
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 ${!item.active ? 'opacity-75' : ''}">
                     <div class="flex justify-between items-start mb-3">
                         <div class="flex-1">
-                            <h4 class="text-lg font-semibold text-gray-900">${item.name}</h4>
+                            <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
                             <div class="flex items-center mt-1">
-                                <span class="text-2xl font-bold text-green-600">$${Math.abs(item.price)}</span>
-                                ${item.unit ? `<span class="text-sm text-gray-500 ml-1">/ ${item.unit}</span>` : ''}
+                                <span class="text-2xl font-bold ${priceColor}">${pricePrefix}${displayPrice}</span>
+                                ${safeUnit ? `<span class="text-sm text-gray-500 ml-1">/ ${safeUnit}</span>` : ''}
                             </div>
                         </div>
                         <div class="flex flex-col items-end space-y-2">
@@ -7456,9 +7533,9 @@ async function initializeSystemAfterLogin() {
                         </div>
                     </div>
                     
-                    ${item.description ? `
+                    ${safeDescription ? `
                         <div class="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                            ${item.description}
+                            ${safeDescription}
                         </div>
                     ` : ''}
                 </div>
@@ -9249,43 +9326,44 @@ function displayUsers() {
                 lastLogin = new Date(user.lastLogin).toLocaleString('zh-TW');
             }
         }
-        
-        const row = document.createElement('tr');
-        row.className = 'hover:bg-gray-50';
-        // 根據是否為主管理員決定操作按鈕顯示
+        // 對動態資料進行轉義
+        const safeId = window.escapeHtml(String(user.id));
+        const safeName = window.escapeHtml(user.name);
+        const safePosition = window.escapeHtml(user.position || '未設定');
+        const safeRegNumber = user.position === '醫師' ? window.escapeHtml(user.registrationNumber || '未設定') : '-';
+        const safeEmail = window.escapeHtml(user.email || '未設定');
+        const safeLastLogin = window.escapeHtml(lastLogin);
         let actionsHtml;
-        // 定義主管理員電子郵件
         const superAdminEmail = 'admin@clinic.com';
-        // 如果是主管理員（根據電子郵件），禁止編輯、刪除或停用
         if (user.email && user.email.toLowerCase() === superAdminEmail) {
             actionsHtml = `<span class="text-gray-400 text-xs">主管理員不可修改</span>`;
         } else if (user.id === currentUserData.id) {
-            // 如果是當前登入用戶，顯示編輯按鈕並標示當前用戶
             actionsHtml = `
-                        <button onclick="editUser('${user.id}')" class="text-blue-600 hover:text-blue-800">編輯</button>
+                        <button onclick="editUser('${safeId}')" class="text-blue-600 hover:text-blue-800">編輯</button>
                         <span class="text-gray-400 text-xs ml-1">當前用戶</span>
                     `;
         } else {
-            // 其他用戶顯示所有控制按鈕
             actionsHtml = `
-                        <button onclick="editUser('${user.id}')" class="text-blue-600 hover:text-blue-800">編輯</button>
-                        <button onclick="toggleUserStatus('${user.id}')" class="text-orange-600 hover:text-orange-800">
+                        <button onclick="editUser('${safeId}')" class="text-blue-600 hover:text-blue-800">編輯</button>
+                        <button onclick="toggleUserStatus('${safeId}')" class="text-orange-600 hover:text-orange-800">
                             ${user.active ? '停用' : '啟用'}
                         </button>
-                        <button onclick="deleteUser('${user.id}')" class="text-red-600 hover:text-red-800">刪除</button>
+                        <button onclick="deleteUser('${safeId}')" class="text-red-600 hover:text-red-800">刪除</button>
                     `;
         }
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50';
         row.innerHTML = `
-            <td class="px-4 py-3 text-sm text-gray-900">${user.name}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${user.position || '未設定'}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${user.position === '醫師' ? (user.registrationNumber || '未設定') : '-'}</td>
-            <td class="px-4 py-3 text-sm text-gray-900">${user.email || '未設定'}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${safeName}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${safePosition}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${safeRegNumber}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${safeEmail}</td>
             <td class="px-4 py-3">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">
                     ${statusText}
                 </span>
             </td>
-            <td class="px-4 py-3 text-sm text-gray-600">${lastLogin}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${safeLastLogin}</td>
             <td class="px-4 py-3 text-sm space-x-2">${actionsHtml}</td>
         `;
         tbody.appendChild(row);
@@ -11856,6 +11934,219 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+
+        /**
+         * 一次性移除頁面上所有內嵌的 onclick/onchange 事件處理器，改以透過
+         * addEventListener 綁定。這樣可避免 HTML 中的 inline 事件污染
+         * 全域命名空間，也方便後續維護與重構。此邏輯將在頁面載入時
+         * 掃描帶有 onclick 或 onchange 屬性的元素，解析其中的函式名稱
+         * 與參數，並以事件委派的方式在相同元素上綁定對應的事件處理
+         * 函式。原始的 onclick/onchange 屬性會被移除，避免重複執行。
+         */
+        (function initInlineEventHandlers() {
+            /**
+             * 將字串形式的參數列表轉換為實際的引數陣列。
+             * 此函式會特別處理字面值 'event' 與 'this'：
+             *   - 'event' 會替換為觸發事件的物件
+             *   - 'this'  會替換為綁定的 DOM 元素
+             * 其餘字串會直接以 JavaScript 字面量解析（例如數字或帶引號的字串）。
+             * @param {string} argsStr 原始參數字串，例如 "-1, 'herbs'"
+             * @param {Event} event 事件對象
+             * @param {HTMLElement} el 觸發事件的元素
+             * @returns {Array} 解析後的引數陣列
+             */
+            function parseArgs(argsStr, event, el) {
+                const trimmed = argsStr.trim();
+                if (!trimmed) {
+                    return [];
+                }
+                // 先替換 'event' 與 'this' 為特殊標記，避免 eval 時當作變數解析
+                const replaced = trimmed
+                    .replace(/\bevent\b/g, '__EVENT__')
+                    .replace(/\bthis\b/g, '__THIS__');
+                let args;
+                try {
+                    // 以陣列字面量包覆，使用 eval 將字串解析為實際值
+                    args = eval(`[${replaced}]`);
+                } catch (e) {
+                    console.error('解析 inline 事件參數失敗:', argsStr, e);
+                    args = [];
+                }
+                // 將特殊標記替換為實際的 event 或 element
+                return args.map(function (arg) {
+                    if (arg === '__EVENT__') return event;
+                    if (arg === '__THIS__') return el;
+                    return arg;
+                });
+            }
+
+            /**
+             * 綁定指定屬性的 inline 事件處理器。此函式會從元素上讀取
+             * 事件屬性（例如 onclick 或 onchange）的內容並解析出函式
+             * 名稱與參數，再透過 addEventListener 重新綁定事件。
+             * @param {string} attrName 屬性名稱，例如 'onclick' 或 'onchange'
+             * @param {string} eventName 對應的事件名稱，例如 'click' 或 'change'
+             */
+            function bindInlineHandlers(attrName, eventName) {
+                const selector = '[' + attrName + ']';
+                document.querySelectorAll(selector).forEach(function (el) {
+                    const handlerCode = el.getAttribute(attrName);
+                    if (!handlerCode) return;
+                    // 移除 inline 屬性，避免瀏覽器原生執行
+                    el.removeAttribute(attrName);
+                    el.addEventListener(eventName, function (event) {
+                        try {
+                            // 匹配類似 "functionName(arg1, arg2)" 的字串
+                            const match = handlerCode.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
+                            if (!match) {
+                                return;
+                            }
+                            const fnName = match[1].trim();
+                            const argsStr = match[2];
+                            // 解析參數
+                            const args = parseArgs(argsStr, event, el);
+                            // 若函式名稱包含 "."，代表可能為某物件的屬性或方法
+                            if (fnName.indexOf('.') >= 0) {
+                                const parts = fnName.split('.');
+                                // 若第一段是 'this'，則從元素本身取用
+                                let target;
+                                if (parts[0] === 'this') {
+                                    target = el;
+                                    parts.shift();
+                                } else {
+                                    // 其餘根據 window 尋找
+                                    target = window[parts.shift()];
+                                }
+                                let prop;
+                                while (parts.length > 1 && target) {
+                                    prop = parts.shift();
+                                    target = target[prop];
+                                }
+                                const methodName = parts.shift();
+                                if (target && typeof target[methodName] === 'function') {
+                                    target[methodName].apply(target, args);
+                                }
+                            } else {
+                                // 從全域 window 取用函式
+                                const fn = window[fnName];
+                                if (typeof fn === 'function') {
+                                    fn.apply(el, args);
+                                }
+                            }
+                        } catch (err) {
+                            console.error('執行 inline 事件處理器時發生錯誤:', handlerCode, err);
+                        }
+                    });
+                });
+            }
+
+            // 綁定所有現有的 onclick 與 onchange 事件
+            bindInlineHandlers('onclick', 'click');
+            bindInlineHandlers('onchange', 'change');
+
+            /**
+             * 監聽 DOM 變更，動態綁定後續新增的元素上的 inline 事件。
+             * 有些按鈕會在執行期間動態插入（例如搜尋結果列表），若不在此
+             * 監聽，將會導致內嵌事件仍然存在。透過 MutationObserver 監
+             * 看新增的節點，並對其及其子孫節點執行相同的綁定邏輯。
+             */
+            const observer = new MutationObserver(function (mutationsList) {
+                mutationsList.forEach(function (mutation) {
+                    mutation.addedNodes.forEach(function (node) {
+                        if (node.nodeType !== 1) return;
+                        // 對新增節點及其子孫節點處理
+                        [node, ...node.querySelectorAll('[onclick], [onchange]')].forEach(function (el) {
+                            if (el.hasAttribute && el.hasAttribute('onclick')) {
+                                const code = el.getAttribute('onclick');
+                                el.removeAttribute('onclick');
+                                // 若已有事件監聽，避免重複綁定（透過 dataset 標記）
+                                if (!el.dataset.inlineClickBound) {
+                                    el.dataset.inlineClickBound = 'true';
+                                    el.addEventListener('click', function (event) {
+                                        try {
+                                            const match = code.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
+                                            if (!match) return;
+                                            const fnName = match[1].trim();
+                                            const argsStr = match[2];
+                                            const args = parseArgs(argsStr, event, el);
+                                            if (fnName.indexOf('.') >= 0) {
+                                                const parts = fnName.split('.');
+                                                let target;
+                                                if (parts[0] === 'this') {
+                                                    target = el;
+                                                    parts.shift();
+                                                } else {
+                                                    target = window[parts.shift()];
+                                                }
+                                                let prop;
+                                                while (parts.length > 1 && target) {
+                                                    prop = parts.shift();
+                                                    target = target[prop];
+                                                }
+                                                const methodName = parts.shift();
+                                                if (target && typeof target[methodName] === 'function') {
+                                                    target[methodName].apply(target, args);
+                                                }
+                                            } else {
+                                                const fn = window[fnName];
+                                                if (typeof fn === 'function') {
+                                                    fn.apply(el, args);
+                                                }
+                                            }
+                                        } catch (err) {
+                                            console.error('執行動態 inline 事件處理器錯誤:', code, err);
+                                        }
+                                    });
+                                }
+                            }
+                            if (el.hasAttribute && el.hasAttribute('onchange')) {
+                                const code = el.getAttribute('onchange');
+                                el.removeAttribute('onchange');
+                                if (!el.dataset.inlineChangeBound) {
+                                    el.dataset.inlineChangeBound = 'true';
+                                    el.addEventListener('change', function (event) {
+                                        try {
+                                            const match = code.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
+                                            if (!match) return;
+                                            const fnName = match[1].trim();
+                                            const argsStr = match[2];
+                                            const args = parseArgs(argsStr, event, el);
+                                            if (fnName.indexOf('.') >= 0) {
+                                                const parts = fnName.split('.');
+                                                let target;
+                                                if (parts[0] === 'this') {
+                                                    target = el;
+                                                    parts.shift();
+                                                } else {
+                                                    target = window[parts.shift()];
+                                                }
+                                                let prop;
+                                                while (parts.length > 1 && target) {
+                                                    prop = parts.shift();
+                                                    target = target[prop];
+                                                }
+                                                const methodName = parts.shift();
+                                                if (target && typeof target[methodName] === 'function') {
+                                                    target[methodName].apply(target, args);
+                                                }
+                                            } else {
+                                                const fn = window[fnName];
+                                                if (typeof fn === 'function') {
+                                                    fn.apply(el, args);
+                                                }
+                                            }
+                                        } catch (err) {
+                                            console.error('執行動態 inline 事件處理器錯誤:', code, err);
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    });
+                });
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        })();
     } catch (e) {
         console.error('綁定登入與側邊欄事件時發生錯誤:', e);
     }
@@ -11878,6 +12169,23 @@ document.addEventListener('DOMContentLoaded', function() {
   window.exportClinicBackup = exportClinicBackup;
   window.triggerBackupImport = triggerBackupImport;
   window.handleBackupFile = handleBackupFile;
+
+  /**
+   * 安全地轉義使用者提供的字串，用於避免 XSS 攻擊。
+   * 將特殊字元替換為 HTML 實體，確保不會被當成 HTML 插入。
+   * @param {any} str 可能包含 HTML 的字串或其他型別
+   * @returns {string} 轉義後的字串
+   */
+  window.escapeHtml = function(str) {
+    // 對於 null 或 undefined 直接轉為空字串
+    const s = String(str == null ? '' : str);
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
   window.filterBillingItems = filterBillingItems;
   window.filterHerbLibrary = filterHerbLibrary;
   window.filterUsers = filterUsers;
@@ -12034,13 +12342,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!template) return;
         const div = document.createElement('div');
         div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
-        const categoryLine = template.category ? `<div class="text-sm text-gray-500">${template.category}</div>` : '';
+        // 對模板名稱與分類進行轉義，避免 XSS
+        const safeName = template.name ? window.escapeHtml(template.name) : '';
+        const safeCategory = template.category ? window.escapeHtml(template.category) : null;
+        const categoryLine = safeCategory ? `<div class="text-sm text-gray-500">${safeCategory}</div>` : '';
+        const safeId = String(template.id).replace(/"/g, '&quot;');
         div.innerHTML = `
             <div>
-              <div class="font-medium text-gray-800">${template.name || ''}</div>
+              <div class="font-medium text-gray-800">${safeName}</div>
               ${categoryLine}
             </div>
-            <button type="button" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded" onclick="selectDiagnosisTemplate('${template.id}')">套用</button>
+            <button type="button" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded" onclick="selectDiagnosisTemplate('${safeId}')">套用</button>
         `;
         listEl.appendChild(div);
       });
@@ -12239,10 +12551,13 @@ document.addEventListener('DOMContentLoaded', function() {
           if (!template) return;
           const div = document.createElement('div');
           div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
-          const categoryLine = template.category ? `<div class="text-sm text-gray-500">${template.category}</div>` : '';
+          // 對模板名稱與分類進行轉義，避免 XSS
+          const safeName = template.name ? window.escapeHtml(template.name) : '';
+          const safeCategory = template.category ? window.escapeHtml(template.category) : null;
+          const categoryLine = safeCategory ? `<div class="text-sm text-gray-500">${safeCategory}</div>` : '';
           div.innerHTML = `
             <div>
-              <div class="font-medium text-gray-800">${template.name || ''}</div>
+              <div class="font-medium text-gray-800">${safeName}</div>
               ${categoryLine}
             </div>
             <button type="button" class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded select-prescription-btn" data-id="${template.id}">套用</button>
@@ -13661,17 +13976,21 @@ function refreshTemplateCategoryFilters() {
                 combos.forEach(combo => {
                   const itemDiv = document.createElement('div');
                   itemDiv.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
+                  // 對名稱與原料進行轉義，避免 XSS
+                  const safeComboName = combo.name ? window.escapeHtml(combo.name) : '';
                   const ingredientsText = (combo.ingredients && combo.ingredients.length > 0)
                     ? combo.ingredients.map(ing => {
-                        const name = ing && ing.name ? ing.name : '';
+                        const name = ing && ing.name ? window.escapeHtml(ing.name) : '';
                         if (ing && ing.dosage) {
-                          return name + '(' + ing.dosage + '克)';
+                          // 將劑量也轉義
+                          const safeDosage = window.escapeHtml(String(ing.dosage));
+                          return name + '(' + safeDosage + '克)';
                         }
                         return name;
                       }).join('、')
                     : '';
                   itemDiv.innerHTML = `
-                    <div class="font-semibold text-gray-800 mb-1">${combo.name}</div>
+                    <div class="font-semibold text-gray-800 mb-1">${safeComboName}</div>
                     <div class="text-sm text-gray-600">${ingredientsText}</div>
                   `;
                   itemDiv.onclick = function() {
@@ -13789,10 +14108,15 @@ function refreshTemplateCategoryFilters() {
                   const itemDiv = document.createElement('div');
                   itemDiv.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
                   const pointsText = (combo.points && combo.points.length > 0)
-                    ? combo.points.map(pt => pt.name + (pt.type ? '(' + pt.type + ')' : '')).join('、')
+                    ? combo.points.map(pt => {
+                        const pName = pt && pt.name ? window.escapeHtml(pt.name) : '';
+                        const pType = pt && pt.type ? window.escapeHtml(pt.type) : '';
+                        return pName + (pType ? '(' + pType + ')' : '');
+                      }).join('、')
                     : '';
+                  const safeComboName = combo.name ? window.escapeHtml(combo.name) : '';
                   itemDiv.innerHTML = `
-                    <div class="font-semibold text-gray-800 mb-1">${combo.name}</div>
+                    <div class="font-semibold text-gray-800 mb-1">${safeComboName}</div>
                     <div class="text-sm text-gray-600">${pointsText}</div>
                   `;
                   itemDiv.onclick = function() {
