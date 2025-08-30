@@ -1003,6 +1003,22 @@ async function logout() {
                 return;
             }
             hideAllSections();
+
+            // 根據所選的區域決定是否顯示主要內容包裝區（contentWrapper）。
+            // 當顯示個人設置或模板庫管理時，隱藏包裝區以避免產生額外的上方留白；
+            // 其他區域則顯示包裝區，保持與原先版面一致。
+            try {
+                const wrapper = document.getElementById('contentWrapper');
+                if (wrapper) {
+                    if (sectionId === 'personalSettings' || sectionId === 'templateLibrary') {
+                        wrapper.classList.add('hidden');
+                    } else {
+                        wrapper.classList.remove('hidden');
+                    }
+                }
+            } catch (e) {
+                console.error('切換區域時調整版面顯示失敗：', e);
+            }
             // 隱藏歡迎頁
             document.getElementById('welcomePage').classList.add('hidden');
             // 顯示指定區域
