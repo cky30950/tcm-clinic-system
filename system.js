@@ -2051,16 +2051,27 @@ async function selectPatientForRegistration(patientId) {
             loadDoctorOptions();
             
             // 設置預設掛號時間為當前時間（加5分鐘避免時間過期）
-            const now = new Date();
-            now.setMinutes(now.getMinutes() + 5); // 加5分鐘
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const localDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
-            
-            document.getElementById('appointmentDateTime').value = localDateTime;
+            const nowForDefault = new Date();
+            nowForDefault.setMinutes(nowForDefault.getMinutes() + 5); // 加5分鐘作為預設值
+            const defYear = nowForDefault.getFullYear();
+            const defMonth = String(nowForDefault.getMonth() + 1).padStart(2, '0');
+            const defDay = String(nowForDefault.getDate()).padStart(2, '0');
+            const defHours = String(nowForDefault.getHours()).padStart(2, '0');
+            const defMinutes = String(nowForDefault.getMinutes()).padStart(2, '0');
+            const localDateTime = `${defYear}-${defMonth}-${defDay}T${defHours}:${defMinutes}`;
+
+            // 設置掛號時間輸入欄的預設值
+            const appointmentInput = document.getElementById('appointmentDateTime');
+            appointmentInput.value = localDateTime;
+
+            // 設置允許選擇的最小日期時間為今日 00:00
+            // 依需求，掛號時間只能選擇「今日」或之後的日期
+            const today = new Date();
+            const tYear = today.getFullYear();
+            const tMonth = String(today.getMonth() + 1).padStart(2, '0');
+            const tDay = String(today.getDate()).padStart(2, '0');
+            const minDateTime = `${tYear}-${tMonth}-${tDay}T00:00`;
+            appointmentInput.min = minDateTime;
             
             clearRegistrationForm();
             // 根據病人載入問診資料選項
