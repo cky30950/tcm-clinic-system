@@ -64,14 +64,6 @@ let userCache = null;
 // 每個項目包含 patientId、packageRecordId 以及 delta，
 // delta 為負數表示消耗一次，為正數表示退回一次。
 let pendingPackageChanges = [];
-// 分頁相關變數與設定
-// 預設每頁顯示的項目數。可以根據需求調整此常數。
-const PAGE_SIZE = 10;
-// 儲存各種彈窗當前的頁數。當使用者在清單中翻頁時，這些值會被更新。
-let diagnosisTemplatePage = 1;
-let prescriptionTemplatePage = 1;
-let herbComboPage = 1;
-let acupointComboPage = 1;
 
 /**
  * 計算指定病人和套票的暫存變更總和。
@@ -822,27 +814,6 @@ function getUserPositionFromEmail(email) {
     if (email === 'nurse@clinic.com') return '護理師';
     return '用戶';
 }
-
-// 新增函式：在登入後為頁面底部添加統一版權區塊
-// 這個區塊採用固定的格式和樣式，包括頂部細線及版權文字。
-function addUnifiedFooter() {
-    try {
-        let footer = document.getElementById('pageFooter');
-        if (!footer) {
-            footer = document.createElement('div');
-            footer.id = 'pageFooter';
-            // 使用 TailwindCSS 樣式使版權與頂部細線一致
-            footer.className = 'text-center text-xs text-gray-400';
-            const innerDiv = document.createElement('div');
-            innerDiv.className = 'border-t border-gray-200 pt-4';
-            innerDiv.innerHTML = 'Copyright © 2025 <span class="text-gray-600 font-medium">湛凌有限公司</span>. All rights reserved.';
-            footer.appendChild(innerDiv);
-            document.body.appendChild(footer);
-        }
-    } catch (e) {
-        console.error('建立統一版權區塊時發生錯誤', e);
-    }
-}
         
         // 執行登入
         function performLogin(user) {
@@ -864,10 +835,6 @@ function addUnifiedFooter() {
             document.getElementById('sidebarUserRole').textContent = `當前用戶：${getUserDisplayName(user)}`;
             
             generateSidebarMenu();
-            // 在登入後顯示統一版權區塊，確保所有登入後的頁面底部都有一致的版權聲明
-            if (typeof addUnifiedFooter === 'function') {
-                addUnifiedFooter();
-            }
             // After generating the sidebar, load the personal settings for this user.
             // We call this asynchronously and do not block the login flow. Any errors will be logged to the console.
             if (typeof loadPersonalSettings === 'function') {
@@ -11659,8 +11626,6 @@ document.addEventListener('DOMContentLoaded', function() {
         listEl.parentNode.insertBefore(searchInput, listEl);
         // 在輸入時重新渲染列表
         searchInput.addEventListener('input', function() {
-          // 搜尋時重置頁碼至第一頁
-          diagnosisTemplatePage = 1;
           showDiagnosisTemplateModal();
         });
       }
@@ -11686,15 +11651,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const bn = (b && b.name) ? b.name : '';
         return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
       });
-      // 計算分頁並渲染當前頁的項目
-      const totalPages = Math.ceil(sorted.length / PAGE_SIZE) || 1;
-      // 調整頁碼至有效範圍
-      if (diagnosisTemplatePage > totalPages) diagnosisTemplatePage = totalPages;
-      if (diagnosisTemplatePage < 1) diagnosisTemplatePage = 1;
-      const startIndex = (diagnosisTemplatePage - 1) * PAGE_SIZE;
-      const endIndex = startIndex + PAGE_SIZE;
-      const pageItems = sorted.slice(startIndex, endIndex);
-      pageItems.forEach(template => {
+      sorted.forEach(template => {
         if (!template) return;
         const div = document.createElement('div');
         div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
@@ -11708,36 +11665,6 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         listEl.appendChild(div);
       });
-      // 新增分頁控制按鈕
-      if (totalPages > 1) {
-        const navDiv = document.createElement('div');
-        navDiv.className = 'flex justify-center items-center mt-3 space-x-2';
-        if (diagnosisTemplatePage > 1) {
-          const prevBtn = document.createElement('button');
-          prevBtn.className = 'px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded';
-          prevBtn.textContent = '上一頁';
-          prevBtn.onclick = function() {
-            diagnosisTemplatePage--;
-            showDiagnosisTemplateModal();
-          };
-          navDiv.appendChild(prevBtn);
-        }
-        const pageInfo = document.createElement('span');
-        pageInfo.className = 'text-sm text-gray-600';
-        pageInfo.textContent = `第 ${diagnosisTemplatePage} / ${totalPages} 頁`;
-        navDiv.appendChild(pageInfo);
-        if (diagnosisTemplatePage < totalPages) {
-          const nextBtn = document.createElement('button');
-          nextBtn.className = 'px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded';
-          nextBtn.textContent = '下一頁';
-          nextBtn.onclick = function() {
-            diagnosisTemplatePage++;
-            showDiagnosisTemplateModal();
-          };
-          navDiv.appendChild(nextBtn);
-        }
-        listEl.appendChild(navDiv);
-      }
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('顯示診斷模板彈窗失敗:', err);
@@ -11898,8 +11825,7 @@ document.addEventListener('DOMContentLoaded', function() {
         searchInput.className = 'w-full mb-3 px-3 py-2 border border-gray-300 rounded';
         listEl.parentNode.insertBefore(searchInput, listEl);
         searchInput.addEventListener('input', function() {
-          // 搜尋時重置頁碼至第一頁，然後重新渲染列表
-          prescriptionTemplatePage = 1;
+          // 重新渲染列表
           showPrescriptionTemplateModal();
         });
       }
@@ -11930,76 +11856,31 @@ document.addEventListener('DOMContentLoaded', function() {
           const bn = (b && b.name) ? b.name : '';
           return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
         });
-        if (sorted.length === 0) {
-          // 若篩選後無任何結果，顯示提示訊息
-          const emptyDiv = document.createElement('div');
-          emptyDiv.className = 'text-sm text-gray-500 text-center p-4';
-          emptyDiv.textContent = '查無符合的醫囑模板';
-          listEl.appendChild(emptyDiv);
-        } else {
-          // 計算分頁並限制頁碼
-          const totalPages = Math.ceil(sorted.length / PAGE_SIZE) || 1;
-          if (prescriptionTemplatePage > totalPages) prescriptionTemplatePage = totalPages;
-          if (prescriptionTemplatePage < 1) prescriptionTemplatePage = 1;
-          const startIndex = (prescriptionTemplatePage - 1) * PAGE_SIZE;
-          const endIndex = startIndex + PAGE_SIZE;
-          const pageItems = sorted.slice(startIndex, endIndex);
-          // 渲染當前頁
-          pageItems.forEach(template => {
-            if (!template) return;
-            const div = document.createElement('div');
-            div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
-            const categoryLine = template.category ? `<div class="text-sm text-gray-500">${template.category}</div>` : '';
-            div.innerHTML = `
+        sorted.forEach(template => {
+          if (!template) return;
+          const div = document.createElement('div');
+          div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
+          const categoryLine = template.category ? `<div class="text-sm text-gray-500">${template.category}</div>` : '';
+          div.innerHTML = `
             <div>
               <div class="font-medium text-gray-800">${template.name || ''}</div>
               ${categoryLine}
             </div>
             <button type="button" class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded select-prescription-btn" data-id="${template.id}">套用</button>
           `;
-            listEl.appendChild(div);
-          });
-          // 為當前頁的按鈕掛上事件監聽
-          const buttons = listEl.querySelectorAll('.select-prescription-btn');
-          buttons.forEach(btn => {
-            btn.addEventListener('click', function (evt) {
-              const tid = evt.currentTarget.getAttribute('data-id');
-              if (window && typeof window.selectPrescriptionTemplate === 'function') {
-                window.selectPrescriptionTemplate(tid);
-              }
-            });
-          });
-          // 新增分頁導航
-          if (totalPages > 1) {
-            const navDiv = document.createElement('div');
-            navDiv.className = 'flex justify-center items-center mt-3 space-x-2';
-            if (prescriptionTemplatePage > 1) {
-              const prevBtn = document.createElement('button');
-              prevBtn.className = 'px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded';
-              prevBtn.textContent = '上一頁';
-              prevBtn.onclick = function() {
-                prescriptionTemplatePage--;
-                showPrescriptionTemplateModal();
-              };
-              navDiv.appendChild(prevBtn);
+          listEl.appendChild(div);
+        });
+        // 為每個按鈕掛上事件監聽
+        const buttons = listEl.querySelectorAll('.select-prescription-btn');
+        buttons.forEach(btn => {
+          btn.addEventListener('click', function (evt) {
+            const tid = evt.currentTarget.getAttribute('data-id');
+            // 使用全域掛載的新版函式載入醫囑模板
+            if (window && typeof window.selectPrescriptionTemplate === 'function') {
+              window.selectPrescriptionTemplate(tid);
             }
-            const pageInfo = document.createElement('span');
-            pageInfo.className = 'text-sm text-gray-600';
-            pageInfo.textContent = `第 ${prescriptionTemplatePage} / ${totalPages} 頁`;
-            navDiv.appendChild(pageInfo);
-            if (prescriptionTemplatePage < totalPages) {
-              const nextBtn = document.createElement('button');
-              nextBtn.className = 'px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded';
-              nextBtn.textContent = '下一頁';
-              nextBtn.onclick = function() {
-                prescriptionTemplatePage++;
-                showPrescriptionTemplateModal();
-              };
-              navDiv.appendChild(nextBtn);
-            }
-            listEl.appendChild(navDiv);
-          }
-        }
+          });
+        });
       }
       modal.classList.remove('hidden');
     } catch (err) {
@@ -13409,8 +13290,7 @@ function refreshTemplateCategoryFilters() {
                 searchInput.className = 'w-full mb-3 px-3 py-2 border border-gray-300 rounded';
                 listContainer.parentNode.insertBefore(searchInput, listContainer);
                 searchInput.addEventListener('input', function() {
-                  // 搜尋時重置頁碼至第一頁
-                  herbComboPage = 1;
+                  // 重新渲染列表
                   showHerbComboModal();
                 });
               }
@@ -13432,23 +13312,16 @@ function refreshTemplateCategoryFilters() {
                   return nameStr.includes(herbKeyword) || ingredientsStr.includes(herbKeyword);
                 });
               }
-              // 依名稱排序
-              combos = combos.slice().sort((a, b) => {
-                  const an = a && a.name ? a.name : '';
-                  const bn = b && b.name ? b.name : '';
-                  return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
-              });
               if (combos.length === 0) {
                 listContainer.innerHTML = '<div class="text-center text-gray-500">尚未設定常用藥方組合</div>';
               } else {
-                // 計算分頁
-                const totalPages = Math.ceil(combos.length / PAGE_SIZE) || 1;
-                if (herbComboPage > totalPages) herbComboPage = totalPages;
-                if (herbComboPage < 1) herbComboPage = 1;
-                const startIndex = (herbComboPage - 1) * PAGE_SIZE;
-                const endIndex = startIndex + PAGE_SIZE;
-                const pageItems = combos.slice(startIndex, endIndex);
-                pageItems.forEach(combo => {
+                // 依名稱排序
+                combos = combos.slice().sort((a, b) => {
+                  const an = a && a.name ? a.name : '';
+                  const bn = b && b.name ? b.name : '';
+                  return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
+                });
+                combos.forEach(combo => {
                   const itemDiv = document.createElement('div');
                   itemDiv.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
                   const ingredientsText = (combo.ingredients && combo.ingredients.length > 0)
@@ -13469,36 +13342,6 @@ function refreshTemplateCategoryFilters() {
                   };
                   listContainer.appendChild(itemDiv);
                 });
-                // 分頁導航
-                if (totalPages > 1) {
-                  const navDiv = document.createElement('div');
-                  navDiv.className = 'flex justify-center items-center mt-3 space-x-2';
-                  if (herbComboPage > 1) {
-                    const prevBtn = document.createElement('button');
-                    prevBtn.className = 'px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded';
-                    prevBtn.textContent = '上一頁';
-                    prevBtn.onclick = function() {
-                      herbComboPage--;
-                      showHerbComboModal();
-                    };
-                    navDiv.appendChild(prevBtn);
-                  }
-                  const pageInfo = document.createElement('span');
-                  pageInfo.className = 'text-sm text-gray-600';
-                  pageInfo.textContent = `第 ${herbComboPage} / ${totalPages} 頁`;
-                  navDiv.appendChild(pageInfo);
-                  if (herbComboPage < totalPages) {
-                    const nextBtn = document.createElement('button');
-                    nextBtn.className = 'px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded';
-                    nextBtn.textContent = '下一頁';
-                    nextBtn.onclick = function() {
-                      herbComboPage++;
-                      showHerbComboModal();
-                    };
-                    navDiv.appendChild(nextBtn);
-                  }
-                  listContainer.appendChild(navDiv);
-                }
               }
               modal.classList.remove('hidden');
             } catch (error) {
@@ -13571,8 +13414,6 @@ function refreshTemplateCategoryFilters() {
                 searchInput.className = 'w-full mb-3 px-3 py-2 border border-gray-300 rounded';
                 listContainer.parentNode.insertBefore(searchInput, listContainer);
                 searchInput.addEventListener('input', function() {
-                  // 搜尋時重置頁碼至第一頁
-                  acupointComboPage = 1;
                   showAcupointComboModal();
                 });
               }
@@ -13598,23 +13439,16 @@ function refreshTemplateCategoryFilters() {
                   return nameStr.includes(acuKeyword) || pointsStr.includes(acuKeyword) || techniqueStr.includes(acuKeyword);
                 });
               }
-              // 依名稱排序
-              combos = combos.slice().sort((a, b) => {
-                  const an = a && a.name ? a.name : '';
-                  const bn = b && b.name ? b.name : '';
-                  return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
-              });
               if (combos.length === 0) {
                 listContainer.innerHTML = '<div class="text-center text-gray-500">尚未設定常用穴位組合</div>';
               } else {
-                // 計算分頁
-                const totalPages = Math.ceil(combos.length / PAGE_SIZE) || 1;
-                if (acupointComboPage > totalPages) acupointComboPage = totalPages;
-                if (acupointComboPage < 1) acupointComboPage = 1;
-                const startIndex = (acupointComboPage - 1) * PAGE_SIZE;
-                const endIndex = startIndex + PAGE_SIZE;
-                const pageItems = combos.slice(startIndex, endIndex);
-                pageItems.forEach(combo => {
+                // 依名稱排序
+                combos = combos.slice().sort((a, b) => {
+                  const an = a && a.name ? a.name : '';
+                  const bn = b && b.name ? b.name : '';
+                  return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
+                });
+                combos.forEach(combo => {
                   const itemDiv = document.createElement('div');
                   itemDiv.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
                   const pointsText = (combo.points && combo.points.length > 0)
@@ -13629,36 +13463,6 @@ function refreshTemplateCategoryFilters() {
                   };
                   listContainer.appendChild(itemDiv);
                 });
-                // 分頁導航
-                if (totalPages > 1) {
-                  const navDiv = document.createElement('div');
-                  navDiv.className = 'flex justify-center items-center mt-3 space-x-2';
-                  if (acupointComboPage > 1) {
-                    const prevBtn = document.createElement('button');
-                    prevBtn.className = 'px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded';
-                    prevBtn.textContent = '上一頁';
-                    prevBtn.onclick = function() {
-                      acupointComboPage--;
-                      showAcupointComboModal();
-                    };
-                    navDiv.appendChild(prevBtn);
-                  }
-                  const pageInfo = document.createElement('span');
-                  pageInfo.className = 'text-sm text-gray-600';
-                  pageInfo.textContent = `第 ${acupointComboPage} / ${totalPages} 頁`;
-                  navDiv.appendChild(pageInfo);
-                  if (acupointComboPage < totalPages) {
-                    const nextBtn = document.createElement('button');
-                    nextBtn.className = 'px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded';
-                    nextBtn.textContent = '下一頁';
-                    nextBtn.onclick = function() {
-                      acupointComboPage++;
-                      showAcupointComboModal();
-                    };
-                    navDiv.appendChild(nextBtn);
-                  }
-                  listContainer.appendChild(navDiv);
-                }
               }
               modal.classList.remove('hidden');
             } catch (error) {
@@ -14840,8 +14644,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // 動態新增頁面底部的版權資訊。若頁腳元素不存在則創建，確保所有頁面底部都顯示版權。
             (function() {
                 try {
-                    let footer = document.getElementById('pageFooter');
-                    if (!footer) {
+        // 若 mainPageFooter 已存在（主系統頁面已含版權區塊），則不再動態建立頁腳
+        if (document.getElementById('mainPageFooter')) {
+            return;
+        }
+        let footer = document.getElementById('pageFooter');
+        if (!footer) {
                         footer = document.createElement('div');
                         footer.id = 'pageFooter';
                         // 基本樣式：居中顯示、字體大小和顏色以及適當的邊距
