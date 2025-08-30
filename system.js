@@ -10295,6 +10295,14 @@ async function exportClinicBackup() {
         if (typeof initBillingItems === 'function') {
             await initBillingItems();
         }
+        // 確保模板庫已載入以獲取最新模板資料
+        if (typeof initTemplateLibrary === 'function') {
+            try {
+                await initTemplateLibrary();
+            } catch (_e) {
+                // 若初始化失敗，略過並依據現有資料備份
+            }
+        }
         const herbData = Array.isArray(herbLibrary) ? herbLibrary : [];
         const billingData = Array.isArray(billingItems) ? billingItems : [];
         // 讀取所有套票資料
@@ -10302,10 +10310,41 @@ async function exportClinicBackup() {
         try {
             const snapshot = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'patientPackages'));
             snapshot.forEach((docSnap) => {
-                packageData.push({ ...docSnap.data() });
+                // 將文件 ID 一併存入，以便還原時能維持原有 ID
+                packageData.push({ id: docSnap.id, ...docSnap.data() });
             });
         } catch (e) {
             console.error('讀取套票資料失敗:', e);
+        }
+        // 讀取醫囑模板資料
+        let prescriptionTemplatesData = [];
+        try {
+            const presSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'prescriptionTemplates'));
+            presSnap.forEach((docSnap) => {
+                prescriptionTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
+            });
+        } catch (e) {
+            console.error('讀取醫囑模板資料失敗:', e);
+        }
+        // 讀取診斷模板資料
+        let diagnosisTemplatesData = [];
+        try {
+            const diagSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'diagnosisTemplates'));
+            diagSnap.forEach((docSnap) => {
+                diagnosisTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
+            });
+        } catch (e) {
+            console.error('讀取診斷模板資料失敗:', e);
+        }
+        // 讀取問診資料
+        let inquiriesData = [];
+        try {
+            const inquirySnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'inquiries'));
+            inquirySnap.forEach((docSnap) => {
+                inquiriesData.push({ id: docSnap.id, ...docSnap.data() });
+            });
+        } catch (e) {
+            console.error('讀取問診資料失敗:', e);
         }
         // 組合備份資料
         const backup = {
@@ -10315,7 +10354,10 @@ async function exportClinicBackup() {
             herbLibrary: herbData,
             billingItems: billingData,
             patientPackages: packageData,
-            clinicSettings: clinicSettings
+            clinicSettings: clinicSettings,
+            prescriptionTemplates: prescriptionTemplatesData,
+            diagnosisTemplates: diagnosisTemplatesData,
+            inquiries: inquiriesData
         };
         const json = JSON.stringify(backup, null, 2);
         const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
@@ -10413,6 +10455,10 @@ async function importClinicBackup(data) {
     await replaceCollection('herbLibrary', Array.isArray(data.herbLibrary) ? data.herbLibrary : []);
     await replaceCollection('billingItems', Array.isArray(data.billingItems) ? data.billingItems : []);
     await replaceCollection('patientPackages', Array.isArray(data.patientPackages) ? data.patientPackages : []);
+    // 新增：覆蓋醫囑模板、診斷模板與問診資料
+    await replaceCollection('prescriptionTemplates', Array.isArray(data.prescriptionTemplates) ? data.prescriptionTemplates : []);
+    await replaceCollection('diagnosisTemplates', Array.isArray(data.diagnosisTemplates) ? data.diagnosisTemplates : []);
+    await replaceCollection('inquiries', Array.isArray(data.inquiries) ? data.inquiries : []);
     // 更新診所設定
     if (data.clinicSettings && typeof data.clinicSettings === 'object') {
         clinicSettings = { ...data.clinicSettings };
@@ -10425,6 +10471,17 @@ async function importClinicBackup(data) {
     userCache = null;
     herbLibrary = Array.isArray(data.herbLibrary) ? data.herbLibrary : [];
     billingItems = Array.isArray(data.billingItems) ? data.billingItems : [];
+    // 更新模板資料至全域變數
+    if (Array.isArray(data.prescriptionTemplates)) {
+        prescriptionTemplates = data.prescriptionTemplates;
+    } else {
+        prescriptionTemplates = [];
+    }
+    if (Array.isArray(data.diagnosisTemplates)) {
+        diagnosisTemplates = data.diagnosisTemplates;
+    } else {
+        diagnosisTemplates = [];
+    }
     // 重新載入資料
     await fetchPatients(true);
     await fetchConsultations(true);
@@ -10434,6 +10491,23 @@ async function importClinicBackup(data) {
     }
     if (typeof initBillingItems === 'function') {
         await initBillingItems();
+    }
+    // 重新載入模板庫資料顯示
+    if (typeof renderPrescriptionTemplates === 'function') {
+        try {
+            renderPrescriptionTemplates();
+        } catch (_e) {}
+    }
+    if (typeof renderDiagnosisTemplates === 'function') {
+        try {
+            renderDiagnosisTemplates();
+        } catch (_e) {}
+    }
+    // 更新模板分類篩選
+    if (typeof refreshTemplateCategoryFilters === 'function') {
+        try {
+            refreshTemplateCategoryFilters();
+        } catch (_e) {}
     }
     // 更新界面
     if (typeof loadPatientList === 'function') {
