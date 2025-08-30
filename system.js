@@ -14657,16 +14657,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         footer.style.fontSize = '12px';
                         footer.style.color = '#888';
                         footer.style.margin = '20px 0 10px 0';
-                        // 使用診所中文名稱（若未設定則使用預設值），並動態帶入今年年份
-                        const year = new Date().getFullYear();
-                        const clinicName = (typeof clinicSettings !== 'undefined' && clinicSettings && clinicSettings.chineseName) ? clinicSettings.chineseName : '名醫診所系統';
-                        footer.innerHTML = `&copy; ${year} ${clinicName} 版權所有`;
+                        // 加入頂部細線分隔和內邊距，模仿主系統頁面版權宣告的樣式
+                        footer.style.borderTop = '1px solid #e5e7eb';
+                        footer.style.paddingTop = '16px';
+                        // 固定版權文字：顯示 2025 年與公司名稱「湛凌有限公司」
+                        footer.innerHTML = 'Copyright © 2025 湛凌有限公司. All rights reserved.';
                         document.body.appendChild(footer);
                     } else {
-                        // 若已存在頁腳，更新其年份與診所名稱（防止重複）
-                        const year = new Date().getFullYear();
-                        const clinicName = (typeof clinicSettings !== 'undefined' && clinicSettings && clinicSettings.chineseName) ? clinicSettings.chineseName : '名醫診所系統';
-                        footer.innerHTML = `&copy; ${year} ${clinicName} 版權所有`;
+                        // 若已存在頁腳，統一更新樣式與版權內容
+                        footer.style.borderTop = '1px solid #e5e7eb';
+                        footer.style.paddingTop = '16px';
+                        footer.innerHTML = 'Copyright © 2025 湛凌有限公司. All rights reserved.';
                     }
                 } catch (e) {
                     console.error('建立頁腳版權資訊時發生錯誤', e);
