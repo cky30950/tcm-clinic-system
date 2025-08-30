@@ -14657,17 +14657,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         footer.style.fontSize = '12px';
                         footer.style.color = '#888';
                         footer.style.margin = '20px 0 10px 0';
-                        // 加入頂部細線分隔和內邊距，模仿主系統頁面版權宣告的樣式
+                        // 加入頂部細線與內邊距，使其與主系統頁面的版權區塊一致
                         footer.style.borderTop = '1px solid #e5e7eb';
                         footer.style.paddingTop = '16px';
-                        // 固定版權文字：顯示 2025 年與公司名稱「名醫有限公司」
-                        footer.innerHTML = 'Copyright © 2025 名醫有限公司. All rights reserved.';
+                        // 固定版權文字：顯示 2025 年與公司名稱「湛凌有限公司」
+                        footer.innerHTML = 'Copyright © 2025 湛凌有限公司. All rights reserved.';
                         document.body.appendChild(footer);
                     } else {
                         // 若已存在頁腳，統一更新樣式與版權內容
                         footer.style.borderTop = '1px solid #e5e7eb';
                         footer.style.paddingTop = '16px';
-                        footer.innerHTML = 'Copyright © 2025 名醫有限公司. All rights reserved.';
+                        footer.innerHTML = 'Copyright © 2025 湛凌有限公司. All rights reserved.';
                     }
                 } catch (e) {
                     console.error('建立頁腳版權資訊時發生錯誤', e);
