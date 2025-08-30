@@ -230,7 +230,7 @@ async function fetchUsers(forceRefresh = false) {
         // 診所設定
         let clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
         if (!clinicSettings.chineseName) {
-            clinicSettings.chineseName = '名醫診所系統';
+            clinicSettings.chineseName = '湛凌診所系統';
             clinicSettings.englishName = 'TCM Clinic';
             clinicSettings.businessHours = '週一至週五 09:00-18:00';
             clinicSettings.phone = '(852) 2345-6789';
@@ -845,16 +845,6 @@ function getUserPositionFromEmail(email) {
             // 統計資訊將在登入後初始化系統時更新
 
             showToast(`歡迎回來，${getUserDisplayName(user)}！`, 'success');
-
-            // 登入後更新頁腳公司名稱為湛凌有限公司
-            try {
-                const pf2 = document.getElementById('pageFooter');
-                if (pf2) {
-                    pf2.innerHTML = 'Copyright © 2025 湛凌有限公司. All rights reserved.';
-                }
-            } catch (_updateFooterErr) {
-                // 若更新頁腳失敗，忽略此錯誤
-            }
         }
 
         // 側邊選單控制
@@ -921,16 +911,6 @@ async function logout() {
         document.getElementById('mainLoginPassword').value = '';
         
         showToast('已成功登出', 'success');
-
-        // 登出後更新頁腳公司名稱為名醫有限公司
-        try {
-            const pf3 = document.getElementById('pageFooter');
-            if (pf3) {
-                pf3.innerHTML = 'Copyright © 2025 名醫有限公司. All rights reserved.';
-            }
-        } catch (_e) {
-            // 忽略頁腳更新錯誤
-        }
         
     } catch (error) {
         console.error('登出錯誤:', error);
@@ -4653,7 +4633,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                 <div class="receipt-container">
                     <!-- 診所標題 -->
                     <div class="clinic-header">
-                        <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
+                        <div class="clinic-name">${clinicSettings.chineseName || '湛凌診所系統'}</div>
                         <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
                         <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                     </div>
@@ -5110,7 +5090,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                     <div class="content">
                         <!-- 診所標題 -->
                         <div class="clinic-header">
-                            <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
+                            <div class="clinic-name">${clinicSettings.chineseName || '湛凌診所系統'}</div>
                             <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
                             <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                         </div>
@@ -5446,7 +5426,7 @@ async function printSickLeave(consultationId, consultationData = null) {
                     <div class="content">
                         <!-- 診所標題 -->
                         <div class="clinic-header">
-                            <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
+                            <div class="clinic-name">${clinicSettings.chineseName || '湛凌診所系統'}</div>
                             <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
                             <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                         </div>
@@ -5963,7 +5943,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                 <div class="advice-container">
                     <!-- 診所標題 -->
                     <div class="clinic-header">
-                        <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
+                        <div class="clinic-name">${clinicSettings.chineseName || '湛凌診所系統'}</div>
                         <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
                         <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                     </div>
@@ -6787,7 +6767,7 @@ async function initializeSystemAfterLogin() {
             const englishNameSpan = document.getElementById('displayEnglishName');
             
             if (chineseNameSpan) {
-                chineseNameSpan.textContent = clinicSettings.chineseName || '名醫診所系統';
+                chineseNameSpan.textContent = clinicSettings.chineseName || '湛凌診所系統';
             }
             if (englishNameSpan) {
                 englishNameSpan.textContent = clinicSettings.englishName || 'TCM Clinic';
@@ -6797,7 +6777,7 @@ async function initializeSystemAfterLogin() {
             const loginTitle = document.getElementById('loginTitle');
             const loginEnglishTitle = document.getElementById('loginEnglishTitle');
             if (loginTitle) {
-                loginTitle.textContent = clinicSettings.chineseName || '名醫診所系統';
+                loginTitle.textContent = clinicSettings.chineseName || '湛凌診所系統';
             }
             if (loginEnglishTitle) {
                 loginEnglishTitle.textContent = clinicSettings.englishName || 'TCM Clinic';
@@ -6807,7 +6787,7 @@ async function initializeSystemAfterLogin() {
             const systemTitle = document.getElementById('systemTitle');
             const systemEnglishTitle = document.getElementById('systemEnglishTitle');
             if (systemTitle) {
-                systemTitle.textContent = clinicSettings.chineseName || '名醫診所系統';
+                systemTitle.textContent = clinicSettings.chineseName || '湛凌診所系統';
             }
             if (systemEnglishTitle) {
                 systemEnglishTitle.textContent = clinicSettings.englishName || 'TCM Clinic';
@@ -6817,7 +6797,7 @@ async function initializeSystemAfterLogin() {
             const welcomeTitle = document.getElementById('welcomeTitle');
             const welcomeEnglishTitle = document.getElementById('welcomeEnglishTitle');
             if (welcomeTitle) {
-                welcomeTitle.textContent = `歡迎使用${clinicSettings.chineseName || '名醫診所系統'}`;
+                welcomeTitle.textContent = `歡迎使用${clinicSettings.chineseName || '湛凌診所系統'}`;
             }
             if (welcomeEnglishTitle) {
                 welcomeEnglishTitle.textContent = `Welcome to ${clinicSettings.englishName || 'TCM Clinic'}`;
@@ -14664,54 +14644,25 @@ document.addEventListener('DOMContentLoaded', function() {
             // 動態新增頁面底部的版權資訊。若頁腳元素不存在則創建，確保所有頁面底部都顯示版權。
             (function() {
                 try {
-        // 若 mainPageFooter 已存在（主系統頁面已含版權區塊），則不再動態建立頁腳
-        if (document.getElementById('mainPageFooter')) {
-            return;
-        }
-        let footer = document.getElementById('pageFooter');
-        if (!footer) {
+                    let footer = document.getElementById('pageFooter');
+                    if (!footer) {
                         footer = document.createElement('div');
                         footer.id = 'pageFooter';
-                        // 固定在視窗底部，保持版權資訊隨時可見
-                        footer.style.position = 'fixed';
-                        footer.style.bottom = '0';
-                        footer.style.left = '0';
-                        footer.style.right = '0';
-                        footer.style.background = '#ffffff';
-                        footer.style.borderTop = '1px solid #e5e7eb';
-                        footer.style.padding = '16px 0';
-                        footer.style.fontSize = '12px';
-                        footer.style.color = '#555';
+                        // 基本樣式：居中顯示、字體大小和顏色以及適當的邊距
                         footer.style.textAlign = 'center';
-                        footer.style.width = '100%';
-                        // 設置較高的 z-index 以確保版權資訊顯示在其他元素之上
-                        footer.style.zIndex = '9999';
-                        // 根據目前可見的頁面決定顯示的公司名稱
-                        const loginPageEl = document.getElementById('loginPage');
-                        const isLoginVisible = loginPageEl && !loginPageEl.classList.contains('hidden');
-                        const companyName = isLoginVisible ? '名醫有限公司' : '湛凌有限公司';
-                        footer.innerHTML = 'Copyright © 2025 ' + companyName + '. All rights reserved.';
+                        footer.style.fontSize = '12px';
+                        footer.style.color = '#888';
+                        footer.style.margin = '20px 0 10px 0';
+                        // 使用診所中文名稱（若未設定則使用預設值），並動態帶入今年年份
+                        const year = new Date().getFullYear();
+                        const clinicName = (typeof clinicSettings !== 'undefined' && clinicSettings && clinicSettings.chineseName) ? clinicSettings.chineseName : '湛凌診所系統';
+                        footer.innerHTML = `&copy; ${year} ${clinicName} 版權所有`;
                         document.body.appendChild(footer);
                     } else {
-                        // 若已存在頁腳，統一更新樣式與版權內容
-                        footer.style.position = 'fixed';
-                        footer.style.bottom = '0';
-                        footer.style.left = '0';
-                        footer.style.right = '0';
-                        footer.style.background = '#ffffff';
-                        footer.style.borderTop = '1px solid #e5e7eb';
-                        footer.style.padding = '16px 0';
-                        footer.style.fontSize = '12px';
-                        footer.style.color = '#555';
-                        footer.style.textAlign = 'center';
-                        footer.style.width = '100%';
-                        // 確保頁腳在所有元素之上顯示
-                        footer.style.zIndex = '9999';
-                        // 更新文字：若當前顯示主系統則為湛凌有限公司，否則為名醫有限公司
-                        const loginPageEl2 = document.getElementById('loginPage');
-                        const isLoginVisible2 = loginPageEl2 && !loginPageEl2.classList.contains('hidden');
-                        const companyName2 = isLoginVisible2 ? '名醫有限公司' : '湛凌有限公司';
-                        footer.innerHTML = 'Copyright © 2025 ' + companyName2 + '. All rights reserved.';
+                        // 若已存在頁腳，更新其年份與診所名稱（防止重複）
+                        const year = new Date().getFullYear();
+                        const clinicName = (typeof clinicSettings !== 'undefined' && clinicSettings && clinicSettings.chineseName) ? clinicSettings.chineseName : '湛凌診所系統';
+                        footer.innerHTML = `&copy; ${year} ${clinicName} 版權所有`;
                     }
                 } catch (e) {
                     console.error('建立頁腳版權資訊時發生錯誤', e);
