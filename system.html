@@ -439,12 +439,12 @@
                         </div>
                     </div>
                 </div>
-                <!-- 掛號列表 -->
+                <!-- 今日掛號列表 -->
                 <div class="bg-white border border-gray-200 rounded-lg">
                     <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
                         <div class="flex justify-between items-center">
                             <h3 class="text-lg font-semibold text-gray-800 flex items-center">
-                                <span class="mr-2">📅</span>掛號列表
+                                <span class="mr-2">📅</span>今日掛號列表
                             </h3>
                             <div class="text-sm text-gray-600 flex items-center space-x-3">
                                 <!-- 新增更新掛號列表按鈕：呼叫 loadTodayAppointments 重新載入當日掛號資料 -->
@@ -453,6 +453,14 @@
                                 <span>
                                     總計：<span id="todayTotal" class="font-semibold text-blue-600">0</span> 人
                                 </span>
+                                <label class="flex items-center space-x-1">
+                                    <span class="whitespace-nowrap">日期</span>
+                                    <input
+                                        type="datetime-local"
+                                        id="appointmentDatePicker"
+                                        class="border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-700 text-sm"
+                                    />
+                                </label>
                             </div>
                         </div>
                     </div>

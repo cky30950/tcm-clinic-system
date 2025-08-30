@@ -1853,8 +1853,51 @@ async function loadInquiryOptions(patient) {
         }
         
         function loadConsultationSystem() {
+            // 初始化掛號日期選擇器
+            try {
+                setupAppointmentDatePicker();
+            } catch (_e) {
+                // 忽略初始化失敗
+            }
+            // 載入選定日期的掛號列表
             loadTodayAppointments();
             clearPatientSearch();
+        }
+
+        /**
+         * 初始化掛號日期選擇器。
+         * 設定最小可選日期為今日 00:00，並在未選擇日期時預設為今日 00:00。
+         * 當使用者改變日期時會重新載入掛號列表。
+         */
+        function setupAppointmentDatePicker() {
+            try {
+                const picker = document.getElementById('appointmentDatePicker');
+                if (!picker) return;
+                // 設定最小可選日期為今天 00:00
+                const now = new Date();
+                const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const localMin = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000)
+                    .toISOString()
+                    .slice(0, 16);
+                picker.min = localMin;
+                // 若尚未有值，預設為今日 00:00
+                if (!picker.value) {
+                    picker.value = localMin;
+                }
+                // 只綁定一次 change 事件
+                if (!picker.dataset.bound) {
+                    picker.addEventListener('change', function () {
+                        try {
+                            loadTodayAppointments();
+                        } catch (_err) {
+                            console.error('更新掛號列表失敗：', _err);
+                        }
+                    });
+                    picker.dataset.bound = 'true';
+                }
+            } catch (err) {
+                console.error('初始化日期選擇器失敗：', err);
+            }
         }
         
 // 1. 修改病人搜尋函數，改為從 Firebase 讀取資料
@@ -2295,9 +2338,22 @@ async function loadTodayAppointments() {
         }
     }
 
-    const today = new Date().toDateString();
+    // 根據日期選擇器決定要顯示的日期；若未選擇則使用今日
+    let targetDate = new Date();
+    try {
+        const datePicker = document.getElementById('appointmentDatePicker');
+        if (datePicker && datePicker.value) {
+            const selected = new Date(datePicker.value);
+            if (!isNaN(selected.getTime())) {
+                targetDate = selected;
+            }
+        }
+    } catch (_e) {
+        // 若取得日期失敗則維持今日
+    }
+    const targetDateStr = targetDate.toDateString();
     let todayAppointments = appointments.filter(apt => 
-        new Date(apt.appointmentTime).toDateString() === today
+        new Date(apt.appointmentTime).toDateString() === targetDateStr
     );
     
     // 如果當前用戶是醫師，只顯示掛給自己的病人
