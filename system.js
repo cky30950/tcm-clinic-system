@@ -845,6 +845,16 @@ function getUserPositionFromEmail(email) {
             // 統計資訊將在登入後初始化系統時更新
 
             showToast(`歡迎回來，${getUserDisplayName(user)}！`, 'success');
+
+            // 登入後更新頁腳公司名稱為湛凌有限公司
+            try {
+                const pf2 = document.getElementById('pageFooter');
+                if (pf2) {
+                    pf2.innerHTML = 'Copyright © 2025 湛凌有限公司. All rights reserved.';
+                }
+            } catch (_updateFooterErr) {
+                // 若更新頁腳失敗，忽略此錯誤
+            }
         }
 
         // 側邊選單控制
@@ -911,6 +921,16 @@ async function logout() {
         document.getElementById('mainLoginPassword').value = '';
         
         showToast('已成功登出', 'success');
+
+        // 登出後更新頁腳公司名稱為名醫有限公司
+        try {
+            const pf3 = document.getElementById('pageFooter');
+            if (pf3) {
+                pf3.innerHTML = 'Copyright © 2025 名醫有限公司. All rights reserved.';
+            }
+        } catch (_e) {
+            // 忽略頁腳更新錯誤
+        }
         
     } catch (error) {
         console.error('登出錯誤:', error);
@@ -14652,25 +14672,46 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!footer) {
                         footer = document.createElement('div');
                         footer.id = 'pageFooter';
-                        // 基本樣式：居中顯示、字體大小和顏色以及適當的邊距
-                        footer.style.textAlign = 'center';
-                        footer.style.fontSize = '12px';
-                        footer.style.color = '#888';
-                        footer.style.margin = '20px 0 10px 0';
-                        // 寬度佔滿頁面，確保在行動裝置也能完整顯示
-                        footer.style.width = '100%';
-                        // 加入頂部細線與內邊距，使其與主系統頁面的版權區塊一致
+                        // 固定在視窗底部，保持版權資訊隨時可見
+                        footer.style.position = 'fixed';
+                        footer.style.bottom = '0';
+                        footer.style.left = '0';
+                        footer.style.right = '0';
+                        footer.style.background = '#ffffff';
                         footer.style.borderTop = '1px solid #e5e7eb';
-                        footer.style.paddingTop = '16px';
-                        // 固定版權文字：顯示 2025 年與公司名稱「湛凌有限公司」
-                        footer.innerHTML = 'Copyright © 2025 湛凌有限公司. All rights reserved.';
+                        footer.style.padding = '16px 0';
+                        footer.style.fontSize = '12px';
+                        footer.style.color = '#555';
+                        footer.style.textAlign = 'center';
+                        footer.style.width = '100%';
+                        // 設置較高的 z-index 以確保版權資訊顯示在其他元素之上
+                        footer.style.zIndex = '9999';
+                        // 根據目前可見的頁面決定顯示的公司名稱
+                        const loginPageEl = document.getElementById('loginPage');
+                        const isLoginVisible = loginPageEl && !loginPageEl.classList.contains('hidden');
+                        const companyName = isLoginVisible ? '名醫有限公司' : '湛凌有限公司';
+                        footer.innerHTML = 'Copyright © 2025 ' + companyName + '. All rights reserved.';
                         document.body.appendChild(footer);
                     } else {
                         // 若已存在頁腳，統一更新樣式與版權內容
+                        footer.style.position = 'fixed';
+                        footer.style.bottom = '0';
+                        footer.style.left = '0';
+                        footer.style.right = '0';
+                        footer.style.background = '#ffffff';
                         footer.style.borderTop = '1px solid #e5e7eb';
-                        footer.style.paddingTop = '16px';
+                        footer.style.padding = '16px 0';
+                        footer.style.fontSize = '12px';
+                        footer.style.color = '#555';
+                        footer.style.textAlign = 'center';
                         footer.style.width = '100%';
-                        footer.innerHTML = 'Copyright © 2025 湛凌有限公司. All rights reserved.';
+                        // 確保頁腳在所有元素之上顯示
+                        footer.style.zIndex = '9999';
+                        // 更新文字：若當前顯示主系統則為湛凌有限公司，否則為名醫有限公司
+                        const loginPageEl2 = document.getElementById('loginPage');
+                        const isLoginVisible2 = loginPageEl2 && !loginPageEl2.classList.contains('hidden');
+                        const companyName2 = isLoginVisible2 ? '名醫有限公司' : '湛凌有限公司';
+                        footer.innerHTML = 'Copyright © 2025 ' + companyName2 + '. All rights reserved.';
                     }
                 } catch (e) {
                     console.error('建立頁腳版權資訊時發生錯誤', e);
