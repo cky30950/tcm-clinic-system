@@ -14641,31 +14641,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('初始化搜尋與分類監聽器時發生錯誤:', e);
             }
 
-            // 動態新增頁面底部的版權資訊。若頁腳元素不存在則創建，確保所有頁面底部都顯示版權。
-            (function() {
-                try {
-                    let footer = document.getElementById('pageFooter');
-                    if (!footer) {
-                        footer = document.createElement('div');
-                        footer.id = 'pageFooter';
-                        // 基本樣式：居中顯示、字體大小和顏色以及適當的邊距
-                        footer.style.textAlign = 'center';
-                        footer.style.fontSize = '12px';
-                        footer.style.color = '#888';
-                        footer.style.margin = '20px 0 10px 0';
-                        // 使用診所中文名稱（若未設定則使用預設值），並動態帶入今年年份
-                        const year = new Date().getFullYear();
-                        const clinicName = (typeof clinicSettings !== 'undefined' && clinicSettings && clinicSettings.chineseName) ? clinicSettings.chineseName : '湛凌診所系統';
-                        footer.innerHTML = `&copy; ${year} ${clinicName} 版權所有`;
-                        document.body.appendChild(footer);
-                    } else {
-                        // 若已存在頁腳，更新其年份與診所名稱（防止重複）
-                        const year = new Date().getFullYear();
-                        const clinicName = (typeof clinicSettings !== 'undefined' && clinicSettings && clinicSettings.chineseName) ? clinicSettings.chineseName : '湛凌診所系統';
-                        footer.innerHTML = `&copy; ${year} ${clinicName} 版權所有`;
-                    }
-                } catch (e) {
-                    console.error('建立頁腳版權資訊時發生錯誤', e);
-                }
-            })();
+            // 已移除舊版頁腳版權資訊初始化函式
           });
+
+// 新增全局版權聲明：在 DOMContentLoaded 後於頁面底部插入帶頂部細線的版權聲明。
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    // 如果已經存在 id 為 globalCopyright 的元素，避免重複插入
+    if (!document.getElementById('globalCopyright')) {
+      const container = document.createElement('div');
+      container.id = 'globalCopyright';
+      // 使用 Tailwind 類別設置寬度、邊距與內距，並加上上邊界線
+      container.className = 'max-w-7xl mx-auto px-4 py-4 mt-8';
+      container.innerHTML = `
+        <div class="text-center border-t border-gray-200 pt-4">
+          <div class="text-xs text-gray-400">
+            Copyright © 2025 <span class="text-gray-600 font-medium">湛凌有限公司</span>. All rights reserved.
+          </div>
+        </div>
+      `;
+      document.body.appendChild(container);
+    }
+  } catch (e) {
+    console.error('初始化全局版權資訊時發生錯誤', e);
+  }
+});
