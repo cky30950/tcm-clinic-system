@@ -483,10 +483,8 @@ function generateMedicalRecordNumber() {
          * 此函式會等待 Firebase 初始化完成後再執行。
          */
         async function initHerbLibrary() {
-            // 等待 Firebase 初始化
-            while (!window.firebase || !window.firebase.db) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
+            // 等待 Firebase 及其資料庫初始化
+            await waitForFirebaseDb();
             try {
                 // 從 Firestore 取得 herbLibrary 集合資料
                 const querySnapshot = await window.firebase.getDocs(
@@ -518,10 +516,8 @@ function generateMedicalRecordNumber() {
          * 此函式會等待 Firebase 初始化完成後再執行。
          */
         async function initBillingItems() {
-            // 等待 Firebase 初始化
-            while (!window.firebase || !window.firebase.db) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
+            // 等待 Firebase 及其資料庫初始化
+            await waitForFirebaseDb();
             try {
                 // 從 Firestore 取得 billingItems 集合資料
                 const querySnapshot = await window.firebase.getDocs(
@@ -549,10 +545,8 @@ function generateMedicalRecordNumber() {
          * 此函式會等待 Firebase 初始化完成後再執行，並在讀取後重新渲染模板列表。
          */
         async function initTemplateLibrary() {
-            // 等待 Firebase 初始化
-            while (!window.firebase || !window.firebase.db) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
+            // 等待 Firebase 及其資料庫初始化
+            await waitForFirebaseDb();
             try {
                 // 從 Firestore 讀取醫囑模板
                 const presSnapshot = await window.firebase.getDocs(
@@ -606,6 +600,21 @@ function generateMedicalRecordNumber() {
         // 初始化用戶資料：不使用本地預設，用空陣列代替，待由 Firebase 載入
         let users = [];
 
+// 通用等待 Firebase 初始化的輔助函式
+// 避免在程式各處反覆使用 while (!window.firebase) 或 while (!window.firebase.db)
+async function waitForFirebase() {
+  while (!window.firebase) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+
+async function waitForFirebaseDb() {
+  await waitForFirebase();
+  while (!window.firebase.db) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+
     
 
 // 主要登入功能
@@ -627,9 +636,7 @@ async function attemptMainLogin() {
 
     try {
         // 等待 Firebase 初始化
-        while (!window.firebase) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        await waitForFirebase();
 
         // 使用 Firebase 登入
         const userCredential = await window.firebase.signInWithEmailAndPassword(
@@ -701,34 +708,36 @@ async function attemptMainLogin() {
             return;
         }
 
-        // 在登入主系統前先載入中藥庫資料和收費項目資料
-        // 目前中藥庫管理與收費項目管理僅在進入各頁面時會重新讀取 Firestore 資料，
-        // 為了縮短首次進入功能頁面的等待時間，這裡於登入後就先行載入一次。
+        // 在登入主系統前並行載入中藥庫資料、收費項目、分類資料與模板資料
+        // 透過 Promise.all 同時執行多個初始化函式，提升效率
         try {
-            // 若有定義 initHerbLibrary 函式，則執行一次
+            const initTasks = [];
             if (typeof initHerbLibrary === 'function') {
-                await initHerbLibrary();
+                initTasks.push(initHerbLibrary());
             }
-            // 若有定義 initBillingItems 函式，則執行一次
             if (typeof initBillingItems === 'function') {
-                await initBillingItems();
+                initTasks.push(initBillingItems());
             }
-            // 讀取或初始化分類資料，避免在後續使用時未同步 Firebase 分類
             if (typeof initCategoryData === 'function') {
-                try {
-                    await initCategoryData();
-                } catch (err) {
-                    console.error('初始化分類資料失敗:', err);
-                }
+                initTasks.push((async () => {
+                    try {
+                        await initCategoryData();
+                    } catch (err) {
+                        console.error('初始化分類資料失敗:', err);
+                    }
+                })());
             }
-
-            // 初始化模板庫資料
             if (typeof initTemplateLibrary === 'function') {
-                try {
-                    await initTemplateLibrary();
-                } catch (err) {
-                    console.error('初始化模板庫資料失敗:', err);
-                }
+                initTasks.push((async () => {
+                    try {
+                        await initTemplateLibrary();
+                    } catch (err) {
+                        console.error('初始化模板庫資料失敗:', err);
+                    }
+                })());
+            }
+            if (initTasks.length > 0) {
+                await Promise.all(initTasks);
             }
         } catch (error) {
             console.error('初始化中藥庫或收費項目資料失敗:', error);
