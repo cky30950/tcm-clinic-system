@@ -1878,9 +1878,9 @@ async function loadInquiryOptions(patient) {
                 const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 const localMin = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000)
                     .toISOString()
-                    .slice(0, 16);
+                    .slice(0, 10);
                 picker.min = localMin;
-                // 若尚未有值，預設為今日 00:00
+                // 若尚未有值，預設為今日
                 if (!picker.value) {
                     picker.value = localMin;
                 }
