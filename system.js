@@ -619,8 +619,11 @@ async function attemptMainLogin() {
     }
 
     // 顯示載入狀態：在按鈕中顯示旋轉小圈並禁用按鈕
-    const loginButton = document.querySelector('button[onclick="attemptMainLogin()"]');
-    setButtonLoading(loginButton, '登入中...');
+    // 由於不再使用 inline onclick 屬性，透過 id 取得登入按鈕
+    const loginButton = document.getElementById('loginButton');
+    if (loginButton) {
+        setButtonLoading(loginButton, '登入中...');
+    }
 
     try {
         // 等待 Firebase 初始化
@@ -11705,6 +11708,147 @@ document.addEventListener('DOMContentLoaded', function() {
         window.toggleChiefComplaintVisibility = toggleChiefComplaintVisibility;
         // 根據預設值初始化顯示狀態
         toggleChiefComplaintVisibility();
+    }
+
+    /*
+     * 登入頁與側邊欄事件綁定
+     * 為了避免在 HTML 中使用 inline 事件處理器，我們在 DOMContentLoaded 之後
+     * 使用 addEventListener 綁定對應的事件。這些元素在系統各處使用，透過
+     * id 或 data-* 屬性取得後綁定事件處理函式。
+     */
+    try {
+        // 登入按鈕：點擊觸發登入
+        const loginBtn = document.getElementById('loginButton');
+        if (loginBtn) {
+            loginBtn.addEventListener('click', function () {
+                try {
+                    attemptMainLogin();
+                } catch (e) {
+                    console.error('登入按鈕事件錯誤:', e);
+                }
+            });
+        }
+
+        // 登入頁輸入框：按下 Enter 鍵觸發登入
+        const loginEmailInput = document.querySelector('[data-login-email]');
+        const loginPasswordInput = document.querySelector('[data-login-password]');
+        const loginKeyListener = function (ev) {
+            if (ev && ev.key === 'Enter') {
+                try {
+                    attemptMainLogin();
+                } catch (e) {
+                    console.error('登入輸入框鍵盤事件錯誤:', e);
+                }
+            }
+        };
+        if (loginEmailInput) {
+            loginEmailInput.addEventListener('keypress', loginKeyListener);
+        }
+        if (loginPasswordInput) {
+            loginPasswordInput.addEventListener('keypress', loginKeyListener);
+        }
+
+        // 側邊欄開關按鈕與遮罩：點擊時切換側邊欄狀態
+        const openSidebarBtn = document.getElementById('openSidebarButton');
+        if (openSidebarBtn) {
+            openSidebarBtn.addEventListener('click', function () {
+                try {
+                    toggleSidebar();
+                } catch (e) {
+                    console.error('開啟側邊欄按鈕事件錯誤:', e);
+                }
+            });
+        }
+        const closeSidebarBtn = document.getElementById('closeSidebarButton');
+        if (closeSidebarBtn) {
+            closeSidebarBtn.addEventListener('click', function () {
+                try {
+                    toggleSidebar();
+                } catch (e) {
+                    console.error('關閉側邊欄按鈕事件錯誤:', e);
+                }
+            });
+        }
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', function () {
+                try {
+                    toggleSidebar();
+                } catch (e) {
+                    console.error('點擊遮罩錯誤:', e);
+                }
+            });
+        }
+
+        // 登出按鈕（頂部與側邊欄）：點擊後調用 logout
+        const logoutBtn = document.getElementById('logoutButton');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', function () {
+                try {
+                    logout();
+                } catch (e) {
+                    console.error('頂部登出按鈕事件錯誤:', e);
+                }
+            });
+        }
+        const sidebarLogoutBtn = document.getElementById('sidebarLogoutButton');
+        if (sidebarLogoutBtn) {
+            sidebarLogoutBtn.addEventListener('click', function () {
+                try {
+                    logout();
+                } catch (e) {
+                    console.error('側邊欄登出按鈕事件錯誤:', e);
+                }
+            });
+        }
+
+        // 病人資料管理：新增/隱藏/儲存事件綁定
+        // 新增病人按鈕
+        const showAddPatientBtn = document.getElementById('showAddPatientButton');
+        if (showAddPatientBtn) {
+            showAddPatientBtn.addEventListener('click', function () {
+                try {
+                    showAddPatientForm();
+                } catch (e) {
+                    console.error('顯示新增病人表單錯誤:', e);
+                }
+            });
+        }
+        // 關閉新增病人表單（標題列叉號）
+        const hideAddPatientBtnTop = document.getElementById('hideAddPatientButtonTop');
+        if (hideAddPatientBtnTop) {
+            hideAddPatientBtnTop.addEventListener('click', function () {
+                try {
+                    hideAddPatientForm();
+                } catch (e) {
+                    console.error('關閉新增病人表單（標題）錯誤:', e);
+                }
+            });
+        }
+        // 取消按鈕：隱藏新增病人表單
+        const cancelAddPatientBtn = document.getElementById('cancelAddPatientButton');
+        if (cancelAddPatientBtn) {
+            cancelAddPatientBtn.addEventListener('click', function () {
+                try {
+                    hideAddPatientForm();
+                } catch (e) {
+                    console.error('取消新增病人表單錯誤:', e);
+                }
+            });
+        }
+        // 儲存病人按鈕：提交表單
+        const savePatientBtn = document.getElementById('savePatientButton');
+        if (savePatientBtn) {
+            savePatientBtn.addEventListener('click', function () {
+                try {
+                    savePatient();
+                } catch (e) {
+                    console.error('儲存病人資料錯誤:', e);
+                }
+            });
+        }
+    } catch (e) {
+        console.error('綁定登入與側邊欄事件時發生錯誤:', e);
     }
 });
 

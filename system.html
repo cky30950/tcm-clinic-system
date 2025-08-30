@@ -87,16 +87,16 @@
                     <label class="block text-sm font-medium text-gray-700 mb-2">電子郵件</label>
                     <input type="email" id="mainLoginUsername" placeholder="請輸入電子郵件" 
                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                           onkeypress="if(event.key==='Enter') document.getElementById('mainLoginPassword').focus()">
+                           data-login-email>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">密碼</label>
                     <input type="password" id="mainLoginPassword" placeholder="請輸入密碼" 
                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                           onkeypress="if(event.key==='Enter') attemptMainLogin()">
+                           data-login-password>
                 </div>
                 
-                <button onclick="attemptMainLogin()" 
+                <button id="loginButton" 
                         class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200">
                     登入系統
                 </button>
@@ -118,7 +118,7 @@
                             <span class="text-2xl mr-3">🏥</span>
                             <h2 class="text-lg font-bold">診所功能</h2>
                         </div>
-                        <button onclick="toggleSidebar()" class="text-white hover:text-gray-200 text-xl">
+                        <button id="closeSidebarButton" class="text-white hover:text-gray-200 text-xl">
                             ×
                         </button>
                     </div>
@@ -132,7 +132,7 @@
                 </div>
                 <!-- 底部操作 -->
                 <div class="border-t border-gray-200 p-4">
-                    <button onclick="logout()" class="w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg text-sm transition duration-200 flex items-center justify-center">
+                    <button id="sidebarLogoutButton" class="w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg text-sm transition duration-200 flex items-center justify-center">
                         <span class="mr-2">🚪</span>
                         登出系統
                     </button>
@@ -140,13 +140,13 @@
             </div>
         </div>
         <!-- 遮罩層 -->
-        <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden" onclick="toggleSidebar()"></div>
+        <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
         <!-- 頂部導航 -->
         <nav class="bg-white shadow-lg border-b-4 border-green-500">
             <div class="max-w-7xl mx-auto px-4">
                 <div class="flex justify-between items-center py-4">
                     <div class="flex items-center">
-                        <button onclick="toggleSidebar()" class="mr-4 p-2 rounded-lg hover:bg-gray-100 transition duration-200">
+                        <button id="openSidebarButton" class="mr-4 p-2 rounded-lg hover:bg-gray-100 transition duration-200">
                             <div class="w-6 h-6 flex flex-col justify-center space-y-1">
                                 <div class="w-full h-0.5 bg-gray-600"></div>
                                 <div class="w-full h-0.5 bg-gray-600"></div>
@@ -161,7 +161,7 @@
                     </div>
                     <div class="flex items-center space-x-4">
                         <span id="userRole" class="text-sm text-gray-600"></span>
-                        <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                        <button id="logoutButton" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
                             登出
                         </button>
                     </div>
@@ -213,7 +213,7 @@
                             <input type="text" id="searchPatient" placeholder="搜尋病人編號、姓名或電話..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
                             <span class="absolute right-3 top-2.5 text-gray-400">🔍</span>
                         </div>
-                        <button onclick="showAddPatientForm()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200 whitespace-nowrap">
+                        <button id="showAddPatientButton" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200 whitespace-nowrap">
                             + 新增病人
                         </button>
                     </div>
@@ -223,7 +223,7 @@
                     <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                             <h3 id="formTitle" class="text-xl font-bold text-gray-800">新增病人資料</h3>
-                            <button onclick="hideAddPatientForm()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                            <button id="hideAddPatientButtonTop" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
                         </div>
                         
                         <div class="p-6">
@@ -272,10 +272,10 @@
                             </div>
                             
                             <div class="flex justify-end space-x-4 mt-6 pt-4 border-t border-gray-200">
-                                <button onclick="hideAddPatientForm()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition duration-200">
+                                <button id="cancelAddPatientButton" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition duration-200">
                                     取消
                                 </button>
-                                <button onclick="savePatient()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition duration-200">
+                                <button id="savePatientButton" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition duration-200">
                                     <span id="saveButtonText">儲存</span>
                                 </button>
                             </div>
@@ -1855,6 +1855,7 @@
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
