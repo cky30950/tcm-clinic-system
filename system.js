@@ -309,6 +309,23 @@ function playNotificationSound() {
     }
 }
 
+/**
+ * 生成唯一的病歷編號。
+ * 使用當前日期時間和隨機數組成，格式如 MR20250101123045-1234。
+ * @returns {string} 新的病歷編號
+ */
+function generateMedicalRecordNumber() {
+    try {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const datePart = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        const randomPart = Math.floor(1000 + Math.random() * 9000);
+        return `MR${datePart}-${randomPart}`;
+    } catch (e) {
+        // 萬一日期取得失敗，退回目前時間戳記為編號
+        return `MR${Date.now()}`;
+    }
+}
         // 按鈕讀取狀態控制函數
         // 在按鈕上顯示一個半透明的旋轉小圈，以顯示正在讀取中。
         // 原始內容將儲存在 data-originalHtml 中，完成後可復原。
@@ -3572,6 +3589,8 @@ async function saveConsultation() {
             }
         } else {
             // New consultation: assign the current date and doctor
+            // 為新的病歷產生一個唯一的病歷編號
+            consultationData.medicalRecordNumber = generateMedicalRecordNumber();
             consultationData.date = new Date();
             consultationData.doctor = currentUser;
             const result = await window.firebaseDataManager.addConsultation(consultationData);
@@ -3766,6 +3785,9 @@ if (!patient) {
                                 </span>
                                 <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded">
                                     醫師：${getDoctorDisplayName(consultation.doctor)}
+                                </span>
+                                <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded">
+                                    病歷編號：${consultation.medicalRecordNumber || consultation.id}
                                 </span>
                                 ${consultation.updatedAt ? `
                                     <span class="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
