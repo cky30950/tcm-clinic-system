@@ -17,10 +17,10 @@ const ROLE_PERMISSIONS = {
   // 護理師原本僅能使用診症相關功能。為了讓模板庫管理變成公用功能，
   // 將 templateLibrary 新增到護理師的權限清單，讓護理師也能瀏覽與使用模板庫。
   // 護理師：模板庫管理放在診症系統之後
-  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary'],
+      '護理師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary'],
   // 一般用戶原本只能進入病患管理與診症系統。為了讓模板庫管理變成公用功能，
   // 也將 templateLibrary 新增到一般用戶的權限清單，使所有登入用戶都可存取模板庫。
-  '用戶': ['patientManagement', 'consultationSystem']
+      '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary']
 };
 
 /**
@@ -71,21 +71,7 @@ let pendingPackageChanges = [];
  * @param {string} packageRecordId
  * @returns {number}
  */
-function getPendingPackageDelta(patientId, packageRecordId) {
-    try {
-        return pendingPackageChanges
-            .filter(ch => {
-                if (!ch || typeof ch.delta !== 'number') return false;
-                // 比較 patientId 和 packageRecordId 時統一轉為字串，以避免類型不一致導致匹配失敗
-                const pidMatches = (ch.patientId !== undefined && patientId !== undefined) ? String(ch.patientId) === String(patientId) : false;
-                const pkgMatches = (ch.packageRecordId !== undefined && packageRecordId !== undefined) ? String(ch.packageRecordId) === String(packageRecordId) : false;
-                return pidMatches && pkgMatches;
-            })
-            .reduce((sum, ch) => sum + ch.delta, 0);
-    } catch (e) {
-        return 0;
-    }
-}
+// 已移除 getPendingPackageDelta 函式（未使用）
 
 /**
  * 將所有暫存的套票變更同步至 Firestore。
@@ -615,6 +601,16 @@ async function waitForFirebaseDb() {
   }
 }
 
+// 等待 FirebaseDataManager 初始化的輔助函式
+// 某些函式需要等待 DataManager isReady 再繼續
+async function waitForFirebaseDataManager() {
+  // 先確保 Firebase 本身已初始化，以避免數據管理器永遠無法就緒
+  await waitForFirebase();
+  while (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+
     
 
 // 主要登入功能
@@ -637,6 +633,12 @@ async function attemptMainLogin() {
     try {
         // 等待 Firebase 初始化
         await waitForFirebase();
+
+        // 等待 Firebase 初始化後檢查連線狀態，若未連線則顯示錯誤並中止
+        if (window.firebaseConnected === false) {
+            showToast('無法連接到伺服器，請稍後再試', 'error');
+            return;
+        }
 
         // 使用 Firebase 登入
         const userCredential = await window.firebase.signInWithEmailAndPassword(
@@ -828,21 +830,7 @@ async function syncUserDataFromFirebase() {
     }
 }
 
-// 幫助函數：從 email 獲取姓名
-function getUserNameFromEmail(email) {
-    if (email === 'admin@clinic.com') return '系統管理員';
-    if (email === 'doctor@clinic.com') return '張中醫師';
-    if (email === 'nurse@clinic.com') return '林護理師';
-    return '用戶';
-}
-
-// 幫助函數：從 email 獲取職位
-function getUserPositionFromEmail(email) {
-    if (email === 'admin@clinic.com') return '診所管理';
-    if (email === 'doctor@clinic.com') return '醫師';
-    if (email === 'nurse@clinic.com') return '護理師';
-    return '用戶';
-}
+// 已移除 getUserNameFromEmail 與 getUserPositionFromEmail 函式（未使用）
         
         // 執行登入
         function performLogin(user) {
@@ -1020,9 +1008,7 @@ async function logout() {
          * @param {string[]} allowedRoles 允許存取的職位陣列
          * @returns {boolean} 若當前用戶存在且職位在允許名單中則回傳 true
          */
-        function hasPermission(allowedRoles) {
-            return currentUserData && Array.isArray(allowedRoles) && allowedRoles.includes(currentUserData.position);
-        }
+// 已移除 hasPermission 函式（未使用）
 
         // 顯示指定區域
         function showSection(sectionId) {
@@ -1131,6 +1117,13 @@ async function savePatient() {
     // 驗證必填欄位：姓名、性別、電話、出生日期與身分證字號
     if (!patient.name || !patient.gender || !patient.phone || !patient.birthDate || !patient.idCard) {
         showToast('請填寫必要資料（姓名、性別、電話、出生日期、身分證字號）！', 'error');
+        return;
+    }
+
+    // 驗證電話格式：僅允許數字，可接受 7~15 位
+    const phonePattern = /^\d{7,15}$/;
+    if (!phonePattern.test(patient.phone)) {
+        showToast('電話格式不正確，請輸入 7-15 位數字！', 'error');
         return;
     }
 
@@ -2755,18 +2748,7 @@ function parseConsultationDate(dateInput) {
     }
 }
 // 修復格式化診症日期顯示
-function formatConsultationDate(dateInput) {
-    const date = parseConsultationDate(dateInput);
-    if (!date || isNaN(date.getTime())) {
-        return '日期未知';
-    }
-    
-    return date.toLocaleDateString('zh-TW', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    });
-}
+// 已移除 formatConsultationDate 函式（未使用），請改用 formatConsultationDateTime()
 
 function formatConsultationDateTime(dateInput) {
     const date = parseConsultationDate(dateInput);
@@ -6911,9 +6893,7 @@ async function updateStatistics() {
 // 並在完成後更新統計資訊以及訂閱掛號即時更新。
 async function initializeSystemAfterLogin() {
     // 確保 Firebase 資料管理器已準備好
-    while (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-    }
+    await waitForFirebaseDataManager();
     try {
         // 僅在登入後初始化必要的資料。為了避免在進入主頁時重複讀取掛號與病人資料，
         // 此處僅讀取診療記錄，掛號與病人資料將透過實時監聽或功能頁面再讀取。
@@ -8956,16 +8936,7 @@ function parseBillingItemsFromText(billingText) {
     }
 }
         
-        // 載入上次收費項目（內部函數 - 保留向後兼容）
-        function loadPreviousBillingItemsFromConsultation(lastConsultation) {
-    selectedBillingItems = [];
-    parseBillingItemsFromText(lastConsultation.billingItems);
-    // 排除載入舊病歷時的套票抵扣和購買項目，避免重複加載。
-    if (Array.isArray(selectedBillingItems) && selectedBillingItems.length > 0) {
-        selectedBillingItems = selectedBillingItems.filter(item => item.category !== 'packageUse' && item.category !== 'package');
-    }
-    updateBillingDisplay();
-        }
+        // 已移除 loadPreviousBillingItemsFromConsultation 函式（未使用）
         
         // 載入指定病歷記錄到當前診症
         async function loadMedicalRecordToCurrentConsultation(consultationId) {
@@ -9143,21 +9114,7 @@ const consultationDate = (() => {
         }
         
         // 清空診症表單時也要清空處方搜索
-        function clearConsultationFormOld() {
-            ['formSymptoms', 'formTongue', 'formPulse', 'formCurrentHistory', 'formDiagnosis', 'formSyndrome', 'formAcupunctureNotes', 'formPrescription', 'formUsage', 'formTreatmentCourse', 'formInstructions', 'formFollowUpDate'].forEach(id => {
-                document.getElementById(id).value = '';
-            });
-            
-            // 清空處方項目
-            selectedPrescriptionItems = [];
-            updatePrescriptionDisplay();
-            clearPrescriptionSearch();
-            
-            // 清空收費項目
-            selectedBillingItems = [];
-            updateBillingDisplay();
-            clearBillingSearch();
-        }
+        /* clearConsultationFormOld 函式已移除（未使用） */
 
 
 
@@ -9502,6 +9459,25 @@ async function saveUser() {
     if (!name || !position) {
         showToast('請填寫必要資料（姓名、職位）！', 'error');
         return;
+    }
+
+    // 檢查電子郵件格式
+    if (email) {
+        // 基本電子郵件格式驗證
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(email)) {
+            showToast('電子郵件格式不正確！', 'error');
+            return;
+        }
+    }
+
+    // 檢查電話格式：允許 7~15 位數字
+    if (phone) {
+        const phonePattern = /^\d{7,15}$/;
+        if (!phonePattern.test(phone)) {
+            showToast('電話格式不正確，請輸入 7-15 位數字！', 'error');
+            return;
+        }
     }
     
     // 醫師職位必須填寫註冊編號
@@ -11131,10 +11107,8 @@ class FirebaseDataManager {
     }
 
     async initializeWhenReady() {
-        // 等待 Firebase 初始化
-        while (!window.firebase) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        // 等待 Firebase 初始化，使用通用等待函式
+        await waitForFirebase();
         this.isReady = true;
         console.log('Firebase 數據管理器已準備就緒');
     }
@@ -13214,9 +13188,7 @@ function refreshTemplateCategoryFilters() {
           }
 
           // 等待 Firebase 初始化完成
-          while (!window.firebase || !window.firebase.db) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
+          await waitForFirebaseDb();
           try {
             const docRef = window.firebase.doc(window.firebase.db, 'categories', 'default');
             const docSnap = await window.firebase.getDoc(docRef);
@@ -13267,9 +13239,7 @@ function refreshTemplateCategoryFilters() {
             // 如果 Firebase 可用，則將分類資料寫入 Firestore
             if (window.firebase && window.firebase.db && window.firebase.setDoc && window.firebase.doc) {
               // 確保 Firebase 已經初始化
-              while (!window.firebase || !window.firebase.db) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
+              await waitForFirebaseDb();
               const docRef = window.firebase.doc(window.firebase.db, 'categories', 'default');
               await window.firebase.setDoc(docRef, {
                 herbs: categories.herbs,
@@ -13454,21 +13424,7 @@ function refreshTemplateCategoryFilters() {
             showEditModal('herb', newItem.name);
           }
 
-          function duplicateHerbCombination(id) {
-            const item = herbCombinations.find(h => h.id === id);
-            if (!item) return;
-            const copy = JSON.parse(JSON.stringify(item));
-            copy.id = Date.now();
-            copy.name += ' (複製)';
-            herbCombinations.push(copy);
-            renderHerbCombinations();
-            // Persist changes for personal herb combinations
-            if (typeof updatePersonalSettings === 'function') {
-              try {
-                updatePersonalSettings().catch((err) => console.error('更新個人設置失敗:', err));
-              } catch (_e) {}
-            }
-          }
+          /* duplicateHerbCombination 函式已移除（未使用） */
 
           function deleteHerbCombination(id) {
             if (!confirm('確定要刪除此藥方組合嗎？')) return;
@@ -13593,21 +13549,7 @@ function refreshTemplateCategoryFilters() {
             showEditModal('acupoint', newItem.name);
           }
 
-          function duplicateAcupointCombination(id) {
-            const item = acupointCombinations.find(a => a.id === id);
-            if (!item) return;
-            const copy = JSON.parse(JSON.stringify(item));
-            copy.id = Date.now();
-            copy.name += ' (複製)';
-            acupointCombinations.push(copy);
-            renderAcupointCombinations();
-            // Persist changes for personal acupoint combinations
-            if (typeof updatePersonalSettings === 'function') {
-              try {
-                updatePersonalSettings().catch((err) => console.error('更新個人設置失敗:', err));
-              } catch (_e) {}
-            }
-          }
+          /* duplicateAcupointCombination 函式已移除（未使用） */
 
           function deleteAcupointCombination(id) {
             if (!confirm('確定要刪除此穴位組合嗎？')) return;
@@ -13791,14 +13733,9 @@ function refreshTemplateCategoryFilters() {
            */
           async function loadPersonalSettings() {
             try {
-              // 等待 Firebase 初始化
-              while (!window.firebase || !window.firebase.db) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-              // 等待數據管理器初始化
-              while (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
+              // 等待 Firebase 與資料管理器初始化
+              await waitForFirebaseDb();
+              await waitForFirebaseDataManager();
               // 若沒有當前用戶資料，直接結束
               if (!currentUserData || !currentUserData.id) {
                 return;
@@ -13899,9 +13836,7 @@ function refreshTemplateCategoryFilters() {
            */
           async function updatePersonalSettings() {
             try {
-              while (!window.firebase || !window.firebase.db) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
+              await waitForFirebaseDb();
               if (!currentUserData || !currentUserData.id) {
                 return;
               }
@@ -14222,15 +14157,7 @@ function refreshTemplateCategoryFilters() {
             showEditModal('prescription', newItem.name);
           }
 
-          function duplicatePrescriptionTemplate(id) {
-            const item = prescriptionTemplates.find(p => p.id === id);
-            if (!item) return;
-            const copy = JSON.parse(JSON.stringify(item));
-            copy.id = Date.now();
-            copy.name += ' (複製)';
-            prescriptionTemplates.push(copy);
-            renderPrescriptionTemplates();
-          }
+          /* duplicatePrescriptionTemplate 函式已移除（未使用） */
 
           async function deletePrescriptionTemplate(id) {
             if (!confirm('確定要刪除此醫囑模板嗎？')) return;
@@ -14330,15 +14257,7 @@ function refreshTemplateCategoryFilters() {
             showEditModal('diagnosis', newItem.name);
           }
 
-          function duplicateDiagnosisTemplate(id) {
-            const item = diagnosisTemplates.find(d => d.id === id);
-            if (!item) return;
-            const copy = JSON.parse(JSON.stringify(item));
-            copy.id = Date.now();
-            copy.name += ' (複製)';
-            diagnosisTemplates.push(copy);
-            renderDiagnosisTemplates();
-          }
+          /* duplicateDiagnosisTemplate 函式已移除（未使用） */
 
           async function deleteDiagnosisTemplate(id) {
             if (!confirm('確定要刪除此診斷模板嗎？')) return;
@@ -15098,14 +15017,7 @@ function refreshTemplateCategoryFilters() {
             hideEditModal();
           }
 
-          function addHerbIngredientField() {
-            const container = document.getElementById('herbIngredients');
-            const div = document.createElement('div');
-            div.className = 'grid grid-cols-2 gap-2';
-            // 新增的藥材欄位改為兩個輸入框：藥材名稱與劑量
-            div.innerHTML = '<input type="text" placeholder="藥材名稱" class="px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="劑量" class="px-2 py-1 border border-gray-300 rounded">';
-            container.appendChild(div);
-          }
+          /* addHerbIngredientField 函式已移除（未使用） */
 
           function addAcupointPointField() {
             const container = document.getElementById('acupointPoints');
