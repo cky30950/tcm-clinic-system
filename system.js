@@ -4108,6 +4108,10 @@ function displayConsultationMedicalHistoryPage() {
                         <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded">
                             醫師：${getDoctorDisplayName(consultation.doctor)}
                         </span>
+                        <!-- 新增病歷編號顯示 -->
+                        <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded">
+                            病歷編號：${consultation.medicalRecordNumber || consultation.id}
+                        </span>
                         ${consultation.updatedAt ? `
                             <span class="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
                                 已修改
