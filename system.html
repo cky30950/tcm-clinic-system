@@ -116,7 +116,8 @@
         </div>
     </div>
     <!-- 主系統頁面 -->
-    <div id="mainSystem" class="hidden fade-in">
+    <!-- 使用 flex 容器和最小高度確保頁腳始終位於頁面底部 -->
+    <div id="mainSystem" class="hidden flex flex-col min-h-screen fade-in">
         <!-- 側邊選單 -->
         <div id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out">
             <div class="flex flex-col h-full">
@@ -1800,8 +1801,8 @@
             </div>
         </div>
 
-        <!-- 主系統頁面版權宣告，帶有頂部細線 -->
-        <div id="mainPageFooter" class="max-w-7xl mx-auto px-4 py-4 mt-8">
+        <!-- 主系統頁面版權宣告，帶有頂部細線。透過 mt-auto 讓此區塊推至頁面底部 -->
+        <div id="mainPageFooter" class="max-w-7xl mx-auto px-4 py-4 mt-auto">
             <div class="text-center text-xs text-gray-400">
                 <div class="border-t border-gray-200 pt-4">
                     Copyright © 2025 <span class="text-gray-600 font-medium">湛凌有限公司</span>. All rights reserved.

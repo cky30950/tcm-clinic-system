@@ -14657,6 +14657,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         footer.style.fontSize = '12px';
                         footer.style.color = '#888';
                         footer.style.margin = '20px 0 10px 0';
+                        // 寬度佔滿頁面，確保在行動裝置也能完整顯示
+                        footer.style.width = '100%';
                         // 加入頂部細線與內邊距，使其與主系統頁面的版權區塊一致
                         footer.style.borderTop = '1px solid #e5e7eb';
                         footer.style.paddingTop = '16px';
@@ -14667,6 +14669,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         // 若已存在頁腳，統一更新樣式與版權內容
                         footer.style.borderTop = '1px solid #e5e7eb';
                         footer.style.paddingTop = '16px';
+                        footer.style.width = '100%';
                         footer.innerHTML = 'Copyright © 2025 湛凌有限公司. All rights reserved.';
                     }
                 } catch (e) {
