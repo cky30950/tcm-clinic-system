@@ -230,7 +230,7 @@ async function fetchUsers(forceRefresh = false) {
         // 診所設定
         let clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
         if (!clinicSettings.chineseName) {
-            clinicSettings.chineseName = '湛凌診所系統';
+            clinicSettings.chineseName = '名醫診所系統';
             clinicSettings.englishName = 'TCM Clinic';
             clinicSettings.businessHours = '週一至週五 09:00-18:00';
             clinicSettings.phone = '(852) 2345-6789';
@@ -4665,7 +4665,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                 <div class="receipt-container">
                     <!-- 診所標題 -->
                     <div class="clinic-header">
-                        <div class="clinic-name">${clinicSettings.chineseName || '湛凌診所系統'}</div>
+                        <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
                         <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
                         <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                     </div>
@@ -5122,7 +5122,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                     <div class="content">
                         <!-- 診所標題 -->
                         <div class="clinic-header">
-                            <div class="clinic-name">${clinicSettings.chineseName || '湛凌診所系統'}</div>
+                            <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
                             <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
                             <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                         </div>
@@ -5458,7 +5458,7 @@ async function printSickLeave(consultationId, consultationData = null) {
                     <div class="content">
                         <!-- 診所標題 -->
                         <div class="clinic-header">
-                            <div class="clinic-name">${clinicSettings.chineseName || '湛凌診所系統'}</div>
+                            <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
                             <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
                             <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                         </div>
@@ -5975,7 +5975,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                 <div class="advice-container">
                     <!-- 診所標題 -->
                     <div class="clinic-header">
-                        <div class="clinic-name">${clinicSettings.chineseName || '湛凌診所系統'}</div>
+                        <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
                         <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
                         <div class="clinic-subtitle">電話：${clinicSettings.phone || '(852) 2345-6789'}　地址：${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                     </div>
@@ -6799,7 +6799,7 @@ async function initializeSystemAfterLogin() {
             const englishNameSpan = document.getElementById('displayEnglishName');
             
             if (chineseNameSpan) {
-                chineseNameSpan.textContent = clinicSettings.chineseName || '湛凌診所系統';
+                chineseNameSpan.textContent = clinicSettings.chineseName || '名醫診所系統';
             }
             if (englishNameSpan) {
                 englishNameSpan.textContent = clinicSettings.englishName || 'TCM Clinic';
@@ -6809,7 +6809,7 @@ async function initializeSystemAfterLogin() {
             const loginTitle = document.getElementById('loginTitle');
             const loginEnglishTitle = document.getElementById('loginEnglishTitle');
             if (loginTitle) {
-                loginTitle.textContent = clinicSettings.chineseName || '湛凌診所系統';
+                loginTitle.textContent = clinicSettings.chineseName || '名醫診所系統';
             }
             if (loginEnglishTitle) {
                 loginEnglishTitle.textContent = clinicSettings.englishName || 'TCM Clinic';
@@ -6819,7 +6819,7 @@ async function initializeSystemAfterLogin() {
             const systemTitle = document.getElementById('systemTitle');
             const systemEnglishTitle = document.getElementById('systemEnglishTitle');
             if (systemTitle) {
-                systemTitle.textContent = clinicSettings.chineseName || '湛凌診所系統';
+                systemTitle.textContent = clinicSettings.chineseName || '名醫診所系統';
             }
             if (systemEnglishTitle) {
                 systemEnglishTitle.textContent = clinicSettings.englishName || 'TCM Clinic';
@@ -6829,7 +6829,7 @@ async function initializeSystemAfterLogin() {
             const welcomeTitle = document.getElementById('welcomeTitle');
             const welcomeEnglishTitle = document.getElementById('welcomeEnglishTitle');
             if (welcomeTitle) {
-                welcomeTitle.textContent = `歡迎使用${clinicSettings.chineseName || '湛凌診所系統'}`;
+                welcomeTitle.textContent = `歡迎使用${clinicSettings.chineseName || '名醫診所系統'}`;
             }
             if (welcomeEnglishTitle) {
                 welcomeEnglishTitle.textContent = `Welcome to ${clinicSettings.englishName || 'TCM Clinic'}`;
@@ -14696,7 +14696,7 @@ document.addEventListener('DOMContentLoaded', function () {
         loginCopy.className = 'text-center mt-8 text-xs text-gray-400';
         loginCopy.innerHTML = `
           <div class="border-t border-gray-200 pt-4">
-            Copyright © 2025 <span class="text-gray-600 font-medium">湛凌有限公司</span>. All rights reserved.
+            Copyright © 2025 <span class="text-gray-600 font-medium">名醫有限公司</span>. All rights reserved.
           </div>
         `;
         cardContainer.appendChild(loginCopy);
@@ -14711,7 +14711,7 @@ document.addEventListener('DOMContentLoaded', function () {
       globalContainer.innerHTML = `
         <div class="text-center border-t border-gray-200 pt-4">
           <div class="text-xs text-gray-400">
-            Copyright © 2025 <span class="text-gray-600 font-medium">湛凌有限公司</span>. All rights reserved.
+            Copyright © 2025 <span class="text-gray-600 font-medium">名醫有限公司</span>. All rights reserved.
           </div>
         </div>
       `;
