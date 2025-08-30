@@ -12849,55 +12849,11 @@ function refreshTemplateCategoryFilters() {
         }
 
           // 數據存儲
-          let herbCombinations = [
-            {
-              id: 1,
-              name: '小柴胡湯加減',
-              category: '感冒類',
-              description: '適用：少陽證、往來寒熱、胸脅苦滿',
-              ingredients: [
-                { name: '柴胡', dosage: '12g' },
-                { name: '黃芩', dosage: '9g' },
-                { name: '半夏', dosage: '9g' },
-                { name: '人參', dosage: '6g' },
-                { name: '甘草', dosage: '6g' }
-              ],
-              frequency: '高',
-              lastModified: '2024-01-10'
-            },
-            {
-              id: 2,
-              name: '四君子湯',
-              category: '補益類',
-              description: '適用：脾胃氣虛、食少便溏、面色萎白',
-              ingredients: [
-                { name: '人參', dosage: '9g' },
-                { name: '白朮', dosage: '9g' },
-                { name: '茯苓', dosage: '9g' },
-                { name: '甘草', dosage: '6g' }
-              ],
-              frequency: '中',
-              lastModified: '2024-03-18'
-            }
-          ];
+          // 移除預設的中藥組合範例，預設為空陣列。
+          let herbCombinations = [];
 
-          let acupointCombinations = [
-            {
-              id: 1,
-              name: '腹痛針灸組合',
-              category: '內科疾病',
-              points: [
-                { name: '中脘穴', type: '主穴' },
-                { name: '足三里', type: '主穴' },
-                { name: '合谷穴', type: '配穴' },
-                { name: '內關穴', type: '配穴' },
-                { name: '胃俞穴', type: '配穴' }
-              ],
-              technique: '補法為主，可配合艾灸',
-              frequency: '高',
-              lastModified: '2024-02-01'
-            }
-          ];
+          // 移除預設的穴位組合範例，預設為空陣列。
+          let acupointCombinations = [];
 
           let prescriptionTemplates = [
             {
@@ -12970,7 +12926,8 @@ function refreshTemplateCategoryFilters() {
               ? list.filter(item => item && item.name && String(item.name).trim() !== '')
               : [];
             if (!Array.isArray(list) || list.length === 0) {
-              container.innerHTML = '<div class="text-center text-gray-500">尚未設定常用藥方組合</div>';
+              // 當列表為空時顯示提示，鼓勵使用者創建自己的組合。
+              container.innerHTML = '<div class="w-full md:col-span-2 text-center text-gray-400 text-lg py-10">創建自己的組合</div>';
               return;
             }
             list.forEach(item => {
@@ -13113,7 +13070,8 @@ function refreshTemplateCategoryFilters() {
               : [];
             // 若無資料顯示提示。
             if (!Array.isArray(list) || list.length === 0) {
-              container.innerHTML = '<div class="text-center text-gray-500">尚未設定常用穴位組合</div>';
+              // 顯示背景文字提示，鼓勵使用者創建自己的穴位組合。
+              container.innerHTML = '<div class="w-full md:col-span-2 text-center text-gray-400 text-lg py-10">創建自己的組合</div>';
               return;
             }
             // 渲染篩選後的結果。
