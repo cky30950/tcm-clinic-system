@@ -3865,7 +3865,7 @@ if (!patient) {
                             <div class="flex space-x-2">
                                 <button onclick="printConsultationRecord('${consultation.id}')" 
                                         class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded">
-                                    📄 列印收據
+                                    列印收據
                                 </button>
                                 <!-- 新增藥單醫囑列印按鈕，放在收據右側 -->
                                 <button onclick="printPrescriptionInstructions('${consultation.id}')" 
@@ -3874,7 +3874,7 @@ if (!patient) {
                                 </button>
                                 <button onclick="printAttendanceCertificate('${consultation.id}')" 
                                         class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded">
-                                    📋 到診證明
+                                    到診證明
                                 </button>
                                 ${(() => {
                                     // 檢查是否正在診症且為相同病人
@@ -4193,7 +4193,7 @@ function displayConsultationMedicalHistoryPage() {
                     <div class="flex space-x-2">
                         <button onclick="printConsultationRecord('${consultation.id}')" 
                                 class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded">
-                            📄 列印收據
+                            列印收據
                         </button>
                         <!-- 新增藥單醫囑列印按鈕，放在收據右側 -->
                         <button onclick="printPrescriptionInstructions('${consultation.id}')" 
@@ -4202,7 +4202,7 @@ function displayConsultationMedicalHistoryPage() {
                         </button>
                         <button onclick="printAttendanceCertificate('${consultation.id}')" 
                                 class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded">
-                            📋 到診證明
+                            到診證明
                         </button>
                         ${(() => {
                             // 檢查是否正在診症且為相同病人
