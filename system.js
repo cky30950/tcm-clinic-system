@@ -4705,6 +4705,11 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                             <span class="info-label">病人姓名：</span>
                             <span>${patient.name}</span>
                         </div>
+                        <!-- 新增病歷編號顯示，置於姓名下方 -->
+                        <div class="info-row">
+                            <span class="info-label">病歷編號：</span>
+                            <span>${consultation.medicalRecordNumber || consultation.id}</span>
+                        </div>
                         <div class="info-row">
                             <span class="info-label">病人號碼：</span>
                             <span>${patient.patientNumber}</span>
@@ -5163,6 +5168,11 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                                 <span class="info-label">姓　　名：</span>
                                 <span class="info-value">${patient.name}</span>
                             </div>
+                            <!-- 新增病歷編號顯示，置於姓名下方 -->
+                            <div class="info-row">
+                                <span class="info-label">病歷編號：</span>
+                                <span class="info-value">${consultation.medicalRecordNumber || consultation.id}</span>
+                            </div>
                             <div class="info-row">
                                 <span class="info-label">性　　別：</span>
                                 <span class="info-value">${patient.gender}</span>
@@ -5498,6 +5508,11 @@ async function printSickLeave(consultationId, consultationData = null) {
                             <div class="info-row">
                                 <span class="info-label">姓　　名：</span>
                                 <span class="info-value">${patient.name}</span>
+                            </div>
+                            <!-- 新增病歷編號顯示，置於姓名下方 -->
+                            <div class="info-row">
+                                <span class="info-label">病歷編號：</span>
+                                <span class="info-value">${consultation.medicalRecordNumber || consultation.id}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">性　　別：</span>
@@ -6006,6 +6021,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     <!-- 病人及診療資訊 -->
                     <div class="patient-info">
                         <div class="info-row"><span class="info-label">病人姓名：</span><span>${patient.name}</span></div>
+                        <!-- 新增病歷編號顯示，置於姓名下方 -->
+                        <div class="info-row"><span class="info-label">病歷編號：</span><span>${consultation.medicalRecordNumber || consultation.id}</span></div>
                         ${patient.patientNumber ? `<div class="info-row"><span class="info-label">病人號碼：</span><span>${patient.patientNumber}</span></div>` : ''}
                         <div class="info-row"><span class="info-label">診療日期：</span><span>${consultationDate.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span></div>
                         <div class="info-row"><span class="info-label">診療時間：</span><span>${consultationDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</span></div>
