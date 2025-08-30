@@ -4706,7 +4706,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                             <span>${patient.name}</span>
                         </div>
                         <div class="info-row">
-                            <span class="info-label">病歷號碼：</span>
+                            <span class="info-label">病人號碼：</span>
                             <span>${patient.patientNumber}</span>
                         </div>
                         <div class="info-row">
@@ -6006,7 +6006,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     <!-- 病人及診療資訊 -->
                     <div class="patient-info">
                         <div class="info-row"><span class="info-label">病人姓名：</span><span>${patient.name}</span></div>
-                        ${patient.patientNumber ? `<div class="info-row"><span class="info-label">病歷號碼：</span><span>${patient.patientNumber}</span></div>` : ''}
+                        ${patient.patientNumber ? `<div class="info-row"><span class="info-label">病人號碼：</span><span>${patient.patientNumber}</span></div>` : ''}
                         <div class="info-row"><span class="info-label">診療日期：</span><span>${consultationDate.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span></div>
                         <div class="info-row"><span class="info-label">診療時間：</span><span>${consultationDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</span></div>
                         <div class="info-row"><span class="info-label">主治醫師：</span><span>${getDoctorDisplayName(consultation.doctor)}</span></div>
