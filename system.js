@@ -830,6 +830,14 @@ function getUserPositionFromEmail(email) {
             // 切換到主系統
             document.getElementById('loginPage').classList.add('hidden');
             document.getElementById('mainSystem').classList.remove('hidden');
+            // 切換版權顯示：登入頁版權隱藏，顯示全局版權
+            if (typeof showGlobalCopyright === 'function') {
+                try {
+                    showGlobalCopyright();
+                } catch (_e) {
+                    // 若發生錯誤則忽略
+                }
+            }
             
             document.getElementById('userRole').textContent = `當前用戶：${getUserDisplayName(user)}`;
             document.getElementById('sidebarUserRole').textContent = `當前用戶：${getUserDisplayName(user)}`;
@@ -876,6 +884,14 @@ async function logout() {
         // 切換頁面
         document.getElementById('loginPage').classList.remove('hidden');
         document.getElementById('mainSystem').classList.add('hidden');
+        // 切換版權顯示：顯示登入頁版權，隱藏全局版權
+        if (typeof hideGlobalCopyright === 'function') {
+            try {
+                hideGlobalCopyright();
+            } catch (_e) {
+                // 若發生錯誤則忽略
+            }
+        }
         document.getElementById('sidebar').classList.add('-translate-x-full');
         document.getElementById('sidebarOverlay').classList.add('hidden');
         hideAllSections();
@@ -14644,25 +14660,98 @@ document.addEventListener('DOMContentLoaded', function() {
             // 已移除舊版頁腳版權資訊初始化函式
           });
 
-// 新增全局版權聲明：在 DOMContentLoaded 後於頁面底部插入帶頂部細線的版權聲明。
+// 全局與登入版權聲明初始化：在 DOMContentLoaded 後插入對應的版權資訊。
 document.addEventListener('DOMContentLoaded', function () {
   try {
-    // 如果已經存在 id 為 globalCopyright 的元素，避免重複插入
+    // 插入登入頁版權聲明（位於登入按鈕下方）
+    const loginPage = document.getElementById('loginPage');
+    if (loginPage && !document.getElementById('loginCopyright')) {
+      // 尋找登入卡片容器
+      let cardContainer = null;
+      // 嘗試尋找具有 shadow 樣式的登入卡片
+      cardContainer = loginPage.querySelector('.bg-white.rounded-2xl.shadow-2xl');
+      // 若未找到，則退而求其次尋找首個白色背景容器
+      if (!cardContainer) {
+        cardContainer = loginPage.querySelector('.bg-white');
+      }
+      if (cardContainer) {
+        const loginCopy = document.createElement('div');
+        loginCopy.id = 'loginCopyright';
+        loginCopy.className = 'text-center mt-8 text-xs text-gray-400';
+        loginCopy.innerHTML = `
+          <div class="border-t border-gray-200 pt-4">
+            Copyright © 2025 <span class="text-gray-600 font-medium">湛凌有限公司</span>. All rights reserved.
+          </div>
+        `;
+        cardContainer.appendChild(loginCopy);
+      }
+    }
+
+    // 插入全局版權聲明（頁面底部）
     if (!document.getElementById('globalCopyright')) {
-      const container = document.createElement('div');
-      container.id = 'globalCopyright';
-      // 使用 Tailwind 類別設置寬度、邊距與內距，並加上上邊界線
-      container.className = 'max-w-7xl mx-auto px-4 py-4 mt-8';
-      container.innerHTML = `
+      const globalContainer = document.createElement('div');
+      globalContainer.id = 'globalCopyright';
+      globalContainer.className = 'max-w-7xl mx-auto px-4 py-4 mt-8';
+      globalContainer.innerHTML = `
         <div class="text-center border-t border-gray-200 pt-4">
           <div class="text-xs text-gray-400">
-            Copyright © 2025 <span class="text-gray-600 font-medium">湛凌有限公司</span>. All rights reserved.
+            Copyright © 2025 <span class="text-gray-600 font-medium">湛凌有限公司</span>. All rights reserved.
           </div>
         </div>
       `;
-      document.body.appendChild(container);
+      // 預設隱藏，登入頁面顯示時不顯示全局版權
+      globalContainer.style.display = 'none';
+      document.body.appendChild(globalContainer);
+    }
+
+    // 根據目前頁面狀態顯示或隱藏對應版權
+    const loginVisible = loginPage && !loginPage.classList.contains('hidden') && window.getComputedStyle(loginPage).display !== 'none';
+    const globalCopyright = document.getElementById('globalCopyright');
+    const loginCopyright = document.getElementById('loginCopyright');
+    if (loginVisible) {
+      if (globalCopyright) globalCopyright.style.display = 'none';
+      if (loginCopyright) loginCopyright.style.display = '';
+    } else {
+      if (globalCopyright) globalCopyright.style.display = '';
+      if (loginCopyright) loginCopyright.style.display = 'none';
     }
   } catch (e) {
-    console.error('初始化全局版權資訊時發生錯誤', e);
+    console.error('初始化版權資訊時發生錯誤', e);
   }
 });
+
+/**
+ * 顯示主系統頁面底部的版權聲明，隱藏登入頁內的版權。
+ */
+function showGlobalCopyright() {
+  try {
+    const globalCopyright = document.getElementById('globalCopyright');
+    const loginCopyright = document.getElementById('loginCopyright');
+    if (globalCopyright) {
+      globalCopyright.style.display = '';
+    }
+    if (loginCopyright) {
+      loginCopyright.style.display = 'none';
+    }
+  } catch (e) {
+    console.error('顯示全局版權時發生錯誤', e);
+  }
+}
+
+/**
+ * 顯示登入頁內的版權聲明，隱藏頁面底部的版權。
+ */
+function hideGlobalCopyright() {
+  try {
+    const globalCopyright = document.getElementById('globalCopyright');
+    const loginCopyright = document.getElementById('loginCopyright');
+    if (globalCopyright) {
+      globalCopyright.style.display = 'none';
+    }
+    if (loginCopyright) {
+      loginCopyright.style.display = '';
+    }
+  } catch (e) {
+    console.error('隱藏全局版權時發生錯誤', e);
+  }
+}
