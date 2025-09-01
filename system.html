@@ -513,16 +513,18 @@
                     
                     <div class="p-6">
                         <div class="overflow-x-auto">
-                            <table class="w-full">
+                            <!-- 使用 table-fixed 以確保各欄寬度穩定分配，避免因內容寬度導致表頭排列錯亂 -->
+                            <table class="w-full table-fixed">
                                 <thead class="bg-gray-100">
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">序號</th>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">病人姓名</th>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">掛號醫師</th>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">掛號時間</th>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">主訴症狀</th>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">狀態</th>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">操作</th>
+                                        <!-- 加入 whitespace-nowrap 以防表頭文字換行，保持表格整齊 -->
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">序號</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">病人姓名</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">掛號醫師</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">掛號時間</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">主訴症狀</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">狀態</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="todayAppointmentsList" class="divide-y divide-gray-200">
