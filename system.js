@@ -2937,14 +2937,12 @@ function createAppointmentRow(appointment, patient, index) {
                     ${statusInfo.text}
                 </span>
             </td>
-            <td class="px-4 py-3 text-sm">
+            <td class="px-4 py-3 text-sm text-right">
                 <!--
-                  將操作按鈕容器設為寬度 100% 並使用 justify-end，使所有操作按鈕靠右排列。
-                  原本在 <td> 上設置 w-full 會導致表格排版異常，令整列偏左。
-                  因此僅在內層容器上使用 w-full，以確保按鈕佔滿該欄寬度但不影響整行
-                  的寬度計算。
+                  操作按鈕容器改用 inline-flex 並移除 w-full，讓它自適應寬度並靠右對齊，
+                  避免整列寬度被撐開導致排版偏左的問題。
                 -->
-                <div class="flex flex-wrap gap-1 justify-end w-full">
+                <div class="inline-flex flex-wrap gap-1 justify-end">
                     ${operationButtons}
                 </div>
             </td>
@@ -14601,11 +14599,10 @@ function refreshTemplateCategoryFilters() {
             }
             sourceList.forEach((cat, idx) => {
               const div = document.createElement('div');
-              // 使用 flex 排版顯示分類，名稱使用 flex-1 及 break-all 以便長字串自動換行不溢出
               div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
               div.innerHTML = `
-                <span class="text-gray-700 flex-1 break-all">${cat}</span>
-                <button onclick="removeCategory('${type}', ${idx})" class="text-red-600 hover:text-red-800 text-sm ml-2">刪除</button>
+                <span class="text-gray-700">${cat}</span>
+                <button onclick="removeCategory('${type}', ${idx})" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
               `;
               listEl.appendChild(div);
             });
@@ -14804,11 +14801,9 @@ function refreshTemplateCategoryFilters() {
               // 重新組裝藥材列表：每行使用 flex 排版，包含名稱、劑量欄、單位及刪除按鈕。
               const herbIngredientsHtml = Array.isArray(item.ingredients)
                 ? item.ingredients.map(ing => {
-                    // 在編輯藥方組合時，藥材名稱列與劑量欄位應根據可用空間自動伸縮，避免固定欄長
-                    // 將劑量欄位的固定寬度 class "w-20" 移除，使其寬度隨內容或容器調整
                     return '<div class="flex items-center gap-2">' +
                       '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded">' +
-                      '<input type="number" value="' + (ing.dosage || '') + '" placeholder="" class="px-2 py-1 border border-gray-300 rounded">' +
+                      '<input type="number" value="' + (ing.dosage || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
                       '<span class="text-sm text-gray-700">克</span>' +
                       '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>' +
                       '</div>';
@@ -15274,8 +15269,7 @@ function refreshTemplateCategoryFilters() {
             // 劑量欄位預設為空，不自動填入任何值
             dosageInput.value = '';
             dosageInput.placeholder = '';
-            // 移除固定寬度 w-20，使劑量欄位寬度可依內容與容器自由調整
-            dosageInput.className = 'px-2 py-1 border border-gray-300 rounded';
+            dosageInput.className = 'w-20 px-2 py-1 border border-gray-300 rounded';
             const unitSpan = document.createElement('span');
             unitSpan.textContent = '克';
             unitSpan.className = 'text-sm text-gray-700';
