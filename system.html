@@ -513,18 +513,17 @@
                     
                     <div class="p-6">
                         <div class="overflow-x-auto">
-                            <!-- 使用 table-fixed 以確保各欄寬度穩定分配，避免因內容寬度導致表頭排列錯亂 -->
-                            <table class="w-full table-fixed">
+                            <table class="w-full">
                                 <thead class="bg-gray-100">
                                     <tr>
-                                        <!-- 指定每個表頭的寬度以固定欄寬，避免資料導致排版偏移 -->
-                                        <th style="width:5%" class="px-2 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">序號</th>
-                                        <th style="width:15%" class="px-2 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">病人姓名</th>
-                                        <th style="width:15%" class="px-2 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">掛號醫師</th>
-                                        <th style="width:15%" class="px-2 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">掛號時間</th>
-                                        <th style="width:25%" class="px-2 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">主訴症狀</th>
-                                        <th style="width:10%" class="px-2 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">狀態</th>
-                                        <th style="width:15%" class="px-4 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">操作</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">序號</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">病人姓名</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">掛號醫師</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">掛號時間</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">主訴症狀</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">狀態</th>
+                                        <!-- 將操作欄標題改為右對齊，使其與資料列內的按鈕對齊 -->
+                                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="todayAppointmentsList" class="divide-y divide-gray-200">
@@ -1902,6 +1901,7 @@
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
