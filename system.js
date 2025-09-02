@@ -10751,6 +10751,313 @@ async function importClinicBackup(data) {
     }
 }
 
+/**
+ * 觸發模板庫資料匯入。
+ * 點擊匯入模板資料按鈕時，觸發隱藏的檔案選擇器。
+ */
+function triggerTemplateImport() {
+  try {
+    const input = document.getElementById('templateImportFile');
+    if (input) {
+      // Reset the input so selecting the same file again triggers change
+      input.value = '';
+      input.click();
+    }
+  } catch (e) {
+    console.error('觸發模板匯入時發生錯誤:', e);
+  }
+}
+
+/**
+ * 處理選擇的模板庫匯入檔案。
+ * 檔案應為 JSON 格式，包含 prescriptionTemplates 或 diagnosisTemplates 陣列，或直接為模板陣列。
+ * 匯入會覆蓋現有的模板庫資料。
+ * @param {File} file 使用者選擇的檔案
+ */
+async function handleTemplateImportFile(file) {
+  if (!file) return;
+  try {
+    // 提醒使用者匯入將覆蓋現有資料
+    if (!window.confirm('匯入模板資料將覆蓋現有模板庫資料，是否繼續？')) {
+      return;
+    }
+    const text = await file.text();
+    const data = JSON.parse(text);
+    // 將檔案內容拆分成醫囑模板與診斷模板
+    let prescriptions = [];
+    let diagnoses = [];
+    // 如果是陣列，根據欄位判斷類型
+    if (Array.isArray(data)) {
+      data.forEach(item => {
+        if (!item || typeof item !== 'object') return;
+        // 若未指定 id，產生一個唯一 id
+        if (item.id === undefined || item.id === null) {
+          item.id = Date.now() + Math.floor(Math.random() * 10000);
+        }
+        // 透過診斷模板特有欄位判斷
+        if ('chiefComplaint' in item || 'currentHistory' in item || 'tcmDiagnosis' in item || 'syndromeDiagnosis' in item) {
+          diagnoses.push(item);
+        } else {
+          prescriptions.push(item);
+        }
+      });
+    } else if (data && typeof data === 'object') {
+      // JSON 物件可能包含 prescriptionTemplates、diagnosisTemplates 或其他命名
+      if (Array.isArray(data.prescriptionTemplates)) {
+        prescriptions = data.prescriptionTemplates.map(item => {
+          if (!item || typeof item !== 'object') return null;
+          if (item.id === undefined || item.id === null) {
+            item.id = Date.now() + Math.floor(Math.random() * 10000);
+          }
+          return item;
+        }).filter(Boolean);
+      }
+      if (Array.isArray(data.prescriptions)) {
+        // 兼容名稱 prescriptions
+        const arr = data.prescriptions.map(item => {
+          if (!item || typeof item !== 'object') return null;
+          if (item.id === undefined || item.id === null) {
+            item.id = Date.now() + Math.floor(Math.random() * 10000);
+          }
+          return item;
+        }).filter(Boolean);
+        prescriptions = prescriptions.concat(arr);
+      }
+      if (Array.isArray(data.diagnosisTemplates)) {
+        diagnoses = data.diagnosisTemplates.map(item => {
+          if (!item || typeof item !== 'object') return null;
+          if (item.id === undefined || item.id === null) {
+            item.id = Date.now() + Math.floor(Math.random() * 10000);
+          }
+          return item;
+        }).filter(Boolean);
+      }
+      if (Array.isArray(data.diagnoses)) {
+        const arr = data.diagnoses.map(item => {
+          if (!item || typeof item !== 'object') return null;
+          if (item.id === undefined || item.id === null) {
+            item.id = Date.now() + Math.floor(Math.random() * 10000);
+          }
+          return item;
+        }).filter(Boolean);
+        diagnoses = diagnoses.concat(arr);
+      }
+      // 若資料包含單一 templates 陣列
+      if (Array.isArray(data.templates)) {
+        data.templates.forEach(item => {
+          if (!item || typeof item !== 'object') return;
+          if (item.id === undefined || item.id === null) {
+            item.id = Date.now() + Math.floor(Math.random() * 10000);
+          }
+          if ('chiefComplaint' in item || 'currentHistory' in item || 'tcmDiagnosis' in item || 'syndromeDiagnosis' in item) {
+            diagnoses.push(item);
+          } else {
+            prescriptions.push(item);
+          }
+        });
+      }
+    }
+    // 如未找到任何模板資料，提示錯誤
+    if (!Array.isArray(prescriptions) && !Array.isArray(diagnoses)) {
+      showToast('未偵測到有效的模板資料', 'error');
+      return;
+    }
+    await importTemplateLibraryData(prescriptions, diagnoses);
+    showToast('模板資料匯入完成！', 'success');
+  } catch (err) {
+    console.error('處理模板匯入檔案時發生錯誤:', err);
+    showToast('匯入模板資料失敗，請確認檔案格式是否正確', 'error');
+  }
+}
+
+/**
+ * 將模板庫資料寫入 Firestore，覆蓋現有的醫囑模板與診斷模板集合。
+ * 同步更新本地變數並重新渲染界面。
+ * @param {Array} prescriptions 醫囑模板陣列
+ * @param {Array} diagnoses 診斷模板陣列
+ */
+async function importTemplateLibraryData(prescriptions, diagnoses) {
+  try {
+    await ensureFirebaseReady();
+    // 定義覆蓋集合的 helper
+    async function replaceCollectionItems(collectionName, items) {
+      const colRef = window.firebase.collection(window.firebase.db, collectionName);
+      try {
+        const snap = await window.firebase.getDocs(colRef);
+        const deletions = [];
+        snap.forEach(docSnap => {
+          deletions.push(window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, collectionName, docSnap.id)));
+        });
+        if (deletions.length > 0) {
+          await Promise.all(deletions);
+        }
+      } catch (err) {
+        console.error('刪除 ' + collectionName + ' 舊資料失敗:', err);
+      }
+      const writes = [];
+      if (Array.isArray(items)) {
+        items.forEach(item => {
+          if (!item || typeof item !== 'object') return;
+          const idStr = String(item.id);
+          writes.push(window.firebase.setDoc(window.firebase.doc(window.firebase.db, collectionName, idStr), item));
+        });
+      }
+      if (writes.length > 0) {
+        await Promise.all(writes);
+      }
+    }
+    // 覆寫醫囑模板和診斷模板
+    if (Array.isArray(prescriptions)) {
+      await replaceCollectionItems('prescriptionTemplates', prescriptions);
+      // 更新全域變數
+      prescriptionTemplates = prescriptions;
+    }
+    if (Array.isArray(diagnoses)) {
+      await replaceCollectionItems('diagnosisTemplates', diagnoses);
+      diagnosisTemplates = diagnoses;
+    }
+    // 重新渲染模板列表
+    if (typeof renderPrescriptionTemplates === 'function') {
+      try {
+        renderPrescriptionTemplates();
+      } catch (_e) {}
+    }
+    if (typeof renderDiagnosisTemplates === 'function') {
+      try {
+        renderDiagnosisTemplates();
+      } catch (_e) {}
+    }
+    // 更新分類下拉選單
+    if (typeof refreshTemplateCategoryFilters === 'function') {
+      try {
+        refreshTemplateCategoryFilters();
+      } catch (_e) {}
+    }
+  } catch (error) {
+    console.error('匯入模板資料時發生錯誤:', error);
+    throw error;
+  }
+}
+
+/**
+ * 觸發中藥庫資料匯入。
+ * 點擊匯入中藥資料按鈕時，觸發隱藏的檔案選擇器。
+ */
+function triggerHerbImport() {
+  try {
+    const input = document.getElementById('herbImportFile');
+    if (input) {
+      input.value = '';
+      input.click();
+    }
+  } catch (e) {
+    console.error('觸發中藥庫匯入時發生錯誤:', e);
+  }
+}
+
+/**
+ * 處理選擇的中藥庫匯入檔案。
+ * 檔案應為 JSON 格式，包含 herbLibrary 陣列，或直接為中藥庫條目陣列。
+ * 匯入會覆蓋現有的中藥庫資料。
+ * @param {File} file 使用者選擇的檔案
+ */
+async function handleHerbImportFile(file) {
+  if (!file) return;
+  try {
+    if (!window.confirm('匯入中藥資料將覆蓋現有中藥庫資料，是否繼續？')) {
+      return;
+    }
+    const text = await file.text();
+    const data = JSON.parse(text);
+    let items = [];
+    if (Array.isArray(data)) {
+      items = data;
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.herbLibrary)) {
+        items = data.herbLibrary;
+      } else if (Array.isArray(data.herbs)) {
+        items = data.herbs;
+      } else if (Array.isArray(data.items)) {
+        items = data.items;
+      }
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      showToast('未偵測到有效的中藥庫資料', 'error');
+      return;
+    }
+    // 給未設置 id 的項目產生 id
+    items = items.map(item => {
+      if (!item || typeof item !== 'object') return item;
+      if (item.id === undefined || item.id === null) {
+        item.id = Date.now() + Math.floor(Math.random() * 10000);
+      }
+      return item;
+    });
+    await importHerbLibraryData(items);
+    showToast('中藥資料匯入完成！', 'success');
+  } catch (err) {
+    console.error('處理中藥匯入檔案時發生錯誤:', err);
+    showToast('匯入中藥資料失敗，請確認檔案格式是否正確', 'error');
+  }
+}
+
+/**
+ * 將中藥庫資料寫入 Firestore，覆蓋現有的 herbLibrary 集合。
+ * 同步更新本地變數並重新渲染中藥庫列表。
+ * @param {Array} items 中藥庫資料陣列
+ */
+async function importHerbLibraryData(items) {
+  try {
+    await ensureFirebaseReady();
+    // 定義覆蓋集合的 helper
+    async function replaceCollectionItems(collectionName, list) {
+      const colRef = window.firebase.collection(window.firebase.db, collectionName);
+      try {
+        const snap = await window.firebase.getDocs(colRef);
+        const deletions = [];
+        snap.forEach(docSnap => {
+          deletions.push(window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, collectionName, docSnap.id)));
+        });
+        if (deletions.length > 0) {
+          await Promise.all(deletions);
+        }
+      } catch (err) {
+        console.error('刪除 ' + collectionName + ' 舊資料失敗:', err);
+      }
+      const writes = [];
+      if (Array.isArray(list)) {
+        list.forEach(item => {
+          if (!item || typeof item !== 'object') return;
+          const idStr = String(item.id);
+          writes.push(window.firebase.setDoc(window.firebase.doc(window.firebase.db, collectionName, idStr), item));
+        });
+      }
+      if (writes.length > 0) {
+        await Promise.all(writes);
+      }
+    }
+    // 覆寫中藥庫集合
+    if (Array.isArray(items)) {
+      await replaceCollectionItems('herbLibrary', items);
+      herbLibrary = items;
+    }
+    // 重新載入並顯示資料
+    if (typeof initHerbLibrary === 'function') {
+      try {
+        await initHerbLibrary();
+      } catch (_e) {}
+    }
+    if (typeof displayHerbLibrary === 'function') {
+      try {
+        displayHerbLibrary();
+      } catch (_e) {}
+    }
+  } catch (error) {
+    console.error('匯入中藥資料時發生錯誤:', error);
+    throw error;
+  }
+}
+
         
 // 套票管理函式
 async function getPatientPackages(patientId) {
@@ -12317,6 +12624,12 @@ document.addEventListener('DOMContentLoaded', function() {
   window.exportClinicBackup = exportClinicBackup;
   window.triggerBackupImport = triggerBackupImport;
   window.handleBackupFile = handleBackupFile;
+
+  // 數據匯入相關函式
+  window.triggerTemplateImport = triggerTemplateImport;
+  window.handleTemplateImportFile = handleTemplateImportFile;
+  window.triggerHerbImport = triggerHerbImport;
+  window.handleHerbImportFile = handleHerbImportFile;
 
   /**
    * 安全地轉義使用者提供的字串，用於避免 XSS 攻擊。
