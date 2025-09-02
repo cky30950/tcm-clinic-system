@@ -4050,7 +4050,7 @@ if (!patient) {
                                     </span>
                                 ` : ''}
                             </div>
-                            <div class="flex flex-wrap gap-2">
+<div class="flex flex-wrap gap-2">
                                 <button onclick="printConsultationRecord('${consultation.id}')" 
                                         class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded">
                                     列印收據
@@ -14803,8 +14803,7 @@ function refreshTemplateCategoryFilters() {
               const herbIngredientsHtml = Array.isArray(item.ingredients)
                 ? item.ingredients.map(ing => {
                     return '<div class="flex items-center gap-2">' +
-                      // 將藥材名稱欄位寬度縮短為一半，避免在行動裝置上過長
-                      '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="w-1/2 px-2 py-1 border border-gray-300 rounded">' +
+                      '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded">' +
                       '<input type="number" value="' + (ing.dosage || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
                       '<span class="text-sm text-gray-700">克</span>' +
                       '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>' +
@@ -14861,7 +14860,7 @@ function refreshTemplateCategoryFilters() {
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">穴位列表</label>
                     <div id="acupointPoints" class="space-y-2">
-${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text" value="' + (pt.name || '') + '" placeholder="穴位名稱" class="w-1/2 px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + (pt.type || '') + '" placeholder="主穴/配穴" class="w-28 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button></div>').join('')}
+                      ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text" value="' + (pt.name || '') + '" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + (pt.type || '') + '" placeholder="主穴/配穴" class="w-28 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button></div>').join('')}
                     </div>
                     <button onclick="addAcupointPointField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增穴位</button>
                   </div>
@@ -15209,8 +15208,7 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
             // 使用 flex 布局讓刪除按鈕置於右側
             div.className = 'flex items-center gap-2';
             // 建立名稱與類型輸入框以及刪除按鈕，刪除按鈕點擊後可移除所在行
-    // 調整穴位名稱欄位寬度為一半，避免在手機或小螢幕上過長
-    div.innerHTML = '<input type="text" placeholder="穴位名稱" class="w-1/2 px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="主穴/配穴" class="w-28 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>';
+            div.innerHTML = '<input type="text" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="主穴/配穴" class="w-28 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>';
             container.appendChild(div);
           }
 
@@ -15266,8 +15264,7 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
             nameInput.placeholder = '藥材名稱';
             // 新增後的藥材名稱固定顯示，不可編輯
             nameInput.readOnly = true;
-            // 將藥材名稱欄位寬度縮短為一半，避免在行動裝置上過長
-            nameInput.className = 'w-1/2 px-2 py-1 border border-gray-300 rounded';
+            nameInput.className = 'flex-1 px-2 py-1 border border-gray-300 rounded';
             const dosageInput = document.createElement('input');
             dosageInput.type = 'number';
             // 劑量欄位預設為空，不自動填入任何值
