@@ -295,6 +295,57 @@ function playNotificationSound() {
     }
 }
 
+// 匯入備份時使用的進度條相關函式
+/**
+ * 顯示備份匯入進度條。
+ * @param {number} totalSteps 總步驟數，用於計算百分比
+ */
+function showBackupProgressBar(totalSteps) {
+    const container = document.getElementById('backupProgressContainer');
+    const bar = document.getElementById('backupProgressBar');
+    const text = document.getElementById('backupProgressText');
+    if (container && bar && text) {
+        container.classList.remove('hidden');
+        bar.style.width = '0%';
+        text.textContent = '匯入進度 0%';
+        container.dataset.totalSteps = totalSteps;
+    }
+}
+
+/**
+ * 更新備份匯入進度條。
+ * @param {number} currentStep 已完成的步驟數
+ * @param {number} totalSteps 總步驟數
+ */
+function updateBackupProgressBar(currentStep, totalSteps) {
+    const container = document.getElementById('backupProgressContainer');
+    const bar = document.getElementById('backupProgressBar');
+    const text = document.getElementById('backupProgressText');
+    if (container && bar && text) {
+        const percent = totalSteps > 0 ? Math.round((currentStep / totalSteps) * 100) : 0;
+        bar.style.width = percent + '%';
+        text.textContent = '匯入進度 ' + percent + '%';
+    }
+}
+
+/**
+ * 完成備份匯入進度條。
+ * @param {boolean} success 是否匯入成功
+ */
+function finishBackupProgressBar(success) {
+    const container = document.getElementById('backupProgressContainer');
+    const bar = document.getElementById('backupProgressBar');
+    const text = document.getElementById('backupProgressText');
+    if (container && bar && text) {
+        bar.style.width = '100%';
+        text.textContent = success ? '匯入完成！' : '匯入失敗！';
+        // 於 2 秒後隱藏進度條
+        setTimeout(() => {
+            container.classList.add('hidden');
+        }, 2000);
+    }
+}
+
 /**
  * 生成唯一的病歷編號。
  * 使用當前日期時間和隨機數組成，格式如 MR20250101123045-1234。
@@ -10631,14 +10682,23 @@ async function handleBackupFile(file) {
     }
     const button = document.getElementById('backupImportBtn');
     setButtonLoading(button);
+    // 顯示匯入進度條，假設有 9 個主要步驟（每個集合一次覆蓋）
+    const totalStepsForBackupImport = 9;
+    showBackupProgressBar(totalStepsForBackupImport);
     try {
         const text = await file.text();
         const data = JSON.parse(text);
-        await importClinicBackup(data);
+        // 傳入進度回調以更新匯入進度
+        await importClinicBackup(data, function(step, total) {
+            updateBackupProgressBar(step, total);
+        });
         showToast('備份資料匯入完成！', 'success');
+        finishBackupProgressBar(true);
     } catch (error) {
         console.error('匯入備份失敗:', error);
         showToast('匯入備份失敗，請確認檔案格式是否正確', 'error');
+        // 進度條標記為失敗
+        finishBackupProgressBar(false);
     } finally {
         clearButtonLoading(button);
     }
@@ -10649,6 +10709,15 @@ async function handleBackupFile(file) {
  * @param {Object} data 備份物件
  */
 async function importClinicBackup(data) {
+    let progressCallback = null;
+    let totalSteps = 9;
+    // 若第二個參數為函式，視為進度回調；第三個參數為總步驟數（可選）
+    if (arguments.length >= 2 && typeof arguments[1] === 'function') {
+        progressCallback = arguments[1];
+    }
+    if (arguments.length >= 3 && typeof arguments[2] === 'number') {
+        totalSteps = arguments[2];
+    }
     await ensureFirebaseReady();
     // helper：清空並覆寫集合資料
     async function replaceCollection(collectionName, items) {
@@ -10678,17 +10747,44 @@ async function importClinicBackup(data) {
             await Promise.all(writes);
         }
     }
-    // 覆蓋各集合
+    // 覆蓋各集合並更新進度
+    let stepCount = 0;
     await replaceCollection('patients', Array.isArray(data.patients) ? data.patients : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('consultations', Array.isArray(data.consultations) ? data.consultations : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('users', Array.isArray(data.users) ? data.users : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('herbLibrary', Array.isArray(data.herbLibrary) ? data.herbLibrary : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('billingItems', Array.isArray(data.billingItems) ? data.billingItems : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('patientPackages', Array.isArray(data.patientPackages) ? data.patientPackages : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     // 新增：覆蓋醫囑模板、診斷模板與問診資料
     await replaceCollection('prescriptionTemplates', Array.isArray(data.prescriptionTemplates) ? data.prescriptionTemplates : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('diagnosisTemplates', Array.isArray(data.diagnosisTemplates) ? data.diagnosisTemplates : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('inquiries', Array.isArray(data.inquiries) ? data.inquiries : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
     // 更新診所設定
     if (data.clinicSettings && typeof data.clinicSettings === 'object') {
         clinicSettings = { ...data.clinicSettings };
@@ -10748,6 +10844,10 @@ async function importClinicBackup(data) {
     }
     if (typeof updateStatistics === 'function') {
         updateStatistics();
+    }
+    // 若最後仍未達到總步驟數，進行最後一次更新以顯示 100%
+    if (progressCallback && stepCount < totalSteps) {
+        progressCallback(totalSteps, totalSteps);
     }
 }
 
@@ -12405,34 +12505,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!trimmed) {
                     return [];
                 }
-                // 先替換 'event' 與 'this' 為特殊標記，避免 eval 時當作變數解析
+                // 先替換 'event' 與 'this' 為特殊標記，避免直接 eval 解析錯誤
                 const replaced = trimmed
                     .replace(/\bevent\b/g, '__EVENT__')
                     .replace(/\bthis\b/g, '__THIS__');
                 let args;
                 try {
                     /*
-                     * 直接 eval 包含 __EVENT__/__THIS__ 標記的字串會導致 ReferenceError，
-                     * 因為這些標記並非實際定義的變數。為了避免此問題，先將這些標記
-                     * 轉換成帶引號的字串，讓 eval 得到的是字串占位符陣列，再於後續
-                     * 將其映射回正確的 event 或元素物件。這樣能避免在開發階段於控制台
-                     * 輸出 "__EVENT__ is not defined" 的錯誤訊息。
+                     * 使用動態函式的方式來解析包含 __EVENT__/__THIS__ 標記的引數字串，
+                     * 並將實際的 event 與元素物件作為參數注入。這樣就可以正確解析
+                     * 複雜的屬性存取表達式（例如 __THIS__.files[0]），避免將 __THIS__
+                     * 當作字串處理導致無法讀取屬性。
                      */
-                    const replacedForEval = replaced
-                        .replace(/__EVENT__/g, '"__EVENT__"')
-                        .replace(/__THIS__/g, '"__THIS__"');
-                    // 以陣列字面量包覆，使用 eval 將字串解析為實際值
-                    args = eval(`[${replacedForEval}]`);
+                    const fn = new Function('__EVENT__', '__THIS__', 'return [' + replaced + '];');
+                    args = fn(event, el);
                 } catch (e) {
                     console.error('解析 inline 事件參數失敗:', argsStr, e);
                     args = [];
                 }
-                // 將特殊標記替換為實際的 event 或 element
-                return args.map(function (arg) {
-                    if (arg === '__EVENT__') return event;
-                    if (arg === '__THIS__') return el;
-                    return arg;
-                });
+                // args 現在已經是包含正確值的陣列，無需再替換特殊標記
+                return args;
             }
 
             /**
