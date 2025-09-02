@@ -295,6 +295,107 @@ function playNotificationSound() {
     }
 }
 
+// 匯入備份時使用的進度條相關函式
+/**
+ * 顯示備份匯入進度條。
+ * @param {number} totalSteps 總步驟數，用於計算百分比
+ */
+function showBackupProgressBar(totalSteps) {
+    const container = document.getElementById('backupProgressContainer');
+    const bar = document.getElementById('backupProgressBar');
+    const text = document.getElementById('backupProgressText');
+    if (container && bar && text) {
+        container.classList.remove('hidden');
+        bar.style.width = '0%';
+        text.textContent = '匯入進度 0%';
+        container.dataset.totalSteps = totalSteps;
+    }
+}
+
+/**
+ * 更新備份匯入進度條。
+ * @param {number} currentStep 已完成的步驟數
+ * @param {number} totalSteps 總步驟數
+ */
+function updateBackupProgressBar(currentStep, totalSteps) {
+    const container = document.getElementById('backupProgressContainer');
+    const bar = document.getElementById('backupProgressBar');
+    const text = document.getElementById('backupProgressText');
+    if (container && bar && text) {
+        const percent = totalSteps > 0 ? Math.round((currentStep / totalSteps) * 100) : 0;
+        bar.style.width = percent + '%';
+        text.textContent = '匯入進度 ' + percent + '%';
+    }
+}
+
+/**
+ * 完成備份匯入進度條。
+ * @param {boolean} success 是否匯入成功
+ */
+function finishBackupProgressBar(success) {
+    const container = document.getElementById('backupProgressContainer');
+    const bar = document.getElementById('backupProgressBar');
+    const text = document.getElementById('backupProgressText');
+    if (container && bar && text) {
+        bar.style.width = '100%';
+        text.textContent = success ? '匯入完成！' : '匯入失敗！';
+        // 於 2 秒後隱藏進度條
+        setTimeout(() => {
+            container.classList.add('hidden');
+        }, 2000);
+    }
+}
+
+/**
+ * 顯示資料匯入/清除進度條。
+ * 這些函式與備份匯入進度條相似，但使用不同的容器元素。
+ * @param {number} totalSteps 總步驟數，用於計算百分比
+ */
+function showImportProgressBar(totalSteps) {
+    const container = document.getElementById('importProgressContainer');
+    const bar = document.getElementById('importProgressBar');
+    const text = document.getElementById('importProgressText');
+    if (container && bar && text) {
+        container.classList.remove('hidden');
+        bar.style.width = '0%';
+        text.textContent = '匯入進度 0%';
+        container.dataset.totalSteps = totalSteps;
+    }
+}
+
+/**
+ * 更新資料匯入/清除進度條。
+ * @param {number} currentStep 已完成的步驟數
+ * @param {number} totalSteps 總步驟數
+ */
+function updateImportProgressBar(currentStep, totalSteps) {
+    const container = document.getElementById('importProgressContainer');
+    const bar = document.getElementById('importProgressBar');
+    const text = document.getElementById('importProgressText');
+    if (container && bar && text) {
+        const percent = totalSteps > 0 ? Math.round((currentStep / totalSteps) * 100) : 0;
+        bar.style.width = percent + '%';
+        text.textContent = '匯入進度 ' + percent + '%';
+    }
+}
+
+/**
+ * 完成資料匯入/清除進度條。
+ * @param {boolean} success 是否成功
+ */
+function finishImportProgressBar(success) {
+    const container = document.getElementById('importProgressContainer');
+    const bar = document.getElementById('importProgressBar');
+    const text = document.getElementById('importProgressText');
+    if (container && bar && text) {
+        bar.style.width = '100%';
+        text.textContent = success ? '匯入完成！' : '匯入失敗！';
+        setTimeout(() => {
+            container.classList.add('hidden');
+        }, 2000);
+    }
+}
+
 /**
  * 生成唯一的病歷編號。
  * 使用當前日期時間和隨機數組成，格式如 MR20250101123045-1234。
@@ -2937,14 +3038,13 @@ function createAppointmentRow(appointment, patient, index) {
                     ${statusInfo.text}
                 </span>
             </td>
+            <!--
+              將操作按鈕欄保持內容寬度，不再撐滿整列。
+              為了讓表頭「操作」與診症記錄按鈕左對齊，移除 w-full 以及 justify-end，
+              使按鈕自然靠左排列。
+            -->
             <td class="px-4 py-3 text-sm">
-                <!--
-                  將操作按鈕容器設為寬度 100% 並使用 justify-end，使所有操作按鈕靠右排列。
-                  原本在 <td> 上設置 w-full 會導致表格排版異常，令整列偏左。
-                  因此僅在內層容器上使用 w-full，以確保按鈕佔滿該欄寬度但不影響整行
-                  的寬度計算。
-                -->
-                <div class="flex flex-wrap gap-1 justify-end w-full">
+                <div class="flex flex-wrap gap-1">
                     ${operationButtons}
                 </div>
             </td>
@@ -4051,18 +4151,18 @@ if (!patient) {
                                     </span>
                                 ` : ''}
                             </div>
-                            <div class="flex space-x-2">
+                            <div class="flex flex-wrap gap-2">
                                 <button onclick="printConsultationRecord('${consultation.id}')" 
-                                        class="text-green-600 hover:text-green-800 text-xs font-medium bg-green-50 px-2 py-1 rounded">
+                                        class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
                                     列印收據
                                 </button>
                                 <!-- 新增藥單醫囑列印按鈕，放在收據右側 -->
                                 <button onclick="printPrescriptionInstructions('${consultation.id}')" 
-                                        class="text-yellow-600 hover:text-yellow-800 text-xs font-medium bg-yellow-50 px-2 py-1 rounded">
+                                        class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
                                     藥單醫囑
                                 </button>
                                 <button onclick="printAttendanceCertificate('${consultation.id}')" 
-                                        class="text-blue-600 hover:text-blue-800 text-xs font-medium bg-blue-50 px-2 py-1 rounded">
+                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
                                     到診證明
                                 </button>
                                 ${(() => {
@@ -4072,7 +4172,7 @@ if (!patient) {
                                         if (currentAppointment && String(currentAppointment.patientId) === String(consultation.patientId)) {
                                             return `
                                                 <button onclick="loadMedicalRecordToCurrentConsultation('${consultation.id}')" 
-                                                        class="text-blue-600 hover:text-blue-800 text-xs font-medium bg-blue-50 px-2 py-1 rounded">
+                                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
                                                     載入病歷
                                                 </button>
                                             `;
@@ -4379,18 +4479,18 @@ function displayConsultationMedicalHistoryPage() {
                             </span>
                         ` : ''}
                     </div>
-                    <div class="flex space-x-2">
+                    <div class="flex flex-wrap gap-2">
                         <button onclick="printConsultationRecord('${consultation.id}')" 
-                                class="text-green-600 hover:text-green-800 text-xs font-medium bg-green-50 px-2 py-1 rounded">
+                                class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
                             列印收據
                         </button>
                         <!-- 新增藥單醫囑列印按鈕，放在收據右側 -->
                         <button onclick="printPrescriptionInstructions('${consultation.id}')" 
-                                class="text-yellow-600 hover:text-yellow-800 text-xs font-medium bg-yellow-50 px-2 py-1 rounded">
+                                class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
                             藥單醫囑
                         </button>
                         <button onclick="printAttendanceCertificate('${consultation.id}')" 
-                                class="text-blue-600 hover:text-blue-800 text-xs font-medium bg-blue-50 px-2 py-1 rounded">
+                                class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
                             到診證明
                         </button>
                         ${(() => {
@@ -4400,7 +4500,7 @@ function displayConsultationMedicalHistoryPage() {
                                 if (currentAppointment && String(currentAppointment.patientId) === String(consultation.patientId)) {
                                     return `
                                         <button onclick="loadMedicalRecordToCurrentConsultation('${consultation.id}')" 
-                                                class="text-blue-600 hover:text-blue-800 text-xs font-medium bg-blue-50 px-2 py-1 rounded">
+                                                class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
                                             載入病歷
                                         </button>
                                     `;
@@ -10632,14 +10732,23 @@ async function handleBackupFile(file) {
     }
     const button = document.getElementById('backupImportBtn');
     setButtonLoading(button);
+    // 顯示匯入進度條，假設有 9 個主要步驟（每個集合一次覆蓋）
+    const totalStepsForBackupImport = 9;
+    showBackupProgressBar(totalStepsForBackupImport);
     try {
         const text = await file.text();
         const data = JSON.parse(text);
-        await importClinicBackup(data);
+        // 傳入進度回調以更新匯入進度
+        await importClinicBackup(data, function(step, total) {
+            updateBackupProgressBar(step, total);
+        });
         showToast('備份資料匯入完成！', 'success');
+        finishBackupProgressBar(true);
     } catch (error) {
         console.error('匯入備份失敗:', error);
         showToast('匯入備份失敗，請確認檔案格式是否正確', 'error');
+        // 進度條標記為失敗
+        finishBackupProgressBar(false);
     } finally {
         clearButtonLoading(button);
     }
@@ -10650,6 +10759,15 @@ async function handleBackupFile(file) {
  * @param {Object} data 備份物件
  */
 async function importClinicBackup(data) {
+    let progressCallback = null;
+    let totalSteps = 9;
+    // 若第二個參數為函式，視為進度回調；第三個參數為總步驟數（可選）
+    if (arguments.length >= 2 && typeof arguments[1] === 'function') {
+        progressCallback = arguments[1];
+    }
+    if (arguments.length >= 3 && typeof arguments[2] === 'number') {
+        totalSteps = arguments[2];
+    }
     await ensureFirebaseReady();
     // helper：清空並覆寫集合資料
     async function replaceCollection(collectionName, items) {
@@ -10679,17 +10797,44 @@ async function importClinicBackup(data) {
             await Promise.all(writes);
         }
     }
-    // 覆蓋各集合
+    // 覆蓋各集合並更新進度
+    let stepCount = 0;
     await replaceCollection('patients', Array.isArray(data.patients) ? data.patients : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('consultations', Array.isArray(data.consultations) ? data.consultations : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('users', Array.isArray(data.users) ? data.users : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('herbLibrary', Array.isArray(data.herbLibrary) ? data.herbLibrary : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('billingItems', Array.isArray(data.billingItems) ? data.billingItems : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('patientPackages', Array.isArray(data.patientPackages) ? data.patientPackages : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     // 新增：覆蓋醫囑模板、診斷模板與問診資料
     await replaceCollection('prescriptionTemplates', Array.isArray(data.prescriptionTemplates) ? data.prescriptionTemplates : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('diagnosisTemplates', Array.isArray(data.diagnosisTemplates) ? data.diagnosisTemplates : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
     await replaceCollection('inquiries', Array.isArray(data.inquiries) ? data.inquiries : []);
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
     // 更新診所設定
     if (data.clinicSettings && typeof data.clinicSettings === 'object') {
         clinicSettings = { ...data.clinicSettings };
@@ -10750,6 +10895,443 @@ async function importClinicBackup(data) {
     if (typeof updateStatistics === 'function') {
         updateStatistics();
     }
+    // 若最後仍未達到總步驟數，進行最後一次更新以顯示 100%
+    if (progressCallback && stepCount < totalSteps) {
+        progressCallback(totalSteps, totalSteps);
+    }
+}
+
+/**
+ * 觸發模板庫資料匯入。
+ * 點擊匯入模板資料按鈕時，觸發隱藏的檔案選擇器。
+ */
+function triggerTemplateImport() {
+  try {
+    const input = document.getElementById('templateImportFile');
+    if (input) {
+      // Reset the input so selecting the same file again triggers change
+      input.value = '';
+      input.click();
+    }
+  } catch (e) {
+    console.error('觸發模板匯入時發生錯誤:', e);
+  }
+}
+
+/**
+ * 處理選擇的模板庫匯入檔案。
+ * 檔案應為 JSON 格式，包含 prescriptionTemplates 或 diagnosisTemplates 陣列，或直接為模板陣列。
+ * 匯入會覆蓋現有的模板庫資料。
+ * @param {File} file 使用者選擇的檔案
+ */
+async function handleTemplateImportFile(file) {
+  if (!file) return;
+  try {
+    // 提醒使用者匯入將新增資料，不會刪除現有資料
+    if (!window.confirm('匯入模板資料將新增資料（不會刪除現有模板庫資料），是否繼續？')) {
+      return;
+    }
+    const text = await file.text();
+    const data = JSON.parse(text);
+    // 將檔案內容拆分成醫囑模板與診斷模板
+    let prescriptions = [];
+    let diagnoses = [];
+    // 如果是陣列，根據欄位判斷類型
+    if (Array.isArray(data)) {
+      data.forEach(item => {
+        if (!item || typeof item !== 'object') return;
+        // 若未指定 id，產生一個唯一 id
+        if (item.id === undefined || item.id === null) {
+          item.id = Date.now() + Math.floor(Math.random() * 10000);
+        }
+        // 透過診斷模板特有欄位判斷
+        if ('chiefComplaint' in item || 'currentHistory' in item || 'tcmDiagnosis' in item || 'syndromeDiagnosis' in item) {
+          diagnoses.push(item);
+        } else {
+          prescriptions.push(item);
+        }
+      });
+    } else if (data && typeof data === 'object') {
+      // JSON 物件可能包含 prescriptionTemplates、diagnosisTemplates 或其他命名
+      if (Array.isArray(data.prescriptionTemplates)) {
+        prescriptions = data.prescriptionTemplates.map(item => {
+          if (!item || typeof item !== 'object') return null;
+          if (item.id === undefined || item.id === null) {
+            item.id = Date.now() + Math.floor(Math.random() * 10000);
+          }
+          return item;
+        }).filter(Boolean);
+      }
+      if (Array.isArray(data.prescriptions)) {
+        // 兼容名稱 prescriptions
+        const arr = data.prescriptions.map(item => {
+          if (!item || typeof item !== 'object') return null;
+          if (item.id === undefined || item.id === null) {
+            item.id = Date.now() + Math.floor(Math.random() * 10000);
+          }
+          return item;
+        }).filter(Boolean);
+        prescriptions = prescriptions.concat(arr);
+      }
+      if (Array.isArray(data.diagnosisTemplates)) {
+        diagnoses = data.diagnosisTemplates.map(item => {
+          if (!item || typeof item !== 'object') return null;
+          if (item.id === undefined || item.id === null) {
+            item.id = Date.now() + Math.floor(Math.random() * 10000);
+          }
+          return item;
+        }).filter(Boolean);
+      }
+      if (Array.isArray(data.diagnoses)) {
+        const arr = data.diagnoses.map(item => {
+          if (!item || typeof item !== 'object') return null;
+          if (item.id === undefined || item.id === null) {
+            item.id = Date.now() + Math.floor(Math.random() * 10000);
+          }
+          return item;
+        }).filter(Boolean);
+        diagnoses = diagnoses.concat(arr);
+      }
+      // 若資料包含單一 templates 陣列
+      if (Array.isArray(data.templates)) {
+        data.templates.forEach(item => {
+          if (!item || typeof item !== 'object') return;
+          if (item.id === undefined || item.id === null) {
+            item.id = Date.now() + Math.floor(Math.random() * 10000);
+          }
+          if ('chiefComplaint' in item || 'currentHistory' in item || 'tcmDiagnosis' in item || 'syndromeDiagnosis' in item) {
+            diagnoses.push(item);
+          } else {
+            prescriptions.push(item);
+          }
+        });
+      }
+    }
+    // 如未找到任何模板資料，提示錯誤
+    if (!Array.isArray(prescriptions) && !Array.isArray(diagnoses)) {
+      showToast('未偵測到有效的模板資料', 'error');
+      return;
+    }
+    // 計算總步驟：醫囑模板與診斷模板項目總數
+    const totalSteps =
+      (Array.isArray(prescriptions) ? prescriptions.length : 0) +
+      (Array.isArray(diagnoses) ? diagnoses.length : 0);
+    try {
+      showImportProgressBar(totalSteps);
+      let processedCount = 0;
+      await importTemplateLibraryData(
+        prescriptions,
+        diagnoses,
+        () => {
+          // 增加處理計數並更新進度條
+          processedCount++;
+          updateImportProgressBar(processedCount, totalSteps);
+        }
+      );
+      finishImportProgressBar(true);
+      showToast('模板資料匯入完成！', 'success');
+    } catch (err) {
+      finishImportProgressBar(false);
+      throw err;
+    }
+  } catch (err) {
+    console.error('處理模板匯入檔案時發生錯誤:', err);
+    showToast('匯入模板資料失敗，請確認檔案格式是否正確', 'error');
+  }
+}
+
+/**
+ * 將模板庫資料寫入 Firestore，覆蓋現有的醫囑模板與診斷模板集合。
+ * 同步更新本地變數並重新渲染界面。
+ * @param {Array} prescriptions 醫囑模板陣列
+ * @param {Array} diagnoses 診斷模板陣列
+ */
+async function importTemplateLibraryData(prescriptions, diagnoses, progressCallback) {
+  try {
+    await ensureFirebaseReady();
+    // 定義資料寫入的 helper，不會刪除現有資料，只會新增或更新
+    async function upsertCollectionItems(collectionName, items) {
+      if (!Array.isArray(items) || items.length === 0) return;
+      // 取得集合參考
+      const colRef = window.firebase.collection(window.firebase.db, collectionName);
+      // 逐一寫入/更新
+      for (const item of items) {
+        if (!item || typeof item !== 'object') continue;
+        const idStr = String(item.id);
+        await window.firebase.setDoc(window.firebase.doc(window.firebase.db, collectionName, idStr), item);
+        if (typeof progressCallback === 'function') {
+          progressCallback();
+        }
+      }
+    }
+    // 先初始化本地全域變數為空陣列（如果尚未存在）
+    if (typeof prescriptionTemplates === 'undefined') {
+      prescriptionTemplates = [];
+    }
+    if (typeof diagnosisTemplates === 'undefined') {
+      diagnosisTemplates = [];
+    }
+    // 更新/新增醫囑模板
+    if (Array.isArray(prescriptions) && prescriptions.length > 0) {
+      await upsertCollectionItems('prescriptionTemplates', prescriptions);
+      // 合併到本地資料：根據 id 替換或新增
+      const updated = Array.isArray(prescriptionTemplates) ? [...prescriptionTemplates] : [];
+      prescriptions.forEach(item => {
+        if (!item || typeof item !== 'object') return;
+        const idx = updated.findIndex(p => String(p.id) === String(item.id));
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], ...item };
+        } else {
+          updated.push(item);
+        }
+      });
+      prescriptionTemplates = updated;
+    }
+    // 更新/新增診斷模板
+    if (Array.isArray(diagnoses) && diagnoses.length > 0) {
+      await upsertCollectionItems('diagnosisTemplates', diagnoses);
+      const updatedDiag = Array.isArray(diagnosisTemplates) ? [...diagnosisTemplates] : [];
+      diagnoses.forEach(item => {
+        if (!item || typeof item !== 'object') return;
+        const idx = updatedDiag.findIndex(d => String(d.id) === String(item.id));
+        if (idx >= 0) {
+          updatedDiag[idx] = { ...updatedDiag[idx], ...item };
+        } else {
+          updatedDiag.push(item);
+        }
+      });
+      diagnosisTemplates = updatedDiag;
+    }
+    // 重新渲染模板列表
+    if (typeof renderPrescriptionTemplates === 'function') {
+      try {
+        renderPrescriptionTemplates();
+      } catch (_e) {}
+    }
+    if (typeof renderDiagnosisTemplates === 'function') {
+      try {
+        renderDiagnosisTemplates();
+      } catch (_e) {}
+    }
+    // 更新分類下拉選單
+    if (typeof refreshTemplateCategoryFilters === 'function') {
+      try {
+        refreshTemplateCategoryFilters();
+      } catch (_e) {}
+    }
+  } catch (error) {
+    console.error('匯入模板資料時發生錯誤:', error);
+    throw error;
+  }
+}
+
+/**
+ * 觸發中藥庫資料匯入。
+ * 點擊匯入中藥資料按鈕時，觸發隱藏的檔案選擇器。
+ */
+function triggerHerbImport() {
+  try {
+    const input = document.getElementById('herbImportFile');
+    if (input) {
+      input.value = '';
+      input.click();
+    }
+  } catch (e) {
+    console.error('觸發中藥庫匯入時發生錯誤:', e);
+  }
+}
+
+/**
+ * 處理選擇的中藥庫匯入檔案。
+ * 檔案應為 JSON 格式，包含 herbLibrary 陣列，或直接為中藥庫條目陣列。
+ * 匯入會覆蓋現有的中藥庫資料。
+ * @param {File} file 使用者選擇的檔案
+ */
+async function handleHerbImportFile(file) {
+  if (!file) return;
+  try {
+    if (!window.confirm('匯入中藥資料將新增資料（不會刪除現有中藥庫資料），是否繼續？')) {
+      return;
+    }
+    const text = await file.text();
+    const data = JSON.parse(text);
+    let items = [];
+    if (Array.isArray(data)) {
+      items = data;
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.herbLibrary)) {
+        items = data.herbLibrary;
+      } else if (Array.isArray(data.herbs)) {
+        items = data.herbs;
+      } else if (Array.isArray(data.items)) {
+        items = data.items;
+      }
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      showToast('未偵測到有效的中藥庫資料', 'error');
+      return;
+    }
+    // 給未設置 id 的項目產生 id
+    items = items.map(item => {
+      if (!item || typeof item !== 'object') return item;
+      if (item.id === undefined || item.id === null) {
+        item.id = Date.now() + Math.floor(Math.random() * 10000);
+      }
+      return item;
+    });
+    // 計算總步驟
+    const totalSteps = Array.isArray(items) ? items.length : 0;
+    try {
+      showImportProgressBar(totalSteps);
+      let processedCount = 0;
+      await importHerbLibraryData(items, () => {
+        processedCount++;
+        updateImportProgressBar(processedCount, totalSteps);
+      });
+      finishImportProgressBar(true);
+      showToast('中藥資料匯入完成！', 'success');
+    } catch (err2) {
+      finishImportProgressBar(false);
+      throw err2;
+    }
+  } catch (err) {
+    console.error('處理中藥匯入檔案時發生錯誤:', err);
+    showToast('匯入中藥資料失敗，請確認檔案格式是否正確', 'error');
+  }
+}
+
+/**
+ * 將中藥庫資料寫入 Firestore，覆蓋現有的 herbLibrary 集合。
+ * 同步更新本地變數並重新渲染中藥庫列表。
+ * @param {Array} items 中藥庫資料陣列
+ */
+async function importHerbLibraryData(items, progressCallback) {
+  try {
+    await ensureFirebaseReady();
+    if (!Array.isArray(items) || items.length === 0) {
+      return;
+    }
+    // 確保本地變數存在
+    if (typeof herbLibrary === 'undefined') {
+      herbLibrary = [];
+    }
+    // 逐一新增/更新藥材資料
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+      const idStr = String(item.id);
+      await window.firebase.setDoc(window.firebase.doc(window.firebase.db, 'herbLibrary', idStr), item);
+      if (typeof progressCallback === 'function') {
+        progressCallback();
+      }
+      // 更新本地陣列：若已存在則覆蓋，否則加入
+      const idx = herbLibrary.findIndex(h => String(h.id) === idStr);
+      if (idx >= 0) {
+        herbLibrary[idx] = { ...herbLibrary[idx], ...item };
+      } else {
+        herbLibrary.push(item);
+      }
+    }
+    // 重新載入並顯示資料
+    if (typeof initHerbLibrary === 'function') {
+      try {
+        await initHerbLibrary();
+      } catch (_e) {}
+    }
+    if (typeof displayHerbLibrary === 'function') {
+      try {
+        displayHerbLibrary();
+      } catch (_e) {}
+    }
+  } catch (error) {
+    console.error('匯入中藥資料時發生錯誤:', error);
+    throw error;
+  }
+}
+
+/**
+ * 清除所有模板資料（醫囑與診斷模板）。
+ * 顯示進度條並逐一刪除資料。
+ */
+async function clearTemplateData() {
+  try {
+    // 確認使用者操作
+    if (!window.confirm('確定要清除所有模板資料嗎？此動作將無法復原。')) {
+      return;
+    }
+    await ensureFirebaseReady();
+    // 取得兩個集合的所有文件
+    const presSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'prescriptionTemplates'));
+    const diagSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'diagnosisTemplates'));
+    const totalSteps = presSnap.size + diagSnap.size;
+    let processed = 0;
+    showImportProgressBar(totalSteps);
+    // 刪除醫囑模板
+    for (const docSnap of presSnap.docs) {
+      await window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, 'prescriptionTemplates', docSnap.id));
+      processed++;
+      updateImportProgressBar(processed, totalSteps);
+    }
+    // 刪除診斷模板
+    for (const docSnap of diagSnap.docs) {
+      await window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, 'diagnosisTemplates', docSnap.id));
+      processed++;
+      updateImportProgressBar(processed, totalSteps);
+    }
+    // 更新本地資料
+    prescriptionTemplates = [];
+    diagnosisTemplates = [];
+    // 重新渲染
+    if (typeof renderPrescriptionTemplates === 'function') {
+      try { renderPrescriptionTemplates(); } catch (_e) {}
+    }
+    if (typeof renderDiagnosisTemplates === 'function') {
+      try { renderDiagnosisTemplates(); } catch (_e) {}
+    }
+    if (typeof refreshTemplateCategoryFilters === 'function') {
+      try { refreshTemplateCategoryFilters(); } catch (_e) {}
+    }
+    finishImportProgressBar(true);
+    showToast('模板資料已清除！', 'success');
+  } catch (err) {
+    finishImportProgressBar(false);
+    console.error('清除模板資料失敗:', err);
+    showToast('清除模板資料失敗，請稍後再試', 'error');
+  }
+}
+
+/**
+ * 清除所有中藥資料。
+ * 顯示進度條並逐一刪除資料。
+ */
+async function clearHerbData() {
+  try {
+    if (!window.confirm('確定要清除所有中藥資料嗎？此動作將無法復原。')) {
+      return;
+    }
+    await ensureFirebaseReady();
+    const herbSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'herbLibrary'));
+    const totalSteps = herbSnap.size;
+    let processed = 0;
+    showImportProgressBar(totalSteps);
+    for (const docSnap of herbSnap.docs) {
+      await window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, 'herbLibrary', docSnap.id));
+      processed++;
+      updateImportProgressBar(processed, totalSteps);
+    }
+    herbLibrary = [];
+    if (typeof initHerbLibrary === 'function') {
+      try { await initHerbLibrary(); } catch (_e) {}
+    }
+    if (typeof displayHerbLibrary === 'function') {
+      try { displayHerbLibrary(); } catch (_e) {}
+    }
+    finishImportProgressBar(true);
+    showToast('中藥資料已清除！', 'success');
+  } catch (err) {
+    finishImportProgressBar(false);
+    console.error('清除中藥資料失敗:', err);
+    showToast('清除中藥資料失敗，請稍後再試', 'error');
+  }
 }
 
         
@@ -12099,34 +12681,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!trimmed) {
                     return [];
                 }
-                // 先替換 'event' 與 'this' 為特殊標記，避免 eval 時當作變數解析
+                // 先替換 'event' 與 'this' 為特殊標記，避免直接 eval 解析錯誤
                 const replaced = trimmed
                     .replace(/\bevent\b/g, '__EVENT__')
                     .replace(/\bthis\b/g, '__THIS__');
                 let args;
                 try {
                     /*
-                     * 直接 eval 包含 __EVENT__/__THIS__ 標記的字串會導致 ReferenceError，
-                     * 因為這些標記並非實際定義的變數。為了避免此問題，先將這些標記
-                     * 轉換成帶引號的字串，讓 eval 得到的是字串占位符陣列，再於後續
-                     * 將其映射回正確的 event 或元素物件。這樣能避免在開發階段於控制台
-                     * 輸出 "__EVENT__ is not defined" 的錯誤訊息。
+                     * 使用動態函式的方式來解析包含 __EVENT__/__THIS__ 標記的引數字串，
+                     * 並將實際的 event 與元素物件作為參數注入。這樣就可以正確解析
+                     * 複雜的屬性存取表達式（例如 __THIS__.files[0]），避免將 __THIS__
+                     * 當作字串處理導致無法讀取屬性。
                      */
-                    const replacedForEval = replaced
-                        .replace(/__EVENT__/g, '"__EVENT__"')
-                        .replace(/__THIS__/g, '"__THIS__"');
-                    // 以陣列字面量包覆，使用 eval 將字串解析為實際值
-                    args = eval(`[${replacedForEval}]`);
+                    const fn = new Function('__EVENT__', '__THIS__', 'return [' + replaced + '];');
+                    args = fn(event, el);
                 } catch (e) {
                     console.error('解析 inline 事件參數失敗:', argsStr, e);
                     args = [];
                 }
-                // 將特殊標記替換為實際的 event 或 element
-                return args.map(function (arg) {
-                    if (arg === '__EVENT__') return event;
-                    if (arg === '__THIS__') return el;
-                    return arg;
-                });
+                // args 現在已經是包含正確值的陣列，無需再替換特殊標記
+                return args;
             }
 
             /**
@@ -12318,6 +12892,16 @@ document.addEventListener('DOMContentLoaded', function() {
   window.exportClinicBackup = exportClinicBackup;
   window.triggerBackupImport = triggerBackupImport;
   window.handleBackupFile = handleBackupFile;
+
+  // 數據匯入相關函式
+  window.triggerTemplateImport = triggerTemplateImport;
+  window.handleTemplateImportFile = handleTemplateImportFile;
+  window.triggerHerbImport = triggerHerbImport;
+  window.handleHerbImportFile = handleHerbImportFile;
+
+  // 清除資料相關函式
+  window.clearTemplateData = clearTemplateData;
+  window.clearHerbData = clearHerbData;
 
   /**
    * 安全地轉義使用者提供的字串，用於避免 XSS 攻擊。
@@ -13499,6 +14083,16 @@ function refreshTemplateCategoryFilters() {
             const container = document.getElementById('herbCombinationsContainer');
             if (!container) return;
             container.innerHTML = '';
+            // 更新中藥組合總數至標籤顯示
+            try {
+              const totalCount = Array.isArray(herbCombinations)
+                ? herbCombinations.filter(item => item && item.name && String(item.name).trim() !== '').length
+                : 0;
+              const countElem = document.getElementById('herbCount');
+              if (countElem) {
+                countElem.textContent = String(totalCount);
+              }
+            } catch (_e) {}
             // 根據搜尋關鍵字與分類篩選清單
             let searchTerm = '';
             ['herbComboSearch', 'searchHerbCombo', 'searchHerbCombination', 'herbComboSearchInput'].some(id => {
@@ -13622,6 +14216,16 @@ function refreshTemplateCategoryFilters() {
             const container = document.getElementById('acupointCombinationsContainer');
             if (!container) return;
             container.innerHTML = '';
+            // 更新穴位組合總數至標籤顯示
+            try {
+              const totalCount = Array.isArray(acupointCombinations)
+                ? acupointCombinations.filter(item => item && item.name && String(item.name).trim() !== '').length
+                : 0;
+              const countElem = document.getElementById('acupointCount');
+              if (countElem) {
+                countElem.textContent = String(totalCount);
+              }
+            } catch (_e) {}
             // 取得搜尋字串，支援多個可能的輸入框 ID。
             let searchTerm = '';
             ['acupointComboSearch', 'searchAcupointCombo', 'acupointComboSearchInput'].some(id => {
@@ -14289,6 +14893,16 @@ function refreshTemplateCategoryFilters() {
             const displayTemplates = Array.isArray(templates)
               ? templates.filter(t => !t.isNew)
               : [];
+            // 更新醫囑模板總數至標籤顯示
+            try {
+              const totalCount = Array.isArray(prescriptionTemplates)
+                ? prescriptionTemplates.filter(p => p && !p.isNew).length
+                : 0;
+              const countElem = document.getElementById('prescriptionCount');
+              if (countElem) {
+                countElem.textContent = String(totalCount);
+              }
+            } catch (_e) {}
             displayTemplates.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-purple-200';
@@ -14362,6 +14976,16 @@ function refreshTemplateCategoryFilters() {
             const displayTemplates = Array.isArray(templates)
               ? templates.filter(t => !t.isNew)
               : [];
+            // 更新診斷模板總數至標籤顯示
+            try {
+              const totalCount = Array.isArray(diagnosisTemplates)
+                ? diagnosisTemplates.filter(t => t && !t.isNew).length
+                : 0;
+              const countElem = document.getElementById('diagnosisCount');
+              if (countElem) {
+                countElem.textContent = String(totalCount);
+              }
+            } catch (_e) {}
             displayTemplates.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-orange-200';
@@ -14804,7 +15428,8 @@ function refreshTemplateCategoryFilters() {
               const herbIngredientsHtml = Array.isArray(item.ingredients)
                 ? item.ingredients.map(ing => {
                     return '<div class="flex items-center gap-2">' +
-                      '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded">' +
+                      // 將藥材名稱欄位寬度縮短為一半，避免在行動裝置上過長
+                      '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="w-1/2 px-2 py-1 border border-gray-300 rounded">' +
                       '<input type="number" value="' + (ing.dosage || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
                       '<span class="text-sm text-gray-700">克</span>' +
                       '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>' +
@@ -14861,7 +15486,7 @@ function refreshTemplateCategoryFilters() {
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">穴位列表</label>
                     <div id="acupointPoints" class="space-y-2">
-                      ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text" value="' + (pt.name || '') + '" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + (pt.type || '') + '" placeholder="主穴/配穴" class="w-28 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button></div>').join('')}
+${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text" value="' + (pt.name || '') + '" placeholder="穴位名稱" class="w-1/2 px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + (pt.type || '') + '" placeholder="主穴/配穴" class="w-28 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button></div>').join('')}
                     </div>
                     <button onclick="addAcupointPointField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增穴位</button>
                   </div>
@@ -15209,7 +15834,8 @@ function refreshTemplateCategoryFilters() {
             // 使用 flex 布局讓刪除按鈕置於右側
             div.className = 'flex items-center gap-2';
             // 建立名稱與類型輸入框以及刪除按鈕，刪除按鈕點擊後可移除所在行
-            div.innerHTML = '<input type="text" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="主穴/配穴" class="w-28 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>';
+    // 調整穴位名稱欄位寬度為一半，避免在手機或小螢幕上過長
+    div.innerHTML = '<input type="text" placeholder="穴位名稱" class="w-1/2 px-2 py-1 border border-gray-300 rounded"><input type="text" placeholder="主穴/配穴" class="w-28 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>';
             container.appendChild(div);
           }
 
@@ -15265,7 +15891,8 @@ function refreshTemplateCategoryFilters() {
             nameInput.placeholder = '藥材名稱';
             // 新增後的藥材名稱固定顯示，不可編輯
             nameInput.readOnly = true;
-            nameInput.className = 'flex-1 px-2 py-1 border border-gray-300 rounded';
+            // 將藥材名稱欄位寬度縮短為一半，避免在行動裝置上過長
+            nameInput.className = 'w-1/2 px-2 py-1 border border-gray-300 rounded';
             const dosageInput = document.createElement('input');
             dosageInput.type = 'number';
             // 劑量欄位預設為空，不自動填入任何值
