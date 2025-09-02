@@ -347,6 +347,56 @@ function finishBackupProgressBar(success) {
 }
 
 /**
+ * 顯示資料匯入/清除進度條。
+ * 這些函式與備份匯入進度條相似，但使用不同的容器元素。
+ * @param {number} totalSteps 總步驟數，用於計算百分比
+ */
+function showImportProgressBar(totalSteps) {
+    const container = document.getElementById('importProgressContainer');
+    const bar = document.getElementById('importProgressBar');
+    const text = document.getElementById('importProgressText');
+    if (container && bar && text) {
+        container.classList.remove('hidden');
+        bar.style.width = '0%';
+        text.textContent = '匯入進度 0%';
+        container.dataset.totalSteps = totalSteps;
+    }
+}
+
+/**
+ * 更新資料匯入/清除進度條。
+ * @param {number} currentStep 已完成的步驟數
+ * @param {number} totalSteps 總步驟數
+ */
+function updateImportProgressBar(currentStep, totalSteps) {
+    const container = document.getElementById('importProgressContainer');
+    const bar = document.getElementById('importProgressBar');
+    const text = document.getElementById('importProgressText');
+    if (container && bar && text) {
+        const percent = totalSteps > 0 ? Math.round((currentStep / totalSteps) * 100) : 0;
+        bar.style.width = percent + '%';
+        text.textContent = '匯入進度 ' + percent + '%';
+    }
+}
+
+/**
+ * 完成資料匯入/清除進度條。
+ * @param {boolean} success 是否成功
+ */
+function finishImportProgressBar(success) {
+    const container = document.getElementById('importProgressContainer');
+    const bar = document.getElementById('importProgressBar');
+    const text = document.getElementById('importProgressText');
+    if (container && bar && text) {
+        bar.style.width = '100%';
+        text.textContent = success ? '匯入完成！' : '匯入失敗！';
+        setTimeout(() => {
+            container.classList.add('hidden');
+        }, 2000);
+    }
+}
+
+/**
  * 生成唯一的病歷編號。
  * 使用當前日期時間和隨機數組成，格式如 MR20250101123045-1234。
  * @returns {string} 新的病歷編號
@@ -10877,8 +10927,8 @@ function triggerTemplateImport() {
 async function handleTemplateImportFile(file) {
   if (!file) return;
   try {
-    // 提醒使用者匯入將覆蓋現有資料
-    if (!window.confirm('匯入模板資料將覆蓋現有模板庫資料，是否繼續？')) {
+    // 提醒使用者匯入將新增資料，不會刪除現有資料
+    if (!window.confirm('匯入模板資料將新增資料（不會刪除現有模板庫資料），是否繼續？')) {
       return;
     }
     const text = await file.text();
@@ -10962,8 +11012,28 @@ async function handleTemplateImportFile(file) {
       showToast('未偵測到有效的模板資料', 'error');
       return;
     }
-    await importTemplateLibraryData(prescriptions, diagnoses);
-    showToast('模板資料匯入完成！', 'success');
+    // 計算總步驟：醫囑模板與診斷模板項目總數
+    const totalSteps =
+      (Array.isArray(prescriptions) ? prescriptions.length : 0) +
+      (Array.isArray(diagnoses) ? diagnoses.length : 0);
+    try {
+      showImportProgressBar(totalSteps);
+      let processedCount = 0;
+      await importTemplateLibraryData(
+        prescriptions,
+        diagnoses,
+        () => {
+          // 增加處理計數並更新進度條
+          processedCount++;
+          updateImportProgressBar(processedCount, totalSteps);
+        }
+      );
+      finishImportProgressBar(true);
+      showToast('模板資料匯入完成！', 'success');
+    } catch (err) {
+      finishImportProgressBar(false);
+      throw err;
+    }
   } catch (err) {
     console.error('處理模板匯入檔案時發生錯誤:', err);
     showToast('匯入模板資料失敗，請確認檔案格式是否正確', 'error');
@@ -10976,45 +11046,61 @@ async function handleTemplateImportFile(file) {
  * @param {Array} prescriptions 醫囑模板陣列
  * @param {Array} diagnoses 診斷模板陣列
  */
-async function importTemplateLibraryData(prescriptions, diagnoses) {
+async function importTemplateLibraryData(prescriptions, diagnoses, progressCallback) {
   try {
     await ensureFirebaseReady();
-    // 定義覆蓋集合的 helper
-    async function replaceCollectionItems(collectionName, items) {
+    // 定義資料寫入的 helper，不會刪除現有資料，只會新增或更新
+    async function upsertCollectionItems(collectionName, items) {
+      if (!Array.isArray(items) || items.length === 0) return;
+      // 取得集合參考
       const colRef = window.firebase.collection(window.firebase.db, collectionName);
-      try {
-        const snap = await window.firebase.getDocs(colRef);
-        const deletions = [];
-        snap.forEach(docSnap => {
-          deletions.push(window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, collectionName, docSnap.id)));
-        });
-        if (deletions.length > 0) {
-          await Promise.all(deletions);
+      // 逐一寫入/更新
+      for (const item of items) {
+        if (!item || typeof item !== 'object') continue;
+        const idStr = String(item.id);
+        await window.firebase.setDoc(window.firebase.doc(window.firebase.db, collectionName, idStr), item);
+        if (typeof progressCallback === 'function') {
+          progressCallback();
         }
-      } catch (err) {
-        console.error('刪除 ' + collectionName + ' 舊資料失敗:', err);
-      }
-      const writes = [];
-      if (Array.isArray(items)) {
-        items.forEach(item => {
-          if (!item || typeof item !== 'object') return;
-          const idStr = String(item.id);
-          writes.push(window.firebase.setDoc(window.firebase.doc(window.firebase.db, collectionName, idStr), item));
-        });
-      }
-      if (writes.length > 0) {
-        await Promise.all(writes);
       }
     }
-    // 覆寫醫囑模板和診斷模板
-    if (Array.isArray(prescriptions)) {
-      await replaceCollectionItems('prescriptionTemplates', prescriptions);
-      // 更新全域變數
-      prescriptionTemplates = prescriptions;
+    // 先初始化本地全域變數為空陣列（如果尚未存在）
+    if (typeof prescriptionTemplates === 'undefined') {
+      prescriptionTemplates = [];
     }
-    if (Array.isArray(diagnoses)) {
-      await replaceCollectionItems('diagnosisTemplates', diagnoses);
-      diagnosisTemplates = diagnoses;
+    if (typeof diagnosisTemplates === 'undefined') {
+      diagnosisTemplates = [];
+    }
+    // 更新/新增醫囑模板
+    if (Array.isArray(prescriptions) && prescriptions.length > 0) {
+      await upsertCollectionItems('prescriptionTemplates', prescriptions);
+      // 合併到本地資料：根據 id 替換或新增
+      const updated = Array.isArray(prescriptionTemplates) ? [...prescriptionTemplates] : [];
+      prescriptions.forEach(item => {
+        if (!item || typeof item !== 'object') return;
+        const idx = updated.findIndex(p => String(p.id) === String(item.id));
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], ...item };
+        } else {
+          updated.push(item);
+        }
+      });
+      prescriptionTemplates = updated;
+    }
+    // 更新/新增診斷模板
+    if (Array.isArray(diagnoses) && diagnoses.length > 0) {
+      await upsertCollectionItems('diagnosisTemplates', diagnoses);
+      const updatedDiag = Array.isArray(diagnosisTemplates) ? [...diagnosisTemplates] : [];
+      diagnoses.forEach(item => {
+        if (!item || typeof item !== 'object') return;
+        const idx = updatedDiag.findIndex(d => String(d.id) === String(item.id));
+        if (idx >= 0) {
+          updatedDiag[idx] = { ...updatedDiag[idx], ...item };
+        } else {
+          updatedDiag.push(item);
+        }
+      });
+      diagnosisTemplates = updatedDiag;
     }
     // 重新渲染模板列表
     if (typeof renderPrescriptionTemplates === 'function') {
@@ -11064,7 +11150,7 @@ function triggerHerbImport() {
 async function handleHerbImportFile(file) {
   if (!file) return;
   try {
-    if (!window.confirm('匯入中藥資料將覆蓋現有中藥庫資料，是否繼續？')) {
+    if (!window.confirm('匯入中藥資料將新增資料（不會刪除現有中藥庫資料），是否繼續？')) {
       return;
     }
     const text = await file.text();
@@ -11093,8 +11179,21 @@ async function handleHerbImportFile(file) {
       }
       return item;
     });
-    await importHerbLibraryData(items);
-    showToast('中藥資料匯入完成！', 'success');
+    // 計算總步驟
+    const totalSteps = Array.isArray(items) ? items.length : 0;
+    try {
+      showImportProgressBar(totalSteps);
+      let processedCount = 0;
+      await importHerbLibraryData(items, () => {
+        processedCount++;
+        updateImportProgressBar(processedCount, totalSteps);
+      });
+      finishImportProgressBar(true);
+      showToast('中藥資料匯入完成！', 'success');
+    } catch (err2) {
+      finishImportProgressBar(false);
+      throw err2;
+    }
   } catch (err) {
     console.error('處理中藥匯入檔案時發生錯誤:', err);
     showToast('匯入中藥資料失敗，請確認檔案格式是否正確', 'error');
@@ -11106,40 +11205,31 @@ async function handleHerbImportFile(file) {
  * 同步更新本地變數並重新渲染中藥庫列表。
  * @param {Array} items 中藥庫資料陣列
  */
-async function importHerbLibraryData(items) {
+async function importHerbLibraryData(items, progressCallback) {
   try {
     await ensureFirebaseReady();
-    // 定義覆蓋集合的 helper
-    async function replaceCollectionItems(collectionName, list) {
-      const colRef = window.firebase.collection(window.firebase.db, collectionName);
-      try {
-        const snap = await window.firebase.getDocs(colRef);
-        const deletions = [];
-        snap.forEach(docSnap => {
-          deletions.push(window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, collectionName, docSnap.id)));
-        });
-        if (deletions.length > 0) {
-          await Promise.all(deletions);
-        }
-      } catch (err) {
-        console.error('刪除 ' + collectionName + ' 舊資料失敗:', err);
-      }
-      const writes = [];
-      if (Array.isArray(list)) {
-        list.forEach(item => {
-          if (!item || typeof item !== 'object') return;
-          const idStr = String(item.id);
-          writes.push(window.firebase.setDoc(window.firebase.doc(window.firebase.db, collectionName, idStr), item));
-        });
-      }
-      if (writes.length > 0) {
-        await Promise.all(writes);
-      }
+    if (!Array.isArray(items) || items.length === 0) {
+      return;
     }
-    // 覆寫中藥庫集合
-    if (Array.isArray(items)) {
-      await replaceCollectionItems('herbLibrary', items);
-      herbLibrary = items;
+    // 確保本地變數存在
+    if (typeof herbLibrary === 'undefined') {
+      herbLibrary = [];
+    }
+    // 逐一新增/更新藥材資料
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+      const idStr = String(item.id);
+      await window.firebase.setDoc(window.firebase.doc(window.firebase.db, 'herbLibrary', idStr), item);
+      if (typeof progressCallback === 'function') {
+        progressCallback();
+      }
+      // 更新本地陣列：若已存在則覆蓋，否則加入
+      const idx = herbLibrary.findIndex(h => String(h.id) === idStr);
+      if (idx >= 0) {
+        herbLibrary[idx] = { ...herbLibrary[idx], ...item };
+      } else {
+        herbLibrary.push(item);
+      }
     }
     // 重新載入並顯示資料
     if (typeof initHerbLibrary === 'function') {
@@ -11155,6 +11245,92 @@ async function importHerbLibraryData(items) {
   } catch (error) {
     console.error('匯入中藥資料時發生錯誤:', error);
     throw error;
+  }
+}
+
+/**
+ * 清除所有模板資料（醫囑與診斷模板）。
+ * 顯示進度條並逐一刪除資料。
+ */
+async function clearTemplateData() {
+  try {
+    // 確認使用者操作
+    if (!window.confirm('確定要清除所有模板資料嗎？此動作將無法復原。')) {
+      return;
+    }
+    await ensureFirebaseReady();
+    // 取得兩個集合的所有文件
+    const presSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'prescriptionTemplates'));
+    const diagSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'diagnosisTemplates'));
+    const totalSteps = presSnap.size + diagSnap.size;
+    let processed = 0;
+    showImportProgressBar(totalSteps);
+    // 刪除醫囑模板
+    for (const docSnap of presSnap.docs) {
+      await window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, 'prescriptionTemplates', docSnap.id));
+      processed++;
+      updateImportProgressBar(processed, totalSteps);
+    }
+    // 刪除診斷模板
+    for (const docSnap of diagSnap.docs) {
+      await window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, 'diagnosisTemplates', docSnap.id));
+      processed++;
+      updateImportProgressBar(processed, totalSteps);
+    }
+    // 更新本地資料
+    prescriptionTemplates = [];
+    diagnosisTemplates = [];
+    // 重新渲染
+    if (typeof renderPrescriptionTemplates === 'function') {
+      try { renderPrescriptionTemplates(); } catch (_e) {}
+    }
+    if (typeof renderDiagnosisTemplates === 'function') {
+      try { renderDiagnosisTemplates(); } catch (_e) {}
+    }
+    if (typeof refreshTemplateCategoryFilters === 'function') {
+      try { refreshTemplateCategoryFilters(); } catch (_e) {}
+    }
+    finishImportProgressBar(true);
+    showToast('模板資料已清除！', 'success');
+  } catch (err) {
+    finishImportProgressBar(false);
+    console.error('清除模板資料失敗:', err);
+    showToast('清除模板資料失敗，請稍後再試', 'error');
+  }
+}
+
+/**
+ * 清除所有中藥資料。
+ * 顯示進度條並逐一刪除資料。
+ */
+async function clearHerbData() {
+  try {
+    if (!window.confirm('確定要清除所有中藥資料嗎？此動作將無法復原。')) {
+      return;
+    }
+    await ensureFirebaseReady();
+    const herbSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'herbLibrary'));
+    const totalSteps = herbSnap.size;
+    let processed = 0;
+    showImportProgressBar(totalSteps);
+    for (const docSnap of herbSnap.docs) {
+      await window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, 'herbLibrary', docSnap.id));
+      processed++;
+      updateImportProgressBar(processed, totalSteps);
+    }
+    herbLibrary = [];
+    if (typeof initHerbLibrary === 'function') {
+      try { await initHerbLibrary(); } catch (_e) {}
+    }
+    if (typeof displayHerbLibrary === 'function') {
+      try { displayHerbLibrary(); } catch (_e) {}
+    }
+    finishImportProgressBar(true);
+    showToast('中藥資料已清除！', 'success');
+  } catch (err) {
+    finishImportProgressBar(false);
+    console.error('清除中藥資料失敗:', err);
+    showToast('清除中藥資料失敗，請稍後再試', 'error');
   }
 }
 
@@ -12722,6 +12898,10 @@ document.addEventListener('DOMContentLoaded', function() {
   window.handleTemplateImportFile = handleTemplateImportFile;
   window.triggerHerbImport = triggerHerbImport;
   window.handleHerbImportFile = handleHerbImportFile;
+
+  // 清除資料相關函式
+  window.clearTemplateData = clearTemplateData;
+  window.clearHerbData = clearHerbData;
 
   /**
    * 安全地轉義使用者提供的字串，用於避免 XSS 攻擊。

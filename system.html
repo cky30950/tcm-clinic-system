@@ -1578,8 +1578,8 @@
                     <!-- 數據匯入 -->
                     <div class="bg-gray-50 rounded-lg p-6">
                         <h3 class="text-lg font-semibold mb-4">數據匯入</h3>
-                        <p class="text-sm text-gray-600 mb-4">您可以將外部 JSON 檔案的資料匯入模板庫與中藥庫。請注意：匯入後將覆蓋現有資料。</p>
-                        <div class="flex flex-col md:flex-row gap-4">
+                        <p class="text-sm text-gray-600 mb-4">您可以將外部 JSON 檔案的資料匯入模板庫與中藥庫，匯入時將新增資料而不會刪除現有資料。您也可以清除現有的模板資料與中藥資料。</p>
+                        <div class="flex flex-col md:flex-row flex-wrap gap-4">
                             <!-- 匯入模板資料 -->
                             <button id="templateImportBtn" onclick="triggerTemplateImport()" class="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition duration-200">
                                 匯入模板資料
@@ -1590,6 +1590,21 @@
                                 匯入中藥資料
                             </button>
                             <input type="file" id="herbImportFile" accept=".json" class="hidden" onchange="handleHerbImportFile(this.files[0])">
+                            <!-- 清除模板資料 -->
+                            <button id="templateClearBtn" onclick="clearTemplateData()" class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition duration-200">
+                                清除模板資料
+                            </button>
+                            <!-- 清除中藥資料 -->
+                            <button id="herbClearBtn" onclick="clearHerbData()" class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition duration-200">
+                                清除中藥資料
+                            </button>
+                        </div>
+                        <!-- 匯入/清除進度條 -->
+                        <div id="importProgressContainer" class="hidden mt-4">
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="importProgressBar" class="bg-blue-600 h-2.5 rounded-full" style="width:0%"></div>
+                            </div>
+                            <div id="importProgressText" class="mt-2 text-sm text-gray-700"></div>
                         </div>
                     </div>
                     
@@ -1952,6 +1967,7 @@
     <script src="system.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
