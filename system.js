@@ -13903,6 +13903,16 @@ function refreshTemplateCategoryFilters() {
             const container = document.getElementById('herbCombinationsContainer');
             if (!container) return;
             container.innerHTML = '';
+            // 更新中藥組合總數至標籤顯示
+            try {
+              const totalCount = Array.isArray(herbCombinations)
+                ? herbCombinations.filter(item => item && item.name && String(item.name).trim() !== '').length
+                : 0;
+              const countElem = document.getElementById('herbCount');
+              if (countElem) {
+                countElem.textContent = String(totalCount);
+              }
+            } catch (_e) {}
             // 根據搜尋關鍵字與分類篩選清單
             let searchTerm = '';
             ['herbComboSearch', 'searchHerbCombo', 'searchHerbCombination', 'herbComboSearchInput'].some(id => {
@@ -14026,6 +14036,16 @@ function refreshTemplateCategoryFilters() {
             const container = document.getElementById('acupointCombinationsContainer');
             if (!container) return;
             container.innerHTML = '';
+            // 更新穴位組合總數至標籤顯示
+            try {
+              const totalCount = Array.isArray(acupointCombinations)
+                ? acupointCombinations.filter(item => item && item.name && String(item.name).trim() !== '').length
+                : 0;
+              const countElem = document.getElementById('acupointCount');
+              if (countElem) {
+                countElem.textContent = String(totalCount);
+              }
+            } catch (_e) {}
             // 取得搜尋字串，支援多個可能的輸入框 ID。
             let searchTerm = '';
             ['acupointComboSearch', 'searchAcupointCombo', 'acupointComboSearchInput'].some(id => {
@@ -14693,6 +14713,16 @@ function refreshTemplateCategoryFilters() {
             const displayTemplates = Array.isArray(templates)
               ? templates.filter(t => !t.isNew)
               : [];
+            // 更新醫囑模板總數至標籤顯示
+            try {
+              const totalCount = Array.isArray(prescriptionTemplates)
+                ? prescriptionTemplates.filter(p => p && !p.isNew).length
+                : 0;
+              const countElem = document.getElementById('prescriptionCount');
+              if (countElem) {
+                countElem.textContent = String(totalCount);
+              }
+            } catch (_e) {}
             displayTemplates.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-purple-200';
@@ -14766,6 +14796,16 @@ function refreshTemplateCategoryFilters() {
             const displayTemplates = Array.isArray(templates)
               ? templates.filter(t => !t.isNew)
               : [];
+            // 更新診斷模板總數至標籤顯示
+            try {
+              const totalCount = Array.isArray(diagnosisTemplates)
+                ? diagnosisTemplates.filter(t => t && !t.isNew).length
+                : 0;
+              const countElem = document.getElementById('diagnosisCount');
+              if (countElem) {
+                countElem.textContent = String(totalCount);
+              }
+            } catch (_e) {}
             displayTemplates.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-orange-200';
