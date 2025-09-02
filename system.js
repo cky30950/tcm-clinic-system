@@ -2938,20 +2938,12 @@ function createAppointmentRow(appointment, patient, index) {
                 </span>
             </td>
             <!--
-              移除 w-full 讓此欄不再撐滿整個剩餘空間，只保留內邊距及文字大小類別。
-              保持『操作』欄寬度自適應內容，並交由表格其他欄位平均分配寬度。
+              將操作按鈕欄保持內容寬度，不再撐滿整列。
+              為了讓表頭「操作」與診症記錄按鈕左對齊，移除 w-full 以及 justify-end，
+              使按鈕自然靠左排列。
             -->
             <td class="px-4 py-3 text-sm">
-                <!--
-                  將操作按鈕容器設為寬度 100% 並使用 justify-end，使所有操作按鈕靠右排列。
-                  這樣可以有效利用表格的剩餘寬度，減少右側的空白區域，
-                  也讓按鈕始終貼齊最右側。
-                -->
-                <!--
-                  移除內層容器的 w-full，避免整個操作容器撐滿剩餘空間。
-                  透過 flex 與 justify-end 將按鈕靠右排列，不會影響其他欄位寬度。
-                -->
-                <div class="flex flex-wrap gap-1 justify-end">
+                <div class="flex flex-wrap gap-1">
                     ${operationButtons}
                 </div>
             </td>
