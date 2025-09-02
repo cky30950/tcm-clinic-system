@@ -4050,7 +4050,8 @@ if (!patient) {
                                     </span>
                                 ` : ''}
                             </div>
-                            <div class="flex space-x-2">
+                            <!-- 使用 flex-wrap 允許按鈕在小螢幕換行，改用 gap-2 以在換行時仍保持間距 -->
+                            <div class="flex flex-wrap gap-2">
                                 <button onclick="printConsultationRecord('${consultation.id}')" 
                                         class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded">
                                     列印收據
@@ -4378,7 +4379,8 @@ function displayConsultationMedicalHistoryPage() {
                             </span>
                         ` : ''}
                     </div>
-                    <div class="flex space-x-2">
+                    <!-- 使用 flex-wrap 允許按鈕在小螢幕換行，改用 gap-2 以在換行時仍保持間距 -->
+                    <div class="flex flex-wrap gap-2">
                         <button onclick="printConsultationRecord('${consultation.id}')" 
                                 class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded">
                             列印收據
@@ -13568,7 +13570,8 @@ function refreshTemplateCategoryFilters() {
                     // 始終在劑量後顯示單位「克」，如果劑量為空則不顯示單位
                     const dosage = ing && ing.dosage ? String(ing.dosage).trim() : '';
                     const displayDosage = dosage ? dosage + '克' : '';
-                    return '<div class="flex justify-between"><span>' + (ing && ing.name ? ing.name : '') + '</span><span>' + displayDosage + '</span></div>';
+                    // 為了在手機版顯示時避免藥材名稱過長造成版面溢出，使用 flex-wrap 及 medical-field
+                    return '<div class="flex justify-between flex-wrap gap-2"><span class="medical-field">' + (ing && ing.name ? ing.name : '') + '</span><span>' + displayDosage + '</span></div>';
                   }).join('')}
                 </div>
                 <!-- 使用頻率顯示已移除 -->
@@ -13694,7 +13697,13 @@ function refreshTemplateCategoryFilters() {
                   </div>
                 </div>
                 <div class="text-sm text-gray-700 space-y-1">
-                  ${item.points.map(pt => '<div class="flex justify-between items-center"><span class="text-gray-700">' + pt.name + '</span><span class="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded">' + pt.type + '</span></div>').join('')}
+                  ${item.points.map(pt => {
+                    // 穴位名稱可能很長，使用 flex-wrap 與 medical-field 並加上 flex-1 讓名稱區塊換行且佔滿剩餘空間
+                    return '<div class="flex justify-between items-center flex-wrap gap-2">' +
+                           '<span class="text-gray-700 medical-field flex-1">' + (pt && pt.name ? pt.name : '') + '</span>' +
+                           '<span class="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded">' + (pt && pt.type ? pt.type : '') + '</span>' +
+                           '</div>';
+                  }).join('')}
                 </div>
                 <div class="mt-3 pt-3 border-t border-gray-200 text-sm text-gray-600">
                   <p>針法：${item.technique}</p>

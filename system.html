@@ -1744,7 +1744,8 @@
             <div class="mb-6">
               <label class="block text-gray-700 font-medium mb-2">新增分類</label>
               <div class="flex gap-2">
-                <input type="text" id="newCategoryInput" placeholder="輸入分類名稱..." class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+        <!-- 在手機版限制輸入框的最大寬度，避免過寬造成版面問題 -->
+        <input type="text" id="newCategoryInput" placeholder="輸入分類名稱..." class="flex-1 max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                 <button onclick="addCategory()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
                   新增
                 </button>
