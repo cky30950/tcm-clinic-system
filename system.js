@@ -7960,20 +7960,30 @@ async function initializeSystemAfterLogin() {
         }
 
         // 處方搜索功能
-        function searchHerbsForPrescription() {
+        async function searchHerbsForPrescription() {
             const searchTerm = document.getElementById('prescriptionSearch').value.trim().toLowerCase();
             const resultsContainer = document.getElementById('prescriptionSearchResults');
             const resultsList = document.getElementById('prescriptionSearchList');
-            
+
+            // 若搜尋字串為空，直接隱藏結果
             if (searchTerm.length < 1) {
                 resultsContainer.classList.add('hidden');
                 return;
             }
-            
+
+            // 確保中藥庫已經載入，避免空陣列導致搜尋不到結果
+            if (typeof initHerbLibrary === 'function' && (!Array.isArray(herbLibrary) || herbLibrary.length === 0)) {
+                try {
+                    await initHerbLibrary();
+                } catch (e) {
+                    console.error('初始化中藥庫失敗:', e);
+                }
+            }
+
             // 搜索匹配的中藥材和方劑
             // 部分匯入的資料可能缺少名稱或非字串類型，直接呼叫 toLowerCase 會導致錯誤。
             // 在此先檢查屬性存在且為字串，再進行比對，避免搜尋過程中斷。
-            const matchedItems = herbLibrary
+            const matchedItems = (Array.isArray(herbLibrary) ? herbLibrary : [])
                 .filter(item => {
                     // 若沒有名稱或名稱不是字串，則視為不符合搜尋
                     const nameMatch = (typeof item.name === 'string') && item.name.toLowerCase().includes(searchTerm);
@@ -7983,7 +7993,8 @@ async function initializeSystemAfterLogin() {
                     return nameMatch || aliasMatch || effectsMatch;
                 })
                 .slice(0, 10); // 限制顯示前10個結果
-            
+
+            // 無匹配結果時顯示提示
             if (matchedItems.length === 0) {
                 resultsList.innerHTML = `
                     <div class="p-3 text-center text-gray-500 text-sm">
@@ -7993,14 +8004,22 @@ async function initializeSystemAfterLogin() {
                 resultsContainer.classList.remove('hidden');
                 return;
             }
-            
+
             // 顯示搜索結果，於每個項目上加入 tooltip
             resultsList.innerHTML = matchedItems.map(item => {
                 const typeName = item.type === 'herb' ? '中藥材' : '方劑';
                 const bgColor = 'bg-yellow-50 hover:bg-yellow-100 border-yellow-200';
                 // 產生詳細說明並進行 HTML 轉義與換行處理
                 const tooltip = generateHerbOrFormulaTooltip(item);
-                const safeTooltip = window.escapeHtml(tooltip).replace(/\n/g, '&#10;');
+                // 若 escapeHtml 尚未掛載至 window，提供簡易替代方案以避免錯誤
+                const escapeFn = typeof window.escapeHtml === 'function'
+                    ? window.escapeHtml
+                    : (str) => String(str).replace(/&/g, '&amp;')
+                                          .replace(/</g, '&lt;')
+                                          .replace(/>/g, '&gt;')
+                                          .replace(/"/g, '&quot;')
+                                          .replace(/'/g, '&#039;');
+                const safeTooltip = escapeFn(tooltip).replace(/\n/g, '&#10;');
                 return `
                     <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" title="${safeTooltip}" onclick="addToPrescription('${item.type}', ${item.id})">
                         <div class="text-center">
@@ -8012,7 +8031,8 @@ async function initializeSystemAfterLogin() {
                     </div>
                 `;
             }).join('');
-            
+
+            // 顯示結果容器
             resultsContainer.classList.remove('hidden');
         }
         
