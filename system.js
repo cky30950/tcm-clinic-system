@@ -7284,12 +7284,14 @@ async function initializeSystemAfterLogin() {
             
             // 過濾資料
             let filteredItems = herbLibrary.filter(item => {
-                const matchesSearch = item.name.toLowerCase().includes(searchTerm) ||
-                                    (item.alias && item.alias.toLowerCase().includes(searchTerm)) ||
-                                    (item.effects && item.effects.toLowerCase().includes(searchTerm));
-                
+                // 在執行 toLowerCase 之前檢查資料是否存在且為字串，避免匯入資料格式錯誤導致錯誤中斷
+                const nameMatch = (typeof item.name === 'string') && item.name.toLowerCase().includes(searchTerm);
+                const aliasMatch = (typeof item.alias === 'string') && item.alias.toLowerCase().includes(searchTerm);
+                const effectsMatch = (typeof item.effects === 'string') && item.effects.toLowerCase().includes(searchTerm);
+                const matchesSearch = nameMatch || aliasMatch || effectsMatch;
+
                 const matchesFilter = currentHerbFilter === 'all' || item.type === currentHerbFilter;
-                
+
                 return matchesSearch && matchesFilter;
             });
             
@@ -7969,11 +7971,18 @@ async function initializeSystemAfterLogin() {
             }
             
             // 搜索匹配的中藥材和方劑
-            const matchedItems = herbLibrary.filter(item => 
-                item.name.toLowerCase().includes(searchTerm) ||
-                (item.alias && item.alias.toLowerCase().includes(searchTerm)) ||
-                (item.effects && item.effects.toLowerCase().includes(searchTerm))
-            ).slice(0, 10); // 限制顯示前10個結果
+            // 部分匯入的資料可能缺少名稱或非字串類型，直接呼叫 toLowerCase 會導致錯誤。
+            // 在此先檢查屬性存在且為字串，再進行比對，避免搜尋過程中斷。
+            const matchedItems = herbLibrary
+                .filter(item => {
+                    // 若沒有名稱或名稱不是字串，則視為不符合搜尋
+                    const nameMatch = (typeof item.name === 'string') && item.name.toLowerCase().includes(searchTerm);
+                    // 別名及主治等欄位可能不存在或不是字串，需檢查後再比對
+                    const aliasMatch = (typeof item.alias === 'string') && item.alias.toLowerCase().includes(searchTerm);
+                    const effectsMatch = (typeof item.effects === 'string') && item.effects.toLowerCase().includes(searchTerm);
+                    return nameMatch || aliasMatch || effectsMatch;
+                })
+                .slice(0, 10); // 限制顯示前10個結果
             
             if (matchedItems.length === 0) {
                 resultsList.innerHTML = `
