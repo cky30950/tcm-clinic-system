@@ -4151,7 +4151,7 @@ if (!patient) {
                                     </span>
                                 ` : ''}
                             </div>
-                            <div class="flex flex-wrap gap-2">
+                            <div class="flex flex-wrap justify-end gap-1">
                                 <button onclick="printConsultationRecord('${consultation.id}')" 
                                         class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                                     列印收據
@@ -4479,7 +4479,7 @@ function displayConsultationMedicalHistoryPage() {
                             </span>
                         ` : ''}
                     </div>
-                    <div class="flex flex-wrap gap-2">
+                    <div class="flex flex-wrap justify-end gap-1">
                         <button onclick="printConsultationRecord('${consultation.id}')" 
                                 class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                             列印收據
