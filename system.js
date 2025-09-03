@@ -7400,6 +7400,35 @@ async function initializeSystemAfterLogin() {
         function displayHerbLibrary() {
             const searchTerm = document.getElementById('searchHerb').value.toLowerCase();
             const listContainer = document.getElementById('herbLibraryList');
+
+            // 在搜尋條件下統計中藥庫數量，無論當前篩選類型為何。
+            // 這允許「全部」按鈕顯示包括中藥材與方劑的總數量。
+            // 另外也更新「中藥材」及「方劑」按鈕的數量提示，以便使用者快速瞭解各類型總數。
+            (function updateHerbFilterCounts() {
+                // 首先依據搜尋條件過濾 herbLibrary，忽略類型篩選
+                const searchFiltered = Array.isArray(herbLibrary) ? herbLibrary.filter(item => {
+                    const lowerName = item.name ? item.name.toLowerCase() : '';
+                    const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
+                    const lowerEffects = item.effects ? item.effects.toLowerCase() : '';
+                    return lowerName.includes(searchTerm) || lowerAlias.includes(searchTerm) || lowerEffects.includes(searchTerm);
+                }) : [];
+                const totalAll = searchFiltered.length;
+                const totalHerbsAll = searchFiltered.filter(item => item.type === 'herb').length;
+                const totalFormulasAll = searchFiltered.filter(item => item.type === 'formula').length;
+                // 更新各分類按鈕的顯示文字
+                const allBtn = document.getElementById('filter-all');
+                if (allBtn) {
+                    allBtn.innerHTML = `全部 (${totalAll})`;
+                }
+                const herbBtn = document.getElementById('filter-herb');
+                if (herbBtn) {
+                    herbBtn.innerHTML = `中藥材 (${totalHerbsAll})`;
+                }
+                const formulaBtn = document.getElementById('filter-formula');
+                if (formulaBtn) {
+                    formulaBtn.innerHTML = `方劑 (${totalFormulasAll})`;
+                }
+            })();
             // 過濾資料
             let filteredItems = Array.isArray(herbLibrary) ? herbLibrary.filter(item => {
                 const matchesSearch = item.name.toLowerCase().includes(searchTerm) ||
