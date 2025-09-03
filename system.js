@@ -4153,16 +4153,16 @@ if (!patient) {
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <button onclick="printConsultationRecord('${consultation.id}')" 
-                                        class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
+                                        class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                                     列印收據
                                 </button>
                                 <!-- 新增藥單醫囑列印按鈕，放在收據右側 -->
                                 <button onclick="printPrescriptionInstructions('${consultation.id}')" 
-                                        class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
+                                        class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                                     藥單醫囑
                                 </button>
                                 <button onclick="printAttendanceCertificate('${consultation.id}')" 
-                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
+                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                                     到診證明
                                 </button>
                                 ${(() => {
@@ -4172,7 +4172,7 @@ if (!patient) {
                                         if (currentAppointment && String(currentAppointment.patientId) === String(consultation.patientId)) {
                                             return `
                                                 <button onclick="loadMedicalRecordToCurrentConsultation('${consultation.id}')" 
-                                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
+                                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                                                     載入病歷
                                                 </button>
                                             `;
@@ -4481,16 +4481,16 @@ function displayConsultationMedicalHistoryPage() {
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <button onclick="printConsultationRecord('${consultation.id}')" 
-                                class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
+                                class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                             列印收據
                         </button>
                         <!-- 新增藥單醫囑列印按鈕，放在收據右側 -->
                         <button onclick="printPrescriptionInstructions('${consultation.id}')" 
-                                class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
+                                class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                             藥單醫囑
                         </button>
                         <button onclick="printAttendanceCertificate('${consultation.id}')" 
-                                class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
+                                class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                             到診證明
                         </button>
                         ${(() => {
@@ -4500,7 +4500,7 @@ function displayConsultationMedicalHistoryPage() {
                                 if (currentAppointment && String(currentAppointment.patientId) === String(consultation.patientId)) {
                                     return `
                                         <button onclick="loadMedicalRecordToCurrentConsultation('${consultation.id}')" 
-                                                class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.5); transform-origin: left;">
+                                                class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                                             載入病歷
                                         </button>
                                     `;
