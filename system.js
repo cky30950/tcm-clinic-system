@@ -7284,14 +7284,12 @@ async function initializeSystemAfterLogin() {
             
             // 過濾資料
             let filteredItems = herbLibrary.filter(item => {
-                // 在執行 toLowerCase 之前檢查資料是否存在且為字串，避免匯入資料格式錯誤導致錯誤中斷
-                const nameMatch = (typeof item.name === 'string') && item.name.toLowerCase().includes(searchTerm);
-                const aliasMatch = (typeof item.alias === 'string') && item.alias.toLowerCase().includes(searchTerm);
-                const effectsMatch = (typeof item.effects === 'string') && item.effects.toLowerCase().includes(searchTerm);
-                const matchesSearch = nameMatch || aliasMatch || effectsMatch;
-
+                const matchesSearch = item.name.toLowerCase().includes(searchTerm) ||
+                                    (item.alias && item.alias.toLowerCase().includes(searchTerm)) ||
+                                    (item.effects && item.effects.toLowerCase().includes(searchTerm));
+                
                 const matchesFilter = currentHerbFilter === 'all' || item.type === currentHerbFilter;
-
+                
                 return matchesSearch && matchesFilter;
             });
             
@@ -7960,41 +7958,23 @@ async function initializeSystemAfterLogin() {
         }
 
         // 處方搜索功能
-        async function searchHerbsForPrescription() {
+        function searchHerbsForPrescription() {
             const searchTerm = document.getElementById('prescriptionSearch').value.trim().toLowerCase();
             const resultsContainer = document.getElementById('prescriptionSearchResults');
             const resultsList = document.getElementById('prescriptionSearchList');
-
-            // 若搜尋字串為空，直接隱藏結果
+            
             if (searchTerm.length < 1) {
                 resultsContainer.classList.add('hidden');
                 return;
             }
-
-            // 確保中藥庫已經載入，避免空陣列導致搜尋不到結果
-            if (typeof initHerbLibrary === 'function' && (!Array.isArray(herbLibrary) || herbLibrary.length === 0)) {
-                try {
-                    await initHerbLibrary();
-                } catch (e) {
-                    console.error('初始化中藥庫失敗:', e);
-                }
-            }
-
+            
             // 搜索匹配的中藥材和方劑
-            // 部分匯入的資料可能缺少名稱或非字串類型，直接呼叫 toLowerCase 會導致錯誤。
-            // 在此先檢查屬性存在且為字串，再進行比對，避免搜尋過程中斷。
-            const matchedItems = (Array.isArray(herbLibrary) ? herbLibrary : [])
-                .filter(item => {
-                    // 若沒有名稱或名稱不是字串，則視為不符合搜尋
-                    const nameMatch = (typeof item.name === 'string') && item.name.toLowerCase().includes(searchTerm);
-                    // 別名及主治等欄位可能不存在或不是字串，需檢查後再比對
-                    const aliasMatch = (typeof item.alias === 'string') && item.alias.toLowerCase().includes(searchTerm);
-                    const effectsMatch = (typeof item.effects === 'string') && item.effects.toLowerCase().includes(searchTerm);
-                    return nameMatch || aliasMatch || effectsMatch;
-                })
-                .slice(0, 10); // 限制顯示前10個結果
-
-            // 無匹配結果時顯示提示
+            const matchedItems = herbLibrary.filter(item => 
+                item.name.toLowerCase().includes(searchTerm) ||
+                (item.alias && item.alias.toLowerCase().includes(searchTerm)) ||
+                (item.effects && item.effects.toLowerCase().includes(searchTerm))
+            ).slice(0, 10); // 限制顯示前10個結果
+            
             if (matchedItems.length === 0) {
                 resultsList.innerHTML = `
                     <div class="p-3 text-center text-gray-500 text-sm">
@@ -8004,24 +7984,14 @@ async function initializeSystemAfterLogin() {
                 resultsContainer.classList.remove('hidden');
                 return;
             }
-
-            // 顯示搜索結果，於每個項目上加入 tooltip
+            
+            // 顯示搜索結果
             resultsList.innerHTML = matchedItems.map(item => {
                 const typeName = item.type === 'herb' ? '中藥材' : '方劑';
                 const bgColor = 'bg-yellow-50 hover:bg-yellow-100 border-yellow-200';
-                // 產生詳細說明並進行 HTML 轉義與換行處理
-                const tooltip = generateHerbOrFormulaTooltip(item);
-                // 若 escapeHtml 尚未掛載至 window，提供簡易替代方案以避免錯誤
-                const escapeFn = typeof window.escapeHtml === 'function'
-                    ? window.escapeHtml
-                    : (str) => String(str).replace(/&/g, '&amp;')
-                                          .replace(/</g, '&lt;')
-                                          .replace(/>/g, '&gt;')
-                                          .replace(/"/g, '&quot;')
-                                          .replace(/'/g, '&#039;');
-                const safeTooltip = escapeFn(tooltip).replace(/\n/g, '&#10;');
+                
                 return `
-                    <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" title="${safeTooltip}" onclick="addToPrescription('${item.type}', ${item.id})">
+                    <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToPrescription('${item.type}', ${item.id})">
                         <div class="text-center">
                             <div class="font-semibold text-gray-900 text-sm mb-1">${item.name}</div>
                             <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${typeName}</div>
@@ -8031,8 +8001,7 @@ async function initializeSystemAfterLogin() {
                     </div>
                 `;
             }).join('');
-
-            // 顯示結果容器
+            
             resultsContainer.classList.remove('hidden');
         }
         
@@ -8105,20 +8074,14 @@ async function initializeSystemAfterLogin() {
             // 顯示服藥天數設定
             medicationSettings.style.display = 'block';
             
-            // 顯示已添加的項目，為每個條目加入詳細提示
-            const itemsHtml = selectedPrescriptionItems.map((item, index) => {
-                const bgColor = 'bg-yellow-50 border-yellow-200';
-                // 從中藥庫中取得完整資料以組合詳細說明
-                let fullItem = null;
-                try {
-                    fullItem = herbLibrary.find(h => String(h.id) === String(item.id));
-                } catch (_e) {
-                    fullItem = null;
-                }
-                const tooltip = generateHerbOrFormulaTooltip(fullItem || item);
-                const safeTooltip = window.escapeHtml(tooltip).replace(/\n/g, '&#10;');
-                return `
-                            <div class="${bgColor} border rounded-lg p-3" title="${safeTooltip}">
+            // 顯示已添加的項目
+            const displayHtml = `
+                <div class="space-y-3">
+                    ${selectedPrescriptionItems.map((item, index) => {
+                        const bgColor = 'bg-yellow-50 border-yellow-200';
+                        
+                        return `
+                            <div class="${bgColor} border rounded-lg p-3">
                                 <div class="flex items-center">
                                     <div class="flex-1">
                                         <div class="font-semibold text-gray-900">${item.name}</div>
@@ -8148,11 +8111,8 @@ async function initializeSystemAfterLogin() {
                                     </div>
                                 ` : ''}
                             </div>
-                `;
-            }).join('');
-            const displayHtml = `
-                <div class="space-y-3">
-                    ${itemsHtml}
+                        `;
+                    }).join('')}
                 </div>
             `;
             
@@ -9315,146 +9275,6 @@ if (!patientResult.success) {
     return;
 }
 
-        /**
-         * 根據中藥材或方劑資料生成詳細說明字串。
-         * 用於滑鼠懸停顯示 tooltip。
-         * @param {Object} item 中藥材或方劑資料
-         * @returns {string} 詳細說明，包含別名、性味、歸經、功效、主治、劑量、組成、用法、出處與注意事項等
-         */
-        function generateHerbOrFormulaTooltip(item) {
-            try {
-                if (!item || typeof item !== 'object') return '';
-                const lines = [];
-                // 別名
-                if (item.alias) {
-                    lines.push('別名: ' + item.alias);
-                }
-                // 性味
-                if (item.nature) {
-                    lines.push('性味: ' + item.nature);
-                }
-                // 歸經
-                if (item.meridian) {
-                    lines.push('歸經: ' + item.meridian);
-                }
-                // 功效
-                if (item.effects) {
-                    lines.push('功效: ' + item.effects);
-                }
-                // 主治
-                if (item.indications) {
-                    lines.push('主治: ' + item.indications);
-                }
-                // 劑量（中藥材）
-                if (item.type === 'herb' && item.dosage) {
-                    lines.push('劑量: ' + item.dosage);
-                }
-                // 組成（方劑）
-                if (item.type === 'formula' && item.composition) {
-                    lines.push('組成: ' + item.composition);
-                }
-                // 用法
-                if (item.usage) {
-                    lines.push('用法: ' + item.usage);
-                }
-                // 出處
-                if (item.source) {
-                    lines.push('出處: ' + item.source);
-                }
-                // 注意事項
-                if (item.cautions) {
-                    lines.push('注意: ' + item.cautions);
-                }
-                return lines.join('\n');
-            } catch (_e) {
-                return '';
-            }
-        }
-
-        /**
-         * 根據診斷或醫囑模板產生詳細說明字串。
-         * 用於滑鼠懸停於模板列表時顯示詳細內容。
-         * @param {Object} template 模板資料物件
-         * @returns {string} 詳細說明，包含分類、療程、複診、內容以及其他欄位
-         */
-        function generateTemplateTooltip(template) {
-            try {
-                if (!template || typeof template !== 'object') return '';
-                const lines = [];
-                // 分類
-                if (template.category) {
-                    lines.push('分類: ' + template.category);
-                }
-                // 療程或療程安排
-                if (template.duration) {
-                    lines.push('療程: ' + template.duration);
-                }
-                if (template.treatment) {
-                    lines.push('療程安排: ' + template.treatment);
-                }
-                // 複診安排
-                if (template.followUp) {
-                    lines.push('複診: ' + template.followUp);
-                }
-                if (template.followUpPlan) {
-                    lines.push('複診安排: ' + template.followUpPlan);
-                }
-                // 主訴、現病史、舌象、脈象、診斷、證型
-                if (template.chiefComplaint) {
-                    lines.push('主訴: ' + template.chiefComplaint);
-                }
-                if (template.currentHistory) {
-                    lines.push('現病史: ' + template.currentHistory);
-                }
-                if (template.tongue) {
-                    lines.push('舌象: ' + template.tongue);
-                }
-                if (template.pulse) {
-                    lines.push('脈象: ' + template.pulse);
-                }
-                if (template.diagnosis) {
-                    lines.push('診斷: ' + template.diagnosis);
-                }
-                if (template.syndrome) {
-                    lines.push('證型: ' + template.syndrome);
-                }
-                // 內容
-                if (template.content) {
-                    lines.push('內容: ' + template.content);
-                }
-                // 用藥方法/服用方式
-                if (template.usage) {
-                    lines.push('服用方法: ' + template.usage);
-                }
-                // 注意事項/醫囑
-                if (template.instructions) {
-                    lines.push('注意事項: ' + template.instructions);
-                }
-                if (template.note) {
-                    lines.push('備註: ' + template.note);
-                }
-                if (template.notes) {
-                    lines.push('備註: ' + template.notes);
-                }
-                // 任何其餘字串欄位，排除常見欄位
-                Object.keys(template).forEach(key => {
-                    if ([
-                        'id','name','category','duration','followUp','followUpPlan','treatment','chiefComplaint',
-                        'currentHistory','tongue','pulse','diagnosis','syndrome','content','usage','instructions',
-                        'note','notes','lastModified'
-                    ].includes(key)) {
-                        return;
-                    }
-                    const val = template[key];
-                    if (typeof val === 'string' && val) {
-                        lines.push(key + ': ' + val);
-                    }
-                });
-                return lines.join('\n');
-            } catch (_e) {
-                return '';
-            }
-        }
 const patient = patientResult.data.find(p => p.id === consultation.patientId);
 if (!patient) {
     showToast('找不到病人資料！', 'error');
@@ -13443,14 +13263,6 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <button type="button" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded" onclick="selectDiagnosisTemplate('${safeId}')">套用</button>
         `;
-        // 設置 tooltip 顯示模板詳細資料
-        try {
-          const tooltip = generateTemplateTooltip(template);
-          const safeTooltip = window.escapeHtml(tooltip).replace(/\n/g, '&#10;');
-          div.setAttribute('title', safeTooltip);
-        } catch (_e) {
-          // 忽略 tooltip 產生錯誤
-        }
         listEl.appendChild(div);
       });
       modal.classList.remove('hidden');
@@ -13659,14 +13471,6 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <button type="button" class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded select-prescription-btn" data-id="${template.id}">套用</button>
           `;
-          // 設置 tooltip 以顯示醫囑模板詳細內容
-          try {
-            const tooltip = generateTemplateTooltip(template);
-            const safeTooltip = window.escapeHtml(tooltip).replace(/\n/g, '&#10;');
-            div.setAttribute('title', safeTooltip);
-          } catch (_e) {
-            // 忽略 tooltip 產生錯誤
-          }
           listEl.appendChild(div);
         });
         // 為每個按鈕掛上事件監聽
