@@ -693,45 +693,27 @@ function generateMedicalRecordNumber() {
          * 從 Firestore 讀取中藥庫資料，若資料不存在則自動使用預設值初始化。
          * 此函式會等待 Firebase 初始化完成後再執行。
          */
-        /**
-         * 初始化中藥庫資料。
-         * 由於中藥庫文件可能包含大量內容，這裡改為讀取切分後的概要集合（herbSummaries）。
-         * 如果尚未執行資料結構遷移，會先觸發 migrateHerbLibraryStructure() 將原始 herbLibrary
-         * 集合拆分為概要與詳情兩個集合。
-         */
         async function initHerbLibrary() {
             // 等待 Firebase 及其資料庫初始化
             await waitForFirebaseDb();
-            // 若尚未遷移資料結構，先執行遷移
             try {
-                await migrateHerbLibraryStructure();
-            } catch (_e) {
-                // 若遷移失敗，略過並繼續嘗試讀取概要資料
-            }
-            try {
-                // 從 Firestore 取得 herbSummaries 集合資料
-                const summarySnapshot = await window.firebase.getDocs(
-                    window.firebase.collection(window.firebase.db, 'herbSummaries')
+                // 從 Firestore 取得 herbLibrary 集合資料
+                const querySnapshot = await window.firebase.getDocs(
+                    window.firebase.collection(window.firebase.db, 'herbLibrary')
                 );
                 const herbsFromFirestore = [];
-                summarySnapshot.forEach((docSnap) => {
+                querySnapshot.forEach((docSnap) => {
+                    // docSnap.data() 已包含 id 屬性，因此直接展開
                     herbsFromFirestore.push({ ...docSnap.data() });
                 });
-                herbLibrary = herbsFromFirestore;
-            } catch (error) {
-                console.error('讀取/初始化中藥庫概要資料失敗:', error);
-                // 若讀取概要資料失敗，退回嘗試讀取原始 herbLibrary 資料以避免無資料可用
-                try {
-                    const fallbackSnapshot = await window.firebase.getDocs(
-                        window.firebase.collection(window.firebase.db, 'herbLibrary')
-                    );
-                    const fallback = [];
-                    fallbackSnapshot.forEach(docSnap => fallback.push({ ...docSnap.data() }));
-                    herbLibrary = fallback;
-                } catch (fallbackErr) {
-                    console.error('讀取原始中藥庫資料亦失敗:', fallbackErr);
+                if (herbsFromFirestore.length === 0) {
+                    // Firestore 中沒有資料時，不自動載入預設資料，保持空陣列
                     herbLibrary = [];
+                } else {
+                    herbLibrary = herbsFromFirestore;
                 }
+            } catch (error) {
+                console.error('讀取/初始化中藥庫資料失敗:', error);
             }
         }
 
@@ -777,56 +759,26 @@ function generateMedicalRecordNumber() {
             // 等待 Firebase 及其資料庫初始化
             await waitForFirebaseDb();
             try {
-                // 執行模板庫資料遷移，確保新集合存在
-                await migrateTemplateLibraryStructure();
-                // 嘗試從概要集合讀取醫囑模板
-                let presFromFirestore = [];
-                try {
-                    const presSummSnap = await window.firebase.getDocs(
-                        window.firebase.collection(window.firebase.db, 'prescriptionSummaries')
-                    );
-                    presSummSnap.forEach(docSnap => {
-                        presFromFirestore.push({ ...docSnap.data() });
-                    });
-                } catch (_err) {
-                    presFromFirestore = [];
-                }
-                // 若概要集合無資料，退回舊集合
-                if (!presFromFirestore || presFromFirestore.length === 0) {
-                    try {
-                        const presSnapshot = await window.firebase.getDocs(
-                            window.firebase.collection(window.firebase.db, 'prescriptionTemplates')
-                        );
-                        presSnapshot.forEach(docSnap => {
-                            presFromFirestore.push({ ...docSnap.data() });
-                        });
-                    } catch (_err2) {}
-                }
+                // 從 Firestore 讀取醫囑模板
+                const presSnapshot = await window.firebase.getDocs(
+                    window.firebase.collection(window.firebase.db, 'prescriptionTemplates')
+                );
+                const presFromFirestore = [];
+                presSnapshot.forEach(docSnap => {
+                    presFromFirestore.push({ ...docSnap.data() });
+                });
                 if (presFromFirestore.length > 0) {
                     prescriptionTemplates = presFromFirestore;
                 }
-                // 從概要集合讀取診斷模板
-                let diagFromFirestore = [];
-                try {
-                    const diagSummSnap = await window.firebase.getDocs(
-                        window.firebase.collection(window.firebase.db, 'diagnosisSummaries')
-                    );
-                    diagSummSnap.forEach(docSnap => {
-                        diagFromFirestore.push({ ...docSnap.data() });
-                    });
-                } catch (_err) {
-                    diagFromFirestore = [];
-                }
-                if (!diagFromFirestore || diagFromFirestore.length === 0) {
-                    try {
-                        const diagSnapshot = await window.firebase.getDocs(
-                            window.firebase.collection(window.firebase.db, 'diagnosisTemplates')
-                        );
-                        diagSnapshot.forEach(docSnap => {
-                            diagFromFirestore.push({ ...docSnap.data() });
-                        });
-                    } catch (_err2) {}
-                }
+
+                // 從 Firestore 讀取診斷模板
+                const diagSnapshot = await window.firebase.getDocs(
+                    window.firebase.collection(window.firebase.db, 'diagnosisTemplates')
+                );
+                const diagFromFirestore = [];
+                diagSnapshot.forEach(docSnap => {
+                    diagFromFirestore.push({ ...docSnap.data() });
+                });
                 if (diagFromFirestore.length > 0) {
                     diagnosisTemplates = diagFromFirestore;
                 }
@@ -836,11 +788,10 @@ function generateMedicalRecordNumber() {
             // 渲染模板內容
             try {
                 if (typeof renderPrescriptionTemplates === 'function') {
-                    // 採用異步渲染以載入詳情
-                    try { renderPrescriptionTemplates(); } catch (_e) {}
+                    renderPrescriptionTemplates();
                 }
                 if (typeof renderDiagnosisTemplates === 'function') {
-                    try { renderDiagnosisTemplates(); } catch (_e) {}
+                    renderDiagnosisTemplates();
                 }
                 // 在初次初始化模板庫後刷新分類篩選下拉選單，
                 // 以確保「診斷模板」與「醫囑模板」篩選器顯示最新的分類
@@ -883,244 +834,6 @@ async function waitForFirebaseDataManager() {
   while (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-}
-
-/**
- * 遷移中藥庫資料結構：
- * 將原來 herbLibrary 集合中的文件拆分成概要（herbSummaries）與詳情（herbDetails）。
- *
- * 摘要包含：id、type、name、alias、nature、meridian、effects、createdAt、updatedAt。
- * 詳情包含：id、indications、dosage、cautions。
- *
- * 此函式只在概要集合為空時才執行，避免重複遷移。
- */
-async function migrateHerbLibraryStructure() {
-    await waitForFirebaseDb();
-    try {
-        const summaryCollectionRef = window.firebase.collection(window.firebase.db, 'herbSummaries');
-        const summarySnapshot = await window.firebase.getDocs(summaryCollectionRef);
-        // 若概要集合已有資料，視為遷移完成，直接返回
-        if (!summarySnapshot.empty) {
-            return;
-        }
-    } catch (err) {
-        // 若檢查概要集合時發生錯誤，仍嘗試進行遷移
-        console.warn('檢查 herbSummaries 集合失敗，將嘗試進行遷移:', err);
-    }
-    // 讀取原始 herbLibrary 資料
-    try {
-        const oldCollectionRef = window.firebase.collection(window.firebase.db, 'herbLibrary');
-        const herbsSnapshot = await window.firebase.getDocs(oldCollectionRef);
-        // 若無原始資料，直接返回
-        if (herbsSnapshot.empty) {
-            return;
-        }
-        // 逐筆拆分並寫入新集合
-        const batchPromises = [];
-        herbsSnapshot.forEach((docSnap) => {
-            const data = docSnap.data() || {};
-            const docId = data.id ? String(data.id) : String(docSnap.id);
-            const summary = {
-                id: data.id || docId,
-                type: data.type,
-                name: data.name,
-                alias: data.alias,
-                nature: data.nature,
-                meridian: data.meridian,
-                effects: data.effects,
-                createdAt: data.createdAt || new Date().toISOString(),
-                updatedAt: data.updatedAt || new Date().toISOString(),
-            };
-            const details = {
-                id: data.id || docId,
-                indications: data.indications,
-                dosage: data.dosage,
-                cautions: data.cautions,
-            };
-            // 使用 setDoc 寫入概要與詳情
-            const summaryRef = window.firebase.doc(window.firebase.db, 'herbSummaries', docId);
-            const detailsRef = window.firebase.doc(window.firebase.db, 'herbDetails', docId);
-            batchPromises.push(
-                window.firebase.setDoc(summaryRef, summary).catch(err => {
-                    console.error('寫入 herbSummaries 失敗:', err);
-                })
-            );
-            batchPromises.push(
-                window.firebase.setDoc(detailsRef, details).catch(err => {
-                    console.error('寫入 herbDetails 失敗:', err);
-                })
-            );
-        });
-        await Promise.all(batchPromises);
-        console.log('中藥庫資料結構遷移完成');
-    } catch (error) {
-        console.error('中藥庫資料結構遷移失敗:', error);
-    }
-}
-
-/**
- * 遷移模板庫資料結構：
- * 將原有 prescriptionTemplates 和 diagnosisTemplates 集合中的文件拆分成概要與詳情。
- *
- * 概要集合：prescriptionSummaries、diagnosisSummaries
- * 詳情集合：prescriptionDetails、diagnosisDetails
- *
- * 此函式僅在概要集合為空時執行遷移，避免重複處理。
- */
-async function migrateTemplateLibraryStructure() {
-    await waitForFirebaseDb();
-    // 遷移醫囑模板
-    try {
-        const presSummaryRef = window.firebase.collection(window.firebase.db, 'prescriptionSummaries');
-        const presSummarySnap = await window.firebase.getDocs(presSummaryRef);
-        if (!presSummarySnap || presSummarySnap.empty) {
-            // 若新集合尚無資料，從舊集合讀取並拆分
-            const oldPresRef = window.firebase.collection(window.firebase.db, 'prescriptionTemplates');
-            const oldPresSnap = await window.firebase.getDocs(oldPresRef);
-            if (!oldPresSnap.empty) {
-                const presPromises = [];
-                oldPresSnap.forEach((docSnap) => {
-                    const data = docSnap.data() || {};
-                    const docId = data.id ? String(data.id) : String(docSnap.id);
-                    // 建立概要
-                    const summary = {
-                        id: data.id || docId,
-                        name: data.name,
-                        category: data.category,
-                        duration: data.duration,
-                        followUp: data.followUp,
-                        createdAt: data.createdAt || new Date().toISOString(),
-                        updatedAt: data.lastModified || data.updatedAt || new Date().toISOString()
-                    };
-                    // 建立詳情
-                    const details = {
-                        id: data.id || docId,
-                        content: data.content,
-                        note: data.note
-                    };
-                    presPromises.push(
-                        window.firebase.setDoc(
-                            window.firebase.doc(window.firebase.db, 'prescriptionSummaries', String(summary.id)),
-                            summary
-                        ).catch(() => {}),
-                        window.firebase.setDoc(
-                            window.firebase.doc(window.firebase.db, 'prescriptionDetails', String(details.id)),
-                            details
-                        ).catch(() => {})
-                    );
-                });
-                await Promise.all(presPromises);
-            }
-        }
-    } catch (err) {
-        console.warn('遷移醫囑模板資料失敗:', err);
-    }
-    // 遷移診斷模板
-    try {
-        const diagSummaryRef = window.firebase.collection(window.firebase.db, 'diagnosisSummaries');
-        const diagSummarySnap = await window.firebase.getDocs(diagSummaryRef);
-        if (!diagSummarySnap || diagSummarySnap.empty) {
-            const oldDiagRef = window.firebase.collection(window.firebase.db, 'diagnosisTemplates');
-            const oldDiagSnap = await window.firebase.getDocs(oldDiagRef);
-            if (!oldDiagSnap.empty) {
-                const diagPromises = [];
-                oldDiagSnap.forEach((docSnap) => {
-                    const data = docSnap.data() || {};
-                    const docId = data.id ? String(data.id) : String(docSnap.id);
-                    const summary = {
-                        id: data.id || docId,
-                        name: data.name,
-                        category: data.category,
-                        createdAt: data.createdAt || new Date().toISOString(),
-                        updatedAt: data.lastModified || data.updatedAt || new Date().toISOString()
-                    };
-                    const details = {
-                        id: data.id || docId,
-                        chiefComplaint: data.chiefComplaint,
-                        currentHistory: data.currentHistory,
-                        tongue: data.tongue,
-                        pulse: data.pulse,
-                        tcmDiagnosis: data.tcmDiagnosis,
-                        syndromeDiagnosis: data.syndromeDiagnosis,
-                        content: data.content
-                    };
-                    diagPromises.push(
-                        window.firebase.setDoc(
-                            window.firebase.doc(window.firebase.db, 'diagnosisSummaries', String(summary.id)),
-                            summary
-                        ).catch(() => {}),
-                        window.firebase.setDoc(
-                            window.firebase.doc(window.firebase.db, 'diagnosisDetails', String(details.id)),
-                            details
-                        ).catch(() => {})
-                    );
-                });
-                await Promise.all(diagPromises);
-            }
-        }
-    } catch (err) {
-        console.warn('遷移診斷模板資料失敗:', err);
-    }
-}
-
-/**
- * 取得指定醫囑模板的詳情內容。
- * 若找不到詳情，返回空物件。
- * @param {string|number} id 模板 ID
- * @returns {Promise<object>}
- */
-async function getPrescriptionDetails(id) {
-    await waitForFirebaseDb();
-    try {
-        const docRef = window.firebase.doc(window.firebase.db, 'prescriptionDetails', String(id));
-        const snapshot = await window.firebase.getDoc(docRef);
-        if (snapshot && snapshot.exists()) {
-            return snapshot.data() || {};
-        }
-    } catch (err) {
-        console.warn('讀取醫囑模板詳情失敗:', err);
-    }
-    return {};
-}
-
-/**
- * 取得指定診斷模板的詳情內容。
- * 若找不到詳情，返回空物件。
- * @param {string|number} id 模板 ID
- * @returns {Promise<object>}
- */
-async function getDiagnosisDetails(id) {
-    await waitForFirebaseDb();
-    try {
-        const docRef = window.firebase.doc(window.firebase.db, 'diagnosisDetails', String(id));
-        const snapshot = await window.firebase.getDoc(docRef);
-        if (snapshot && snapshot.exists()) {
-            return snapshot.data() || {};
-        }
-    } catch (err) {
-        console.warn('讀取診斷模板詳情失敗:', err);
-    }
-    return {};
-}
-
-/**
- * 從 herbDetails 集合取得指定中藥材的詳情。
- * 如未找到，回傳空物件。
- * @param {string|number} id 中藥材的 ID
- * @returns {Promise<object>}
- */
-async function getHerbDetails(id) {
-    await waitForFirebaseDb();
-    try {
-        const docRef = window.firebase.doc(window.firebase.db, 'herbDetails', String(id));
-        const docSnap = await window.firebase.getDoc(docRef);
-        if (docSnap.exists()) {
-            return docSnap.data() || {};
-        }
-    } catch (err) {
-        console.error('取得中藥詳情失敗:', err);
-    }
-    return {};
 }
 
     
@@ -7654,14 +7367,13 @@ async function initializeSystemAfterLogin() {
             if (typeof initHerbLibrary === 'function' && (!Array.isArray(herbLibrary) || herbLibrary.length === 0)) {
                 await initHerbLibrary();
             }
-            await displayHerbLibrary();
+            displayHerbLibrary();
             
             // 搜尋功能：當搜尋條件變化時重置至第一頁並重新渲染
             const searchInput = document.getElementById('searchHerb');
             if (searchInput) {
                 searchInput.addEventListener('input', function() {
                     paginationSettings.herbLibrary.currentPage = 1;
-                    // 非同步重新渲染中藥庫列表
                     displayHerbLibrary();
                 });
             }
@@ -7681,7 +7393,7 @@ async function initializeSystemAfterLogin() {
             displayHerbLibrary();
         }
         
-        async function displayHerbLibrary() {
+        function displayHerbLibrary() {
             const searchTerm = document.getElementById('searchHerb').value.toLowerCase();
             const listContainer = document.getElementById('herbLibraryList');
 
@@ -7750,15 +7462,6 @@ async function initializeSystemAfterLogin() {
             const startIdx = (currentPage - 1) * itemsPerPage;
             const endIdx = startIdx + itemsPerPage;
             const pageItems = filteredItems.slice(startIdx, endIdx);
-            // 載入當前頁每個項目的詳情
-            try {
-                const detailsList = await Promise.all(pageItems.map(item => getHerbDetails(item.id)));
-                for (let i = 0; i < pageItems.length; i++) {
-                    pageItems[i] = { ...pageItems[i], ...detailsList[i] };
-                }
-            } catch (err) {
-                console.error('載入中藥詳情失敗:', err);
-            }
             // 計算當前篩選條件下各類型的總數（非頁面數量）
             // herbLibrary 包含中藥材與方劑兩種類型，這裡統計的是在篩選條件下
             // 所有符合條件的項目總數，避免只顯示當前頁的數量
@@ -7899,33 +7602,27 @@ async function initializeSystemAfterLogin() {
             });
         }
         
-        async function editHerb(id) {
+        function editHerb(id) {
             const herb = herbLibrary.find(item => item.id === id && item.type === 'herb');
             if (!herb) return;
-            // 取得詳情資料
-            let details = {};
-            try {
-                details = await getHerbDetails(id);
-            } catch (_e) {}
-            const fullHerb = { ...herb, ...details };
-
+            
             editingHerbId = id;
             document.getElementById('herbFormTitle').textContent = '編輯中藥材';
             document.getElementById('herbSaveButtonText').textContent = '更新';
-
-            document.getElementById('herbName').value = fullHerb.name || '';
-            document.getElementById('herbAlias').value = fullHerb.alias || '';
+            
+            document.getElementById('herbName').value = herb.name || '';
+            document.getElementById('herbAlias').value = herb.alias || '';
             // 還原性味、歸經與主治欄位
             const natureInput = document.getElementById('herbNature');
-            if (natureInput) natureInput.value = fullHerb.nature || '';
+            if (natureInput) natureInput.value = herb.nature || '';
             const meridianInput = document.getElementById('herbMeridian');
-            if (meridianInput) meridianInput.value = fullHerb.meridian || '';
-            document.getElementById('herbEffects').value = fullHerb.effects || '';
+            if (meridianInput) meridianInput.value = herb.meridian || '';
+            document.getElementById('herbEffects').value = herb.effects || '';
             const indicationsInput = document.getElementById('herbIndications');
-            if (indicationsInput) indicationsInput.value = fullHerb.indications || '';
-            document.getElementById('herbDosage').value = fullHerb.dosage || '';
-            document.getElementById('herbCautions').value = fullHerb.cautions || '';
-
+            if (indicationsInput) indicationsInput.value = herb.indications || '';
+            document.getElementById('herbDosage').value = herb.dosage || '';
+            document.getElementById('herbCautions').value = herb.cautions || '';
+            
             document.getElementById('addHerbModal').classList.remove('hidden');
         }
         
@@ -7963,35 +7660,7 @@ async function initializeSystemAfterLogin() {
             }
             
             try {
-                // 拆分概要與詳情資料
-                const summary = {
-                    id: herb.id,
-                    type: herb.type,
-                    name: herb.name,
-                    alias: herb.alias,
-                    nature: herb.nature,
-                    meridian: herb.meridian,
-                    effects: herb.effects,
-                    createdAt: herb.createdAt,
-                    updatedAt: herb.updatedAt,
-                };
-                const details = {
-                    id: herb.id,
-                    indications: herb.indications,
-                    dosage: herb.dosage,
-                    cautions: herb.cautions,
-                };
-                // 將中藥材概要寫入 herbSummaries
-                await window.firebase.setDoc(
-                    window.firebase.doc(window.firebase.db, 'herbSummaries', String(herb.id)),
-                    summary
-                );
-                // 將詳情寫入 herbDetails
-                await window.firebase.setDoc(
-                    window.firebase.doc(window.firebase.db, 'herbDetails', String(herb.id)),
-                    details
-                );
-                // 同時更新原始 herbLibrary 集合以維持相容性（可選）
+                // 將中藥材資料寫入 Firestore
                 await window.firebase.setDoc(
                     window.firebase.doc(window.firebase.db, 'herbLibrary', String(herb.id)),
                     herb
@@ -8000,10 +7669,7 @@ async function initializeSystemAfterLogin() {
                 console.error('儲存中藥材資料至 Firestore 失敗:', error);
             }
             hideAddHerbForm();
-            // 重新渲染中藥庫列表（等待詳情載入）
-            try {
-                await displayHerbLibrary();
-            } catch (_e) {}
+            displayHerbLibrary();
         }
         
         // 方劑表單功能
@@ -8112,14 +7778,6 @@ async function initializeSystemAfterLogin() {
             if (confirm(`確定要刪除${itemType}「${item.name}」嗎？\n\n此操作無法復原！`)) {
                 herbLibrary = herbLibrary.filter(h => h.id !== id);
                 try {
-                    // 刪除拆分後的概要與詳情資料
-                    await window.firebase.deleteDoc(
-                        window.firebase.doc(window.firebase.db, 'herbSummaries', String(id))
-                    );
-                    await window.firebase.deleteDoc(
-                        window.firebase.doc(window.firebase.db, 'herbDetails', String(id))
-                    );
-                    // 同時刪除原始 herbLibrary 資料以避免殘留
                     await window.firebase.deleteDoc(
                         window.firebase.doc(window.firebase.db, 'herbLibrary', String(id))
                     );
@@ -8127,9 +7785,7 @@ async function initializeSystemAfterLogin() {
                     console.error('刪除中藥材資料至 Firestore 失敗:', error);
                 }
                 showToast(`${itemType}「${item.name}」已刪除！`, 'success');
-                try {
-                    await displayHerbLibrary();
-                } catch (_e) {}
+                displayHerbLibrary();
             }
         }
 
@@ -11812,7 +11468,7 @@ async function importHerbLibraryData(items, progressCallback) {
     }
     if (typeof displayHerbLibrary === 'function') {
       try {
-        await displayHerbLibrary();
+        displayHerbLibrary();
       } catch (_e) {}
     }
   } catch (error) {
@@ -11896,7 +11552,7 @@ async function clearHerbData() {
       try { await initHerbLibrary(); } catch (_e) {}
     }
     if (typeof displayHerbLibrary === 'function') {
-      try { await displayHerbLibrary(); } catch (_e) {}
+      try { displayHerbLibrary(); } catch (_e) {}
     }
     finishImportProgressBar(true);
     showToast('中藥資料已清除！', 'success');
@@ -15615,7 +15271,7 @@ function refreshTemplateCategoryFilters() {
 
 
           // 渲染醫囑模板
-          async function renderPrescriptionTemplates(list, pageChange = false) {
+          function renderPrescriptionTemplates(list, pageChange = false) {
             const container = document.getElementById('prescriptionTemplatesContainer');
             container.innerHTML = '';
             // 取得要顯示的模板列表；若傳入特定列表則使用之，否則使用全域列表。
@@ -15646,25 +15302,8 @@ function refreshTemplateCategoryFilters() {
             const startIdx = (currentPage - 1) * itemsPerPage;
             const endIdx = startIdx + itemsPerPage;
             const pageItems = displayTemplates.slice(startIdx, endIdx);
-            // 取得每個頁面項目的詳情（如果有需要）
-            let enrichedItems = [];
-            if (pageItems && pageItems.length > 0) {
-              try {
-                enrichedItems = await Promise.all(pageItems.map(async (item) => {
-                  if (!item || !item.id) return item;
-                  // 取得詳情，將詳情欄位合併進 item
-                  const detail = await getPrescriptionDetails(item.id);
-                  return Object.assign({}, item, detail || {});
-                }));
-              } catch (_err) {
-                // 若讀取詳情失敗，使用頁面項目原本資料
-                enrichedItems = pageItems;
-              }
-            } else {
-              enrichedItems = [];
-            }
             // 若無模板資料
-            if (!enrichedItems || enrichedItems.length === 0) {
+            if (!pageItems || pageItems.length === 0) {
               container.innerHTML = '<div class="text-center text-gray-500 py-8">暫無醫囑模板</div>';
               const paginEl = ensurePaginationContainer('prescriptionTemplatesContainer', 'prescriptionTemplatesPagination');
               if (paginEl) {
@@ -15674,7 +15313,7 @@ function refreshTemplateCategoryFilters() {
               return;
             }
             // 渲染當前頁模板
-            enrichedItems.forEach(item => {
+            pageItems.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-purple-200';
               card.innerHTML = `
@@ -15730,7 +15369,7 @@ function refreshTemplateCategoryFilters() {
           async function deletePrescriptionTemplate(id) {
             if (!confirm('確定要刪除此醫囑模板嗎？')) return;
             prescriptionTemplates = prescriptionTemplates.filter(p => p.id !== id);
-            // 從 Firestore 中刪除該醫囑模板（包含概要與詳情）
+            // 從 Firestore 中刪除該醫囑模板
             try {
               await window.firebase.deleteDoc(
                 window.firebase.doc(window.firebase.db, 'prescriptionTemplates', String(id))
@@ -15738,21 +15377,11 @@ function refreshTemplateCategoryFilters() {
             } catch (error) {
               console.error('刪除醫囑模板資料至 Firestore 失敗:', error);
             }
-            try {
-              await window.firebase.deleteDoc(
-                window.firebase.doc(window.firebase.db, 'prescriptionSummaries', String(id))
-              );
-              await window.firebase.deleteDoc(
-                window.firebase.doc(window.firebase.db, 'prescriptionDetails', String(id))
-              );
-            } catch (err) {
-              console.error('刪除醫囑模板概要或詳情失敗:', err);
-            }
             renderPrescriptionTemplates();
           }
 
           // 渲染診斷模板
-          async function renderDiagnosisTemplates(list, pageChange = false) {
+          function renderDiagnosisTemplates(list, pageChange = false) {
             const container = document.getElementById('diagnosisTemplatesContainer');
             container.innerHTML = '';
             // 取得要顯示的診斷模板列表；若傳入特定列表則使用之，否則使用全域列表。
@@ -15783,23 +15412,8 @@ function refreshTemplateCategoryFilters() {
             const startIdx = (currentPage - 1) * itemsPerPage;
             const endIdx = startIdx + itemsPerPage;
             const pageItems = displayTemplates.slice(startIdx, endIdx);
-            // 取得每個頁面項目的詳情（若需要）
-            let enrichedItems = [];
-            if (pageItems && pageItems.length > 0) {
-              try {
-                enrichedItems = await Promise.all(pageItems.map(async (item) => {
-                  if (!item || !item.id) return item;
-                  const detail = await getDiagnosisDetails(item.id);
-                  return Object.assign({}, item, detail || {});
-                }));
-              } catch (_err) {
-                enrichedItems = pageItems;
-              }
-            } else {
-              enrichedItems = [];
-            }
             // 若無資料顯示提示並隱藏分頁
-            if (!enrichedItems || enrichedItems.length === 0) {
+            if (!pageItems || pageItems.length === 0) {
               container.innerHTML = '<div class="text-center text-gray-500 py-8">暫無診斷模板</div>';
               const paginEl = ensurePaginationContainer('diagnosisTemplatesContainer', 'diagnosisTemplatesPagination');
               if (paginEl) {
@@ -15809,7 +15423,7 @@ function refreshTemplateCategoryFilters() {
               return;
             }
             // 渲染當前頁資料
-            enrichedItems.forEach(item => {
+            pageItems.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-orange-200';
               // Build display content for diagnosis template fields.
@@ -15892,23 +15506,13 @@ function refreshTemplateCategoryFilters() {
           async function deleteDiagnosisTemplate(id) {
             if (!confirm('確定要刪除此診斷模板嗎？')) return;
             diagnosisTemplates = diagnosisTemplates.filter(d => d.id !== id);
-            // 從 Firestore 中刪除該診斷模板（包含概要與詳情）
+            // 從 Firestore 中刪除該診斷模板
             try {
               await window.firebase.deleteDoc(
                 window.firebase.doc(window.firebase.db, 'diagnosisTemplates', String(id))
               );
             } catch (error) {
               console.error('刪除診斷模板資料至 Firestore 失敗:', error);
-            }
-            try {
-              await window.firebase.deleteDoc(
-                window.firebase.doc(window.firebase.db, 'diagnosisSummaries', String(id))
-              );
-              await window.firebase.deleteDoc(
-                window.firebase.doc(window.firebase.db, 'diagnosisDetails', String(id))
-              );
-            } catch (err) {
-              console.error('刪除診斷模板概要或詳情失敗:', err);
             }
             renderDiagnosisTemplates();
           }
@@ -16193,7 +15797,7 @@ function refreshTemplateCategoryFilters() {
           }
 
           // 顯示編輯彈窗
-          async function showEditModal(itemType, title) {
+          function showEditModal(itemType, title) {
             const modal = document.getElementById('editModal');
             const modalTitle = document.getElementById('editModalTitle');
             const modalContent = document.getElementById('editModalContent');
@@ -16228,16 +15832,6 @@ function refreshTemplateCategoryFilters() {
                   }
                 }
               }
-              // 如果找到項目且有 id，嘗試載入詳情欄位
-              if (item && item.id) {
-                try {
-                  const detail = await getPrescriptionDetails(item.id);
-                  if (detail) {
-                    if (detail.content !== undefined) item.content = detail.content;
-                    if (detail.note !== undefined) item.note = detail.note;
-                  }
-                } catch (_e) {}
-              }
             } else if (itemType === 'diagnosis') {
               if (title && title.trim()) {
                 item = diagnosisTemplates.find(d => d.name === title);
@@ -16252,21 +15846,6 @@ function refreshTemplateCategoryFilters() {
                     }
                   }
                 }
-              }
-              // 載入診斷模板詳情欄位
-              if (item && item.id) {
-                try {
-                  const detail = await getDiagnosisDetails(item.id);
-                  if (detail) {
-                    item.chiefComplaint = detail.chiefComplaint || '';
-                    item.currentHistory = detail.currentHistory || '';
-                    item.tongue = detail.tongue || '';
-                    item.pulse = detail.pulse || '';
-                    item.tcmDiagnosis = detail.tcmDiagnosis || '';
-                    item.syndromeDiagnosis = detail.syndromeDiagnosis || '';
-                    if (detail.content !== undefined && !item.content) item.content = detail.content;
-                  }
-                } catch (_e) {}
               }
             }
             // 若找不到項目則返回，不顯示編輯窗
@@ -16633,43 +16212,13 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               const noteVal = document.getElementById('prescriptionNoteInput') ? document.getElementById('prescriptionNoteInput').value : '';
               item.note = noteVal;
               item.lastModified = new Date().toISOString().split('T')[0];
-              // 如果首次保存，補上 createdAt 欄位
-              if (!item.createdAt) {
-                item.createdAt = new Date().toISOString();
-              }
               // 標記為已保存（非新建），避免取消時被移除
               if (item.isNew) {
                 item.isNew = false;
               }
               modal.dataset.isNew = 'false';
-              // 組合概要與詳情物件
-              const summary = {
-                id: item.id,
-                name: item.name,
-                category: item.category,
-                duration: item.duration,
-                followUp: item.followUp,
-                createdAt: item.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              };
-              const details = {
-                id: item.id,
-                content: item.content,
-                note: item.note
-              };
               // 將資料保存至 Firestore
               try {
-                // 保存概要
-                await window.firebase.setDoc(
-                  window.firebase.doc(window.firebase.db, 'prescriptionSummaries', String(item.id)),
-                  summary
-                );
-                // 保存詳情
-                await window.firebase.setDoc(
-                  window.firebase.doc(window.firebase.db, 'prescriptionDetails', String(item.id)),
-                  details
-                );
-                // 兼容舊資料：保存完整項目至舊集合
                 await window.firebase.setDoc(
                   window.firebase.doc(window.firebase.db, 'prescriptionTemplates', String(item.id)),
                   item
@@ -16703,43 +16252,13 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               // 移除舊診斷內容欄位，避免混淆（若存在）
               item.content = '';
               item.lastModified = new Date().toISOString().split('T')[0];
-              // 若為首次保存，補上 createdAt 欄位
-              if (!item.createdAt) {
-                item.createdAt = new Date().toISOString();
-              }
               // 標記為已保存（非新建），避免取消時被移除
               if (item.isNew) {
                 item.isNew = false;
               }
               modal.dataset.isNew = 'false';
-              // 組合概要與詳情物件
-              const summary = {
-                id: item.id,
-                name: item.name,
-                category: item.category,
-                createdAt: item.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              };
-              const details = {
-                id: item.id,
-                chiefComplaint: item.chiefComplaint,
-                currentHistory: item.currentHistory,
-                tongue: item.tongue,
-                pulse: item.pulse,
-                tcmDiagnosis: item.tcmDiagnosis,
-                syndromeDiagnosis: item.syndromeDiagnosis,
-                content: ''
-              };
               // 將資料保存至 Firestore
               try {
-                await window.firebase.setDoc(
-                  window.firebase.doc(window.firebase.db, 'diagnosisSummaries', String(item.id)),
-                  summary
-                );
-                await window.firebase.setDoc(
-                  window.firebase.doc(window.firebase.db, 'diagnosisDetails', String(item.id)),
-                  details
-                );
                 await window.firebase.setDoc(
                   window.firebase.doc(window.firebase.db, 'diagnosisTemplates', String(item.id)),
                   item
