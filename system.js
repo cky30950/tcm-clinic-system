@@ -7437,6 +7437,11 @@ async function initializeSystemAfterLogin() {
             const startIdx = (currentPage - 1) * itemsPerPage;
             const endIdx = startIdx + itemsPerPage;
             const pageItems = filteredItems.slice(startIdx, endIdx);
+            // 計算當前篩選條件下各類型的總數（非頁面數量）
+            // herbLibrary 包含中藥材與方劑兩種類型，這裡統計的是在篩選條件下
+            // 所有符合條件的項目總數，避免只顯示當前頁的數量
+            const totalHerbsInFiltered = filteredItems.filter(item => item.type === 'herb').length;
+            const totalFormulasInFiltered = filteredItems.filter(item => item.type === 'formula').length;
             // 按類型分組顯示分頁資料
             const herbsInPage = pageItems.filter(item => item.type === 'herb');
             const formulasInPage = pageItems.filter(item => item.type === 'formula');
@@ -7445,7 +7450,7 @@ async function initializeSystemAfterLogin() {
                 html += `
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                            <span class="mr-2">🌿</span>中藥材 (${herbsInPage.length})
+                            <span class="mr-2">🌿</span>中藥材 (${totalHerbsInFiltered})
                         </h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             ${herbsInPage.map(herb => createHerbCard(herb)).join('')}
@@ -7457,7 +7462,7 @@ async function initializeSystemAfterLogin() {
                 html += `
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                            <span class="mr-2">📋</span>方劑 (${formulasInPage.length})
+                            <span class="mr-2">📋</span>方劑 (${totalFormulasInFiltered})
                         </h3>
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             ${formulasInPage.map(formula => createFormulaCard(formula)).join('')}
