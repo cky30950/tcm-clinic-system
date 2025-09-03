@@ -11,8 +11,6 @@ const ROLE_PERMISSIONS = {
   // 診所管理者擁有全部功能權限，包括個人設置與模板庫管理
   // 診所管理：將模板庫管理放在診症系統之後，其餘順序保持一致
   '診所管理': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings'],
-  // 醫師可存取大部分功能，包含個人設置與模板庫管理
-  // 醫師：模板庫管理放在診症系統之後
   '醫師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement', 'personalSettings'],
   // 護理師原本僅能使用診症相關功能。為了讓模板庫管理變成公用功能，
   // 將 templateLibrary 新增到護理師的權限清單，讓護理師也能瀏覽與使用模板庫。
