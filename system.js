@@ -10944,6 +10944,10 @@ async function handleTemplateImportFile(file) {
         if (item.id === undefined || item.id === null) {
           item.id = Date.now() + Math.floor(Math.random() * 10000);
         }
+        // 跳過中藥或方劑資料
+        if (item.type === 'herb' || item.type === 'formula') {
+          return;
+        }
         // 透過診斷模板特有欄位判斷
         if ('chiefComplaint' in item || 'currentHistory' in item || 'tcmDiagnosis' in item || 'syndromeDiagnosis' in item) {
           diagnoses.push(item);
@@ -10956,6 +10960,10 @@ async function handleTemplateImportFile(file) {
       if (Array.isArray(data.prescriptionTemplates)) {
         prescriptions = data.prescriptionTemplates.map(item => {
           if (!item || typeof item !== 'object') return null;
+          // 跳過中藥或方劑資料
+          if (item.type === 'herb' || item.type === 'formula') {
+            return null;
+          }
           if (item.id === undefined || item.id === null) {
             item.id = Date.now() + Math.floor(Math.random() * 10000);
           }
@@ -10966,6 +10974,10 @@ async function handleTemplateImportFile(file) {
         // 兼容名稱 prescriptions
         const arr = data.prescriptions.map(item => {
           if (!item || typeof item !== 'object') return null;
+          // 跳過中藥或方劑資料
+          if (item.type === 'herb' || item.type === 'formula') {
+            return null;
+          }
           if (item.id === undefined || item.id === null) {
             item.id = Date.now() + Math.floor(Math.random() * 10000);
           }
@@ -10976,6 +10988,10 @@ async function handleTemplateImportFile(file) {
       if (Array.isArray(data.diagnosisTemplates)) {
         diagnoses = data.diagnosisTemplates.map(item => {
           if (!item || typeof item !== 'object') return null;
+          // 跳過中藥或方劑資料
+          if (item.type === 'herb' || item.type === 'formula') {
+            return null;
+          }
           if (item.id === undefined || item.id === null) {
             item.id = Date.now() + Math.floor(Math.random() * 10000);
           }
@@ -10985,6 +11001,10 @@ async function handleTemplateImportFile(file) {
       if (Array.isArray(data.diagnoses)) {
         const arr = data.diagnoses.map(item => {
           if (!item || typeof item !== 'object') return null;
+          // 跳過中藥或方劑資料
+          if (item.type === 'herb' || item.type === 'formula') {
+            return null;
+          }
           if (item.id === undefined || item.id === null) {
             item.id = Date.now() + Math.floor(Math.random() * 10000);
           }
@@ -10993,9 +11013,13 @@ async function handleTemplateImportFile(file) {
         diagnoses = diagnoses.concat(arr);
       }
       // 若資料包含單一 templates 陣列
-      if (Array.isArray(data.templates)) {
+       if (Array.isArray(data.templates)) {
         data.templates.forEach(item => {
           if (!item || typeof item !== 'object') return;
+          // 跳過中藥或方劑資料
+          if (item.type === 'herb' || item.type === 'formula') {
+            return;
+          }
           if (item.id === undefined || item.id === null) {
             item.id = Date.now() + Math.floor(Math.random() * 10000);
           }
@@ -11007,9 +11031,13 @@ async function handleTemplateImportFile(file) {
         });
       }
     }
-    // 如未找到任何模板資料，提示錯誤
-    if (!Array.isArray(prescriptions) && !Array.isArray(diagnoses)) {
-      showToast('未偵測到有效的模板資料', 'error');
+    // 如未找到任何模板資料，根據模式決定是否提示錯誤
+    const hasPrescriptions = Array.isArray(prescriptions) && prescriptions.length > 0;
+    const hasDiagnoses = Array.isArray(diagnoses) && diagnoses.length > 0;
+    if (!hasPrescriptions && !hasDiagnoses) {
+      if (!window.isCombinedImportMode) {
+        showToast('未偵測到有效的模板資料', 'error');
+      }
       return;
     }
     // 計算總步驟：醫囑模板與診斷模板項目總數
@@ -11167,8 +11195,16 @@ async function handleHerbImportFile(file) {
         items = data.items;
       }
     }
+    // 過濾僅保留中藥或方劑資料
+    if (Array.isArray(items)) {
+      items = items.filter(item => {
+        return item && typeof item === 'object' && (item.type === 'herb' || item.type === 'formula');
+      });
+    }
     if (!Array.isArray(items) || items.length === 0) {
-      showToast('未偵測到有效的中藥庫資料', 'error');
+      if (!window.isCombinedImportMode) {
+        showToast('未偵測到有效的中藥庫資料', 'error');
+      }
       return;
     }
     // 給未設置 id 的項目產生 id
@@ -11331,6 +11367,125 @@ async function clearHerbData() {
     finishImportProgressBar(false);
     console.error('清除中藥資料失敗:', err);
     showToast('清除中藥資料失敗，請稍後再試', 'error');
+  }
+}
+
+/**
+ * 觸發匯入模板與中藥資料的檔案選擇器。
+ * 清空檔案輸入框並打開檔案選擇對話框。
+ */
+function triggerTemplateAndHerbImport() {
+  try {
+    const input = document.getElementById('templateAndHerbImportFile');
+    if (input) {
+      // 重置 value，確保可重新選擇同一檔案
+      input.value = '';
+      input.click();
+    }
+  } catch (e) {
+    console.error('觸發模板及中藥匯入時發生錯誤:', e);
+  }
+}
+
+/**
+ * 處理選擇的模板及中藥資料檔案。
+ * 會先顯示確認提示，再依次執行模板匯入與中藥匯入。
+ * 在合併匯入模式下，將會抑制單項匯入時的確認提示與無效資料錯誤提示。
+ * @param {File} file 使用者選擇的檔案
+ */
+async function handleTemplateAndHerbImportFile(file) {
+  if (!file) return;
+  try {
+    if (!window.confirm('匯入模板及中藥資料將新增資料（不會刪除現有資料），是否繼續？')) {
+      return;
+    }
+    // 啟用合併匯入模式，覆寫 confirm 以跳過後續二次確認
+    window.isCombinedImportMode = true;
+    const originalConfirm = window.confirm;
+    window.confirm = () => true;
+    try {
+      // 依序執行模板匯入與中藥匯入
+      await handleTemplateImportFile(file);
+      await handleHerbImportFile(file);
+      showToast('模板及中藥資料匯入完成！', 'success');
+    } catch (err) {
+      console.error('匯入模板及中藥資料失敗:', err);
+      showToast('匯入模板及中藥資料失敗，請確認檔案格式是否正確', 'error');
+    } finally {
+      // 還原 confirm
+      window.confirm = originalConfirm;
+    }
+  } catch (err2) {
+    console.error('處理模板及中藥匯入檔案時發生錯誤:', err2);
+    showToast('匯入模板及中藥資料失敗，請確認檔案格式是否正確', 'error');
+  } finally {
+    // 關閉合併匯入模式
+    window.isCombinedImportMode = false;
+  }
+}
+
+/**
+ * 將模板與中藥庫資料匯出為 JSON 檔案。
+ * 會從 Firestore 讀取醫囑模板、診斷模板及中藥庫資料，組合成單一檔案下載。
+ */
+async function exportTemplateAndHerbData() {
+  const button = document.getElementById('templateAndHerbExportBtn');
+  setButtonLoading(button);
+  try {
+    await ensureFirebaseReady();
+    // 讀取中藥庫資料
+    let herbData = [];
+    try {
+      const herbSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'herbLibrary'));
+      herbSnap.forEach(docSnap => {
+        herbData.push({ id: docSnap.id, ...docSnap.data() });
+      });
+    } catch (e) {
+      console.error('讀取中藥資料失敗:', e);
+    }
+    // 讀取醫囑模板資料
+    let prescriptionTemplatesData = [];
+    try {
+      const presSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'prescriptionTemplates'));
+      presSnap.forEach(docSnap => {
+        prescriptionTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
+      });
+    } catch (e) {
+      console.error('讀取醫囑模板資料失敗:', e);
+    }
+    // 讀取診斷模板資料
+    let diagnosisTemplatesData = [];
+    try {
+      const diagSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'diagnosisTemplates'));
+      diagSnap.forEach(docSnap => {
+        diagnosisTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
+      });
+    } catch (e) {
+      console.error('讀取診斷模板資料失敗:', e);
+    }
+    // 組合資料
+    const exportData = {
+      prescriptionTemplates: prescriptionTemplatesData,
+      diagnosisTemplates: diagnosisTemplatesData,
+      herbLibrary: herbData
+    };
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    a.download = `template_herb_data_${timestamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('資料已匯出！', 'success');
+  } catch (error) {
+    console.error('匯出資料失敗:', error);
+    showToast('匯出資料失敗，請稍後再試', 'error');
+  } finally {
+    clearButtonLoading(button);
   }
 }
 
@@ -12898,6 +13053,14 @@ document.addEventListener('DOMContentLoaded', function() {
   window.handleTemplateImportFile = handleTemplateImportFile;
   window.triggerHerbImport = triggerHerbImport;
   window.handleHerbImportFile = handleHerbImportFile;
+
+  // 合併匯入/匯出相關函式
+  window.triggerTemplateAndHerbImport = triggerTemplateAndHerbImport;
+  window.handleTemplateAndHerbImportFile = handleTemplateAndHerbImportFile;
+  window.exportTemplateAndHerbData = exportTemplateAndHerbData;
+
+  // 合併匯入模式旗標，預設為 false。
+  window.isCombinedImportMode = false;
 
   // 清除資料相關函式
   window.clearTemplateData = clearTemplateData;
