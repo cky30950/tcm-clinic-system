@@ -935,40 +935,8 @@ async function attemptMainLogin() {
             return;
         }
 
-        // 在登入主系統前並行載入中藥庫資料、收費項目、分類資料與模板資料
-        // 透過 Promise.all 同時執行多個初始化函式，提升效率
-        try {
-            const initTasks = [];
-            if (typeof initHerbLibrary === 'function') {
-                initTasks.push(initHerbLibrary());
-            }
-            if (typeof initBillingItems === 'function') {
-                initTasks.push(initBillingItems());
-            }
-            if (typeof initCategoryData === 'function') {
-                initTasks.push((async () => {
-                    try {
-                        await initCategoryData();
-                    } catch (err) {
-                        console.error('初始化分類資料失敗:', err);
-                    }
-                })());
-            }
-            if (typeof initTemplateLibrary === 'function') {
-                initTasks.push((async () => {
-                    try {
-                        await initTemplateLibrary();
-                    } catch (err) {
-                        console.error('初始化模板庫資料失敗:', err);
-                    }
-                })());
-            }
-            if (initTasks.length > 0) {
-                await Promise.all(initTasks);
-            }
-        } catch (error) {
-            console.error('初始化中藥庫或收費項目資料失敗:', error);
-        }
+        // 取消登入前等待載入中藥庫、收費項目、分類資料與模板資料。
+        // 這些資料將在登入完成後於背景非阻塞方式載入。
 
         // 登入成功，切換到主系統
         performLogin(currentUserData);
@@ -984,6 +952,34 @@ async function attemptMainLogin() {
             }
         } catch (err) {
             console.error('登入後清理問診資料失敗:', err);
+        }
+
+        // 在登入完成後於背景載入中藥庫、收費項目、分類資料與模板資料。
+        // 這些載入操作不會等待完成，以避免阻塞登入流程。
+        try {
+            if (typeof initHerbLibrary === 'function') {
+                // 非阻塞呼叫，中藥庫初始化失敗時僅在控制台輸出錯誤
+                initHerbLibrary().catch(err => {
+                    console.error('背景載入中藥庫資料失敗:', err);
+                });
+            }
+            if (typeof initBillingItems === 'function') {
+                initBillingItems().catch(err => {
+                    console.error('背景載入收費項目資料失敗:', err);
+                });
+            }
+            if (typeof initCategoryData === 'function') {
+                initCategoryData().catch(err => {
+                    console.error('背景載入分類資料失敗:', err);
+                });
+            }
+            if (typeof initTemplateLibrary === 'function') {
+                initTemplateLibrary().catch(err => {
+                    console.error('背景載入模板庫資料失敗:', err);
+                });
+            }
+        } catch (e) {
+            console.error('背景載入資料出現問題:', e);
         }
 
         showToast('登入成功！', 'success');
