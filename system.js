@@ -11,6 +11,8 @@ const ROLE_PERMISSIONS = {
   // 診所管理者擁有全部功能權限，包括個人設置與模板庫管理
   // 診所管理：將模板庫管理放在診症系統之後，其餘順序保持一致
   '診所管理': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings'],
+  // 醫師可存取大部分功能，包含個人設置與模板庫管理
+  // 醫師：模板庫管理放在診症系統之後
   '醫師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'billingManagement', 'userManagement', 'systemManagement', 'personalSettings'],
   // 護理師原本僅能使用診症相關功能。為了讓模板庫管理變成公用功能，
   // 將 templateLibrary 新增到護理師的權限清單，讓護理師也能瀏覽與使用模板庫。
@@ -7341,7 +7343,11 @@ async function initializeSystemAfterLogin() {
             // 為避免 XSS，對文字內容進行轉義
             const safeName = window.escapeHtml(herb.name);
             const safeAlias = herb.alias ? window.escapeHtml(herb.alias) : null;
+            // 新增性味、歸經與主治欄位的轉義處理
+            const safeNature = herb.nature ? window.escapeHtml(herb.nature) : null;
+            const safeMeridian = herb.meridian ? window.escapeHtml(herb.meridian) : null;
             const safeEffects = herb.effects ? window.escapeHtml(herb.effects) : null;
+            const safeIndications = herb.indications ? window.escapeHtml(herb.indications) : null;
             const safeDosage = herb.dosage ? window.escapeHtml(String(herb.dosage)) : null;
             const safeCautions = herb.cautions ? window.escapeHtml(herb.cautions) : null;
             return `
@@ -7358,8 +7364,10 @@ async function initializeSystemAfterLogin() {
                     </div>
                     
                     <div class="space-y-2 text-sm">
-                        <!-- 移除性味與歸經顯示 -->
+                        ${safeNature ? `<div><span class="font-medium text-gray-700">性味：</span>${safeNature}</div>` : ''}
+                        ${safeMeridian ? `<div><span class="font-medium text-gray-700">歸經：</span>${safeMeridian}</div>` : ''}
                         ${safeEffects ? `<div><span class="font-medium text-gray-700">功效：</span>${safeEffects}</div>` : ''}
+                        ${safeIndications ? `<div><span class="font-medium text-gray-700">主治：</span>${safeIndications}</div>` : ''}
                         ${safeDosage ? `<div><span class="font-medium text-gray-700">劑量：</span><span class="text-blue-600 font-medium">${safeDosage}</span></div>` : ''}
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
@@ -7372,7 +7380,10 @@ async function initializeSystemAfterLogin() {
             const safeName = window.escapeHtml(formula.name);
             const safeSource = formula.source ? window.escapeHtml(formula.source) : null;
             const safeEffects = formula.effects ? window.escapeHtml(formula.effects) : null;
+            // 新增主治與用法欄位的轉義處理
+            const safeIndications = formula.indications ? window.escapeHtml(formula.indications) : null;
             const safeComposition = formula.composition ? window.escapeHtml(formula.composition).replace(/\n/g, '<br>') : null;
+            const safeUsage = formula.usage ? window.escapeHtml(formula.usage) : null;
             const safeCautions = formula.cautions ? window.escapeHtml(formula.cautions) : null;
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
@@ -7389,14 +7400,14 @@ async function initializeSystemAfterLogin() {
                     
                     <div class="space-y-3 text-sm">
                         ${safeEffects ? `<div><span class="font-medium text-gray-700">功效：</span>${safeEffects}</div>` : ''}
-                        <!-- 移除主治顯示 -->
+                        ${safeIndications ? `<div><span class="font-medium text-gray-700">主治：</span>${safeIndications}</div>` : ''}
                         ${safeComposition ? `
                             <div>
                                 <span class="font-medium text-gray-700">組成：</span>
                                 <div class="mt-1 p-2 bg-yellow-50 rounded text-xs whitespace-pre-line border-l-2 border-yellow-400">${safeComposition}</div>
                             </div>
                         ` : ''}
-                        <!-- 移除用法顯示 -->
+                        ${safeUsage ? `<div><span class="font-medium text-gray-700">用法：</span>${safeUsage}</div>` : ''}
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
                 </div>
@@ -7419,9 +7430,10 @@ async function initializeSystemAfterLogin() {
         }
         
         function clearHerbForm() {
-            // 移除性味、歸經與主治欄位，僅清除仍使用的欄位
-            ['herbName', 'herbAlias', 'herbEffects', 'herbDosage', 'herbCautions'].forEach(id => {
-                document.getElementById(id).value = '';
+            // 清除中藥材表單欄位（包含性味、歸經與主治）
+            ['herbName', 'herbAlias', 'herbNature', 'herbMeridian', 'herbEffects', 'herbIndications', 'herbDosage', 'herbCautions'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
             });
         }
         
@@ -7435,9 +7447,14 @@ async function initializeSystemAfterLogin() {
             
             document.getElementById('herbName').value = herb.name || '';
             document.getElementById('herbAlias').value = herb.alias || '';
-            // 不再處理性味與歸經欄位
+            // 還原性味、歸經與主治欄位
+            const natureInput = document.getElementById('herbNature');
+            if (natureInput) natureInput.value = herb.nature || '';
+            const meridianInput = document.getElementById('herbMeridian');
+            if (meridianInput) meridianInput.value = herb.meridian || '';
             document.getElementById('herbEffects').value = herb.effects || '';
-            // 主治欄位已移除
+            const indicationsInput = document.getElementById('herbIndications');
+            if (indicationsInput) indicationsInput.value = herb.indications || '';
             document.getElementById('herbDosage').value = herb.dosage || '';
             document.getElementById('herbCautions').value = herb.cautions || '';
             
@@ -7452,13 +7469,16 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
-            // 組合中藥物件時，不再包含性味、歸經與主治欄位
+            // 組合中藥物件（包含性味、歸經與主治欄位）
             const herb = {
                 id: editingHerbId || Date.now(),
                 type: 'herb',
                 name: name,
                 alias: document.getElementById('herbAlias').value.trim(),
+                nature: document.getElementById('herbNature').value.trim(),
+                meridian: document.getElementById('herbMeridian').value.trim(),
                 effects: document.getElementById('herbEffects').value.trim(),
+                indications: document.getElementById('herbIndications').value.trim(),
                 dosage: document.getElementById('herbDosage').value.trim(),
                 cautions: document.getElementById('herbCautions').value.trim(),
                 createdAt: editingHerbId ? herbLibrary.find(h => h.id === editingHerbId).createdAt : new Date().toISOString(),
@@ -7503,9 +7523,10 @@ async function initializeSystemAfterLogin() {
         }
         
         function clearFormulaForm() {
-            // 只清除仍使用的欄位，移除主治與用法
-            ['formulaName', 'formulaSource', 'formulaEffects', 'formulaComposition', 'formulaCautions'].forEach(id => {
-                document.getElementById(id).value = '';
+            // 清除方劑表單欄位（包含主治與用法）
+            ['formulaName', 'formulaSource', 'formulaEffects', 'formulaComposition', 'formulaCautions', 'formulaIndications', 'formulaUsage'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
             });
         }
         
@@ -7520,8 +7541,12 @@ async function initializeSystemAfterLogin() {
             document.getElementById('formulaName').value = formula.name || '';
             document.getElementById('formulaSource').value = formula.source || '';
             document.getElementById('formulaEffects').value = formula.effects || '';
-            // 主治與用法欄位已移除，不再填入
+            // 還原主治與用法欄位
+            const formInd = document.getElementById('formulaIndications');
+            if (formInd) formInd.value = formula.indications || '';
             document.getElementById('formulaComposition').value = formula.composition || '';
+            const formUsage = document.getElementById('formulaUsage');
+            if (formUsage) formUsage.value = formula.usage || '';
             document.getElementById('formulaCautions').value = formula.cautions || '';
             
             document.getElementById('addFormulaModal').classList.remove('hidden');
@@ -7541,14 +7566,16 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
-            // 組合方劑物件時，不再包含主治與用法欄位
+            // 組合方劑物件（包含主治與用法欄位）
             const formula = {
                 id: editingFormulaId || Date.now(),
                 type: 'formula',
                 name: name,
                 source: document.getElementById('formulaSource').value.trim(),
                 effects: document.getElementById('formulaEffects').value.trim(),
+                indications: document.getElementById('formulaIndications').value.trim(),
                 composition: composition,
+                usage: document.getElementById('formulaUsage').value.trim(),
                 cautions: document.getElementById('formulaCautions').value.trim(),
                 createdAt: editingFormulaId ? herbLibrary.find(f => f.id === editingFormulaId).createdAt : new Date().toISOString(),
                 updatedAt: new Date().toISOString()
@@ -12597,19 +12624,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     updateClinicSettingsDisplay();
 
-    // 隱藏不再使用的中藥材及方劑欄位：性味、歸經、主治、用法
-    ['herbNature', 'herbMeridian', 'herbIndications', 'formulaIndications', 'formulaUsage'].forEach(function(id) {
-        const el = document.getElementById(id);
-        if (el) {
-            // 嘗試隱藏包含此輸入的父層容器（通常為欄位區塊）。
-            const container = el.closest('div');
-            if (container) {
-                container.style.display = 'none';
-            } else {
-                el.style.display = 'none';
-            }
-        }
-    });
+    // 保持所有中藥材及方劑欄位可見（包含性味、歸經、主治、用法）
     
     
     // 自動聚焦到電子郵件輸入框
