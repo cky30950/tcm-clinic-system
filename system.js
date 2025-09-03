@@ -7737,9 +7737,12 @@ async function initializeSystemAfterLogin() {
             // 處理折扣項目的顯示
             if (item.category === 'discount') {
                 if (item.price > 0 && item.price < 1) {
-                    // 百分比折扣 (0.9 = 9折)
+                    // 百分比折扣 (例如 0.85 = 8.5 折)。
+                    // 將折扣倍率乘以 10 以取得折扣表示，保留 1 位小數以避免將 8.5 四捨五入成 9。
+                    // 若結果為整數則不顯示小數點。
                     pricePrefix = '';
-                    displayPrice = (item.price * 10).toFixed(0);
+                    const discountRate = item.price * 10;
+                    displayPrice = Number.isInteger(discountRate) ? discountRate : discountRate.toFixed(1);
                 } else if (item.price < 0) {
                     // 固定金額折扣
                     pricePrefix = '-$';
