@@ -30,15 +30,47 @@ function ensurePaginationContainer(parentId, paginationId) {
     const parentEl = document.getElementById(parentId);
     if (!parentEl) return null;
     let container = document.getElementById(paginationId);
+    // 如果分頁容器尚未創建，則先創建元素
     if (!container) {
         container = document.createElement('div');
         container.id = paginationId;
+        // 使用 flex 置中和外距設定
         container.className = 'mt-4 flex justify-center';
-        // 將容器插入在父元素之後
-        if (parentEl.nextSibling) {
-            parentEl.parentNode.insertBefore(container, parentEl.nextSibling);
-        } else {
-            parentEl.parentNode.appendChild(container);
+    }
+
+    /**
+     * 判斷父元素是否位於表格（table/tbody/thead/tfoot/tr）內。
+     * 如果是，直接將分頁容器插入在 table 元素之後，
+     * 這樣可以避免在 table 結構內插入 <div> 造成排版問題。
+     */
+    const parentTag = parentEl.tagName ? parentEl.tagName.toLowerCase() : '';
+    // 定義表格相關標籤
+    const tableTags = ['table', 'tbody', 'thead', 'tfoot', 'tr', 'td', 'th'];
+    // 找到最近的表格元素
+    let tableEl = null;
+    if (tableTags.includes(parentTag)) {
+        // 若 parentEl 本身是表格相關標籤，嘗試往上尋找最近的 table
+        tableEl = parentEl.closest('table');
+    }
+    if (tableEl) {
+        const tableParent = tableEl.parentNode;
+        if (!container.parentNode || container.parentNode !== tableParent) {
+            // 插入位置在 table 之後
+            if (tableEl.nextSibling) {
+                tableParent.insertBefore(container, tableEl.nextSibling);
+            } else {
+                tableParent.appendChild(container);
+            }
+        }
+    } else {
+        // 非表格場景，插入在 parentEl 後面
+        const parentContainer = parentEl.parentNode;
+        if (!container.parentNode || container.parentNode !== parentContainer) {
+            if (parentEl.nextSibling) {
+                parentContainer.insertBefore(container, parentEl.nextSibling);
+            } else {
+                parentContainer.appendChild(container);
+            }
         }
     }
     return container;
