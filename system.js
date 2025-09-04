@@ -13,30 +13,11 @@ const paginationSettings = {
     personalAcupointCombos: { currentPage: 1, itemsPerPage: 6 },
     prescriptionTemplates: { currentPage: 1, itemsPerPage: 6 },
     diagnosisTemplates: { currentPage: 1, itemsPerPage: 6 },
-    patientList: { currentPage: 1, itemsPerPage: 10 },
-    // 新增：彈窗分頁設定，用於常用藥方、穴位及模板彈窗
-    herbComboModal: { currentPage: 1, itemsPerPage: 6 },
-    acupointComboModal: { currentPage: 1, itemsPerPage: 6 },
-    prescriptionTemplateModal: { currentPage: 1, itemsPerPage: 6 },
-    diagnosisTemplateModal: { currentPage: 1, itemsPerPage: 6 }
+    patientList: { currentPage: 1, itemsPerPage: 10 }
 };
 
 // 快取病人篩選結果，用於分頁顯示
 let patientListFiltered = [];
-
-// Firestore 分頁狀態變數
-// 用於追蹤中藥庫、醫囑模板及診斷模板的分頁載入狀態
-let herbLibraryLastDoc = null;
-let herbLibraryHasMore = true;
-let herbLibraryLoading = false;
-
-let prescriptionTemplatesLastDoc = null;
-let prescriptionTemplatesHasMore = true;
-let prescriptionTemplatesLoading = false;
-
-let diagnosisTemplatesLastDoc = null;
-let diagnosisTemplatesHasMore = true;
-let diagnosisTemplatesLoading = false;
 
 /**
  * 確保在指定父元素之後存在分頁容器，若不存在則建立。
@@ -715,59 +696,24 @@ function generateMedicalRecordNumber() {
         async function initHerbLibrary() {
             // 等待 Firebase 及其資料庫初始化
             await waitForFirebaseDb();
-            // 初始化分頁狀態
-            herbLibrary = [];
-            herbLibraryLastDoc = null;
-            herbLibraryHasMore = true;
-            herbLibraryLoading = false;
             try {
-                // 取得排序後的前幾筆資料以實作分頁
-                const firstQuery = window.firebase.query(
-                    window.firebase.collection(window.firebase.db, 'herbLibrary'),
-                    window.firebase.orderBy('name'),
-                    window.firebase.limit(paginationSettings.herbLibrary.itemsPerPage)
+                // 從 Firestore 取得 herbLibrary 集合資料
+                const querySnapshot = await window.firebase.getDocs(
+                    window.firebase.collection(window.firebase.db, 'herbLibrary')
                 );
-                const querySnapshot = await window.firebase.getDocs(firstQuery);
                 const herbsFromFirestore = [];
                 querySnapshot.forEach((docSnap) => {
-                    herbsFromFirestore.push({ id: docSnap.id, ...docSnap.data() });
+                    // docSnap.data() 已包含 id 屬性，因此直接展開
+                    herbsFromFirestore.push({ ...docSnap.data() });
                 });
-                herbLibrary = herbsFromFirestore;
-                // 記錄最後一筆檔案以便之後 startAfter() 查詢
-                herbLibraryLastDoc = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null;
-                herbLibraryHasMore = herbsFromFirestore.length >= paginationSettings.herbLibrary.itemsPerPage;
+                if (herbsFromFirestore.length === 0) {
+                    // Firestore 中沒有資料時，不自動載入預設資料，保持空陣列
+                    herbLibrary = [];
+                } else {
+                    herbLibrary = herbsFromFirestore;
+                }
             } catch (error) {
                 console.error('讀取/初始化中藥庫資料失敗:', error);
-            }
-        }
-
-        /**
-         * 從 Firestore 載入中藥庫下一批資料，支援分頁顯示。
-         * 根據目前 herbLibraryLastDoc 作為起點，載入 itemsPerPage 筆資料。
-         * 若無更多資料或正在載入中，則不執行任何操作。
-         */
-        async function fetchNextHerbPage() {
-            if (!herbLibraryHasMore || herbLibraryLoading || !herbLibraryLastDoc) return;
-            herbLibraryLoading = true;
-            try {
-                const nextQuery = window.firebase.query(
-                    window.firebase.collection(window.firebase.db, 'herbLibrary'),
-                    window.firebase.orderBy('name'),
-                    window.firebase.startAfter(herbLibraryLastDoc),
-                    window.firebase.limit(paginationSettings.herbLibrary.itemsPerPage)
-                );
-                const querySnapshot = await window.firebase.getDocs(nextQuery);
-                const herbs = [];
-                querySnapshot.forEach((docSnap) => {
-                    herbs.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                herbLibrary = herbLibrary.concat(herbs);
-                herbLibraryLastDoc = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null;
-                herbLibraryHasMore = herbs.length >= paginationSettings.herbLibrary.itemsPerPage;
-            } catch (err) {
-                console.error('載入下一批中藥資料失敗:', err);
-            } finally {
-                herbLibraryLoading = false;
             }
         }
 
@@ -812,14 +758,34 @@ function generateMedicalRecordNumber() {
         async function initTemplateLibrary() {
             // 等待 Firebase 及其資料庫初始化
             await waitForFirebaseDb();
-            // 使用分頁方式初始化醫囑模板與診斷模板
             try {
-                await initPrescriptionTemplates();
-                await initDiagnosisTemplates();
-            } catch (err) {
-                console.error('讀取/初始化模板庫資料失敗:', err);
+                // 從 Firestore 讀取醫囑模板
+                const presSnapshot = await window.firebase.getDocs(
+                    window.firebase.collection(window.firebase.db, 'prescriptionTemplates')
+                );
+                const presFromFirestore = [];
+                presSnapshot.forEach(docSnap => {
+                    presFromFirestore.push({ ...docSnap.data() });
+                });
+                if (presFromFirestore.length > 0) {
+                    prescriptionTemplates = presFromFirestore;
+                }
+
+                // 從 Firestore 讀取診斷模板
+                const diagSnapshot = await window.firebase.getDocs(
+                    window.firebase.collection(window.firebase.db, 'diagnosisTemplates')
+                );
+                const diagFromFirestore = [];
+                diagSnapshot.forEach(docSnap => {
+                    diagFromFirestore.push({ ...docSnap.data() });
+                });
+                if (diagFromFirestore.length > 0) {
+                    diagnosisTemplates = diagFromFirestore;
+                }
+            } catch (error) {
+                console.error('讀取/初始化模板庫資料失敗:', error);
             }
-            // 初始化完成後渲染模板列表與刷新分類篩選器
+            // 渲染模板內容
             try {
                 if (typeof renderPrescriptionTemplates === 'function') {
                     renderPrescriptionTemplates();
@@ -827,6 +793,8 @@ function generateMedicalRecordNumber() {
                 if (typeof renderDiagnosisTemplates === 'function') {
                     renderDiagnosisTemplates();
                 }
+                // 在初次初始化模板庫後刷新分類篩選下拉選單，
+                // 以確保「診斷模板」與「醫囑模板」篩選器顯示最新的分類
                 if (typeof refreshTemplateCategoryFilters === 'function') {
                     try {
                         refreshTemplateCategoryFilters();
@@ -834,143 +802,6 @@ function generateMedicalRecordNumber() {
                 }
             } catch (err) {
                 console.error('渲染模板庫內容失敗:', err);
-            }
-        }
-        
-        // 以下為分頁載入模板庫的初始化與載入函式
-
-        /**
-         * 初始化醫囑模板：僅載入第一頁資料。
-         */
-        async function initPrescriptionTemplates() {
-            await waitForFirebaseDb();
-            prescriptionTemplates = [];
-            prescriptionTemplatesLastDoc = null;
-            prescriptionTemplatesHasMore = true;
-            prescriptionTemplatesLoading = false;
-            try {
-                const firstQuery = window.firebase.query(
-                    window.firebase.collection(window.firebase.db, 'prescriptionTemplates'),
-                    window.firebase.orderBy('name'),
-                    window.firebase.limit(paginationSettings.prescriptionTemplates.itemsPerPage)
-                );
-                const snap = await window.firebase.getDocs(firstQuery);
-                const list = [];
-                snap.forEach((docSnap) => {
-                    list.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                prescriptionTemplates = list;
-                prescriptionTemplatesLastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
-                prescriptionTemplatesHasMore = list.length >= paginationSettings.prescriptionTemplates.itemsPerPage;
-            } catch (err) {
-                console.error('讀取醫囑模板資料失敗:', err);
-            }
-        }
-
-        /**
-         * 載入醫囑模板下一頁。
-         */
-        async function fetchNextPrescriptionTemplatesPage() {
-            if (!prescriptionTemplatesHasMore || prescriptionTemplatesLoading || !prescriptionTemplatesLastDoc) return;
-            prescriptionTemplatesLoading = true;
-            try {
-                const nextQuery = window.firebase.query(
-                    window.firebase.collection(window.firebase.db, 'prescriptionTemplates'),
-                    window.firebase.orderBy('name'),
-                    window.firebase.startAfter(prescriptionTemplatesLastDoc),
-                    window.firebase.limit(paginationSettings.prescriptionTemplates.itemsPerPage)
-                );
-                const snap = await window.firebase.getDocs(nextQuery);
-                const list = [];
-                snap.forEach((docSnap) => {
-                    list.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                prescriptionTemplates = prescriptionTemplates.concat(list);
-                prescriptionTemplatesLastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
-                prescriptionTemplatesHasMore = list.length >= paginationSettings.prescriptionTemplates.itemsPerPage;
-            } catch (err) {
-                console.error('載入下一批醫囑模板資料失敗:', err);
-            } finally {
-                prescriptionTemplatesLoading = false;
-            }
-        }
-
-        /**
-         * 初始化診斷模板：僅載入第一頁資料。
-         */
-        async function initDiagnosisTemplates() {
-            await waitForFirebaseDb();
-            diagnosisTemplates = [];
-            diagnosisTemplatesLastDoc = null;
-            diagnosisTemplatesHasMore = true;
-            diagnosisTemplatesLoading = false;
-            try {
-                const firstQuery = window.firebase.query(
-                    window.firebase.collection(window.firebase.db, 'diagnosisTemplates'),
-                    window.firebase.orderBy('name'),
-                    window.firebase.limit(paginationSettings.diagnosisTemplates.itemsPerPage)
-                );
-                const snap = await window.firebase.getDocs(firstQuery);
-                const list = [];
-                snap.forEach((docSnap) => {
-                    list.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                diagnosisTemplates = list;
-                diagnosisTemplatesLastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
-                diagnosisTemplatesHasMore = list.length >= paginationSettings.diagnosisTemplates.itemsPerPage;
-            } catch (err) {
-                console.error('讀取診斷模板資料失敗:', err);
-            }
-        }
-
-        /**
-         * 載入診斷模板下一頁。
-         */
-        async function fetchNextDiagnosisTemplatesPage() {
-            if (!diagnosisTemplatesHasMore || diagnosisTemplatesLoading || !diagnosisTemplatesLastDoc) return;
-            diagnosisTemplatesLoading = true;
-            try {
-                const nextQuery = window.firebase.query(
-                    window.firebase.collection(window.firebase.db, 'diagnosisTemplates'),
-                    window.firebase.orderBy('name'),
-                    window.firebase.startAfter(diagnosisTemplatesLastDoc),
-                    window.firebase.limit(paginationSettings.diagnosisTemplates.itemsPerPage)
-                );
-                const snap = await window.firebase.getDocs(nextQuery);
-                const list = [];
-                snap.forEach((docSnap) => {
-                    list.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                diagnosisTemplates = diagnosisTemplates.concat(list);
-                diagnosisTemplatesLastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
-                diagnosisTemplatesHasMore = list.length >= paginationSettings.diagnosisTemplates.itemsPerPage;
-            } catch (err) {
-                console.error('載入下一批診斷模板資料失敗:', err);
-            } finally {
-                diagnosisTemplatesLoading = false;
-            }
-        }
-
-        /**
-         * 載入模板庫：當進入模板庫頁面時按需載入資料。
-         */
-        async function loadTemplateLibrary() {
-            if (!Array.isArray(prescriptionTemplates) || prescriptionTemplates.length === 0) {
-                await initPrescriptionTemplates();
-            }
-            if (!Array.isArray(diagnosisTemplates) || diagnosisTemplates.length === 0) {
-                await initDiagnosisTemplates();
-            }
-            if (typeof renderPrescriptionTemplates === 'function') {
-                renderPrescriptionTemplates();
-            }
-            if (typeof renderDiagnosisTemplates === 'function') {
-                renderDiagnosisTemplates();
-            }
-            if (typeof refreshTemplateCategoryFilters === 'function') {
-                try {
-                    refreshTemplateCategoryFilters();
-                } catch (_e) {}
             }
         }
 
@@ -1108,7 +939,9 @@ async function attemptMainLogin() {
         // 透過 Promise.all 同時執行多個初始化函式，提升效率
         try {
             const initTasks = [];
-            // 中藥庫與模板庫改為按需載入，登入時不預先初始化
+            if (typeof initHerbLibrary === 'function') {
+                initTasks.push(initHerbLibrary());
+            }
             if (typeof initBillingItems === 'function') {
                 initTasks.push(initBillingItems());
             }
@@ -1121,7 +954,15 @@ async function attemptMainLogin() {
                     }
                 })());
             }
-            // 不在此階段初始化模板庫（initTemplateLibrary）或中藥庫
+            if (typeof initTemplateLibrary === 'function') {
+                initTasks.push((async () => {
+                    try {
+                        await initTemplateLibrary();
+                    } catch (err) {
+                        console.error('初始化模板庫資料失敗:', err);
+                    }
+                })());
+            }
             if (initTasks.length > 0) {
                 await Promise.all(initTasks);
             }
@@ -1430,8 +1271,6 @@ async function logout() {
                 loadConsultationSystem();
             } else if (sectionId === 'herbLibrary') {
                 loadHerbLibrary();
-            } else if (sectionId === 'templateLibrary') {
-                loadTemplateLibrary();
             } else if (sectionId === 'billingManagement') {
                 loadBillingManagement();
             } else if (sectionId === 'financialReports') {
@@ -7558,7 +7397,7 @@ async function initializeSystemAfterLogin() {
             displayHerbLibrary();
         }
         
-async function displayHerbLibrary() {
+        function displayHerbLibrary() {
             const searchTerm = document.getElementById('searchHerb').value.toLowerCase();
             const listContainer = document.getElementById('herbLibraryList');
 
@@ -7619,12 +7458,6 @@ async function displayHerbLibrary() {
             const totalItems = filteredItems.length;
             const itemsPerPage = paginationSettings.herbLibrary.itemsPerPage;
             let currentPage = paginationSettings.herbLibrary.currentPage;
-            // 若使用者點擊到尚未載入的頁面，嘗試從 Firestore 載入下一批資料
-            const loadedPages = Math.ceil((Array.isArray(herbLibrary) ? herbLibrary.length : 0) / itemsPerPage);
-            if (currentPage > loadedPages && herbLibraryHasMore) {
-                await fetchNextHerbPage();
-                return displayHerbLibrary();
-            }
             const totalPages = Math.ceil(totalItems / itemsPerPage);
             // 防止當前頁超出範圍
             if (currentPage < 1) currentPage = 1;
@@ -7669,9 +7502,9 @@ async function displayHerbLibrary() {
             listContainer.innerHTML = html;
             // 產生分頁控制
             const paginationEl = ensurePaginationContainer('herbLibraryList', 'herbLibraryPagination');
-            renderPagination(totalItems, itemsPerPage, currentPage, async function(newPage) {
+            renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
                 paginationSettings.herbLibrary.currentPage = newPage;
-                await displayHerbLibrary();
+                displayHerbLibrary();
             }, paginationEl);
         }
         
@@ -13546,12 +13379,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // 模板庫：診斷模板與醫囑模板彈窗
   // 顯示診斷模板選擇彈窗，並動態生成模板列表
-async function showDiagnosisTemplateModal(pageChange) {
+  function showDiagnosisTemplateModal() {
     try {
       const modal = document.getElementById('diagnosisTemplateModal');
       const listEl = document.getElementById('diagnosisTemplateList');
       if (!modal || !listEl) return;
-      // 初始化搜尋框
+      // 在列表上方放置搜尋欄，若尚未存在則建立
       let searchInput = modal.querySelector('#diagnosisTemplateSearch');
       if (!searchInput) {
         searchInput = document.createElement('input');
@@ -13559,20 +13392,19 @@ async function showDiagnosisTemplateModal(pageChange) {
         searchInput.type = 'text';
         searchInput.placeholder = '搜尋診斷模板...';
         searchInput.className = 'w-full mb-3 px-3 py-2 border border-gray-300 rounded';
+        // 插入至列表容器之前
         listEl.parentNode.insertBefore(searchInput, listEl);
+        // 在輸入時重新渲染列表
         searchInput.addEventListener('input', function() {
-          paginationSettings.diagnosisTemplateModal.currentPage = 1;
           showDiagnosisTemplateModal();
         });
       }
-      // 若非分頁切換則重置頁碼
-      if (!pageChange) {
-        paginationSettings.diagnosisTemplateModal.currentPage = 1;
-      }
-      listEl.innerHTML = '';
-      // 取得並過濾模板資料
-      let templates = Array.isArray(diagnosisTemplates) ? diagnosisTemplates : [];
+      // 取得搜尋字串並轉成小寫以便比對
       const keyword = searchInput.value ? String(searchInput.value).trim().toLowerCase() : '';
+      listEl.innerHTML = '';
+      // 取得模板列表
+      const templates = Array.isArray(diagnosisTemplates) ? diagnosisTemplates : [];
+      // 根據關鍵字過濾
       let filtered = templates;
       if (keyword) {
         filtered = templates.filter(t => {
@@ -13583,77 +13415,30 @@ async function showDiagnosisTemplateModal(pageChange) {
           return name.includes(keyword) || category.includes(keyword) || content.includes(keyword);
         });
       }
-      // 依名稱排序
-      filtered = filtered.slice().sort((a, b) => {
+      // 依名稱排序，改善搜尋體驗
+      const sorted = filtered.slice().sort((a, b) => {
         const an = (a && a.name) ? a.name : '';
         const bn = (b && b.name) ? b.name : '';
         return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
       });
-      // 根據需要載入更多資料
-      const currentPage = paginationSettings.diagnosisTemplateModal.currentPage;
-      const itemsPerPage = paginationSettings.diagnosisTemplateModal.itemsPerPage;
-      const requiredCount = currentPage * itemsPerPage;
-      while (filtered.length < requiredCount && diagnosisTemplatesHasMore) {
-        try {
-          await fetchNextDiagnosisTemplatesPage();
-        } catch (_err) {
-          console.error('載入診斷模板下一頁資料失敗:', _err);
-          break;
-        }
-        templates = Array.isArray(diagnosisTemplates) ? diagnosisTemplates : [];
-        filtered = templates;
-        if (keyword) {
-          filtered = templates.filter(t => {
-            if (!t) return false;
-            const name = (t.name || '').toLowerCase();
-            const category = (t.category || '').toLowerCase();
-            const content = (t.content || '').toLowerCase();
-            return name.includes(keyword) || category.includes(keyword) || content.includes(keyword);
-          });
-        }
-        filtered = filtered.slice().sort((a, b) => {
-          const an = (a && a.name) ? a.name : '';
-          const bn = (b && b.name) ? b.name : '';
-          return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
-        });
-      }
-      const totalItems = filtered.length;
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const pageItems = filtered.slice(startIndex, endIndex);
-      // 渲染列表
-      if (pageItems.length === 0) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'text-sm text-gray-500 text-center p-4';
-        emptyDiv.textContent = '目前尚無診斷模板，請先建立或同步模板資料。';
-        listEl.appendChild(emptyDiv);
-      } else {
-        pageItems.forEach(template => {
-          if (!template) return;
-          const div = document.createElement('div');
-          div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
-          const safeName = template.name ? window.escapeHtml(template.name) : '';
-          const safeCategory = template.category ? window.escapeHtml(template.category) : null;
-          const categoryLine = safeCategory ? `<div class="text-sm text-gray-500">${safeCategory}</div>` : '';
-          const safeId = String(template.id).replace(/"/g, '&quot;');
-          div.innerHTML = `
-              <div>
-                <div class="font-medium text-gray-800">${safeName}</div>
-                ${categoryLine}
-              </div>
-              <button type="button" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded" onclick="selectDiagnosisTemplate('${safeId}')">套用</button>
-          `;
-          listEl.appendChild(div);
-        });
-      }
-      // 分頁控制
-      const paginationEl = ensurePaginationContainer(listEl.id, 'diagnosisTemplateModalPagination');
-      if (paginationEl) {
-        renderPagination(totalItems, itemsPerPage, currentPage, function(page) {
-          paginationSettings.diagnosisTemplateModal.currentPage = page;
-          showDiagnosisTemplateModal(true);
-        }, paginationEl);
-      }
+      sorted.forEach(template => {
+        if (!template) return;
+        const div = document.createElement('div');
+        div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
+        // 對模板名稱與分類進行轉義，避免 XSS
+        const safeName = template.name ? window.escapeHtml(template.name) : '';
+        const safeCategory = template.category ? window.escapeHtml(template.category) : null;
+        const categoryLine = safeCategory ? `<div class="text-sm text-gray-500">${safeCategory}</div>` : '';
+        const safeId = String(template.id).replace(/"/g, '&quot;');
+        div.innerHTML = `
+            <div>
+              <div class="font-medium text-gray-800">${safeName}</div>
+              ${categoryLine}
+            </div>
+            <button type="button" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded" onclick="selectDiagnosisTemplate('${safeId}')">套用</button>
+        `;
+        listEl.appendChild(div);
+      });
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('顯示診斷模板彈窗失敗:', err);
@@ -13784,16 +13569,17 @@ async function showDiagnosisTemplateModal(pageChange) {
   }
 
   // 顯示醫囑模板選擇彈窗，並動態生成列表
-  /**
-   * 顯示醫囑模板選擇彈窗。加入搜尋與分頁功能，按需載入模板資料。
-   * @param {boolean} pageChange 表示是否由分頁控制器觸發，若為 true 則不重置頁碼
-   */
-  async function showPrescriptionTemplateModal(pageChange) {
+  async function showPrescriptionTemplateModal() {
+    /**
+     * 顯示醫囑模板選擇彈窗。此函式會在必要時先初始化模板庫資料，
+     * 然後根據目前的醫囑模板清單動態產生列表。若無可用模板，
+     * 將顯示提示訊息。所有操作包含在 try/catch 中，以避免意外錯誤破壞 UI。
+     */
     try {
       const modal = document.getElementById('prescriptionTemplateModal');
       const listEl = document.getElementById('prescriptionTemplateList');
       if (!modal || !listEl) return;
-      // 如果模板尚未載入，嘗試從資料庫初始化
+      // 如果模板尚未載入，嘗試從資料庫初始化。
       if (!Array.isArray(prescriptionTemplates) || prescriptionTemplates.length === 0) {
         if (typeof initTemplateLibrary === 'function') {
           try {
@@ -13803,7 +13589,7 @@ async function showDiagnosisTemplateModal(pageChange) {
           }
         }
       }
-      // 建立搜尋輸入框
+      // 在列表上方放置搜尋欄，若尚未存在則建立
       let searchInput = modal.querySelector('#prescriptionTemplateSearch');
       if (!searchInput) {
         searchInput = document.createElement('input');
@@ -13813,46 +13599,22 @@ async function showDiagnosisTemplateModal(pageChange) {
         searchInput.className = 'w-full mb-3 px-3 py-2 border border-gray-300 rounded';
         listEl.parentNode.insertBefore(searchInput, listEl);
         searchInput.addEventListener('input', function() {
-          paginationSettings.prescriptionTemplateModal.currentPage = 1;
+          // 重新渲染列表
           showPrescriptionTemplateModal();
         });
       }
-      // 若非分頁切換則重設頁碼
-      if (!pageChange) {
-        paginationSettings.prescriptionTemplateModal.currentPage = 1;
-      }
       listEl.innerHTML = '';
-      let templates = Array.isArray(prescriptionTemplates) ? prescriptionTemplates : [];
+      const templates = Array.isArray(prescriptionTemplates) ? prescriptionTemplates : [];
+      // 取得搜尋字串
       const keyword = searchInput.value ? String(searchInput.value).trim().toLowerCase() : '';
-      let filtered = templates;
-      if (keyword) {
-        filtered = templates.filter(t => {
-          if (!t) return false;
-          const name = (t.name || '').toLowerCase();
-          const category = (t.category || '').toLowerCase();
-          const content = (t.content || '').toLowerCase();
-          return name.includes(keyword) || category.includes(keyword) || content.includes(keyword);
-        });
-      }
-      // 依名稱排序
-      filtered = filtered.slice().sort((a, b) => {
-        const an = (a && a.name) ? a.name : '';
-        const bn = (b && b.name) ? b.name : '';
-        return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
-      });
-      // 根據需要載入更多資料
-      const currentPage = paginationSettings.prescriptionTemplateModal.currentPage;
-      const itemsPerPage = paginationSettings.prescriptionTemplateModal.itemsPerPage;
-      const requiredCount = currentPage * itemsPerPage;
-      while (filtered.length < requiredCount && prescriptionTemplatesHasMore) {
-        try {
-          await fetchNextPrescriptionTemplatesPage();
-        } catch (_err) {
-          console.error('載入醫囑模板下一頁資料失敗:', _err);
-          break;
-        }
-        templates = Array.isArray(prescriptionTemplates) ? prescriptionTemplates : [];
-        filtered = templates;
+      if (!templates || templates.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'text-sm text-gray-500 text-center p-4';
+        emptyDiv.textContent = '目前尚無醫囑模板，請先建立或同步模板資料。';
+        listEl.appendChild(emptyDiv);
+      } else {
+        // 過濾列表
+        let filtered = templates;
         if (keyword) {
           filtered = templates.filter(t => {
             if (!t) return false;
@@ -13862,27 +13624,17 @@ async function showDiagnosisTemplateModal(pageChange) {
             return name.includes(keyword) || category.includes(keyword) || content.includes(keyword);
           });
         }
-        filtered = filtered.slice().sort((a, b) => {
+        // 依名稱排序
+        const sorted = filtered.slice().sort((a, b) => {
           const an = (a && a.name) ? a.name : '';
           const bn = (b && b.name) ? b.name : '';
           return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
         });
-      }
-      const totalItems = filtered.length;
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const pageItems = filtered.slice(startIndex, endIndex);
-      // 渲染列表
-      if (pageItems.length === 0) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'text-sm text-gray-500 text-center p-4';
-        emptyDiv.textContent = '目前尚無醫囑模板，請先建立或同步模板資料。';
-        listEl.appendChild(emptyDiv);
-      } else {
-        pageItems.forEach(template => {
+        sorted.forEach(template => {
           if (!template) return;
           const div = document.createElement('div');
           div.className = 'p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50';
+          // 對模板名稱與分類進行轉義，避免 XSS
           const safeName = template.name ? window.escapeHtml(template.name) : '';
           const safeCategory = template.category ? window.escapeHtml(template.category) : null;
           const categoryLine = safeCategory ? `<div class="text-sm text-gray-500">${safeCategory}</div>` : '';
@@ -13900,19 +13652,12 @@ async function showDiagnosisTemplateModal(pageChange) {
         buttons.forEach(btn => {
           btn.addEventListener('click', function (evt) {
             const tid = evt.currentTarget.getAttribute('data-id');
+            // 使用全域掛載的新版函式載入醫囑模板
             if (window && typeof window.selectPrescriptionTemplate === 'function') {
               window.selectPrescriptionTemplate(tid);
             }
           });
         });
-      }
-      // 分頁控制
-      const paginationEl = ensurePaginationContainer(listEl.id, 'prescriptionTemplateModalPagination');
-      if (paginationEl) {
-        renderPagination(totalItems, itemsPerPage, currentPage, function(page) {
-          paginationSettings.prescriptionTemplateModal.currentPage = page;
-          showPrescriptionTemplateModal(true);
-        }, paginationEl);
       }
       modal.classList.remove('hidden');
     } catch (err) {
@@ -15290,15 +15035,14 @@ function refreshTemplateCategoryFilters() {
           }
 
           /**
-           * 顯示常用藥方組合選擇彈窗。加入搜尋與分頁功能，避免一次顯示過多項目。
-           * @param {boolean} pageChange 表示是否由分頁控制器觸發，若為 true 則不重置頁碼
+           * 顯示常用藥方組合選擇彈窗。列出所有個人慣用中藥組合供選擇。
            */
-          function showHerbComboModal(pageChange) {
+          function showHerbComboModal() {
             try {
               const modal = document.getElementById('herbComboModal');
               const listContainer = document.getElementById('herbComboList');
               if (!modal || !listContainer) return;
-              // 搜尋輸入框
+              // 在列表上方放置搜尋欄，若尚未存在則建立
               let searchInput = modal.querySelector('#herbComboSearch');
               if (!searchInput) {
                 searchInput = document.createElement('input');
@@ -15308,22 +15052,21 @@ function refreshTemplateCategoryFilters() {
                 searchInput.className = 'w-full mb-3 px-3 py-2 border border-gray-300 rounded';
                 listContainer.parentNode.insertBefore(searchInput, listContainer);
                 searchInput.addEventListener('input', function() {
-                  paginationSettings.herbComboModal.currentPage = 1;
+                  // 重新渲染列表
                   showHerbComboModal();
                 });
               }
-              if (!pageChange) {
-                paginationSettings.herbComboModal.currentPage = 1;
-              }
               listContainer.innerHTML = '';
-              // 過濾組合
+              // 過濾掉名稱為空白或未命名的組合，避免顯示錯誤資料
               let combos = Array.isArray(herbCombinations)
                 ? herbCombinations.filter(c => c && c.name && String(c.name).trim() !== '')
                 : [];
+              // 取得搜尋關鍵字
               const herbKeyword = searchInput.value ? String(searchInput.value).trim().toLowerCase() : '';
               if (herbKeyword) {
                 combos = combos.filter(combo => {
-                  const nameStr = combo.name ? String(combo.name).toLowerCase() : '';
+                  const nameStr = combo.name ? combo.name.toLowerCase() : '';
+                  // 搜尋名稱或原料
                   let ingredientsStr = '';
                   if (Array.isArray(combo.ingredients)) {
                     ingredientsStr = combo.ingredients.map(ing => (ing && ing.name ? String(ing.name).toLowerCase() : '')).join(' ');
@@ -15331,31 +15074,25 @@ function refreshTemplateCategoryFilters() {
                   return nameStr.includes(herbKeyword) || ingredientsStr.includes(herbKeyword);
                 });
               }
-              // 排序
-              combos = combos.slice().sort((a, b) => {
-                const an = a && a.name ? a.name : '';
-                const bn = b && b.name ? b.name : '';
-                return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
-              });
-              // 分頁計算
-              const currentPage = paginationSettings.herbComboModal.currentPage;
-              const itemsPerPage = paginationSettings.herbComboModal.itemsPerPage;
-              const totalItems = combos.length;
-              const startIndex = (currentPage - 1) * itemsPerPage;
-              const endIndex = startIndex + itemsPerPage;
-              const pageItems = combos.slice(startIndex, endIndex);
-              // 顯示列表
-              if (pageItems.length === 0) {
+              if (combos.length === 0) {
                 listContainer.innerHTML = '<div class="text-center text-gray-500">尚未設定常用藥方組合</div>';
               } else {
-                pageItems.forEach(combo => {
+                // 依名稱排序
+                combos = combos.slice().sort((a, b) => {
+                  const an = a && a.name ? a.name : '';
+                  const bn = b && b.name ? b.name : '';
+                  return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
+                });
+                combos.forEach(combo => {
                   const itemDiv = document.createElement('div');
                   itemDiv.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
+                  // 對名稱與原料進行轉義，避免 XSS
                   const safeComboName = combo.name ? window.escapeHtml(combo.name) : '';
                   const ingredientsText = (combo.ingredients && combo.ingredients.length > 0)
                     ? combo.ingredients.map(ing => {
                         const name = ing && ing.name ? window.escapeHtml(ing.name) : '';
                         if (ing && ing.dosage) {
+                          // 將劑量也轉義
                           const safeDosage = window.escapeHtml(String(ing.dosage));
                           return name + '(' + safeDosage + '克)';
                         }
@@ -15371,14 +15108,6 @@ function refreshTemplateCategoryFilters() {
                   };
                   listContainer.appendChild(itemDiv);
                 });
-              }
-              // 分頁控制
-              const paginationEl = ensurePaginationContainer(listContainer.id, 'herbComboModalPagination');
-              if (paginationEl) {
-                renderPagination(totalItems, itemsPerPage, currentPage, function(page) {
-                  paginationSettings.herbComboModal.currentPage = page;
-                  showHerbComboModal(true);
-                }, paginationEl);
               }
               modal.classList.remove('hidden');
             } catch (error) {
@@ -15434,15 +15163,14 @@ function refreshTemplateCategoryFilters() {
           }
 
           /**
-           * 顯示常用穴位組合選擇彈窗。加入分頁與搜尋功能，避免一次顯示過多項目。
-           * @param {boolean} pageChange 表示是否由分頁控制器觸發，若為 true 則不重置頁碼
+           * 顯示常用穴位組合選擇彈窗。
            */
-          function showAcupointComboModal(pageChange) {
+          function showAcupointComboModal() {
             try {
               const modal = document.getElementById('acupointComboModal');
               const listContainer = document.getElementById('acupointComboList');
               if (!modal || !listContainer) return;
-              // 建立搜尋輸入框
+              // 在列表上方放置搜尋欄，若尚未存在則建立
               let searchInput = modal.querySelector('#acupointComboSearch');
               if (!searchInput) {
                 searchInput = document.createElement('input');
@@ -15451,25 +15179,20 @@ function refreshTemplateCategoryFilters() {
                 searchInput.placeholder = '搜尋常用穴位...';
                 searchInput.className = 'w-full mb-3 px-3 py-2 border border-gray-300 rounded';
                 listContainer.parentNode.insertBefore(searchInput, listContainer);
-                // 當輸入變更時重新渲染，重置頁碼為 1
                 searchInput.addEventListener('input', function() {
-                  paginationSettings.acupointComboModal.currentPage = 1;
                   showAcupointComboModal();
                 });
               }
-              // 非分頁切換則重設頁碼
-              if (!pageChange) {
-                paginationSettings.acupointComboModal.currentPage = 1;
-              }
               listContainer.innerHTML = '';
-              // 取得並過濾組合
               let combos = Array.isArray(acupointCombinations)
                 ? acupointCombinations.filter(c => c && c.name && String(c.name).trim() !== '')
                 : [];
+              // 搜尋關鍵字
               const acuKeyword = searchInput.value ? String(searchInput.value).trim().toLowerCase() : '';
               if (acuKeyword) {
                 combos = combos.filter(combo => {
-                  const nameStr = combo.name ? String(combo.name).toLowerCase() : '';
+                  const nameStr = combo.name ? combo.name.toLowerCase() : '';
+                  // 將穴位名稱與類型串起來供搜尋
                   let pointsStr = '';
                   if (Array.isArray(combo.points)) {
                     pointsStr = combo.points.map(pt => {
@@ -15482,24 +15205,16 @@ function refreshTemplateCategoryFilters() {
                   return nameStr.includes(acuKeyword) || pointsStr.includes(acuKeyword) || techniqueStr.includes(acuKeyword);
                 });
               }
-              // 排序
-              combos = combos.slice().sort((a, b) => {
-                const an = a && a.name ? a.name : '';
-                const bn = b && b.name ? b.name : '';
-                return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
-              });
-              // 計算分頁
-              const currentPage = paginationSettings.acupointComboModal.currentPage;
-              const itemsPerPage = paginationSettings.acupointComboModal.itemsPerPage;
-              const totalItems = combos.length;
-              const startIndex = (currentPage - 1) * itemsPerPage;
-              const endIndex = startIndex + itemsPerPage;
-              const pageItems = combos.slice(startIndex, endIndex);
-              // 顯示列表
-              if (pageItems.length === 0) {
+              if (combos.length === 0) {
                 listContainer.innerHTML = '<div class="text-center text-gray-500">尚未設定常用穴位組合</div>';
               } else {
-                pageItems.forEach(combo => {
+                // 依名稱排序
+                combos = combos.slice().sort((a, b) => {
+                  const an = a && a.name ? a.name : '';
+                  const bn = b && b.name ? b.name : '';
+                  return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
+                });
+                combos.forEach(combo => {
                   const itemDiv = document.createElement('div');
                   itemDiv.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
                   const pointsText = (combo.points && combo.points.length > 0)
@@ -15519,14 +15234,6 @@ function refreshTemplateCategoryFilters() {
                   };
                   listContainer.appendChild(itemDiv);
                 });
-              }
-              // 渲染分頁控制
-              const paginationEl = ensurePaginationContainer(listContainer.id, 'acupointComboModalPagination');
-              if (paginationEl) {
-                renderPagination(totalItems, itemsPerPage, currentPage, function(page) {
-                  paginationSettings.acupointComboModal.currentPage = page;
-                  showAcupointComboModal(true);
-                }, paginationEl);
               }
               modal.classList.remove('hidden');
             } catch (error) {
@@ -15568,7 +15275,7 @@ function refreshTemplateCategoryFilters() {
 
 
           // 渲染醫囑模板
-          async function renderPrescriptionTemplates(list, pageChange = false) {
+          function renderPrescriptionTemplates(list, pageChange = false) {
             const container = document.getElementById('prescriptionTemplatesContainer');
             container.innerHTML = '';
             // 取得要顯示的模板列表；若傳入特定列表則使用之，否則使用全域列表。
@@ -15592,13 +15299,7 @@ function refreshTemplateCategoryFilters() {
             const totalItems = displayTemplates.length;
             const itemsPerPage = paginationSettings.prescriptionTemplates.itemsPerPage;
             let currentPage = paginationSettings.prescriptionTemplates.currentPage;
-            // 若用戶要求超出已載入頁數且仍有更多資料，則載入下一批資料
-            const loadedPages = Math.ceil(displayTemplates.length / itemsPerPage);
             const totalPages = totalItems > 0 ? Math.ceil(totalItems / itemsPerPage) : 1;
-            if (currentPage > loadedPages && prescriptionTemplatesHasMore) {
-              await fetchNextPrescriptionTemplatesPage();
-              return renderPrescriptionTemplates(templates, pageChange);
-            }
             if (currentPage < 1) currentPage = 1;
             if (currentPage > totalPages) currentPage = totalPages;
             paginationSettings.prescriptionTemplates.currentPage = currentPage;
@@ -15642,9 +15343,9 @@ function refreshTemplateCategoryFilters() {
             });
             // 分頁控制
             const paginEl = ensurePaginationContainer('prescriptionTemplatesContainer', 'prescriptionTemplatesPagination');
-            renderPagination(totalItems, itemsPerPage, currentPage, async function(newPage) {
+            renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
               paginationSettings.prescriptionTemplates.currentPage = newPage;
-              await renderPrescriptionTemplates(templates, true);
+              renderPrescriptionTemplates(templates, true);
             }, paginEl);
           }
 
@@ -15684,7 +15385,7 @@ function refreshTemplateCategoryFilters() {
           }
 
           // 渲染診斷模板
-          async function renderDiagnosisTemplates(list, pageChange = false) {
+          function renderDiagnosisTemplates(list, pageChange = false) {
             const container = document.getElementById('diagnosisTemplatesContainer');
             container.innerHTML = '';
             // 取得要顯示的診斷模板列表；若傳入特定列表則使用之，否則使用全域列表。
@@ -15708,13 +15409,7 @@ function refreshTemplateCategoryFilters() {
             const totalItems = displayTemplates.length;
             const itemsPerPage = paginationSettings.diagnosisTemplates.itemsPerPage;
             let currentPage = paginationSettings.diagnosisTemplates.currentPage;
-            // 若用戶要求超出已載入頁數且仍有更多資料，則載入下一批資料
-            const loadedPages = Math.ceil(displayTemplates.length / itemsPerPage);
             const totalPages = totalItems > 0 ? Math.ceil(totalItems / itemsPerPage) : 1;
-            if (currentPage > loadedPages && diagnosisTemplatesHasMore) {
-              await fetchNextDiagnosisTemplatesPage();
-              return renderDiagnosisTemplates(templates, pageChange);
-            }
             if (currentPage < 1) currentPage = 1;
             if (currentPage > totalPages) currentPage = totalPages;
             paginationSettings.diagnosisTemplates.currentPage = currentPage;
@@ -15782,9 +15477,9 @@ function refreshTemplateCategoryFilters() {
             });
             // 分頁控制
             const paginEl = ensurePaginationContainer('diagnosisTemplatesContainer', 'diagnosisTemplatesPagination');
-            renderPagination(totalItems, itemsPerPage, currentPage, async function(newPage) {
+            renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
               paginationSettings.diagnosisTemplates.currentPage = newPage;
-              await renderDiagnosisTemplates(templates, true);
+              renderDiagnosisTemplates(templates, true);
             }, paginEl);
           }
 
