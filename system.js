@@ -179,6 +179,20 @@ let appointments = [];
 // 快取病人列表，避免重複從 Firestore 讀取
 let patientCache = null;
 
+// 用於游標分頁的病人列表快取。
+// patientPagesCache[pageNumber] 儲存每頁已載入的病人資料；
+// patientPageCursors[pageNumber] 儲存該頁最後一筆文件的快照，用於下一頁查詢。
+let patientPagesCache = {};
+let patientPageCursors = {};
+
+// 快取病人總數，用於分頁計算。讀取一次後會快取，除非強制刷新。
+let patientsCountCache = null;
+
+// 標記初始化狀態，避免重複初始化中藥庫、收費項目與模板庫。
+let herbLibraryLoaded = false;
+let billingItemsLoaded = false;
+let templateLibraryLoaded = false;
+
 // 快取診症記錄和用戶列表，避免重複從 Firestore 讀取
 let consultationCache = null;
 let userCache = null;
@@ -298,13 +312,103 @@ async function fetchDataWithCache(cache, fetchFunc, forceRefresh = false) {
  * @param {boolean} forceRefresh 是否強制重新從 Firestore 讀取資料
  * @returns {Promise<Array>} 病人資料陣列
  */
-async function fetchPatients(forceRefresh = false) {
+async function fetchPatients(forceRefresh = false, pageNumber = null) {
+    // 若指定頁碼，使用游標方式僅讀取該頁資料
+    if (pageNumber !== null && typeof pageNumber === 'number') {
+        return await fetchPatientsPage(pageNumber, forceRefresh);
+    }
+    // 預設行為：從快取載入全部病人資料
     patientCache = await fetchDataWithCache(
         patientCache,
         () => window.firebaseDataManager.getPatients(),
         forceRefresh
     );
     return patientCache;
+}
+
+/**
+ * 透過游標及 limit 方式分頁讀取病人資料。
+ * 頁數從 1 開始計算。讀取後會快取該頁資料及最後一筆文件，以利下一頁查詢。
+ * 當 forceRefresh 為 true 時，會清除所有分頁快取並重新讀取。
+ *
+ * @param {number} pageNumber 欲讀取的頁碼，從 1 起算
+ * @param {boolean} forceRefresh 是否強制重新載入
+ * @returns {Promise<Array>} 該頁病人資料陣列
+ */
+async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
+    // 參數檢查
+    if (pageNumber < 1) pageNumber = 1;
+    // 如果強制刷新，清空分頁快取
+    if (forceRefresh) {
+        patientPagesCache = {};
+        patientPageCursors = {};
+    }
+    // 若快取中已有對應頁資料，直接返回
+    if (!forceRefresh && patientPagesCache[pageNumber]) {
+        return patientPagesCache[pageNumber];
+    }
+    await waitForFirebaseDb();
+    try {
+        const pageSize = paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage
+            ? paginationSettings.patientList.itemsPerPage
+            : 10;
+        // 建立基礎查詢：依照 createdAt 由舊至新排序
+        let q = window.firebase.query(
+            window.firebase.collection(window.firebase.db, 'patients'),
+            window.firebase.orderBy('createdAt'),
+            window.firebase.limit(pageSize)
+        );
+        // 如果頁碼大於 1，且前一頁已記錄最後一筆文件，則以該文件為起點
+        if (pageNumber > 1) {
+            const prevCursor = patientPageCursors[pageNumber - 1];
+            if (prevCursor) {
+                q = window.firebase.query(q, window.firebase.startAfter(prevCursor));
+            }
+        }
+        const snapshot = await window.firebase.getDocs(q);
+        const docs = [];
+        snapshot.forEach((doc) => {
+            docs.push({ id: doc.id, ...doc.data() });
+        });
+        // 記錄最後一個文件作為下一頁的游標
+        if (docs.length > 0) {
+            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+            patientPageCursors[pageNumber] = lastDoc;
+        }
+        // 快取本頁資料
+        patientPagesCache[pageNumber] = docs;
+        return docs;
+    } catch (error) {
+        console.error('分頁讀取病人資料失敗:', error);
+        return [];
+    }
+}
+
+/**
+ * 取得病人總數，透過 Firestore 聚合查詢 count()。
+ * 結果將快取，以避免重複計算；除非 forceRefresh 為 true 才重新查詢。
+ *
+ * @param {boolean} forceRefresh 是否強制重新從 Firestore 讀取總數
+ * @returns {Promise<number>} 病人數量
+ */
+async function getPatientsCount(forceRefresh = false) {
+    // 若快取已存在且未要求強制刷新，直接返回快取值
+    if (!forceRefresh && typeof patientsCountCache === 'number') {
+        return patientsCountCache;
+    }
+    try {
+        await waitForFirebaseDb();
+        // 建立查詢（不指定排序或條件）
+        const colRef = window.firebase.collection(window.firebase.db, 'patients');
+        // 使用 Firestore 聚合查詢取得文件總數
+        const countSnap = await window.firebase.getCountFromServer(colRef);
+        const count = countSnap.data().count;
+        patientsCountCache = typeof count === 'number' ? count : 0;
+        return patientsCountCache;
+    } catch (error) {
+        console.error('取得病人總數失敗:', error);
+        return 0;
+    }
 }
 
 /**
@@ -725,27 +829,26 @@ function generateMedicalRecordNumber() {
          * 從 Firestore 讀取中藥庫資料，若資料不存在則自動使用預設值初始化。
          * 此函式會等待 Firebase 初始化完成後再執行。
          */
-        async function initHerbLibrary() {
-            // 等待 Firebase 及其資料庫初始化
-            await waitForFirebaseDb();
+        async function initHerbLibrary(forceRefresh = false) {
+            // 若已載入且不需要強制重新載入，直接返回以避免重複讀取
+            if (herbLibraryLoaded && !forceRefresh) {
+                return;
+            }
+            // 從本地 JSON 檔案載入中藥資料與方劑資料
             try {
-                // 從 Firestore 取得 herbLibrary 集合資料
-                const querySnapshot = await window.firebase.getDocs(
-                    window.firebase.collection(window.firebase.db, 'herbLibrary')
-                );
-                const herbsFromFirestore = [];
-                querySnapshot.forEach((docSnap) => {
-                    // docSnap.data() 已包含 id 屬性，因此直接展開
-                    herbsFromFirestore.push({ ...docSnap.data() });
-                });
-                if (herbsFromFirestore.length === 0) {
-                    // Firestore 中沒有資料時，不自動載入預設資料，保持空陣列
-                    herbLibrary = [];
-                } else {
-                    herbLibrary = herbsFromFirestore;
-                }
+                const [herbRes, formulaRes] = await Promise.all([
+                    fetch('/data/herbLibrary.json', { cache: 'reload' }),
+                    fetch('/data/herbformulaLibrary.json', { cache: 'reload' })
+                ]);
+                const herbData = await herbRes.json();
+                const formulaData = await formulaRes.json();
+                // herbLibrary.json 和 herbformulaLibrary.json 都會有 herbLibrary 陣列
+                const herbList = Array.isArray(herbData.herbLibrary) ? herbData.herbLibrary : [];
+                const formulaList = Array.isArray(formulaData.herbLibrary) ? formulaData.herbLibrary : [];
+                herbLibrary = [...herbList, ...formulaList];
+                herbLibraryLoaded = true;
             } catch (error) {
-                console.error('讀取/初始化中藥庫資料失敗:', error);
+                console.error('讀取本地 JSON 中藥庫資料失敗:', error);
             }
         }
 
@@ -758,7 +861,11 @@ function generateMedicalRecordNumber() {
          * 從 Firestore 讀取收費項目資料，若資料不存在則使用預設資料初始化。
          * 此函式會等待 Firebase 初始化完成後再執行。
          */
-        async function initBillingItems() {
+        async function initBillingItems(forceRefresh = false) {
+            // 若已載入且不需要強制重新載入，直接返回以避免重複讀取
+            if (billingItemsLoaded && !forceRefresh) {
+                return;
+            }
             // 等待 Firebase 及其資料庫初始化
             await waitForFirebaseDb();
             try {
@@ -776,6 +883,7 @@ function generateMedicalRecordNumber() {
                 } else {
                     billingItems = itemsFromFirestore;
                 }
+                billingItemsLoaded = true;
             } catch (error) {
                 console.error('讀取/初始化收費項目資料失敗:', error);
             }
@@ -787,50 +895,56 @@ function generateMedicalRecordNumber() {
          * 若資料存在於 Firestore，則取代本地目前的模板列表；否則保留現有資料。
          * 此函式會等待 Firebase 初始化完成後再執行，並在讀取後重新渲染模板列表。
          */
-        async function initTemplateLibrary() {
-            // 等待 Firebase 及其資料庫初始化
-            await waitForFirebaseDb();
+        async function initTemplateLibrary(forceRefresh = false) {
+            // 若已載入且不需要強制重新載入，仍執行渲染函式以確保頁面顯示，但不重新讀取資料
+            if (templateLibraryLoaded && !forceRefresh) {
+                if (typeof renderPrescriptionTemplates === 'function') {
+                    try { renderPrescriptionTemplates(); } catch (_e) {}
+                }
+                if (typeof renderDiagnosisTemplates === 'function') {
+                    try { renderDiagnosisTemplates(); } catch (_e) {}
+                }
+                if (typeof refreshTemplateCategoryFilters === 'function') {
+                    try { refreshTemplateCategoryFilters(); } catch (_e) {}
+                }
+                return;
+            }
+            // 從本地 JSON 檔案載入醫囑模板與診斷模板資料
             try {
-                // 從 Firestore 讀取醫囑模板
-                const presSnapshot = await window.firebase.getDocs(
-                    window.firebase.collection(window.firebase.db, 'prescriptionTemplates')
-                );
-                const presFromFirestore = [];
-                presSnapshot.forEach(docSnap => {
-                    presFromFirestore.push({ ...docSnap.data() });
-                });
-                if (presFromFirestore.length > 0) {
-                    prescriptionTemplates = presFromFirestore;
+                const [presRes, diagRes] = await Promise.all([
+                    fetch('/data/prescriptionTemplates.json', { cache: 'reload' }),
+                    fetch('/data/diagnosisTemplates.json', { cache: 'reload' })
+                ]);
+                const presData = await presRes.json();
+                const diagData = await diagRes.json();
+                // 解析並指派醫囑模板
+                if (presData && Array.isArray(presData.prescriptionTemplates)) {
+                    prescriptionTemplates = presData.prescriptionTemplates;
+                } else {
+                    prescriptionTemplates = [];
                 }
-
-                // 從 Firestore 讀取診斷模板
-                const diagSnapshot = await window.firebase.getDocs(
-                    window.firebase.collection(window.firebase.db, 'diagnosisTemplates')
-                );
-                const diagFromFirestore = [];
-                diagSnapshot.forEach(docSnap => {
-                    diagFromFirestore.push({ ...docSnap.data() });
-                });
-                if (diagFromFirestore.length > 0) {
-                    diagnosisTemplates = diagFromFirestore;
+                // 解析並指派診斷模板
+                if (diagData && Array.isArray(diagData.diagnosisTemplates)) {
+                    diagnosisTemplates = diagData.diagnosisTemplates;
+                } else {
+                    diagnosisTemplates = [];
                 }
+                templateLibraryLoaded = true;
             } catch (error) {
-                console.error('讀取/初始化模板庫資料失敗:', error);
+                console.error('讀取本地模板資料失敗:', error);
             }
             // 渲染模板內容
             try {
                 if (typeof renderPrescriptionTemplates === 'function') {
-                    renderPrescriptionTemplates();
+                    try { renderPrescriptionTemplates(); } catch (_e) {}
                 }
                 if (typeof renderDiagnosisTemplates === 'function') {
-                    renderDiagnosisTemplates();
+                    try { renderDiagnosisTemplates(); } catch (_e) {}
                 }
                 // 在初次初始化模板庫後刷新分類篩選下拉選單，
                 // 以確保「診斷模板」與「醫囑模板」篩選器顯示最新的分類
                 if (typeof refreshTemplateCategoryFilters === 'function') {
-                    try {
-                        refreshTemplateCategoryFilters();
-                    } catch (_e) {}
+                    try { refreshTemplateCategoryFilters(); } catch (_e) {}
                 }
             } catch (err) {
                 console.error('渲染模板庫內容失敗:', err);
@@ -1486,7 +1600,9 @@ async function generatePatientNumberFromFirebase() {
 // 從 Firebase 載入病人列表
 async function loadPatientListFromFirebase() {
     const tbody = document.getElementById('patientList');
-    const searchTerm = document.getElementById('searchPatient').value.toLowerCase();
+    if (!tbody) return;
+    const searchInput = document.getElementById('searchPatient');
+    const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
     try {
         // 顯示載入中
         tbody.innerHTML = `
@@ -1497,18 +1613,24 @@ async function loadPatientListFromFirebase() {
                 </td>
             </tr>
         `;
-        // 從快取或 Firebase 取得病人資料
-        const allPatients = await fetchPatients();
-        // 過濾病人資料
-        const filteredPatients = Array.isArray(allPatients) ? allPatients.filter(patient =>
-            (patient.name && patient.name.toLowerCase().includes(searchTerm)) ||
-            (patient.phone && patient.phone.includes(searchTerm)) ||
-            (patient.idCard && patient.idCard.toLowerCase().includes(searchTerm)) ||
-            (patient.patientNumber && patient.patientNumber.toLowerCase().includes(searchTerm))
-        ) : [];
-        // 更新快取清單並渲染表格（由分頁函式處理顯示）
-        patientListFiltered = filteredPatients;
-        renderPatientListTable(false);
+        // 若有搜尋字串，載入全部病人資料並在前端進行篩選
+        if (searchTerm) {
+            const allPatients = await fetchPatients();
+            const filteredPatients = Array.isArray(allPatients) ? allPatients.filter(patient =>
+                (patient.name && patient.name.toLowerCase().includes(searchTerm)) ||
+                (patient.phone && patient.phone.includes(searchTerm)) ||
+                (patient.idCard && patient.idCard.toLowerCase().includes(searchTerm)) ||
+                (patient.patientNumber && patient.patientNumber.toLowerCase().includes(searchTerm))
+            ) : [];
+            patientListFiltered = filteredPatients;
+            renderPatientListTable(false);
+        } else {
+            // 無搜尋條件，使用游標分頁僅載入當前頁
+            const currentPage = paginationSettings.patientList.currentPage || 1;
+            const pageData = await fetchPatientsPage(currentPage);
+            const totalItems = await getPatientsCount();
+            renderPatientListPage(pageData, totalItems, currentPage);
+        }
     } catch (error) {
         console.error('載入病人列表錯誤:', error);
         const msg = `
@@ -1598,6 +1720,68 @@ function renderPatientListTable(pageChange = false) {
     renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
         paginationSettings.patientList.currentPage = newPage;
         renderPatientListTable(true);
+    }, paginEl);
+}
+
+/**
+ * 渲染伺服器分頁的病人列表。
+ * 當搜尋條件為空時，使用此函式以避免載入整個集合。
+ *
+ * @param {Array} pageItems 當前頁的病人資料陣列
+ * @param {number} totalItems 全部病人的總數
+ * @param {number} currentPage 當前頁碼（從 1 開始）
+ */
+function renderPatientListPage(pageItems, totalItems, currentPage) {
+    const tbody = document.getElementById('patientList');
+    if (!tbody) return;
+    // 若沒有任何病人資料，顯示提示
+    if (!Array.isArray(pageItems) || pageItems.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                    尚無病人資料
+                </td>
+            </tr>
+        `;
+        const paginEl = ensurePaginationContainer('patientList', 'patientListPagination');
+        if (paginEl) {
+            paginEl.innerHTML = '';
+            paginEl.classList.add('hidden');
+        }
+        return;
+    }
+    // 重新渲染表格內容
+    tbody.innerHTML = '';
+    pageItems.forEach(patient => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50';
+        // 安全轉義顯示的值
+        const safeNumber = window.escapeHtml(patient.patientNumber || '未設定');
+        const safeName = window.escapeHtml(patient.name);
+        const safeAge = window.escapeHtml(formatAge(patient.birthDate));
+        const safeGender = window.escapeHtml(patient.gender);
+        const safePhone = window.escapeHtml(patient.phone);
+        row.innerHTML = `
+            <td class="px-4 py-3 text-sm text-blue-600 font-medium">${safeNumber}</td>
+            <td class="px-4 py-3 text-sm text-gray-900 font-medium">${safeName}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${safeAge}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${safeGender}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${safePhone}</td>
+            <td class="px-4 py-3 text-sm space-x-2">
+                <button onclick="viewPatient('${patient.id}')" class="text-blue-600 hover:text-blue-800">查看</button>
+                <button onclick="showPatientMedicalHistory('${patient.id}')" class="text-purple-600 hover:text-purple-800">病歷</button>
+                <button onclick="editPatient('${patient.id}')" class="text-green-600 hover:text-green-800">編輯</button>
+                <button onclick="deletePatient('${patient.id}')" class="text-red-600 hover:text-red-800">刪除</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    // 分頁控制
+    const paginEl = ensurePaginationContainer('patientList', 'patientListPagination');
+    renderPagination(totalItems, paginationSettings.patientList.itemsPerPage, currentPage, function (newPage) {
+        // 更新當前頁碼，重新載入資料（使用伺服器分頁）
+        paginationSettings.patientList.currentPage = newPage;
+        loadPatientList();
     }, paginEl);
 }
 
@@ -12591,21 +12775,17 @@ class FirebaseDataManager {
 
     async getPatientPackages(patientId) {
         if (!this.isReady) return { success: false, data: [] };
-
         try {
-            const querySnapshot = await window.firebase.getDocs(
-                window.firebase.collection(window.firebase.db, 'patientPackages')
+            // 使用條件查詢僅取得該病人的套票，避免一次讀取整個 patientPackages 集合
+            const q = window.firebase.query(
+                window.firebase.collection(window.firebase.db, 'patientPackages'),
+                window.firebase.where('patientId', '==', patientId)
             );
-            
+            const querySnapshot = await window.firebase.getDocs(q);
             const packages = [];
             querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                // 以字串比較避免 patientId 型別不一致導致匹配失敗
-                if (String(data.patientId) === String(patientId)) {
-                    packages.push({ id: doc.id, ...data });
-                }
+                packages.push({ id: doc.id, ...doc.data() });
             });
-            
             return { success: true, data: packages };
         } catch (error) {
             console.error('讀取患者套票失敗:', error);
