@@ -834,22 +834,10 @@ function generateMedicalRecordNumber() {
             if (herbLibraryLoaded && !forceRefresh) {
                 return;
             }
-            // 從本地 JSON 檔案載入中藥資料與方劑資料
+            // 從本地 JSON 檔案載入中藥資料與方劑資料，若找不到則回退至 GitHub Raw
             try {
-                const [herbRes, formulaRes] = await Promise.all([
-                    fetch('data/herbLibrary.json', { cache: 'reload' }),
-                    fetch('data/herbformulaLibrary.json', { cache: 'reload' })
-                ]);
-                // 確認 HTTP 響應是否成功，若非 2xx 則拋出錯誤避免後續解析失敗
-                if (!herbRes.ok) {
-                    throw new Error(`herbLibrary.json HTTP error ${herbRes.status}`);
-                }
-                if (!formulaRes.ok) {
-                    throw new Error(`herbformulaLibrary.json HTTP error ${formulaRes.status}`);
-                }
-                const herbData = await herbRes.json();
-                const formulaData = await formulaRes.json();
-                // herbLibrary.json 和 herbformulaLibrary.json 均包含名為 herbLibrary 的陣列
+                const herbData = await fetchJsonWithFallback('herbLibrary.json');
+                const formulaData = await fetchJsonWithFallback('herbformulaLibrary.json');
                 const herbList = Array.isArray(herbData.herbLibrary) ? herbData.herbLibrary : [];
                 const formulaList = Array.isArray(formulaData.herbLibrary) ? formulaData.herbLibrary : [];
                 herbLibrary = [...herbList, ...formulaList];
@@ -916,20 +904,10 @@ function generateMedicalRecordNumber() {
                 }
                 return;
             }
-            // 從本地 JSON 檔案載入醫囑模板與診斷模板資料
+            // 從本地 JSON 檔案載入醫囑模板與診斷模板資料，若找不到則回退至 GitHub Raw
             try {
-                const [presRes, diagRes] = await Promise.all([
-                    fetch('data/prescriptionTemplates.json', { cache: 'reload' }),
-                    fetch('data/diagnosisTemplates.json', { cache: 'reload' })
-                ]);
-                if (!presRes.ok) {
-                    throw new Error(`prescriptionTemplates.json HTTP error ${presRes.status}`);
-                }
-                if (!diagRes.ok) {
-                    throw new Error(`diagnosisTemplates.json HTTP error ${diagRes.status}`);
-                }
-                const presData = await presRes.json();
-                const diagData = await diagRes.json();
+                const presData = await fetchJsonWithFallback('prescriptionTemplates.json');
+                const diagData = await fetchJsonWithFallback('diagnosisTemplates.json');
                 prescriptionTemplates = Array.isArray(presData.prescriptionTemplates) ? presData.prescriptionTemplates : [];
                 diagnosisTemplates = Array.isArray(diagData.diagnosisTemplates) ? diagData.diagnosisTemplates : [];
                 templateLibraryLoaded = true;
@@ -983,6 +961,48 @@ async function waitForFirebaseDataManager() {
   while (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
+}
+
+/**
+ * 讀取位於 /data 目錄或 GitHub Pages raw 路徑的 JSON 檔案。
+ * 這個輔助函式會先嘗試相對路徑 data/<fileName>，若回傳 404 或其他非成功狀態，
+ * 並且當前網站運行在 GitHub Pages 網域（xxx.github.io），則回退至
+ * https://raw.githubusercontent.com/<user>/<repo>/main/public/data/<fileName>。
+ * @param {string} fileName - 要讀取的檔名，例如 'herbLibrary.json'
+ * @returns {Promise<any>} 回傳解析後的 JSON 內容
+ */
+async function fetchJsonWithFallback(fileName) {
+    // 先嘗試從相對路徑取得檔案
+    try {
+        const relativeResponse = await fetch(`data/${fileName}`, { cache: 'reload' });
+        if (relativeResponse.ok) {
+            return await relativeResponse.json();
+        }
+        throw new Error(`Relative path HTTP error ${relativeResponse.status}`);
+    } catch (err) {
+        const host = window.location.hostname;
+        // 僅當域名包含 github.io 才進行回退
+        if (host && host.endsWith('github.io')) {
+            try {
+                const user = host.split('.')[0];
+                const pathParts = window.location.pathname.split('/');
+                const repo = pathParts.length > 1 ? pathParts[1] : '';
+                if (user && repo) {
+                    const rawUrl = `https://raw.githubusercontent.com/${user}/${repo}/main/public/data/${fileName}`;
+                    const rawResponse = await fetch(rawUrl, { cache: 'reload' });
+                    if (!rawResponse.ok) {
+                        throw new Error(`GitHub raw HTTP error ${rawResponse.status}`);
+                    }
+                    return await rawResponse.json();
+                }
+            } catch (fallbackErr) {
+                console.error(`回退至 GitHub raw 讀取 ${fileName} 失敗:`, fallbackErr);
+                // 如果回退也失敗，繼續往下拋出
+            }
+        }
+        // 若仍無法取得，重新拋出原始錯誤以便呼叫者處理
+        throw err;
+    }
 }
 
     
