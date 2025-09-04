@@ -972,37 +972,49 @@ async function waitForFirebaseDataManager() {
  * @returns {Promise<any>} 回傳解析後的 JSON 內容
  */
 async function fetchJsonWithFallback(fileName) {
-    // 先嘗試從相對路徑取得檔案
-    try {
-        const relativeResponse = await fetch(`data/${fileName}`, { cache: 'reload' });
-        if (relativeResponse.ok) {
-            return await relativeResponse.json();
-        }
-        throw new Error(`Relative path HTTP error ${relativeResponse.status}`);
-    } catch (err) {
-        const host = window.location.hostname;
-        // 僅當域名包含 github.io 才進行回退
-        if (host && host.endsWith('github.io')) {
-            try {
-                const user = host.split('.')[0];
-                const pathParts = window.location.pathname.split('/');
-                const repo = pathParts.length > 1 ? pathParts[1] : '';
-                if (user && repo) {
-                    const rawUrl = `https://raw.githubusercontent.com/${user}/${repo}/main/public/data/${fileName}`;
-                    const rawResponse = await fetch(rawUrl, { cache: 'reload' });
-                    if (!rawResponse.ok) {
-                        throw new Error(`GitHub raw HTTP error ${rawResponse.status}`);
-                    }
-                    return await rawResponse.json();
-                }
-            } catch (fallbackErr) {
-                console.error(`回退至 GitHub raw 讀取 ${fileName} 失敗:`, fallbackErr);
-                // 如果回退也失敗，繼續往下拋出
+    const host = window.location.hostname;
+    const isGithubPages = host && host.endsWith('github.io');
+    // 如果不是運行在 GitHub Pages 域名下，先嘗試從相對路徑讀取資料
+    if (!isGithubPages) {
+        try {
+            const relativeResponse = await fetch(`data/${fileName}`, { cache: 'reload' });
+            if (relativeResponse.ok) {
+                return await relativeResponse.json();
             }
+            // 若非 2xx，拋出以便進入回退邏輯
+            throw new Error(`Relative path HTTP error ${relativeResponse.status}`);
+        } catch (relativeErr) {
+            // 繼續嘗試回退邏輯
         }
-        // 若仍無法取得，重新拋出原始錯誤以便呼叫者處理
-        throw err;
     }
+    // 若為 GitHub Pages 網域，或相對讀取失敗，嘗試從 raw.githubusercontent.com 讀取
+    if (host && host.endsWith('github.io')) {
+        try {
+            const user = host.split('.')[0];
+            const pathParts = window.location.pathname.split('/');
+            const repo = pathParts.length > 1 ? pathParts[1] : '';
+            if (user && repo) {
+                // 嘗試從多個分支讀取檔案（先嘗試 main，再嘗試 master），方便兼容不同預設分支名稱
+                const branches = ['main', 'master'];
+                for (const branch of branches) {
+                    const rawUrl = `https://raw.githubusercontent.com/${user}/${repo}/${branch}/public/data/${fileName}`;
+                    try {
+                        const rawResponse = await fetch(rawUrl, { cache: 'reload' });
+                        if (rawResponse.ok) {
+                            return await rawResponse.json();
+                        }
+                    } catch (fetchErr) {
+                        // 忽略單一分支的 fetch 錯誤並嘗試下一個分支
+                    }
+                }
+            }
+        } catch (fallbackErr) {
+            console.error(`回退至 GitHub raw 讀取 ${fileName} 失敗:`, fallbackErr);
+            // 回退失敗時繼續往下拋出
+        }
+    }
+    // 最終若仍無法取得資料，拋出錯誤以便呼叫者處理
+    throw new Error(`無法取得 ${fileName} 資料`);
 }
 
     
