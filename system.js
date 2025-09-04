@@ -16135,12 +16135,8 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               // 檢查名稱必填
               const nameVal = (document.getElementById('herbNameInput').value || '').trim();
               if (!nameVal) {
-                // 若名稱為空，提示錯誤並停止保存
-                if (typeof showToast === 'function') {
-                  showToast('請輸入組合名稱！', 'error');
-                } else {
-                  alert('請輸入組合名稱！');
-                }
+                // 若名稱為空，提示錯誤並停止保存。改用頂部彈窗提示，不再使用瀏覽器 alert。
+                showToast('請輸入組合名稱！', 'error');
                 return;
               }
               // 更新資料
@@ -16188,11 +16184,8 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               // 檢查名稱必填
               const acupointNameVal = (document.getElementById('acupointNameInput').value || '').trim();
               if (!acupointNameVal) {
-                if (typeof showToast === 'function') {
-                  showToast('請輸入組合名稱！', 'error');
-                } else {
-                  alert('請輸入組合名稱！');
-                }
+                // 使用統一的右上角提示顯示錯誤信息
+                showToast('請輸入組合名稱！', 'error');
                 return;
               }
               item.name = acupointNameVal;
@@ -16223,11 +16216,8 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               // 檢查模板名稱必填
               const presNameVal = (document.getElementById('prescriptionNameInput').value || '').trim();
               if (!presNameVal) {
-                if (typeof showToast === 'function') {
-                  showToast('請輸入模板名稱！', 'error');
-                } else {
-                  alert('請輸入模板名稱！');
-                }
+                // 使用頂部彈窗提示用戶輸入模板名稱
+                showToast('請輸入模板名稱！', 'error');
                 return;
               }
               item.name = presNameVal;
@@ -16269,11 +16259,8 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               // 檢查模板名稱必填
               const diagNameVal = (document.getElementById('diagnosisNameInput').value || '').trim();
               if (!diagNameVal) {
-                if (typeof showToast === 'function') {
-                  showToast('請輸入模板名稱！', 'error');
-                } else {
-                  alert('請輸入模板名稱！');
-                }
+                // 使用頂部彈窗提示用戶輸入診斷模板名稱
+                showToast('請輸入模板名稱！', 'error');
                 return;
               }
               item.name = diagNameVal;
@@ -16304,7 +16291,8 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               }
               renderDiagnosisTemplates();
             }
-            alert('保存成功！');
+            // 保存成功後顯示成功提示，不再使用瀏覽器 alert
+            showToast('保存成功！', 'success');
             hideEditModal();
           }
 
