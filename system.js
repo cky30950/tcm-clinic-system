@@ -659,39 +659,6 @@ async function fetchDiagnosisTemplatesPage(page) {
             }, 4000);
         }
 
-        /**
-         * 顯示列表載入中提示。
-         * 傳入的容器元素會被覆蓋為一段載入指示，待資料取得後由呼叫者負責重新渲染內容。
-         * @param {HTMLElement} container 列表容器，例如 <div> 或 <ul> 元素。
-         */
-        function showListLoading(container) {
-            if (!container) return;
-            container.innerHTML = `
-                <div class="flex flex-col items-center justify-center py-8 text-gray-500">
-                    <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-                    <div class="mt-2 text-sm">載入中...</div>
-                </div>
-            `;
-        }
-
-        /**
-         * 顯示表格載入中提示。
-         * @param {HTMLElement} tbody 表格的 tbody 元素。
-         */
-        function showTableLoading(tbody) {
-            if (!tbody) return;
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="100%">
-                        <div class="flex flex-col items-center justify-center py-8 text-gray-500">
-                            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-                            <div class="mt-2 text-sm">載入中...</div>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }
-
         // 播放候診提醒音效
         // 使用 Web Audio API 產生簡單的短促音效，避免載入外部音訊檔案。
         // 此函式在病人狀態變為候診中時被呼叫。
@@ -1608,9 +1575,6 @@ async function logout() {
                 loadFinancialReports();
             } else if (sectionId === 'userManagement') {
                 loadUserManagement();
-            } else if (sectionId === 'templateLibrary') {
-                // 在進入模板庫頁面時載入模板資料
-                loadTemplateLibrary();
             }
         }
 
@@ -3159,6 +3123,26 @@ async function selectPatientForRegistration(patientId) {
 
 // 3. 修改今日掛號列表載入功能，確保能正確顯示病人資訊
 async function loadTodayAppointments() {
+    // 在載入掛號資料前先顯示讀取圈與重設今日掛號總數
+    try {
+        const tbodyLoading = document.getElementById('todayAppointmentsList');
+        if (tbodyLoading) {
+            tbodyLoading.innerHTML = `
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                        <div class="mt-2">載入中...</div>
+                    </td>
+                </tr>
+            `;
+        }
+        const totalEl = document.getElementById('todayTotal');
+        if (totalEl) {
+            totalEl.textContent = '0';
+        }
+    } catch (_e) {
+        // ignore rendering errors
+    }
     // 在讀取掛號資料之前，先清除過期掛號（同步到 Firebase）。
     // 如果掛號時間在昨日或更早（即早於今天 00:00:00），會從 Realtime Database 中刪除。
     await clearOldAppointments();
@@ -7820,6 +7804,19 @@ async function initializeSystemAfterLogin() {
             const listContainer = document.getElementById('herbLibraryList');
             const searchInput = document.getElementById('searchHerb');
             const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+            // 在取得資料之前先顯示讀取圈，以改善使用者體驗
+            try {
+                if (listContainer) {
+                    listContainer.innerHTML = `
+                        <div class="text-center py-12 text-gray-500">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                            <div class="mt-2">載入中...</div>
+                        </div>
+                    `;
+                }
+            } catch (_e) {
+                // 忽略渲染錯誤
+            }
             // 取得並顯示總數
             await fetchHerbCounts();
             // 更新分類按鈕文字
@@ -8205,6 +8202,20 @@ ${formulasInPage.map(formula => createFormulaCard(formula)).join('')}
         showToast('權限不足，無法存取收費項目管理', 'error');
         return;
     }
+    // 在讀取資料之前顯示一個讀取圈，與診所用戶管理頁面一致
+    try {
+        const listContainer = document.getElementById('billingItemsList');
+        if (listContainer) {
+            listContainer.innerHTML = `
+                <div class="text-center py-12 text-gray-500">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    <div class="mt-2">載入中...</div>
+                </div>
+            `;
+        }
+    } catch (_e) {
+        // ignore rendering errors
+    }
             // 若尚未載入收費項目資料，才從 Firestore 重新載入
             if (typeof initBillingItems === 'function' && (!Array.isArray(billingItems) || billingItems.length === 0)) {
                 await initBillingItems();
@@ -8217,43 +8228,6 @@ ${formulasInPage.map(formula => createFormulaCard(formula)).join('')}
                 searchInput.addEventListener('input', function() {
                     displayBillingItems();
                 });
-            }
-        }
-
-        /**
-         * 載入模板庫管理功能。
-         *
-         * 由於模板資料需要從 Firestore 取得，為避免在未登入時觸發授權錯誤，不在 DOMContentLoaded 時即載入。
-         * 當使用者選擇模板庫管理頁面時，將呼叫此函式載入診斷模板與醫囑模板。
-         */
-        async function loadTemplateLibrary() {
-            // 權限檢查：未擁有模板庫權限者不可訪問
-            if (!hasAccessToSection('templateLibrary')) {
-                showToast('權限不足，無法存取模板庫管理', 'error');
-                return;
-            }
-            try {
-                const diagContainer = document.getElementById('diagnosisTemplatesContainer');
-                const prescContainer = document.getElementById('prescriptionTemplatesContainer');
-                // 在載入資料之前顯示讀取提示，若前面有定義顯示方法則使用
-                if (typeof showListLoading === 'function') {
-                    if (diagContainer) showListLoading(diagContainer);
-                    if (prescContainer) showListLoading(prescContainer);
-                }
-                // 載入並渲染診斷模板（伺服器端分頁）
-                if (typeof renderDiagnosisTemplates === 'function') {
-                    await renderDiagnosisTemplates(null, false);
-                }
-                // 載入並渲染醫囑模板（伺服器端分頁）
-                if (typeof renderPrescriptionTemplates === 'function') {
-                    await renderPrescriptionTemplates(null, false);
-                }
-                // 初始化搜尋與分類過濾功能，在渲染完模板後再註冊事件
-                if (typeof setupTemplateLibrarySearch === 'function') {
-                    setupTemplateLibrarySearch();
-                }
-            } catch (err) {
-                console.error('載入模板庫管理時發生錯誤:', err);
             }
         }
         
@@ -10639,6 +10613,55 @@ async function deleteUser(id) {
         
         // 載入財務報表頁面
         async function loadFinancialReports() {
+            // 在載入資料之前，顯示讀取圈到各財務報表表格中，使用與用戶管理相同的樣式
+            try {
+                const summaryBody = document.getElementById('financialSummaryTableBody');
+                if (summaryBody) {
+                    summaryBody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="px-4 py-8 text-center text-gray-500">
+                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                                <div class="mt-2">載入中...</div>
+                            </td>
+                        </tr>
+                    `;
+                }
+                const dailyBody = document.getElementById('financialDailyTableBody');
+                if (dailyBody) {
+                    dailyBody.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                                <div class="mt-2">載入中...</div>
+                            </td>
+                        </tr>
+                    `;
+                }
+                const doctorBody = document.getElementById('financialDoctorTableBody');
+                if (doctorBody) {
+                    doctorBody.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                                <div class="mt-2">載入中...</div>
+                            </td>
+                        </tr>
+                    `;
+                }
+                const serviceBody = document.getElementById('financialServiceTableBody');
+                if (serviceBody) {
+                    serviceBody.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                                <div class="mt-2">載入中...</div>
+                            </td>
+                        </tr>
+                    `;
+                }
+            } catch (_e) {
+                // 忽略渲染錯誤
+            }
             // 設置預設日期範圍（本月）
             const today = new Date();
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -16906,10 +16929,19 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
 
           // 初始化
 document.addEventListener('DOMContentLoaded', function() {
-            // 初始渲染常用藥方與穴位清單
-            // 模板庫資料需登入後方可訪問，故不在此立即載入
+            // 初始渲染藥方、穴位與模板列表
             renderHerbCombinations();
             renderAcupointCombinations();
+            renderPrescriptionTemplates();
+            renderDiagnosisTemplates();
+            // 在渲染模板後初始化搜尋功能，確保可找到相關元素
+            try {
+                if (typeof setupTemplateLibrarySearch === 'function') {
+                    setupTemplateLibrarySearch();
+                }
+            } catch (_e) {
+                console.error('初始化模板庫搜尋功能失敗:', _e);
+            }
 
             /**
              * 一些彈窗（例如分類管理與編輯彈窗）原本是在個別功能區塊下的容器中定義。
