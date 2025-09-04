@@ -19,23 +19,6 @@ const paginationSettings = {
 // 快取病人篩選結果，用於分頁顯示
 let patientListFiltered = [];
 
-// === 全域總數與分頁資料變數（伺服器端分頁用） ===
-// 這些變數用於儲存各模組的總筆數以及當前頁的資料，避免一次性讀取全部資料。
-// 病人管理
-let patientTotalCount = 0;
-let patientPageItems = [];
-// 中藥庫
-let herbTotalCountAll = 0;
-let herbTotalCountHerb = 0;
-let herbTotalCountFormula = 0;
-let herbPageItems = [];
-// 醫囑模板
-let prescriptionTotalCount = 0;
-let prescriptionPageItems = [];
-// 診斷模板
-let diagnosisTotalCount = 0;
-let diagnosisPageItems = [];
-
 /**
  * 確保在指定父元素之後存在分頁容器，若不存在則建立。
  * 分頁容器統一使用 flex 排版與 margin-top 提升顯示效果。
@@ -354,253 +337,6 @@ async function fetchUsers(forceRefresh = false) {
         forceRefresh
     );
     return userCache;
-}
-
-/**
- * 伺服器端分頁：讀取病人資料的指定頁。
- * 根據頁碼計算 offset 後，僅讀取該頁資料，並更新 patientTotalCount 和 patientPageItems。
- * 若支援 getCountFromServer，僅於尚未取得總數時計算總筆數。
- * @param {number} page 要載入的頁碼（從 1 起算）
- */
-async function fetchPatientsPage(page) {
-    try {
-        await waitForFirebaseDb();
-        const itemsPerPage = paginationSettings.patientList.itemsPerPage || 10;
-        const offsetVal = (page - 1) * itemsPerPage;
-        const collectionRef = window.firebase.collection(window.firebase.db, 'patients');
-        if (!patientTotalCount || patientTotalCount <= 0) {
-            try {
-                const countSnap = await window.firebase.getCountFromServer(collectionRef);
-                if (countSnap && countSnap.data) {
-                    patientTotalCount = countSnap.data().count || 0;
-                }
-            } catch (_e) {
-                const allSnap = await window.firebase.getDocs(collectionRef);
-                patientTotalCount = allSnap.size || 0;
-            }
-        }
-        let q;
-        try {
-            q = window.firebase.query(
-                collectionRef,
-                window.firebase.orderBy('createdAt'),
-                window.firebase.offset(offsetVal),
-                window.firebase.limit(itemsPerPage)
-            );
-        } catch (_err) {
-            const allSnap = await window.firebase.getDocs(collectionRef);
-            const allItems = [];
-            allSnap.forEach(doc => {
-                allItems.push({ id: doc.id, ...doc.data() });
-            });
-            patientPageItems = allItems.slice(offsetVal, offsetVal + itemsPerPage);
-            return;
-        }
-        const snapshot = await window.firebase.getDocs(q);
-        patientPageItems = [];
-        snapshot.forEach(doc => {
-            patientPageItems.push({ id: doc.id, ...doc.data() });
-        });
-    } catch (error) {
-        console.error('fetchPatientsPage error:', error);
-        patientPageItems = [];
-    }
-}
-
-/**
- * 從 Firestore 取得中藥庫的總筆數。分別計算全部、中藥材與方劑的數量。
- * 使用聚合查詢 getCountFromServer，如不支援則退回讀取全部資料以計算。
- */
-async function fetchHerbCounts() {
-    try {
-        await waitForFirebaseDb();
-        const collectionRef = window.firebase.collection(window.firebase.db, 'herbLibrary');
-        // 全部數量
-        try {
-            const allCountSnap = await window.firebase.getCountFromServer(collectionRef);
-            herbTotalCountAll = (allCountSnap && allCountSnap.data) ? allCountSnap.data().count || 0 : 0;
-        } catch (_e) {
-            const allSnap = await window.firebase.getDocs(collectionRef);
-            herbTotalCountAll = allSnap.size || 0;
-        }
-        // 中藥材
-        try {
-            const herbQuery = window.firebase.query(collectionRef, window.firebase.where('type', '==', 'herb'));
-            const herbCountSnap = await window.firebase.getCountFromServer(herbQuery);
-            herbTotalCountHerb = (herbCountSnap && herbCountSnap.data) ? herbCountSnap.data().count || 0 : 0;
-        } catch (_e) {
-            const herbSnap = await window.firebase.getDocs(
-                window.firebase.query(collectionRef, window.firebase.where('type', '==', 'herb'))
-            );
-            herbTotalCountHerb = herbSnap.size || 0;
-        }
-        // 方劑
-        try {
-            const formulaQuery = window.firebase.query(collectionRef, window.firebase.where('type', '==', 'formula'));
-            const formulaCountSnap = await window.firebase.getCountFromServer(formulaQuery);
-            herbTotalCountFormula = (formulaCountSnap && formulaCountSnap.data) ? formulaCountSnap.data().count || 0 : 0;
-        } catch (_e) {
-            const formulaSnap = await window.firebase.getDocs(
-                window.firebase.query(collectionRef, window.firebase.where('type', '==', 'formula'))
-            );
-            herbTotalCountFormula = formulaSnap.size || 0;
-        }
-    } catch (error) {
-        console.error('fetchHerbCounts error:', error);
-        herbTotalCountAll = 0;
-        herbTotalCountHerb = 0;
-        herbTotalCountFormula = 0;
-    }
-}
-
-/**
- * 伺服器端分頁：根據 currentHerbFilter 從 Firestore 讀取中藥庫的指定頁。
- * @param {number} page 要載入的頁碼（從 1 起算）
- */
-async function fetchHerbsPage(page) {
-    try {
-        await waitForFirebaseDb();
-        const itemsPerPage = paginationSettings.herbLibrary.itemsPerPage || 6;
-        const offsetVal = (page - 1) * itemsPerPage;
-        const collectionRef = window.firebase.collection(window.firebase.db, 'herbLibrary');
-        let baseQuery = collectionRef;
-        if (typeof currentHerbFilter !== 'undefined' && currentHerbFilter === 'herb') {
-            baseQuery = window.firebase.query(collectionRef, window.firebase.where('type', '==', 'herb'));
-        } else if (typeof currentHerbFilter !== 'undefined' && currentHerbFilter === 'formula') {
-            baseQuery = window.firebase.query(collectionRef, window.firebase.where('type', '==', 'formula'));
-        }
-        let q;
-        try {
-            q = window.firebase.query(
-                baseQuery,
-                window.firebase.orderBy('name'),
-                window.firebase.offset(offsetVal),
-                window.firebase.limit(itemsPerPage)
-            );
-        } catch (_err) {
-            const snap = await window.firebase.getDocs(baseQuery);
-            const allItems = [];
-            snap.forEach(doc => {
-                allItems.push({ id: doc.id, ...doc.data() });
-            });
-            herbPageItems = allItems
-                .sort((a, b) => {
-                    return (a.name || '').localeCompare(b.name || '');
-                })
-                .slice(offsetVal, offsetVal + itemsPerPage);
-            return;
-        }
-        const snap = await window.firebase.getDocs(q);
-        herbPageItems = [];
-        snap.forEach(doc => {
-            herbPageItems.push({ id: doc.id, ...doc.data() });
-        });
-    } catch (error) {
-        console.error('fetchHerbsPage error:', error);
-        herbPageItems = [];
-    }
-}
-
-/**
- * 伺服器端分頁：讀取醫囑模板的指定頁，並更新總筆數。
- * @param {number} page 要載入的頁碼（從 1 起算）
- */
-async function fetchPrescriptionTemplatesPage(page) {
-    try {
-        await waitForFirebaseDb();
-        const itemsPerPage = paginationSettings.prescriptionTemplates.itemsPerPage || 6;
-        const offsetVal = (page - 1) * itemsPerPage;
-        const collectionRef = window.firebase.collection(window.firebase.db, 'prescriptionTemplates');
-        if (!prescriptionTotalCount || prescriptionTotalCount <= 0) {
-            try {
-                const countSnap = await window.firebase.getCountFromServer(collectionRef);
-                prescriptionTotalCount = (countSnap && countSnap.data) ? countSnap.data().count || 0 : 0;
-            } catch (_e) {
-                const allSnap = await window.firebase.getDocs(collectionRef);
-                prescriptionTotalCount = allSnap.size || 0;
-            }
-        }
-        let q;
-        try {
-            q = window.firebase.query(
-                collectionRef,
-                window.firebase.orderBy('name'),
-                window.firebase.offset(offsetVal),
-                window.firebase.limit(itemsPerPage)
-            );
-        } catch (_err) {
-            const allSnap = await window.firebase.getDocs(collectionRef);
-            const allItems = [];
-            allSnap.forEach(doc => {
-                allItems.push({ id: doc.id, ...doc.data() });
-            });
-            prescriptionPageItems = allItems
-                .sort((a, b) => {
-                    return (a.name || '').localeCompare(b.name || '');
-                })
-                .slice(offsetVal, offsetVal + itemsPerPage);
-            return;
-        }
-        const snap = await window.firebase.getDocs(q);
-        prescriptionPageItems = [];
-        snap.forEach(doc => {
-            prescriptionPageItems.push({ id: doc.id, ...doc.data() });
-        });
-    } catch (error) {
-        console.error('fetchPrescriptionTemplatesPage error:', error);
-        prescriptionPageItems = [];
-    }
-}
-
-/**
- * 伺服器端分頁：讀取診斷模板的指定頁，並更新總筆數。
- * @param {number} page 要載入的頁碼（從 1 起算）
- */
-async function fetchDiagnosisTemplatesPage(page) {
-    try {
-        await waitForFirebaseDb();
-        const itemsPerPage = paginationSettings.diagnosisTemplates.itemsPerPage || 6;
-        const offsetVal = (page - 1) * itemsPerPage;
-        const collectionRef = window.firebase.collection(window.firebase.db, 'diagnosisTemplates');
-        if (!diagnosisTotalCount || diagnosisTotalCount <= 0) {
-            try {
-                const countSnap = await window.firebase.getCountFromServer(collectionRef);
-                diagnosisTotalCount = (countSnap && countSnap.data) ? countSnap.data().count || 0 : 0;
-            } catch (_e) {
-                const allSnap = await window.firebase.getDocs(collectionRef);
-                diagnosisTotalCount = allSnap.size || 0;
-            }
-        }
-        let q;
-        try {
-            q = window.firebase.query(
-                collectionRef,
-                window.firebase.orderBy('name'),
-                window.firebase.offset(offsetVal),
-                window.firebase.limit(itemsPerPage)
-            );
-        } catch (_err) {
-            const allSnap = await window.firebase.getDocs(collectionRef);
-            const allItems = [];
-            allSnap.forEach(doc => {
-                allItems.push({ id: doc.id, ...doc.data() });
-            });
-            diagnosisPageItems = allItems
-                .sort((a, b) => {
-                    return (a.name || '').localeCompare(b.name || '');
-                })
-                .slice(offsetVal, offsetVal + itemsPerPage);
-            return;
-        }
-        const snap = await window.firebase.getDocs(q);
-        diagnosisPageItems = [];
-        snap.forEach(doc => {
-            diagnosisPageItems.push({ id: doc.id, ...doc.data() });
-        });
-    } catch (error) {
-        console.error('fetchDiagnosisTemplatesPage error:', error);
-        diagnosisPageItems = [];
-    }
 }
         
         // 診所設定
@@ -1235,10 +971,9 @@ async function attemptMainLogin() {
         // 透過 Promise.all 同時執行多個初始化函式，提升效率
         try {
             const initTasks = [];
-            // 不在登入時初始化中藥庫，改為進入中藥庫頁面時再載入
-            // if (typeof initHerbLibrary === 'function') {
-            //     initTasks.push(initHerbLibrary());
-            // }
+            if (typeof initHerbLibrary === 'function') {
+                initTasks.push(initHerbLibrary());
+            }
             if (typeof initBillingItems === 'function') {
                 initTasks.push(initBillingItems());
             }
@@ -1251,16 +986,15 @@ async function attemptMainLogin() {
                     }
                 })());
             }
-            // 不在登入時初始化模板庫，改為進入模板庫頁面時再載入
-            // if (typeof initTemplateLibrary === 'function') {
-            //     initTasks.push((async () => {
-            //         try {
-            //             await initTemplateLibrary();
-            //         } catch (err) {
-            //             console.error('初始化模板庫資料失敗:', err);
-            //         }
-            //     })());
-            // }
+            if (typeof initTemplateLibrary === 'function') {
+                initTasks.push((async () => {
+                    try {
+                        await initTemplateLibrary();
+                    } catch (err) {
+                        console.error('初始化模板庫資料失敗:', err);
+                    }
+                })());
+            }
             if (initTasks.length > 0) {
                 await Promise.all(initTasks);
             }
@@ -1709,11 +1443,8 @@ async function savePatient() {
         // 更新快取資料，下一次讀取時重新載入
         patientCache = null;
 
-        // 重新載入病人列表：清空篩選並從伺服器端重新載入第一頁
-        patientListFiltered = [];
-        patientTotalCount = 0;
-        paginationSettings.patientList.currentPage = 1;
-        await renderPatientListTable(false);
+        // 重新載入病人列表
+        await loadPatientListFromFirebase();
         hideAddPatientForm();
         updateStatistics();
 
@@ -1791,34 +1522,8 @@ async function loadPatientListFromFirebase() {
     }
 }
 
-// 進入病人管理頁面時，不預先載入全部病人資料，而是伺服器端分頁按需載入。
-async function loadPatientList() {
-    // 重置篩選與分頁資料
-    patientListFiltered = [];
-    patientTotalCount = 0;
-    patientPageItems = [];
-    paginationSettings.patientList.currentPage = 1;
-    // 綁定搜尋輸入框：輸入關鍵字時切換為本地搜尋；清除時回復伺服器端分頁
-    const searchInput = document.getElementById('searchPatient');
-    if (searchInput && !searchInput.dataset.boundPatientSearch) {
-        searchInput.dataset.boundPatientSearch = 'true';
-        searchInput.addEventListener('input', function() {
-            const value = searchInput.value.trim().toLowerCase();
-            if (value) {
-                // 有搜尋條件時，使用舊有流程載入全部資料再進行搜尋
-                loadPatientListFromFirebase();
-            } else {
-                // 清空搜尋條件：回復伺服器端分頁
-                patientListFiltered = [];
-                patientTotalCount = 0;
-                patientPageItems = [];
-                paginationSettings.patientList.currentPage = 1;
-                renderPatientListTable();
-            }
-        });
-    }
-    // 初始渲染當前頁面
-    await renderPatientListTable();
+function loadPatientList() {
+    loadPatientListFromFirebase();
 }
 
 /**
@@ -1826,85 +1531,17 @@ async function loadPatientList() {
  * 在非分頁跳轉情況下會將頁碼重置為第一頁。
  * @param {boolean} pageChange 是否為分頁點擊導致的重新渲染
  */
-async function renderPatientListTable(pageChange = false) {
+function renderPatientListTable(pageChange = false) {
     const tbody = document.getElementById('patientList');
     if (!tbody) return;
-    const searchTermEl = document.getElementById('searchPatient');
-    const searchTerm = searchTermEl ? searchTermEl.value.trim().toLowerCase() : '';
-    // 若有搜尋條件且 patientListFiltered 已有資料，使用本地分頁
-    if (searchTerm) {
-        if (!Array.isArray(patientListFiltered) || patientListFiltered.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="px-4 py-8 text-center text-gray-500">
-                        沒有找到符合條件的病人
-                    </td>
-                </tr>
-            `;
-            const paginEl = ensurePaginationContainer('patientList', 'patientListPagination');
-            if (paginEl) {
-                paginEl.innerHTML = '';
-                paginEl.classList.add('hidden');
-            }
-            return;
-        }
-        if (!pageChange) {
-            paginationSettings.patientList.currentPage = 1;
-        }
-        const totalItems = patientListFiltered.length;
-        const itemsPerPage = paginationSettings.patientList.itemsPerPage;
-        let currentPage = paginationSettings.patientList.currentPage;
-        const totalPages = Math.ceil(totalItems / itemsPerPage);
-        if (currentPage < 1) currentPage = 1;
-        if (currentPage > totalPages) currentPage = totalPages;
-        paginationSettings.patientList.currentPage = currentPage;
-        const startIdx = (currentPage - 1) * itemsPerPage;
-        const endIdx = startIdx + itemsPerPage;
-        const pageItems = patientListFiltered.slice(startIdx, endIdx);
-        tbody.innerHTML = '';
-        pageItems.forEach(patient => {
-            const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-50';
-            const safeNumber = window.escapeHtml(patient.patientNumber || '未設定');
-            const safeName = window.escapeHtml(patient.name);
-            const safeAge = window.escapeHtml(formatAge(patient.birthDate));
-            const safeGender = window.escapeHtml(patient.gender);
-            const safePhone = window.escapeHtml(patient.phone);
-            row.innerHTML = `
-                <td class="px-4 py-3 text-sm text-blue-600 font-medium">${safeNumber}</td>
-                <td class="px-4 py-3 text-sm text-gray-900 font-medium">${safeName}</td>
-                <td class="px-4 py-3 text-sm text-gray-900">${safeAge}</td>
-                <td class="px-4 py-3 text-sm text-gray-900">${safeGender}</td>
-                <td class="px-4 py-3 text-sm text-gray-900">${safePhone}</td>
-                <td class="px-4 py-3 text-sm space-x-2">
-                    <button onclick="viewPatient('${patient.id}')" class="text-blue-600 hover:text-blue-800">查看</button>
-                    <button onclick="showPatientMedicalHistory('${patient.id}')" class="text-purple-600 hover:text-purple-800">病歷</button>
-                    <button onclick="editPatient('${patient.id}')" class="text-green-600 hover:text-green-800">編輯</button>
-                    <button onclick="deletePatient('${patient.id}')" class="text-red-600 hover:text-red-800">刪除</button>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
-        const paginEl = ensurePaginationContainer('patientList', 'patientListPagination');
-        renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
-            paginationSettings.patientList.currentPage = newPage;
-            renderPatientListTable(true);
-        }, paginEl);
-        return;
-    }
-    // 沒有搜尋條件：伺服器端分頁
-    if (!pageChange) {
-        paginationSettings.patientList.currentPage = 1;
-    }
-    const currentPage = paginationSettings.patientList.currentPage;
-    await fetchPatientsPage(currentPage);
-    const itemsPerPage = paginationSettings.patientList.itemsPerPage;
-    const totalItems = patientTotalCount;
-    if (!Array.isArray(patientPageItems) || patientPageItems.length === 0) {
+    // 若無病人資料
+    if (!Array.isArray(patientListFiltered) || patientListFiltered.length === 0) {
+        const searchTermEl = document.getElementById('searchPatient');
+        const searchTerm = searchTermEl ? searchTermEl.value.toLowerCase() : '';
         tbody.innerHTML = `
             <tr>
                 <td colspan="6" class="px-4 py-8 text-center text-gray-500">
-                    ${totalItems > 0 ? '沒有資料可顯示' : '尚無病人資料'}
+                    ${searchTerm ? '沒有找到符合條件的病人' : '尚無病人資料'}
                 </td>
             </tr>
         `;
@@ -1915,15 +1552,32 @@ async function renderPatientListTable(pageChange = false) {
         }
         return;
     }
+    // 分頁：非頁面跳轉時重置當前頁
+    if (!pageChange) {
+        paginationSettings.patientList.currentPage = 1;
+    }
+    const totalItems = patientListFiltered.length;
+    const itemsPerPage = paginationSettings.patientList.itemsPerPage;
+    let currentPage = paginationSettings.patientList.currentPage;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    if (currentPage < 1) currentPage = 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    paginationSettings.patientList.currentPage = currentPage;
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    const endIdx = startIdx + itemsPerPage;
+    const pageItems = patientListFiltered.slice(startIdx, endIdx);
+    // 清空表格
     tbody.innerHTML = '';
-    patientPageItems.forEach(patient => {
+    // 渲染當前頁病人資料
+    pageItems.forEach(patient => {
         const row = document.createElement('tr');
         row.className = 'hover:bg-gray-50';
+        // 轉義顯示的值，避免 XSS
         const safeNumber = window.escapeHtml(patient.patientNumber || '未設定');
-        const safeName = window.escapeHtml(patient.name || '');
+        const safeName = window.escapeHtml(patient.name);
         const safeAge = window.escapeHtml(formatAge(patient.birthDate));
-        const safeGender = window.escapeHtml(patient.gender || '');
-        const safePhone = window.escapeHtml(patient.phone || '');
+        const safeGender = window.escapeHtml(patient.gender);
+        const safePhone = window.escapeHtml(patient.phone);
         row.innerHTML = `
             <td class="px-4 py-3 text-sm text-blue-600 font-medium">${safeNumber}</td>
             <td class="px-4 py-3 text-sm text-gray-900 font-medium">${safeName}</td>
@@ -1939,6 +1593,7 @@ async function renderPatientListTable(pageChange = false) {
         `;
         tbody.appendChild(row);
     });
+    // 分頁控制
     const paginEl = ensurePaginationContainer('patientList', 'patientListPagination');
     renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
         paginationSettings.patientList.currentPage = newPage;
@@ -2015,11 +1670,8 @@ async function deletePatient(id) {
                 showToast('病人資料已刪除！', 'success');
                 // 清除快取，下次讀取時重新從資料庫載入
                 patientCache = null;
-                // 重新載入病人列表：重置篩選並從伺服器端載入
-                patientListFiltered = [];
-                patientTotalCount = 0;
-                paginationSettings.patientList.currentPage = 1;
-                await renderPatientListTable(false);
+                // 重新載入病人列表
+                await loadPatientListFromFirebase();
                 updateStatistics();
             } else {
                 showToast('刪除失敗，請稍後再試', 'error');
@@ -3123,26 +2775,6 @@ async function selectPatientForRegistration(patientId) {
 
 // 3. 修改今日掛號列表載入功能，確保能正確顯示病人資訊
 async function loadTodayAppointments() {
-    // 在載入掛號資料前先顯示讀取圈與重設今日掛號總數
-    try {
-        const tbodyLoading = document.getElementById('todayAppointmentsList');
-        if (tbodyLoading) {
-            tbodyLoading.innerHTML = `
-                <tr>
-                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
-                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                        <div class="mt-2">載入中...</div>
-                    </td>
-                </tr>
-            `;
-        }
-        const totalEl = document.getElementById('todayTotal');
-        if (totalEl) {
-            totalEl.textContent = '0';
-        }
-    } catch (_e) {
-        // ignore rendering errors
-    }
     // 在讀取掛號資料之前，先清除過期掛號（同步到 Firebase）。
     // 如果掛號時間在昨日或更早（即早於今天 00:00:00），會從 Realtime Database 中刪除。
     await clearOldAppointments();
@@ -7767,18 +7399,15 @@ async function initializeSystemAfterLogin() {
         let currentHerbFilter = 'all';
         
         async function loadHerbLibrary() {
-            // 進入中藥庫頁面時不立即載入全部資料，而是採伺服器端分頁
-            herbTotalCountAll = 0;
-            herbTotalCountHerb = 0;
-            herbTotalCountFormula = 0;
-            herbPageItems = [];
-            currentHerbFilter = 'all';
-            paginationSettings.herbLibrary.currentPage = 1;
-            await displayHerbLibrary();
-            // 搜尋功能：當搜尋條件變化時重置至第一頁並重新渲染當頁資料
+            // 若尚未載入中藥庫資料，才從 Firestore 重新載入
+            if (typeof initHerbLibrary === 'function' && (!Array.isArray(herbLibrary) || herbLibrary.length === 0)) {
+                await initHerbLibrary();
+            }
+            displayHerbLibrary();
+            
+            // 搜尋功能：當搜尋條件變化時重置至第一頁並重新渲染
             const searchInput = document.getElementById('searchHerb');
-            if (searchInput && !searchInput.dataset.bindListener) {
-                searchInput.dataset.bindListener = 'true';
+            if (searchInput) {
                 searchInput.addEventListener('input', function() {
                     paginationSettings.herbLibrary.currentPage = 1;
                     displayHerbLibrary();
@@ -7800,53 +7429,48 @@ async function initializeSystemAfterLogin() {
             displayHerbLibrary();
         }
         
-        async function displayHerbLibrary() {
+        function displayHerbLibrary() {
+            const searchTerm = document.getElementById('searchHerb').value.toLowerCase();
             const listContainer = document.getElementById('herbLibraryList');
-            const searchInput = document.getElementById('searchHerb');
-            const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
-            // 在取得資料之前先顯示讀取圈，以改善使用者體驗
-            try {
-                if (listContainer) {
-                    listContainer.innerHTML = `
-                        <div class="text-center py-12 text-gray-500">
-                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                            <div class="mt-2">載入中...</div>
-                        </div>
-                    `;
-                }
-            } catch (_e) {
-                // 忽略渲染錯誤
-            }
-            // 取得並顯示總數
-            await fetchHerbCounts();
-            // 更新分類按鈕文字
-            const allBtn = document.getElementById('filter-all');
-            if (allBtn) {
-                allBtn.innerHTML = `全部 (${herbTotalCountAll})`;
-            }
-            const herbBtn = document.getElementById('filter-herb');
-            if (herbBtn) {
-                herbBtn.innerHTML = `中藥材 (${herbTotalCountHerb})`;
-            }
-            const formulaBtn = document.getElementById('filter-formula');
-            if (formulaBtn) {
-                formulaBtn.innerHTML = `方劑 (${herbTotalCountFormula})`;
-            }
-            // 取得當前頁的資料
-            const currentPage = paginationSettings.herbLibrary.currentPage;
-            await fetchHerbsPage(currentPage);
-            let items = Array.isArray(herbPageItems) ? [...herbPageItems] : [];
-            // 在每頁資料上進行搜尋過濾
-            if (searchTerm) {
-                items = items.filter(item => {
+
+            // 在搜尋條件下統計中藥庫數量，無論當前篩選類型為何。
+            // 這允許「全部」按鈕顯示包括中藥材與方劑的總數量。
+            // 另外也更新「中藥材」及「方劑」按鈕的數量提示，以便使用者快速瞭解各類型總數。
+            (function updateHerbFilterCounts() {
+                // 首先依據搜尋條件過濾 herbLibrary，忽略類型篩選
+                const searchFiltered = Array.isArray(herbLibrary) ? herbLibrary.filter(item => {
                     const lowerName = item.name ? item.name.toLowerCase() : '';
                     const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
                     const lowerEffects = item.effects ? item.effects.toLowerCase() : '';
                     return lowerName.includes(searchTerm) || lowerAlias.includes(searchTerm) || lowerEffects.includes(searchTerm);
-                });
-            }
-            // 若無資料
-            if (!items || items.length === 0) {
+                }) : [];
+                const totalAll = searchFiltered.length;
+                const totalHerbsAll = searchFiltered.filter(item => item.type === 'herb').length;
+                const totalFormulasAll = searchFiltered.filter(item => item.type === 'formula').length;
+                // 更新各分類按鈕的顯示文字
+                const allBtn = document.getElementById('filter-all');
+                if (allBtn) {
+                    allBtn.innerHTML = `全部 (${totalAll})`;
+                }
+                const herbBtn = document.getElementById('filter-herb');
+                if (herbBtn) {
+                    herbBtn.innerHTML = `中藥材 (${totalHerbsAll})`;
+                }
+                const formulaBtn = document.getElementById('filter-formula');
+                if (formulaBtn) {
+                    formulaBtn.innerHTML = `方劑 (${totalFormulasAll})`;
+                }
+            })();
+            // 過濾資料
+            let filteredItems = Array.isArray(herbLibrary) ? herbLibrary.filter(item => {
+                const matchesSearch = item.name.toLowerCase().includes(searchTerm) ||
+                    (item.alias && item.alias.toLowerCase().includes(searchTerm)) ||
+                    (item.effects && item.effects.toLowerCase().includes(searchTerm));
+                const matchesFilter = currentHerbFilter === 'all' || item.type === currentHerbFilter;
+                return matchesSearch && matchesFilter;
+            }) : [];
+            // 若無資料，顯示提示並清除分頁
+            if (!filteredItems || filteredItems.length === 0) {
                 listContainer.innerHTML = `
                     <div class="text-center py-12 text-gray-500">
                         <div class="text-4xl mb-4">🌿</div>
@@ -7854,6 +7478,7 @@ async function initializeSystemAfterLogin() {
                         <div class="text-sm">請嘗試其他搜尋條件或新增中藥材/方劑</div>
                     </div>
                 `;
+                // 隱藏分頁容器
                 const paginEl = ensurePaginationContainer('herbLibraryList', 'herbLibraryPagination');
                 if (paginEl) {
                     paginEl.innerHTML = '';
@@ -7861,50 +7486,58 @@ async function initializeSystemAfterLogin() {
                 }
                 return;
             }
-            // 根據當前篩選類型決定總筆數
-            let totalItemsForPagination = herbTotalCountAll;
-            if (typeof currentHerbFilter !== 'undefined' && currentHerbFilter !== 'all') {
-                totalItemsForPagination = currentHerbFilter === 'herb' ? herbTotalCountHerb : herbTotalCountFormula;
-            }
-            // 分組
-            const herbsInPage = items.filter(item => item.type === 'herb');
-            const formulasInPage = items.filter(item => item.type === 'formula');
+            // 計算分頁並取得當前頁資料
+            const totalItems = filteredItems.length;
+            const itemsPerPage = paginationSettings.herbLibrary.itemsPerPage;
+            let currentPage = paginationSettings.herbLibrary.currentPage;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            // 防止當前頁超出範圍
+            if (currentPage < 1) currentPage = 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            paginationSettings.herbLibrary.currentPage = currentPage;
+            const startIdx = (currentPage - 1) * itemsPerPage;
+            const endIdx = startIdx + itemsPerPage;
+            const pageItems = filteredItems.slice(startIdx, endIdx);
+            // 計算當前篩選條件下各類型的總數（非頁面數量）
+            // herbLibrary 包含中藥材與方劑兩種類型，這裡統計的是在篩選條件下
+            // 所有符合條件的項目總數，避免只顯示當前頁的數量
+            const totalHerbsInFiltered = filteredItems.filter(item => item.type === 'herb').length;
+            const totalFormulasInFiltered = filteredItems.filter(item => item.type === 'formula').length;
+            // 按類型分組顯示分頁資料
+            const herbsInPage = pageItems.filter(item => item.type === 'herb');
+            const formulasInPage = pageItems.filter(item => item.type === 'formula');
             let html = '';
-            if ((currentHerbFilter === 'all' || currentHerbFilter === 'herb') && herbsInPage.length > 0) {
-                const count = herbTotalCountHerb;
+            if (herbsInPage.length > 0 && (currentHerbFilter === 'all' || currentHerbFilter === 'herb')) {
                 html += `
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                            <span class="mr-2">🌿</span>中藥材 (${count})
+                            <span class="mr-2">🌿</span>中藥材 (${totalHerbsInFiltered})
                         </h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-${herbsInPage.map(herb => createHerbCard(herb)).join('')}
+                            ${herbsInPage.map(herb => createHerbCard(herb)).join('')}
                         </div>
                     </div>
                 `;
             }
-            if ((currentHerbFilter === 'all' || currentHerbFilter === 'formula') && formulasInPage.length > 0) {
-                const count = herbTotalCountFormula;
+            if (formulasInPage.length > 0 && (currentHerbFilter === 'all' || currentHerbFilter === 'formula')) {
                 html += `
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                            <span class="mr-2">📋</span>方劑 (${count})
+                            <span class="mr-2">📋</span>方劑 (${totalFormulasInFiltered})
                         </h3>
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-${formulasInPage.map(formula => createFormulaCard(formula)).join('')}
+                            ${formulasInPage.map(formula => createFormulaCard(formula)).join('')}
                         </div>
                     </div>
                 `;
             }
             listContainer.innerHTML = html;
-            // 分頁控制
-            const paginEl = ensurePaginationContainer('herbLibraryList', 'herbLibraryPagination');
-            const itemsPerPage = paginationSettings.herbLibrary.itemsPerPage;
-            const totalForPaging = searchTerm ? items.length : totalItemsForPagination;
-            renderPagination(totalForPaging, itemsPerPage, currentPage, function(newPage) {
+            // 產生分頁控制
+            const paginationEl = ensurePaginationContainer('herbLibraryList', 'herbLibraryPagination');
+            renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
                 paginationSettings.herbLibrary.currentPage = newPage;
                 displayHerbLibrary();
-            }, paginEl);
+            }, paginationEl);
         }
         
         function createHerbCard(herb) {
@@ -8201,20 +7834,6 @@ ${formulasInPage.map(formula => createFormulaCard(formula)).join('')}
     if (!hasAccessToSection('billingManagement')) {
         showToast('權限不足，無法存取收費項目管理', 'error');
         return;
-    }
-    // 在讀取資料之前顯示一個讀取圈，與診所用戶管理頁面一致
-    try {
-        const listContainer = document.getElementById('billingItemsList');
-        if (listContainer) {
-            listContainer.innerHTML = `
-                <div class="text-center py-12 text-gray-500">
-                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    <div class="mt-2">載入中...</div>
-                </div>
-            `;
-        }
-    } catch (_e) {
-        // ignore rendering errors
     }
             // 若尚未載入收費項目資料，才從 Firestore 重新載入
             if (typeof initBillingItems === 'function' && (!Array.isArray(billingItems) || billingItems.length === 0)) {
@@ -10613,55 +10232,6 @@ async function deleteUser(id) {
         
         // 載入財務報表頁面
         async function loadFinancialReports() {
-            // 在載入資料之前，顯示讀取圈到各財務報表表格中，使用與用戶管理相同的樣式
-            try {
-                const summaryBody = document.getElementById('financialSummaryTableBody');
-                if (summaryBody) {
-                    summaryBody.innerHTML = `
-                        <tr>
-                            <td colspan="4" class="px-4 py-8 text-center text-gray-500">
-                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                                <div class="mt-2">載入中...</div>
-                            </td>
-                        </tr>
-                    `;
-                }
-                const dailyBody = document.getElementById('financialDailyTableBody');
-                if (dailyBody) {
-                    dailyBody.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">
-                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                                <div class="mt-2">載入中...</div>
-                            </td>
-                        </tr>
-                    `;
-                }
-                const doctorBody = document.getElementById('financialDoctorTableBody');
-                if (doctorBody) {
-                    doctorBody.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">
-                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                                <div class="mt-2">載入中...</div>
-                            </td>
-                        </tr>
-                    `;
-                }
-                const serviceBody = document.getElementById('financialServiceTableBody');
-                if (serviceBody) {
-                    serviceBody.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">
-                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                                <div class="mt-2">載入中...</div>
-                            </td>
-                        </tr>
-                    `;
-                }
-            } catch (_e) {
-                // 忽略渲染錯誤
-            }
             // 設置預設日期範圍（本月）
             const today = new Date();
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -15736,32 +15306,38 @@ function refreshTemplateCategoryFilters() {
           }
 
 
-          // 渲染醫囑模板（伺服器端分頁）
-          async function renderPrescriptionTemplates(list, pageChange = false) {
+          // 渲染醫囑模板
+          function renderPrescriptionTemplates(list, pageChange = false) {
             const container = document.getElementById('prescriptionTemplatesContainer');
             container.innerHTML = '';
+            // 取得要顯示的模板列表；若傳入特定列表則使用之，否則使用全域列表。
+            const templates = Array.isArray(list) ? list : prescriptionTemplates;
+            // 過濾掉尚未儲存的新建項目
+            const displayTemplates = Array.isArray(templates) ? templates.filter(t => !t.isNew) : [];
             // 更新醫囑模板總數至標籤顯示
             try {
-              // 在第一次載入或總數為零時重新取得總筆數
-              if (!prescriptionTotalCount || prescriptionTotalCount < 0) {
-                await fetchPrescriptionTemplatesPage(1);
-              }
+              const totalCount = Array.isArray(prescriptionTemplates)
+                ? prescriptionTemplates.filter(p => p && !p.isNew).length
+                : 0;
               const countElem = document.getElementById('prescriptionCount');
               if (countElem) {
-                countElem.textContent = String(prescriptionTotalCount);
+                countElem.textContent = String(totalCount);
               }
             } catch (_e) {}
             // 分頁：若非頁面跳轉則重置至第一頁
             if (!pageChange) {
               paginationSettings.prescriptionTemplates.currentPage = 1;
             }
-            const currentPage = paginationSettings.prescriptionTemplates.currentPage;
+            const totalItems = displayTemplates.length;
             const itemsPerPage = paginationSettings.prescriptionTemplates.itemsPerPage;
-            // 取得當前頁資料
-            await fetchPrescriptionTemplatesPage(currentPage);
-            const pageItems = Array.isArray(prescriptionPageItems)
-              ? prescriptionPageItems.filter(item => !item.isNew)
-              : [];
+            let currentPage = paginationSettings.prescriptionTemplates.currentPage;
+            const totalPages = totalItems > 0 ? Math.ceil(totalItems / itemsPerPage) : 1;
+            if (currentPage < 1) currentPage = 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            paginationSettings.prescriptionTemplates.currentPage = currentPage;
+            const startIdx = (currentPage - 1) * itemsPerPage;
+            const endIdx = startIdx + itemsPerPage;
+            const pageItems = displayTemplates.slice(startIdx, endIdx);
             // 若無模板資料
             if (!pageItems || pageItems.length === 0) {
               container.innerHTML = '<div class="text-center text-gray-500 py-8">暫無醫囑模板</div>';
@@ -15798,11 +15374,10 @@ function refreshTemplateCategoryFilters() {
               container.appendChild(card);
             });
             // 分頁控制
-            const totalItems = prescriptionTotalCount;
             const paginEl = ensurePaginationContainer('prescriptionTemplatesContainer', 'prescriptionTemplatesPagination');
             renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
               paginationSettings.prescriptionTemplates.currentPage = newPage;
-              renderPrescriptionTemplates(null, true);
+              renderPrescriptionTemplates(templates, true);
             }, paginEl);
           }
 
@@ -15937,95 +15512,6 @@ function refreshTemplateCategoryFilters() {
             renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
               paginationSettings.diagnosisTemplates.currentPage = newPage;
               renderDiagnosisTemplates(templates, true);
-            }, paginEl);
-          }
-
-          // 新增：覆寫診斷模板渲染函式以支援伺服器端分頁
-          async function renderDiagnosisTemplates(list, pageChange = false) {
-            const container = document.getElementById('diagnosisTemplatesContainer');
-            container.innerHTML = '';
-            // 更新診斷模板總數
-            try {
-              if (!diagnosisTotalCount || diagnosisTotalCount < 0) {
-                await fetchDiagnosisTemplatesPage(1);
-              }
-              const countElem = document.getElementById('diagnosisCount');
-              if (countElem) {
-                countElem.textContent = String(diagnosisTotalCount);
-              }
-            } catch (_e) {}
-            // 重置頁碼
-            if (!pageChange) {
-              paginationSettings.diagnosisTemplates.currentPage = 1;
-            }
-            const currentPage = paginationSettings.diagnosisTemplates.currentPage;
-            const itemsPerPage = paginationSettings.diagnosisTemplates.itemsPerPage;
-            // 取得當前頁資料
-            await fetchDiagnosisTemplatesPage(currentPage);
-            const pageItems = Array.isArray(diagnosisPageItems)
-              ? diagnosisPageItems.filter(item => !item.isNew)
-              : [];
-            if (!pageItems || pageItems.length === 0) {
-              container.innerHTML = '<div class="text-center text-gray-500 py-8">暫無診斷模板</div>';
-              const paginEl = ensurePaginationContainer('diagnosisTemplatesContainer', 'diagnosisTemplatesPagination');
-              if (paginEl) {
-                paginEl.innerHTML = '';
-                paginEl.classList.add('hidden');
-              }
-              return;
-            }
-            pageItems.forEach(item => {
-              const card = document.createElement('div');
-              card.className = 'bg-white p-6 rounded-lg border-2 border-orange-200';
-              let contentHtml = '';
-              if (item.chiefComplaint || item.currentHistory || item.tongue || item.pulse || item.tcmDiagnosis || item.syndromeDiagnosis) {
-                const parts = [];
-                if (item.chiefComplaint) {
-                  parts.push('<p class="mb-2"><strong>主訴：</strong>' + String(item.chiefComplaint).split('\n').map(l => l).join('<br>') + '</p>');
-                }
-                if (item.currentHistory) {
-                  parts.push('<p class="mb-2"><strong>現病史：</strong>' + String(item.currentHistory).split('\n').map(l => l).join('<br>') + '</p>');
-                }
-                if (item.tongue) {
-                  parts.push('<p class="mb-2"><strong>舌象：</strong>' + String(item.tongue).split('\n').map(l => l).join('<br>') + '</p>');
-                }
-                if (item.pulse) {
-                  parts.push('<p class="mb-2"><strong>脈象：</strong>' + String(item.pulse).split('\n').map(l => l).join('<br>') + '</p>');
-                }
-                if (item.tcmDiagnosis) {
-                  parts.push('<p class="mb-2"><strong>中醫診斷：</strong>' + String(item.tcmDiagnosis).split('\n').map(l => l).join('<br>') + '</p>');
-                }
-                if (item.syndromeDiagnosis) {
-                  parts.push('<p class="mb-2"><strong>證型診斷：</strong>' + String(item.syndromeDiagnosis).split('\n').map(l => l).join('<br>') + '</p>');
-                }
-                contentHtml = parts.join('');
-              } else if (item.content) {
-                contentHtml = item.content.split('\n').map(p => '<p class="mb-2">' + p + '</p>').join('');
-              }
-              card.innerHTML = `
-                <div class="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 class="text-lg font-semibold text-orange-800">${item.name}</h3>
-                    <div class="flex gap-2 mt-1">
-                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">${item.category}</span>
-                    </div>
-                  </div>
-                  <div class="flex gap-2">
-                    <button class="text-blue-600 hover:text-blue-800" onclick="showEditModal('diagnosis', '${item.name}')">編輯</button>
-                    <button class="text-red-600 hover:text-red-800" onclick="deleteDiagnosisTemplate(${item.id})">刪除</button>
-                  </div>
-                </div>
-                <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
-                  ${contentHtml}
-                </div>
-              `;
-              container.appendChild(card);
-            });
-            const totalItems = diagnosisTotalCount;
-            const paginEl = ensurePaginationContainer('diagnosisTemplatesContainer', 'diagnosisTemplatesPagination');
-            renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
-              paginationSettings.diagnosisTemplates.currentPage = newPage;
-              renderDiagnosisTemplates(null, true);
             }, paginEl);
           }
 
