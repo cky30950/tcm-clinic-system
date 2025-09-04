@@ -659,6 +659,39 @@ async function fetchDiagnosisTemplatesPage(page) {
             }, 4000);
         }
 
+    /**
+     * 顯示表格載入中提示。將目標表格 tbody 內容替換為一行含讀取圈和文字的提示。
+     * @param {HTMLElement} tbody 目標 <tbody> 元素
+     * @param {number} colspan 欄位總數，用於設定 colspan 以跨越整個表格
+     */
+    function showTableLoading(tbody, colspan = 1) {
+        if (!tbody) return;
+        // 建立一行包含旋轉圈圈和「載入中」文字的占位內容。使用 Tailwind 樣式與用戶管理一致。
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="${colspan}" class="px-4 py-8 text-center text-gray-500">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    <div class="mt-2">載入中...</div>
+                </td>
+            </tr>
+        `;
+    }
+
+    /**
+     * 顯示列表載入中提示。用於非表格型資料容器，如卡片列表。
+     * @param {HTMLElement} container 目標容器元素
+     */
+    function showListLoading(container) {
+        if (!container) return;
+        // 使用 flex 置中顯示旋轉圈圈與文字
+        container.innerHTML = `
+            <div class="text-center py-12 text-gray-500">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                <div class="mt-2">載入中...</div>
+            </div>
+        `;
+    }
+
         // 播放候診提醒音效
         // 使用 Web Audio API 產生簡單的短促音效，避免載入外部音訊檔案。
         // 此函式在病人狀態變為候診中時被呼叫。
@@ -3123,6 +3156,17 @@ async function selectPatientForRegistration(patientId) {
 
 // 3. 修改今日掛號列表載入功能，確保能正確顯示病人資訊
 async function loadTodayAppointments() {
+    // 顯示掛號列表載入中指示器，在進行任何異步操作前先佔位。使用與用戶管理相同的 loading 樣式。
+    try {
+        const loadingTbody = document.getElementById('todayAppointmentsList');
+        // 掛號列表有 7 欄，loading 行應跨所有欄位
+        if (loadingTbody) {
+            showTableLoading(loadingTbody, 7);
+        }
+    } catch (_) {
+        // 忽略任何錯誤以免阻止後續邏輯
+    }
+
     // 在讀取掛號資料之前，先清除過期掛號（同步到 Firebase）。
     // 如果掛號時間在昨日或更早（即早於今天 00:00:00），會從 Realtime Database 中刪除。
     await clearOldAppointments();
@@ -7781,8 +7825,17 @@ async function initializeSystemAfterLogin() {
         }
         
         async function displayHerbLibrary() {
-            const listContainer = document.getElementById('herbLibraryList');
-            const searchInput = document.getElementById('searchHerb');
+    const listContainer = document.getElementById('herbLibraryList');
+    // 顯示中藥庫列表載入中提示。透過這個 spinner 提示使用者資料正在載入。
+    try {
+        if (listContainer) {
+            showListLoading(listContainer);
+        }
+    } catch (_) {
+        // 忽略錯誤
+    }
+
+    const searchInput = document.getElementById('searchHerb');
             const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
             // 取得並顯示總數
             await fetchHerbCounts();
@@ -8169,7 +8222,17 @@ ${formulasInPage.map(formula => createFormulaCard(formula)).join('')}
         showToast('權限不足，無法存取收費項目管理', 'error');
         return;
     }
-            // 若尚未載入收費項目資料，才從 Firestore 重新載入
+    // 顯示收費項目列表載入中提示，避免在讀取資料時列表內容為空。使用列表 loading spinner。
+    try {
+        const billingContainer = document.getElementById('billingItemsList');
+        if (billingContainer) {
+            showListLoading(billingContainer);
+        }
+    } catch (_) {
+        // 忽略錯誤
+    }
+
+    // 若尚未載入收費項目資料，才從 Firestore 重新載入
             if (typeof initBillingItems === 'function' && (!Array.isArray(billingItems) || billingItems.length === 0)) {
                 await initBillingItems();
             }
@@ -15643,7 +15706,14 @@ function refreshTemplateCategoryFilters() {
           // 渲染醫囑模板（伺服器端分頁）
           async function renderPrescriptionTemplates(list, pageChange = false) {
             const container = document.getElementById('prescriptionTemplatesContainer');
-            container.innerHTML = '';
+            // 先顯示載入中指示器，讓使用者知曉正在載入資料
+            try {
+              if (container) {
+                showListLoading(container);
+              }
+            } catch (_) {
+              // 忽略任何錯誤
+            }
             // 更新醫囑模板總數至標籤顯示
             try {
               // 在第一次載入或總數為零時重新取得總筆數
@@ -15677,6 +15747,8 @@ function refreshTemplateCategoryFilters() {
               return;
             }
             // 渲染當前頁模板
+            // 清除先前的內容（例如載入中的 spinner）再開始渲染實際資料
+            container.innerHTML = '';
             pageItems.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-purple-200';
@@ -15847,7 +15919,12 @@ function refreshTemplateCategoryFilters() {
           // 新增：覆寫診斷模板渲染函式以支援伺服器端分頁
           async function renderDiagnosisTemplates(list, pageChange = false) {
             const container = document.getElementById('diagnosisTemplatesContainer');
-            container.innerHTML = '';
+            // 先顯示載入中指示器，告知使用者正在載入診斷模板資料
+            try {
+              if (container) {
+                showListLoading(container);
+              }
+            } catch (_) {}
             // 更新診斷模板總數
             try {
               if (!diagnosisTotalCount || diagnosisTotalCount < 0) {
@@ -15878,6 +15955,8 @@ function refreshTemplateCategoryFilters() {
               }
               return;
             }
+            // 清除載入中的內容，然後開始渲染每個模板卡片
+            container.innerHTML = '';
             pageItems.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-orange-200';
