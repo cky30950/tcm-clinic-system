@@ -837,12 +837,19 @@ function generateMedicalRecordNumber() {
             // 從本地 JSON 檔案載入中藥資料與方劑資料
             try {
                 const [herbRes, formulaRes] = await Promise.all([
-                    fetch('/data/herbLibrary.json', { cache: 'reload' }),
-                    fetch('/data/herbformulaLibrary.json', { cache: 'reload' })
+                    fetch('data/herbLibrary.json', { cache: 'reload' }),
+                    fetch('data/herbformulaLibrary.json', { cache: 'reload' })
                 ]);
+                // 確認 HTTP 響應是否成功，若非 2xx 則拋出錯誤避免後續解析失敗
+                if (!herbRes.ok) {
+                    throw new Error(`herbLibrary.json HTTP error ${herbRes.status}`);
+                }
+                if (!formulaRes.ok) {
+                    throw new Error(`herbformulaLibrary.json HTTP error ${formulaRes.status}`);
+                }
                 const herbData = await herbRes.json();
                 const formulaData = await formulaRes.json();
-                // herbLibrary.json 和 herbformulaLibrary.json 都會有 herbLibrary 陣列
+                // herbLibrary.json 和 herbformulaLibrary.json 均包含名為 herbLibrary 的陣列
                 const herbList = Array.isArray(herbData.herbLibrary) ? herbData.herbLibrary : [];
                 const formulaList = Array.isArray(formulaData.herbLibrary) ? formulaData.herbLibrary : [];
                 herbLibrary = [...herbList, ...formulaList];
@@ -912,23 +919,19 @@ function generateMedicalRecordNumber() {
             // 從本地 JSON 檔案載入醫囑模板與診斷模板資料
             try {
                 const [presRes, diagRes] = await Promise.all([
-                    fetch('/data/prescriptionTemplates.json', { cache: 'reload' }),
-                    fetch('/data/diagnosisTemplates.json', { cache: 'reload' })
+                    fetch('data/prescriptionTemplates.json', { cache: 'reload' }),
+                    fetch('data/diagnosisTemplates.json', { cache: 'reload' })
                 ]);
+                if (!presRes.ok) {
+                    throw new Error(`prescriptionTemplates.json HTTP error ${presRes.status}`);
+                }
+                if (!diagRes.ok) {
+                    throw new Error(`diagnosisTemplates.json HTTP error ${diagRes.status}`);
+                }
                 const presData = await presRes.json();
                 const diagData = await diagRes.json();
-                // 解析並指派醫囑模板
-                if (presData && Array.isArray(presData.prescriptionTemplates)) {
-                    prescriptionTemplates = presData.prescriptionTemplates;
-                } else {
-                    prescriptionTemplates = [];
-                }
-                // 解析並指派診斷模板
-                if (diagData && Array.isArray(diagData.diagnosisTemplates)) {
-                    diagnosisTemplates = diagData.diagnosisTemplates;
-                } else {
-                    diagnosisTemplates = [];
-                }
+                prescriptionTemplates = Array.isArray(presData.prescriptionTemplates) ? presData.prescriptionTemplates : [];
+                diagnosisTemplates = Array.isArray(diagData.diagnosisTemplates) ? diagData.diagnosisTemplates : [];
                 templateLibraryLoaded = true;
             } catch (error) {
                 console.error('讀取本地模板資料失敗:', error);
