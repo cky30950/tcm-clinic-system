@@ -1,6 +1,6 @@
 // Import Firebase functions
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit, startAfter, enableIndexedDbPersistence, getCountFromServer } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
     import { getDatabase, ref, set, get, child, push, update, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
@@ -29,10 +29,27 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
   console.error('設置 Firebase Auth 持久化模式失敗:', error);
 });
 
+// 啟用 Firestore 離線快取（IndexedDB）。
+// 這將在瀏覽器中快取已讀取的文件，離線時可以快速返回資料，減少重複讀取。
+// 如果啟用失敗，僅輸出錯誤，不會阻止應用程式繼續運作。
+try {
+  enableIndexedDbPersistence(db).catch((err) => {
+    // 如果多個頁籤開啟或不支援 IndexedDB，啟用快取可能失敗。
+    console.warn('啟用 Firestore 離線快取失敗:', err);
+  });
+} catch (e) {
+  console.warn('啟用 Firestore 離線快取時發生例外:', e);
+}
+
     // 讓其他腳本可以使用 Firebase
     window.firebase = {
         app, db, rtdb, auth,
         collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit,
+        startAfter,
+        // 聚合查詢函式，用於取得集合中的文件總數
+        getCountFromServer,
+        // 將離線快取相關函式導出以供其他模組使用（若需要）
+        enableIndexedDbPersistence,
         ref, set, get, child, push, update, remove, onValue, off,
         signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
         // 讓其他模組可存取持久化相關方法（可選）
