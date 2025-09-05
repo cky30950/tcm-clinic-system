@@ -16826,6 +16826,47 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
   window.moveTooltip = moveTooltip;
   window.hideTooltip = hideTooltip;
 
+  /**
+   * 全局事件委託：處方搜尋結果或其他含有 data-tooltip 屬性的元素
+   * 將以統一的方式顯示、移動和隱藏工具提示。這可避免因動態產生的
+   * 元素上內嵌事件綁定失效而導致無法顯示 tooltip 的情況，並保證
+   * 任何擁有 data-tooltip 的元素在滑鼠停留時都能即時顯示完整資訊。
+   */
+  try {
+    // 滑鼠移入：找到最近的 data-tooltip 元素並顯示提示
+    document.addEventListener('mouseover', function (e) {
+      const targetEl = e.target && typeof e.target.closest === 'function'
+        ? e.target.closest('[data-tooltip]')
+        : null;
+      if (targetEl) {
+        const encoded = targetEl.getAttribute('data-tooltip');
+        // 調用全局函式以顯示 tooltip
+        window.showTooltip(e, encoded);
+      }
+    });
+    // 滑鼠移動：若 tooltip 已顯示則更新位置
+    document.addEventListener('mousemove', function (e) {
+      // 直接使用 moveTooltip 內部會檢查是否需更新
+      window.moveTooltip(e);
+    });
+    // 滑鼠移出：當離開 data-tooltip 元素並且未進入另一個 data-tooltip 元素時，隱藏提示
+    document.addEventListener('mouseout', function (e) {
+      const fromEl = e.target && typeof e.target.closest === 'function'
+        ? e.target.closest('[data-tooltip]')
+        : null;
+      const toEl = e.relatedTarget && typeof e.relatedTarget.closest === 'function'
+        ? e.relatedTarget.closest('[data-tooltip]')
+        : null;
+      // 如果離開的是 data-tooltip 元素，且沒有進入另一個相同屬性的元素
+      if (fromEl && fromEl !== toEl) {
+        window.hideTooltip();
+      }
+    });
+  } catch (_e) {
+    // 捕獲潛在錯誤避免阻斷其他邏輯
+    console.error('初始化 tooltip 全局事件監聽失敗:', _e);
+  }
+
           // 初始化
 document.addEventListener('DOMContentLoaded', function() {
             // 初始渲染藥方、穴位與模板列表
