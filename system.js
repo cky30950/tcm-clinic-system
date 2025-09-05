@@ -197,35 +197,6 @@ let templateLibraryLoaded = false;
 let consultationCache = null;
 let userCache = null;
 
-// ============================================================================
-// 病人診症記錄快取
-//
-// 為避免在瀏覽病歷時大量重複讀取資料庫，此處建立一個簡單的快取。
-// 鍵值為病人 ID，值為該病人的診症記錄陣列。當 forceRefresh 為 true
-// 時會忽略快取並重新從 Firebase 讀取，以確保資料即時性。
-// 使用方法：
-//    const result = await getPatientConsultationsCached(patientId);
-//    const result = await getPatientConsultationsCached(patientId, true); // 強制刷新
-let patientConsultationsCache = {};
-
-async function getPatientConsultationsCached(patientId, forceRefresh = false) {
-    try {
-        // 若已有快取且不要求強制刷新，直接返回快取
-        if (!forceRefresh && patientConsultationsCache[patientId]) {
-            return { success: true, data: patientConsultationsCache[patientId] };
-        }
-        const result = await window.firebaseDataManager.getPatientConsultations(patientId);
-        if (result && result.success) {
-            // 快取成功讀取的資料
-            patientConsultationsCache[patientId] = result.data || [];
-        }
-        return result;
-    } catch (err) {
-        console.error('讀取病人診症記錄錯誤:', err);
-        return { success: false, data: [] };
-    }
-}
-
 // 追蹤本次診症操作期間對套票使用造成的暫時變更。
 // 當使用者在開啟診症或編輯病歷時使用或取消使用套票，
 // 將對患者套票剩餘次數產生影響。若使用者最終未保存病歷或取消診症，
@@ -2105,10 +2076,6 @@ async function viewPatient(id) {
                 </div>
                 `;
             }
-            // 建立詳細資訊區塊，並加入按鈕以便使用者按需載入診症摘要。
-            // 診症摘要不會在開啟時自動讀取，以免造成過量讀取。
-            // 使用 safeId 以避免 XSS。
-            const safeId = window.escapeHtml(patient.id);
             content = `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-4">
@@ -2136,17 +2103,6 @@ async function viewPatient(id) {
                 </div>
             </div>
             ${packageStatusHtml}
-            <!-- 診症記錄摘要（按需載入） -->
-            <div class="mt-6 pt-6 border-t border-gray-200">
-                <div class="flex justify-between items-center mb-4">
-                    <h4 class="text-lg font-semibold text-gray-800">診症記錄摘要</h4>
-                </div>
-                <div id="patientConsultationSummary" class="text-center">
-                    <button onclick="loadPatientConsultationSummary('${safeId}')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                        載入診症記錄摘要
-                    </button>
-                </div>
-            </div>
             `;
         }
         // 先將內容插入並顯示模態框
@@ -2159,9 +2115,13 @@ async function viewPatient(id) {
             modalEl.classList.remove('hidden');
         }
 
-        // 診症記錄摘要不再於打開病人詳細資料時自動載入，
-        // 將由使用者點擊按鈕後再讀取資料，以避免過量讀取。
-        // loadPatientConsultationSummary(id); // 已移除自動呼叫，按需載入
+        /**
+         * 載入診症記錄摘要
+         *
+         * 注意：診症記錄摘要區塊是在上面插入的內容中動態生成的。
+         * 必須確保 DOM 已經渲染完畢後再呼叫，否則會找不到容器導致錯誤。
+         */
+        loadPatientConsultationSummary(id);
 
     } catch (error) {
         console.error('查看病人資料錯誤:', error);
@@ -4414,8 +4374,8 @@ if (!patient) {
     return;
 }
             
-            // 獲取該病人的所有診症記錄（僅在第一次查看時讀取，之後使用快取）
-            const consultationResult = await getPatientConsultationsCached(patientId);
+            // 獲取該病人的所有診症記錄（從 Firestore 取得）
+            const consultationResult = await window.firebaseDataManager.getPatientConsultations(patientId);
             if (!consultationResult.success) {
                 showToast('無法讀取診症記錄！', 'error');
                 return;
@@ -4737,8 +4697,8 @@ async function viewPatientMedicalHistory(patientId) {
             return;
         }
         
-        // 獲取該病人的所有診症記錄（使用快取避免重複讀取）
-        const consultationResult = await getPatientConsultationsCached(patientId);
+        // 獲取該病人的所有診症記錄
+        const consultationResult = await window.firebaseDataManager.getPatientConsultations(patientId);
         if (!consultationResult.success) {
             showToast('無法讀取診症記錄', 'error');
             return;
@@ -7194,7 +7154,7 @@ async function loadPatientConsultationSummary(patientId) {
     }
 
     try {
-        const result = await getPatientConsultationsCached(patientId);
+        const result = await window.firebaseDataManager.getPatientConsultations(patientId);
         
         if (!result.success) {
             summaryContainer.innerHTML = `
@@ -7536,20 +7496,32 @@ async function initializeSystemAfterLogin() {
     // 確保 Firebase 資料管理器已準備好
     await waitForFirebaseDataManager();
     try {
-        // 僅在登入後初始化必要的資料。為了避免在進入主頁時重複讀取掛號與病人資料，
-        // 此處僅讀取診療記錄，掛號與病人資料將透過實時監聽或功能頁面再讀取。
+        /**
+         * 2025-09: 為了避免在登入後立即從 Firebase 讀取所有病歷記錄，
+         * 我們不再於此自動讀取 consultations 資料。
+         * 病歷記錄將在實際需要顯示或操作時再個別查詢，
+         * 以降低初始化時的讀取量。
+         *
+         * 此處先從本地存儲讀取任何已緩存的診療記錄，
+         * 若無緩存則保持空陣列，待使用時再讀取。
+         */
         try {
-            const consultationResult = await window.firebaseDataManager.getConsultations();
-            if (consultationResult && consultationResult.success) {
-                consultations = consultationResult.data;
+            const storedConsultations = localStorage.getItem('consultations');
+            if (storedConsultations) {
+                const parsed = JSON.parse(storedConsultations);
+                if (Array.isArray(parsed)) {
+                    consultations = parsed;
+                } else {
+                    consultations = [];
+                }
             } else {
                 consultations = [];
             }
-        } catch (consultError) {
-            console.error('讀取診療記錄失敗:', consultError);
+        } catch (e) {
+            console.warn('讀取本地診療記錄快取時發生錯誤:', e);
             consultations = [];
         }
-        console.log('登入後系統資料初始化完成');
+        console.log('登入後系統資料初始化完成（不自動讀取診療記錄）');
     } catch (error) {
         console.error('初始化系統資料失敗:', error);
         consultations = [];
@@ -9356,8 +9328,8 @@ async function initializeSystemAfterLogin() {
                     showToast('找不到病人資料！', 'error');
                     return;
                 }
-                // 讀取病人的診症記錄（強制重新載入最新資料）
-                const consultationResult = await getPatientConsultationsCached(patient.id, true);
+                // 讀取病人的診症記錄
+                const consultationResult = await window.firebaseDataManager.getPatientConsultations(patient.id);
                 if (!consultationResult.success) {
                     showToast('無法讀取診症記錄！', 'error');
                     return;
@@ -9532,8 +9504,8 @@ async function initializeSystemAfterLogin() {
                     showToast('找不到病人資料！', 'error');
                     return;
                 }
-                // 從 Firebase 取得病人的診症記錄並按日期排序（強制重新載入最新資料）
-                const consultationResult = await getPatientConsultationsCached(patient.id, true);
+                // 從 Firebase 取得病人的診症記錄並按日期排序
+                const consultationResult = await window.firebaseDataManager.getPatientConsultations(patient.id);
                 if (!consultationResult.success) {
                     showToast('無法讀取診症記錄！', 'error');
                     return;
@@ -12458,19 +12430,28 @@ class FirebaseDataManager {
         if (!this.isReady) return { success: false, data: [] };
 
         try {
-            const allConsultations = await this.getConsultations();
-            if (!allConsultations.success) {
-                return { success: false, data: [] };
-            }
-
-            const patientConsultations = allConsultations.data
-                .filter(consultation => String(consultation.patientId) === String(patientId))
-                .sort((a, b) => {
-                    const dateA = a.date ? new Date(a.date.seconds * 1000) : new Date(a.createdAt.seconds * 1000);
-                    const dateB = b.date ? new Date(b.date.seconds * 1000) : new Date(b.createdAt.seconds * 1000);
-                    return dateB - dateA; // 最新的在前面
-                });
-
+            /**
+             * 改為直接使用 Firestore 查詢特定 patientId 的診療記錄，避免先讀取全部後再過濾。
+             * 這樣可降低讀取量，僅在開啟病歷時讀取該病患相關的診療記錄。
+             */
+            // 使用 where 條件建立查詢
+            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+            const q = window.firebase.query(colRef, window.firebase.where('patientId', '==', patientId));
+            const querySnapshot = await window.firebase.getDocs(q);
+            const patientConsultations = [];
+            querySnapshot.forEach((docSnap) => {
+                patientConsultations.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            // 按日期（若有 date 欄位）或 createdAt 排序，最新在前
+            patientConsultations.sort((a, b) => {
+                const dateA = a.date
+                    ? (a.date.seconds ? new Date(a.date.seconds * 1000) : new Date(a.date))
+                    : (a.createdAt && a.createdAt.seconds ? new Date(a.createdAt.seconds * 1000) : new Date(a.createdAt));
+                const dateB = b.date
+                    ? (b.date.seconds ? new Date(b.date.seconds * 1000) : new Date(b.date))
+                    : (b.createdAt && b.createdAt.seconds ? new Date(b.createdAt.seconds * 1000) : new Date(b.createdAt));
+                return dateB - dateA;
+            });
             return { success: true, data: patientConsultations };
         } catch (error) {
             console.error('讀取病人診症記錄失敗:', error);
