@@ -16670,6 +16670,10 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
             if (!resultsContainer || !resultsList) return;
             if (searchTerm.length < 1) {
               resultsContainer.classList.add('hidden');
+              // 當搜尋字串為空時，同步隱藏任何提示框
+              if (typeof hideTooltip === 'function') {
+                hideTooltip();
+              }
               return;
             }
             // 搜索並根據匹配程度排序 herbLibrary 中的中藥材與方劑（名稱、別名或功效）
@@ -16700,6 +16704,10 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
             if (matched.length === 0) {
               resultsList.innerHTML = '<div class="p-2 text-center text-gray-500 text-sm">找不到符合條件的藥材</div>';
               resultsContainer.classList.remove('hidden');
+              // 沒有符合項目時，隱藏提示框
+              if (typeof hideTooltip === 'function') {
+                hideTooltip();
+              }
               return;
             }
             // 顯示搜尋結果：移除劑量顯示並使用 tooltip 顯示詳細資料
@@ -16779,6 +16787,10 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
             const searchInput = document.getElementById('herbIngredientSearch');
             if (searchInput) {
               searchInput.value = '';
+            }
+            // 新增完藥材後隱藏提示框，以免留下殘影
+            if (typeof hideTooltip === 'function') {
+              hideTooltip();
             }
           }
 
