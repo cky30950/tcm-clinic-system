@@ -11442,16 +11442,17 @@ async function exportClinicBackup() {
             console.error('讀取問診資料失敗:', e);
         }
         // 組合備份資料
+        // Note: 中藥庫與模板庫資料不再納入備份檔案，僅保留其他核心資料
         const backup = {
             patients: patientsData,
             consultations: consultationsData,
             users: usersData,
-            herbLibrary: herbData,
+            // herbLibrary: herbData, // 移除中藥庫資料備份
             billingItems: billingData,
             patientPackages: packageData,
             clinicSettings: clinicSettings,
-            prescriptionTemplates: prescriptionTemplatesData,
-            diagnosisTemplates: diagnosisTemplatesData,
+            // prescriptionTemplates: prescriptionTemplatesData, // 移除醫囑模板備份
+            // diagnosisTemplates: diagnosisTemplatesData, // 移除診斷模板備份
             inquiries: inquiriesData
         };
         const json = JSON.stringify(backup, null, 2);
@@ -11496,8 +11497,8 @@ async function handleBackupFile(file) {
     }
     const button = document.getElementById('backupImportBtn');
     setButtonLoading(button);
-    // 顯示匯入進度條，假設有 9 個主要步驟（每個集合一次覆蓋）
-    const totalStepsForBackupImport = 9;
+    // 顯示匯入進度條，由於不再涵蓋中藥庫及模板庫，總步驟數調整為 6
+    const totalStepsForBackupImport = 6;
     showBackupProgressBar(totalStepsForBackupImport);
     try {
         const text = await file.text();
@@ -11524,7 +11525,8 @@ async function handleBackupFile(file) {
  */
 async function importClinicBackup(data) {
     let progressCallback = null;
-    let totalSteps = 9;
+    // 中藥庫與模板庫不再還原，總步驟數調整為 6
+    let totalSteps = 6;
     // 若第二個參數為函式，視為進度回調；第三個參數為總步驟數（可選）
     if (arguments.length >= 2 && typeof arguments[1] === 'function') {
         progressCallback = arguments[1];
@@ -11575,9 +11577,7 @@ async function importClinicBackup(data) {
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
 
-    await replaceCollection('herbLibrary', Array.isArray(data.herbLibrary) ? data.herbLibrary : []);
-    stepCount++;
-    if (progressCallback) progressCallback(stepCount, totalSteps);
+    // 跳過 herbLibrary 匯入
 
     await replaceCollection('billingItems', Array.isArray(data.billingItems) ? data.billingItems : []);
     stepCount++;
@@ -11587,15 +11587,7 @@ async function importClinicBackup(data) {
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
 
-    // 新增：覆蓋醫囑模板、診斷模板與問診資料
-    await replaceCollection('prescriptionTemplates', Array.isArray(data.prescriptionTemplates) ? data.prescriptionTemplates : []);
-    stepCount++;
-    if (progressCallback) progressCallback(stepCount, totalSteps);
-
-    await replaceCollection('diagnosisTemplates', Array.isArray(data.diagnosisTemplates) ? data.diagnosisTemplates : []);
-    stepCount++;
-    if (progressCallback) progressCallback(stepCount, totalSteps);
-
+    // 只覆蓋問診資料，不再覆蓋醫囑模板與診斷模板
     await replaceCollection('inquiries', Array.isArray(data.inquiries) ? data.inquiries : []);
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
@@ -11609,19 +11601,8 @@ async function importClinicBackup(data) {
     patientCache = null;
     consultationCache = null;
     userCache = null;
-    herbLibrary = Array.isArray(data.herbLibrary) ? data.herbLibrary : [];
+    // 保持現有的中藥庫與模板庫資料，不從備份中還原
     billingItems = Array.isArray(data.billingItems) ? data.billingItems : [];
-    // 更新模板資料至全域變數
-    if (Array.isArray(data.prescriptionTemplates)) {
-        prescriptionTemplates = data.prescriptionTemplates;
-    } else {
-        prescriptionTemplates = [];
-    }
-    if (Array.isArray(data.diagnosisTemplates)) {
-        diagnosisTemplates = data.diagnosisTemplates;
-    } else {
-        diagnosisTemplates = [];
-    }
     // 重新載入資料
     await fetchPatients(true);
     await fetchConsultations(true);
