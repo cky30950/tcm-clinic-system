@@ -137,17 +137,17 @@ function renderPagination(totalItems, itemsPerPage, currentPage, onPageChange, c
  * 每個角色可存取哪些頁面（功能），在此集中定義。
  */
 const ROLE_PERMISSIONS = {
-  // 診所管理者擁有全部功能權限，包括個人設置與模板庫管理
-  // 診所管理：將模板庫管理放在診症系統之後，其餘順序保持一致
+  // 診所管理者擁有全部功能權限，包括個人設置與模板庫
+  // 診所管理：將模板庫放在診症系統之後，其餘順序保持一致
   '診所管理': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings'],
-  // 醫師可存取大部分功能，包含個人設置與模板庫管理
-  // 醫師：模板庫管理放在診症系統之後
+  // 醫師可存取大部分功能，包含個人設置與模板庫
+  // 醫師：模板庫放在診症系統之後
   '醫師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'systemManagement', 'personalSettings'],
-  // 護理師原本僅能使用診症相關功能。為了讓模板庫管理變成公用功能，
+  // 護理師原本僅能使用診症相關功能。為了讓模板庫變成公用功能，
   // 將 templateLibrary 新增到護理師的權限清單，讓護理師也能瀏覽與使用模板庫。
-  // 護理師：模板庫管理放在診症系統之後
+  // 護理師：模板庫放在診症系統之後
       '護理師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary'],
-  // 一般用戶原本只能進入病患管理與診症系統。為了讓模板庫管理變成公用功能，
+  // 一般用戶原本只能進入病患管理與診症系統。為了讓模板庫變成公用功能，
   // 也將 templateLibrary 新增到一般用戶的權限清單，使所有登入用戶都可存取模板庫。
       '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary']
 };
@@ -1377,9 +1377,9 @@ async function logout() {
             const menuItems = {
                 patientManagement: { title: '病人資料管理', icon: '👥', description: '新增、查看、管理病人資料' },
                 consultationSystem: { title: '診症系統', icon: '🩺', description: '記錄症狀、診斷、開立處方' },
-                herbLibrary: { title: '中藥庫管理', icon: '🌿', description: '管理中藥材及方劑資料' },
-                // 新增：穴位庫管理
-                acupointLibrary: { title: '穴位庫管理', icon: '📌', description: '管理穴位資料' },
+                herbLibrary: { title: '中藥庫', icon: '🌿', description: '查看中藥材及方劑資料' },
+                // 新增：穴位庫
+                acupointLibrary: { title: '穴位庫', icon: '📌', description: '查看穴位資料' },
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
                 // 將診所用戶管理的圖示更新為單人符號，以符合交換後的配置
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
@@ -1387,8 +1387,8 @@ async function logout() {
                 systemManagement: { title: '系統管理', icon: '⚙️', description: '統計資料、備份匯出' },
                 // 新增：個人設置（使用扳手符號作為圖示）
                 personalSettings: { title: '個人設置', icon: '🔧', description: '管理慣用藥方及穴位組合' },
-                // 新增：模板庫管理
-                templateLibrary: { title: '模板庫管理', icon: '📚', description: '管理醫囑與診斷模板' }
+                // 新增：模板庫
+                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
             };
 
             // 根據當前用戶職位決定可使用的功能列表
@@ -1439,7 +1439,7 @@ async function logout() {
             hideAllSections();
 
             // 根據所選的區域決定是否顯示主要內容包裝區（contentWrapper）。
-            // 當顯示個人設置或模板庫管理時，隱藏包裝區以避免產生額外的上方留白；
+            // 當顯示個人設置或模板庫時，隱藏包裝區以避免產生額外的上方留白；
             // 其他區域則顯示包裝區，保持與原先版面一致。
             try {
                 const wrapper = document.getElementById('contentWrapper');
@@ -1478,7 +1478,7 @@ async function logout() {
 
         // 隱藏所有區域
         function hideAllSections() {
-            // 隱藏所有區域，包括新增的個人設置與模板庫管理
+            // 隱藏所有區域，包括新增的個人設置與模板庫
             ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary', 'welcomePage'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.add('hidden');
@@ -7639,7 +7639,7 @@ async function initializeSystemAfterLogin() {
 
 
 
-        // 中藥庫管理功能
+        // 中藥庫功能
         let editingHerbId = null;
         let editingFormulaId = null;
         let currentHerbFilter = 'all';
@@ -8080,7 +8080,7 @@ async function initializeSystemAfterLogin() {
             }
         }
 
-        // 穴位庫管理功能
+        // 穴位庫功能
         /**
          * 初始化穴位庫資料。
          * 從本地 data 資料夾讀取 acupointLibrary.json。
@@ -8142,13 +8142,13 @@ async function initializeSystemAfterLogin() {
         }
 
         /**
-         * 載入穴位庫管理畫面。若資料尚未初始化，會先讀取資料。
+         * 載入穴位庫畫面。若資料尚未初始化，會先讀取資料。
          * 綁定搜尋輸入框的事件，當搜尋字串變化時重置頁碼並重新渲染列表。
          */
         async function loadAcupointLibrary() {
             // 權限檢查：護理師與診所管理者、醫師可使用；其他角色禁止
             if (!hasAccessToSection('acupointLibrary')) {
-                showToast('權限不足，無法存取穴位庫管理', 'error');
+                showToast('權限不足，無法存取穴位庫', 'error');
                 return;
             }
             // 若尚未載入資料則初始化
@@ -11851,7 +11851,7 @@ async function handleTemplateImportFile(file) {
  */
 async function importTemplateLibraryData(prescriptions, diagnoses, progressCallback) {
   try {
-    // Firestore 不再用於模板庫管理，移除遠端寫入及初始化等待。
+    // Firestore 不再用於模板庫，移除遠端寫入及初始化等待。
     // 定義資料處理 helper，只用於調整進度條，不與 Firestore 互動。
     async function upsertCollectionItems(collectionName, items) {
       if (!Array.isArray(items) || items.length === 0) return;
@@ -12058,7 +12058,7 @@ async function importHerbLibraryData(items, progressCallback) {
 }
 
 /**
- * 清除所有模板資料（醫囑與診斷模板）。
+ * 清除所有模板資料（查看查看查看查看醫囑與診斷模板）。
  * 顯示進度條並逐一刪除資料。
  */
 // 已移除 clearTemplateData 功能
