@@ -232,7 +232,7 @@
             </div>
         </nav>
         <!-- 主要內容區域 -->
-        <!-- 主要內容包裝區，新增 id 方便在顯示個人設置或模板庫管理時隱藏整個包裝 -->
+        <!-- 主要內容包裝區，新增 id 方便在顯示個人設置或模板庫時隱藏整個包裝 -->
         <div id="contentWrapper" class="max-w-7xl mx-auto px-4 py-6">
             <!-- 歡迎頁面 -->
             <div id="welcomePage" class="text-center py-16">
@@ -920,10 +920,10 @@
                     </div>
                 </div>
             </div>
-            <!-- 中藥庫管理 -->
+            <!-- 中藥庫 -->
             <div id="herbLibrary" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800">中藥庫管理</h2>
+                    <h2 class="text-2xl font-bold text-gray-800">中藥庫</h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchHerb" placeholder="搜尋中藥材或方劑名稱..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
@@ -1068,10 +1068,10 @@
                 </div>
             </div>
 
-            <!-- 穴位庫管理 -->
+            <!-- 穴位庫 -->
             <div id="acupointLibrary" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800">穴位庫管理</h2>
+                    <h2 class="text-2xl font-bold text-gray-800">穴位庫</h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchAcupoint" placeholder="搜尋穴位或經絡名稱..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-64">
@@ -1626,7 +1626,7 @@
                 </div>
             </div>
         </div>
-        <!-- 個人設置與模板庫管理內容 -->
+        <!-- 個人設置與模板庫內容 -->
         <!-- 個人設置區：在外層加入與其他頁面一致的寬度與內邊距容器，卡片樣式位於內層 -->
         <!-- 個人設置區：包裝在與其他頁面相同的寬度限制與內外邊距容器中，使版面保持一致 -->
         <div id="personalSettings" class="hidden max-w-7xl mx-auto px-4 py-6">
@@ -1724,15 +1724,15 @@
           </div>
         </div>
 
-        <!-- 模板庫管理區：在外層加入與其他頁面一致的寬度與內邊距容器，卡片樣式位於內層 -->
-        <!-- 模板庫管理區：包裝在與其他頁面相同的寬度限制與內外邊距容器中，使版面保持一致 -->
+        <!-- 模板庫區：在外層加入與其他頁面一致的寬度與內邊距容器，卡片樣式位於內層 -->
+        <!-- 模板庫區：包裝在與其他頁面相同的寬度限制與內外邊距容器中，使版面保持一致 -->
         <div id="templateLibrary" class="hidden max-w-7xl mx-auto px-4 py-6">
           <div class="bg-white rounded-xl shadow-lg p-6">
             <!-- 移除內層多餘的背景框，避免重複包裹 -->
             <div>
             <h2 class="text-2xl font-bold text-amber-800 mb-6 flex items-center">
               <span class="text-3xl mr-3">📚</span>
-              模板庫管理
+              模板庫
             </h2>
             
             <!-- 標籤切換：診斷模板與醫囑模板位置互換 -->
