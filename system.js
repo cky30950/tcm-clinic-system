@@ -9057,6 +9057,10 @@ async function initializeSystemAfterLogin() {
             if (index >= 0 && index < selectedPrescriptionItems.length) {
                 const removedItem = selectedPrescriptionItems.splice(index, 1)[0];
                 updatePrescriptionDisplay();
+                // 移除處方項目時，若游標仍在原位置會導致 tooltip 殘留，故手動隱藏
+                if (typeof hideTooltip === 'function') {
+                    hideTooltip();
+                }
                 
                 // 如果移除後沒有處方項目了，移除藥費
                 if (selectedPrescriptionItems.length === 0) {
