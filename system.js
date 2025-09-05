@@ -1377,9 +1377,9 @@ async function logout() {
             const menuItems = {
                 patientManagement: { title: '病人資料管理', icon: '👥', description: '新增、查看、管理病人資料' },
                 consultationSystem: { title: '診症系統', icon: '🩺', description: '記錄症狀、診斷、開立處方' },
-                herbLibrary: { title: '中藥庫管理', icon: '🌿', description: '管理中藥材及方劑資料' },
+                herbLibrary: { title: '中藥庫', icon: '🌿', description: '查看中藥材及方劑資料' },
                 // 新增：穴位庫管理
-                acupointLibrary: { title: '穴位庫管理', icon: '📌', description: '管理穴位資料' },
+                acupointLibrary: { title: '穴位庫', icon: '📌', description: '查看穴位資料' },
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
                 // 將診所用戶管理的圖示更新為單人符號，以符合交換後的配置
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
@@ -1388,7 +1388,7 @@ async function logout() {
                 // 新增：個人設置（使用扳手符號作為圖示）
                 personalSettings: { title: '個人設置', icon: '🔧', description: '管理慣用藥方及穴位組合' },
                 // 新增：模板庫管理
-                templateLibrary: { title: '模板庫管理', icon: '📚', description: '管理醫囑與診斷模板' }
+                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
             };
 
             // 根據當前用戶職位決定可使用的功能列表
