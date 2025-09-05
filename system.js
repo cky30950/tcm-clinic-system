@@ -8143,7 +8143,9 @@ async function initializeSystemAfterLogin() {
             // 重置當前頁碼為 1
             paginationSettings.acupointLibrary.currentPage = 1;
             // 更新按鈕樣式
-            const container = document.getElementById('acupointFilterButtons');
+            // 取得分類篩選容器。前端 HTML 使用 id="acupointFilterContainer"
+            // 這裡修正名稱以避免與不存在的 acupointFilterButtons 不符導致無法更新按鈕樣式
+            const container = document.getElementById('acupointFilterContainer');
             if (container) {
                 Array.from(container.children).forEach(btn => {
                     btn.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition duration-200';
@@ -8181,7 +8183,9 @@ async function initializeSystemAfterLogin() {
                 meridianCounts[m]++;
             });
             // 更新篩選按鈕
-            const filterContainer = document.getElementById('acupointFilterButtons');
+            // 取得分類篩選容器。前端 HTML 使用 id="acupointFilterContainer"
+            // 修正 ID 名稱，避免因為找不到元素而不顯示分類按鈕
+            const filterContainer = document.getElementById('acupointFilterContainer');
             if (filterContainer) {
                 filterContainer.innerHTML = '';
                 // 全部按鈕
