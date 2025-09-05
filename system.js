@@ -5568,13 +5568,8 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                             }
                                         }
                                         
-                                        // 方劑顯示格式：方劑名 劑量g (組成)
-                                        if (composition) {
-                                            // 方劑保留名稱與劑量之間的空格，並以小字體標示組成
-                                            allItems.push(`${itemName} ${dosage}g <span style="font-size: 8px;">(${composition})</span>`);
-                                        } else {
-                                            allItems.push(`${itemName} ${dosage}g`);
-                                        }
+                                        // 方劑顯示格式：僅顯示名稱與劑量，不顯示組成
+                                        allItems.push(`${itemName} ${dosage}g`);
                                     } else {
                                         // 普通藥材：為節省空間，藥名與劑量之間不加空格
                                         allItems.push(`${itemName}${dosage}g`);
@@ -6557,9 +6552,9 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                                     i++;
                                 }
                             }
-                            // 建立方劑區塊，組成文字使用半尺寸字體並置於下一行
-                            const compHtml = composition ? `<br><span style="font-size: 5px;">(${composition})</span>` : '';
-                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g${compHtml}</div>`);
+                            // 建立方劑區塊，只顯示名稱與劑量，不顯示組成
+                            // 若有組成行，前面已跳過
+                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
                         } else {
                             // 普通藥材區塊
                             itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
@@ -8852,14 +8847,7 @@ async function initializeSystemAfterLogin() {
                                     </div>
                                     <button onclick="removePrescriptionItem(${index})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>
                                 </div>
-                                ${item.type === 'formula' && item.composition ? `
-                                    <div class="mt-3 pt-3 border-t border-yellow-200">
-                                        <div class="text-xs font-semibold text-gray-700 mb-2">方劑組成：</div>
-                                        <div class="text-xs text-gray-600 bg-white rounded px-3 py-2 border border-yellow-100">
-                                            ${window.escapeHtml(item.composition.replace(/\n/g, '、'))}
-                                        </div>
-                                    </div>
-                                ` : ''}
+                                ${''}
                             </div>
                         `;
                     }).join('')}
@@ -8877,11 +8865,8 @@ async function initializeSystemAfterLogin() {
                     prescriptionText += `${item.name} ${dosage}g\n`;
                 } else if (item.type === 'formula') {
                     const dosage = item.customDosage || '6';
-                    prescriptionText += `${item.name} ${dosage}g\n`;
-                    if (item.composition) {
-                        prescriptionText += `${item.composition.replace(/\n/g, '、')}\n`;
-                    }
-                    prescriptionText += '\n';
+                    // 為方劑僅記錄名稱與劑量，不包含組成
+                    prescriptionText += `${item.name} ${dosage}g\n\n`;
                 }
             });
             
