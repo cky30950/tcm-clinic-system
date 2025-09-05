@@ -137,17 +137,17 @@ function renderPagination(totalItems, itemsPerPage, currentPage, onPageChange, c
  * 每個角色可存取哪些頁面（功能），在此集中定義。
  */
 const ROLE_PERMISSIONS = {
-  // 診所管理者擁有全部功能權限，包括個人設置與模板庫
-  // 診所管理：將模板庫放在診症系統之後，其餘順序保持一致
+  // 診所管理者擁有全部功能權限，包括個人設置與模板庫管理
+  // 診所管理：將模板庫管理放在診症系統之後，其餘順序保持一致
   '診所管理': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings'],
-  // 醫師可存取大部分功能，包含個人設置與模板庫
-  // 醫師：模板庫放在診症系統之後
+  // 醫師可存取大部分功能，包含個人設置與模板庫管理
+  // 醫師：模板庫管理放在診症系統之後
   '醫師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'systemManagement', 'personalSettings'],
-  // 護理師原本僅能使用診症相關功能。為了讓模板庫變成公用功能，
+  // 護理師原本僅能使用診症相關功能。為了讓模板庫管理變成公用功能，
   // 將 templateLibrary 新增到護理師的權限清單，讓護理師也能瀏覽與使用模板庫。
-  // 護理師：模板庫放在診症系統之後
+  // 護理師：模板庫管理放在診症系統之後
       '護理師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary'],
-  // 一般用戶原本只能進入病患管理與診症系統。為了讓模板庫變成公用功能，
+  // 一般用戶原本只能進入病患管理與診症系統。為了讓模板庫管理變成公用功能，
   // 也將 templateLibrary 新增到一般用戶的權限清單，使所有登入用戶都可存取模板庫。
       '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary']
 };
@@ -1377,9 +1377,9 @@ async function logout() {
             const menuItems = {
                 patientManagement: { title: '病人資料管理', icon: '👥', description: '新增、查看、管理病人資料' },
                 consultationSystem: { title: '診症系統', icon: '🩺', description: '記錄症狀、診斷、開立處方' },
-                herbLibrary: { title: '中藥庫', icon: '🌿', description: '查看中藥材及方劑資料' },
-                // 新增：穴位庫
-                acupointLibrary: { title: '穴位庫', icon: '📌', description: '查看穴位資料' },
+                herbLibrary: { title: '中藥庫管理', icon: '🌿', description: '管理中藥材及方劑資料' },
+                // 新增：穴位庫管理
+                acupointLibrary: { title: '穴位庫管理', icon: '📌', description: '管理穴位資料' },
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
                 // 將診所用戶管理的圖示更新為單人符號，以符合交換後的配置
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
@@ -1387,8 +1387,8 @@ async function logout() {
                 systemManagement: { title: '系統管理', icon: '⚙️', description: '統計資料、備份匯出' },
                 // 新增：個人設置（使用扳手符號作為圖示）
                 personalSettings: { title: '個人設置', icon: '🔧', description: '管理慣用藥方及穴位組合' },
-                // 新增：模板庫
-                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
+                // 新增：模板庫管理
+                templateLibrary: { title: '模板庫管理', icon: '📚', description: '管理醫囑與診斷模板' }
             };
 
             // 根據當前用戶職位決定可使用的功能列表
@@ -1439,7 +1439,7 @@ async function logout() {
             hideAllSections();
 
             // 根據所選的區域決定是否顯示主要內容包裝區（contentWrapper）。
-            // 當顯示個人設置或模板庫時，隱藏包裝區以避免產生額外的上方留白；
+            // 當顯示個人設置或模板庫管理時，隱藏包裝區以避免產生額外的上方留白；
             // 其他區域則顯示包裝區，保持與原先版面一致。
             try {
                 const wrapper = document.getElementById('contentWrapper');
@@ -1478,7 +1478,7 @@ async function logout() {
 
         // 隱藏所有區域
         function hideAllSections() {
-            // 隱藏所有區域，包括新增的個人設置與模板庫
+            // 隱藏所有區域，包括新增的個人設置與模板庫管理
             ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary', 'welcomePage'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.add('hidden');
@@ -7639,7 +7639,7 @@ async function initializeSystemAfterLogin() {
 
 
 
-        // 中藥庫功能
+        // 中藥庫管理功能
         let editingHerbId = null;
         let editingFormulaId = null;
         let currentHerbFilter = 'all';
@@ -8080,7 +8080,7 @@ async function initializeSystemAfterLogin() {
             }
         }
 
-        // 穴位庫功能
+        // 穴位庫管理功能
         /**
          * 初始化穴位庫資料。
          * 從本地 data 資料夾讀取 acupointLibrary.json。
@@ -8142,13 +8142,13 @@ async function initializeSystemAfterLogin() {
         }
 
         /**
-         * 載入穴位庫畫面。若資料尚未初始化，會先讀取資料。
+         * 載入穴位庫管理畫面。若資料尚未初始化，會先讀取資料。
          * 綁定搜尋輸入框的事件，當搜尋字串變化時重置頁碼並重新渲染列表。
          */
         async function loadAcupointLibrary() {
             // 權限檢查：護理師與診所管理者、醫師可使用；其他角色禁止
             if (!hasAccessToSection('acupointLibrary')) {
-                showToast('權限不足，無法存取穴位庫', 'error');
+                showToast('權限不足，無法存取穴位庫管理', 'error');
                 return;
             }
             // 若尚未載入資料則初始化
@@ -11851,7 +11851,7 @@ async function handleTemplateImportFile(file) {
  */
 async function importTemplateLibraryData(prescriptions, diagnoses, progressCallback) {
   try {
-    // Firestore 不再用於模板庫，移除遠端寫入及初始化等待。
+    // Firestore 不再用於模板庫管理，移除遠端寫入及初始化等待。
     // 定義資料處理 helper，只用於調整進度條，不與 Firestore 互動。
     async function upsertCollectionItems(collectionName, items) {
       if (!Array.isArray(items) || items.length === 0) return;
@@ -12058,7 +12058,7 @@ async function importHerbLibraryData(items, progressCallback) {
 }
 
 /**
- * 清除所有模板資料（查看查看查看查看醫囑與診斷模板）。
+ * 清除所有模板資料（醫囑與診斷模板）。
  * 顯示進度條並逐一刪除資料。
  */
 // 已移除 clearTemplateData 功能
@@ -16722,7 +16722,7 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               if (item.cautions) details.push('注意：' + item.cautions);
               const encoded = encodeURIComponent(details.join('\n'));
               // 使用模板字串來組合 HTML，避免字串串接時的引號轉義錯誤
-              // 這裡使用單引號包裹 safeName 參數，並確保任何單引號都已在上方以 \ 替換
+              // 這裡使用單引號包裹 safeName 參數，並確保任何單引號都已在上方以 \\ 替換
               return `<div class="p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addHerbToCombo('${safeName}', '')">${window.escapeHtml(item.name)}</div>`;
             }).join('');
             resultsContainer.classList.remove('hidden');
@@ -16802,8 +16802,10 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
     // 設置初始位置，稍微偏移以免遮擋游標
     const offsetX = 10;
     const offsetY = 10;
-    tooltip.style.left = (event.pageX + offsetX) + 'px';
-    tooltip.style.top = (event.pageY + offsetY) + 'px';
+    // 使用 clientX/clientY 以取得視窗內座標，配合 position:fixed 讓提示靠近游標
+    // 若使用 pageX/pageY，當畫面有滾動時會導致位置偏移
+    tooltip.style.left = (event.clientX + offsetX) + 'px';
+    tooltip.style.top = (event.clientY + offsetY) + 'px';
   }
 
   function moveTooltip(event) {
@@ -16811,8 +16813,9 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
     if (!tooltip || tooltip.classList.contains('hidden')) return;
     const offsetX = 10;
     const offsetY = 10;
-    tooltip.style.left = (event.pageX + offsetX) + 'px';
-    tooltip.style.top = (event.pageY + offsetY) + 'px';
+    // 使用 clientX/clientY 以取得視窗內座標，配合 position:fixed 讓提示靠近游標
+    tooltip.style.left = (event.clientX + offsetX) + 'px';
+    tooltip.style.top = (event.clientY + offsetY) + 'px';
   }
 
   function hideTooltip() {
@@ -16825,47 +16828,6 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
   window.showTooltip = showTooltip;
   window.moveTooltip = moveTooltip;
   window.hideTooltip = hideTooltip;
-
-  /**
-   * 全局事件委託：處方搜尋結果或其他含有 data-tooltip 屬性的元素
-   * 將以統一的方式顯示、移動和隱藏工具提示。這可避免因動態產生的
-   * 元素上內嵌事件綁定失效而導致無法顯示 tooltip 的情況，並保證
-   * 任何擁有 data-tooltip 的元素在滑鼠停留時都能即時顯示完整資訊。
-   */
-  try {
-    // 滑鼠移入：找到最近的 data-tooltip 元素並顯示提示
-    document.addEventListener('mouseover', function (e) {
-      const targetEl = e.target && typeof e.target.closest === 'function'
-        ? e.target.closest('[data-tooltip]')
-        : null;
-      if (targetEl) {
-        const encoded = targetEl.getAttribute('data-tooltip');
-        // 調用全局函式以顯示 tooltip
-        window.showTooltip(e, encoded);
-      }
-    });
-    // 滑鼠移動：若 tooltip 已顯示則更新位置
-    document.addEventListener('mousemove', function (e) {
-      // 直接使用 moveTooltip 內部會檢查是否需更新
-      window.moveTooltip(e);
-    });
-    // 滑鼠移出：當離開 data-tooltip 元素並且未進入另一個 data-tooltip 元素時，隱藏提示
-    document.addEventListener('mouseout', function (e) {
-      const fromEl = e.target && typeof e.target.closest === 'function'
-        ? e.target.closest('[data-tooltip]')
-        : null;
-      const toEl = e.relatedTarget && typeof e.relatedTarget.closest === 'function'
-        ? e.relatedTarget.closest('[data-tooltip]')
-        : null;
-      // 如果離開的是 data-tooltip 元素，且沒有進入另一個相同屬性的元素
-      if (fromEl && fromEl !== toEl) {
-        window.hideTooltip();
-      }
-    });
-  } catch (_e) {
-    // 捕獲潛在錯誤避免阻斷其他邏輯
-    console.error('初始化 tooltip 全局事件監聽失敗:', _e);
-  }
 
           // 初始化
 document.addEventListener('DOMContentLoaded', function() {
