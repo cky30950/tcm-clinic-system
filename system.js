@@ -8623,14 +8623,31 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
-            // 搜索匹配的中藥材和方劑
-            const matchedItems = herbLibrary.filter(item => 
-                item.name.toLowerCase().includes(searchTerm) ||
-                (item.alias && item.alias.toLowerCase().includes(searchTerm)) ||
-                (item.effects && item.effects.toLowerCase().includes(searchTerm))
-            ).slice(0, 10); // 限制顯示前10個結果
+    // 搜索匹配的中藥材和方劑，並根據匹配程度排序
+    let matchedItems = (Array.isArray(herbLibrary) ? herbLibrary : []).filter(item => {
+        const lowerName = item.name ? item.name.toLowerCase() : '';
+        const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
+        const lowerEffects = item.effects ? item.effects.toLowerCase() : '';
+        return lowerName.includes(searchTerm) || lowerAlias.includes(searchTerm) || lowerEffects.includes(searchTerm);
+    }).map(item => {
+        // 計算匹配分數：名稱匹配最先，其次別名，再其次功效
+        const lowerName = item.name ? item.name.toLowerCase() : '';
+        const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
+        const lowerEffects = item.effects ? item.effects.toLowerCase() : '';
+        let score = Infinity;
+        if (lowerName.includes(searchTerm)) {
+            score = lowerName.indexOf(searchTerm);
+        } else if (lowerAlias.includes(searchTerm)) {
+            score = 100 + lowerAlias.indexOf(searchTerm);
+        } else if (lowerEffects.includes(searchTerm)) {
+            score = 200 + lowerEffects.indexOf(searchTerm);
+        }
+        return { item, score };
+    }).sort((a, b) => a.score - b.score).map(obj => obj.item);
+    // 只取前10個結果
+    matchedItems = matchedItems.slice(0, 10);
             
-            if (matchedItems.length === 0) {
+    if (!matchedItems || matchedItems.length === 0) {
                 resultsList.innerHTML = `
                     <div class="p-3 text-center text-gray-500 text-sm">
                         找不到符合條件的中藥材或方劑
@@ -8640,24 +8657,39 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
-            // 顯示搜索結果
-            resultsList.innerHTML = matchedItems.map(item => {
-                const typeName = item.type === 'herb' ? '中藥材' : '方劑';
-                const bgColor = 'bg-yellow-50 hover:bg-yellow-100 border-yellow-200';
-                
-                return `
-                    <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToPrescription('${item.type}', ${item.id})">
-                        <div class="text-center">
-                            <div class="font-semibold text-gray-900 text-sm mb-1">${item.name}</div>
-                            <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${typeName}</div>
-                            ${item.type === 'herb' && item.dosage ? `<div class="text-xs text-yellow-600 font-medium">${item.dosage}</div>` : ''}
-                            ${item.effects ? `<div class="text-xs text-gray-600 mt-1">${item.effects.substring(0, 30)}${item.effects.length > 30 ? '...' : ''}</div>` : ''}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-            
-            resultsContainer.classList.remove('hidden');
+    // 顯示搜索結果，移除劑量欄，並於滑鼠停留時顯示完整資訊
+    resultsList.innerHTML = matchedItems.map(item => {
+        const typeName = item.type === 'herb' ? '中藥材' : '方劑';
+        const bgColor = 'bg-yellow-50 hover:bg-yellow-100 border-yellow-200';
+        // 組合完整資訊作為 tooltip 內容
+        const details = [];
+        details.push(`名稱：${item.name}`);
+        if (item.alias) details.push(`別名：${item.alias}`);
+        if (item.type === 'herb') {
+            if (item.nature) details.push(`性味：${item.nature}`);
+            if (item.meridian) details.push(`歸經：${item.meridian}`);
+        }
+        if (item.effects) details.push(`功效：${item.effects}`);
+        if (item.indications) details.push(`主治：${item.indications}`);
+        if (item.type === 'formula') {
+            if (item.composition) details.push(`組成：${item.composition.replace(/\n/g, '、')}`);
+            if (item.usage) details.push(`用法：${item.usage}`);
+        }
+        if (item.cautions) details.push(`注意：${item.cautions}`);
+        const tooltip = window.escapeHtml(details.join('\n'));
+        return `
+            <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToPrescription('${item.type}', ${item.id})" title="${tooltip}">
+                <div class="text-center">
+                    <div class="font-semibold text-gray-900 text-sm mb-1">${window.escapeHtml(item.name)}</div>
+                    <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${typeName}</div>
+                    <!-- 劑量已移除，不顯示 -->
+                    ${item.effects ? `<div class="text-xs text-gray-600 mt-1">${window.escapeHtml(item.effects.substring(0, 30))}${item.effects.length > 30 ? '...' : ''}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    resultsContainer.classList.remove('hidden');
         }
         
         // 存儲已選擇的處方項目
@@ -8729,48 +8761,63 @@ async function initializeSystemAfterLogin() {
             // 顯示服藥天數設定
             medicationSettings.style.display = 'block';
             
-            // 顯示已添加的項目
-            const displayHtml = `
-                <div class="space-y-3">
-                    ${selectedPrescriptionItems.map((item, index) => {
-                        const bgColor = 'bg-yellow-50 border-yellow-200';
-                        
-                        return `
-                            <div class="${bgColor} border rounded-lg p-3">
-                                <div class="flex items-center">
-                                    <div class="flex-1">
-                                        <div class="font-semibold text-gray-900">${item.name}</div>
-                                        ${item.type === 'formula' ? `<div class="text-xs text-gray-600">方劑</div>` : ''}
-                                    </div>
-                                    <div class="flex items-center space-x-2 mr-3">
-                                        <input type="number" 
-                                               value="${item.customDosage || '6'}" 
-                                               min="0.5" 
-                                               max="100" 
-                                               step="0.5"
-                                               class="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-center"
-                                               oninput="updatePrescriptionDosageLive(${index}, this.value)"
-                                               onchange="updatePrescriptionDosage(${index}, this.value)"
-                                               onclick="this.select()">
-                                        <span class="text-sm text-gray-600 font-medium">g</span>
-                                    </div>
-                                    <button onclick="removePrescriptionItem(${index})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>
-                                </div>
-                                
-                                ${item.type === 'formula' && item.composition ? `
-                                    <div class="mt-3 pt-3 border-t border-yellow-200">
-                                        <div class="text-xs font-semibold text-gray-700 mb-2">方劑組成：</div>
-                                        <div class="text-xs text-gray-600 bg-white rounded px-3 py-2 border border-yellow-100">
-                                            ${item.composition.replace(/\n/g, '、')}
-                                        </div>
-                                    </div>
-                                ` : ''}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-            
+            // 顯示已添加的項目，並於滑鼠停留時顯示完整資訊
+            let itemsHtml = '';
+            (Array.isArray(selectedPrescriptionItems) ? selectedPrescriptionItems : []).forEach((item, index) => {
+                const bgColor = 'bg-yellow-50 border-yellow-200';
+                // 查找完整資料以便組合 tooltip
+                let full = null;
+                if (Array.isArray(herbLibrary)) {
+                    const found = herbLibrary.find(h => h && String(h.id) === String(item.id));
+                    if (found) full = found;
+                }
+                const details = [];
+                details.push(`名稱：${item.name}`);
+                if (full && full.alias) details.push(`別名：${full.alias}`);
+                // 根據類型添加性味、歸經、功效、主治等資訊
+                if (item.type === 'herb' && full) {
+                    if (full.nature) details.push(`性味：${full.nature}`);
+                    if (full.meridian) details.push(`歸經：${full.meridian}`);
+                }
+                // 功效
+                if (full && full.effects) details.push(`功效：${full.effects}`);
+                // 主治
+                if (full && full.indications) details.push(`主治：${full.indications}`);
+                // 方劑組成與用法
+                if (item.type === 'formula' && full) {
+                    if (full.composition) details.push(`組成：${full.composition.replace(/\n/g, '、')}`);
+                    if (full.usage) details.push(`用法：${full.usage}`);
+                }
+                // 注意事項
+                if (full && full.cautions) details.push(`注意：${full.cautions}`);
+                const tooltip = window.escapeHtml(details.join('\n'));
+                // 構建單個項目的 HTML
+                let itemHtml = '';
+                itemHtml += `<div class="${bgColor} border rounded-lg p-3" title="${tooltip}">`;
+                itemHtml += `<div class="flex items-center">`;
+                itemHtml += `<div class="flex-1">`;
+                itemHtml += `<div class="font-semibold text-gray-900">${window.escapeHtml(item.name)}</div>`;
+                if (item.type === 'formula') {
+                    itemHtml += `<div class="text-xs text-gray-600">方劑</div>`;
+                }
+                itemHtml += `</div>`;
+                itemHtml += `<div class="flex items-center space-x-2 mr-3">`;
+                itemHtml += `<input type="number" value="${item.customDosage || '6'}" min="0.5" max="100" step="0.5" class="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-center" oninput="updatePrescriptionDosageLive(${index}, this.value)" onchange="updatePrescriptionDosage(${index}, this.value)" onclick="this.select()">`;
+                itemHtml += `<span class="text-sm text-gray-600 font-medium">g</span>`;
+                itemHtml += `</div>`;
+                itemHtml += `<button onclick="removePrescriptionItem(${index})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>`;
+                itemHtml += `</div>`;
+                // 如果為方劑且有組成資訊，附加組成區塊
+                if (item.type === 'formula' && item.composition) {
+                    itemHtml += `<div class="mt-3 pt-3 border-t border-yellow-200">`;
+                    itemHtml += `<div class="text-xs font-semibold text-gray-700 mb-2">方劑組成：</div>`;
+                    itemHtml += `<div class="text-xs text-gray-600 bg-white rounded px-3 py-2 border border-yellow-100">${window.escapeHtml(item.composition.replace(/\n/g, '、'))}</div>`;
+                    itemHtml += `</div>`;
+                }
+                itemHtml += `</div>`;
+                itemsHtml += itemHtml;
+            });
+            const displayHtml = `<div class="space-y-3">${itemsHtml}</div>`;
             container.innerHTML = displayHtml;
             
             // 更新隱藏的文本域
@@ -16534,21 +16581,52 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               resultsContainer.classList.add('hidden');
               return;
             }
-            // 搜索 herbLibrary 中的中藥材與方劑，名稱、別名或功效中包含搜尋字串
-            const matched = (Array.isArray(herbLibrary) ? herbLibrary : []).filter(item => item && (item.type === 'herb' || item.type === 'formula') && (
+            // 搜索 herbLibrary 中的中藥材與方劑，名稱、別名或功效中包含搜尋字串，並根據匹配程度排序
+            let matched = (Array.isArray(herbLibrary) ? herbLibrary : []).filter(item => item && (item.type === 'herb' || item.type === 'formula') && (
               (item.name && item.name.toLowerCase().includes(searchTerm)) ||
               (item.alias && item.alias.toLowerCase().includes(searchTerm)) ||
               (item.effects && item.effects.toLowerCase().includes(searchTerm))
-            )).slice(0, 10);
-            if (matched.length === 0) {
+            )).map(item => {
+              const lowerName = item.name ? item.name.toLowerCase() : '';
+              const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
+              const lowerEffects = item.effects ? item.effects.toLowerCase() : '';
+              let score = Infinity;
+              if (lowerName.includes(searchTerm)) {
+                score = lowerName.indexOf(searchTerm);
+              } else if (lowerAlias.includes(searchTerm)) {
+                score = 100 + lowerAlias.indexOf(searchTerm);
+              } else if (lowerEffects.includes(searchTerm)) {
+                score = 200 + lowerEffects.indexOf(searchTerm);
+              }
+              return { item, score };
+            }).sort((a, b) => a.score - b.score).map(obj => obj.item);
+            // 只取前10個結果
+            matched = matched.slice(0, 10);
+            if (!matched || matched.length === 0) {
               resultsList.innerHTML = '<div class="p-2 text-center text-gray-500 text-sm">找不到符合條件的藥材</div>';
               resultsContainer.classList.remove('hidden');
               return;
             }
+            // 產生結果並在滑鼠停留時顯示完整資訊
             resultsList.innerHTML = matched.map(item => {
               const safeName = (item.name || '').replace(/'/g, "\\'");
               const safeDosage = (item.dosage || '').replace(/'/g, "\\'");
-              return '<div class="p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded cursor-pointer text-center text-sm" onclick="addHerbToCombo(\'' + safeName + '\', \'' + safeDosage + '\')">' + item.name + '</div>';
+              const details = [];
+              details.push('名稱：' + item.name);
+              if (item.alias) details.push('別名：' + item.alias);
+              if (item.type === 'herb') {
+                if (item.nature) details.push('性味：' + item.nature);
+                if (item.meridian) details.push('歸經：' + item.meridian);
+              }
+              if (item.effects) details.push('功效：' + item.effects);
+              if (item.indications) details.push('主治：' + item.indications);
+              if (item.type === 'formula') {
+                if (item.composition) details.push('組成：' + item.composition.replace(/\n/g, '、'));
+                if (item.usage) details.push('用法：' + item.usage);
+              }
+              if (item.cautions) details.push('注意：' + item.cautions);
+              const tooltip = window.escapeHtml(details.join('\n'));
+              return '<div class="p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded cursor-pointer text-center text-sm" title="' + tooltip + '" onclick="addHerbToCombo(\'' + safeName + '\', \'' + safeDosage + '\')">' + window.escapeHtml(item.name) + '</div>';
             }).join('');
             resultsContainer.classList.remove('hidden');
           }
