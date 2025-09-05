@@ -11736,104 +11736,19 @@ async function importHerbLibraryData(items, progressCallback) {
  * 清除所有模板資料（醫囑與診斷模板）。
  * 顯示進度條並逐一刪除資料。
  */
-async function clearTemplateData() {
-  try {
-    // 確認使用者操作
-    if (!window.confirm('確定要清除所有模板資料嗎？此動作將無法復原。')) {
-      return;
-    }
-    await ensureFirebaseReady();
-    // 取得兩個集合的所有文件
-    const presSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'prescriptionTemplates'));
-    const diagSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'diagnosisTemplates'));
-    const totalSteps = presSnap.size + diagSnap.size;
-    let processed = 0;
-    showImportProgressBar(totalSteps);
-    // 刪除醫囑模板
-    for (const docSnap of presSnap.docs) {
-      await window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, 'prescriptionTemplates', docSnap.id));
-      processed++;
-      updateImportProgressBar(processed, totalSteps);
-    }
-    // 刪除診斷模板
-    for (const docSnap of diagSnap.docs) {
-      await window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, 'diagnosisTemplates', docSnap.id));
-      processed++;
-      updateImportProgressBar(processed, totalSteps);
-    }
-    // 更新本地資料
-    prescriptionTemplates = [];
-    diagnosisTemplates = [];
-    // 重新渲染
-    if (typeof renderPrescriptionTemplates === 'function') {
-      try { renderPrescriptionTemplates(); } catch (_e) {}
-    }
-    if (typeof renderDiagnosisTemplates === 'function') {
-      try { renderDiagnosisTemplates(); } catch (_e) {}
-    }
-    if (typeof refreshTemplateCategoryFilters === 'function') {
-      try { refreshTemplateCategoryFilters(); } catch (_e) {}
-    }
-    finishImportProgressBar(true);
-    showToast('模板資料已清除！', 'success');
-  } catch (err) {
-    finishImportProgressBar(false);
-    console.error('清除模板資料失敗:', err);
-    showToast('清除模板資料失敗，請稍後再試', 'error');
-  }
-}
+// 已移除 clearTemplateData 功能
 
 /**
  * 清除所有中藥資料。
  * 顯示進度條並逐一刪除資料。
  */
-async function clearHerbData() {
-  try {
-    if (!window.confirm('確定要清除所有中藥資料嗎？此動作將無法復原。')) {
-      return;
-    }
-    await ensureFirebaseReady();
-    const herbSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'herbLibrary'));
-    const totalSteps = herbSnap.size;
-    let processed = 0;
-    showImportProgressBar(totalSteps);
-    for (const docSnap of herbSnap.docs) {
-      await window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, 'herbLibrary', docSnap.id));
-      processed++;
-      updateImportProgressBar(processed, totalSteps);
-    }
-    herbLibrary = [];
-    if (typeof initHerbLibrary === 'function') {
-      try { await initHerbLibrary(); } catch (_e) {}
-    }
-    if (typeof displayHerbLibrary === 'function') {
-      try { displayHerbLibrary(); } catch (_e) {}
-    }
-    finishImportProgressBar(true);
-    showToast('中藥資料已清除！', 'success');
-  } catch (err) {
-    finishImportProgressBar(false);
-    console.error('清除中藥資料失敗:', err);
-    showToast('清除中藥資料失敗，請稍後再試', 'error');
-  }
-}
+// 已移除 clearHerbData 功能
 
 /**
  * 觸發匯入模板與中藥資料的檔案選擇器。
  * 清空檔案輸入框並打開檔案選擇對話框。
  */
-function triggerTemplateAndHerbImport() {
-  try {
-    const input = document.getElementById('templateAndHerbImportFile');
-    if (input) {
-      // 重置 value，確保可重新選擇同一檔案
-      input.value = '';
-      input.click();
-    }
-  } catch (e) {
-    console.error('觸發模板及中藥匯入時發生錯誤:', e);
-  }
-}
+// 已移除 triggerTemplateAndHerbImport 功能
 
 /**
  * 處理選擇的模板及中藥資料檔案。
@@ -11841,101 +11756,13 @@ function triggerTemplateAndHerbImport() {
  * 在合併匯入模式下，將會抑制單項匯入時的確認提示與無效資料錯誤提示。
  * @param {File} file 使用者選擇的檔案
  */
-async function handleTemplateAndHerbImportFile(file) {
-  if (!file) return;
-  try {
-    if (!window.confirm('匯入模板及中藥資料將新增資料（不會刪除現有資料），是否繼續？')) {
-      return;
-    }
-    // 啟用合併匯入模式，覆寫 confirm 以跳過後續二次確認
-    window.isCombinedImportMode = true;
-    const originalConfirm = window.confirm;
-    window.confirm = () => true;
-    try {
-      // 依序執行模板匯入與中藥匯入
-      await handleTemplateImportFile(file);
-      await handleHerbImportFile(file);
-      showToast('模板及中藥資料匯入完成！', 'success');
-    } catch (err) {
-      console.error('匯入模板及中藥資料失敗:', err);
-      showToast('匯入模板及中藥資料失敗，請確認檔案格式是否正確', 'error');
-    } finally {
-      // 還原 confirm
-      window.confirm = originalConfirm;
-    }
-  } catch (err2) {
-    console.error('處理模板及中藥匯入檔案時發生錯誤:', err2);
-    showToast('匯入模板及中藥資料失敗，請確認檔案格式是否正確', 'error');
-  } finally {
-    // 關閉合併匯入模式
-    window.isCombinedImportMode = false;
-  }
-}
+// 已移除 handleTemplateAndHerbImportFile 功能
 
 /**
  * 將模板與中藥庫資料匯出為 JSON 檔案。
  * 會從 Firestore 讀取醫囑模板、診斷模板及中藥庫資料，組合成單一檔案下載。
  */
-async function exportTemplateAndHerbData() {
-  const button = document.getElementById('templateAndHerbExportBtn');
-  setButtonLoading(button);
-  try {
-    await ensureFirebaseReady();
-    // 讀取中藥庫資料
-    let herbData = [];
-    try {
-      const herbSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'herbLibrary'));
-      herbSnap.forEach(docSnap => {
-        herbData.push({ id: docSnap.id, ...docSnap.data() });
-      });
-    } catch (e) {
-      console.error('讀取中藥資料失敗:', e);
-    }
-    // 讀取醫囑模板資料
-    let prescriptionTemplatesData = [];
-    try {
-      const presSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'prescriptionTemplates'));
-      presSnap.forEach(docSnap => {
-        prescriptionTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
-      });
-    } catch (e) {
-      console.error('讀取醫囑模板資料失敗:', e);
-    }
-    // 讀取診斷模板資料
-    let diagnosisTemplatesData = [];
-    try {
-      const diagSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'diagnosisTemplates'));
-      diagSnap.forEach(docSnap => {
-        diagnosisTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
-      });
-    } catch (e) {
-      console.error('讀取診斷模板資料失敗:', e);
-    }
-    // 組合資料
-    const exportData = {
-      prescriptionTemplates: prescriptionTemplatesData,
-      diagnosisTemplates: diagnosisTemplatesData,
-      herbLibrary: herbData
-    };
-    const json = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    a.download = `template_herb_data_${timestamp}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('資料已匯出！', 'success');
-  } catch (error) {
-    console.error('匯出資料失敗:', error);
-    showToast('匯出資料失敗，請稍後再試', 'error');
-  } finally {
-    clearButtonLoading(button);
-  }
-}
+// 已移除 exportTemplateAndHerbData 功能
 
         
 // 套票管理函式
@@ -13488,17 +13315,9 @@ document.addEventListener('DOMContentLoaded', function() {
   window.triggerHerbImport = triggerHerbImport;
   window.handleHerbImportFile = handleHerbImportFile;
 
-  // 合併匯入/匯出相關函式
-  window.triggerTemplateAndHerbImport = triggerTemplateAndHerbImport;
-  window.handleTemplateAndHerbImportFile = handleTemplateAndHerbImportFile;
-  window.exportTemplateAndHerbData = exportTemplateAndHerbData;
-
-  // 合併匯入模式旗標，預設為 false。
+  // 已移除合併匯入/匯出及清除資料相關函式
+  // 預留 isCombinedImportMode 旗標為 false，以維持既有匯入流程的邏輯判斷
   window.isCombinedImportMode = false;
-
-  // 清除資料相關函式
-  window.clearTemplateData = clearTemplateData;
-  window.clearHerbData = clearHerbData;
 
   /**
    * 安全地轉義使用者提供的字串，用於避免 XSS 攻擊。
