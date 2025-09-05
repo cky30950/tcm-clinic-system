@@ -833,7 +833,8 @@ function generateMedicalRecordNumber() {
         // 初始化穴位庫資料
         let acupointLibrary = [];
         // 穴位庫編輯狀態與篩選條件
-        let editingAcupointId = null;
+        // 移除穴位編輯狀態變數（不再支援新增/編輯/刪除）
+        // let editingAcupointId = null;
         let currentAcupointFilter = 'all';
         /**
          * 從 Firestore 讀取中藥庫資料，若資料不存在則自動使用預設值初始化。
@@ -8206,7 +8207,7 @@ async function initializeSystemAfterLogin() {
             const meridianFiltered = currentAcupointFilter === 'all' ? searchFiltered : searchFiltered.filter(item => item.meridian === currentAcupointFilter);
             // 若無資料，顯示提示並隱藏分頁
             if (!meridianFiltered || meridianFiltered.length === 0) {
-                listContainer.innerHTML = `\n                    <div class="text-center py-12 text-gray-500">\n                        <div class="text-4xl mb-4">📌</div>\n                        <div class="text-lg font-medium mb-2">沒有找到相關穴位</div>\n                        <div class="text-sm">請嘗試其他搜尋條件或新增穴位</div>\n                    </div>\n                `;
+                listContainer.innerHTML = `\n                    <div class="text-center py-12 text-gray-500">\n                        <div class="text-4xl mb-4">📌</div>\n                        <div class="text-lg font-medium mb-2">沒有找到相關穴位</div>\n                        <div class="text-sm">請嘗試其他搜尋條件</div>\n                    </div>\n                `;
                 const paginEl = ensurePaginationContainer('acupointLibraryList', 'acupointLibraryPagination');
                 if (paginEl) {
                     paginEl.innerHTML = '';
@@ -8262,140 +8263,14 @@ async function initializeSystemAfterLogin() {
             const safeIndications = inds.length > 0 ? inds.map(item => window.escapeHtml(item)).join('、') : '';
             const safeMethod = ac.method ? window.escapeHtml(ac.method) : '';
             const safeCategory = ac.category ? window.escapeHtml(ac.category) : '';
-            return `\n                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">\n                    <div class="flex justify-between items-start mb-3">\n                        <div>\n                            <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>\n                            ${safeMeridian ? `<p class="text-sm text-gray-600">${safeMeridian}</p>` : ''}\n                        </div>\n                        <div class="flex space-x-1">\n                            <button onclick="editAcupoint(${ac.id})" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>\n                            <button onclick="deleteAcupoint(${ac.id})" class="text-red-600 hover:text-red-800 text-sm">刪除</button>\n                        </div>\n                    </div>\n                    <div class="space-y-2 text-sm">\n                        ${safeLocation ? `<div><span class="font-medium text-gray-700">定位：</span>${safeLocation}</div>` : ''}\n                        ${safeFunctions ? `<div><span class="font-medium text-gray-700">功能：</span>${safeFunctions}</div>` : ''}\n                        ${safeIndications ? `<div><span class="font-medium text-gray-700">主治：</span>${safeIndications}</div>` : ''}\n                        ${safeMethod ? `<div><span class="font-medium text-gray-700">針法：</span>${safeMethod}</div>` : ''}\n                        ${safeCategory ? `<div><span class="font-medium text-gray-700">穴性：</span>${safeCategory}</div>` : ''}\n                    </div>\n                </div>\n            `;
+            return `\n                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">\n                    <div class="flex justify-between items-start mb-3">\n                        <div>\n                            <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>\n                            ${safeMeridian ? `<p class="text-sm text-gray-600">${safeMeridian}</p>` : ''}\n                        </div>\n                        <!-- 編輯與刪除按鈕已移除，僅顯示資料 -->\n                    </div>\n                    <div class="space-y-2 text-sm">\n                        ${safeLocation ? `<div><span class="font-medium text-gray-700">定位：</span>${safeLocation}</div>` : ''}\n                        ${safeFunctions ? `<div><span class="font-medium text-gray-700">功能：</span>${safeFunctions}</div>` : ''}\n                        ${safeIndications ? `<div><span class="font-medium text-gray-700">主治：</span>${safeIndications}</div>` : ''}\n                        ${safeMethod ? `<div><span class="font-medium text-gray-700">針法：</span>${safeMethod}</div>` : ''}\n                        ${safeCategory ? `<div><span class="font-medium text-gray-700">穴性：</span>${safeCategory}</div>` : ''}\n                    </div>\n                </div>\n            `;
         }
 
         /**
-         * 顯示新增穴位表單彈窗。
+         * 以下函式與 UI 操作相關，用於新增、編輯與刪除穴位資料。
+         * 現在系統改用只讀模式，故不再需要這些函式，已移除實作。
+         * 如需重新啟用此功能，可重新撰寫相應的表單與事件處理邏輯。
          */
-        function showAddAcupointForm() {
-            editingAcupointId = null;
-            const titleEl = document.getElementById('acupointFormTitle');
-            if (titleEl) titleEl.textContent = '新增穴位';
-            const btnTextEl = document.getElementById('acupointSaveButtonText');
-            if (btnTextEl) btnTextEl.textContent = '儲存';
-            clearAcupointForm();
-            const modal = document.getElementById('addAcupointModal');
-            if (modal) modal.classList.remove('hidden');
-        }
-
-        /**
-         * 隱藏新增/編輯穴位表單並清空內容。
-         */
-        function hideAddAcupointForm() {
-            const modal = document.getElementById('addAcupointModal');
-            if (modal) modal.classList.add('hidden');
-            clearAcupointForm();
-            editingAcupointId = null;
-        }
-
-        /**
-         * 清除穴位表單欄位內容。
-         */
-        function clearAcupointForm() {
-            ['acupointName', 'acupointMeridian', 'acupointLocation', 'acupointFunctions', 'acupointIndications', 'acupointMethod', 'acupointCategory'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.value = '';
-            });
-        }
-
-        /**
-         * 編輯指定穴位，將資料填入表單並顯示彈窗。
-         * @param {number} id - 穴位 ID
-         */
-        function editAcupoint(id) {
-            const ac = acupointLibrary.find(item => item.id === id);
-            if (!ac) return;
-            editingAcupointId = id;
-            const titleEl = document.getElementById('acupointFormTitle');
-            if (titleEl) titleEl.textContent = '編輯穴位';
-            const btnTextEl = document.getElementById('acupointSaveButtonText');
-            if (btnTextEl) btnTextEl.textContent = '更新';
-            const nameEl = document.getElementById('acupointName');
-            if (nameEl) nameEl.value = ac.name || '';
-            const meridianEl = document.getElementById('acupointMeridian');
-            if (meridianEl) meridianEl.value = ac.meridian || '';
-            const locEl = document.getElementById('acupointLocation');
-            if (locEl) locEl.value = ac.location || '';
-            const funcEl = document.getElementById('acupointFunctions');
-            if (funcEl) funcEl.value = Array.isArray(ac.functions) ? ac.functions.join('\n') : (ac.functions || '');
-            const indEl = document.getElementById('acupointIndications');
-            if (indEl) indEl.value = Array.isArray(ac.indications) ? ac.indications.join('\n') : (ac.indications || '');
-            const methodEl = document.getElementById('acupointMethod');
-            if (methodEl) methodEl.value = ac.method || '';
-            const catEl = document.getElementById('acupointCategory');
-            if (catEl) catEl.value = ac.category || '';
-            const modal = document.getElementById('addAcupointModal');
-            if (modal) modal.classList.remove('hidden');
-        }
-
-        /**
-         * 儲存穴位資料，處理新增與編輯情況。
-         */
-        function saveAcupoint() {
-            const nameEl = document.getElementById('acupointName');
-            const name = nameEl ? nameEl.value.trim() : '';
-            if (!name) {
-                showToast('請輸入穴位名稱！', 'error');
-                return;
-            }
-            const meridian = document.getElementById('acupointMeridian').value.trim();
-            const location = document.getElementById('acupointLocation').value.trim();
-            const functionsStr = document.getElementById('acupointFunctions').value;
-            const indicationsStr = document.getElementById('acupointIndications').value;
-            const method = document.getElementById('acupointMethod').value.trim();
-            const category = document.getElementById('acupointCategory').value.trim();
-            const functionsArr = functionsStr ? functionsStr.split(/\n+/).map(s => s.trim()).filter(Boolean) : [];
-            const indicationsArr = indicationsStr ? indicationsStr.split(/\n+/).map(s => s.trim()).filter(Boolean) : [];
-            if (editingAcupointId) {
-                const idx = acupointLibrary.findIndex(item => item.id === editingAcupointId);
-                if (idx !== -1) {
-                    const existing = acupointLibrary[idx];
-                    acupointLibrary[idx] = {
-                        ...existing,
-                        name: name,
-                        meridian: meridian,
-                        location: location,
-                        functions: functionsArr,
-                        indications: indicationsArr,
-                        method: method,
-                        category: category,
-                        updatedAt: new Date().toISOString()
-                    };
-                    showToast('穴位資料已更新！', 'success');
-                }
-            } else {
-                acupointLibrary.push({
-                    id: Date.now(),
-                    name: name,
-                    meridian: meridian,
-                    location: location,
-                    functions: functionsArr,
-                    indications: indicationsArr,
-                    method: method,
-                    category: category,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                });
-                showToast('穴位已新增！', 'success');
-            }
-            hideAddAcupointForm();
-            displayAcupointLibrary();
-        }
-
-        /**
-         * 刪除指定穴位並重新渲染列表。
-         * @param {number} id - 穴位 ID
-         */
-        function deleteAcupoint(id) {
-            const ac = acupointLibrary.find(item => item.id === id);
-            if (!ac) return;
-            if (confirm(`確定要刪除穴位「${ac.name}」嗎？\n\n此操作無法復原！`)) {
-                acupointLibrary = acupointLibrary.filter(item => item.id !== id);
-                showToast(`穴位「${ac.name}」已刪除！`, 'success');
-                displayAcupointLibrary();
-            }
-        }
 
         // 收費項目管理功能
         let editingBillingItemId = null;
