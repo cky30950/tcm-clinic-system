@@ -7683,12 +7683,32 @@ async function initializeSystemAfterLogin() {
             // 這允許「全部」按鈕顯示包括中藥材與方劑的總數量。
             // 另外也更新「中藥材」及「方劑」按鈕的數量提示，以便使用者快速瞭解各類型總數。
             (function updateHerbFilterCounts() {
-                // 首先依據搜尋條件過濾 herbLibrary，忽略類型篩選
+                /**
+                 * 根據搜尋條件過濾 herbLibrary。
+                 * 為了讓使用者能夠搜尋到中藥材或方劑的詳細內容，
+                 * 不再僅僅比對名稱或別名，而是將物件的所有主要欄位
+                 * （字串或數值）合併為一段文字進行搜尋。
+                 * 這樣可以支援搜尋性味、歸經、主治、用法等內容。
+                 */
                 const searchFiltered = Array.isArray(herbLibrary) ? herbLibrary.filter(item => {
-                    const lowerName = item.name ? item.name.toLowerCase() : '';
-                    const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
-                    const lowerEffects = item.effects ? item.effects.toLowerCase() : '';
-                    return lowerName.includes(searchTerm) || lowerAlias.includes(searchTerm) || lowerEffects.includes(searchTerm);
+                    try {
+                        // 將所有值轉為字串並合併，用於全文搜尋
+                        let combined = '';
+                        Object.keys(item).forEach(key => {
+                            if (key === 'id' || key === 'type') return;
+                            const v = item[key];
+                            if (!v) return;
+                            if (Array.isArray(v)) {
+                                combined += ' ' + v.join(' ');
+                            } else if (typeof v === 'string' || typeof v === 'number') {
+                                combined += ' ' + String(v);
+                            }
+                        });
+                        combined = combined.toLowerCase();
+                        return combined.includes(searchTerm);
+                    } catch (_e) {
+                        return false;
+                    }
                 }) : [];
                 const totalAll = searchFiltered.length;
                 const totalHerbsAll = searchFiltered.filter(item => item.type === 'herb').length;
@@ -7707,11 +7727,26 @@ async function initializeSystemAfterLogin() {
                     formulaBtn.innerHTML = `方劑 (${totalFormulasAll})`;
                 }
             })();
-            // 過濾資料
+            // 過濾資料：同樣使用全文搜尋，並根據類型篩選
             let filteredItems = Array.isArray(herbLibrary) ? herbLibrary.filter(item => {
-                const matchesSearch = item.name.toLowerCase().includes(searchTerm) ||
-                    (item.alias && item.alias.toLowerCase().includes(searchTerm)) ||
-                    (item.effects && item.effects.toLowerCase().includes(searchTerm));
+                let matchesSearch = true;
+                try {
+                    let combined = '';
+                    Object.keys(item).forEach(key => {
+                        if (key === 'id' || key === 'type') return;
+                        const v = item[key];
+                        if (!v) return;
+                        if (Array.isArray(v)) {
+                            combined += ' ' + v.join(' ');
+                        } else if (typeof v === 'string' || typeof v === 'number') {
+                            combined += ' ' + String(v);
+                        }
+                    });
+                    combined = combined.toLowerCase();
+                    matchesSearch = combined.includes(searchTerm);
+                } catch (_e) {
+                    matchesSearch = false;
+                }
                 const matchesFilter = currentHerbFilter === 'all' || item.type === currentHerbFilter;
                 return matchesSearch && matchesFilter;
             }) : [];
@@ -8173,7 +8208,11 @@ async function initializeSystemAfterLogin() {
                 const locationMatch = item.location && item.location.toLowerCase().includes(searchTerm);
                 const funcMatch = item.functions && Array.isArray(item.functions) ? item.functions.join(' ').toLowerCase().includes(searchTerm) : (item.functions ? String(item.functions).toLowerCase().includes(searchTerm) : false);
                 const indMatch = item.indications && Array.isArray(item.indications) ? item.indications.join(' ').toLowerCase().includes(searchTerm) : (item.indications ? String(item.indications).toLowerCase().includes(searchTerm) : false);
-                return nameMatch || meridianMatch || locationMatch || funcMatch || indMatch;
+                // 針法/治療方法搜尋
+                const methodMatch = item.method && item.method.toLowerCase().includes(searchTerm);
+                // 分類搜尋
+                const categoryMatch = item.category && item.category.toLowerCase().includes(searchTerm);
+                return nameMatch || meridianMatch || locationMatch || funcMatch || indMatch || methodMatch || categoryMatch;
             }) : [];
             // 計算各經絡的總數量，用於篩選按鈕顯示
             const meridianCounts = {};
@@ -15845,12 +15884,34 @@ function refreshTemplateCategoryFilters() {
               // 醫囑模板搜尋與分類
               const pInput = document.getElementById('prescriptionTemplateSearch');
               const pCategory = document.getElementById('prescriptionTemplateCategoryFilter');
+              /**
+               * 依據搜尋字串和分類篩選醫囑模板。
+               * 以前僅比對模板名稱，現在改為將模板的所有主要欄位合併後進行全文搜尋，
+               * 以便使用者能透過內容關鍵字快速找到相關醫囑模板。
+               */
               const filterPrescriptions = function() {
                 const term = pInput ? pInput.value.trim().toLowerCase() : '';
                 const cat = pCategory ? pCategory.value : '';
                 let filtered = Array.isArray(prescriptionTemplates) ? prescriptionTemplates.filter(item => {
-                  const name = (item.name || '').toLowerCase();
-                  return name.includes(term);
+                  // 全文搜尋：將所有值（字串/數值/陣列）串接並轉小寫
+                  if (!term) return true;
+                  try {
+                    let combined = '';
+                    Object.keys(item).forEach(key => {
+                      if (['id', 'isNew', 'lastModified'].includes(key)) return;
+                      const v = item[key];
+                      if (!v) return;
+                      if (Array.isArray(v)) {
+                        combined += ' ' + v.join(' ');
+                      } else if (typeof v === 'string' || typeof v === 'number') {
+                        combined += ' ' + String(v);
+                      }
+                    });
+                    combined = combined.toLowerCase();
+                    return combined.includes(term);
+                  } catch (_e) {
+                    return false;
+                  }
                 }) : [];
                 // 若選擇非全部類別，則依據類別進一步篩選
                 if (cat && cat !== '全部類別' && cat !== '全部分類') {
@@ -15870,12 +15931,33 @@ function refreshTemplateCategoryFilters() {
               // 診斷模板搜尋與分類
               const dInput = document.getElementById('diagnosisTemplateSearch');
               const dCategory = document.getElementById('diagnosisTemplateCategoryFilter');
+              /**
+               * 依據搜尋字串和分類篩選診斷模板。
+               * 與醫囑模板類似，將模板的主要內容（包含主訴、現病史、舌象、脈象、
+               * 中醫診斷、證型診斷及一般 content 欄位）合併為一段文字進行全文搜尋。
+               */
               const filterDiagnosis = function() {
                 const term = dInput ? dInput.value.trim().toLowerCase() : '';
                 const cat = dCategory ? dCategory.value : '';
                 let filtered = Array.isArray(diagnosisTemplates) ? diagnosisTemplates.filter(item => {
-                  const name = (item.name || '').toLowerCase();
-                  return name.includes(term);
+                  if (!term) return true;
+                  try {
+                    let combined = '';
+                    Object.keys(item).forEach(key => {
+                      if (['id', 'isNew', 'lastModified'].includes(key)) return;
+                      const v = item[key];
+                      if (!v) return;
+                      if (Array.isArray(v)) {
+                        combined += ' ' + v.join(' ');
+                      } else if (typeof v === 'string' || typeof v === 'number') {
+                        combined += ' ' + String(v);
+                      }
+                    });
+                    combined = combined.toLowerCase();
+                    return combined.includes(term);
+                  } catch (_e) {
+                    return false;
+                  }
                 }) : [];
                 if (cat && cat !== '全部科別' && cat !== '全部分類') {
                   filtered = filtered.filter(item => item.category === cat);
@@ -16639,7 +16721,9 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               }
               if (item.cautions) details.push('注意：' + item.cautions);
               const encoded = encodeURIComponent(details.join('\n'));
-              return '<div class="p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded cursor-pointer text-center text-sm" data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addHerbToCombo(\'' + safeName + '\', '')">' + window.escapeHtml(item.name) + '</div>';
+              // 使用模板字串來組合 HTML，避免字串串接時的引號轉義錯誤
+              // 這裡使用單引號包裹 safeName 參數，並確保任何單引號都已在上方以 \ 替換
+              return `<div class="p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addHerbToCombo('${safeName}', '')">${window.escapeHtml(item.name)}</div>`;
             }).join('');
             resultsContainer.classList.remove('hidden');
           }
