@@ -7770,6 +7770,7 @@ async function initializeSystemAfterLogin() {
             const safeIndications = herb.indications ? window.escapeHtml(herb.indications) : null;
             const safeDosage = herb.dosage ? window.escapeHtml(String(herb.dosage)) : null;
             const safeCautions = herb.cautions ? window.escapeHtml(herb.cautions) : null;
+            // 中藥卡片：僅顯示資訊，不提供編輯/刪除操作
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
@@ -7777,10 +7778,7 @@ async function initializeSystemAfterLogin() {
                             <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
                             ${safeAlias ? `<p class="text-sm text-gray-600">${safeAlias}</p>` : ''}
                         </div>
-                        <div class="flex space-x-1">
-                            <button onclick="editHerb(${herb.id})" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
-                            <button onclick="deleteHerbItem(${herb.id})" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
-                        </div>
+                        <!-- 操作區已移除：不提供編輯或刪除按鈕 -->
                     </div>
                     
                     <div class="space-y-2 text-sm">
@@ -7805,6 +7803,7 @@ async function initializeSystemAfterLogin() {
             const safeComposition = formula.composition ? window.escapeHtml(formula.composition).replace(/\n/g, '<br>') : null;
             const safeUsage = formula.usage ? window.escapeHtml(formula.usage) : null;
             const safeCautions = formula.cautions ? window.escapeHtml(formula.cautions) : null;
+            // 方劑卡片：僅顯示資訊，不提供編輯/刪除操作
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
@@ -7812,10 +7811,7 @@ async function initializeSystemAfterLogin() {
                             <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
                             ${safeSource ? `<p class="text-sm text-gray-600">出處：${safeSource}</p>` : ''}
                         </div>
-                        <div class="flex space-x-1">
-                            <button onclick="editFormula(${formula.id})" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
-                            <button onclick="deleteHerbItem(${formula.id})" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
-                        </div>
+                        <!-- 操作區已移除：不提供編輯或刪除按鈕 -->
                     </div>
                     
                     <div class="space-y-3 text-sm">
@@ -7914,15 +7910,7 @@ async function initializeSystemAfterLogin() {
                 showToast('中藥材已新增！', 'success');
             }
             
-            try {
-                // 將中藥材資料寫入 Firestore
-                await window.firebase.setDoc(
-                    window.firebase.doc(window.firebase.db, 'herbLibrary', String(herb.id)),
-                    herb
-                );
-            } catch (error) {
-                console.error('儲存中藥材資料至 Firestore 失敗:', error);
-            }
+            // 不再將中藥材資料寫入 Firestore；資料僅保留於本地陣列
             hideAddHerbForm();
             displayHerbLibrary();
         }
@@ -8010,15 +7998,7 @@ async function initializeSystemAfterLogin() {
                 showToast('方劑已新增！', 'success');
             }
             
-            try {
-                // 將方劑資料寫入 Firestore
-                await window.firebase.setDoc(
-                    window.firebase.doc(window.firebase.db, 'herbLibrary', String(formula.id)),
-                    formula
-                );
-            } catch (error) {
-                console.error('儲存方劑資料至 Firestore 失敗:', error);
-            }
+            // 不再將方劑資料寫入 Firestore；資料僅保留於本地陣列
             hideAddFormulaForm();
             displayHerbLibrary();
         }
@@ -8032,13 +8012,7 @@ async function initializeSystemAfterLogin() {
             
             if (confirm(`確定要刪除${itemType}「${item.name}」嗎？\n\n此操作無法復原！`)) {
                 herbLibrary = herbLibrary.filter(h => h.id !== id);
-                try {
-                    await window.firebase.deleteDoc(
-                        window.firebase.doc(window.firebase.db, 'herbLibrary', String(id))
-                    );
-                } catch (error) {
-                    console.error('刪除中藥材資料至 Firestore 失敗:', error);
-                }
+                // 不再從 Firestore 刪除資料
                 showToast(`${itemType}「${item.name}」已刪除！`, 'success');
                 displayHerbLibrary();
             }
@@ -11524,17 +11498,13 @@ async function handleTemplateImportFile(file) {
  */
 async function importTemplateLibraryData(prescriptions, diagnoses, progressCallback) {
   try {
-    await ensureFirebaseReady();
-    // 定義資料寫入的 helper，不會刪除現有資料，只會新增或更新
+    // Firestore 不再用於模板庫管理，移除遠端寫入及初始化等待。
+    // 定義資料處理 helper，只用於調整進度條，不與 Firestore 互動。
     async function upsertCollectionItems(collectionName, items) {
       if (!Array.isArray(items) || items.length === 0) return;
-      // 取得集合參考
-      const colRef = window.firebase.collection(window.firebase.db, collectionName);
-      // 逐一寫入/更新
       for (const item of items) {
         if (!item || typeof item !== 'object') continue;
-        const idStr = String(item.id);
-        await window.firebase.setDoc(window.firebase.doc(window.firebase.db, collectionName, idStr), item);
+        // 遞增進度
         if (typeof progressCallback === 'function') {
           progressCallback();
         }
@@ -11549,6 +11519,7 @@ async function importTemplateLibraryData(prescriptions, diagnoses, progressCallb
     }
     // 更新/新增醫囑模板
     if (Array.isArray(prescriptions) && prescriptions.length > 0) {
+      // 不再寫入至 Firestore，僅更新本地資料並調整進度
       await upsertCollectionItems('prescriptionTemplates', prescriptions);
       // 合併到本地資料：根據 id 替換或新增
       const updated = Array.isArray(prescriptionTemplates) ? [...prescriptionTemplates] : [];
@@ -11565,6 +11536,7 @@ async function importTemplateLibraryData(prescriptions, diagnoses, progressCallb
     }
     // 更新/新增診斷模板
     if (Array.isArray(diagnoses) && diagnoses.length > 0) {
+      // 不再寫入至 Firestore，僅更新本地資料並調整進度
       await upsertCollectionItems('diagnosisTemplates', diagnoses);
       const updatedDiag = Array.isArray(diagnosisTemplates) ? [...diagnosisTemplates] : [];
       diagnoses.forEach(item => {
@@ -11691,7 +11663,7 @@ async function handleHerbImportFile(file) {
  */
 async function importHerbLibraryData(items, progressCallback) {
   try {
-    await ensureFirebaseReady();
+    // 不再使用 Firestore，移除遠端初始化等待。
     if (!Array.isArray(items) || items.length === 0) {
       return;
     }
@@ -11703,7 +11675,7 @@ async function importHerbLibraryData(items, progressCallback) {
     for (const item of items) {
       if (!item || typeof item !== 'object') continue;
       const idStr = String(item.id);
-      await window.firebase.setDoc(window.firebase.doc(window.firebase.db, 'herbLibrary', idStr), item);
+      // 不再寫入至 Firestore，只更新本地資料並調整進度
       if (typeof progressCallback === 'function') {
         progressCallback();
       }
@@ -14414,41 +14386,10 @@ function refreshTemplateCategoryFilters() {
          */
         async function saveCategoriesToFirebase() {
           try {
-            // 如果 Firebase 可用，則將分類資料寫入 Firestore
-            if (window.firebase && window.firebase.db && window.firebase.setDoc && window.firebase.doc) {
-              // 確保 Firebase 已經初始化
-              await waitForFirebaseDb();
-              const docRef = window.firebase.doc(window.firebase.db, 'categories', 'default');
-              await window.firebase.setDoc(docRef, {
-                herbs: categories.herbs,
-                acupoints: categories.acupoints,
-                prescriptions: categories.prescriptions,
-                diagnosis: categories.diagnosis
-              });
-
-              // 無論是否使用 Firebase，均在本地保存一份副本
-              try {
-                localStorage.setItem('categories', JSON.stringify(categories));
-              } catch (err) {
-                console.error('保存分類資料至本地失敗:', err);
-              }
-            } else {
-              // 若 Firebase 不可用，退而求其次保存至 localStorage
-              try {
-                localStorage.setItem('categories', JSON.stringify(categories));
-              } catch (err) {
-                console.error('保存分類資料至本地失敗:', err);
-              }
-              return;
-            }
-          } catch (error) {
-            console.error('保存分類資料至 Firebase 失敗:', error);
-            // 嘗試使用本地儲存作為後備機制
-            try {
-              localStorage.setItem('categories', JSON.stringify(categories));
-            } catch (err2) {
-              console.error('保存分類資料至本地失敗:', err2);
-            }
+            // Firebase 不再使用：僅將分類資料儲存至 localStorage
+            localStorage.setItem('categories', JSON.stringify(categories));
+          } catch (err) {
+            console.error('保存分類資料至本地失敗:', err);
           }
         }
 
@@ -15397,8 +15338,7 @@ function refreshTemplateCategoryFilters() {
                     </div>
                   </div>
                   <div class="flex gap-2">
-                    <button class="text-blue-600 hover:text-blue-800" onclick="showEditModal('prescription', '${item.name}')">編輯</button>
-                    <button class="text-red-600 hover:text-red-800" onclick="deletePrescriptionTemplate(${item.id})">刪除</button>
+                    <!-- 操作按鈕已移除 -->
                   </div>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
@@ -15439,14 +15379,7 @@ function refreshTemplateCategoryFilters() {
           async function deletePrescriptionTemplate(id) {
             if (!confirm('確定要刪除此醫囑模板嗎？')) return;
             prescriptionTemplates = prescriptionTemplates.filter(p => p.id !== id);
-            // 從 Firestore 中刪除該醫囑模板
-            try {
-              await window.firebase.deleteDoc(
-                window.firebase.doc(window.firebase.db, 'prescriptionTemplates', String(id))
-              );
-            } catch (error) {
-              console.error('刪除醫囑模板資料至 Firestore 失敗:', error);
-            }
+            // 不再從 Firestore 刪除醫囑模板；直接重新渲染列表
             renderPrescriptionTemplates();
           }
 
@@ -15531,8 +15464,7 @@ function refreshTemplateCategoryFilters() {
                     </div>
                   </div>
                   <div class="flex gap-2">
-                    <button class="text-blue-600 hover:text-blue-800" onclick="showEditModal('diagnosis', '${item.name}')">編輯</button>
-                    <button class="text-red-600 hover:text-red-800" onclick="deleteDiagnosisTemplate(${item.id})">刪除</button>
+                    <!-- 操作按鈕已移除 -->
                   </div>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
@@ -15576,14 +15508,7 @@ function refreshTemplateCategoryFilters() {
           async function deleteDiagnosisTemplate(id) {
             if (!confirm('確定要刪除此診斷模板嗎？')) return;
             diagnosisTemplates = diagnosisTemplates.filter(d => d.id !== id);
-            // 從 Firestore 中刪除該診斷模板
-            try {
-              await window.firebase.deleteDoc(
-                window.firebase.doc(window.firebase.db, 'diagnosisTemplates', String(id))
-              );
-            } catch (error) {
-              console.error('刪除診斷模板資料至 Firestore 失敗:', error);
-            }
+            // 不再從 Firestore 刪除診斷模板；直接重新渲染列表
             renderDiagnosisTemplates();
           }
 
@@ -16277,15 +16202,7 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
                 item.isNew = false;
               }
               modal.dataset.isNew = 'false';
-              // 將資料保存至 Firestore
-              try {
-                await window.firebase.setDoc(
-                  window.firebase.doc(window.firebase.db, 'prescriptionTemplates', String(item.id)),
-                  item
-                );
-              } catch (error) {
-                console.error('儲存醫囑模板資料至 Firestore 失敗:', error);
-              }
+              // 不再將醫囑模板資料寫入 Firestore；直接重新渲染列表
               renderPrescriptionTemplates();
             } else if (editType === 'diagnosis') {
               const item = diagnosisTemplates.find(d => d.id === itemId);
@@ -16314,15 +16231,7 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
                 item.isNew = false;
               }
               modal.dataset.isNew = 'false';
-              // 將資料保存至 Firestore
-              try {
-                await window.firebase.setDoc(
-                  window.firebase.doc(window.firebase.db, 'diagnosisTemplates', String(item.id)),
-                  item
-                );
-              } catch (error) {
-                console.error('儲存診斷模板資料至 Firestore 失敗:', error);
-              }
+              // 不再將診斷模板資料寫入 Firestore；直接重新渲染列表
               renderDiagnosisTemplates();
             }
             // 保存成功後顯示成功提示，不再使用瀏覽器 alert
