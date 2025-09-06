@@ -16312,7 +16312,7 @@ function refreshTemplateCategoryFilters() {
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">搜尋穴位</label>
-                    <input type="text" id="acupointPointSearch" placeholder="搜尋穴位名稱或定位..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" oninput="searchAcupointForCombo()">
+                    <input type="text" id="acupointPointSearch" placeholder="搜尋穴位名稱、定位、功能或經絡..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" oninput="searchAcupointForCombo()">
                     <div id="acupointPointSearchResults" class="hidden">
                       <div class="bg-white border border-blue-200 rounded max-h-40 overflow-y-auto">
                         <div id="acupointPointSearchList" class="grid grid-cols-1 md:grid-cols-2 gap-2 p-2"></div>
@@ -16377,7 +16377,7 @@ function refreshTemplateCategoryFilters() {
                   <!-- 先顯示搜尋欄，再列出已添加的藥材列表 -->
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">搜尋藥材或方劑</label>
-                    <input type="text" id="herbIngredientSearch" placeholder="搜尋中藥材或方劑名稱..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" oninput="searchHerbForCombo()">
+                    <input type="text" id="herbIngredientSearch" placeholder="搜尋中藥材、方劑名稱或功能..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" oninput="searchHerbForCombo()">
                     <div id="herbIngredientSearchResults" class="hidden">
                       <div class="bg-white border border-green-200 rounded max-h-40 overflow-y-auto">
                         <div id="herbIngredientSearchList" class="grid grid-cols-1 md:grid-cols-2 gap-2 p-2"></div>
