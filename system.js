@@ -16245,9 +16245,9 @@ function refreshTemplateCategoryFilters() {
                 ? item.ingredients.map(ing => {
                     return '<div class="flex items-center gap-2">' +
                       // 將藥材名稱欄位寬度縮短為一半，避免在行動裝置上過長
-                      // 藥材名稱使用透明背景且移除邊框，避免出現白色欄位
-                      '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="w-1/2 px-2 py-1 bg-transparent border-0 focus:outline-none">' +
-                      '<input type="number" value="' + (ing.dosage || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
+                      '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="w-1/2 px-2 py-1 border border-gray-300 rounded">' +
+                      // 劑量輸入欄位亦使用透明背景並去除邊框，避免顯示白色輸入框
+                      '<input type="number" value="' + (ing.dosage || '') + '" placeholder="" class="w-20 px-2 py-1 bg-transparent border-0 focus:outline-none text-right">' +
                       '<span class="text-sm text-gray-700">克</span>' +
                       '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>' +
                       '</div>';
@@ -16726,14 +16726,14 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
             // 新增後的藥材名稱固定顯示，不可編輯
             nameInput.readOnly = true;
             // 將藥材名稱欄位寬度縮短為一半，避免在行動裝置上過長
-            // 使用透明背景且移除邊框，避免顯示白色欄位
-            nameInput.className = 'w-1/2 px-2 py-1 bg-transparent border-0 focus:outline-none';
+            nameInput.className = 'w-1/2 px-2 py-1 border border-gray-300 rounded';
             const dosageInput = document.createElement('input');
             dosageInput.type = 'number';
             // 劑量欄位預設為空，不自動填入任何值
             dosageInput.value = '';
             dosageInput.placeholder = '';
-            dosageInput.className = 'w-20 px-2 py-1 border border-gray-300 rounded';
+            // 劑量輸入欄位使用透明背景並去除邊框，避免顯示白色輸入框
+            dosageInput.className = 'w-20 px-2 py-1 bg-transparent border-0 focus:outline-none text-right';
             const unitSpan = document.createElement('span');
             unitSpan.textContent = '克';
             unitSpan.className = 'text-sm text-gray-700';
