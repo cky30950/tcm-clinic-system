@@ -16509,7 +16509,8 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               item.category = document.getElementById('herbCategorySelect').value;
               item.description = document.getElementById('herbDescriptionTextarea').value;
               const ingredientRows = document.querySelectorAll('#herbIngredients > div');
-              item.ingredients = Array.from(ingredientRows).map(row => {
+              // 將每一列的資料取出為物件陣列
+              const newIngredients = Array.from(ingredientRows).map(row => {
                 // 優先使用 dataset.herbName（新設計）；若不存在則退回舊結構
                 let name = '';
                 let dosage = '';
@@ -16532,6 +16533,14 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
                 }
                 return { name: name, dosage: dosage };
               });
+              // 過濾出名稱非空的藥材，用於檢查是否至少新增一項
+              const validIngredients = newIngredients.filter(ing => ing && ing.name && String(ing.name).trim() !== '');
+              if (validIngredients.length === 0) {
+                // 若沒有任何藥材，提示錯誤並中止保存
+                showToast('請至少添加一個藥材！', 'error');
+                return;
+              }
+              item.ingredients = newIngredients;
               item.lastModified = new Date().toISOString().split('T')[0];
               // 標記為已保存（非新建），避免取消時被移除
               if (item.isNew) {
@@ -16559,10 +16568,19 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               item.name = acupointNameVal;
               item.category = document.getElementById('acupointCategorySelect').value;
               const pointRows = document.querySelectorAll('#acupointPoints > div');
-              item.points = Array.from(pointRows).map(row => {
+              // 將每一列的穴位資料取出為物件陣列
+              const newPoints = Array.from(pointRows).map(row => {
                 const inputs = row.querySelectorAll('input');
                 return { name: inputs[0].value, type: inputs[1].value };
               });
+              // 過濾出名稱非空的穴位，用於檢查是否至少新增一項
+              const validPoints = newPoints.filter(pt => pt && pt.name && String(pt.name).trim() !== '');
+              if (validPoints.length === 0) {
+                // 若沒有任何穴位，提示錯誤並中止保存
+                showToast('請至少添加一個穴位！', 'error');
+                return;
+              }
+              item.points = newPoints;
               item.technique = document.getElementById('acupointTechniqueInput').value;
               item.lastModified = new Date().toISOString().split('T')[0];
               // 標記為已保存（非新建），避免取消時被移除
