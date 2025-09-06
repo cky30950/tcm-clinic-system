@@ -14870,13 +14870,20 @@ function refreshTemplateCategoryFilters() {
                     const dosage = ing && ing.dosage ? String(ing.dosage).trim() : '';
                     const displayDosage = dosage ? (dosage + '克') : '';
                     const nameVal = ing && ing.name ? ing.name : '';
-                    // 為每個藥材生成提示內容並編碼
+                    // 取得該藥材的提示內容並編碼
                     const tooltipContent = getHerbTooltipContent(nameVal);
+                    const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
                     let attrs = '';
                     if (tooltipContent) {
-                      const encoded = encodeURIComponent(tooltipContent);
-                      // 使用模板字串避免引號嵌套問題
-                      attrs = ` data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"`;
+                      // Use proper escaping for single quotes inside single-quoted strings. The
+                      // original implementation attempted to escape the single quotes surrounding
+                      // the `data-tooltip` attribute name using double backslashes (\\'), which
+                      // resulted in the string being prematurely terminated and caused a
+                      // `SyntaxError: Unexpected identifier` at runtime. To correctly embed
+                      // single quotes within a single-quoted JavaScript string, a single
+                      // backslash (\') should be used. This matches the pattern used in
+                      // similar code elsewhere in this file (see line ~16266).
+                      attrs = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
                     }
                     return '<div class="flex justify-between items-center p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded text-sm"' + attrs + '>' +
                       '<span class="text-green-800">' + nameVal + '</span>' +
@@ -16251,18 +16258,28 @@ function refreshTemplateCategoryFilters() {
             modal.classList.remove('hidden');
             // 根據不同類型渲染編輯內容
             if (itemType === 'herb') {
-              // 使用輸入框而非下拉選單顯示既有藥材，並提供搜尋功能新增藥材
-              // 重新組裝藥材列表：每行使用 flex 排版，包含名稱、劑量欄、單位及刪除按鈕。
+              // 使用綠色長方格顯示既有藥材，並提供搜尋功能新增藥材
+              // 每個藥材行包含名稱（不可編輯）、劑量輸入框、單位與刪除按鈕
               const herbIngredientsHtml = Array.isArray(item.ingredients)
                 ? item.ingredients.map(ing => {
-                    // 每一個藥材條目以綠色長方格顯示，使其外觀與搜尋結果一致
-                    // 新增額外的內邊距、背景色與邊框樣式，以便呈現綠色長方格
-                    return '<div class="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">' +
-                      // 將藥材名稱欄位寬度縮短為一半，避免在行動裝置上過長
-                      '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="w-1/2 px-2 py-1 border border-gray-300 rounded">' +
-                      '<input type="number" value="' + (ing.dosage || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
+                    const nameVal = (ing && ing.name) ? ing.name : '';
+                    const dosageVal = (ing && ing.dosage) ? ing.dosage : '';
+                    // 取得提示內容並進行 URI 編碼供屬性使用
+                    const tooltipContent = getHerbTooltipContent(nameVal);
+                    const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
+                    // 屬性字串：若存在名稱則添加 data-herb-name，若存在 tooltip 則添加相關屬性與事件
+                    const nameAttr = nameVal ? (' data-herb-name="' + nameVal.replace(/\"/g, '&quot;') + '"') : '';
+                    let tooltipAttr = '';
+                    if (tooltipContent) {
+                      tooltipAttr = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
+                    }
+                    return '<div class="flex items-center gap-2 p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded"' + nameAttr + tooltipAttr + '>' +
+                      // 名稱以 span 顯示，不可編輯
+                      '<span class="flex-1 text-green-800">' + (typeof window !== 'undefined' && window.escapeHtml ? window.escapeHtml(nameVal) : nameVal) + '</span>' +
+                      // 劑量輸入欄
+                      '<input type="number" value="' + (dosageVal || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
                       '<span class="text-sm text-gray-700">克</span>' +
-                      '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>' +
+                    '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>' +
                       '</div>';
                   }).join('')
                 : '';
@@ -16493,17 +16510,20 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               item.description = document.getElementById('herbDescriptionTextarea').value;
               const ingredientRows = document.querySelectorAll('#herbIngredients > div');
               item.ingredients = Array.from(ingredientRows).map(row => {
-                const select = row.querySelector('select');
-                const inputs = row.querySelectorAll('input');
+                // 優先使用 dataset.herbName（新設計）；若不存在則退回舊結構
                 let name = '';
                 let dosage = '';
-                if (select) {
-                  // 若存在下拉選單，名稱取自 select，劑量取自第一個 input
-                  name = select.value;
-                  dosage = inputs[0] ? inputs[0].value : '';
+                if (row.dataset && row.dataset.herbName) {
+                  name = row.dataset.herbName;
+                  const dosageInput = row.querySelector('input[type="number"]');
+                  dosage = dosageInput ? dosageInput.value : '';
                 } else {
-                  // 兼容舊資料結構：使用兩個輸入框分別代表名稱與劑量
-                  if (inputs.length >= 2) {
+                  const select = row.querySelector('select');
+                  const inputs = row.querySelectorAll('input');
+                  if (select) {
+                    name = select.value;
+                    dosage = inputs[0] ? inputs[0].value : '';
+                  } else if (inputs.length >= 2) {
                     name = inputs[0].value;
                     dosage = inputs[1].value;
                   } else if (inputs.length === 1) {
@@ -16729,27 +16749,46 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
           function addHerbToCombo(name, dosage) {
             const container = document.getElementById('herbIngredients');
             if (!container) return;
+            // 建立新的一行，並使用綠色背景與邊框樣式
             const div = document.createElement('div');
-            // 每一行以 flex 排版，包含名稱、劑量、單位與刪除按鈕
-            // 使用綠色長方格樣式讓藥材列表與搜尋結果一致
-            div.className = 'flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded';
-            const nameInput = document.createElement('input');
-            nameInput.type = 'text';
-            nameInput.value = name || '';
-            nameInput.placeholder = '藥材名稱';
-            // 新增後的藥材名稱固定顯示，不可編輯
-            nameInput.readOnly = true;
-            // 將藥材名稱欄位寬度縮短為一半，避免在行動裝置上過長
-            nameInput.className = 'w-1/2 px-2 py-1 border border-gray-300 rounded';
+            div.className = 'flex items-center gap-2 p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded';
+            // 儲存藥材名稱於 dataset，方便後續保存時讀取
+            if (name) {
+              div.dataset.herbName = name;
+            }
+            // 設定提示內容（若查詢不到則不設定）
+            const tooltipContent = getHerbTooltipContent(name || '');
+            if (tooltipContent) {
+              const encoded = encodeURIComponent(tooltipContent);
+              div.setAttribute('data-tooltip', encoded);
+              div.addEventListener('mouseenter', function(e) {
+                showTooltip(e, this.getAttribute('data-tooltip'));
+              });
+              div.addEventListener('mousemove', function(e) {
+                moveTooltip(e);
+              });
+              div.addEventListener('mouseleave', function() {
+                hideTooltip();
+              });
+            }
+            // 名稱以 span 顯示（不可編輯）
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'flex-1 text-green-800';
+            nameSpan.textContent = name || '';
+            div.appendChild(nameSpan);
+            // 劑量輸入欄
             const dosageInput = document.createElement('input');
             dosageInput.type = 'number';
-            // 劑量欄位預設為空，不自動填入任何值
             dosageInput.value = '';
             dosageInput.placeholder = '';
             dosageInput.className = 'w-20 px-2 py-1 border border-gray-300 rounded';
+            div.appendChild(dosageInput);
+            // 單位
             const unitSpan = document.createElement('span');
             unitSpan.textContent = '克';
             unitSpan.className = 'text-sm text-gray-700';
+            div.appendChild(unitSpan);
+            // 刪除按鈕
             const deleteBtn = document.createElement('button');
             deleteBtn.type = 'button';
             deleteBtn.textContent = '刪除';
@@ -16759,10 +16798,6 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
                 div.parentElement.removeChild(div);
               }
             });
-            // 組合元素
-            div.appendChild(nameInput);
-            div.appendChild(dosageInput);
-            div.appendChild(unitSpan);
             div.appendChild(deleteBtn);
             container.appendChild(div);
             const resultsContainer = document.getElementById('herbIngredientSearchResults');
@@ -16819,6 +16854,38 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
     const tooltip = document.getElementById('tooltip');
     if (!tooltip) return;
     tooltip.classList.add('hidden');
+  }
+
+  /**
+   * 取得指定中藥材或方劑的完整提示內容。
+   * 根據 herbLibrary 中的資料組合名稱、別名、性味、歸經、功效、主治、組成、用法與注意事項。
+   * 如果找不到對應的資料則回傳空字串。
+   * @param {string} name 藥材或方劑名稱
+   * @returns {string} 組合的詳細內容，以換行符分隔
+   */
+  function getHerbTooltipContent(name) {
+    if (!name || !Array.isArray(herbLibrary) || herbLibrary.length === 0) return '';
+    // 嘗試在 herbLibrary 中尋找名稱精確匹配的資料
+    const item = herbLibrary.find(h => h && h.name === name);
+    if (!item) return '';
+    const details = [];
+    details.push('名稱：' + (item.name || ''));
+    if (item.alias) details.push('別名：' + item.alias);
+    // 中藥材類型特有屬性
+    if (item.type === 'herb') {
+      if (item.nature) details.push('性味：' + item.nature);
+      if (item.meridian) details.push('歸經：' + item.meridian);
+    }
+    // 功效與主治
+    if (item.effects) details.push('功效：' + item.effects);
+    if (item.indications) details.push('主治：' + item.indications);
+    // 方劑類型的其他屬性
+    if (item.type === 'formula') {
+      if (item.composition) details.push('組成：' + item.composition.replace(/\n/g, '、'));
+      if (item.usage) details.push('用法：' + item.usage);
+    }
+    if (item.cautions) details.push('注意：' + item.cautions);
+    return details.join('\n');
   }
 
   // 將 tooltip 函式掛載至 window，供行內事件處理器調用
