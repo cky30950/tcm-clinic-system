@@ -162,6 +162,18 @@ function hasAccessToSection(sectionId) {
   // 若尚未取得用戶資料或未設定職位，則直接拒絕存取
   if (!currentUserData || !currentUserData.position) return false;
 
+  /*
+   * 僅限診所管理者可以使用用戶管理
+   * 即使 `ROLE_PERMISSIONS` 配置錯誤，或資料庫中的職稱有多餘空格或其他
+   * 狀況，也必須確保只有診所管理者能進入用戶管理畫面。
+   */
+  if (sectionId === 'userManagement') {
+    // 取得目前用戶職位並移除前後空白
+    const pos = currentUserData.position.trim ? currentUserData.position.trim() : currentUserData.position;
+    // 僅診所管理者可以使用用戶管理
+    return pos === '診所管理';
+  }
+
   // 額外規則：收費項目管理僅限診所管理者或醫師使用
   // 即使在 ROLE_PERMISSIONS 中配置不當，也能確保護理師無法進入
   if (sectionId === 'billingManagement') {
@@ -1275,6 +1287,15 @@ async function syncUserDataFromFirebase() {
             document.getElementById('sidebarUserRole').textContent = `當前用戶：${getUserDisplayName(user)}`;
             
             generateSidebarMenu();
+
+            // 更新歡迎頁面卡片可見性
+            if (typeof updateWelcomeCards === 'function') {
+                try {
+                    updateWelcomeCards();
+                } catch (_e) {
+                    // 忽略錯誤
+                }
+            }
             // After generating the sidebar, load the personal settings for this user.
             // We call this asynchronously and do not block the login flow. Any errors will be logged to the console.
             if (typeof loadPersonalSettings === 'function') {
@@ -1394,9 +1415,13 @@ async function logout() {
             const permissions = ROLE_PERMISSIONS[userPosition] || [];
 
             // 依序建立側邊選單按鈕
+            // 僅顯示當前用戶可存取的功能。即使權限配置錯誤，
+            // 也需要透過 hasAccessToSection() 再檢查一次，防止誤顯。
             permissions.forEach(permission => {
+                // 若對應功能未定義或無權存取，直接跳過
                 const item = menuItems[permission];
                 if (!item) return;
+                if (!hasAccessToSection(permission)) return;
                 const button = document.createElement('button');
                 // 移除預設 margin-bottom，改由外層容器控制間距，使選單項目更加整齊
                 button.className = 'w-full text-left p-4 rounded-lg hover:bg-gray-100 transition duration-200 border border-gray-200';
@@ -1480,6 +1505,46 @@ async function logout() {
             ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary', 'welcomePage'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.add('hidden');
+            });
+        }
+
+        /**
+         * 更新歡迎頁面卡片的可見性。
+         * 根據當前用戶的權限，隱藏無法存取的功能卡片（例如用戶管理）。
+         * 此函式在登入後被呼叫，確保使用者只看到自己的權限內的功能預覽。
+         */
+        function updateWelcomeCards() {
+            const welcomePageEl = document.getElementById('welcomePage');
+            if (!welcomePageEl) return;
+            // 選取所有直接子卡片
+            const cards = welcomePageEl.querySelectorAll('.grid > div');
+            cards.forEach(card => {
+                const titleEl = card.querySelector('.font-semibold');
+                const title = titleEl && titleEl.textContent ? titleEl.textContent.trim() : '';
+                if (!title) return;
+                // 對應標題到 section ID
+                let sectionId = null;
+                switch (title) {
+                    case '病人資料管理':
+                        sectionId = 'patientManagement';
+                        break;
+                    case '診症系統':
+                        sectionId = 'consultationSystem';
+                        break;
+                    case '用戶管理':
+                        sectionId = 'userManagement';
+                        break;
+                    case '系統管理':
+                        sectionId = 'systemManagement';
+                        break;
+                    default:
+                        sectionId = null;
+                }
+                if (sectionId && !hasAccessToSection(sectionId)) {
+                    card.classList.add('hidden');
+                } else {
+                    card.classList.remove('hidden');
+                }
             });
         }
 
