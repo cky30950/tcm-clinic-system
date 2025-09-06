@@ -57,12 +57,22 @@ function ensurePaginationContainer(parentId, paginationId) {
     }
     if (tableEl) {
         const tableParent = tableEl.parentNode;
-        if (!container.parentNode || container.parentNode !== tableParent) {
-            // 插入位置在 table 之後
-            if (tableEl.nextSibling) {
-                tableParent.insertBefore(container, tableEl.nextSibling);
+        // 預設將容器插入在 table 之後
+        let insertionParent = tableParent;
+        let referenceNode = tableEl.nextSibling;
+        // 如果表格的父元素是 overflow-x-auto 容器，則應將分頁容器放在 overflow 容器之外
+        if (tableParent && tableParent.classList && tableParent.classList.contains('overflow-x-auto')) {
+            // 將插入目標設為 overflow 容器的父元素
+            const overflowContainer = tableParent;
+            insertionParent = overflowContainer.parentNode;
+            referenceNode = overflowContainer.nextSibling;
+        }
+        // 如果當前容器尚未插入到正確的父容器中，則執行插入或移動
+        if (!container.parentNode || container.parentNode !== insertionParent) {
+            if (referenceNode) {
+                insertionParent.insertBefore(container, referenceNode);
             } else {
-                tableParent.appendChild(container);
+                insertionParent.appendChild(container);
             }
         }
     } else {
