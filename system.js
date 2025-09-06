@@ -16256,17 +16256,20 @@ function refreshTemplateCategoryFilters() {
             }
             // 顯示 modal
             modal.classList.remove('hidden');
-            // 若為穴位組合，使用搜尋介面並顯示提示框詳細資料，移除舊的手動新增功能
+            // 若為穴位組合，使用搜尋介面及提示框顯示完整資料。此邏輯將在此返回，避免進入舊的穴位分支。
             if (itemType === 'acupoint') {
+              // 建立已存在穴位行的 HTML，每行包含提示資訊、名稱、類型選擇與刪除按鈕
               const acupointRowsHtml = Array.isArray(item.points)
                 ? item.points.map(pt => {
                     const nameVal = (pt && pt.name) ? pt.name : '';
                     const typeVal = (pt && pt.type) ? pt.type : '主穴';
                     const tooltipContent = getAcupointTooltipContent(nameVal);
                     const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
-                    const nameAttr = nameVal ? (' data-acupoint-name="' + nameVal.replace(/"/g, '&quot;') + '"') : '';
+                    const nameAttr = nameVal ? (' data-acupoint-name="' + nameVal.replace(/\"/g, '&quot;') + '"') : '';
                     let tooltipAttr = '';
                     if (tooltipContent) {
+                      // 將鼠標提示字串中的單引號正確跳脫。原本使用 \\'data-tooltip\\' 會在字串中留下兩個反斜線，導致語法錯誤。
+                      // 改為使用 \'data-tooltip\'，即可正確產生內嵌屬性，避免解析錯誤。
                       tooltipAttr = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
                     }
                     const options = ['主穴','配穴'].map(opt => '<option value="' + opt + '" ' + (opt === typeVal ? 'selected' : '') + '>' + opt + '</option>').join('');
@@ -16274,7 +16277,7 @@ function refreshTemplateCategoryFilters() {
                       '<span class="flex-1 text-blue-800">' + (typeof window !== 'undefined' && window.escapeHtml ? window.escapeHtml(nameVal) : nameVal) + '</span>' +
                       '<select class="w-24 px-2 py-1 border border-gray-300 rounded">' + options + '</select>' +
                       '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>' +
-                    '</div>';
+                      '</div>';
                   }).join('')
                 : '';
               modalContent.innerHTML = `
@@ -16368,6 +16371,32 @@ function refreshTemplateCategoryFilters() {
                     <div id="herbIngredients" class="space-y-2">
                       ${herbIngredientsHtml}
                     </div>
+                  </div>
+                </div>
+              `;
+            } else if (itemType === 'acupoint') {
+              modalContent.innerHTML = `
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">組合名稱 *</label>
+                    <input type="text" id="acupointNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">分類</label>
+                    <select id="acupointCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                      ${(Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0 ? acupointComboCategories : categories.acupoints).map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">穴位列表</label>
+                    <div id="acupointPoints" class="space-y-2">
+${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text" value="' + (pt.name || '') + '" placeholder="穴位名稱" class="w-1/2 px-2 py-1 border border-gray-300 rounded"><input type="text" value="' + (pt.type || '') + '" placeholder="主穴/配穴" class="w-28 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button></div>').join('')}
+                    </div>
+                    <button onclick="addAcupointPointField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增穴位</button>
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 font-medium mb-2">針法</label>
+                    <input type="text" id="acupointTechniqueInput" value="${item.technique || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                 </div>
               `;
@@ -16596,25 +16625,23 @@ function refreshTemplateCategoryFilters() {
               item.name = acupointNameVal;
               item.category = document.getElementById('acupointCategorySelect').value;
               const pointRows = document.querySelectorAll('#acupointPoints > div');
-              // 將每一列的穴位資料取出為物件陣列。新結構使用 dataset 存儲名稱與 select 存儲類型；若不存在則退回舊結構。
+              // 將每一列的穴位資料取出為物件陣列，支援新舊兩種結構
               const newPoints = Array.from(pointRows).map(row => {
                 let name = '';
                 let type = '';
+                // 新版本：名稱存在於 dataset.acupointName，類型由 select 取得
                 if (row.dataset && row.dataset.acupointName) {
                   name = row.dataset.acupointName;
-                  const sel = row.querySelector('select');
-                  type = sel ? sel.value : '';
+                  const selectEl = row.querySelector('select');
+                  type = selectEl ? selectEl.value : '';
                 } else {
+                  // 舊版本：名稱與類型儲存在 input 中
                   const inputs = row.querySelectorAll('input');
-                  const select = row.querySelector('select');
-                  if (select) {
-                    type = select.value;
-                  }
-                  if (inputs.length >= 1) {
+                  if (inputs.length >= 2) {
                     name = inputs[0].value;
-                    if (inputs.length >= 2) {
-                      type = type || inputs[1].value;
-                    }
+                    type = inputs[1].value;
+                  } else if (inputs.length === 1) {
+                    name = inputs[0].value;
                   }
                 }
                 return { name: name, type: type };
@@ -16932,10 +16959,12 @@ function refreshTemplateCategoryFilters() {
               })
               .sort((a, b) => a.score - b.score)
               .map(obj => obj.item);
+            // 只顯示前十項
             matched = matched.slice(0, 10);
             if (matched.length === 0) {
               resultsList.innerHTML = '<div class="p-2 text-center text-gray-500 text-sm">找不到符合條件的穴位</div>';
               resultsContainer.classList.remove('hidden');
+              // 隱藏提示框
               if (typeof hideTooltip === 'function') {
                 hideTooltip();
               }
@@ -16972,11 +17001,14 @@ function refreshTemplateCategoryFilters() {
           function addAcupointToCombo(name) {
             const container = document.getElementById('acupointPoints');
             if (!container) return;
+            // 建立新的一行，使用藍色背景與邊框樣式
             const div = document.createElement('div');
             div.className = 'flex items-center gap-2 p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded';
+            // 儲存穴位名稱於 dataset，方便後續保存時讀取
             if (name) {
               div.dataset.acupointName = name;
             }
+            // 設定提示內容（若查詢不到則不設定）
             const tooltipContent = getAcupointTooltipContent(name || '');
             if (tooltipContent) {
               const encoded = encodeURIComponent(tooltipContent);
@@ -16991,10 +17023,12 @@ function refreshTemplateCategoryFilters() {
                 hideTooltip();
               });
             }
+            // 名稱以 span 顯示
             const nameSpan = document.createElement('span');
             nameSpan.className = 'flex-1 text-blue-800';
             nameSpan.textContent = name || '';
             div.appendChild(nameSpan);
+            // 類型選擇（主穴/配穴）
             const select = document.createElement('select');
             select.className = 'w-24 px-2 py-1 border border-gray-300 rounded';
             ['主穴','配穴'].forEach(opt => {
@@ -17004,6 +17038,7 @@ function refreshTemplateCategoryFilters() {
               select.appendChild(opEl);
             });
             div.appendChild(select);
+            // 刪除按鈕
             const deleteBtn = document.createElement('button');
             deleteBtn.type = 'button';
             deleteBtn.textContent = '刪除';
@@ -17015,6 +17050,7 @@ function refreshTemplateCategoryFilters() {
             });
             div.appendChild(deleteBtn);
             container.appendChild(div);
+            // 清空搜尋欄並隱藏結果
             const resultsContainer = document.getElementById('acupointPointSearchResults');
             if (resultsContainer) {
               resultsContainer.classList.add('hidden');
@@ -17023,6 +17059,7 @@ function refreshTemplateCategoryFilters() {
             if (searchInput) {
               searchInput.value = '';
             }
+            // 新增完穴位後隱藏提示框，以免留下殘影
             if (typeof hideTooltip === 'function') {
               hideTooltip();
             }
