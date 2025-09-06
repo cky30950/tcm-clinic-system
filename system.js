@@ -1218,16 +1218,14 @@ async function syncUserDataFromFirebase() {
             return;
         }
 
-        const result = await window.firebaseDataManager.getUsers();
-        if (result.success && result.data.length > 0) {
-            // 更新本地 users 變數
-            // 只同步必要欄位，不包含 personalSettings，以避免將其他用戶的個人設置保存到本地
-            users = result.data.map(user => {
-                // 排除個人設定欄位
+        // 改為透過 fetchUsers(true) 讀取用戶列表，並利用快取避免重複讀取
+        const data = await fetchUsers(true);
+        if (data && data.length > 0) {
+            // 更新本地 users 變數，僅同步必要欄位（排除 personalSettings）
+            users = data.map(user => {
                 const { personalSettings, ...rest } = user || {};
                 return {
                     ...rest,
-                    // 確保數據格式兼容性
                     createdAt: user.createdAt
                       ? (user.createdAt.seconds
                         ? new Date(user.createdAt.seconds * 1000).toISOString()
@@ -1245,12 +1243,11 @@ async function syncUserDataFromFirebase() {
                       : null
                 };
             });
-            
             // 保存到本地存儲作為備用
             localStorage.setItem('users', JSON.stringify(users));
-            console.log('已同步 Firebase 用戶數據到本地:', users.length, '筆');
+            console.log('已同步 Firebase 用戶數據到本地:', users.length, '筆 (使用快取)');
         } else {
-            console.log('Firebase 用戶數據為空或讀取失敗，使用本地數據');
+            console.log('從 Firebase 取得的用戶資料為空或讀取失敗，使用本地數據');
         }
     } catch (error) {
         console.error('同步 Firebase 用戶數據失敗:', error);
@@ -10237,24 +10234,21 @@ async function loadUsersFromFirebase() {
     `;
 
     try {
-        const result = await window.firebaseDataManager.getUsers();
-        
-        if (result.success) {
-            usersFromFirebase = result.data;
-            // 同時更新本地 users 變數以保持兼容性
-            users = result.data.map(user => ({
+        // 改為使用 fetchUsers() 以利用快取減少讀取次數
+        const data = await fetchUsers();
+        if (Array.isArray(data) && data.length > 0) {
+            usersFromFirebase = data;
+            users = data.map(user => ({
                 ...user,
-                // 確保數據格式兼容性
                 createdAt: user.createdAt ? (user.createdAt.seconds ? new Date(user.createdAt.seconds * 1000).toISOString() : user.createdAt) : new Date().toISOString(),
                 updatedAt: user.updatedAt ? (user.updatedAt.seconds ? new Date(user.updatedAt.seconds * 1000).toISOString() : user.updatedAt) : new Date().toISOString(),
                 lastLogin: user.lastLogin ? (user.lastLogin.seconds ? new Date(user.lastLogin.seconds * 1000).toISOString() : user.lastLogin) : null
             }));
-            
-            console.log('已從 Firebase 載入用戶數據:', usersFromFirebase.length, '筆');
+            console.log('已載入用戶數據 (使用快取):', usersFromFirebase.length, '筆');
         } else {
-            // 如果 Firebase 讀取失敗，使用本地 users 數據
+            // 如果讀取失敗或無資料，使用本地 users 數據
             usersFromFirebase = users;
-            console.log('Firebase 讀取失敗，使用本地用戶數據');
+            console.log('快取或 Firebase 讀取失敗，使用本地用戶數據');
         }
     } catch (error) {
         console.error('載入用戶數據錯誤:', error);
@@ -10829,11 +10823,10 @@ async function deleteUser(id) {
                 return;
             }
             try {
-                const result = await window.firebaseDataManager.getUsers();
-                if (result.success) {
-                    // 更新全局 users 變數以供其他函式使用
-                    users = result.data.map(user => {
-                        // 轉換時間戳為 ISO 字串，兼容不同數據類型
+                // 使用 fetchUsers() 以利用快取減少讀取次數
+                const data = await fetchUsers();
+                if (Array.isArray(data) && data.length > 0) {
+                    users = data.map(user => {
                         const createdAt = user.createdAt
                             ? (user.createdAt.seconds
                                 ? new Date(user.createdAt.seconds * 1000).toISOString()
@@ -10853,7 +10846,7 @@ async function deleteUser(id) {
                     });
                 }
             } catch (error) {
-                console.error('載入 Firebase 用戶資料失敗:', error);
+                console.error('載入用戶資料失敗:', error);
             }
         }
 
@@ -11385,14 +11378,23 @@ async function exportClinicBackup() {
     try {
         await ensureFirebaseReady();
         // 讀取病人、診症記錄與用戶資料
-        const [patientsRes, consultationsRes, usersRes] = await Promise.all([
+        // 讀取病人與診症資料，並透過 fetchUsers() 取得用戶列表
+        const [patientsRes, consultationsRes] = await Promise.all([
             window.firebaseDataManager.getPatients(),
-            window.firebaseDataManager.getConsultations(),
-            window.firebaseDataManager.getUsers()
+            window.firebaseDataManager.getConsultations()
         ]);
         const patientsData = patientsRes && patientsRes.success && Array.isArray(patientsRes.data) ? patientsRes.data : [];
         const consultationsData = consultationsRes && consultationsRes.success && Array.isArray(consultationsRes.data) ? consultationsRes.data : [];
-        const usersData = usersRes && usersRes.success && Array.isArray(usersRes.data) ? usersRes.data : [];
+        // 使用 fetchUsers(true) 以取得最新用戶列表（並利用快取降低讀取次數）
+        let usersData = [];
+        try {
+            const fetchedUsers = await fetchUsers(true);
+            if (Array.isArray(fetchedUsers)) {
+                usersData = fetchedUsers;
+            }
+        } catch (_fetchErr) {
+            console.warn('匯出備份時取得用戶列表失敗，將不包含用戶資料');
+        }
         // 確保中藥庫與收費項目已載入
         if (typeof initHerbLibrary === 'function') {
             await initHerbLibrary();
@@ -15323,9 +15325,10 @@ function refreshTemplateCategoryFilters() {
               // 若無法直接取得，改為從用戶清單中篩選
               if (!userRecord) {
                 try {
-                  const usersResult = await window.firebaseDataManager.getUsers();
-                  if (usersResult && usersResult.success && Array.isArray(usersResult.data)) {
-                    userRecord = usersResult.data.find(u => {
+                  // 透過 fetchUsers(true) 獲取用戶列表，並以快取降低讀取頻率
+                  const userList = await fetchUsers(true);
+                  if (Array.isArray(userList) && userList.length > 0) {
+                    userRecord = userList.find(u => {
                       const idMatches = u && u.id !== undefined && currentUserData.id !== undefined;
                       return idMatches && String(u.id) === String(currentUserData.id);
                     });
