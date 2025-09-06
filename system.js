@@ -14869,7 +14869,11 @@ function refreshTemplateCategoryFilters() {
                   ${item.ingredients.map(ing => {
                     const dosage = ing && ing.dosage ? String(ing.dosage).trim() : '';
                     const displayDosage = dosage ? dosage + '克' : '';
-                    return '<div class="flex justify-between"><span>' + (ing && ing.name ? ing.name : '') + '</span><span>' + displayDosage + '</span></div>';
+                    // 以綠色長方格樣式顯示每個藥材與劑量，使其外觀與搜尋結果一致
+                    return '<div class="flex justify-between items-center p-2 bg-green-50 border border-green-200 rounded text-sm">' +
+                      '<span class="text-green-800">' + (ing && ing.name ? ing.name : '') + '</span>' +
+                      '<span class="text-green-600">' + displayDosage + '</span>' +
+                      '</div>';
                   }).join('')}
                 </div>
               `;
@@ -16243,7 +16247,9 @@ function refreshTemplateCategoryFilters() {
               // 重新組裝藥材列表：每行使用 flex 排版，包含名稱、劑量欄、單位及刪除按鈕。
               const herbIngredientsHtml = Array.isArray(item.ingredients)
                 ? item.ingredients.map(ing => {
-                    return '<div class="flex items-center gap-2">' +
+                    // 每一個藥材條目以綠色長方格顯示，使其外觀與搜尋結果一致
+                    // 新增額外的內邊距、背景色與邊框樣式，以便呈現綠色長方格
+                    return '<div class="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">' +
                       // 將藥材名稱欄位寬度縮短為一半，避免在行動裝置上過長
                       '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="w-1/2 px-2 py-1 border border-gray-300 rounded">' +
                       '<input type="number" value="' + (ing.dosage || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
@@ -16717,7 +16723,8 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
             if (!container) return;
             const div = document.createElement('div');
             // 每一行以 flex 排版，包含名稱、劑量、單位與刪除按鈕
-            div.className = 'flex items-center gap-2';
+            // 使用綠色長方格樣式讓藥材列表與搜尋結果一致
+            div.className = 'flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded';
             const nameInput = document.createElement('input');
             nameInput.type = 'text';
             nameInput.value = name || '';
