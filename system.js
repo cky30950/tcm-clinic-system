@@ -11411,26 +11411,32 @@ async function exportClinicBackup() {
         } catch (e) {
             console.error('讀取套票資料失敗:', e);
         }
-        // 讀取醫囑模板資料
-        let prescriptionTemplatesData = [];
-        try {
-            const presSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'prescriptionTemplates'));
-            presSnap.forEach((docSnap) => {
-                prescriptionTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
-            });
-        } catch (e) {
-            console.error('讀取醫囑模板資料失敗:', e);
-        }
-        // 讀取診斷模板資料
-        let diagnosisTemplatesData = [];
-        try {
-            const diagSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'diagnosisTemplates'));
-            diagSnap.forEach((docSnap) => {
-                diagnosisTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
-            });
-        } catch (e) {
-            console.error('讀取診斷模板資料失敗:', e);
-        }
+        /*
+         * Template library data (prescriptionTemplates and diagnosisTemplates) are intentionally
+         * excluded from backup. There is no need to load them here. If in the future we decide
+         * to include templates in the backup again, uncomment the following logic to fetch
+         * them from Firestore:
+         *
+         * let prescriptionTemplatesData = [];
+         * try {
+         *     const presSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'prescriptionTemplates'));
+         *     presSnap.forEach((docSnap) => {
+         *         prescriptionTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
+         *     });
+         * } catch (e) {
+         *     console.error('讀取醫囑模板資料失敗:', e);
+         * }
+         *
+         * let diagnosisTemplatesData = [];
+         * try {
+         *     const diagSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'diagnosisTemplates'));
+         *     diagSnap.forEach((docSnap) => {
+         *         diagnosisTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
+         *     });
+         * } catch (e) {
+         *     console.error('讀取診斷模板資料失敗:', e);
+         * }
+         */
         // 讀取問診資料
         let inquiriesData = [];
         try {
