@@ -16243,11 +16243,15 @@ function refreshTemplateCategoryFilters() {
               // 重新組裝藥材列表：每行使用 flex 排版，包含名稱、劑量欄、單位及刪除按鈕。
               const herbIngredientsHtml = Array.isArray(item.ingredients)
                 ? item.ingredients.map(ing => {
+                    /*
+                     * 在個人設置的慣用中藥組合編輯介面中，將藥材名稱欄位的樣式調整為與搜尋結果相似的綠色長方格，
+                     * 仍保留劑量輸入欄為白色輸入框。使用 Tailwind 類別來控制背景色、文字顏色及邊框色。
+                     */
                     return '<div class="flex items-center gap-2">' +
-                      // 將藥材名稱欄位寬度縮短為一半，避免在行動裝置上過長
-                      '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="w-1/2 px-2 py-1 border border-gray-300 rounded">' +
-                      // 劑量輸入欄位亦使用透明背景並去除邊框，避免顯示白色輸入框
-                      '<input type="number" value="' + (ing.dosage || '') + '" placeholder="" class="w-20 px-2 py-1 bg-transparent border-0 focus:outline-none text-right">' +
+                      // 使用綠色背景與邊框呈現藥材名稱，並設為唯讀，防止直接編輯
+                      '<input type="text" value="' + (ing.name || '') + '" readonly placeholder="藥材名稱" class="w-1/2 px-2 py-1 bg-green-50 border border-green-200 text-green-800 rounded">' +
+                      // 劑量欄位維持白色風格，方便使用者輸入劑量
+                      '<input type="number" value="' + (ing.dosage || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
                       '<span class="text-sm text-gray-700">克</span>' +
                       '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>' +
                       '</div>';
@@ -16725,15 +16729,18 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
             nameInput.placeholder = '藥材名稱';
             // 新增後的藥材名稱固定顯示，不可編輯
             nameInput.readOnly = true;
-            // 將藥材名稱欄位寬度縮短為一半，避免在行動裝置上過長
-            nameInput.className = 'w-1/2 px-2 py-1 border border-gray-300 rounded';
+            /*
+             * 將藥材名稱欄位視覺樣式調整為與搜尋結果相似的綠色長方格。
+             * 這裡使用 Tailwind 的背景色、邊框色與文字顏色類別，並保持 w-1/2 寬度，
+             * 讓其在行動裝置上不會太長。劑量欄仍使用灰色邊框白底以維持區分。
+             */
+            nameInput.className = 'w-1/2 px-2 py-1 bg-green-50 border border-green-200 text-green-800 rounded';
             const dosageInput = document.createElement('input');
             dosageInput.type = 'number';
             // 劑量欄位預設為空，不自動填入任何值
             dosageInput.value = '';
             dosageInput.placeholder = '';
-            // 劑量輸入欄位使用透明背景並去除邊框，避免顯示白色輸入框
-            dosageInput.className = 'w-20 px-2 py-1 bg-transparent border-0 focus:outline-none text-right';
+            dosageInput.className = 'w-20 px-2 py-1 border border-gray-300 rounded';
             const unitSpan = document.createElement('span');
             unitSpan.textContent = '克';
             unitSpan.className = 'text-sm text-gray-700';
