@@ -15044,7 +15044,25 @@ function refreshTemplateCategoryFilters() {
                   </div>
                 </div>
                 <div class="text-sm text-gray-700 space-y-1">
-                  ${item.points.map(pt => '<div class="flex justify-between items-center"><span class="text-gray-700">' + pt.name + '</span><span class="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded">' + pt.type + '</span></div>').join('')}
+                  ${item.points.map(pt => {
+                    // 取得名稱與類型，處理可能為空或未定義的情況
+                    const nameVal = pt && pt.name ? pt.name : '';
+                    const typeVal = pt && pt.type ? pt.type : '';
+                    // 取得該穴位的提示內容並進行 URL 編碼
+                    const tooltipContent = getAcupointTooltipContent(nameVal);
+                    const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
+                    // 根據是否有提示內容來組合 tooltip 屬性與事件
+                    let attrs = '';
+                    if (tooltipContent) {
+                      // 此處必須以 \`data-tooltip\` 加上單引號包裹，在單引號字串中需使用 \\\' 轉義
+                      attrs = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
+                    }
+                    // 返回渲染字串，使用藍色系樣式以區分穴位類型
+                    return '<div class="flex justify-between items-center p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded text-sm"' + attrs + '>' +
+                      '<span class="text-blue-800">' + window.escapeHtml(nameVal) + '</span>' +
+                      '<span class="text-blue-600 bg-blue-100 px-2 py-1 rounded">' + window.escapeHtml(typeVal) + '</span>' +
+                      '</div>';
+                  }).join('')}
                 </div>
                 <div class="mt-3 pt-3 border-t border-gray-200 text-sm text-gray-600">
                   <p>針法：${item.technique}</p>
@@ -16913,16 +16931,26 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
            * 搜索並新增穴位至個人慣用穴位組合。
            * 在編輯穴位組合時，使用者可以在搜尋欄輸入關鍵字搜尋穴位庫中的穴位，並點擊結果將其加入穴位列表。
            */
-          function searchAcupointForCombo() {
+          async function searchAcupointForCombo() {
             const input = document.getElementById('acupointPointSearch');
             if (!input) return;
             const searchTerm = input.value.trim().toLowerCase();
             const resultsContainer = document.getElementById('acupointPointSearchResults');
             const resultsList = document.getElementById('acupointPointSearchList');
             if (!resultsContainer || !resultsList) return;
+            // 如果尚未載入穴位庫資料，則嘗試初始化一次。
+            // 由於 initAcupointLibrary 返回 promise，這裡使用 await 以確保資料就緒後再進行搜尋。
+            try {
+              if (!acupointLibraryLoaded || !Array.isArray(acupointLibrary) || acupointLibrary.length === 0) {
+                await initAcupointLibrary();
+              }
+            } catch (_e) {
+              // 初始化失敗時不中斷搜尋流程，僅記錄錯誤並繼續。
+              console.error('載入穴位庫資料失敗：', _e);
+            }
             if (searchTerm.length < 1) {
+              // 若輸入為空，隱藏結果容器並隱藏提示框
               resultsContainer.classList.add('hidden');
-              // 隱藏提示框以避免殘影
               if (typeof hideTooltip === 'function') {
                 hideTooltip();
               }
@@ -16964,7 +16992,7 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
             if (matched.length === 0) {
               resultsList.innerHTML = '<div class="p-2 text-center text-gray-500 text-sm">找不到符合條件的穴位</div>';
               resultsContainer.classList.remove('hidden');
-              // 隱藏提示框
+              // 沒有匹配項目時也隱藏提示框
               if (typeof hideTooltip === 'function') {
                 hideTooltip();
               }
@@ -16988,6 +17016,8 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
               if (item.method) details.push('針法：' + item.method);
               if (item.category) details.push('分類：' + item.category);
               const encoded = encodeURIComponent(details.join('\n'));
+              // 使用模板字串來組合 HTML，避免字串串接時的引號轉義錯誤
+              // 注意 safeName 中的單引號已使用 \ 替換，因此可以安全地放入單引號包裹的 onclick 引數
               return `<div class="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addAcupointToCombo('${safeName}')">${window.escapeHtml(item.name)}</div>`;
             }).join('');
             resultsContainer.classList.remove('hidden');
