@@ -224,6 +224,8 @@ async function ensureCreatedAtForPatients() {
     } catch (error) {
         console.error('檢查 createdAt 時發生錯誤:', error);
     }
+    // 更新完缺失的 createdAt 後，重置病人總數快取，以便重新計算分頁
+    patientsCountCache = null;
 }
 
 // 標記初始化狀態，避免重複初始化中藥庫、穴位庫、收費項目與模板庫。
@@ -1760,8 +1762,9 @@ async function loadPatientListFromFirebase() {
             // 在分頁查詢之前，先補齊缺少 createdAt 的舊資料，以免因 orderBy('createdAt') 導致部分文件被省略【290379596513450†L1055-L1070】
             await ensureCreatedAtForPatients();
             const currentPage = paginationSettings.patientList.currentPage || 1;
-            const pageData = await fetchPatientsPage(currentPage);
-            const totalItems = await getPatientsCount();
+            // 使用強制刷新參數重新讀取該頁資料和總數，以避免快取導致資料不一致
+            const pageData = await fetchPatientsPage(currentPage, true);
+            const totalItems = await getPatientsCount(true);
             renderPatientListPage(pageData, totalItems, currentPage);
         }
     } catch (error) {
