@@ -187,6 +187,13 @@ let appointments = [];
 // 快取病人列表，避免重複從 Firestore 讀取
 let patientCache = null;
 
+// 病人套票與診療記錄的本地快取。
+// 以 patientId 為索引，儲存先前查詢過的結果，用於減少重複讀取。
+// 調用查詢函式時若未指定強制刷新且有快取，即直接回傳快取資料。
+// 在新增、更新或消耗套票／診療記錄後，會依據情況更新或清除對應快取。
+let patientPackagesCache = {};
+let patientConsultationsCache = {};
+
 // 用於游標分頁的病人列表快取。
 // patientPagesCache[pageNumber] 儲存每頁已載入的病人資料；
 // patientPageCursors[pageNumber] 儲存該頁最後一筆文件的快照，用於下一頁查詢。
@@ -12199,7 +12206,9 @@ async function importHerbLibraryData(items, progressCallback) {
 
         
 // 套票管理函式
-async function getPatientPackages(patientId) {
+// 取得指定患者的套票清單，並使用本地快取避免重複讀取。
+// 新增 forceRefresh 參數允許呼叫端強制重新讀取資料。
+async function getPatientPackages(patientId, forceRefresh = false) {
     // 等待數據管理器準備就緒，避免初始化過程中返回空陣列
     if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
         // 最多等待5秒（100 * 50ms），防止無限等待
@@ -12212,9 +12221,18 @@ async function getPatientPackages(patientId) {
         console.warn('FirebaseDataManager 尚未就緒，無法取得患者套票');
         return [];
     }
+    // 如果有快取且不需要強制刷新，直接回傳快取內容
+    if (!forceRefresh && patientPackagesCache && Array.isArray(patientPackagesCache[patientId])) {
+        return patientPackagesCache[patientId];
+    }
     try {
         const result = await window.firebaseDataManager.getPatientPackages(patientId);
-        return result.success ? result.data : [];
+        const packages = result.success ? result.data : [];
+        // 將結果存入快取供下次使用
+        if (packages) {
+            patientPackagesCache[patientId] = packages;
+        }
+        return packages;
     } catch (error) {
         console.error('獲取患者套票錯誤:', error);
         return [];
@@ -12241,7 +12259,16 @@ async function purchasePackage(patientId, item) {
     try {
         const result = await window.firebaseDataManager.addPatientPackage(record);
         if (result.success) {
-            return { ...record, id: result.id };
+            // 建立新套票記錄並更新本地快取
+            const newPkg = { ...record, id: result.id };
+            if (Array.isArray(patientPackagesCache[patientId])) {
+                // 若快取存在，附加新套票
+                patientPackagesCache[patientId] = [...patientPackagesCache[patientId], newPkg];
+            } else {
+                // 建立新的快取陣列
+                patientPackagesCache[patientId] = [newPkg];
+            }
+            return newPkg;
         }
         return null;
     } catch (error) {
@@ -12269,8 +12296,17 @@ async function consumePackage(patientId, packageRecordId) {
         };
         
         const result = await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
-        
+
         if (result.success) {
+            // 更新本地快取中的對應套票剩餘次數
+            if (Array.isArray(patientPackagesCache[patientId])) {
+                patientPackagesCache[patientId] = patientPackagesCache[patientId].map(p => {
+                    if (String(p.id) === String(packageRecordId)) {
+                        return { ...p, remainingUses: (p.remainingUses || 0) - 1 };
+                    }
+                    return p;
+                });
+            }
             return { ok: true, record: updatedPackage };
         } else {
             return { ok: false, msg: '更新套票失敗' };
@@ -12851,8 +12887,20 @@ class FirebaseDataManager {
             );
             
             console.log('診症記錄已添加到 Firebase:', docRef.id);
-            // 新增診症後清除緩存
+            // 新增診症後清除全域診症快取
             this.consultationsCache = null;
+            // 同時清除或更新單一病人的診症快取，以便下次重新讀取
+            try {
+                if (consultationData && consultationData.patientId) {
+                    delete patientConsultationsCache[consultationData.patientId];
+                } else {
+                    // 如果缺少病人 ID，清除所有病人診症快取
+                    patientConsultationsCache = {};
+                }
+            } catch (_err) {
+                // 若執行快取清理時發生錯誤，直接重置快取
+                patientConsultationsCache = {};
+            }
             return { success: true, id: docRef.id };
         } catch (error) {
             console.error('添加診症記錄失敗:', error);
@@ -12963,8 +13011,19 @@ class FirebaseDataManager {
                     updatedBy: currentUser
                 }
             );
-            // 更新診症後清除緩存
+            // 更新診症後清除全域診症快取
             this.consultationsCache = null;
+            // 更新單一病人診症快取或清除全部快取
+            try {
+                if (consultationData && consultationData.patientId) {
+                    delete patientConsultationsCache[consultationData.patientId];
+                } else {
+                    // 如果無法確定病人 ID，則清除所有病人診症快取
+                    patientConsultationsCache = {};
+                }
+            } catch (_err) {
+                patientConsultationsCache = {};
+            }
             return { success: true };
         } catch (error) {
             console.error('更新診症記錄失敗:', error);
@@ -12972,10 +13031,14 @@ class FirebaseDataManager {
         }
     }
 
-    async getPatientConsultations(patientId) {
+    async getPatientConsultations(patientId, forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
 
         try {
+            // 若快取存在且不需要強制刷新，直接回傳快取資料
+            if (!forceRefresh && patientConsultationsCache && Array.isArray(patientConsultationsCache[patientId])) {
+                return { success: true, data: patientConsultationsCache[patientId] };
+            }
             /**
              * 改為直接使用 Firestore 查詢特定 patientId 的診療記錄，避免先讀取全部後再過濾。
              * 這樣可降低讀取量，僅在開啟病歷時讀取該病患相關的診療記錄。
@@ -12998,6 +13061,8 @@ class FirebaseDataManager {
                     : (b.createdAt && b.createdAt.seconds ? new Date(b.createdAt.seconds * 1000) : new Date(b.createdAt));
                 return dateB - dateA;
             });
+            // 儲存至快取以供後續使用
+            patientConsultationsCache[patientId] = patientConsultations;
             return { success: true, data: patientConsultations };
         } catch (error) {
             console.error('讀取病人診症記錄失敗:', error);
