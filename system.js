@@ -344,6 +344,66 @@ async function fetchPatients(forceRefresh = false, pageNumber = null) {
 }
 
 /**
+ * 使用 Firestore 條件查詢搜尋病人。
+ * 此函式會同時根據姓名、電話與病人編號前綴進行查詢，再合併結果去除重複。
+ * 如此避免載入整個 patients 集合進行前端篩選。
+ *
+ * @param {string} term 搜尋字串，會自動轉換成小寫/大寫以符合查詢需求
+ * @returns {Promise<Array>} 匹配的病人資料陣列
+ */
+async function searchPatientsViaFirestore(term) {
+    if (!term) return [];
+    await waitForFirebaseDb();
+    const lower = term.toLowerCase();
+    const upper = term.toUpperCase();
+    const col = window.firebase.collection(window.firebase.db, 'patients');
+    // 建立三個查詢：姓名前綴、電話前綴、病人編號前綴
+    const queries = [];
+    try {
+        // 姓名
+        queries.push(window.firebase.getDocs(window.firebase.query(
+            col,
+            window.firebase.orderBy('name'),
+            window.firebase.where('name', '>=', lower),
+            window.firebase.where('name', '<=', lower + '\uf8ff'),
+            window.firebase.limit(20)
+        )));
+    } catch (_e) {}
+    try {
+        // 電話
+        queries.push(window.firebase.getDocs(window.firebase.query(
+            col,
+            window.firebase.orderBy('phone'),
+            window.firebase.where('phone', '>=', term),
+            window.firebase.where('phone', '<=', term + '\uf8ff'),
+            window.firebase.limit(20)
+        )));
+    } catch (_e) {}
+    try {
+        // 病人編號（使用大寫）
+        queries.push(window.firebase.getDocs(window.firebase.query(
+            col,
+            window.firebase.orderBy('patientNumber'),
+            window.firebase.where('patientNumber', '>=', upper),
+            window.firebase.where('patientNumber', '<=', upper + '\uf8ff'),
+            window.firebase.limit(20)
+        )));
+    } catch (_e) {}
+    const docsMap = {};
+    try {
+        const results = await Promise.all(queries);
+        results.forEach((snap) => {
+            snap.forEach((docSnap) => {
+                docsMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+            });
+        });
+    } catch (e) {
+        console.warn('搜尋病人資料時發生錯誤:', e);
+    }
+    return Object.values(docsMap);
+}
+
+/**
  * 透過游標及 limit 方式分頁讀取病人資料。
  * 頁數從 1 開始計算。讀取後會快取該頁資料及最後一筆文件，以利下一頁查詢。
  * 當 forceRefresh 為 true 時，會清除所有分頁快取並重新讀取。
@@ -1701,27 +1761,37 @@ async function savePatient() {
     } // end of savePatient function
 
         // 從 Firebase 生成病人編號
-async function generatePatientNumberFromFirebase() {
-    try {
-        const result = await window.firebaseDataManager.getPatients();
-        if (!result.success) {
-            return 'P000001'; // 如果無法讀取，使用預設編號
+    async function generatePatientNumberFromFirebase() {
+        /**
+         * 從 Firestore 中查詢 patientNumber 最大值，避免載入整個病人集合。
+         * 若不存在任何病人，則回傳 P000001。若查詢失敗則回傳時間戳作為備用編號。
+         */
+        try {
+            await waitForFirebaseDb();
+            // 建立查詢：依 patientNumber 由大到小排序，取第一筆
+            const col = window.firebase.collection(window.firebase.db, 'patients');
+            const q = window.firebase.query(
+                col,
+                window.firebase.orderBy('patientNumber', 'desc'),
+                window.firebase.limit(1)
+            );
+            const snap = await window.firebase.getDocs(q);
+            let maxNumber = 0;
+            if (!snap.empty) {
+                const docSnap = snap.docs[0];
+                const pn = docSnap.data().patientNumber;
+                if (pn && /^P\d+$/.test(pn)) {
+                    const num = parseInt(pn.substring(1));
+                    if (!isNaN(num)) maxNumber = num;
+                }
+            }
+            const newNumber = maxNumber + 1;
+            return `P${String(newNumber).padStart(6, '0')}`;
+        } catch (error) {
+            console.error('生成病人編號失敗:', error);
+            return `P${Date.now().toString().slice(-6)}`;
         }
-
-        const existingNumbers = result.data
-            .map(p => p.patientNumber)
-            .filter(num => num && num.startsWith('P'))
-            .map(num => parseInt(num.substring(1)))
-            .filter(num => !isNaN(num));
-
-        const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-        const newNumber = maxNumber + 1;
-        return `P${newNumber.toString().padStart(6, '0')}`;
-    } catch (error) {
-        console.error('生成病人編號失敗:', error);
-        return `P${Date.now().toString().slice(-6)}`; // 備用方案
     }
-}
 
 // 從 Firebase 載入病人列表
 async function loadPatientListFromFirebase() {
@@ -1739,18 +1809,12 @@ async function loadPatientListFromFirebase() {
                 </td>
             </tr>
         `;
-        // 若有搜尋字串，載入全部病人資料並在前端進行篩選
-        if (searchTerm) {
-            const allPatients = await fetchPatients();
-            const filteredPatients = Array.isArray(allPatients) ? allPatients.filter(patient =>
-                (patient.name && patient.name.toLowerCase().includes(searchTerm)) ||
-                (patient.phone && patient.phone.includes(searchTerm)) ||
-                (patient.idCard && patient.idCard.toLowerCase().includes(searchTerm)) ||
-                (patient.patientNumber && patient.patientNumber.toLowerCase().includes(searchTerm))
-            ) : [];
-            patientListFiltered = filteredPatients;
-            renderPatientListTable(false);
-        } else {
+            // 若有搜尋字串，透過 Firestore 查詢進行匹配，避免讀取整個集合
+            if (searchTerm) {
+                const matched = await searchPatientsViaFirestore(searchTerm);
+                patientListFiltered = Array.isArray(matched) ? matched : [];
+                renderPatientListTable(false);
+            } else {
             // 無搜尋條件，使用伺服器分頁以減少讀取量
             // 取得當前頁碼；若未設定則預設為第一頁
             const currentPage = (paginationSettings && paginationSettings.patientList && paginationSettings.patientList.currentPage) || 1;
@@ -2678,64 +2742,45 @@ async function searchPatientsForRegistration() {
     `;
     resultsContainer.classList.remove('hidden');
     
-    try {
-        // 從快取或 Firebase 取得病人資料
-        const allPatients = await fetchPatients();
-        if (!allPatients || allPatients.length === 0) {
+        try {
+            // 透過 Firestore 查詢取得匹配的病人列表
+            const matchedPatients = await searchPatientsViaFirestore(searchTerm);
+            if (!matchedPatients || matchedPatients.length === 0) {
+                resultsList.innerHTML = `
+                    <div class="p-4 text-center text-gray-500">
+                        找不到符合條件的病人
+                    </div>
+                `;
+                resultsContainer.classList.remove('hidden');
+                return;
+            }
+            // 顯示搜索結果，使用 escapeHtml 轉義顯示內容
+            resultsList.innerHTML = matchedPatients.map(patient => {
+                const safeId = String(patient.id).replace(/"/g, '&quot;');
+                const safeName = window.escapeHtml(patient.name);
+                const safeNumber = window.escapeHtml(patient.patientNumber || '');
+                const safeAge = window.escapeHtml(formatAge(patient.birthDate));
+                const safeGender = window.escapeHtml(patient.gender);
+                const safePhone = window.escapeHtml(patient.phone);
+                return `
+                <div class="p-4 hover:bg-gray-50 cursor-pointer transition duration-200" onclick="selectPatientForRegistration('${safeId}')">
+                    <div>
+                        <div class="font-semibold text-gray-900">${safeName}</div>
+                        <div class="text-sm text-gray-600">編號：${safeNumber} | 年齡：${safeAge} | 性別：${safeGender}</div>
+                        <div class="text-sm text-gray-500">電話：${safePhone}</div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+            resultsContainer.classList.remove('hidden');
+        } catch (error) {
+            console.error('搜尋病人資料錯誤:', error);
             resultsList.innerHTML = `
                 <div class="p-4 text-center text-red-500">
-                    讀取病人資料失敗，請重試
+                    搜尋失敗，請檢查網路連接
                 </div>
             `;
-            return;
         }
-
-        // 搜索匹配的病人
-        const matchedPatients = allPatients.filter(patient => 
-            (patient.name && patient.name.toLowerCase().includes(searchTerm)) ||
-            (patient.phone && patient.phone.includes(searchTerm)) ||
-            (patient.patientNumber && patient.patientNumber.toLowerCase().includes(searchTerm))
-        );
-        
-        if (matchedPatients.length === 0) {
-            resultsList.innerHTML = `
-                <div class="p-4 text-center text-gray-500">
-                    找不到符合條件的病人
-                </div>
-            `;
-            resultsContainer.classList.remove('hidden');
-            return;
-        }
-        
-        // 顯示搜索結果，使用 escapeHtml 轉義顯示內容
-        resultsList.innerHTML = matchedPatients.map(patient => {
-            const safeId = String(patient.id).replace(/"/g, '&quot;');
-            const safeName = window.escapeHtml(patient.name);
-            const safeNumber = window.escapeHtml(patient.patientNumber || '');
-            const safeAge = window.escapeHtml(formatAge(patient.birthDate));
-            const safeGender = window.escapeHtml(patient.gender);
-            const safePhone = window.escapeHtml(patient.phone);
-            return `
-            <div class="p-4 hover:bg-gray-50 cursor-pointer transition duration-200" onclick="selectPatientForRegistration('${safeId}')">
-                <div>
-                    <div class="font-semibold text-gray-900">${safeName}</div>
-                    <div class="text-sm text-gray-600">編號：${safeNumber} | 年齡：${safeAge} | 性別：${safeGender}</div>
-                    <div class="text-sm text-gray-500">電話：${safePhone}</div>
-                </div>
-            </div>
-            `;
-        }).join('');
-        
-        resultsContainer.classList.remove('hidden');
-        
-    } catch (error) {
-        console.error('搜尋病人資料錯誤:', error);
-        resultsList.innerHTML = `
-            <div class="p-4 text-center text-red-500">
-                搜尋失敗，請檢查網路連接
-            </div>
-        `;
-    }
 }
         
 // 2. 修改選擇病人進行掛號函數
