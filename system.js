@@ -408,17 +408,29 @@ async function fetchPatients(forceRefresh = false, pageNumber = null) {
  * @returns {Promise<Array>} 匹配的病人資料陣列
  */
 async function searchPatientsViaFirestore(term) {
+    // 如果搜尋字串為空則直接返回空陣列
     if (!term) return [];
+    // 等待 Firebase DB 初始化
     await waitForFirebaseDb();
+    // 轉換搜尋字串為不同格式，以便後續查詢
     const lower = term.toLowerCase();
     const upper = term.toUpperCase();
     const col = window.firebase.collection(window.firebase.db, 'patients');
+    // 透過物件儲存文件，避免重複加入同一筆結果
     const docsMap = {};
-    // 首先嘗試使用 searchKeywords 欄位進行統一查詢，將搜尋字串以小寫傳入
+
+    /**
+     * 首先使用 searchKeywords 欄位進行查詢。searchKeywords 為前綴關鍵字陣列，
+     * 能夠用單一欄位索引覆蓋多個條件，降低複數欄位查詢的開銷。若 searchKeywords
+     * 查詢能返回結果，則無需進一步查詢 name、phone、patientNumber
+     * 欄位。此查詢會依賴自動建立的 array-contains 索引。
+     */
     try {
         const kwQuery = window.firebase.query(
             col,
+            // 由於 searchKeywords 為陣列，此查詢會使用 array-contains 索引
             window.firebase.where('searchKeywords', 'array-contains', lower),
+            // 限制返回筆數以減少不必要的文件讀取
             window.firebase.limit(20)
         );
         const kwSnap = await window.firebase.getDocs(kwQuery);
@@ -428,9 +440,9 @@ async function searchPatientsViaFirestore(term) {
     } catch (_e) {
         // 若 searchKeywords 欄位不存在或查詢失敗則忽略
     }
-    // 若透過 searchKeywords 已取得結果，直接返回（可避免額外的查詢）
+    // 若透過 searchKeywords 已取得結果，直接回傳（可避免額外查詢）
     if (Object.keys(docsMap).length > 0) {
-        // 將搜尋結果更新至患者字典快取
+        // 更新 patientDictCache 快取
         try {
             if (window.firebaseDataManager && window.firebaseDataManager.patientDictCache) {
                 Object.keys(docsMap).forEach(id => {
@@ -441,30 +453,40 @@ async function searchPatientsViaFirestore(term) {
         } catch (_e) {}
         return Object.values(docsMap);
     }
-    // 若未使用 searchKeywords 或查詢結果為空，則採用原本的多條件前綴查詢
+
+    /**
+     * 若 searchKeywords 查詢未找到結果，則對 name、phone、patientNumber 分別
+     * 進行前綴查詢。這些查詢都搭配 orderBy()、>=、<= 以及 limit() 以利用
+     * Firestore 的複合索引（需在 Firebase 控制台建立）並限制返回筆數，避免
+     * 掃描大量文件。例如：(name asc)、(phone asc)、(patientNumber asc)。
+     */
     const queries = [];
+    // 按姓名前綴查詢
     try {
-        // 姓名（小寫）
         queries.push(window.firebase.getDocs(window.firebase.query(
             col,
             window.firebase.orderBy('name'),
             window.firebase.where('name', '>=', lower),
             window.firebase.where('name', '<=', lower + '\uf8ff'),
+            // 適度限制結果數量，避免大量資料載入
             window.firebase.limit(20)
         )));
     } catch (_e) {}
+    // 按電話前綴查詢：只保留輸入中的數字，以與存儲格式一致
     try {
-        // 電話
-        queries.push(window.firebase.getDocs(window.firebase.query(
-            col,
-            window.firebase.orderBy('phone'),
-            window.firebase.where('phone', '>=', term),
-            window.firebase.where('phone', '<=', term + '\uf8ff'),
-            window.firebase.limit(20)
-        )));
+        const phoneDigits = String(term).replace(/\D+/g, '');
+        if (phoneDigits) {
+            queries.push(window.firebase.getDocs(window.firebase.query(
+                col,
+                window.firebase.orderBy('phone'),
+                window.firebase.where('phone', '>=', phoneDigits),
+                window.firebase.where('phone', '<=', phoneDigits + '\uf8ff'),
+                window.firebase.limit(20)
+            )));
+        }
     } catch (_e) {}
+    // 按病人編號前綴查詢（使用大寫）
     try {
-        // 病人編號（使用大寫）
         queries.push(window.firebase.getDocs(window.firebase.query(
             col,
             window.firebase.orderBy('patientNumber'),
@@ -473,6 +495,7 @@ async function searchPatientsViaFirestore(term) {
             window.firebase.limit(20)
         )));
     } catch (_e) {}
+
     try {
         const results = await Promise.all(queries);
         results.forEach((snap) => {
