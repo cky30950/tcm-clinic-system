@@ -196,38 +196,6 @@ let patientPageCursors = {};
 // 快取病人總數，用於分頁計算。讀取一次後會快取，除非強制刷新。
 let patientsCountCache = null;
 
-// 標記是否已經檢查並補齊過舊病人資料的 createdAt 欄位。
-// 在舊資料缺少 createdAt 的情況下，使用 orderBy('createdAt') 查詢會導致這些文件
-// 被過濾掉【290379596513450†L1055-L1070】。透過這個旗標只執行一次補齊動作。
-let createdAtChecked = false;
-
-/**
- * 確保所有病人文件都有 createdAt 欄位。若缺少則補寫當前時間。
- * 此函式僅在首次呼叫時執行，以減少讀取與寫入次數。
- */
-async function ensureCreatedAtForPatients() {
-    if (createdAtChecked) return;
-    createdAtChecked = true;
-    try {
-        // 讀取所有病人資料
-        const result = await window.firebaseDataManager.getPatients();
-        if (!result.success || !Array.isArray(result.data)) return;
-        const missingList = result.data.filter(p => !p.createdAt);
-        for (const p of missingList) {
-            try {
-                // 補寫 createdAt；使用 updatePatient 以保留其他欄位
-                await window.firebaseDataManager.updatePatient(p.id, { createdAt: new Date() });
-            } catch (e) {
-                console.error('補寫 createdAt 失敗:', e);
-            }
-        }
-    } catch (error) {
-        console.error('檢查 createdAt 時發生錯誤:', error);
-    }
-    // 更新完缺失的 createdAt 後，重置病人總數快取，以便重新計算分頁
-    patientsCountCache = null;
-}
-
 // 標記初始化狀態，避免重複初始化中藥庫、穴位庫、收費項目與模板庫。
 let herbLibraryLoaded = false;
 // 新增：穴位庫是否已載入
@@ -1685,13 +1653,9 @@ async function savePatient() {
 
         // 更新快取資料，下一次讀取時重新載入
         patientCache = null;
-        // 清空病人列表分頁快取及總數快取，避免新增或更新後仍顯示舊頁面
-        patientPagesCache = {};
-        patientPageCursors = {};
-        patientsCountCache = null;
 
-        // 重新載入病人列表，強制刷新以確保新資料立即顯示
-        await loadPatientListFromFirebase(true);
+        // 重新載入病人列表
+        await loadPatientListFromFirebase();
         hideAddPatientForm();
         updateStatistics();
 
@@ -1731,9 +1695,7 @@ async function generatePatientNumberFromFirebase() {
 }
 
 // 從 Firebase 載入病人列表
-// 新增 forceRefresh 參數，用於控制是否強制重新載入分頁資料及總數。
-// 當為 true 時，會清除游標分頁快取並重新讀取；當為 false 時，會優先使用快取以避免重複查詢。
-async function loadPatientListFromFirebase(forceRefresh = false) {
+async function loadPatientListFromFirebase() {
     const tbody = document.getElementById('patientList');
     if (!tbody) return;
     const searchInput = document.getElementById('searchPatient');
@@ -1760,16 +1722,26 @@ async function loadPatientListFromFirebase(forceRefresh = false) {
             patientListFiltered = filteredPatients;
             renderPatientListTable(false);
         } else {
-            // 無搜尋條件，使用游標分頁僅載入當前頁。
-            // 在分頁查詢之前，先補齊缺少 createdAt 的舊資料，以免因 orderBy('createdAt') 導致部分文件被省略【290379596513450†L1055-L1070】
-            await ensureCreatedAtForPatients();
-            const currentPage = paginationSettings.patientList.currentPage || 1;
-            // 根據 forceRefresh 參數決定是否強制重新讀取該頁資料及總數。
-            // 若 forceRefresh 為 true，將重置分頁快取與游標，並重新讀取；
-            // 否則若已有快取，將直接從快取取得，減少對 Firebase 的讀取量。
-            const pageData = await fetchPatientsPage(currentPage, forceRefresh);
-            const totalItems = await getPatientsCount(forceRefresh);
-            renderPatientListPage(pageData, totalItems, currentPage);
+            // 無搜尋條件，預設載入全部病人資料並在前端進行分頁與排序
+            // 這樣可以避免使用游標分頁導致新資料未即時出現的問題
+            const allPatients = await fetchPatients();
+            let sortedPatients = Array.isArray(allPatients) ? allPatients.slice() : [];
+            // 按照 createdAt 由舊至新排序；若缺少 createdAt 則視為最早
+            sortedPatients.sort((a, b) => {
+                const getTime = (p) => {
+                    const c = p && p.createdAt;
+                    if (!c) return 0;
+                    // Firestore Timestamp 物件
+                    if (typeof c === 'object' && c.seconds !== undefined) {
+                        return c.seconds * 1000;
+                    }
+                    const t = new Date(c).getTime();
+                    return isNaN(t) ? 0 : t;
+                };
+                return getTime(a) - getTime(b);
+            });
+            patientListFiltered = sortedPatients;
+            renderPatientListTable(false);
         }
     } catch (error) {
         console.error('載入病人列表錯誤:', error);
@@ -1784,15 +1756,8 @@ async function loadPatientListFromFirebase(forceRefresh = false) {
     }
 }
 
-/**
- * 封裝病人列表載入函式。
- *
- * @param {boolean} forceRefresh 是否強制重新載入分頁資料及總數，預設為 false。
- * 使用此參數可以在新增、編輯或刪除病人後強制刷新頁面，
- * 避免使用舊的快取導致頁面資料不同步。
- */
-function loadPatientList(forceRefresh = false) {
-    loadPatientListFromFirebase(forceRefresh);
+function loadPatientList() {
+    loadPatientListFromFirebase();
 }
 
 /**
@@ -2001,12 +1966,8 @@ async function deletePatient(id) {
                 showToast('病人資料已刪除！', 'success');
                 // 清除快取，下次讀取時重新從資料庫載入
                 patientCache = null;
-                // 清空分頁快取與總數快取，確保刪除後的列表與分頁數同步更新
-                patientPagesCache = {};
-                patientPageCursors = {};
-                patientsCountCache = null;
-                // 重新載入病人列表，強制刷新以確保刪除後資料同步
-                await loadPatientListFromFirebase(true);
+                // 重新載入病人列表
+                await loadPatientListFromFirebase();
                 updateStatistics();
             } else {
                 showToast('刪除失敗，請稍後再試', 'error');
@@ -11705,10 +11666,6 @@ async function importClinicBackup(data) {
     }
     // 清除本地快取
     patientCache = null;
-    // 同步清空分頁快取與總數快取，避免恢復備份後仍顯示舊資料
-    patientPagesCache = {};
-    patientPageCursors = {};
-    patientsCountCache = null;
     consultationCache = null;
     userCache = null;
     // 保持現有的中藥庫與模板庫資料，不從備份中還原
@@ -11742,8 +11699,7 @@ async function importClinicBackup(data) {
     }
     // 更新界面
     if (typeof loadPatientList === 'function') {
-        // 匯入備份後，強制刷新病人列表以確保資料與分頁更新
-        loadPatientList(true);
+        loadPatientList();
     }
     if (typeof loadTodayAppointments === 'function') {
         await loadTodayAppointments();
