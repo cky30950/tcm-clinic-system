@@ -1669,7 +1669,19 @@ async function savePatient() {
         }
 
         // 更新快取資料，下一次讀取時重新載入
+        // 新增或更新病人後，除了清除病人列表快取之外，
+        // 也應清除分頁游標與病人數量快取，
+        // 以避免新增或更新的資料未立即反映在列表上。
         patientCache = null;
+        // 清除分頁快取，包含每頁資料與游標
+        if (typeof patientPagesCache === 'object') {
+            patientPagesCache = {};
+        }
+        if (typeof patientPageCursors === 'object') {
+            patientPageCursors = {};
+        }
+        // 清除病人總數快取以重新計算頁數
+        patientsCountCache = null;
 
         // 重新載入病人列表
         await loadPatientListFromFirebase();
@@ -1968,10 +1980,19 @@ async function deletePatient(id) {
             // 從 Firebase 刪除病人資料
             const deleteResult = await window.firebaseDataManager.deletePatient(id);
             
-            if (deleteResult.success) {
+                if (deleteResult.success) {
                 showToast('病人資料已刪除！', 'success');
                 // 清除快取，下次讀取時重新從資料庫載入
+                // 刪除病人後也需要清除分頁快取與病人總數快取，
+                // 以免刪除後仍顯示在列表中或總數不變。
                 patientCache = null;
+                if (typeof patientPagesCache === 'object') {
+                    patientPagesCache = {};
+                }
+                if (typeof patientPageCursors === 'object') {
+                    patientPageCursors = {};
+                }
+                patientsCountCache = null;
                 // 重新載入病人列表
                 await loadPatientListFromFirebase();
                 updateStatistics();
