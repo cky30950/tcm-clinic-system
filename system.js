@@ -13029,10 +13029,63 @@ class FirebaseDataManager {
         this.initializeWhenReady();
     }
 
+    /**
+     * 從 localStorage 載入各類緩存資料。
+     * 若本地已有緩存，將其填入對應的屬性，以便後續直接使用。
+     * 讀取失敗時僅記錄警告，不會阻止應用繼續運行。
+     */
+    loadCacheFromStorage() {
+        try {
+            // 讀取病人列表緩存
+            const patientsCacheStr = (typeof localStorage !== 'undefined') ? localStorage.getItem('patientsCache') : null;
+            if (patientsCacheStr) {
+                this.patientsCache = JSON.parse(patientsCacheStr);
+            }
+            // 讀取病人字典緩存
+            const patientDictStr = (typeof localStorage !== 'undefined') ? localStorage.getItem('patientDictCache') : null;
+            if (patientDictStr) {
+                this.patientDictCache = JSON.parse(patientDictStr);
+            }
+            // 讀取用戶列表緩存
+            const usersCacheStr = (typeof localStorage !== 'undefined') ? localStorage.getItem('usersCache') : null;
+            if (usersCacheStr) {
+                this.usersCache = JSON.parse(usersCacheStr);
+            }
+        } catch (e) {
+            console.warn('載入本地快取時發生錯誤:', e);
+        }
+    }
+
+    /**
+     * 將指定的緩存資料保存到 localStorage。
+     * 當 data 為 null 或 undefined 時，將移除對應的儲存項目。
+     * 保存失敗時僅記錄警告，不會阻止應用繼續運行。
+     * @param {string} key localStorage 的鍵名
+     * @param {*} data 需要序列化並保存的資料
+     */
+    saveCacheToStorage(key, data) {
+        try {
+            if (typeof localStorage === 'undefined') return;
+            if (data === null || data === undefined) {
+                localStorage.removeItem(key);
+            } else {
+                localStorage.setItem(key, JSON.stringify(data));
+            }
+        } catch (e) {
+            console.warn('保存本地快取時發生錯誤:', e);
+        }
+    }
+
     async initializeWhenReady() {
         // 等待 Firebase 初始化，使用通用等待函式
         await waitForFirebase();
         this.isReady = true;
+        // 初始化完成後立即嘗試從本地儲存載入快取，以提供離線使用
+        try {
+            this.loadCacheFromStorage();
+        } catch (_e) {
+            // 若載入快取失敗則忽略
+        }
         console.log('Firebase 數據管理器已準備就緒');
     }
 
@@ -13064,6 +13117,12 @@ class FirebaseDataManager {
             console.log('病人數據已添加到 Firebase:', docRef.id);
             // 新增病人後清除列表緩存，讓下一次讀取時重新載入
             this.patientsCache = null;
+            // 在本地儲存中清除對應緩存，避免讀取到舊資料
+            try {
+                this.saveCacheToStorage('patientsCache', null);
+            } catch (_e) {
+                // ignore
+            }
             // 同步更新快取字典，將新病人加入
             try {
                 if (!this.patientDictCache || typeof this.patientDictCache !== 'object') {
@@ -13077,6 +13136,12 @@ class FirebaseDataManager {
                 }
             } catch (_e) {
                 // 若更新快取失敗則忽略，待下次讀取時刷新
+            }
+            // 將更新後的病人字典快取保存至 localStorage
+            try {
+                this.saveCacheToStorage('patientDictCache', this.patientDictCache);
+            } catch (_e) {
+                // ignore
             }
             return { success: true, id: docRef.id };
         } catch (error) {
@@ -13097,11 +13162,18 @@ class FirebaseDataManager {
     async getPatients(forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
         try {
+            // 嘗試從本地儲存載入病人緩存（若尚未載入），以便離線使用
+            try {
+                this.loadCacheFromStorage();
+            } catch (_e) {
+                // ignore
+            }
             // 若已存在快取且不需強制刷新，直接回傳快取
             // 包含空陣列亦應視為有效快取，避免在沒有病人時每次都去讀取
             if (!forceRefresh && this.patientsCache !== null) {
                 return { success: true, data: this.patientsCache };
             }
+            // 從 Firestore 讀取最新資料
             const querySnapshot = await window.firebase.getDocs(
                 window.firebase.collection(window.firebase.db, 'patients')
             );
@@ -13109,13 +13181,20 @@ class FirebaseDataManager {
             querySnapshot.forEach((doc) => {
                 patients.push({ id: doc.id, ...doc.data() });
             });
-            // 將結果寫入快取
+            // 將結果寫入內存快取
             this.patientsCache = patients;
             // 同步建立字典快取，以便透過 ID 快速查找單一病人
             this.patientDictCache = {};
             patients.forEach((p) => {
                 this.patientDictCache[p.id] = p;
             });
+            // 將快取保存至 localStorage，以便離線使用
+            try {
+                this.saveCacheToStorage('patientsCache', this.patientsCache);
+                this.saveCacheToStorage('patientDictCache', this.patientDictCache);
+            } catch (_e) {
+                // ignore
+            }
             console.log('已從 Firebase 讀取病人數據:', patients.length, '筆');
             return { success: true, data: patients };
         } catch (error) {
@@ -13148,6 +13227,12 @@ class FirebaseDataManager {
             );
             // 更新病人資料後清除列表緩存，讓下一次讀取時重新載入
             this.patientsCache = null;
+            // 在本地儲存中清除患者列表緩存，避免讀取到舊資料
+            try {
+                this.saveCacheToStorage('patientsCache', null);
+            } catch (_e) {
+                // ignore
+            }
             // 同步更新病人快取字典
             try {
                 // 確保快取字典存在
@@ -13172,6 +13257,13 @@ class FirebaseDataManager {
             } catch (_e) {
                 // 忽略列表快取更新錯誤
             }
+            // 將更新後的病人字典與列表保存到 localStorage
+            try {
+                this.saveCacheToStorage('patientDictCache', this.patientDictCache);
+                this.saveCacheToStorage('patientsCache', this.patientsCache);
+            } catch (_e) {
+                // ignore
+            }
             return { success: true };
         } catch (error) {
             console.error('更新病人數據失敗:', error);
@@ -13186,6 +13278,12 @@ class FirebaseDataManager {
             );
             // 刪除病人後清除緩存
             this.patientsCache = null;
+            // 同時從本地儲存移除病人列表緩存，避免下次讀取到舊資料
+            try {
+                this.saveCacheToStorage('patientsCache', null);
+            } catch (_e) {
+                // ignore
+            }
             // 從字典快取中移除該病人
             try {
                 if (this.patientDictCache && this.patientDictCache[patientId]) {
@@ -13193,6 +13291,12 @@ class FirebaseDataManager {
                 }
             } catch (_err) {
                 // 忽略刪除字典快取失敗
+            }
+            // 將更新後的病人字典保存至 localStorage
+            try {
+                this.saveCacheToStorage('patientDictCache', this.patientDictCache);
+            } catch (_e) {
+                // ignore
             }
             return { success: true };
         } catch (error) {
@@ -13215,6 +13319,12 @@ class FirebaseDataManager {
             return { success: false, data: null };
         }
         try {
+            // 嘗試從本地儲存載入快取，以便離線使用
+            try {
+                this.loadCacheFromStorage();
+            } catch (_e) {
+                // ignore
+            }
             // 優先從字典快取取得病人資料
             if (!forceRefresh && this.patientDictCache && this.patientDictCache[patientId]) {
                 return { success: true, data: this.patientDictCache[patientId] };
@@ -13245,6 +13355,13 @@ class FirebaseDataManager {
                     }
                 } else {
                     this.patientsCache = [patientData];
+                }
+                // 將更新後的快取保存至 localStorage
+                try {
+                    this.saveCacheToStorage('patientsCache', this.patientsCache);
+                    this.saveCacheToStorage('patientDictCache', this.patientDictCache);
+                } catch (_e) {
+                    // ignore
                 }
                 return { success: true, data: patientData };
             }
@@ -13476,6 +13593,13 @@ class FirebaseDataManager {
             );
             
             console.log('用戶數據已添加到 Firebase:', docRef.id);
+            // 新增用戶後清除用戶列表快取，避免讀取到舊資料
+            this.usersCache = null;
+            try {
+                this.saveCacheToStorage('usersCache', null);
+            } catch (_e) {
+                // ignore
+            }
             return { success: true, id: docRef.id };
         } catch (error) {
             console.error('添加用戶數據失敗:', error);
@@ -13495,6 +13619,12 @@ class FirebaseDataManager {
     async getUsers(forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
         try {
+            // 嘗試從本地儲存載入用戶快取，以便離線使用
+            try {
+                this.loadCacheFromStorage();
+            } catch (_e) {
+                // ignore
+            }
             // 有快取且不需強制刷新時直接回傳現有快取
             if (!forceRefresh && this.usersCache !== null) {
                 return { success: true, data: this.usersCache, hasMore: !!this.usersHasMore };
@@ -13516,6 +13646,12 @@ class FirebaseDataManager {
             this.usersLastVisible = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
             this.usersHasMore = snapshot.docs.length === pageSize;
             this.usersCache = users;
+            // 保存快取至 localStorage
+            try {
+                this.saveCacheToStorage('usersCache', this.usersCache);
+            } catch (_e) {
+                // ignore
+            }
             console.log('已從 Firebase 讀取用戶數據，載入', users.length, '筆');
             return { success: true, data: users, hasMore: this.usersHasMore };
         } catch (error) {
@@ -13552,6 +13688,12 @@ class FirebaseDataManager {
             this.usersLastVisible = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : this.usersLastVisible;
             this.usersHasMore = snapshot.docs.length === pageSize;
             this.usersCache = Array.isArray(this.usersCache) ? this.usersCache.concat(newData) : newData;
+            // 保存更新後的快取至 localStorage
+            try {
+                this.saveCacheToStorage('usersCache', this.usersCache);
+            } catch (_e) {
+                // ignore
+            }
             return { success: true, data: this.usersCache, hasMore: this.usersHasMore };
         } catch (error) {
             console.error('讀取用戶資料下一頁失敗:', error);
@@ -13571,6 +13713,12 @@ class FirebaseDataManager {
             );
             // 更新用戶後清除用戶緩存
             this.usersCache = null;
+            // 從本地儲存移除用戶快取
+            try {
+                this.saveCacheToStorage('usersCache', null);
+            } catch (_e) {
+                // ignore
+            }
             return { success: true };
         } catch (error) {
             console.error('更新用戶數據失敗:', error);
@@ -13585,6 +13733,12 @@ class FirebaseDataManager {
             );
             // 刪除用戶後清除緩存
             this.usersCache = null;
+            // 從本地儲存移除用戶快取
+            try {
+                this.saveCacheToStorage('usersCache', null);
+            } catch (_e) {
+                // ignore
+            }
             return { success: true };
         } catch (error) {
             console.error('刪除用戶數據失敗:', error);
