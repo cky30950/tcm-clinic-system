@@ -1732,26 +1732,15 @@ async function loadPatientListFromFirebase() {
             patientListFiltered = filteredPatients;
             renderPatientListTable(false);
         } else {
-            // 無搜尋條件，預設載入全部病人資料並在前端進行分頁與排序
-            // 這樣可以避免使用游標分頁導致新資料未即時出現的問題
-            const allPatients = await fetchPatients();
-            let sortedPatients = Array.isArray(allPatients) ? allPatients.slice() : [];
-            // 按照 createdAt 由舊至新排序；若缺少 createdAt 則視為最早
-            sortedPatients.sort((a, b) => {
-                const getTime = (p) => {
-                    const c = p && p.createdAt;
-                    if (!c) return 0;
-                    // Firestore Timestamp 物件
-                    if (typeof c === 'object' && c.seconds !== undefined) {
-                        return c.seconds * 1000;
-                    }
-                    const t = new Date(c).getTime();
-                    return isNaN(t) ? 0 : t;
-                };
-                return getTime(a) - getTime(b);
-            });
-            patientListFiltered = sortedPatients;
-            renderPatientListTable(false);
+            // 無搜尋條件，使用伺服器分頁以減少讀取量
+            // 取得當前頁碼；若未設定則預設為第一頁
+            const currentPage = (paginationSettings && paginationSettings.patientList && paginationSettings.patientList.currentPage) || 1;
+            // 透過分頁函式讀取當前頁的病人資料
+            const pageItems = await fetchPatientsPage(currentPage);
+            // 取得病人總數，用於計算總頁數
+            const totalCount = await getPatientsCount();
+            // 渲染當前頁面資料及分頁控制
+            renderPatientListPage(pageItems, totalCount, currentPage);
         }
     } catch (error) {
         console.error('載入病人列表錯誤:', error);
