@@ -1,6 +1,6 @@
 // Import Firebase functions
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit, getCountFromServer } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
     import { getDatabase, ref, set, get, child, push, update, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
@@ -36,7 +36,9 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         ref, set, get, child, push, update, remove, onValue, off,
         signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
         // 讓其他模組可存取持久化相關方法（可選）
-        setPersistence, browserSessionPersistence
+        setPersistence, browserSessionPersistence,
+        // 聚合查詢函式，用於 count() 等操作
+        getCountFromServer
     };
 
     // 連接狀態監控
