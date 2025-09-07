@@ -2837,65 +2837,89 @@ async function loadInquiryOptions(patient) {
             }
         }
         
-// 1. 修改病人搜尋函數，改為從 Firebase 讀取資料
-async function searchPatientsForRegistration() {
-    const searchTerm = document.getElementById('patientSearchInput').value.trim().toLowerCase();
+// 1. 修改病人搜尋函數，改為從 Firebase 讀取資料，並加入防抖機制避免快速輸入造成多次查詢
+function searchPatientsForRegistration() {
+    // 取得結果顯示容器
     const resultsContainer = document.getElementById('patientSearchResults');
     const resultsList = document.getElementById('searchResultsList');
-    
-    if (searchTerm.length < 1) {
-        resultsContainer.classList.add('hidden');
-        return;
+    // 若先前已有排定的搜尋計時器，先取消，避免重複執行
+    if (searchPatientsForRegistration._timerId) {
+        clearTimeout(searchPatientsForRegistration._timerId);
     }
-    
-    // 顯示載入中
-    resultsList.innerHTML = `
-        <div class="p-4 text-center text-gray-500">
-            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-            <div class="mt-2">搜尋中...</div>
-        </div>
-    `;
-    resultsContainer.classList.remove('hidden');
-    
-        try {
-            // 透過 Firestore 查詢取得匹配的病人列表
-            const matchedPatients = await searchPatientsViaFirestore(searchTerm);
-            if (!matchedPatients || matchedPatients.length === 0) {
-                resultsList.innerHTML = `
-                    <div class="p-4 text-center text-gray-500">
-                        找不到符合條件的病人
-                    </div>
-                `;
-                resultsContainer.classList.remove('hidden');
-                return;
-            }
-            // 顯示搜索結果，使用 escapeHtml 轉義顯示內容
-            resultsList.innerHTML = matchedPatients.map(patient => {
-                const safeId = String(patient.id).replace(/"/g, '&quot;');
-                const safeName = window.escapeHtml(patient.name);
-                const safeNumber = window.escapeHtml(patient.patientNumber || '');
-                const safeAge = window.escapeHtml(formatAge(patient.birthDate));
-                const safeGender = window.escapeHtml(patient.gender);
-                const safePhone = window.escapeHtml(patient.phone);
-                return `
-                <div class="p-4 hover:bg-gray-50 cursor-pointer transition duration-200" onclick="selectPatientForRegistration('${safeId}')">
-                    <div>
-                        <div class="font-semibold text-gray-900">${safeName}</div>
-                        <div class="text-sm text-gray-600">編號：${safeNumber} | 年齡：${safeAge} | 性別：${safeGender}</div>
-                        <div class="text-sm text-gray-500">電話：${safePhone}</div>
-                    </div>
-                </div>
-                `;
-            }).join('');
-            resultsContainer.classList.remove('hidden');
-        } catch (error) {
-            console.error('搜尋病人資料錯誤:', error);
+    // 使用 setTimeout 建立延遲搜尋的行為，在使用者停止輸入一定時間後再執行搜尋
+    searchPatientsForRegistration._timerId = setTimeout(async () => {
+        // 重新讀取最新的輸入值，並轉為小寫方便查詢
+        const inputElem = document.getElementById('patientSearchInput');
+        const searchTerm = inputElem ? inputElem.value.trim().toLowerCase() : '';
+        // 如果沒有有效的搜尋字串，隱藏搜尋結果並結束函式
+        if (!searchTerm || searchTerm.length < 1) {
+            if (resultsContainer) resultsContainer.classList.add('hidden');
+            return;
+        }
+        // 搜尋前，先更新畫面為載入中
+        if (resultsList) {
             resultsList.innerHTML = `
-                <div class="p-4 text-center text-red-500">
-                    搜尋失敗，請檢查網路連接
+                <div class="p-4 text-center text-gray-500">
+                    <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                    <div class="mt-2">搜尋中...</div>
                 </div>
             `;
         }
+        if (resultsContainer) {
+            resultsContainer.classList.remove('hidden');
+        }
+        try {
+            // 使用 Firestore 根據輸入關鍵字查詢病人
+            const matchedPatients = await searchPatientsViaFirestore(searchTerm);
+            // 若未找到任何匹配資料，顯示無結果提示
+            if (!matchedPatients || matchedPatients.length === 0) {
+                if (resultsList) {
+                    resultsList.innerHTML = `
+                        <div class="p-4 text-center text-gray-500">
+                            找不到符合條件的病人
+                        </div>
+                    `;
+                }
+                if (resultsContainer) {
+                    resultsContainer.classList.remove('hidden');
+                }
+                return;
+            }
+            // 將查詢結果渲染為列表，使用 escapeHtml 避免 XSS
+            if (resultsList) {
+                resultsList.innerHTML = matchedPatients.map(patient => {
+                    const safeId = String(patient.id).replace(/"/g, '&quot;');
+                    const safeName = window.escapeHtml(patient.name);
+                    const safeNumber = window.escapeHtml(patient.patientNumber || '');
+                    const safeAge = window.escapeHtml(formatAge(patient.birthDate));
+                    const safeGender = window.escapeHtml(patient.gender);
+                    const safePhone = window.escapeHtml(patient.phone);
+                    return `
+                    <div class="p-4 hover:bg-gray-50 cursor-pointer transition duration-200" onclick="selectPatientForRegistration('${safeId}')">
+                        <div>
+                            <div class="font-semibold text-gray-900">${safeName}</div>
+                            <div class="text-sm text-gray-600">編號：${safeNumber} | 年齡：${safeAge} | 性別：${safeGender}</div>
+                            <div class="text-sm text-gray-500">電話：${safePhone}</div>
+                        </div>
+                    </div>
+                    `;
+                }).join('');
+            }
+            if (resultsContainer) {
+                resultsContainer.classList.remove('hidden');
+            }
+        } catch (error) {
+            // 如發生錯誤，於畫面顯示錯誤訊息
+            console.error('搜尋病人資料錯誤:', error);
+            if (resultsList) {
+                resultsList.innerHTML = `
+                    <div class="p-4 text-center text-red-500">
+                        搜尋失敗，請檢查網路連接
+                    </div>
+                `;
+            }
+        }
+    }, 300);
 }
         
 // 2. 修改選擇病人進行掛號函數
