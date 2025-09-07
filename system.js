@@ -1132,7 +1132,7 @@ async function attemptMainLogin() {
             return;
         }
 
-        // 在登入主系統前並行載入中藥庫資料、收費項目、分類資料與模板資料
+        // 在登入主系統前並行載入中藥庫資料、穴位庫資料、收費項目、分類資料與模板資料
         // 透過 Promise.all 同時執行多個初始化函式，提升效率
         try {
             const initTasks = [];
@@ -1157,6 +1157,16 @@ async function attemptMainLogin() {
                         await initTemplateLibrary();
                     } catch (err) {
                         console.error('初始化模板庫資料失敗:', err);
+                    }
+                })());
+            }
+            // 初始化穴位庫資料，使其與中藥庫和模板庫一樣於登入後即載入
+            if (typeof initAcupointLibrary === 'function') {
+                initTasks.push((async () => {
+                    try {
+                        await initAcupointLibrary();
+                    } catch (err) {
+                        console.error('初始化穴位庫資料失敗:', err);
                     }
                 })());
             }
