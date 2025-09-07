@@ -13114,7 +13114,16 @@ class FirebaseDataManager {
     }
 
     // 病人數據管理
-    async addPatient(patientData) {
+    /**
+     * 新增病人資料，並更新內部快取。
+     * 預設會在快取中新增該筆資料，避免清空整個快取。
+     * 可透過第二個參數 clearCache=true 強制清空 patientsCache。
+     *
+     * @param {object} patientData 新增的病人資料
+     * @param {boolean} clearCache 是否強制清空快取（預設為 false）
+     * @returns {Promise<{success: boolean, id?: string, error?: string}>}
+     */
+    async addPatient(patientData, clearCache = false) {
         if (!this.isReady) {
             showToast('數據管理器尚未準備就緒', 'error');
             return { success: false };
@@ -13139,14 +13148,6 @@ class FirebaseDataManager {
             );
             
             console.log('病人數據已添加到 Firebase:', docRef.id);
-            // 新增病人後清除列表緩存，讓下一次讀取時重新載入
-            this.patientsCache = null;
-            // 在本地儲存中清除對應緩存，避免讀取到舊資料
-            try {
-                this.saveCacheToStorage('patientsCache', null);
-            } catch (_e) {
-                // ignore
-            }
             // 同步更新快取字典，將新病人加入
             try {
                 if (!this.patientDictCache || typeof this.patientDictCache !== 'object') {
@@ -13154,18 +13155,28 @@ class FirebaseDataManager {
                 }
                 // 將新建的病人資料存入字典快取，包含 id
                 this.patientDictCache[docRef.id] = { id: docRef.id, ...patientData };
-                // 若完整列表快取已存在，將新病人附加至緩存陣列
-                if (Array.isArray(this.patientsCache)) {
-                    this.patientsCache.push({ id: docRef.id, ...patientData });
-                }
+                // 將更新後的病人字典快取保存至 localStorage
+                this.saveCacheToStorage('patientDictCache', this.patientDictCache);
             } catch (_e) {
                 // 若更新快取失敗則忽略，待下次讀取時刷新
             }
-            // 將更新後的病人字典快取保存至 localStorage
-            try {
-                this.saveCacheToStorage('patientDictCache', this.patientDictCache);
-            } catch (_e) {
-                // ignore
+            // 根據 clearCache 決定是否清除或更新列表快取
+            if (clearCache) {
+                this.patientsCache = null;
+                try {
+                    this.saveCacheToStorage('patientsCache', null);
+                } catch (_e) {
+                    // ignore
+                }
+            } else {
+                try {
+                    if (Array.isArray(this.patientsCache)) {
+                        this.patientsCache.push({ id: docRef.id, ...patientData });
+                    }
+                    this.saveCacheToStorage('patientsCache', this.patientsCache);
+                } catch (_e) {
+                    // ignore
+                }
             }
             return { success: true, id: docRef.id };
         } catch (error) {
@@ -13227,7 +13238,17 @@ class FirebaseDataManager {
         }
     }
 
-    async updatePatient(patientId, patientData) {
+    /**
+     * 更新病人資料，同步更新內部快取。
+     * 預設情況下會在快取中就地更新該筆資料，避免清空整個快取。
+     * 可透過第三個參數 clearCache=true 強制清空 patientsCache。
+     *
+     * @param {string} patientId 病人文檔 ID
+     * @param {object} patientData 更新的病人資料
+     * @param {boolean} clearCache 是否強制清空快取（預設為 false）
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async updatePatient(patientId, patientData, clearCache = false) {
         try {
             // 更新資料前，若傳入的資料包含姓名、電話或病人編號，則重新生成 searchKeywords
             let updatePayload = { ...patientData };
@@ -13249,14 +13270,6 @@ class FirebaseDataManager {
                 window.firebase.doc(window.firebase.db, 'patients', patientId),
                 updatePayload
             );
-            // 更新病人資料後清除列表緩存，讓下一次讀取時重新載入
-            this.patientsCache = null;
-            // 在本地儲存中清除患者列表緩存，避免讀取到舊資料
-            try {
-                this.saveCacheToStorage('patientsCache', null);
-            } catch (_e) {
-                // ignore
-            }
             // 同步更新病人快取字典
             try {
                 // 確保快取字典存在
@@ -13266,27 +13279,35 @@ class FirebaseDataManager {
                 // 若字典中已有該病人，合併舊資料與更新資料
                 const existing = this.patientDictCache[patientId] || { id: patientId };
                 this.patientDictCache[patientId] = { ...existing, ...patientData };
+                // 將更新後的病人字典保存到 localStorage
+                this.saveCacheToStorage('patientDictCache', this.patientDictCache);
             } catch (_e) {
                 // 若更新快取失敗則忽略
             }
-            // 若完整列表快取已存在，更新該患者資料
-            try {
-                if (Array.isArray(this.patientsCache)) {
-                    const idx = this.patientsCache.findIndex(p => p && String(p.id) === String(patientId));
-                    if (idx !== -1) {
-                        const existingListItem = this.patientsCache[idx] || { id: patientId };
-                        this.patientsCache[idx] = { ...existingListItem, ...patientData };
-                    }
+            // 根據 clearCache 決定是否清除或更新列表快取
+            if (clearCache) {
+                // 清空快取，讓下一次讀取時重新載入完整列表
+                this.patientsCache = null;
+                try {
+                    this.saveCacheToStorage('patientsCache', null);
+                } catch (_e) {
+                    // ignore
                 }
-            } catch (_e) {
-                // 忽略列表快取更新錯誤
-            }
-            // 將更新後的病人字典與列表保存到 localStorage
-            try {
-                this.saveCacheToStorage('patientDictCache', this.patientDictCache);
-                this.saveCacheToStorage('patientsCache', this.patientsCache);
-            } catch (_e) {
-                // ignore
+            } else {
+                // 就地更新快取列表
+                try {
+                    if (Array.isArray(this.patientsCache)) {
+                        const idx = this.patientsCache.findIndex(p => p && String(p.id) === String(patientId));
+                        if (idx !== -1) {
+                            const existingListItem = this.patientsCache[idx] || { id: patientId };
+                            this.patientsCache[idx] = { ...existingListItem, ...patientData };
+                        }
+                    }
+                    // 將更新後的列表保存到 localStorage
+                    this.saveCacheToStorage('patientsCache', this.patientsCache);
+                } catch (_e) {
+                    // ignore list cache update errors
+                }
             }
             return { success: true };
         } catch (error) {
@@ -13295,32 +13316,49 @@ class FirebaseDataManager {
         }
     }
 
-    async deletePatient(patientId) {
+    /**
+     * 刪除指定病人紀錄，並根據 clearCache 決定如何處理快取。
+     * 若 clearCache 為 false（預設），將從快取列表中移除該筆資料，避免重新載入整個列表。
+     * 透過 clearCache=true 可強制清空 patientsCache。
+     *
+     * @param {string} patientId 要刪除的病人 ID
+     * @param {boolean} clearCache 是否強制清空快取（預設為 false）
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async deletePatient(patientId, clearCache = false) {
         try {
             await window.firebase.deleteDoc(
                 window.firebase.doc(window.firebase.db, 'patients', patientId)
             );
-            // 刪除病人後清除緩存
-            this.patientsCache = null;
-            // 同時從本地儲存移除病人列表緩存，避免下次讀取到舊資料
-            try {
-                this.saveCacheToStorage('patientsCache', null);
-            } catch (_e) {
-                // ignore
-            }
             // 從字典快取中移除該病人
             try {
                 if (this.patientDictCache && this.patientDictCache[patientId]) {
                     delete this.patientDictCache[patientId];
+                    this.saveCacheToStorage('patientDictCache', this.patientDictCache);
                 }
             } catch (_err) {
                 // 忽略刪除字典快取失敗
             }
-            // 將更新後的病人字典保存至 localStorage
-            try {
-                this.saveCacheToStorage('patientDictCache', this.patientDictCache);
-            } catch (_e) {
-                // ignore
+            // 根據 clearCache 決定是否清除或更新列表快取
+            if (clearCache) {
+                this.patientsCache = null;
+                try {
+                    this.saveCacheToStorage('patientsCache', null);
+                } catch (_e) {
+                    // ignore
+                }
+            } else {
+                try {
+                    if (Array.isArray(this.patientsCache)) {
+                        const idx = this.patientsCache.findIndex(p => p && String(p.id) === String(patientId));
+                        if (idx !== -1) {
+                            this.patientsCache.splice(idx, 1);
+                        }
+                    }
+                    this.saveCacheToStorage('patientsCache', this.patientsCache);
+                } catch (_e) {
+                    // ignore
+                }
             }
             return { success: true };
         } catch (error) {
@@ -13397,7 +13435,16 @@ class FirebaseDataManager {
         }
     }
 // 診症記錄管理
-    async addConsultation(consultationData) {
+    /**
+     * 新增診症記錄，並更新快取。
+     * 預設會在快取中新增該筆資料，避免清空整個快取。
+     * 可透過第二個參數 clearCache=true 強制清空 consultationsCache 及對應的 patientConsultationsCache。
+     *
+     * @param {object} consultationData 新增的診症資料
+     * @param {boolean} clearCache 是否強制清空快取（預設為 false）
+     * @returns {Promise<{success: boolean, id?: string, error?: string}>}
+     */
+    async addConsultation(consultationData, clearCache = false) {
         if (!this.isReady) {
             showToast('數據管理器尚未準備就緒', 'error');
             return { success: false };
@@ -13416,19 +13463,35 @@ class FirebaseDataManager {
             );
             
             console.log('診症記錄已添加到 Firebase:', docRef.id);
-            // 新增診症後清除全域診症快取
-            this.consultationsCache = null;
-            // 同時清除或更新單一病人的診症快取，以便下次重新讀取
-            try {
-                if (consultationData && consultationData.patientId) {
-                    delete patientConsultationsCache[consultationData.patientId];
-                } else {
-                    // 如果缺少病人 ID，清除所有病人診症快取
+            if (clearCache) {
+                // 新增後清空全域診症快取
+                this.consultationsCache = null;
+                try {
+                    if (consultationData && consultationData.patientId) {
+                        delete patientConsultationsCache[consultationData.patientId];
+                    } else {
+                        patientConsultationsCache = {};
+                    }
+                } catch (_err) {
                     patientConsultationsCache = {};
                 }
-            } catch (_err) {
-                // 若執行快取清理時發生錯誤，直接重置快取
-                patientConsultationsCache = {};
+            } else {
+                // 在快取中新增此診症記錄
+                try {
+                    const newItem = { id: docRef.id, ...consultationData };
+                    if (Array.isArray(this.consultationsCache)) {
+                        this.consultationsCache.push(newItem);
+                    }
+                    // 更新對應病人的診症快取
+                    if (consultationData && consultationData.patientId) {
+                        const pid = consultationData.patientId;
+                        if (patientConsultationsCache && Array.isArray(patientConsultationsCache[pid])) {
+                            patientConsultationsCache[pid].push(newItem);
+                        }
+                    }
+                } catch (_err) {
+                    // ignore
+                }
             }
             return { success: true, id: docRef.id };
         } catch (error) {
@@ -13530,7 +13593,17 @@ class FirebaseDataManager {
         }
     }
 
-    async updateConsultation(consultationId, consultationData) {
+    /**
+     * 更新診症記錄，同步更新內部快取。
+     * 預設情況下會在快取中就地更新該筆資料，避免清空整個快取。
+     * 可透過第三個參數 clearCache=true 強制清空 consultationsCache 及對應的 patientConsultationsCache。
+     *
+     * @param {string} consultationId 診症記錄 ID
+     * @param {object} consultationData 更新的診症資料
+     * @param {boolean} clearCache 是否強制清空快取（預設為 false）
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async updateConsultation(consultationId, consultationData, clearCache = false) {
         try {
             await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'consultations', consultationId),
@@ -13540,18 +13613,46 @@ class FirebaseDataManager {
                     updatedBy: currentUser
                 }
             );
-            // 更新診症後清除全域診症快取
-            this.consultationsCache = null;
-            // 更新單一病人診症快取或清除全部快取
-            try {
-                if (consultationData && consultationData.patientId) {
-                    delete patientConsultationsCache[consultationData.patientId];
-                } else {
-                    // 如果無法確定病人 ID，則清除所有病人診症快取
+            if (clearCache) {
+                // 更新後清空全域快取，待下次重新載入
+                this.consultationsCache = null;
+                try {
+                    if (consultationData && consultationData.patientId) {
+                        delete patientConsultationsCache[consultationData.patientId];
+                    } else {
+                        patientConsultationsCache = {};
+                    }
+                } catch (_err) {
                     patientConsultationsCache = {};
                 }
-            } catch (_err) {
-                patientConsultationsCache = {};
+            } else {
+                // 就地更新 consultationsCache
+                try {
+                    if (Array.isArray(this.consultationsCache)) {
+                        const idx = this.consultationsCache.findIndex(c => c && String(c.id) === String(consultationId));
+                        if (idx !== -1) {
+                            const existing = this.consultationsCache[idx] || { id: consultationId };
+                            this.consultationsCache[idx] = { ...existing, ...consultationData };
+                        }
+                    }
+                } catch (_e) {
+                    // ignore
+                }
+                // 更新病人的診症快取
+                try {
+                    if (consultationData && consultationData.patientId) {
+                        const pid = consultationData.patientId;
+                        if (patientConsultationsCache && Array.isArray(patientConsultationsCache[pid])) {
+                            const cIdx = patientConsultationsCache[pid].findIndex(c => c && String(c.id) === String(consultationId));
+                            if (cIdx !== -1) {
+                                const existing = patientConsultationsCache[pid][cIdx] || { id: consultationId };
+                                patientConsultationsCache[pid][cIdx] = { ...existing, ...consultationData };
+                            }
+                        }
+                    }
+                } catch (_err) {
+                    // ignore
+                }
             }
             return { success: true };
         } catch (error) {
@@ -13599,7 +13700,16 @@ class FirebaseDataManager {
         }
     }
     // 用戶數據管理
-    async addUser(userData) {
+    /**
+     * 新增用戶資料，並更新內部快取。
+     * 預設會在快取中新增該筆資料，避免清空整個快取。
+     * 可透過第二個參數 clearCache=true 強制清空 usersCache。
+     *
+     * @param {object} userData 新增的用戶資料
+     * @param {boolean} clearCache 是否強制清空快取（預設為 false）
+     * @returns {Promise<{success: boolean, id?: string, error?: string}>}
+     */
+    async addUser(userData, clearCache = false) {
         if (!this.isReady) {
             showToast('數據管理器尚未準備就緒', 'error');
             return { success: false };
@@ -13617,12 +13727,23 @@ class FirebaseDataManager {
             );
             
             console.log('用戶數據已添加到 Firebase:', docRef.id);
-            // 新增用戶後清除用戶列表快取，避免讀取到舊資料
-            this.usersCache = null;
-            try {
-                this.saveCacheToStorage('usersCache', null);
-            } catch (_e) {
-                // ignore
+            // 根據 clearCache 決定是否清除或更新列表快取
+            if (clearCache) {
+                this.usersCache = null;
+                try {
+                    this.saveCacheToStorage('usersCache', null);
+                } catch (_e) {
+                    // ignore
+                }
+            } else {
+                try {
+                    if (Array.isArray(this.usersCache)) {
+                        this.usersCache.push({ id: docRef.id, ...userData });
+                    }
+                    this.saveCacheToStorage('usersCache', this.usersCache);
+                } catch (_e) {
+                    // ignore
+                }
             }
             return { success: true, id: docRef.id };
         } catch (error) {
@@ -13725,7 +13846,17 @@ class FirebaseDataManager {
         }
     }
 
-    async updateUser(userId, userData) {
+    /**
+     * 更新用戶資料，同步更新內部快取。
+     * 預設情況下會在快取中就地更新該筆資料，避免清空整個快取。
+     * 可透過第三個參數 clearCache=true 強制清空 usersCache。
+     *
+     * @param {string} userId 用戶文檔 ID
+     * @param {object} userData 更新的用戶資料
+     * @param {boolean} clearCache 是否強制清空快取（預設為 false）
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async updateUser(userId, userData, clearCache = false) {
         try {
             await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'users', userId),
@@ -13735,13 +13866,27 @@ class FirebaseDataManager {
                     updatedBy: currentUser || 'system'
                 }
             );
-            // 更新用戶後清除用戶緩存
-            this.usersCache = null;
-            // 從本地儲存移除用戶快取
-            try {
-                this.saveCacheToStorage('usersCache', null);
-            } catch (_e) {
-                // ignore
+            // 根據 clearCache 決定是否清除或更新列表快取
+            if (clearCache) {
+                this.usersCache = null;
+                try {
+                    this.saveCacheToStorage('usersCache', null);
+                } catch (_e) {
+                    // ignore
+                }
+            } else {
+                try {
+                    if (Array.isArray(this.usersCache)) {
+                        const idx = this.usersCache.findIndex(u => u && String(u.id) === String(userId));
+                        if (idx !== -1) {
+                            const existing = this.usersCache[idx] || { id: userId };
+                            this.usersCache[idx] = { ...existing, ...userData };
+                        }
+                    }
+                    this.saveCacheToStorage('usersCache', this.usersCache);
+                } catch (_e) {
+                    // ignore
+                }
             }
             return { success: true };
         } catch (error) {
@@ -13750,18 +13895,40 @@ class FirebaseDataManager {
         }
     }
 
-    async deleteUser(userId) {
+    /**
+     * 刪除指定用戶紀錄，並根據 clearCache 決定如何處理快取。
+     * 若 clearCache 為 false（預設），將從快取列表中移除該筆資料，避免重新載入整個列表。
+     * 可透過 clearCache=true 強制清空 usersCache。
+     *
+     * @param {string} userId 要刪除的用戶 ID
+     * @param {boolean} clearCache 是否強制清空快取（預設為 false）
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async deleteUser(userId, clearCache = false) {
         try {
             await window.firebase.deleteDoc(
                 window.firebase.doc(window.firebase.db, 'users', userId)
             );
-            // 刪除用戶後清除緩存
-            this.usersCache = null;
-            // 從本地儲存移除用戶快取
-            try {
-                this.saveCacheToStorage('usersCache', null);
-            } catch (_e) {
-                // ignore
+            // 根據 clearCache 決定是否清除或更新列表快取
+            if (clearCache) {
+                this.usersCache = null;
+                try {
+                    this.saveCacheToStorage('usersCache', null);
+                } catch (_e) {
+                    // ignore
+                }
+            } else {
+                try {
+                    if (Array.isArray(this.usersCache)) {
+                        const idx = this.usersCache.findIndex(u => u && String(u.id) === String(userId));
+                        if (idx !== -1) {
+                            this.usersCache.splice(idx, 1);
+                        }
+                    }
+                    this.saveCacheToStorage('usersCache', this.usersCache);
+                } catch (_e) {
+                    // ignore
+                }
             }
             return { success: true };
         } catch (error) {
