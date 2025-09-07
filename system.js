@@ -12716,8 +12716,14 @@ class FirebaseDataManager {
         this.isReady = false;
         // 用於緩存病人列表，避免在同一工作階段重複向 Firestore 讀取整個 patients 集合
         this.patientsCache = null;
-        // 用於緩存診症記錄列表，避免重複讀取整個 consultations 集合
+        // 用於緩存診症記錄列表與其分頁資訊
         this.consultationsCache = null;
+        this.consultationsLastVisible = null;
+        this.consultationsHasMore = false;
+        // 用於緩存用戶列表與其分頁資訊
+        this.usersCache = null;
+        this.usersLastVisible = null;
+        this.usersHasMore = false;
         this.initializeWhenReady();
     }
 
@@ -12863,27 +12869,86 @@ class FirebaseDataManager {
      * @param {boolean} forceRefresh 是否強制重新載入
      * @returns {Promise<{ success: boolean, data: Array }>} 診症記錄資料
      */
+    /**
+     * 取得診症記錄列表。
+     * 預設僅讀取第一批資料，並將游標與快取存入實例屬性，供後續分頁使用。
+     * 若傳入 forceRefresh=true 則重置游標並重新讀取第一批資料。
+     *
+     * @param {boolean} forceRefresh 是否強制重新從 Firestore 讀取第一頁資料
+     * @returns {Promise<{ success: boolean, data: Array, hasMore: boolean }>}
+     */
     async getConsultations(forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
         try {
-            // 若已有快取且不需強制刷新，直接回傳快取
-            // 包含空陣列亦應視為有效快取，避免在沒有資料時每次都去讀取
+            // 如果有快取且不需強制刷新，直接回傳快取資料及是否還有下一頁
             if (!forceRefresh && this.consultationsCache !== null) {
-                return { success: true, data: this.consultationsCache };
+                return { success: true, data: this.consultationsCache, hasMore: !!this.consultationsHasMore };
             }
-            const querySnapshot = await window.firebase.getDocs(
-                window.firebase.collection(window.firebase.db, 'consultations')
+            // 清除既有快取與游標
+            this.consultationsCache = [];
+            this.consultationsLastVisible = null;
+            this.consultationsHasMore = false;
+            const pageSize = 100;
+            // 建立查詢：使用 limit 控制單次載入筆數
+            const q = window.firebase.query(
+                window.firebase.collection(window.firebase.db, 'consultations'),
+                window.firebase.limit(pageSize)
             );
+            const querySnapshot = await window.firebase.getDocs(q);
             const consultations = [];
-            querySnapshot.forEach((doc) => {
-                consultations.push({ id: doc.id, ...doc.data() });
+            querySnapshot.forEach((docSnap) => {
+                consultations.push({ id: docSnap.id, ...docSnap.data() });
             });
-            // 將結果寫入快取
+            // 設定游標為最後一筆文件
+            this.consultationsLastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null;
+            // 判斷是否還有下一頁
+            this.consultationsHasMore = querySnapshot.docs.length === pageSize;
+            // 更新快取
             this.consultationsCache = consultations;
-            console.log('已從 Firebase 讀取診症記錄:', consultations.length, '筆');
-            return { success: true, data: consultations };
+            console.log('已從 Firebase 讀取診症記錄，載入', consultations.length, '筆');
+            return { success: true, data: consultations, hasMore: this.consultationsHasMore };
         } catch (error) {
             console.error('讀取診症記錄失敗:', error);
+            return { success: false, data: [] };
+        }
+    }
+
+    /**
+     * 取得診症記錄的下一頁資料。
+     * 需要先呼叫 getConsultations() 讀取第一批資料後，才能使用本方法。
+     * 本方法會更新快取及游標並將新加入的資料附加至快取陣列。
+     * 若沒有更多資料可讀取，將回傳空陣列並維持 hasMore 為 false。
+     *
+     * @returns {Promise<{ success: boolean, data: Array, hasMore: boolean }>}
+     */
+    async getConsultationsNextPage() {
+        if (!this.isReady) return { success: false, data: [] };
+        try {
+            // 若上一頁沒有讀取滿 pageSize，表示沒有更多資料
+            if (!this.consultationsHasMore || !this.consultationsLastVisible) {
+                return { success: true, data: [], hasMore: false };
+            }
+            const pageSize = 100;
+            // 建立查詢：從上一頁最後一筆之後開始
+            const q = window.firebase.query(
+                window.firebase.collection(window.firebase.db, 'consultations'),
+                window.firebase.startAfter(this.consultationsLastVisible),
+                window.firebase.limit(pageSize)
+            );
+            const snapshot = await window.firebase.getDocs(q);
+            const newData = [];
+            snapshot.forEach((docSnap) => {
+                newData.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            // 更新游標
+            this.consultationsLastVisible = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : this.consultationsLastVisible;
+            // 判斷是否還有更多資料
+            this.consultationsHasMore = snapshot.docs.length === pageSize;
+            // 將新資料附加至快取
+            this.consultationsCache = Array.isArray(this.consultationsCache) ? this.consultationsCache.concat(newData) : newData;
+            return { success: true, data: this.consultationsCache, hasMore: this.consultationsHasMore };
+        } catch (error) {
+            console.error('讀取診症記錄下一頁失敗:', error);
             return { success: false, data: [] };
         }
     }
@@ -12966,23 +13031,77 @@ class FirebaseDataManager {
         }
     }
 
-    async getUsers() {
+    /**
+     * 取得用戶列表。
+     * 預設僅讀取第一批資料，並將游標與快取存入實例屬性，供後續分頁使用。
+     * 若傳入 forceRefresh=true 則重置游標並重新讀取第一批資料。
+     *
+     * @param {boolean} forceRefresh 是否強制重新從 Firestore 讀取第一頁資料
+     * @returns {Promise<{ success: boolean, data: Array, hasMore: boolean }>}
+     */
+    async getUsers(forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
-
         try {
-            const querySnapshot = await window.firebase.getDocs(
-                window.firebase.collection(window.firebase.db, 'users')
+            // 有快取且不需強制刷新時直接回傳現有快取
+            if (!forceRefresh && this.usersCache !== null) {
+                return { success: true, data: this.usersCache, hasMore: !!this.usersHasMore };
+            }
+            // 重置快取與游標
+            this.usersCache = [];
+            this.usersLastVisible = null;
+            this.usersHasMore = false;
+            const pageSize = 100;
+            const q = window.firebase.query(
+                window.firebase.collection(window.firebase.db, 'users'),
+                window.firebase.limit(pageSize)
             );
-            
+            const snapshot = await window.firebase.getDocs(q);
             const users = [];
-            querySnapshot.forEach((doc) => {
-                users.push({ id: doc.id, ...doc.data() });
+            snapshot.forEach((docSnap) => {
+                users.push({ id: docSnap.id, ...docSnap.data() });
             });
-            
-            console.log('已從 Firebase 讀取用戶數據:', users.length, '筆');
-            return { success: true, data: users };
+            this.usersLastVisible = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
+            this.usersHasMore = snapshot.docs.length === pageSize;
+            this.usersCache = users;
+            console.log('已從 Firebase 讀取用戶數據，載入', users.length, '筆');
+            return { success: true, data: users, hasMore: this.usersHasMore };
         } catch (error) {
             console.error('讀取用戶數據失敗:', error);
+            return { success: false, data: [] };
+        }
+    }
+
+    /**
+     * 取得用戶列表的下一頁資料。
+     * 需要先呼叫 getUsers() 取得第一頁後，才能使用本方法。
+     * 本方法會更新快取及游標並將新資料附加至快取。
+     * 若沒有更多資料可讀取，將回傳空陣列並維持 hasMore 為 false。
+     *
+     * @returns {Promise<{ success: boolean, data: Array, hasMore: boolean }>}
+     */
+    async getUsersNextPage() {
+        if (!this.isReady) return { success: false, data: [] };
+        try {
+            if (!this.usersHasMore || !this.usersLastVisible) {
+                return { success: true, data: [], hasMore: false };
+            }
+            const pageSize = 100;
+            const q = window.firebase.query(
+                window.firebase.collection(window.firebase.db, 'users'),
+                window.firebase.startAfter(this.usersLastVisible),
+                window.firebase.limit(pageSize)
+            );
+            const snapshot = await window.firebase.getDocs(q);
+            const newData = [];
+            snapshot.forEach((docSnap) => {
+                newData.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            this.usersLastVisible = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : this.usersLastVisible;
+            this.usersHasMore = snapshot.docs.length === pageSize;
+            this.usersCache = Array.isArray(this.usersCache) ? this.usersCache.concat(newData) : newData;
+            return { success: true, data: this.usersCache, hasMore: this.usersHasMore };
+        } catch (error) {
+            console.error('讀取用戶資料下一頁失敗:', error);
             return { success: false, data: [] };
         }
     }
