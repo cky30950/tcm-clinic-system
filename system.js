@@ -1732,26 +1732,15 @@ async function loadPatientListFromFirebase() {
             patientListFiltered = filteredPatients;
             renderPatientListTable(false);
         } else {
-            // 無搜尋條件，預設載入全部病人資料並在前端進行分頁與排序
-            // 這樣可以避免使用游標分頁導致新資料未即時出現的問題
-            const allPatients = await fetchPatients();
-            let sortedPatients = Array.isArray(allPatients) ? allPatients.slice() : [];
-            // 按照 createdAt 由舊至新排序；若缺少 createdAt 則視為最早
-            sortedPatients.sort((a, b) => {
-                const getTime = (p) => {
-                    const c = p && p.createdAt;
-                    if (!c) return 0;
-                    // Firestore Timestamp 物件
-                    if (typeof c === 'object' && c.seconds !== undefined) {
-                        return c.seconds * 1000;
-                    }
-                    const t = new Date(c).getTime();
-                    return isNaN(t) ? 0 : t;
-                };
-                return getTime(a) - getTime(b);
-            });
-            patientListFiltered = sortedPatients;
-            renderPatientListTable(false);
+            // 無搜尋條件，使用伺服器分頁以減少讀取量
+            // 取得當前頁碼；若未設定則預設為第一頁
+            const currentPage = (paginationSettings && paginationSettings.patientList && paginationSettings.patientList.currentPage) || 1;
+            // 透過分頁函式讀取當前頁的病人資料
+            const pageItems = await fetchPatientsPage(currentPage);
+            // 取得病人總數，用於計算總頁數
+            const totalCount = await getPatientsCount();
+            // 渲染當前頁面資料及分頁控制
+            renderPatientListPage(pageItems, totalCount, currentPage);
         }
     } catch (error) {
         console.error('載入病人列表錯誤:', error);
@@ -2957,17 +2946,17 @@ async function selectPatientForRegistration(patientId) {
                 return;
             }
             
-            // 建立掛號物件，除了儲存病人 ID 與醫師帳號，也額外保存病人姓名與醫師姓名。
-            // 這樣在即時監聽掛號狀態時，不必再從病人集合讀取病人姓名，即可直接顯示。
+            // 建立掛號物件，除了傳入 ID 與帳號之外，同時儲存病人姓名與醫師姓名。
+            // 這可避免日後在監聽掛號狀態時為了取得姓名而再次查詢病人集合。
             const appointment = {
                 id: Date.now(),
                 patientId: selectedPatientForRegistration.id,
-                // 儲存病人姓名與醫師姓名，避免日後查詢全部病人再取得姓名
+                // 新增：直接保存病人姓名，供後續監聽或顯示使用
                 patientName: selectedPatientForRegistration.name,
-                doctorName: selectedDoctor.name,
                 appointmentTime: selectedTime.toISOString(),
-                // 醫師帳號（username）仍保留於 appointmentDoctor，方便比對登入醫師
                 appointmentDoctor: appointmentDoctor,
+                // 新增：直接保存醫師姓名，供後續監聽或顯示使用
+                doctorName: selectedDoctor.name,
                 chiefComplaint: chiefComplaint || '無特殊主訴',
                 status: 'registered', // registered, waiting, consulting, completed
                 createdAt: new Date().toISOString(),
@@ -3227,33 +3216,33 @@ function subscribeToAppointments() {
             }
             // 如果有需要通知的掛號並且目前使用者是醫師
             if (toNotify.length > 0 && currentUserData && currentUserData.position === '醫師') {
-                // 準備一個暫存，用於需要回退到讀取病人列表時使用
-                let patientsData = null;
+                let patientsList = null;
                 for (const apt of toNotify) {
                     // 僅通知該醫師所屬的掛號
                     if (apt.appointmentDoctor === currentUserData.username) {
-                        // 優先使用掛號資料中儲存的病人姓名（若存在）
-                        let patientName = apt.patientName || '';
-                        if (!patientName) {
-                            // 若掛號資料未保存病人姓名，則作為後退方案讀取病人列表一次
-                            if (!patientsData) {
+                        // 優先使用掛號物件中的病人姓名
+                        let patientName = '';
+                        if (apt.patientName) {
+                            patientName = apt.patientName;
+                        } else {
+                            // 僅當缺少 patientName 時才讀取一次完整病人列表
+                            if (!patientsList) {
                                 try {
-                                    patientsData = await fetchPatients();
+                                    patientsList = await fetchPatients();
                                 } catch (fetchErr) {
-                                    console.error('讀取病人資料以取得姓名失敗:', fetchErr);
-                                    patientsData = [];
+                                    console.error('讀取病人資料以取得姓名時發生錯誤:', fetchErr);
                                 }
                             }
-                            const patient = Array.isArray(patientsData) ? patientsData.find(p => p.id === apt.patientId) : null;
-                            patientName = patient && patient.name ? patient.name : '';
+                            if (Array.isArray(patientsList)) {
+                                const patient = patientsList.find(p => p.id === apt.patientId);
+                                patientName = patient ? patient.name : '';
+                            }
                         }
-                        // 顯示提示並播放音效
                         if (patientName) {
+                            // 顯示提示並播放音效
                             showToast(`病人 ${patientName} 已進入候診中，請準備診症。`, 'info');
-                        } else {
-                            showToast(`有病人已進入候診中，請準備診症。`, 'info');
+                            playNotificationSound();
                         }
-                        playNotificationSound();
                     }
                 }
             }
@@ -3271,19 +3260,16 @@ function subscribeToAppointments() {
     };
     // 設置監聽器
     window.firebase.onValue(appointmentsRef, window.appointmentsListener);
-    // 為當前頁面註冊 beforeunload 事件，用於在頁面卸載時解除掛號資料的監聽，避免背景持續讀取
-    if (!window.appointmentsUnloadListenerAdded) {
-        window.appointmentsUnloadListenerAdded = true;
-        window.addEventListener('beforeunload', () => {
+    // 在頁面卸載時自動取消監聽，以避免離開頁面後仍持續監聽造成資源浪費
+    window.addEventListener('beforeunload', () => {
+        if (window.appointmentsListener) {
             try {
-                if (window.appointmentsListener) {
-                    window.firebase.off(appointmentsRef, 'value', window.appointmentsListener);
-                }
-            } catch (_e) {
-                // ignore error when off
+                window.firebase.off(appointmentsRef, 'value', window.appointmentsListener);
+            } catch (e) {
+                console.error('取消掛號監聽器時發生錯誤:', e);
             }
-        });
-    }
+        }
+    });
 }
 
 
@@ -12726,7 +12712,12 @@ window.restorePackageUseMeta = restorePackageUseMeta;
 // Firebase 數據管理系統
 class FirebaseDataManager {
     constructor() {
+        // 設置初始狀態與快取欄位
         this.isReady = false;
+        // 用於緩存病人列表，避免在同一工作階段重複向 Firestore 讀取整個 patients 集合
+        this.patientsCache = null;
+        // 用於緩存診症記錄列表，避免重複讀取整個 consultations 集合
+        this.consultationsCache = null;
         this.initializeWhenReady();
     }
 
@@ -12769,19 +12760,31 @@ class FirebaseDataManager {
         }
     }
 
-    async getPatients() {
+    /**
+     * 讀取病人列表並使用內部快取。
+     * 預設情況下若已存在快取，直接回傳快取內容以避免重複讀取。
+     * 傳入 forceRefresh=true 可強制刷新快取並重新從 Firestore 取得最新資料。
+     *
+     * @param {boolean} forceRefresh 是否強制重新載入
+     * @returns {Promise<{ success: boolean, data: Array }>} 病人資料
+     */
+    async getPatients(forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
-
         try {
+            // 若已存在快取且不需強制刷新，直接回傳快取
+            // 包含空陣列亦應視為有效快取，避免在沒有病人時每次都去讀取
+            if (!forceRefresh && this.patientsCache !== null) {
+                return { success: true, data: this.patientsCache };
+            }
             const querySnapshot = await window.firebase.getDocs(
                 window.firebase.collection(window.firebase.db, 'patients')
             );
-            
             const patients = [];
             querySnapshot.forEach((doc) => {
                 patients.push({ id: doc.id, ...doc.data() });
             });
-            
+            // 將結果寫入快取
+            this.patientsCache = patients;
             console.log('已從 Firebase 讀取病人數據:', patients.length, '筆');
             return { success: true, data: patients };
         } catch (error) {
@@ -12852,19 +12855,31 @@ class FirebaseDataManager {
         }
     }
 
-    async getConsultations() {
+    /**
+     * 讀取診症記錄列表並使用內部快取。
+     * 預設情況下若已存在快取，直接回傳快取內容以避免重複讀取。
+     * 傳入 forceRefresh=true 可強制刷新快取並重新從 Firestore 取得最新資料。
+     *
+     * @param {boolean} forceRefresh 是否強制重新載入
+     * @returns {Promise<{ success: boolean, data: Array }>} 診症記錄資料
+     */
+    async getConsultations(forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
-
         try {
+            // 若已有快取且不需強制刷新，直接回傳快取
+            // 包含空陣列亦應視為有效快取，避免在沒有資料時每次都去讀取
+            if (!forceRefresh && this.consultationsCache !== null) {
+                return { success: true, data: this.consultationsCache };
+            }
             const querySnapshot = await window.firebase.getDocs(
                 window.firebase.collection(window.firebase.db, 'consultations')
             );
-            
             const consultations = [];
             querySnapshot.forEach((doc) => {
                 consultations.push({ id: doc.id, ...doc.data() });
             });
-            
+            // 將結果寫入快取
+            this.consultationsCache = consultations;
             console.log('已從 Firebase 讀取診症記錄:', consultations.length, '筆');
             return { success: true, data: consultations };
         } catch (error) {
