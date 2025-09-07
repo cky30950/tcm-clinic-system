@@ -1,7 +1,13 @@
 // Import Firebase functions
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit, getCountFromServer, startAfter } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-    import { getDatabase, ref, set, get, child, push, update, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getDatabase, ref, set, get, child, push, update, remove, onValue, off,
+        // 新增查詢相關方法，用於在 Realtime Database 上進行條件篩選
+        query as rtdbQuery,
+        orderByChild,
+        startAt,
+        endAt,
+        equalTo } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
     // 您的 Firebase 配置（請替換成您的實際配置）
@@ -36,6 +42,12 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         // 新增 startAfter 供分頁查詢使用
         startAfter,
         ref, set, get, child, push, update, remove, onValue, off,
+        // 將查詢方法暴露到全域，供實時監聽時使用
+        query: rtdbQuery,
+        orderByChild,
+        startAt,
+        endAt,
+        equalTo,
         signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
         // 讓其他模組可存取持久化相關方法（可選）
         setPersistence, browserSessionPersistence,
