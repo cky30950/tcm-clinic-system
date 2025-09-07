@@ -1,50 +1,53 @@
 {
   "indexes": [
+    
     {
       "collectionGroup": "patients",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "name",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "phone",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "patientNumber",
-          "order": "ASCENDING"
-        }
+        { "fieldPath": "name", "order": "ASCENDING" }
       ]
-    }
-    ,
+    },
+    
+    {
+      "collectionGroup": "patients",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "phone", "order": "ASCENDING" }
+      ]
+    },
+    
+    {
+      "collectionGroup": "patients",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "patientNumber", "order": "ASCENDING" }
+      ]
+    },
+    
+    {
+      "collectionGroup": "patients",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "patientNumber", "order": "DESCENDING" }
+      ]
+    },
+    
     {
       "collectionGroup": "patientPackages",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "patientId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "remainingUses",
-          "order": "ASCENDING"
-        }
+        { "fieldPath": "patientId", "order": "ASCENDING" },
+        { "fieldPath": "remainingUses", "order": "ASCENDING" }
       ]
     },
+    
     {
       "collectionGroup": "inquiries",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "patientName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
+        { "fieldPath": "patientName", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     }
   ],
