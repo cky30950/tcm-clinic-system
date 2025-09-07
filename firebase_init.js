@@ -42,8 +42,8 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         // 新增 startAfter 供分頁查詢使用
         startAfter,
         ref, set, get, child, push, update, remove, onValue, off,
-        // 將查詢方法暴露到全域，供實時監聽時使用
-        query: rtdbQuery,
+        // 將 Realtime Database 查詢暴露為 rtdbQuery，避免覆蓋 Firestore 的 query
+        rtdbQuery,
         orderByChild,
         startAt,
         endAt,
