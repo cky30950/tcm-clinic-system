@@ -12690,7 +12690,12 @@ window.restorePackageUseMeta = restorePackageUseMeta;
 // Firebase 數據管理系統
 class FirebaseDataManager {
     constructor() {
+        // 設置初始狀態與快取欄位
         this.isReady = false;
+        // 用於緩存病人列表，避免在同一工作階段重複向 Firestore 讀取整個 patients 集合
+        this.patientsCache = null;
+        // 用於緩存診症記錄列表，避免重複讀取整個 consultations 集合
+        this.consultationsCache = null;
         this.initializeWhenReady();
     }
 
@@ -12733,19 +12738,31 @@ class FirebaseDataManager {
         }
     }
 
-    async getPatients() {
+    /**
+     * 讀取病人列表並使用內部快取。
+     * 預設情況下若已存在快取，直接回傳快取內容以避免重複讀取。
+     * 傳入 forceRefresh=true 可強制刷新快取並重新從 Firestore 取得最新資料。
+     *
+     * @param {boolean} forceRefresh 是否強制重新載入
+     * @returns {Promise<{ success: boolean, data: Array }>} 病人資料
+     */
+    async getPatients(forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
-
         try {
+            // 若已存在快取且不需強制刷新，直接回傳快取
+            // 包含空陣列亦應視為有效快取，避免在沒有病人時每次都去讀取
+            if (!forceRefresh && this.patientsCache !== null) {
+                return { success: true, data: this.patientsCache };
+            }
             const querySnapshot = await window.firebase.getDocs(
                 window.firebase.collection(window.firebase.db, 'patients')
             );
-            
             const patients = [];
             querySnapshot.forEach((doc) => {
                 patients.push({ id: doc.id, ...doc.data() });
             });
-            
+            // 將結果寫入快取
+            this.patientsCache = patients;
             console.log('已從 Firebase 讀取病人數據:', patients.length, '筆');
             return { success: true, data: patients };
         } catch (error) {
@@ -12816,19 +12833,31 @@ class FirebaseDataManager {
         }
     }
 
-    async getConsultations() {
+    /**
+     * 讀取診症記錄列表並使用內部快取。
+     * 預設情況下若已存在快取，直接回傳快取內容以避免重複讀取。
+     * 傳入 forceRefresh=true 可強制刷新快取並重新從 Firestore 取得最新資料。
+     *
+     * @param {boolean} forceRefresh 是否強制重新載入
+     * @returns {Promise<{ success: boolean, data: Array }>} 診症記錄資料
+     */
+    async getConsultations(forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
-
         try {
+            // 若已有快取且不需強制刷新，直接回傳快取
+            // 包含空陣列亦應視為有效快取，避免在沒有資料時每次都去讀取
+            if (!forceRefresh && this.consultationsCache !== null) {
+                return { success: true, data: this.consultationsCache };
+            }
             const querySnapshot = await window.firebase.getDocs(
                 window.firebase.collection(window.firebase.db, 'consultations')
             );
-            
             const consultations = [];
             querySnapshot.forEach((doc) => {
                 consultations.push({ id: doc.id, ...doc.data() });
             });
-            
+            // 將結果寫入快取
+            this.consultationsCache = consultations;
             console.log('已從 Firebase 讀取診症記錄:', consultations.length, '筆');
             return { success: true, data: consultations };
         } catch (error) {
