@@ -400,6 +400,18 @@ async function searchPatientsViaFirestore(term) {
     } catch (e) {
         console.warn('搜尋病人資料時發生錯誤:', e);
     }
+    // 將搜尋結果更新至患者字典快取，以便後續可快速查找
+    try {
+        if (window.firebaseDataManager && window.firebaseDataManager.patientDictCache) {
+            Object.keys(docsMap).forEach(id => {
+                const data = docsMap[id];
+                // 更新或新增至緩存字典
+                window.firebaseDataManager.patientDictCache[id] = data;
+            });
+        }
+    } catch (_e) {
+        // 若更新快取失敗則忽略
+    }
     return Object.values(docsMap);
 }
 
@@ -12901,8 +12913,22 @@ class FirebaseDataManager {
             );
             
             console.log('病人數據已添加到 Firebase:', docRef.id);
-            // 新增病人後清除緩存，讓下一次讀取時重新載入
+            // 新增病人後清除列表緩存，讓下一次讀取時重新載入
             this.patientsCache = null;
+            // 同步更新快取字典，將新病人加入
+            try {
+                if (!this.patientDictCache || typeof this.patientDictCache !== 'object') {
+                    this.patientDictCache = {};
+                }
+                // 將新建的病人資料存入字典快取，包含 id
+                this.patientDictCache[docRef.id] = { id: docRef.id, ...patientData };
+                // 若完整列表快取已存在，將新病人附加至緩存陣列
+                if (Array.isArray(this.patientsCache)) {
+                    this.patientsCache.push({ id: docRef.id, ...patientData });
+                }
+            } catch (_e) {
+                // 若更新快取失敗則忽略，待下次讀取時刷新
+            }
             return { success: true, id: docRef.id };
         } catch (error) {
             console.error('添加病人數據失敗:', error);
@@ -12959,8 +12985,32 @@ class FirebaseDataManager {
                     updatedBy: currentUser || 'system'
                 }
             );
-            // 更新病人資料後清除緩存，讓下一次讀取時重新載入
+            // 更新病人資料後清除列表緩存，讓下一次讀取時重新載入
             this.patientsCache = null;
+            // 同步更新病人快取字典
+            try {
+                // 確保快取字典存在
+                if (!this.patientDictCache || typeof this.patientDictCache !== 'object') {
+                    this.patientDictCache = {};
+                }
+                // 若字典中已有該病人，合併舊資料與更新資料
+                const existing = this.patientDictCache[patientId] || { id: patientId };
+                this.patientDictCache[patientId] = { ...existing, ...patientData };
+            } catch (_e) {
+                // 若更新快取失敗則忽略
+            }
+            // 若完整列表快取已存在，更新該患者資料
+            try {
+                if (Array.isArray(this.patientsCache)) {
+                    const idx = this.patientsCache.findIndex(p => p && String(p.id) === String(patientId));
+                    if (idx !== -1) {
+                        const existingListItem = this.patientsCache[idx] || { id: patientId };
+                        this.patientsCache[idx] = { ...existingListItem, ...patientData };
+                    }
+                }
+            } catch (_e) {
+                // 忽略列表快取更新錯誤
+            }
             return { success: true };
         } catch (error) {
             console.error('更新病人數據失敗:', error);
