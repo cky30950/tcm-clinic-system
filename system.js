@@ -13585,17 +13585,56 @@ class FirebaseDataManager {
     async clearOldInquiries() {
         if (!this.isReady) return { success: false };
         try {
-            const snapshot = await window.firebase.getDocs(
-                window.firebase.collection(window.firebase.db, 'inquiries')
-            );
             const now = new Date();
             // 計算今日凌晨時間（本地時區）。任何發生在此時間之前的紀錄將被視為過期。
             const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const inquiriesRef = window.firebase.collection(window.firebase.db, 'inquiries');
+
+            // 儲存待刪除文件的 ID，避免重複處理
+            const idsToDelete = new Set();
+            const docsToDelete = [];
+
+            /*
+             * Firestore 支援條件查詢，我們將依據 createdAt 與 expireAt 分別查詢過期文件。
+             * 這樣只讀取符合篩選條件的文件，避免先讀取全部再過濾。
+             * 注意：若某筆文件同時具備 createdAt 與 expireAt 且皆小於今日凌晨，會在兩次查詢中出現，
+             *       因此需用 Set 去除重複，並再驗證目標日期以保險無誤。
+             */
+            try {
+                // 查詢 createdAt 在今日凌晨之前的文件
+                const qCreated = window.firebase.query(
+                    inquiriesRef,
+                    window.firebase.where('createdAt', '<', startOfToday)
+                );
+                const snapshotCreated = await window.firebase.getDocs(qCreated);
+                snapshotCreated.forEach((doc) => {
+                    docsToDelete.push(doc);
+                });
+            } catch (err) {
+                console.warn('查詢過期 createdAt 問診資料失敗:', err);
+            }
+
+            try {
+                // 查詢 expireAt 在今日凌晨之前的文件
+                const qExpire = window.firebase.query(
+                    inquiriesRef,
+                    window.firebase.where('expireAt', '<', startOfToday)
+                );
+                const snapshotExpire = await window.firebase.getDocs(qExpire);
+                snapshotExpire.forEach((doc) => {
+                    docsToDelete.push(doc);
+                });
+            } catch (err) {
+                console.warn('查詢過期 expireAt 問診資料失敗:', err);
+            }
+
             const deletions = [];
-            snapshot.forEach(doc => {
+            // 驗證並彙整需要刪除的文件
+            docsToDelete.forEach((doc) => {
+                // 避免同一文件被重複加入
+                if (idsToDelete.has(doc.id)) return;
                 const data = doc.data();
                 let createdDate = null;
-                // 解析 createdAt。Firestore 的 Timestamp 物件包含 seconds 屬性，其他情況視為 ISO 字串。
                 if (data.createdAt) {
                     if (data.createdAt.seconds !== undefined) {
                         createdDate = new Date(data.createdAt.seconds * 1000);
@@ -13603,7 +13642,6 @@ class FirebaseDataManager {
                         createdDate = new Date(data.createdAt);
                     }
                 }
-                // 若缺少 createdAt，則使用 expireAt 作為備援依據
                 let targetDate = createdDate;
                 if (!targetDate && data.expireAt) {
                     if (data.expireAt.seconds !== undefined) {
@@ -13612,13 +13650,17 @@ class FirebaseDataManager {
                         targetDate = new Date(data.expireAt);
                     }
                 }
-                // 如果目標日期存在且早於今日凌晨，則視為過期，待刪除
+                // 如果目標日期存在且早於今日凌晨，則加入刪除佇列
                 if (targetDate && targetDate < startOfToday) {
-                    deletions.push(window.firebase.deleteDoc(
-                        window.firebase.doc(window.firebase.db, 'inquiries', doc.id)
-                    ));
+                    idsToDelete.add(doc.id);
+                    deletions.push(
+                        window.firebase.deleteDoc(
+                            window.firebase.doc(window.firebase.db, 'inquiries', doc.id)
+                        )
+                    );
                 }
             });
+
             let count = 0;
             if (deletions.length > 0) {
                 await Promise.all(deletions);
