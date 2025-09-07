@@ -3094,7 +3094,7 @@ async function selectPatientForRegistration(patientId) {
                  * 此函式會同步更新本地的 appointments 陣列與 localStorage。
                  */
                 try {
-                    // 讀取所有掛號資料
+                    // 讀取所有掛號資料（按日期分類）
                     const snapshot = await window.firebase.get(
                         window.firebase.ref(window.firebase.rtdb, 'appointments')
                     );
@@ -3107,42 +3107,70 @@ async function selectPatientForRegistration(patientId) {
                     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
                     const idsToRemove = [];
-                    for (const id in data) {
-                        if (!Object.prototype.hasOwnProperty.call(data, id)) continue;
-                        const apt = data[id] || {};
-                        const timeValue = apt.appointmentTime;
-                        // 如果沒有 appointmentTime，視為過期資料
-                        if (!timeValue) {
-                            idsToRemove.push(id);
+                    // 遍歷所有日期節點
+                    for (const dateKey in data) {
+                        if (!Object.prototype.hasOwnProperty.call(data, dateKey)) continue;
+                        const dateVal = data[dateKey];
+                        // 解析日期鍵為本地日期
+                        const parsedDate = new Date(dateKey + 'T00:00:00');
+                        // 若日期不合法則跳過
+                        if (isNaN(parsedDate.getTime())) {
                             continue;
                         }
-                        const aptDate = new Date(timeValue);
-                        if (isNaN(aptDate.getTime())) {
-                            // 無法解析日期，視為過期
-                            idsToRemove.push(id);
+                        // 如果日期早於今日（昨天或更早），刪除整個日期節點
+                        if (parsedDate < startOfToday) {
+                            try {
+                                await window.firebase.remove(
+                                    window.firebase.ref(window.firebase.rtdb, 'appointments/' + dateKey)
+                                );
+                            } catch (err) {
+                                console.error('刪除過期日期節點失敗:', dateKey, err);
+                            }
+                            // 收集該日期節點下的所有掛號 ID，用於同步本地陣列
+                            if (dateVal && typeof dateVal === 'object') {
+                                for (const subId in dateVal) {
+                                    if (!Object.prototype.hasOwnProperty.call(dateVal, subId)) continue;
+                                    idsToRemove.push(String(subId));
+                                }
+                            }
                             continue;
                         }
-                        // 如果掛號時間在今日凌晨之前（昨天或更早），則刪除
-                        if (aptDate < startOfToday) {
-                            idsToRemove.push(id);
+                        // 如果日期等於今日，僅刪除那些 appointmentTime 早於今日凌晨的掛號
+                        if (parsedDate.getTime() === startOfToday.getTime()) {
+                            if (dateVal && typeof dateVal === 'object') {
+                                for (const subId in dateVal) {
+                                    if (!Object.prototype.hasOwnProperty.call(dateVal, subId)) continue;
+                                    const apt = dateVal[subId] || {};
+                                    const timeValue = apt.appointmentTime;
+                                    // 如果沒有 appointmentTime 或解析失敗，視為過期資料
+                                    let removeThis = false;
+                                    if (!timeValue) {
+                                        removeThis = true;
+                                    } else {
+                                        const aptDate = new Date(timeValue);
+                                        if (isNaN(aptDate.getTime()) || aptDate < startOfToday) {
+                                            removeThis = true;
+                                        }
+                                    }
+                                    if (removeThis) {
+                                        try {
+                                            await window.firebase.remove(
+                                                window.firebase.ref(window.firebase.rtdb, `appointments/${dateKey}/${subId}`)
+                                            );
+                                            idsToRemove.push(String(subId));
+                                        } catch (removeError) {
+                                            console.error('刪除過期掛號失敗:', subId, removeError);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    // 若沒有需要刪除的掛號，直接返回
+                    // 如果沒有需要刪除的掛號，直接返回
                     if (idsToRemove.length === 0) {
                         console.log('沒有過期掛號需要清除。');
                         return;
-                    }
-
-                    // 刪除每筆過期的掛號
-                    for (const id of idsToRemove) {
-                        try {
-                            await window.firebase.remove(
-                                window.firebase.ref(window.firebase.rtdb, 'appointments/' + id)
-                            );
-                        } catch (removeError) {
-                            console.error('刪除過期掛號失敗:', id, removeError);
-                        }
                     }
 
                     // 更新本地 appointments 陣列
@@ -3150,7 +3178,6 @@ async function selectPatientForRegistration(patientId) {
                         appointments = appointments.filter(apt => !idsToRemove.includes(String(apt.id)));
                         localStorage.setItem('appointments', JSON.stringify(appointments));
                     }
-
                     console.log(`清除 ${idsToRemove.length} 筆過期掛號完成。`);
                 } catch (error) {
                     console.error('清除過期掛號時發生錯誤:', error);
@@ -3289,8 +3316,22 @@ function subscribeToAppointments() {
     const startIso = startOfDay.toISOString();
     const endIso = endOfDay.toISOString();
 
-    // 構建基本參考路徑
-    const appointmentsRef = window.firebase.ref(window.firebase.rtdb, 'appointments');
+    // 構建基本參考路徑（按日期分表）。取得日期字串 YYYY-MM-DD
+    let dateKeyForQuery = '';
+    try {
+        // 使用本地時區組合日期字串
+        const y = startOfDay.getFullYear();
+        const m = String(startOfDay.getMonth() + 1).padStart(2, '0');
+        const d = String(startOfDay.getDate()).padStart(2, '0');
+        dateKeyForQuery = `${y}-${m}-${d}`;
+    } catch (_e) {
+        const nowForKey = new Date();
+        const y = nowForKey.getFullYear();
+        const m = String(nowForKey.getMonth() + 1).padStart(2, '0');
+        const d = String(nowForKey.getDate()).padStart(2, '0');
+        dateKeyForQuery = `${y}-${m}-${d}`;
+    }
+    const appointmentsRef = window.firebase.ref(window.firebase.rtdb, `appointments/${dateKeyForQuery}`);
     // 使用 Realtime Database 查詢以篩選當天的掛號資料，減少監聽範圍
     const appointmentsQuery = window.firebase.query(
         appointmentsRef,
@@ -3895,7 +3936,8 @@ async function removeAppointment(appointmentId) {
             appointments = appointments.filter(apt => apt.id !== appointmentId);
             localStorage.setItem('appointments', JSON.stringify(appointments));
             // 從遠端刪除掛號
-            await window.firebaseDataManager.deleteAppointment(String(appointmentId));
+            // 刪除掛號時需傳入 appointmentTime 用於定位日期節點
+            await window.firebaseDataManager.deleteAppointment(String(appointmentId), appointment.appointmentTime);
             showToast(`已移除 ${patient.name} 的掛號記錄`, 'success');
             loadTodayAppointments();
             // 如果正在診症表單中顯示該病人，則關閉表單
@@ -13433,15 +13475,32 @@ class FirebaseDataManager {
 
     // 掛號資料管理（使用 Realtime Database）
     async addAppointment(appointmentData) {
+        // 根據 appointmentTime 計算日期字串，格式為 YYYY-MM-DD
         if (!this.isReady) {
             showToast('數據管理器尚未準備就緒', 'error');
             return { success: false };
         }
         try {
             const id = appointmentData.id;
-            // 將掛號資料存入 Realtime Database，以掛號 ID 作為鍵
+            let dateKey = '';
+            try {
+                const dt = new Date(appointmentData.appointmentTime);
+                // 根據本地時區組合 YYYY-MM-DD
+                const year = dt.getFullYear();
+                const month = String(dt.getMonth() + 1).padStart(2, '0');
+                const day = String(dt.getDate()).padStart(2, '0');
+                dateKey = `${year}-${month}-${day}`;
+            } catch (_e) {
+                // 若無法解析日期，退回今日日期（本地時區）
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                dateKey = `${year}-${month}-${day}`;
+            }
+            // 將掛號資料存入 Realtime Database，以日期/ID 作為路徑
             await window.firebase.set(
-                window.firebase.ref(window.firebase.rtdb, 'appointments/' + id),
+                window.firebase.ref(window.firebase.rtdb, `appointments/${dateKey}/${id}`),
                 { ...appointmentData }
             );
             console.log('掛號資料已添加到 Firebase Realtime Database:', id);
@@ -13454,15 +13513,32 @@ class FirebaseDataManager {
     }
 
     async getAppointments() {
+        // 讀取所有日期節點並扁平化返回
         if (!this.isReady) return { success: false, data: [] };
         try {
             const snapshot = await window.firebase.get(
                 window.firebase.ref(window.firebase.rtdb, 'appointments')
             );
             const data = snapshot.val() || {};
-            const appointments = Object.keys(data).map(key => {
-                return { id: key, ...data[key] };
-            });
+            const appointments = [];
+            // 若頂層直接是 ID => appointment 的資料（舊結構），則兼容處理
+            for (const key in data) {
+                if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
+                const val = data[key];
+                if (val && typeof val === 'object' && !Array.isArray(val)) {
+                    // 檢查是否為舊結構（含 appointmentTime）
+                    if (val.appointmentTime !== undefined) {
+                        appointments.push({ id: key, ...val });
+                    } else {
+                        // 預期為新結構日期層，遍歷其下的 ID
+                        for (const subId in val) {
+                            if (!Object.prototype.hasOwnProperty.call(val, subId)) continue;
+                            const subVal = val[subId];
+                            appointments.push({ id: subId, ...subVal });
+                        }
+                    }
+                }
+            }
             console.log('已從 Firebase Realtime Database 讀取掛號數據:', appointments.length, '筆');
             return { success: true, data: appointments };
         } catch (error) {
@@ -13472,9 +13548,24 @@ class FirebaseDataManager {
     }
 
     async updateAppointment(id, appointmentData) {
+        // 根據 appointmentTime 計算日期字串，格式為 YYYY-MM-DD
         try {
+            let dateKey = '';
+            try {
+                const dt = new Date(appointmentData.appointmentTime);
+                const year = dt.getFullYear();
+                const month = String(dt.getMonth() + 1).padStart(2, '0');
+                const day = String(dt.getDate()).padStart(2, '0');
+                dateKey = `${year}-${month}-${day}`;
+            } catch (_e) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                dateKey = `${year}-${month}-${day}`;
+            }
             await window.firebase.update(
-                window.firebase.ref(window.firebase.rtdb, 'appointments/' + id),
+                window.firebase.ref(window.firebase.rtdb, `appointments/${dateKey}/${id}`),
                 { ...appointmentData }
             );
             return { success: true };
@@ -13484,10 +13575,26 @@ class FirebaseDataManager {
         }
     }
 
-    async deleteAppointment(id) {
+    async deleteAppointment(id, appointmentTime) {
+        // 根據 appointmentTime 計算日期字串，格式為 YYYY-MM-DD
         try {
+            let dateKey = '';
+            try {
+                const dt = new Date(appointmentTime);
+                const year = dt.getFullYear();
+                const month = String(dt.getMonth() + 1).padStart(2, '0');
+                const day = String(dt.getDate()).padStart(2, '0');
+                dateKey = `${year}-${month}-${day}`;
+            } catch (_e) {
+                // 若無法解析日期，退回今日日期（本地時區）
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                dateKey = `${year}-${month}-${day}`;
+            }
             await window.firebase.remove(
-                window.firebase.ref(window.firebase.rtdb, 'appointments/' + id)
+                window.firebase.ref(window.firebase.rtdb, `appointments/${dateKey}/${id}`)
             );
             return { success: true };
         } catch (error) {
