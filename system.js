@@ -16,6 +16,62 @@ const paginationSettings = {
     patientList: { currentPage: 1, itemsPerPage: 10 }
 };
 
+/**
+ * 通用防抖函式（debounce）。
+ * 用於限制短時間內重複觸發的函式呼叫，例如搜尋輸入事件。
+ * 在使用者停止輸入一段時間後才執行回呼函式，減少伺服器請求數量。
+ *
+ * @param {Function} fn 需要防抖的函式
+ * @param {number} delay 延遲執行毫秒數，預設為 300 毫秒
+ * @returns {Function} 包裝後的函式
+ */
+function debounce(fn, delay = 300) {
+    let timerId;
+    return function (...args) {
+        clearTimeout(timerId);
+        const context = this;
+        timerId = setTimeout(() => {
+            fn.apply(context, args);
+        }, delay);
+    };
+}
+
+/**
+ * 生成病人搜尋關鍵字陣列，用於存放於 searchKeywords 欄位。
+ * 此函式會將姓名、電話與病人編號轉為前綴字串集合，並統一轉為小寫，
+ * 以支援透過 array-contains 查詢達成前綴搜尋效果。
+ * 例如："王小明" 會產生 ["王", "王小", "王小明"]。電話與編號亦同。
+ *
+ * @param {Object} patientData 包含 name、phone、patientNumber 等欄位的物件
+ * @returns {Array<string>} 前綴關鍵字陣列
+ */
+function generateSearchKeywords(patientData = {}) {
+    const keywords = [];
+    // 內部輔助函式：產生所有前綴字串並加入關鍵字陣列
+    const addPrefixes = (str) => {
+        if (!str) return;
+        // 移除空白與非數字字元，並轉為字串
+        const cleaned = String(str).replace(/\s+/g, '').toLowerCase();
+        for (let i = 1; i <= cleaned.length; i++) {
+            keywords.push(cleaned.substring(0, i));
+        }
+    };
+    // 姓名
+    if (patientData.name) {
+        addPrefixes(patientData.name);
+    }
+    // 電話：只保留數字
+    if (patientData.phone) {
+        const phoneDigits = String(patientData.phone).replace(/\D+/g, '');
+        addPrefixes(phoneDigits);
+    }
+    // 病人編號
+    if (patientData.patientNumber) {
+        addPrefixes(patientData.patientNumber);
+    }
+    return keywords;
+}
+
 // 為穴位庫新增分頁設定，每頁顯示 6 筆資料
 paginationSettings.acupointLibrary = { currentPage: 1, itemsPerPage: 6 };
 
@@ -357,10 +413,38 @@ async function searchPatientsViaFirestore(term) {
     const lower = term.toLowerCase();
     const upper = term.toUpperCase();
     const col = window.firebase.collection(window.firebase.db, 'patients');
-    // 建立三個查詢：姓名前綴、電話前綴、病人編號前綴
+    const docsMap = {};
+    // 首先嘗試使用 searchKeywords 欄位進行統一查詢，將搜尋字串以小寫傳入
+    try {
+        const kwQuery = window.firebase.query(
+            col,
+            window.firebase.where('searchKeywords', 'array-contains', lower),
+            window.firebase.limit(20)
+        );
+        const kwSnap = await window.firebase.getDocs(kwQuery);
+        kwSnap.forEach((docSnap) => {
+            docsMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+        });
+    } catch (_e) {
+        // 若 searchKeywords 欄位不存在或查詢失敗則忽略
+    }
+    // 若透過 searchKeywords 已取得結果，直接返回（可避免額外的查詢）
+    if (Object.keys(docsMap).length > 0) {
+        // 將搜尋結果更新至患者字典快取
+        try {
+            if (window.firebaseDataManager && window.firebaseDataManager.patientDictCache) {
+                Object.keys(docsMap).forEach(id => {
+                    const data = docsMap[id];
+                    window.firebaseDataManager.patientDictCache[id] = data;
+                });
+            }
+        } catch (_e) {}
+        return Object.values(docsMap);
+    }
+    // 若未使用 searchKeywords 或查詢結果為空，則採用原本的多條件前綴查詢
     const queries = [];
     try {
-        // 姓名
+        // 姓名（小寫）
         queries.push(window.firebase.getDocs(window.firebase.query(
             col,
             window.firebase.orderBy('name'),
@@ -389,7 +473,6 @@ async function searchPatientsViaFirestore(term) {
             window.firebase.limit(20)
         )));
     } catch (_e) {}
-    const docsMap = {};
     try {
         const results = await Promise.all(queries);
         results.forEach((snap) => {
@@ -400,18 +483,15 @@ async function searchPatientsViaFirestore(term) {
     } catch (e) {
         console.warn('搜尋病人資料時發生錯誤:', e);
     }
-    // 將搜尋結果更新至患者字典快取，以便後續可快速查找
+    // 將搜尋結果更新至患者字典快取
     try {
         if (window.firebaseDataManager && window.firebaseDataManager.patientDictCache) {
             Object.keys(docsMap).forEach(id => {
                 const data = docsMap[id];
-                // 更新或新增至緩存字典
                 window.firebaseDataManager.patientDictCache[id] = data;
             });
         }
-    } catch (_e) {
-        // 若更新快取失敗則忽略
-    }
+    } catch (_e) {}
     return Object.values(docsMap);
 }
 
@@ -12941,10 +13021,14 @@ class FirebaseDataManager {
         }
 
         try {
+            // 在新增資料前，產生 searchKeywords 欄位以利快速查詢
+            const searchKeywords = generateSearchKeywords(patientData);
             const docRef = await window.firebase.addDoc(
                 window.firebase.collection(window.firebase.db, 'patients'),
                 {
                     ...patientData,
+                    // 新增 searchKeywords 欄位（若無關鍵字，仍寫入空陣列）
+                    searchKeywords: Array.isArray(searchKeywords) ? searchKeywords : [],
                     // 初始化套票彙總欄位，避免未購買套票時為 undefined
                     packageActiveCount: 0,
                     packageRemainingUses: 0,
@@ -13019,13 +13103,25 @@ class FirebaseDataManager {
 
     async updatePatient(patientId, patientData) {
         try {
+            // 更新資料前，若傳入的資料包含姓名、電話或病人編號，則重新生成 searchKeywords
+            let updatePayload = { ...patientData };
+            try {
+                const keywords = generateSearchKeywords(patientData);
+                if (Array.isArray(keywords) && keywords.length > 0) {
+                    updatePayload.searchKeywords = keywords;
+                }
+            } catch (_genErr) {
+                // 若生成關鍵字失敗則忽略，不覆寫原有 searchKeywords
+            }
+            // 加入更新時間與使用者資訊
+            updatePayload = {
+                ...updatePayload,
+                updatedAt: new Date(),
+                updatedBy: currentUser || 'system'
+            };
             await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'patients', patientId),
-                {
-                    ...patientData,
-                    updatedAt: new Date(),
-                    updatedBy: currentUser || 'system'
-                }
+                updatePayload
             );
             // 更新病人資料後清除列表緩存，讓下一次讀取時重新載入
             this.patientsCache = null;
@@ -14020,13 +14116,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 病人管理搜尋欄位：輸入時重新載入病人列表
+    // 病人管理搜尋欄位：加入防抖機制，避免每個按鍵都觸發查詢
     const searchInput = document.getElementById('searchPatient');
     if (searchInput) {
-        searchInput.addEventListener('input', function() {
+        // 建立防抖函式，延遲觸發搜尋操作
+        const debouncedPatientSearch = debounce(() => {
             // 搜尋時重置分頁至第一頁
             paginationSettings.patientList.currentPage = 1;
             loadPatientList();
+        }, 300);
+        searchInput.addEventListener('input', function () {
+            debouncedPatientSearch();
         });
     }
 
