@@ -2296,8 +2296,6 @@ async function viewPatient(id) {
                     </div>
                 </div>
             </div>
-            ${packageStatusHtml}
-
             <!-- 診症記錄摘要 -->
             <div class="mt-6 pt-6 border-t border-gray-200">
                 <div class="flex justify-between items-center mb-4">
@@ -7826,6 +7824,120 @@ async function loadPatientConsultationSummary(patientId) {
             }
         }
 
+        // 產生「套票情況」區塊的 HTML，用於診療摘要中顯示套票資訊
+        let packageSituationInnerHtml = '';
+        try {
+            if (Array.isArray(pkgs) && pkgs.length > 0) {
+                const nowPs = new Date();
+                const soonThresholdPs = new Date(nowPs.getTime() + 7 * 24 * 60 * 60 * 1000);
+                const validPkgsPs = [];
+                const invalidPkgsPs = [];
+                pkgs.forEach(pkg => {
+                    const expDate = new Date(pkg.expiresAt);
+                    const expired = expDate < nowPs || (typeof pkg.remainingUses === 'number' && pkg.remainingUses <= 0);
+                    if (expired) {
+                        invalidPkgsPs.push(pkg);
+                    } else {
+                        validPkgsPs.push(pkg);
+                    }
+                });
+                const sortedValidPs = validPkgsPs.slice().sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt));
+                const sortedInvalidPs = invalidPkgsPs.slice().sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt));
+                packageSituationInnerHtml = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            ${sortedValidPs.length > 0 ? `<div class="font-medium text-gray-700 mb-2">有效套票</div>` : ''}
+                            <div class="space-y-2">
+                                ${sortedValidPs.map(pkg => {
+                                    const safePkgName = window.escapeHtml(pkg.name || '');
+                                    const statusText = formatPackageStatus(pkg);
+                                    const safeStatusText = window.escapeHtml(statusText || '');
+                                    const remainingUses = typeof pkg.remainingUses === 'number' ? pkg.remainingUses : '';
+                                    const totalUses = typeof pkg.totalUses === 'number' ? pkg.totalUses : '';
+                                    const expDate = new Date(pkg.expiresAt);
+                                    const lowUses = typeof pkg.remainingUses === 'number' && pkg.remainingUses <= 2;
+                                    const highlight = (expDate <= soonThresholdPs) || lowUses;
+                                    const containerClasses = highlight ? 'bg-red-50 border border-red-200' : 'bg-purple-50 border border-purple-200';
+                                    const nameClass = highlight ? 'text-red-700' : 'text-purple-900';
+                                    const statusClass = highlight ? 'text-red-600' : 'text-gray-600';
+                                    const usesClass = highlight ? 'text-red-700' : 'text-gray-800';
+                                    return `
+                                        <div class="flex items-center justify-between ${containerClasses} rounded p-2">
+                                            <div>
+                                                <div class="font-medium ${nameClass}">${safePkgName}</div>
+                                                <div class="text-xs ${statusClass}">${safeStatusText}</div>
+                                            </div>
+                                            <div class="text-sm ${usesClass}">${remainingUses}${totalUses !== '' ? '/' + totalUses : ''}</div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                        <div>
+                            ${sortedInvalidPs.length > 0 ? `<div class="font-medium text-gray-700 mb-2">失效套票</div>` : ''}
+                            <div class="space-y-2">
+                                ${sortedInvalidPs.map(pkg => {
+                                    const safePkgName = window.escapeHtml(pkg.name || '');
+                                    const statusText = formatPackageStatus(pkg);
+                                    const safeStatusText = window.escapeHtml(statusText || '');
+                                    const remainingUses = typeof pkg.remainingUses === 'number' ? pkg.remainingUses : '';
+                                    const totalUses = typeof pkg.totalUses === 'number' ? pkg.totalUses : '';
+                                    return `
+                                        <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded p-2">
+                                            <div>
+                                                <div class="font-medium text-gray-500">${safePkgName}</div>
+                                                <div class="text-xs text-gray-400">${safeStatusText}</div>
+                                            </div>
+                                            <div class="text-sm text-gray-500">${remainingUses}${totalUses !== '' ? '/' + totalUses : ''}</div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (Array.isArray(pkgs) && pkgs.length === 0) {
+                // 無套票記錄
+                packageSituationInnerHtml = `
+                    <div class="bg-blue-50 border-blue-200 border rounded-lg p-3 text-center">
+                        <div class="text-blue-400 mb-1">
+                            <svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="text-sm font-medium text-blue-700">尚未購買套票</div>
+                        <div class="text-xs text-blue-600 mt-1">可於診療時購買套票享優惠</div>
+                    </div>
+                `;
+            } else {
+                // 取得套票資訊失敗
+                packageSituationInnerHtml = `
+                    <div class="bg-red-50 border-red-200 border rounded-lg p-3 text-center">
+                        <div class="text-red-400 mb-1">
+                            <svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="text-sm font-medium text-red-700">載入失敗</div>
+                        <div class="text-xs text-red-600 mt-1">無法載入套票狀態</div>
+                    </div>
+                `;
+            }
+        } catch (pkgErr) {
+            console.error('產生套票情況失敗:', pkgErr);
+            packageSituationInnerHtml = `
+                <div class="bg-red-50 border-red-200 border rounded-lg p-3 text-center">
+                    <div class="text-red-400 mb-1">
+                        <svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="text-sm font-medium text-red-700">載入失敗</div>
+                    <div class="text-xs text-red-600 mt-1">無法載入套票狀態</div>
+                </div>
+            `;
+        }
+
         if (totalConsultations === 0) {
             summaryContainer.innerHTML = `
                 <!-- 第一行：基本統計資訊 -->
@@ -7844,20 +7956,22 @@ async function loadPatientConsultationSummary(patientId) {
                     </div>
                 </div>
 
-                <!-- 第二行：套票狀態區域 -->
+                <!-- 第二行：套票情況區域 -->
                 <div class="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200 mb-4">
                     <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center">
+                    <div class="flex items-center">
                             <svg class="w-5 h-5 text-purple-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            <h3 class="text-lg font-semibold text-purple-800">套票狀態</h3>
+                            <!-- 將標題改為「套票情況」，對應新的內容 -->
+                            <h3 class="text-lg font-semibold text-purple-800">套票情況</h3>
                         </div>
                         <div class="text-xs text-purple-600 bg-white px-2 py-1 rounded-full">
                             ${activePkgCount} 個可用
                         </div>
                     </div>
-                    ${packageStatusHtml}
+                    <!-- 改用預先計算的 packageSituationInnerHtml 代替原先的 packageStatusHtml -->
+                    ${packageSituationInnerHtml}
                 </div>
 
                 <div class="text-center py-8 text-gray-500">
@@ -7895,20 +8009,22 @@ async function loadPatientConsultationSummary(patientId) {
                 </div>
             </div>
 
-            <!-- 第二行：套票狀態區域 -->
+            <!-- 第二行：套票情況區域 -->
             <div class="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center">
                         <svg class="w-5 h-5 text-purple-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        <h3 class="text-lg font-semibold text-purple-800">套票狀態</h3>
+                        <!-- 將標題改為「套票情況」，對應新的內容 -->
+                        <h3 class="text-lg font-semibold text-purple-800">套票情況</h3>
                     </div>
                     <div class="text-xs text-purple-600 bg-white px-2 py-1 rounded-full">
                         ${activePkgCount} 個可用
                     </div>
                 </div>
-                ${packageStatusHtml}
+                <!-- 使用預先計算的 packageSituationInnerHtml 取代原先的 packageStatusHtml -->
+                ${packageSituationInnerHtml}
             </div>
         `;
 
