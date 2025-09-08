@@ -36,25 +36,57 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
 });
 
     // 讓其他腳本可以使用 Firebase
+    // 注意：不要覆蓋 Firestore 的 query 方法。為了使用 Realtime Database 的查詢功能，
+    // 將其以 rtdbQuery 名稱暴露，避免與 Firestore 的 query 衝突。
     window.firebase = {
-        app, db, rtdb, auth,
-        collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit,
-        // 新增 startAfter 供分頁查詢使用
-        startAfter,
-        ref, set, get, child, push, update, remove, onValue, off,
-        // 將查詢方法暴露到全域，供實時監聽時使用
+        // 基本實例
+        app,
+        db,
+        rtdb,
+        auth,
+        // Firestore 基本操作函式
+        collection,
+        addDoc,
+        getDocs,
+        doc,
+        updateDoc,
+        deleteDoc,
+        setDoc,
+        onSnapshot,
+        // 將 Firestore 查詢函式以 firestoreQuery 名稱暴露，避免與 Realtime Database 的 query 混淆
+        firestoreQuery: query,
+        where,
+        orderBy,
+        limit,
+        startAfter,   // Firestore 分頁用
+        getDoc,       // 取得單筆 Firestore 文件
+        getCountFromServer,
+        // Realtime Database 基本操作函式
+        ref,
+        set,
+        get,
+        child,
+        push,
+        update,
+        remove,
+        onValue,
+        off,
+        // Realtime Database 查詢函式，同時將其作為預設的 query 屬性供 RTDB 使用
+        rtdbQuery,
+        // 為了向下相容，將 query 指向 Realtime Database 的查詢函式
         query: rtdbQuery,
         orderByChild,
         startAt,
         endAt,
         equalTo,
-        signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
-        // 讓其他模組可存取持久化相關方法（可選）
-        setPersistence, browserSessionPersistence,
-        // 聚合查詢函式，用於 count() 等操作
-        getCountFromServer,
-        // 暴露 getDoc 以便單筆文件查詢，例如根據 ID 取得診症紀錄
-        getDoc
+        // 驗證函式
+        signInWithEmailAndPassword,
+        createUserWithEmailAndPassword,
+        signOut,
+        onAuthStateChanged,
+        // 持久化設置
+        setPersistence,
+        browserSessionPersistence
     };
 
     // 連接狀態監控
