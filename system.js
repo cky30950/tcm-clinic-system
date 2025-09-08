@@ -2132,8 +2132,15 @@ async function viewPatient(id) {
                     <div class="space-y-2">
                         ${patient.history ? `<div><span class="font-medium">病史及備註：</span><div class="mt-1 p-2 bg-gray-50 rounded text-sm medical-field">${patient.history}</div></div>` : ''}
                         ${patient.allergies ? `<div><span class="font-medium">過敏史：</span><div class="mt-1 p-2 bg-red-50 rounded text-sm medical-field">${patient.allergies}</div></div>` : ''}
-                        <div><span class="font-medium">建檔日期：</span>${patient.createdAt ? new Date(patient.createdAt.seconds * 1000).toLocaleDateString('zh-TW') : '未知'}</div>
-                        ${patient.updatedAt ? `<div><span class="font-medium">更新日期：</span>${new Date(patient.updatedAt.seconds * 1000).toLocaleDateString('zh-TW')}</div>` : ''}
+                        <div><span class="font-medium">建檔日期：</span>${patient.createdAt ? (() => {
+                            const d = new Date(patient.createdAt.seconds * 1000);
+                            // 將日期與時間結合，時間以 24 小時制顯示並包含秒數
+                            return d.toLocaleDateString('zh-TW') + ' ' + d.toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        })() : '未知'}</div>
+                        ${patient.updatedAt ? `<div><span class="font-medium">更新日期：</span>${(() => {
+                            const d = new Date(patient.updatedAt.seconds * 1000);
+                            return d.toLocaleDateString('zh-TW') + ' ' + d.toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        })()}</div>` : ''}
                     </div>
                 </div>
             </div>
@@ -2165,8 +2172,15 @@ async function viewPatient(id) {
             const safeHistory = patient.history ? window.escapeHtml(patient.history) : null;
             const safeAllergies = patient.allergies ? window.escapeHtml(patient.allergies) : null;
             const birthDateString = patient.birthDate ? new Date(patient.birthDate).toLocaleDateString('zh-TW') : '';
-            const createdAtStr = patient.createdAt ? new Date(patient.createdAt.seconds * 1000).toLocaleDateString('zh-TW') : '未知';
-            const updatedAtStr = patient.updatedAt ? new Date(patient.updatedAt.seconds * 1000).toLocaleDateString('zh-TW') : '';
+            // 將建檔與更新日期格式化為日期 + 時間字串，採 24 小時制並顯示到秒數
+            const createdAtStr = patient.createdAt ? (() => {
+                const d = new Date(patient.createdAt.seconds * 1000);
+                return d.toLocaleDateString('zh-TW') + ' ' + d.toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            })() : '未知';
+            const updatedAtStr = patient.updatedAt ? (() => {
+                const d = new Date(patient.updatedAt.seconds * 1000);
+                return d.toLocaleDateString('zh-TW') + ' ' + d.toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            })() : '';
             // 取得患者套票資料，用於顯示套票情況
             let packageStatusHtml = '';
             try {
