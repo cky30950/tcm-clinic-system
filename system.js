@@ -2610,16 +2610,33 @@ async function loadInquiryOptions(patient) {
             return true;
         }
         
+        /**
+         * 載入診症（掛號）系統。
+         *
+         * 過期掛號清除僅需在切換到掛號系統時執行一次，
+         * 因此在此函式中先執行清除過期掛號的檢查，然後再初始化日期選擇器
+         * 並載入當天掛號列表。之後觸發更新掛號列表（例如日期變更或新增掛號）
+         * 則不會重複執行清除。
+         */
         function loadConsultationSystem() {
-            // 初始化掛號日期選擇器
-            try {
-                setupAppointmentDatePicker();
-            } catch (_e) {
-                // 忽略初始化失敗
-            }
-            // 載入選定日期的掛號列表
-            loadTodayAppointments();
-            clearPatientSearch();
+            // 先清除過期掛號，完成後再載入掛號列表
+            clearOldAppointments()
+                .catch(err => {
+                    // 即使清除失敗仍繼續載入掛號列表
+                    console.error('切換掛號系統時清除過期掛號錯誤:', err);
+                })
+                .finally(() => {
+                    // 初始化掛號日期選擇器
+                    try {
+                        setupAppointmentDatePicker();
+                    } catch (_e) {
+                        // 忽略初始化失敗
+                    }
+                    // 載入選定日期的掛號列表
+                    loadTodayAppointments();
+                    // 清空病人搜尋欄位
+                    clearPatientSearch();
+                });
         }
 
         /**
@@ -3104,9 +3121,9 @@ async function selectPatientForRegistration(patientId) {
 
 // 3. 修改今日掛號列表載入功能，確保能正確顯示病人資訊
 async function loadTodayAppointments() {
-    // 在讀取掛號資料之前，先清除過期掛號（同步到 Firebase）。
-    // 如果掛號時間在昨日或更早（即早於今天 00:00:00），會從 Realtime Database 中刪除。
-    await clearOldAppointments();
+    // 已在切換到掛號系統時清除過期掛號，這裡不再重複執行。
+    // 如果需要手動清除，請在調用 loadConsultationSystem 前呼叫 clearOldAppointments。
+    // await clearOldAppointments();
 
     // 如果全域 appointments 尚未有資料，則從 Firebase 讀取掛號資料。若已有資料則直接使用，避免重複讀取。
     if (!Array.isArray(appointments) || appointments.length === 0) {
