@@ -4562,12 +4562,12 @@ async function saveConsultation() {
             // date and doctor fields are assigned below depending on whether this is a new record or an edit
             status: 'completed'
         };
-
         // ---
-        // Capture aggregated package usage changes for this consultation.  
-        // When saving a consultation, record any package consumption so that it can be returned if the consultation is withdrawn.  
-        // We aggregate pendingPackageChanges by patientId and packageRecordId and store the result on the consultation record.  
-        // This allows withdrawConsultation to know exactly how many times each package was used and properly refund those uses.
+        // Capture aggregated package usage changes for this consultation.
+        // Aggregation of pendingPackageChanges by patientId and packageRecordId allows us to record
+        // how many times each package was consumed during this consultation. This data is stored
+        // on the consultation record (packageChanges) so that if the consultation is withdrawn
+        // later, we can refund the corresponding package uses.
         try {
             const aggregatedPackageChanges = {};
             if (Array.isArray(pendingPackageChanges) && pendingPackageChanges.length > 0) {
@@ -4580,14 +4580,13 @@ async function saveConsultation() {
                     aggregatedPackageChanges[key].delta += change.delta;
                 });
             }
-            // 只在有聚合結果時才寫入 packageChanges，以免在編輯模式下覆蓋既有資料
             const __aggKeys = Object.keys(aggregatedPackageChanges);
             if (__aggKeys && __aggKeys.length > 0) {
                 consultationData.packageChanges = aggregatedPackageChanges;
             }
         } catch (aggErr) {
             console.error('聚合套票變更時發生錯誤:', aggErr);
-            // 即便聚合失敗，也不要阻止保存；不設置 packageChanges 即可
+            // Do not block saving if aggregation fails
         }
 
         // Determine whether this is an edit of an existing consultation or a new one
@@ -7370,26 +7369,22 @@ if (confirm(confirmMessage)) {
         showToast('刪除診症記錄時發生錯誤', 'error');
     }
 
-    // 在刪除診症記錄後，嘗試退回該次診症所使用的套票。
-    // 使用在保存診症時記錄的 packageChanges，逐一將消耗的次數加回。
+    // 在刪除診症記錄後，退回病歷中所使用的套票。
     try {
         if (consultation && consultation.packageChanges) {
             for (const key in consultation.packageChanges) {
                 const change = consultation.packageChanges[key];
                 if (!change || typeof change.delta !== 'number') continue;
-                // patientId 可能缺失，優先使用記錄中的 patientId，再退回到 appointment 或當前病人
                 const refundPatientId = change.patientId || appointment.patientId || patient.id;
                 const pkgId = change.packageRecordId;
                 if (!pkgId) continue;
                 const revertDelta = -change.delta;
-                // 若 delta 為 0 或 revertDelta 為 0，無需處理
                 if (!revertDelta) continue;
                 try {
                     const pkgs = await getPatientPackages(refundPatientId);
                     const pkg = pkgs.find(p => String(p.id) === String(pkgId));
                     if (pkg) {
                         let newRemaining = (pkg.remainingUses || 0) + revertDelta;
-                        // 約束 newRemaining 在合理範圍內
                         if (typeof pkg.totalUses === 'number') {
                             newRemaining = Math.max(0, Math.min(pkg.totalUses, newRemaining));
                         } else {
@@ -7397,7 +7392,6 @@ if (confirm(confirmMessage)) {
                         }
                         const updatedPkg = { ...pkg, remainingUses: newRemaining };
                         await window.firebaseDataManager.updatePatientPackage(pkgId, updatedPkg);
-                        // 更新本地快取
                         if (patientPackagesCache && Array.isArray(patientPackagesCache[refundPatientId])) {
                             patientPackagesCache[refundPatientId] = patientPackagesCache[refundPatientId].map(p => {
                                 if (String(p.id) === String(pkgId)) {
@@ -7414,6 +7408,20 @@ if (confirm(confirmMessage)) {
         }
     } catch (refundOuterErr) {
         console.error('退回套票時發生錯誤:', refundOuterErr);
+    }
+
+    // 從 patientConsultationsCache 移除該病歷，以確保病歷列表更新
+    try {
+        const pid = appointment.patientId || patient.id;
+        if (patientConsultationsCache && Array.isArray(patientConsultationsCache[pid])) {
+            patientConsultationsCache[pid] = patientConsultationsCache[pid].filter(c => String(c.id) !== String(appointment.consultationId));
+        }
+        // 如有載入病人診療摘要函式，重新載入摘要
+        if (typeof loadPatientConsultationSummary === 'function') {
+            await loadPatientConsultationSummary(pid);
+        }
+    } catch (cacheErr) {
+        console.error('更新病人診症快取時發生錯誤:', cacheErr);
     }
 
     // 將掛號狀態改回已掛號
