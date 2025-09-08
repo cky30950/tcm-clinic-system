@@ -250,21 +250,35 @@ async function commitPendingPackageChanges() {
         // 套用每個聚合後的變更
         for (const key in aggregated) {
             const { patientId, packageRecordId, delta } = aggregated[key];
+            // 如果 delta 為 0 則不做任何更新
             if (!delta) continue;
             try {
-                const packages = await getPatientPackages(patientId);
-                // 確保 ID 比較時以字串進行
+                // 重新讀取當前病人的套票，不使用快取以確保使用最新資料
+                // 如果快取中已有資料，但我們需要計算最新的剩餘次數，可直接取得快取資料
+                let packages = await getPatientPackages(patientId);
+                // 比較 ID 時統一轉為字串，避免類型不一致導致找不到套票
                 const pkg = packages.find(p => String(p.id) === String(packageRecordId));
                 if (!pkg) continue;
                 let newRemaining = (pkg.remainingUses || 0) + delta;
-                // 約束 remainingUses 不小於 0，也不超過 totalUses（若存在）
+                // 約束 remainingUses 不小於 0，也不超過 totalUses（若 totalUses 定義）
                 if (typeof pkg.totalUses === 'number') {
                     newRemaining = Math.max(0, Math.min(pkg.totalUses, newRemaining));
                 } else {
                     newRemaining = Math.max(0, newRemaining);
                 }
+                // 組合更新後的套票資料
                 const updatedPackage = { ...pkg, remainingUses: newRemaining };
+                // 更新後端資料
                 await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
+                // 更新本地快取，以便之後呼叫 getPatientPackages 能得到最新資料
+                if (patientPackagesCache && Array.isArray(patientPackagesCache[patientId])) {
+                    patientPackagesCache[patientId] = patientPackagesCache[patientId].map(p => {
+                        if (String(p.id) === String(packageRecordId)) {
+                            return { ...p, remainingUses: newRemaining };
+                        }
+                        return p;
+                    });
+                }
             } catch (err) {
                 console.error('套用暫存套票變更時發生錯誤:', err);
             }
@@ -13507,6 +13521,22 @@ class FirebaseDataManager {
                     updatedBy: currentUser || 'system'
                 }
             );
+            // 更新本地快取中的套票資料
+            try {
+                // 如果 packageData 中包含 patientId，且 global 的 patientPackagesCache 有該病人的資料
+                if (packageData && packageData.patientId && patientPackagesCache && Array.isArray(patientPackagesCache[packageData.patientId])) {
+                    const pidStr = String(packageData.patientId);
+                    patientPackagesCache[pidStr] = patientPackagesCache[pidStr].map(p => {
+                        if (String(p.id) === String(packageId)) {
+                            // 將更新後的資料合併到本地快取中
+                            return { ...p, ...packageData };
+                        }
+                        return p;
+                    });
+                }
+            } catch (cacheErr) {
+                console.warn('更新套票後更新本地快取失敗:', cacheErr);
+            }
             // 套票更新後，同步更新對應病人的套票彙總欄位。
             try {
                 if (packageData && packageData.patientId) {
