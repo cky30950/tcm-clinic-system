@@ -1,6 +1,6 @@
 // Import Firebase functions
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit, getCountFromServer, startAfter } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit, getCountFromServer, startAfter } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getDatabase, ref, set, get, child, push, update, remove, onValue, off,
         // 新增查詢相關方法，用於在 Realtime Database 上進行條件篩選
         query as rtdbQuery,
@@ -38,12 +38,12 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
     // 讓其他腳本可以使用 Firebase
     window.firebase = {
         app, db, rtdb, auth,
-        collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit,
+        collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, orderBy, limit,
         // 新增 startAfter 供分頁查詢使用
         startAfter,
         ref, set, get, child, push, update, remove, onValue, off,
-        // 將 Realtime Database 查詢暴露為 rtdbQuery，避免覆蓋 Firestore 的 query
-        rtdbQuery,
+        // 將查詢方法暴露到全域，供實時監聽時使用
+        query: rtdbQuery,
         orderByChild,
         startAt,
         endAt,
