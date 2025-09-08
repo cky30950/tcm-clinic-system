@@ -987,6 +987,80 @@ async function waitForFirebaseDataManager() {
 }
 
 /**
+ * 根據掛號 ID 取得最新的掛號資料。
+ *
+ * 在長時間待機後，頁面中的全域掛號陣列可能已過期或為空，
+ * 導致無法在本地找到對應的掛號記錄而無法修改或取消掛號。
+ * 此函式會在需要時重新從 Firebase Realtime Database 載入掛號列表，
+ * 並回傳指定 ID 的掛號物件。若兩次查詢仍找不到，則回傳 null。
+ *
+ * @param {string|number} appointmentId - 掛號 ID
+ * @returns {Promise<Object|null>} 對應的掛號物件或 null
+ */
+async function getLatestAppointmentById(appointmentId) {
+    // 等待 Firebase DataManager 準備好
+    try {
+        await waitForFirebaseDataManager();
+    } catch (_e) {
+        // 如果等待失敗，繼續執行，但可能會導致後續調用失敗
+    }
+
+    const idStr = String(appointmentId);
+    let found = null;
+
+    // 優先從當前記憶體的 appointments 陣列搜尋
+    if (Array.isArray(appointments) && appointments.length > 0) {
+        found = appointments.find(apt => apt && String(apt.id) === idStr) || null;
+    }
+
+    // 若仍未找到，嘗試從 localStorage 讀取快取並更新全域陣列
+    if (!found) {
+        try {
+            const stored = localStorage.getItem('appointments');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) {
+                    // 如果全域陣列尚未初始化，使用儲存值
+                    if (!Array.isArray(appointments) || appointments.length === 0) {
+                        appointments = parsed.map(item => ({ ...item }));
+                    }
+                    found = parsed.find(item => item && String(item.id) === idStr) || null;
+                }
+            }
+        } catch (e) {
+            console.error('getLatestAppointmentById: 讀取本地掛號快取失敗:', e);
+        }
+    }
+
+    // 若還是沒有找到，從後端讀取單筆資料
+    if (!found) {
+        try {
+            const result = await window.firebaseDataManager.getAppointment(appointmentId);
+            if (result && result.success && result.data) {
+                found = result.data;
+                // 更新全域陣列及本地快取
+                if (!Array.isArray(appointments)) appointments = [];
+                const index = appointments.findIndex(apt => apt && String(apt.id) === idStr);
+                if (index >= 0) {
+                    appointments[index] = { ...found };
+                } else {
+                    appointments.push({ ...found });
+                }
+                try {
+                    localStorage.setItem('appointments', JSON.stringify(appointments));
+                } catch (_storageErr) {
+                    // 若無法寫入 localStorage，忽略
+                }
+            }
+        } catch (err) {
+            console.error('getLatestAppointmentById: 讀取單筆掛號時發生錯誤:', err);
+        }
+    }
+
+    return found || null;
+}
+
+/**
  * 讀取位於 /data 目錄或 GitHub Pages raw 路徑的 JSON 檔案。
  * 這個輔助函式會先嘗試相對路徑 data/<fileName>，若回傳 404 或其他非成功狀態，
  * 並且當前網站運行在 GitHub Pages 網域（xxx.github.io），則回退至
@@ -3730,7 +3804,8 @@ function getOperationButtons(appointment, patient = null) {
         
 // 3. 修改確認病人到達函數，支援 Firebase
 async function confirmPatientArrival(appointmentId) {
-    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
+    // 取得最新的掛號資料，避免長時間待機後本地資料過期
+    const appointment = await getLatestAppointmentById(appointmentId);
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
         return;
@@ -3795,7 +3870,8 @@ async function confirmPatientArrival(appointmentId) {
         
  // 5. 修改移除掛號函數，支援 Firebase
 async function removeAppointment(appointmentId) {
-    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
+    // 取得最新的掛號資料，避免長時間待機後本地資料過期
+    const appointment = await getLatestAppointmentById(appointmentId);
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
         return;
@@ -3882,7 +3958,8 @@ async function startConsultation(appointmentId) {
     // 在開始新的診症前，清除先前留存的套票變更記錄，
     // 以免不同病人的操作互相影響。
     pendingPackageChanges = [];
-    const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
+    // 取得最新的掛號資料，避免長時間待機後本地資料過期
+    const appointment = await getLatestAppointmentById(appointmentId);
     if (!appointment) {
         showToast('找不到掛號記錄！', 'error');
         return;
@@ -3991,7 +4068,8 @@ async function startConsultation(appointmentId) {
                 setButtonLoading(loadingButton, '處理中...');
             }
             try {
-                const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
+                // 取得最新的掛號資料，避免長時間待機後本地資料過期
+                const appointment = await getLatestAppointmentById(appointmentId);
                 if (!appointment) {
                     showToast('找不到掛號記錄！', 'error');
                     return;
@@ -13311,6 +13389,33 @@ class FirebaseDataManager {
         } catch (error) {
             console.error('讀取掛號數據失敗:', error);
             return { success: false, data: [] };
+        }
+    }
+
+    /**
+     * 讀取單一掛號資料。
+     * 透過指定掛號 ID 的路徑讀取，避免一次載入整個 appointments 清單，
+     * 以減少無用的資料傳輸。當資料存在時回傳 { id, ...data }；
+     * 若節點不存在則回傳 null。
+     *
+     * @param {string|number} id - 掛號 ID
+     * @returns {Promise<{ success: boolean, data: Object|null }>}
+     */
+    async getAppointment(id) {
+        if (!this.isReady) return { success: false, data: null };
+        try {
+            const snapshot = await window.firebase.get(
+                window.firebase.ref(window.firebase.rtdb, 'appointments/' + id)
+            );
+            const data = snapshot.val();
+            if (data !== null && data !== undefined) {
+                return { success: true, data: { id: String(id), ...data } };
+            } else {
+                return { success: false, data: null };
+            }
+        } catch (error) {
+            console.error('讀取單一掛號失敗:', error);
+            return { success: false, data: null };
         }
     }
 
