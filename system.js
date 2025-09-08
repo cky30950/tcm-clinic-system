@@ -2296,19 +2296,6 @@ async function viewPatient(id) {
                     </div>
                 </div>
             </div>
-
-            <!-- 診症記錄摘要 -->
-            <div class="mt-6 pt-6 border-t border-gray-200">
-                <div class="flex justify-between items-center mb-4">
-                    <h4 class="text-lg font-semibold text-gray-800">診症記錄摘要</h4>
-                </div>
-                <div id="patientConsultationSummary">
-                    <div class="text-center py-4">
-                        <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-                        <div class="mt-2 text-sm">載入診症記錄中...</div>
-                    </div>
-                </div>
-            </div>
             ${packageStatusHtml}
             `;
         }
