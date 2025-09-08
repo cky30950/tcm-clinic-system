@@ -19,10 +19,6 @@ const paginationSettings = {
 // 為穴位庫新增分頁設定，每頁顯示 6 筆資料
 paginationSettings.acupointLibrary = { currentPage: 1, itemsPerPage: 6 };
 
-// 為病人詳細資料中的套票情況新增分頁設定。
-// 若條件改變（例如重新查看另一位病人），應重置 currentPage 為 1。
-paginationSettings.patientPackageStatus = { currentPage: 1, itemsPerPage: 6 };
-
 // 快取病人篩選結果，用於分頁顯示
 let patientListFiltered = [];
 
@@ -2185,21 +2181,109 @@ async function viewPatient(id) {
                 const d = new Date(patient.updatedAt.seconds * 1000);
                 return d.toLocaleString('zh-TW', { hour12: false });
             })() : '';
-            // 套票區塊使用分頁模式由 renderPackageStatusSection 渲染，不在此處載入資料
-            let packageStatusHtml = `
-                <div class="mt-6 pt-6 border-t border-gray-200" id="packageStatusSection">
+            // 取得患者套票資料，用於顯示套票情況
+            let packageStatusHtml = '';
+            try {
+                // 強制從資料庫取得套票，以避免跨裝置快取不一致
+                const pkgs = await getPatientPackages(patient.id, true);
+                if (Array.isArray(pkgs) && pkgs.length > 0) {
+                    // 將套票依有效與失效分類，並另外標示即將到期或剩餘次數少於等於 2 的有效套票
+                    const now = new Date();
+                    // 定義即將到期的閾值（7 天內）
+                    const soonThreshold = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    const validPkgs = [];
+                    const invalidPkgs = [];
+                    pkgs.forEach(pkg => {
+                        const expDate = new Date(pkg.expiresAt);
+                        const expired = expDate < now || (typeof pkg.remainingUses === 'number' && pkg.remainingUses <= 0);
+                        if (expired) {
+                            invalidPkgs.push(pkg);
+                        } else {
+                            validPkgs.push(pkg);
+                        }
+                    });
+                    const sortedValid = validPkgs.slice().sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt));
+                    const sortedInvalid = invalidPkgs.slice().sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt));
+                    packageStatusHtml = `
+                <div class="mt-6 pt-6 border-t border-gray-200">
                     <div class="flex justify-between items-center mb-4">
                         <h4 class="text-lg font-semibold text-gray-800">套票情況</h4>
                     </div>
-                    <div id="packageStatusContent">
-                        <div class="text-center py-4">
-                            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-                            <div class="mt-2 text-sm">載入套票資料中...</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            ${sortedValid.length > 0 ? `<div class="font-medium text-gray-700 mb-2">有效套票</div>` : ''}
+                            <div class="space-y-2">
+                                ${sortedValid.map(pkg => {
+                                    const safePkgName = window.escapeHtml(pkg.name || '');
+                                    const statusText = formatPackageStatus(pkg);
+                                    const safeStatusText = window.escapeHtml(statusText || '');
+                                    const remainingUses = typeof pkg.remainingUses === 'number' ? pkg.remainingUses : '';
+                                    const totalUses = typeof pkg.totalUses === 'number' ? pkg.totalUses : '';
+                                    const expDate = new Date(pkg.expiresAt);
+                                    const lowUses = typeof pkg.remainingUses === 'number' && pkg.remainingUses <= 2;
+                                    // 判斷是否即將到期或剩餘次數少於等於 2
+                                    const highlight = (expDate <= soonThreshold) || lowUses;
+                                    const containerClasses = highlight ? 'bg-red-50 border border-red-200' : 'bg-purple-50 border border-purple-200';
+                                    const nameClass = highlight ? 'text-red-700' : 'text-purple-900';
+                                    const statusClass = highlight ? 'text-red-600' : 'text-gray-600';
+                                    const usesClass = highlight ? 'text-red-700' : 'text-gray-800';
+                                    return `
+                                    <div class="flex items-center justify-between ${containerClasses} rounded p-2">
+                                        <div>
+                                            <div class="font-medium ${nameClass}">${safePkgName}</div>
+                                            <div class="text-xs ${statusClass}">${safeStatusText}</div>
+                                        </div>
+                                        <div class="text-sm ${usesClass}">${remainingUses}${totalUses !== '' ? '/' + totalUses : ''}</div>
+                                    </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                        <div>
+                            ${sortedInvalid.length > 0 ? `<div class="font-medium text-gray-700 mb-2">失效套票</div>` : ''}
+                            <div class="space-y-2">
+                                ${sortedInvalid.map(pkg => {
+                                    const safePkgName = window.escapeHtml(pkg.name || '');
+                                    const statusText = formatPackageStatus(pkg);
+                                    const safeStatusText = window.escapeHtml(statusText || '');
+                                    const remainingUses = typeof pkg.remainingUses === 'number' ? pkg.remainingUses : '';
+                                    const totalUses = typeof pkg.totalUses === 'number' ? pkg.totalUses : '';
+                                    return `
+                                    <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded p-2">
+                                        <div>
+                                            <div class="font-medium text-gray-500">${safePkgName}</div>
+                                            <div class="text-xs text-gray-400">${safeStatusText}</div>
+                                        </div>
+                                        <div class="text-sm text-gray-500">${remainingUses}${totalUses !== '' ? '/' + totalUses : ''}</div>
+                                    </div>
+                                    `;
+                                }).join('')}
+                            </div>
                         </div>
                     </div>
                 </div>
-            `;
-            // 組合安全的 HTML，並插入預先定義的套票區塊骨架（packageStatusHtml），以便 renderPackageStatusSection 後續填充內容。
+                    `;
+                } else {
+                    // 未購買任何套票
+                    packageStatusHtml = `
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-semibold text-gray-800">套票情況</h4>
+                    </div>
+                    <div class="text-sm text-gray-500">尚未購買套票</div>
+                </div>
+                    `;
+                }
+            } catch (err) {
+                packageStatusHtml = `
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-semibold text-gray-800">套票情況</h4>
+                    </div>
+                    <div class="text-sm text-red-600">載入套票資料失敗</div>
+                </div>
+                `;
+            }
             content = `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-4">
@@ -2226,7 +2310,6 @@ async function viewPatient(id) {
                     </div>
                 </div>
             </div>
-            ${packageStatusHtml}
             <!-- 診症記錄摘要 -->
             <div class="mt-6 pt-6 border-t border-gray-200">
                 <div class="flex justify-between items-center mb-4">
@@ -2249,14 +2332,6 @@ async function viewPatient(id) {
         const modalEl = document.getElementById('patientDetailModal');
         if (modalEl) {
             modalEl.classList.remove('hidden');
-        }
-
-        // 套票資料載入與分頁渲染
-        try {
-            // 等待渲染套票區塊完成後再載入診症摘要，避免因 DOM 未就緒造成錯誤
-            await renderPackageStatusSection(id);
-        } catch (_e) {
-            // 忽略套票區塊渲染錯誤，診症摘要仍然繼續載入
         }
 
         /**
@@ -12853,159 +12928,6 @@ async function renderPatientPackages(patientId) {
     } catch (error) {
         console.error('渲染患者套票錯誤:', error);
         container.innerHTML = '<div class="text-red-500">載入套票資料失敗</div>';
-    }
-}
-
-/**
- * 以分頁方式渲染病人詳細資料中的套票情況。
- *
- * 此函式在查看病人詳細資料時使用，支援分頁瀏覽患者購買的所有套票。
- * 首次呼叫（非分頁跳轉）時會重置頁碼至第一頁。
- * 分頁控制將使用全域 paginationSettings.patientPackageStatus 設定。
- *
- * @param {string} patientId 病人 ID
- * @param {boolean} pageChange 是否由分頁控制觸發
- */
-async function renderPackageStatusSection(patientId, pageChange = false) {
-    const contentEl = document.getElementById('packageStatusContent');
-    if (!contentEl) return;
-    try {
-        // 若非分頁跳轉，則重置頁碼為第一頁
-        if (!pageChange) {
-            paginationSettings.patientPackageStatus.currentPage = 1;
-        }
-        // 讀取所有套票（強制刷新以避免跨裝置快取不一致）
-        const pkgs = await getPatientPackages(patientId, true);
-        // 若無套票資料，顯示提示文字並隱藏分頁控制
-        if (!Array.isArray(pkgs) || pkgs.length === 0) {
-            contentEl.innerHTML = `
-                <div class="bg-blue-50 border-blue-200 border rounded-lg p-3 text-center">
-                    <div class="text-blue-400 mb-1">
-                        <svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
-                        </svg>
-                    </div>
-                    <div class="text-sm font-medium text-blue-700">尚未購買套票</div>
-                    <div class="text-xs text-blue-600 mt-1">可於診療時購買套票享優惠</div>
-                </div>
-            `;
-            // 移除分頁容器
-            const paginEl = ensurePaginationContainer('packageStatusContent', 'patientPackageStatusPagination');
-            if (paginEl) {
-                paginEl.innerHTML = '';
-                paginEl.classList.add('hidden');
-            }
-            return;
-        }
-        // 將套票依有效與失效分類
-        const now = new Date();
-        const soonThreshold = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const validPkgs = [];
-        const invalidPkgs = [];
-        pkgs.forEach(pkg => {
-            const expDate = new Date(pkg.expiresAt);
-            const expired = expDate < now || (typeof pkg.remainingUses === 'number' && pkg.remainingUses <= 0);
-            if (expired) {
-                invalidPkgs.push(pkg);
-            } else {
-                validPkgs.push(pkg);
-            }
-        });
-        // 按到期日排序
-        validPkgs.sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt));
-        invalidPkgs.sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt));
-        // 組合為單一陣列，標示是否有效
-        const combined = [
-            ...validPkgs.map(pkg => ({ pkg, valid: true })),
-            ...invalidPkgs.map(pkg => ({ pkg, valid: false }))
-        ];
-        const totalItems = combined.length;
-        const itemsPerPage = paginationSettings.patientPackageStatus.itemsPerPage;
-        // 計算當前頁碼
-        let currentPage = paginationSettings.patientPackageStatus.currentPage || 1;
-        const totalPages = Math.ceil(totalItems / itemsPerPage);
-        if (currentPage < 1) currentPage = 1;
-        if (currentPage > totalPages) currentPage = totalPages;
-        paginationSettings.patientPackageStatus.currentPage = currentPage;
-        const startIdx = (currentPage - 1) * itemsPerPage;
-        const endIdx = startIdx + itemsPerPage;
-        const pageItems = combined.slice(startIdx, endIdx);
-        // 依有效性將本頁項目分類
-        const pageValid = pageItems.filter(item => item.valid).map(item => item.pkg);
-        const pageInvalid = pageItems.filter(item => !item.valid).map(item => item.pkg);
-        // 產生 HTML
-        let htmlParts = [];
-        htmlParts.push('<div class="grid grid-cols-1 md:grid-cols-2 gap-4">');
-        // 有效套票區
-        htmlParts.push('<div>');
-        if (pageValid.length > 0) {
-            htmlParts.push('<div class="font-medium text-gray-700 mb-2">有效套票</div>');
-        }
-        htmlParts.push('<div class="space-y-2">');
-        pageValid.forEach(pkg => {
-            const safePkgName = window.escapeHtml(pkg.name || '');
-            const statusText = formatPackageStatus(pkg);
-            const safeStatusText = window.escapeHtml(statusText || '');
-            const remainingUses = typeof pkg.remainingUses === 'number' ? pkg.remainingUses : '';
-            const totalUses = typeof pkg.totalUses === 'number' ? pkg.totalUses : '';
-            const expDate = new Date(pkg.expiresAt);
-            const lowUses = typeof pkg.remainingUses === 'number' && pkg.remainingUses <= 2;
-            // 判斷是否即將到期或剩餘次數少於等於 2
-            const highlight = (expDate <= soonThreshold) || lowUses;
-            const containerClasses = highlight ? 'bg-red-50 border border-red-200' : 'bg-purple-50 border border-purple-200';
-            const nameClass = highlight ? 'text-red-700' : 'text-purple-900';
-            const statusClass = highlight ? 'text-red-600' : 'text-gray-600';
-            const usesClass = highlight ? 'text-red-700' : 'text-gray-800';
-            htmlParts.push(`
-                <div class="flex items-center justify-between ${containerClasses} rounded p-2">
-                    <div>
-                        <div class="font-medium ${nameClass}">${safePkgName}</div>
-                        <div class="text-xs ${statusClass}">${safeStatusText}</div>
-                    </div>
-                    <div class="text-sm ${usesClass}">${remainingUses}${totalUses !== '' ? '/' + totalUses : ''}</div>
-                </div>
-            `);
-        });
-        htmlParts.push('</div></div>');
-        // 失效套票區
-        htmlParts.push('<div>');
-        if (pageInvalid.length > 0) {
-            htmlParts.push('<div class="font-medium text-gray-700 mb-2">失效套票</div>');
-        }
-        htmlParts.push('<div class="space-y-2">');
-        pageInvalid.forEach(pkg => {
-            const safePkgName = window.escapeHtml(pkg.name || '');
-            const statusText = formatPackageStatus(pkg);
-            const safeStatusText = window.escapeHtml(statusText || '');
-            const remainingUses = typeof pkg.remainingUses === 'number' ? pkg.remainingUses : '';
-            const totalUses = typeof pkg.totalUses === 'number' ? pkg.totalUses : '';
-            htmlParts.push(`
-                <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded p-2">
-                    <div>
-                        <div class="font-medium text-gray-500">${safePkgName}</div>
-                        <div class="text-xs text-gray-400">${safeStatusText}</div>
-                    </div>
-                    <div class="text-sm text-gray-500">${remainingUses}${totalUses !== '' ? '/' + totalUses : ''}</div>
-                </div>
-            `);
-        });
-        htmlParts.push('</div></div></div>');
-        contentEl.innerHTML = htmlParts.join('');
-        // 渲染分頁控制
-        const paginEl = ensurePaginationContainer('packageStatusContent', 'patientPackageStatusPagination');
-        renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
-            paginationSettings.patientPackageStatus.currentPage = newPage;
-            renderPackageStatusSection(patientId, true);
-        }, paginEl);
-    } catch (error) {
-        console.error('載入病人套票資料失敗:', error);
-        contentEl.innerHTML = '<div class="text-sm text-red-600">載入套票資料失敗</div>';
-        // 移除分頁容器
-        const paginEl = ensurePaginationContainer('packageStatusContent', 'patientPackageStatusPagination');
-        if (paginEl) {
-            paginEl.innerHTML = '';
-            paginEl.classList.add('hidden');
-        }
     }
 }
 
