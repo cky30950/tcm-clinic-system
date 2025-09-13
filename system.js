@@ -1152,7 +1152,7 @@ async function getLatestAppointmentById(appointmentId) {
  * 讀取位於 /data 目錄或 GitHub Pages raw 路徑的 JSON 檔案。
  * 這個輔助函式會先嘗試相對路徑 data/<fileName>，若回傳 404 或其他非成功狀態，
  * 並且當前網站運行在 GitHub Pages 網域（xxx.github.io），則回退至
- * https://raw.githubusercontent.com/<user>/<repo>/main/public/data/<fileName>。
+ * https://raw.githubusercontent.com/<user>/<repo>/main/data/<fileName>。
  * @param {string} fileName - 要讀取的檔名，例如 'herbLibrary.json'
  * @returns {Promise<any>} 回傳解析後的 JSON 內容
  */
@@ -1182,7 +1182,8 @@ async function fetchJsonWithFallback(fileName) {
                 // 嘗試從多個分支讀取檔案（先嘗試 main，再嘗試 master），方便兼容不同預設分支名稱
                 const branches = ['main', 'master'];
                 for (const branch of branches) {
-                    const rawUrl = `https://raw.githubusercontent.com/${user}/${repo}/${branch}/public/data/${fileName}`;
+                    // 改為從 data 目錄讀取，不再依賴 public 目錄
+                    const rawUrl = `https://raw.githubusercontent.com/${user}/${repo}/${branch}/data/${fileName}`;
                     try {
                         const rawResponse = await fetch(rawUrl, { cache: 'reload' });
                         if (rawResponse.ok) {
