@@ -697,9 +697,13 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <!-- 已選擇的穴位方塊 -->
-                                    <div id="acupunctureNotesSelected" class="flex flex-wrap gap-2 mb-2"></div>
-                                    <textarea id="formAcupunctureNotes" placeholder="針灸穴位、手法、注意事項等..." rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                                    <!-- 將穴位方塊與備註輸入欄置於同一容器內，方塊顯示於內部上方 -->
+                                    <div class="relative mb-2">
+                                        <!-- 已選擇的穴位方塊會絕對定位於容器頂部，內含多個淺藍色方塊 -->
+                                        <div id="acupunctureNotesSelected" class="absolute inset-x-0 top-0 flex flex-wrap gap-2 p-2 pointer-events-auto"></div>
+                                        <!-- 針灸備註文字輸入區，增加上邊內距以避免與方塊重疊 -->
+                                        <textarea id="formAcupunctureNotes" placeholder="針灸穴位、手法、注意事項等..." rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 pt-12 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                                    </div>
                                 </div>
                             </div>
 

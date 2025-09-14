@@ -18651,6 +18651,10 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
             textarea.value = parts.join('、');
           }
         }
+        // 移除後立即隱藏提示浮窗，以免殘留
+        if (typeof hideTooltip === 'function') {
+          hideTooltip();
+        }
       });
       container.appendChild(div);
       // 更新 textarea：如果文字中不存在該穴位，則加入，以頓號分隔
