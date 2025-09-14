@@ -16580,13 +16580,19 @@ function refreshTemplateCategoryFilters() {
               }
               if (userRecord && userRecord.personalSettings) {
                 const personal = userRecord.personalSettings;
+                // 如果有保存的個人慣用中藥組合，則載入，否則清空
                 if (Array.isArray(personal.herbCombinations)) {
                   herbCombinations = personal.herbCombinations;
+                } else {
+                  herbCombinations = [];
                 }
+                // 如果有保存的個人穴位組合，則載入，否則清空
                 if (Array.isArray(personal.acupointCombinations)) {
                   acupointCombinations = personal.acupointCombinations;
+                } else {
+                  acupointCombinations = [];
                 }
-                // 個人慣用組合分類載入：若 personalSettings 中包含分類，則覆蓋預設值
+                // 個人慣用組合分類載入：若 personalSettings 中包含分類，則覆蓋預設值；否則重置個人分類
                 if (Array.isArray(personal.herbComboCategories)) {
                   // 更新個人慣用分類
                   herbComboCategories = personal.herbComboCategories;
@@ -16598,6 +16604,10 @@ function refreshTemplateCategoryFilters() {
                       window.categories.herbs = categories.herbs;
                     }
                   } catch (_e) {}
+                } else {
+                  // 沒有個人分類時，清空個人分類，以免殘留前一位使用者的資料
+                  herbComboCategories = [];
+                  window.herbComboCategories = [];
                 }
                 if (Array.isArray(personal.acupointComboCategories)) {
                   // 更新個人慣用分類
@@ -16610,7 +16620,19 @@ function refreshTemplateCategoryFilters() {
                       window.categories.acupoints = categories.acupoints;
                     }
                   } catch (_e) {}
+                } else {
+                  // 沒有個人分類時，清空個人分類
+                  acupointComboCategories = [];
+                  window.acupointComboCategories = [];
                 }
+              } else {
+                // 如果找不到用戶記錄或用戶沒有個人設置，則將相關資料清空
+                herbCombinations = [];
+                acupointCombinations = [];
+                herbComboCategories = [];
+                acupointComboCategories = [];
+                window.herbComboCategories = [];
+                window.acupointComboCategories = [];
               }
             } catch (error) {
               console.error('讀取個人設置失敗:', error);
@@ -18455,6 +18477,203 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
   window.showTooltip = showTooltip;
   window.moveTooltip = moveTooltip;
   window.hideTooltip = hideTooltip;
+
+  /**
+   * 清空穴位搜尋欄，並隱藏搜尋結果。
+   * 用於針灸備註區域的穴位快速搜尋。
+   */
+  function clearAcupointNotesSearch() {
+    try {
+      const input = document.getElementById('acupointNotesSearch');
+      const results = document.getElementById('acupointNotesSearchResults');
+      if (input) {
+        input.value = '';
+      }
+      if (results) {
+        results.classList.add('hidden');
+      }
+      // 隱藏提示浮窗
+      if (typeof hideTooltip === 'function') {
+        hideTooltip();
+      }
+    } catch (_e) {
+      console.error('清空穴位搜索欄時發生錯誤：', _e);
+    }
+  }
+
+  /**
+   * 在針灸備註區域搜尋穴位。
+   * 根據輸入的關鍵字於 acupointLibrary 中篩選名稱、經絡、定位、功效或主治。
+   * 動態顯示搜尋結果，點擊可加入針灸備註。
+   */
+  async function searchAcupointForNotes() {
+    try {
+      const input = document.getElementById('acupointNotesSearch');
+      const resultsContainer = document.getElementById('acupointNotesSearchResults');
+      const resultsList = document.getElementById('acupointNotesSearchList');
+      if (!input || !resultsContainer || !resultsList) return;
+      const searchTerm = (input.value || '').trim().toLowerCase();
+      // 若尚未載入穴位庫資料，則初始化一次
+      try {
+        if (!acupointLibraryLoaded || !Array.isArray(acupointLibrary) || acupointLibrary.length === 0) {
+          await initAcupointLibrary();
+        }
+      } catch (_er) {
+        console.error('載入穴位庫失敗：', _er);
+      }
+      if (!searchTerm) {
+        resultsContainer.classList.add('hidden');
+        // 搜尋欄清空時隱藏提示
+        if (typeof hideTooltip === 'function') {
+          hideTooltip();
+        }
+        return;
+      }
+      // 在穴位庫中過濾符合搜尋字串的項目並依匹配度排序
+      let matched = (Array.isArray(acupointLibrary) ? acupointLibrary : [])
+        .filter(item => item && (
+          (item.name && item.name.toLowerCase().includes(searchTerm)) ||
+          (item.meridian && item.meridian.toLowerCase().includes(searchTerm)) ||
+          (item.location && item.location.toLowerCase().includes(searchTerm)) ||
+          (item.functions && (Array.isArray(item.functions) ? item.functions.join(' ').toLowerCase().includes(searchTerm) : String(item.functions).toLowerCase().includes(searchTerm))) ||
+          (item.indications && (Array.isArray(item.indications) ? item.indications.join(' ').toLowerCase().includes(searchTerm) : String(item.indications).toLowerCase().includes(searchTerm)))
+        ))
+        .map(item => {
+          const nameStr = item.name ? item.name.toLowerCase() : '';
+          const meridianStr = item.meridian ? item.meridian.toLowerCase() : '';
+          const locStr = item.location ? item.location.toLowerCase() : '';
+          const funcStr = item.functions ? (Array.isArray(item.functions) ? item.functions.join(' ').toLowerCase() : String(item.functions).toLowerCase()) : '';
+          const indStr = item.indications ? (Array.isArray(item.indications) ? item.indications.join(' ').toLowerCase() : String(item.indications).toLowerCase()) : '';
+          let score = Infinity;
+          if (nameStr.includes(searchTerm)) {
+            score = nameStr.indexOf(searchTerm);
+          } else if (meridianStr.includes(searchTerm)) {
+            score = 100 + meridianStr.indexOf(searchTerm);
+          } else if (locStr.includes(searchTerm)) {
+            score = 200 + locStr.indexOf(searchTerm);
+          } else if (funcStr.includes(searchTerm)) {
+            score = 300 + funcStr.indexOf(searchTerm);
+          } else if (indStr.includes(searchTerm)) {
+            score = 400 + indStr.indexOf(searchTerm);
+          }
+          return { item, score };
+        })
+        .sort((a, b) => a.score - b.score)
+        .map(obj => obj.item);
+      // 限制結果數量避免一次載入太多
+      matched = matched.slice(0, 10);
+      if (!matched || matched.length === 0) {
+        resultsList.innerHTML = '<div class="p-2 text-center text-gray-500 text-sm">找不到符合條件的穴位</div>';
+        resultsContainer.classList.remove('hidden');
+        // 沒有結果時隱藏提示
+        if (typeof hideTooltip === 'function') {
+          hideTooltip();
+        }
+        return;
+      }
+      // 建立結果列表，每個結果可以點擊加入針灸備註
+      resultsList.innerHTML = matched.map(item => {
+        const safeName = (item.name || '').replace(/'/g, "\\'");
+        const details = [];
+        details.push('名稱：' + (item.name || ''));
+        if (item.meridian) details.push('經絡：' + item.meridian);
+        if (item.location) details.push('定位：' + item.location);
+        if (item.functions) {
+          const funcs = Array.isArray(item.functions) ? item.functions.join('、') : String(item.functions);
+          details.push('功效：' + funcs);
+        }
+        if (item.indications) {
+          const inds = Array.isArray(item.indications) ? item.indications.join('、') : String(item.indications);
+          details.push('主治：' + inds);
+        }
+        if (item.method) details.push('針法：' + item.method);
+        if (item.category) details.push('分類：' + item.category);
+        const encoded = encodeURIComponent(details.join('\n'));
+        // 使用藍色背景與邊框呈現搜尋結果，每個結果可點擊加入備註
+        return `<div class="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addAcupointToNotes('${safeName}')">${window.escapeHtml(item.name)}</div>`;
+      }).join('');
+      resultsContainer.classList.remove('hidden');
+    } catch (e) {
+      console.error('搜尋穴位時發生錯誤：', e);
+    }
+  }
+
+  /**
+   * 將指定穴位名稱加入針灸備註的方塊列表。
+   * 新增後更新 textarea，清除搜尋欄與結果。
+   * @param {string} name 穴位名稱
+   */
+  function addAcupointToNotes(name) {
+    try {
+      if (!name) return;
+      const container = document.getElementById('acupunctureNotesSelected');
+      if (!container) return;
+      // 檢查是否已存在相同穴位，避免重複加入
+      const existing = Array.from(container.children).some(el => el.dataset && el.dataset.acupointName === name);
+      if (existing) {
+        // 若已存在則僅清空搜尋框與結果，不再新增
+        clearAcupointNotesSearch();
+        return;
+      }
+      // 建立新的方塊
+      const div = document.createElement('div');
+      // 設定固定大小以呈現方形，同時置中文字
+      div.className = 'w-8 h-8 flex items-center justify-center bg-blue-100 border border-blue-200 rounded text-xs text-blue-800 cursor-pointer hover:bg-blue-200';
+      // 儲存穴位名稱於 dataset 便於後續讀取
+      div.dataset.acupointName = name;
+      // 設定提示內容
+      const tooltipContent = getAcupointTooltipContent(name || '');
+      if (tooltipContent) {
+        const encoded = encodeURIComponent(tooltipContent);
+        div.setAttribute('data-tooltip', encoded);
+        div.addEventListener('mouseenter', function(e) {
+          showTooltip(e, this.getAttribute('data-tooltip'));
+        });
+        div.addEventListener('mousemove', function(e) {
+          moveTooltip(e);
+        });
+        div.addEventListener('mouseleave', function() {
+          hideTooltip();
+        });
+      }
+      // 方塊顯示穴位名稱
+      div.textContent = name;
+      // 點擊方塊可刪除該項
+      div.addEventListener('click', function(e) {
+        // 移除方塊本身
+        if (div && div.parentElement) {
+          div.parentElement.removeChild(div);
+          // 同時更新 textarea，從文字串中移除該穴位名稱
+          const textarea = document.getElementById('formAcupunctureNotes');
+          if (textarea) {
+            let parts = textarea.value.split('、').map(p => p.trim()).filter(p => p !== '');
+            parts = parts.filter(item => item !== name);
+            textarea.value = parts.join('、');
+          }
+        }
+      });
+      container.appendChild(div);
+      // 更新 textarea：如果文字中不存在該穴位，則加入，以頓號分隔
+      const textarea = document.getElementById('formAcupunctureNotes');
+      if (textarea) {
+        const current = textarea.value.trim();
+        const names = current ? current.split('、').map(p => p.trim()).filter(p => p !== '') : [];
+        if (!names.includes(name)) {
+          names.push(name);
+          textarea.value = names.join('、');
+        }
+      }
+      // 新增完畢後清空搜尋欄並隱藏結果
+      clearAcupointNotesSearch();
+    } catch (err) {
+      console.error('新增穴位到針灸備註時發生錯誤：', err);
+    }
+  }
+
+  // 將自訂函式掛載至 window 物件，以便 HTML 內嵌事件調用
+  window.searchAcupointForNotes = searchAcupointForNotes;
+  window.addAcupointToNotes = addAcupointToNotes;
+  window.clearAcupointNotesSearch = clearAcupointNotesSearch;
 
           // 初始化
 document.addEventListener('DOMContentLoaded', function() {
