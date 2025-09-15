@@ -18672,6 +18672,10 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
         }
         if (typeof hideTooltip === 'function') hideTooltip();
       });
+      // 在處理插入前，紀錄當前滾動位置，以便插入後恢復滾動位置
+      const scrollXBefore = window.pageXOffset || document.documentElement.scrollLeft || 0;
+      const scrollYBefore = window.pageYOffset || document.documentElement.scrollTop || 0;
+
       // 將焦點設至針灸備註欄，確保游標定位於可編輯區，但避免捲動畫面
       if (typeof form.focus === 'function') {
         try {
@@ -18730,6 +18734,13 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
       }
       // 插入後清空搜尋欄並隱藏結果與提示
       clearAcupointNotesSearch();
+      // 恢復插入前的滾動位置，以避免畫面移動
+      try {
+        window.scrollTo({ left: scrollXBefore, top: scrollYBefore, behavior: 'auto' });
+      } catch (_e) {
+        // 若瀏覽器不支援 scrollTo 的選項寫法，回退到簡單調用
+        window.scrollTo(scrollXBefore, scrollYBefore);
+      }
     } catch (err) {
       console.error('新增穴位到針灸備註時發生錯誤：', err);
     }
