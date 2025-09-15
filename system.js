@@ -18687,7 +18687,8 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
       if (!form) return;
       // 建立代表穴位的 span 元素
       const span = document.createElement('span');
-      span.className = 'inline-flex items-center justify-center bg-blue-100 border border-blue-200 rounded text-xs text-blue-800 px-1 py-0.5 mr-1 cursor-pointer';
+      // 使用稍大的字體，將原本的 text-xs 改為 text-sm 以增大顯示穴位名稱的字體
+      span.className = 'inline-flex items-center justify-center bg-blue-100 border border-blue-200 rounded text-sm text-blue-800 px-1 py-0.5 mr-1 cursor-pointer';
       // 讓此方塊本身不可編輯，避免用戶修改內文字
       span.setAttribute('contenteditable', 'false');
       span.dataset.acupointName = name;
