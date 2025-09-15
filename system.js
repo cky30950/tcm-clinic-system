@@ -3484,6 +3484,14 @@ async function loadConsultationForEdit(consultationId) {
                 // 使用 innerText 載入針灸備註內容，以支援 contenteditable
                 // 載入針灸備註時直接使用 innerHTML，以保留方塊標記
                 acnEl.innerHTML = consultation.acupunctureNotes || '';
+                // 載入完畢後初始化既有穴位方塊的事件處理
+                if (typeof initializeAcupointNotesSpans === 'function') {
+                  initializeAcupointNotesSpans();
+                }
+                // 載入完畢後初始化既有穴位方塊的事件處理
+                if (typeof initializeAcupointNotesSpans === 'function') {
+                  initializeAcupointNotesSpans();
+                }
               }
             }
             document.getElementById('formUsage').value = consultation.usage || '';
@@ -18745,6 +18753,52 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
       console.error('新增穴位到針灸備註時發生錯誤：', err);
     }
   }
+
+  /**
+   * 初始化針灸備註欄中的已存在穴位方塊，為每個方塊掛載滑鼠提示與刪除事件。
+   * 在載入歷史病歷或編輯模式時呼叫此函式，以便方塊仍具備提示與刪除功能。
+   */
+  function initializeAcupointNotesSpans() {
+    try {
+      const container = document.getElementById('formAcupunctureNotes');
+      if (!container) return;
+      // 查找所有具有 data-acupoint-name 屬性的 span，代表穴位方塊
+      const spans = container.querySelectorAll('span[data-acupoint-name]');
+      spans.forEach(span => {
+        // 確保方塊本身不可編輯
+        span.setAttribute('contenteditable', 'false');
+        const encoded = span.getAttribute('data-tooltip');
+        if (encoded) {
+          span.addEventListener('mouseenter', function(e) {
+            showTooltip(e, encoded);
+          });
+          span.addEventListener('mousemove', function(e) {
+            moveTooltip(e);
+          });
+          span.addEventListener('mouseleave', function() {
+            hideTooltip();
+          });
+        }
+        // 點擊方塊可刪除自身與後方空白
+        span.addEventListener('click', function() {
+          const parent = span.parentNode;
+          if (parent) {
+            const next = span.nextSibling;
+            if (next && next.nodeType === Node.TEXT_NODE && /^\s*$/.test(next.textContent)) {
+              parent.removeChild(next);
+            }
+            parent.removeChild(span);
+          }
+          hideTooltip();
+        });
+      });
+    } catch (err) {
+      console.error('初始化針灸備註方塊失敗:', err);
+    }
+  }
+
+  // 將初始化函式掛載至 window，方便外部呼叫
+  window.initializeAcupointNotesSpans = initializeAcupointNotesSpans;
 
   // 將自訂函式掛載至 window 物件，以便 HTML 內嵌事件調用
   window.searchAcupointForNotes = searchAcupointForNotes;
