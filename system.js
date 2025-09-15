@@ -17634,7 +17634,7 @@ function refreshTemplateCategoryFilters() {
                     }
                     return '<div class="flex items-center gap-2 p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded"' + nameAttr + tooltipAttr + '>' +
                       '<span class="flex-1 text-blue-800">' + (typeof window !== 'undefined' && window.escapeHtml ? window.escapeHtml(nameVal) : nameVal) + '</span>' +
-                      '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="hideTooltip(); this.parentElement.remove()">刪除</button>' +
+                      '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button>' +
                       '</div>';
                   }).join('')
                 : '';
@@ -17694,7 +17694,7 @@ function refreshTemplateCategoryFilters() {
                       // 劑量輸入欄
                       '<input type="number" value="' + (dosageVal || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
                       '<span class="text-sm text-gray-700">克</span>' +
-                    '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="hideTooltip(); this.parentElement.remove()">刪除</button>' +
+                    '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button>' +
                       '</div>';
                   }).join('')
                 : '';
@@ -17750,7 +17750,7 @@ function refreshTemplateCategoryFilters() {
                     <div id="acupointPoints" class="space-y-2">
 ${item.points.map(pt => {
   const nameVal = pt && pt.name ? pt.name : '';
-  return '<div class="flex items-center gap-2"><input type="text" value="' + nameVal + '" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="hideTooltip(); this.parentElement.remove()">刪除</button></div>';
+  return '<div class="flex items-center gap-2"><input type="text" value="' + nameVal + '" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button></div>';
 }).join('')}
                     </div>
                     <button onclick="addAcupointPointField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增穴位</button>
@@ -18104,7 +18104,7 @@ ${item.points.map(pt => {
             // 建立名稱與類型輸入框以及刪除按鈕，刪除按鈕點擊後可移除所在行
     // 調整穴位名稱欄位寬度為一半，避免在手機或小螢幕上過長
     // 只建立穴位名稱輸入框與刪除按鈕，不再顯示主穴/配穴選擇
-    div.innerHTML = '<input type="text" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="hideTooltip(); this.parentElement.remove()">刪除</button>';
+    div.innerHTML = '<input type="text" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button>';
             container.appendChild(div);
           }
 
@@ -18241,12 +18241,6 @@ ${item.points.map(pt => {
             deleteBtn.textContent = '刪除';
             deleteBtn.className = 'text-red-500 hover:text-red-700 text-sm';
             deleteBtn.addEventListener('click', function() {
-              // 當從藥材列表中移除項目時，若有殘留的提示視窗則隱藏之
-              if (typeof hideTooltip === 'function') {
-                try {
-                  hideTooltip();
-                } catch (_e) {}
-              }
               if (div && div.parentElement) {
                 div.parentElement.removeChild(div);
               }
@@ -18409,12 +18403,6 @@ ${item.points.map(pt => {
             deleteBtn.textContent = '刪除';
             deleteBtn.className = 'text-red-500 hover:text-red-700 text-sm';
             deleteBtn.addEventListener('click', function() {
-              // 刪除穴位行時同步隱藏可能仍顯示的提示視窗
-              if (typeof hideTooltip === 'function') {
-                try {
-                  hideTooltip();
-                } catch (_e) {}
-              }
               if (div && div.parentElement) {
                 div.parentElement.removeChild(div);
               }
@@ -18505,6 +18493,30 @@ ${item.points.map(pt => {
     if (!tooltip) return;
     tooltip.classList.add('hidden');
   }
+
+/**
+ * 移除元素所在的父節點，並在移除前隱藏任何殘留的 tooltip。
+ * 此函式用於 inline 事件處理器，避免在 HTML 中撰寫多條敘述導致解析錯誤。
+ * @param {HTMLElement} el 觸發事件的元素（通常是刪除按鈕本身）
+ */
+function removeParentElement(el) {
+  try {
+    // 如果有定義 hideTooltip，則先隱藏提示框
+    if (typeof hideTooltip === 'function') {
+      hideTooltip();
+    }
+  } catch (_e) {
+    // 忽略任何錯誤
+  }
+  if (el && el.parentElement) {
+    el.parentElement.remove();
+  }
+}
+
+// 將 removeParentElement 掛載到全域 window，使其可由 inline handler 調用
+if (typeof window !== 'undefined' && !window.removeParentElement) {
+  window.removeParentElement = removeParentElement;
+}
 
   /**
    * 取得指定中藥材或方劑的完整提示內容。
