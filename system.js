@@ -3208,6 +3208,9 @@ async function selectPatientForRegistration(patientId) {
 
 // 3. 修改今日掛號列表載入功能，確保能正確顯示病人資訊
 async function loadTodayAppointments() {
+    // 在渲染掛號列表前記錄當前頁面的滾動位置。
+    // 這樣在更新列表時可以恢復到相同的卷軸位置，避免操作導致頁面跳動。
+    const prevScrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
     // 已在切換到掛號系統時清除過期掛號，這裡不再重複執行。
     // 如果需要手動清除，請在調用 loadConsultationSystem 前呼叫 clearOldAppointments。
     // await clearOldAppointments();
@@ -3272,6 +3275,12 @@ async function loadTodayAppointments() {
                 </td>
             </tr>
         `;
+        // 更新完表格後恢復原本的滾動位置。
+        try {
+            window.scrollTo({ top: prevScrollY, left: 0, behavior: 'auto' });
+        } catch (_err) {
+            // 在某些瀏覽器上，scrollTo 可能會拋出錯誤；忽略即可。
+        }
         return;
     }
     
@@ -3302,6 +3311,12 @@ async function loadTodayAppointments() {
             // 使用快取病人資料
             return createAppointmentRow(appointment, patient, index);
         }).join('');
+        // 更新完表格後恢復原本的滾動位置。
+        try {
+            window.scrollTo({ top: prevScrollY, left: 0, behavior: 'auto' });
+        } catch (_err) {
+            // 在某些瀏覽器上，scrollTo 可能會拋出錯誤；忽略即可。
+        }
         
     } catch (error) {
         console.error('載入掛號列表錯誤:', error);
@@ -3312,6 +3327,12 @@ async function loadTodayAppointments() {
                 </td>
             </tr>
         `;
+        // 在發生錯誤仍恢復滾動位置
+        try {
+            window.scrollTo({ top: prevScrollY, left: 0, behavior: 'auto' });
+        } catch (_err) {
+            // ignore
+        }
     }
 }
 
@@ -3700,7 +3721,8 @@ function createAppointmentRow(appointment, patient, index) {
               使按鈕自然靠左排列。
             -->
             <td class="px-4 py-3 text-sm">
-                <div class="flex flex-wrap gap-1">
+                <!-- 為操作區域設定最小高度，避免按鈕數量變化時導致列高跳動 -->
+                <div class="flex flex-wrap gap-1 min-h-10 items-center">
                     ${operationButtons}
                 </div>
             </td>
@@ -10701,14 +10723,19 @@ const consultationDate = (() => {
             document.getElementById('formCurrentHistory').value = consultation.currentHistory || '';
             document.getElementById('formDiagnosis').value = consultation.diagnosis || '';
             document.getElementById('formSyndrome').value = consultation.syndrome || '';
-            {
-              const acnEl = document.getElementById('formAcupunctureNotes');
-              if (acnEl) {
-                // 使用 innerText 載入針灸備註內容，以支援 contenteditable
-                // 載入針灸備註時直接使用 innerHTML，以保留方塊標記
-                acnEl.innerHTML = consultation.acupunctureNotes || '';
-              }
-            }
+                {
+                  const acnEl = document.getElementById('formAcupunctureNotes');
+                  if (acnEl) {
+                    // 使用 innerHTML 載入針灸備註，以保留方塊標記
+                    acnEl.innerHTML = consultation.acupunctureNotes || '';
+                    // 載入完成後初始化既有穴位方塊的事件，以使其可刪除與顯示提示
+                    if (typeof initializeAcupointNotesSpans === 'function') {
+                      try {
+                        initializeAcupointNotesSpans();
+                      } catch (_e) {}
+                    }
+                  }
+                }
             document.getElementById('formUsage').value = consultation.usage || '';
             document.getElementById('formTreatmentCourse').value = consultation.treatmentCourse || '';
             document.getElementById('formInstructions').value = consultation.instructions || '';
@@ -17615,24 +17642,20 @@ function refreshTemplateCategoryFilters() {
             modal.classList.remove('hidden');
             // 若為穴位組合，使用搜尋介面及提示框顯示完整資料。此邏輯將在此返回，避免進入舊的穴位分支。
             if (itemType === 'acupoint') {
-              // 建立已存在穴位行的 HTML，每行包含提示資訊、名稱、類型選擇與刪除按鈕
+              // 建立已存在穴位行的 HTML，每行包含提示資訊、名稱與刪除按鈕（已移除主穴/配穴選擇）
               const acupointRowsHtml = Array.isArray(item.points)
                 ? item.points.map(pt => {
                     const nameVal = (pt && pt.name) ? pt.name : '';
-                    const typeVal = (pt && pt.type) ? pt.type : '主穴';
                     const tooltipContent = getAcupointTooltipContent(nameVal);
                     const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
                     const nameAttr = nameVal ? (' data-acupoint-name="' + nameVal.replace(/\"/g, '&quot;') + '"') : '';
                     let tooltipAttr = '';
                     if (tooltipContent) {
-                      // 將鼠標提示字串中的單引號正確跳脫。原本使用 \\'data-tooltip\\' 會在字串中留下兩個反斜線，導致語法錯誤。
-                      // 改為使用 \'data-tooltip\'，即可正確產生內嵌屬性，避免解析錯誤。
+                      // 將鼠標提示字串中的單引號正確跳脫，使用 data-tooltip 屬性
                       tooltipAttr = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
                     }
-                    const options = ['主穴','配穴'].map(opt => '<option value="' + opt + '" ' + (opt === typeVal ? 'selected' : '') + '>' + opt + '</option>').join('');
                     return '<div class="flex items-center gap-2 p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded"' + nameAttr + tooltipAttr + '>' +
                       '<span class="flex-1 text-blue-800">' + (typeof window !== 'undefined' && window.escapeHtml ? window.escapeHtml(nameVal) : nameVal) + '</span>' +
-                      '<select class="w-24 px-2 py-1 border border-gray-300 rounded">' + options + '</select>' +
                       '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="this.parentElement.remove()">刪除</button>' +
                       '</div>';
                   }).join('')
