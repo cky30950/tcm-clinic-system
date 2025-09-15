@@ -4933,7 +4933,7 @@ if (!patient) {
                                 ${consultation.acupunctureNotes ? `
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">針灸備註</span>
-                                    <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${consultation.acupunctureNotes}</div>
+                                    <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.stripHtmlTags(consultation.acupunctureNotes)}</div>
                                 </div>
                                 ` : ''}
                             </div>
@@ -5261,7 +5261,7 @@ function displayConsultationMedicalHistoryPage() {
                         ${consultation.acupunctureNotes ? `
                         <div>
                             <span class="text-sm font-semibold text-gray-700 block mb-2">針灸備註</span>
-                            <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${consultation.acupunctureNotes}</div>
+                            <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.stripHtmlTags(consultation.acupunctureNotes)}</div>
                         </div>
                         ` : ''}
                     </div>
@@ -18799,6 +18799,28 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
 
   // 將初始化函式掛載至 window，方便外部呼叫
   window.initializeAcupointNotesSpans = initializeAcupointNotesSpans;
+
+  /**
+   * 將包含 HTML 標籤的字串轉換為純文字。
+   * 用於在病歷查看模式下顯示針灸備註，避免直接顯示方塊。
+   * @param {string} html 帶有 HTML 內容的字串
+   * @returns {string} 去除標籤後的純文字
+   */
+  function stripHtmlTags(html) {
+    try {
+      if (!html) return '';
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      // 使用 innerText 取得純文字，避免包含 HTML 標籤
+      return tmp.innerText || tmp.textContent || '';
+    } catch (_err) {
+      // 若有錯誤則回傳原始字串，避免程式中斷
+      return html;
+    }
+  }
+
+  // 將 stripHtmlTags 函式掛載到 window 供模板調用
+  window.stripHtmlTags = stripHtmlTags;
 
   // 將自訂函式掛載至 window 物件，以便 HTML 內嵌事件調用
   window.searchAcupointForNotes = searchAcupointForNotes;
