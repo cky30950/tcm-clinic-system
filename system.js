@@ -18660,28 +18660,56 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
         if (parent) parent.removeChild(span);
         if (typeof hideTooltip === 'function') hideTooltip();
       });
-      // 取得當前游標位置並插入 span
+      // 將焦點設至針灸備註欄，確保游標定位於可編輯區
+      if (typeof form.focus === 'function') {
+        form.focus();
+      }
+      // 取得當前選取範圍
       const sel = window.getSelection();
       let range = null;
-      if (sel && sel.rangeCount > 0) range = sel.getRangeAt(0);
-      if (!range) {
-        // 若無選取範圍，將 span 插入至最後
+      let insertAtEnd = true;
+      if (sel && sel.rangeCount > 0) {
+        range = sel.getRangeAt(0);
+        // 檢查選取範圍是否位於針灸備註欄內
+        let container = range.commonAncestorContainer || range.startContainer;
+        // 若為文本節點則取其父元素判斷
+        if (container && container.nodeType === Node.TEXT_NODE) {
+          container = container.parentNode;
+        }
+        if (container && form.contains(container)) {
+          insertAtEnd = false;
+        }
+      }
+      // 建立頓號分隔符
+      const delim = document.createTextNode('、');
+      if (insertAtEnd || !range) {
+        // 若游標不在備註欄內，或沒有選取範圍，則將 span 插入至最後
         form.appendChild(span);
-        // 在尾端添加頓號以區隔後續文字
-        form.appendChild(document.createTextNode('、'));
+        form.appendChild(delim);
+        // 將游標移到頓號之後
+        if (sel) {
+          const newRange = document.createRange();
+          newRange.setStartAfter(delim);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        }
       } else {
+        // 在選取位置插入 span 與分隔符
         range.deleteContents();
         range.insertNode(span);
         // 在 span 後插入頓號以區隔
-        const delim = document.createTextNode('、');
         span.after(delim);
         // 將游標移到頓號之後
-        range.setStartAfter(delim);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
+        if (sel) {
+          const newRange = document.createRange();
+          newRange.setStartAfter(delim);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        }
       }
-      // 插入後清空搜尋欄並隱藏結果
+      // 插入後清空搜尋欄並隱藏結果與提示
       clearAcupointNotesSearch();
     } catch (err) {
       console.error('新增穴位到針灸備註時發生錯誤：', err);
