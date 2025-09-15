@@ -12,6 +12,12 @@
         body { font-family: 'Noto Sans TC', sans-serif; }
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* contenteditable placeholder for針灸備註輸入區 */
+        [contenteditable][data-placeholder]:empty:before {
+            content: attr(data-placeholder);
+            color: #9ca3af; /* text-gray-400 */
+        }
         
         /* 浮動提示樣式 */
         .toast {
@@ -697,13 +703,9 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <!-- 將穴位方塊與備註輸入欄置於同一容器內，方塊顯示於內部上方 -->
-                                    <div class="relative mb-2">
-                                        <!-- 已選擇的穴位方塊會絕對定位於容器頂部，內含多個淺藍色方塊 -->
-                                        <div id="acupunctureNotesSelected" class="absolute inset-x-0 top-0 flex flex-wrap gap-2 p-2 pointer-events-auto"></div>
-                                        <!-- 針灸備註文字輸入區，增加上邊內距以避免與方塊重疊 -->
-                                        <textarea id="formAcupunctureNotes" placeholder="針灸穴位、手法、注意事項等..." rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 pt-12 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
-                                    </div>
+                                    <!-- 針灸備註輸入區，使用 contenteditable 以便嵌入穴位方塊 -->
+                                    <div id="formAcupunctureNotes" contenteditable="true" data-placeholder="針灸穴位、手法、注意事項等..."
+                                         class="w-full border border-gray-300 rounded-lg px-3 py-2 min-h-[80px] focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-2"></div>
                                 </div>
                             </div>
 
