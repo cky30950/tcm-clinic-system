@@ -3482,7 +3482,8 @@ async function loadConsultationForEdit(consultationId) {
               const acnEl = document.getElementById('formAcupunctureNotes');
               if (acnEl) {
                 // 使用 innerText 載入針灸備註內容，以支援 contenteditable
-                acnEl.innerText = consultation.acupunctureNotes || '';
+                // 載入針灸備註時直接使用 innerHTML，以保留方塊標記
+                acnEl.innerHTML = consultation.acupunctureNotes || '';
               }
             }
             document.getElementById('formUsage').value = consultation.usage || '';
@@ -4311,9 +4312,9 @@ async function showConsultationForm(appointment) {
                 const el = document.getElementById(id);
                 if (!el) return;
                 if (id === 'formAcupunctureNotes') {
-                    // contenteditable 元素使用 innerText 清空
+                    // contenteditable 元素使用 innerHTML 清空，以保留樣式定義
                     if (el.hasAttribute('contenteditable')) {
-                        el.innerText = '';
+                        el.innerHTML = '';
                     } else {
                         el.value = '';
                     }
@@ -4572,7 +4573,8 @@ async function saveConsultation() {
             syndrome: document.getElementById('formSyndrome').value.trim(),
             acupunctureNotes: (() => {
                 const acnEl = document.getElementById('formAcupunctureNotes');
-                return acnEl ? acnEl.innerText.trim() : '';
+                // 儲存針灸備註使用 innerHTML 以保留方塊格式
+                return acnEl ? acnEl.innerHTML.trim() : '';
             })(),
             prescription: document.getElementById('formPrescription').value.trim(),
             usage: document.getElementById('formUsage').value.trim(),
@@ -10695,7 +10697,8 @@ const consultationDate = (() => {
               const acnEl = document.getElementById('formAcupunctureNotes');
               if (acnEl) {
                 // 使用 innerText 載入針灸備註內容，以支援 contenteditable
-                acnEl.innerText = consultation.acupunctureNotes || '';
+                // 載入針灸備註時直接使用 innerHTML，以保留方塊標記
+                acnEl.innerHTML = consultation.acupunctureNotes || '';
               }
             }
             document.getElementById('formUsage').value = consultation.usage || '';
@@ -18659,12 +18662,25 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
       // 點擊方塊可刪除該項
       span.addEventListener('click', function() {
         const parent = span.parentNode;
-        if (parent) parent.removeChild(span);
+        if (parent) {
+          // 若方塊後有單獨的空白文字節點，一併刪除，避免留下殘餘空格
+          const next = span.nextSibling;
+          if (next && next.nodeType === Node.TEXT_NODE && /^\s*$/.test(next.textContent)) {
+            parent.removeChild(next);
+          }
+          parent.removeChild(span);
+        }
         if (typeof hideTooltip === 'function') hideTooltip();
       });
-      // 將焦點設至針灸備註欄，確保游標定位於可編輯區
+      // 將焦點設至針灸備註欄，確保游標定位於可編輯區，但避免捲動畫面
       if (typeof form.focus === 'function') {
-        form.focus();
+        try {
+          // preventScroll 避免自動捲動畫面
+          form.focus({ preventScroll: true });
+        } catch (_er) {
+          // 若瀏覽器不支援 preventScroll，則改用一般 focus
+          form.focus();
+        }
       }
       // 取得當前選取範圍
       const sel = window.getSelection();
@@ -18738,6 +18754,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } catch (_e) {
                 console.error('初始化模板庫搜尋功能失敗:', _e);
+            }
+
+            // 監聽針灸備註輸入區的輸入事件，當用鍵盤刪除方塊或編輯內容時隱藏浮窗
+            try {
+                const acnForm = document.getElementById('formAcupunctureNotes');
+                if (acnForm) {
+                    acnForm.addEventListener('input', function() {
+                        if (typeof hideTooltip === 'function') {
+                            hideTooltip();
+                        }
+                    });
+                }
+            } catch (_e) {
+                console.error('初始化針灸備註輸入區事件失敗:', _e);
             }
 
             /**
