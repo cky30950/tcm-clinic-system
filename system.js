@@ -18643,6 +18643,8 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
       // 建立代表穴位的 span 元素
       const span = document.createElement('span');
       span.className = 'inline-flex items-center justify-center bg-blue-100 border border-blue-200 rounded text-xs text-blue-800 px-1 py-0.5 mr-1 cursor-pointer';
+      // 讓此方塊本身不可編輯，避免用戶修改內文字
+      span.setAttribute('contenteditable', 'false');
       span.dataset.acupointName = name;
       span.textContent = name;
       // 設定 tooltip 內容
@@ -18680,30 +18682,31 @@ ${item.points.map(pt => '<div class="flex items-center gap-2"><input type="text"
           insertAtEnd = false;
         }
       }
-      // 建立頓號分隔符
-      const delim = document.createTextNode('、');
       if (insertAtEnd || !range) {
         // 若游標不在備註欄內，或沒有選取範圍，則將 span 插入至最後
         form.appendChild(span);
-        form.appendChild(delim);
-        // 將游標移到頓號之後
+        // 在方塊之後加上一個空格以區隔後續輸入
+        const space = document.createTextNode(' ');
+        form.appendChild(space);
+        // 將游標移到空格之後
         if (sel) {
           const newRange = document.createRange();
-          newRange.setStartAfter(delim);
+          newRange.setStartAfter(space);
           newRange.collapse(true);
           sel.removeAllRanges();
           sel.addRange(newRange);
         }
       } else {
-        // 在選取位置插入 span 與分隔符
+        // 在選取位置插入 span 及空格分隔符
         range.deleteContents();
         range.insertNode(span);
-        // 在 span 後插入頓號以區隔
-        span.after(delim);
-        // 將游標移到頓號之後
+        // 在 span 後插入一個空格，以免與後續內容黏在一起
+        const space = document.createTextNode(' ');
+        span.after(space);
+        // 將游標移到空格之後
         if (sel) {
           const newRange = document.createRange();
-          newRange.setStartAfter(delim);
+          newRange.setStartAfter(space);
           newRange.collapse(true);
           sel.removeAllRanges();
           sel.addRange(newRange);
