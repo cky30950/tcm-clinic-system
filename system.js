@@ -734,10 +734,14 @@ function generateMedicalRecordNumber() {
             button.style.display = 'flex';
             button.style.alignItems = 'center';
             button.style.justifyContent = 'center';
-            // Replace the button's content with a spinner using Tailwind classes. Remove margin since
-            // there's no text to align next to it.
-            // 使用 border-current 讓讀取圓圈的顏色繼承按鈕字體顏色，使其在淺色背景上仍然可見
-            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-current opacity-50"></div>`;
+            // Replace the button's content with a spinner. We draw a circular spinner by
+            // using a full border with the current text color and hiding the top segment.
+            // Using border-t-transparent creates a gap for the spin animation, ensuring the
+            // spinner is visible on both light and dark backgrounds. We intentionally
+            // omit additional opacity here because border-current should provide sufficient
+            // contrast; if the button text color is light on a light background, the
+            // spinning border will still remain visible thanks to the missing top segment.
+            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>`;
         }
 
         // 清除按鈕讀取狀態，還原原始內容
@@ -1817,7 +1821,8 @@ async function savePatient() {
     // 不限制身分證字號格式，因此無需檢查格式
 
     // 顯示載入中狀態：根據是新增或更新顯示不同文字
-    const saveButton = document.querySelector('[onclick="savePatient()"]');
+    // 由於按鈕不再使用 inline onclick 事件，嘗試直接透過按鈕 ID 取得元素。若仍找不到，退回先前的查找方式。
+    const saveButton = document.getElementById('savePatientButton') || document.querySelector('[onclick="savePatient()"]');
     if (saveButton) {
         // 若正在編輯，顯示「更新中...」，否則顯示「儲存中...」
         const loadingText = (typeof editingPatientId !== 'undefined' && editingPatientId) ? '更新中...' : '儲存中...';
