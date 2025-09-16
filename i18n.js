@@ -571,7 +571,15 @@ window.translations = {
 
 // Declare isTranslating early so it is available wherever referenced.
 // Using var ensures the declaration is hoisted and accessible before use.
+// Track whether a translation is currently being applied to avoid recursive invocation
 var isTranslating = false;
+
+// Keep a record of the last language each node was translated into.
+// We use a data attribute on each element (data-last-lang) rather than a WeakMap
+// to persist the last translated language across DOM updates.  This helps
+// prevent repeatedly re‑translating the same node when it hasn't changed
+// languages, which can improve performance on pages with large DOMs.
+
 
 /**
  * Save the original text and placeholder values for each element.  This
@@ -602,6 +610,52 @@ function storeOriginalText() {
 }
 
 /**
+ * Recursively translate a DOM node and its descendants.  This function
+ * ensures that the original text and placeholder values are stored on
+ * first encounter, and then looks up a translated value from the
+ * provided dictionary.  It operates on leaf nodes only (elements
+ * without child elements) to avoid altering internal structures.
+ * @param {Node} node The DOM node to translate.
+ * @param {Object} dict The translation dictionary for the current language.
+ */
+function translateNode(node, dict, lang) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
+    // If the element has no child elements, it is a leaf node and can
+    // have its textContent and placeholder translated directly.
+    if (node.children.length === 0) {
+        // Only translate if the node hasn't been translated to this language yet.
+        if (node.dataset.lastLang !== lang) {
+            const currentText = (node.textContent || '').trim();
+            if (currentText) {
+                // Preserve the original text if not already stored
+                if (!node.dataset.originalText) {
+                    node.dataset.originalText = currentText;
+                }
+                const original = node.dataset.originalText;
+                if (dict && Object.prototype.hasOwnProperty.call(dict, original)) {
+                    node.textContent = dict[original];
+                }
+            }
+            // Handle placeholder attribute if present
+            if (node.hasAttribute('placeholder')) {
+                const phVal = node.getAttribute('placeholder').trim();
+                if (!node.dataset.originalPlaceholder && phVal) {
+                    node.dataset.originalPlaceholder = phVal;
+                }
+                const originalPh = node.dataset.originalPlaceholder;
+                if (originalPh && dict && Object.prototype.hasOwnProperty.call(dict, originalPh)) {
+                    node.setAttribute('placeholder', dict[originalPh]);
+                }
+            }
+            // Record the language this node has been translated into
+            node.dataset.lastLang = lang;
+        }
+    }
+    // Recursively translate child elements
+    Array.from(node.children).forEach(child => translateNode(child, dict, lang));
+}
+
+/**
  * Apply translations based on the currently selected language.  The
  * language code is stored in localStorage under the key 'lang'.  If not
  * present the default language is Chinese ('zh').  For each element
@@ -616,22 +670,8 @@ function applyTranslations() {
     try {
         const lang = localStorage.getItem('lang') || 'zh';
         const dict = window.translations[lang] || {};
-        // Update text nodes
-        const textEls = document.querySelectorAll('[data-original-text]');
-        textEls.forEach(el => {
-            const key = el.dataset.originalText;
-            if (dict && Object.prototype.hasOwnProperty.call(dict, key)) {
-                el.textContent = dict[key];
-            }
-        });
-        // Update placeholders
-        const placeholderEls = document.querySelectorAll('[data-original-placeholder]');
-        placeholderEls.forEach(el => {
-            const key = el.dataset.originalPlaceholder;
-            if (dict && Object.prototype.hasOwnProperty.call(dict, key)) {
-                el.setAttribute('placeholder', dict[key]);
-            }
-        });
+        // Translate the entire document body
+        translateNode(document.body, dict, lang);
     } finally {
         // Reset flag after translation
         isTranslating = false;
@@ -656,37 +696,23 @@ function setLanguage(lang) {
 // translated without needing to call applyTranslations manually in
 // every script.
 
-// Debounce timer used to consolidate rapid mutation events into a single
-// translation call.  This prevents heavy repeated scanning when
-// elements are added/removed in quick succession (e.g. during large
-// list rendering).
-let translationTimeoutId;
-
 const observer = new MutationObserver(mutations => {
     // Do not react to mutations while a translation is being applied.
     if (isTranslating) return;
-    // Check if any nodes were added that could require translation
-    let hasAddedNodes = false;
-    for (const m of mutations) {
+    const lang = localStorage.getItem('lang') || 'zh';
+    const dict = window.translations[lang] || {};
+    mutations.forEach(m => {
         if (m.addedNodes && m.addedNodes.length > 0) {
-            hasAddedNodes = true;
-            break;
+            m.addedNodes.forEach(node => {
+                // Only translate nodes that are elements
+                translateNode(node, dict, lang);
+            });
         }
-    }
-    if (!hasAddedNodes) return;
-    // Debounce translation: clear any pending update and schedule a new one
-    if (translationTimeoutId) {
-        clearTimeout(translationTimeoutId);
-    }
-    translationTimeoutId = setTimeout(() => {
-        applyTranslations();
-        translationTimeoutId = null;
-    }, 50);
+    });
 });
 
 // Setup event listeners on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
-    storeOriginalText();
     const savedLang = localStorage.getItem('lang') || 'zh';
     const langSelector = document.getElementById('languageSelector');
     if (langSelector) {
@@ -696,6 +722,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     applyTranslations();
-    // Start observing the body for added nodes to translate dynamic content
-    observer.observe(document.body, { childList: true, subtree: true });
+    // Observe only the main system container if present; fallback to body.
+    const target = document.getElementById('mainSystem') || document.body;
+    observer.observe(target, { childList: true, subtree: true });
 });
