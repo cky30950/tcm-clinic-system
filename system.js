@@ -1026,17 +1026,24 @@ function generateSearchKeywords(patient = {}) {
             }
         }
     }
-    // 處理電話：完整號碼及每 3~4 位的連續片段
+    // 處理電話：完整號碼及所有長度 >= 3 的連續片段
+    // 允許使用者輸入任意長度的局部號碼即能找到病人
     if (patient.phone) {
         const phone = String(patient.phone).replace(/\s+/g, '').toLowerCase();
         if (phone) {
+            // 加入完整號碼
             keywords.add(phone);
+            /*
+             * 過去僅產生 3~4 位的連續片段，導致當使用者輸入 5 位或以上的電話局部時無法匹配。
+             * 為了加強搜尋功能，這裡將產生從 3 位開始到完整號碼長度的所有連續片段。
+             * 這樣不論使用者輸入電話的前、中、後段，只要長度大於等於 3 位皆能成功匹配。
+             */
             const minLen = 3;
-            const maxLen = Math.min(4, phone.length);
+            const maxLen = phone.length;
             for (let len = minLen; len <= maxLen; len++) {
                 for (let i = 0; i <= phone.length - len; i++) {
                     const fragment = phone.slice(i, i + len);
-                    keywords.add(fragment);
+                    if (fragment) keywords.add(fragment);
                 }
             }
         }
@@ -1051,21 +1058,21 @@ function generateSearchKeywords(patient = {}) {
             }
         }
     }
-    // 處理病人編號：完整字串及連續片段
+    // 處理病人編號：完整字串及所有長度 >= 3 的連續片段
+    // 與電話類似，擴充片段長度到整個編號長度，以支援使用者輸入較長的部分編號搜尋
     if (patient.patientNumber) {
         const numLower = String(patient.patientNumber).replace(/\s+/g, '').toLowerCase();
         if (numLower) {
             keywords.add(numLower);
-            // 將號碼拆成 3 到 4 位的連續片段，方便以部分編號搜尋
             const minLen = 3;
-            const maxLen = Math.min(4, numLower.length);
+            const maxLen = numLower.length;
             for (let len = minLen; len <= maxLen; len++) {
                 for (let i = 0; i <= numLower.length - len; i++) {
                     const fragment = numLower.slice(i, i + len);
-                    keywords.add(fragment);
+                    if (fragment) keywords.add(fragment);
                 }
             }
-            // 後四碼重複加一次，確保舊資料格式
+            // 為向下相容舊資料，保留後四碼重複加入一次
             if (numLower.length >= 4) {
                 keywords.add(numLower.slice(-4));
             }
@@ -13727,13 +13734,40 @@ class FirebaseDataManager {
             } catch (err) {
                 console.error('搜尋病人時發生錯誤:', err);
             }
-            // 若結果未達上限且有本地快取，從快取中搜尋舊資料
-            if (Array.isArray(this.patientsCache) && results.length < limit) {
+            /*
+             * 透過 searchKeywords 查詢後，我們還需要在本地快取中進行補強搜尋。
+             * 過去僅當 Firestore 查詢結果不足時才進行快取搜尋，這會導致當
+             * searchKeywords 中沒有包含使用者輸入的字串時，若目前快取尚未載入，
+             * 使用者輸入的電話或病人編號片段等條件無法被匹配到。
+             * 為了解決這個問題，我們改為總是載入快取（若尚未存在），並在
+             * 本地資料上比對名稱、電話、身分證與病人編號等欄位是否包含輸入字串。
+             */
+            let localPatients = [];
+            try {
+                // 如果 patientsCache 尚未載入，主動讀取全體病人列表以利搜尋
+                if (!Array.isArray(this.patientsCache)) {
+                    const patientRes = await this.getPatients();
+                    if (patientRes && patientRes.success && Array.isArray(patientRes.data)) {
+                        localPatients = patientRes.data;
+                        // 更新快取以供下次使用
+                        this.patientsCache = patientRes.data;
+                    }
+                } else {
+                    localPatients = this.patientsCache;
+                }
+            } catch (cacheErr) {
+                console.error('讀取病人快取時發生錯誤:', cacheErr);
+                localPatients = Array.isArray(this.patientsCache) ? this.patientsCache : [];
+            }
+            // 在本地資料中補強搜尋，避免重複加入已在 results 中的病人。
+            if (Array.isArray(localPatients) && localPatients.length > 0) {
                 const seen = new Set(results.map(p => String(p.id)));
                 const low = searchTerm;
-                for (const p of this.patientsCache) {
+                for (const p of localPatients) {
+                    // 控制返回數量不超過指定 limit
                     if (results.length >= limit) break;
                     if (seen.has(String(p.id))) continue;
+                    // 比對姓名、電話、身分證字號與病人編號欄位
                     const nameMatch = p.name && String(p.name).toLowerCase().includes(low);
                     const phoneMatch = p.phone && String(p.phone).toLowerCase().includes(low);
                     const idMatch = p.idCard && String(p.idCard).toLowerCase().includes(low);
