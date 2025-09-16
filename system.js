@@ -388,10 +388,10 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
         const pageSize = paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage
             ? paginationSettings.patientList.itemsPerPage
             : 10;
-        // 建立基礎查詢：依照 createdAt 由舊至新排序
+        // 建立基礎查詢：依照 createdAt 由新至舊排序
         let q = window.firebase.firestoreQuery(
             window.firebase.collection(window.firebase.db, 'patients'),
-            window.firebase.orderBy('createdAt'),
+            window.firebase.orderBy('createdAt', 'desc'),
             window.firebase.limit(pageSize)
         );
         // 如果頁碼大於 1，且前一頁已記錄最後一筆文件，則以該文件為起點
@@ -1051,11 +1051,21 @@ function generateSearchKeywords(patient = {}) {
             }
         }
     }
-    // 處理病人編號：完整字串與後四位
+    // 處理病人編號：完整字串及連續片段
     if (patient.patientNumber) {
-        const numLower = String(patient.patientNumber).toLowerCase();
+        const numLower = String(patient.patientNumber).replace(/\s+/g, '').toLowerCase();
         if (numLower) {
             keywords.add(numLower);
+            // 將號碼拆成 3 到 4 位的連續片段，方便以部分編號搜尋
+            const minLen = 3;
+            const maxLen = Math.min(4, numLower.length);
+            for (let len = minLen; len <= maxLen; len++) {
+                for (let i = 0; i <= numLower.length - len; i++) {
+                    const fragment = numLower.slice(i, i + len);
+                    keywords.add(fragment);
+                }
+            }
+            // 後四碼重複加一次，確保舊資料格式
             if (numLower.length >= 4) {
                 keywords.add(numLower.slice(-4));
             }
@@ -1911,7 +1921,31 @@ async function loadPatientListFromFirebase() {
             } catch (_searchErr) {
                 console.error('搜尋病人時發生錯誤:', _searchErr);
             }
-            const filteredPatients = (searchResult && searchResult.success && Array.isArray(searchResult.data)) ? searchResult.data : [];
+            let filteredPatients = (searchResult && searchResult.success && Array.isArray(searchResult.data)) ? searchResult.data : [];
+            // 依照 createdAt 由新至舊排序
+            filteredPatients = filteredPatients.slice();
+            filteredPatients.sort((a, b) => {
+                // 取用 createdAt 或 updatedAt 作為排序依據，若無則設定為最早
+                let dateA = 0;
+                let dateB = 0;
+                if (a && a.createdAt) {
+                    if (a.createdAt.seconds) {
+                        dateA = a.createdAt.seconds * 1000;
+                    } else {
+                        const d = new Date(a.createdAt);
+                        dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                    }
+                }
+                if (b && b.createdAt) {
+                    if (b.createdAt.seconds) {
+                        dateB = b.createdAt.seconds * 1000;
+                    } else {
+                        const d = new Date(b.createdAt);
+                        dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                    }
+                }
+                return dateB - dateA;
+            });
             patientListFiltered = filteredPatients;
             renderPatientListTable(false);
         } else {
@@ -1984,6 +2018,8 @@ function renderPatientListTable(pageChange = false) {
     const pageItems = patientListFiltered.slice(startIdx, endIdx);
     // 清空表格
     tbody.innerHTML = '';
+    // 判斷當前用戶是否具有刪除病人權限
+    const showDelete = currentUserData && currentUserData.position && currentUserData.position.trim() === '診所管理';
     // 渲染當前頁病人資料
     pageItems.forEach(patient => {
         const row = document.createElement('tr');
@@ -1994,18 +2030,23 @@ function renderPatientListTable(pageChange = false) {
         const safeAge = window.escapeHtml(formatAge(patient.birthDate));
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
+        let actions = `
+                <button onclick="viewPatient('${patient.id}')" class="text-blue-600 hover:text-blue-800">查看</button>
+                <button onclick="showPatientMedicalHistory('${patient.id}')" class="text-purple-600 hover:text-purple-800">病歷</button>
+                <button onclick="editPatient('${patient.id}')" class="text-green-600 hover:text-green-800">編輯</button>
+        `;
+        if (showDelete) {
+            actions += `
+                <button onclick="deletePatient('${patient.id}')" class="text-red-600 hover:text-red-800">刪除</button>
+            `;
+        }
         row.innerHTML = `
             <td class="px-4 py-3 text-sm text-blue-600 font-medium">${safeNumber}</td>
             <td class="px-4 py-3 text-sm text-gray-900 font-medium">${safeName}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safeAge}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safeGender}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safePhone}</td>
-            <td class="px-4 py-3 text-sm space-x-2">
-                <button onclick="viewPatient('${patient.id}')" class="text-blue-600 hover:text-blue-800">查看</button>
-                <button onclick="showPatientMedicalHistory('${patient.id}')" class="text-purple-600 hover:text-purple-800">病歷</button>
-                <button onclick="editPatient('${patient.id}')" class="text-green-600 hover:text-green-800">編輯</button>
-                <button onclick="deletePatient('${patient.id}')" class="text-red-600 hover:text-red-800">刪除</button>
-            </td>
+            <td class="px-4 py-3 text-sm space-x-2">${actions}</td>
         `;
         tbody.appendChild(row);
     });
@@ -2046,6 +2087,8 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
     }
     // 重新渲染表格內容
     tbody.innerHTML = '';
+    // 判斷是否具有刪除權限
+    const showDelete = currentUserData && currentUserData.position && currentUserData.position.trim() === '診所管理';
     pageItems.forEach(patient => {
         const row = document.createElement('tr');
         row.className = 'hover:bg-gray-50';
@@ -2055,18 +2098,23 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
         const safeAge = window.escapeHtml(formatAge(patient.birthDate));
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
+        let actions = `
+                <button onclick="viewPatient('${patient.id}')" class="text-blue-600 hover:text-blue-800">查看</button>
+                <button onclick="showPatientMedicalHistory('${patient.id}')" class="text-purple-600 hover:text-purple-800">病歷</button>
+                <button onclick="editPatient('${patient.id}')" class="text-green-600 hover:text-green-800">編輯</button>
+        `;
+        if (showDelete) {
+            actions += `
+                <button onclick="deletePatient('${patient.id}')" class="text-red-600 hover:text-red-800">刪除</button>
+            `;
+        }
         row.innerHTML = `
             <td class="px-4 py-3 text-sm text-blue-600 font-medium">${safeNumber}</td>
             <td class="px-4 py-3 text-sm text-gray-900 font-medium">${safeName}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safeAge}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safeGender}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safePhone}</td>
-            <td class="px-4 py-3 text-sm space-x-2">
-                <button onclick="viewPatient('${patient.id}')" class="text-blue-600 hover:text-blue-800">查看</button>
-                <button onclick="showPatientMedicalHistory('${patient.id}')" class="text-purple-600 hover:text-purple-800">病歷</button>
-                <button onclick="editPatient('${patient.id}')" class="text-green-600 hover:text-green-800">編輯</button>
-                <button onclick="deletePatient('${patient.id}')" class="text-red-600 hover:text-red-800">刪除</button>
-            </td>
+            <td class="px-4 py-3 text-sm space-x-2">${actions}</td>
         `;
         tbody.appendChild(row);
     });
@@ -2122,6 +2170,12 @@ async function editPatient(id) {
 }
 async function deletePatient(id) {
     try {
+        // 只有診所管理者可以刪除病人
+        if (!currentUserData || !currentUserData.position || currentUserData.position.trim() !== '診所管理') {
+            showToast('只有管理員可以刪除病人', 'error');
+            return;
+        }
+
         // 從快取或 Firebase 取得病人資料
         const allPatients = await fetchPatients();
         if (!allPatients || allPatients.length === 0) {
@@ -2141,10 +2195,17 @@ async function deletePatient(id) {
             // 顯示刪除中狀態
             showToast('刪除中...', 'info');
 
+            // 刪除與病人相關的診症記錄與套票等資料
+            try {
+                await deletePatientAssociatedData(id);
+            } catch (assocErr) {
+                console.error('刪除病人相關資料時發生錯誤:', assocErr);
+            }
+
             // 從 Firebase 刪除病人資料
             const deleteResult = await window.firebaseDataManager.deletePatient(id);
-            
-                if (deleteResult.success) {
+
+            if (deleteResult && deleteResult.success) {
                 showToast('病人資料已刪除！', 'success');
                 // 清除快取，下次讀取時重新從資料庫載入
                 // 刪除病人後也需要清除分頁快取與病人總數快取，
@@ -2168,6 +2229,59 @@ async function deletePatient(id) {
     } catch (error) {
         console.error('刪除病人資料錯誤:', error);
         showToast('刪除時發生錯誤', 'error');
+    }
+}
+
+/**
+ * 刪除與病人相關的診症記錄、套票等資料。
+ * 在刪除病人記錄之前呼叫，以確保數據完整性。
+ * @param {string} patientId 病人 ID
+ */
+async function deletePatientAssociatedData(patientId) {
+    try {
+        await waitForFirebaseDb();
+        // 刪除診症記錄
+        try {
+            const consRef = window.firebase.collection(window.firebase.db, 'consultations');
+            const consQuery = window.firebase.firestoreQuery(consRef, window.firebase.where('patientId', '==', patientId));
+            const consSnap = await window.firebase.getDocs(consQuery);
+            const consDocs = consSnap && consSnap.docs ? consSnap.docs : [];
+            for (const docSnap of consDocs) {
+                try {
+                    await window.firebase.deleteDoc(docSnap.ref);
+                } catch (delErr) {
+                    console.error('刪除診症記錄失敗:', delErr);
+                }
+            }
+            // 移除本地診症快取
+            if (patientConsultationsCache && patientConsultationsCache[patientId]) {
+                delete patientConsultationsCache[patientId];
+            }
+        } catch (err) {
+            console.error('查詢或刪除診症記錄失敗:', err);
+        }
+        // 刪除患者套票
+        try {
+            const pkgRef = window.firebase.collection(window.firebase.db, 'patientPackages');
+            const pkgQuery = window.firebase.firestoreQuery(pkgRef, window.firebase.where('patientId', '==', patientId));
+            const pkgSnap = await window.firebase.getDocs(pkgQuery);
+            const pkgDocs = pkgSnap && pkgSnap.docs ? pkgSnap.docs : [];
+            for (const docSnap of pkgDocs) {
+                try {
+                    await window.firebase.deleteDoc(docSnap.ref);
+                } catch (delErr) {
+                    console.error('刪除患者套票失敗:', delErr);
+                }
+            }
+            // 移除本地套票快取
+            if (patientPackagesCache && patientPackagesCache[patientId]) {
+                delete patientPackagesCache[patientId];
+            }
+        } catch (err) {
+            console.error('查詢或刪除患者套票失敗:', err);
+        }
+    } catch (error) {
+        console.error('刪除病人相關資料時發生錯誤:', error);
     }
 }
 
