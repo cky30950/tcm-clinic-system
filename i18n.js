@@ -606,24 +606,32 @@ function storeOriginalText() {
  * text remains unchanged.  Placeholders are handled similarly.
  */
 function applyTranslations() {
-    const lang = localStorage.getItem('lang') || 'zh';
-    const dict = window.translations[lang] || {};
-    // Update text nodes
-    const textEls = document.querySelectorAll('[data-original-text]');
-    textEls.forEach(el => {
-        const key = el.dataset.originalText;
-        if (dict && Object.prototype.hasOwnProperty.call(dict, key)) {
-            el.textContent = dict[key];
-        }
-    });
-    // Update placeholders
-    const placeholderEls = document.querySelectorAll('[data-original-placeholder]');
-    placeholderEls.forEach(el => {
-        const key = el.dataset.originalPlaceholder;
-        if (dict && Object.prototype.hasOwnProperty.call(dict, key)) {
-            el.setAttribute('placeholder', dict[key]);
-        }
-    });
+    // Guard against recursive invocation when triggered by mutation observer
+    if (isTranslating) return;
+    isTranslating = true;
+    try {
+        const lang = localStorage.getItem('lang') || 'zh';
+        const dict = window.translations[lang] || {};
+        // Update text nodes
+        const textEls = document.querySelectorAll('[data-original-text]');
+        textEls.forEach(el => {
+            const key = el.dataset.originalText;
+            if (dict && Object.prototype.hasOwnProperty.call(dict, key)) {
+                el.textContent = dict[key];
+            }
+        });
+        // Update placeholders
+        const placeholderEls = document.querySelectorAll('[data-original-placeholder]');
+        placeholderEls.forEach(el => {
+            const key = el.dataset.originalPlaceholder;
+            if (dict && Object.prototype.hasOwnProperty.call(dict, key)) {
+                el.setAttribute('placeholder', dict[key]);
+            }
+        });
+    } finally {
+        // Reset flag after translation
+        isTranslating = false;
+    }
 }
 
 /**
@@ -643,15 +651,19 @@ function setLanguage(lang) {
 // applied.  This helps ensure that dynamic content will also be
 // translated without needing to call applyTranslations manually in
 // every script.
+// Flag used to prevent the mutation observer from triggering
+// translations recursively.  When true, translation modifications
+// will not cause the observer to fire applyTranslations again.
+let isTranslating = false;
+
 const observer = new MutationObserver(mutations => {
-    let needUpdate = false;
-    mutations.forEach(m => {
+    // Do not react to mutations while a translation is being applied.
+    if (isTranslating) return;
+    for (const m of mutations) {
         if (m.addedNodes && m.addedNodes.length > 0) {
-            needUpdate = true;
+            applyTranslations();
+            break;
         }
-    });
-    if (needUpdate) {
-        applyTranslations();
     }
 });
 
