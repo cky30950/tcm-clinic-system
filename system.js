@@ -14800,14 +14800,41 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 病人管理搜尋欄位：輸入時重新載入病人列表
+    // 病人管理搜尋欄位：輸入時重新載入病人列表（加入防抖處理）
     const searchInput = document.getElementById('searchPatient');
     if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            // 搜尋時重置分頁至第一頁
-            paginationSettings.patientList.currentPage = 1;
-            loadPatientList();
-        });
+        // 建立防抖函式，於輸入後延遲一段時間再載入病人列表
+        const debouncedLoadPatientList = debounce(() => {
+            try {
+                // 搜尋時重置分頁至第一頁
+                paginationSettings.patientList.currentPage = 1;
+                loadPatientList();
+            } catch (_err) {
+                console.error('載入病人列表時發生錯誤:', _err);
+            }
+        }, 300);
+        searchInput.addEventListener('input', debouncedLoadPatientList);
+    }
+
+    // 掛號彈窗的病人搜尋欄位：加入防抖處理
+    const patientSearchInput = document.getElementById('patientSearchInput');
+    if (patientSearchInput) {
+        // 移除 HTML 中設定的 oninput 以避免重複觸發
+        try {
+            patientSearchInput.removeAttribute('oninput');
+        } catch (_e) {
+            // 若移除失敗則忽略
+        }
+        const debouncedSearchPatients = debounce(() => {
+            try {
+                if (typeof searchPatientsForRegistration === 'function') {
+                    searchPatientsForRegistration();
+                }
+            } catch (_err) {
+                console.error('搜尋掛號病人時發生錯誤:', _err);
+            }
+        }, 300);
+        patientSearchInput.addEventListener('input', debouncedSearchPatients);
     }
 
     // 當選擇問診資料時，自動隱藏主訴症狀輸入欄位。
