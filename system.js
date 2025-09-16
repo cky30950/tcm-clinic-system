@@ -49,6 +49,13 @@ paginationSettings.acupointLibrary = { currentPage: 1, itemsPerPage: 6 };
 // 若條件改變（例如重新查看另一位病人），應重置 currentPage 為 1。
 paginationSettings.patientPackageStatus = { currentPage: 1, itemsPerPage: 6 };
 
+// 進一步區分有效與失效套票的分頁設定。
+// 有效套票與失效套票各自擁有獨立的當前頁碼與每頁顯示數量，
+// 方便在切換分頁時互不干擾。當查看不同病人或重新載入資料時，
+// 應手動將 currentPage 重置為 1。
+paginationSettings.patientPackageStatusValid = { currentPage: 1, itemsPerPage: 6 };
+paginationSettings.patientPackageStatusInvalid = { currentPage: 1, itemsPerPage: 6 };
+
 // 快取病人篩選結果，用於分頁顯示
 let patientListFiltered = [];
 
@@ -19423,6 +19430,183 @@ function hideGlobalCopyright() {
     console.error('隱藏全局版權時發生錯誤', e);
   }
 }
+
+/**
+ * 覆寫 renderPackageStatusSection，使有效套票與失效套票各自擁有獨立分頁。
+ * 此函式使用 paginationSettings.patientPackageStatusValid 與
+ * paginationSettings.patientPackageStatusInvalid 存儲分頁狀態。
+ * @param {string} patientId 病人 ID
+ * @param {boolean} pageChange 是否由分頁控制觸發；若為 false，會重置分頁
+ */
+renderPackageStatusSection = async function(patientId, pageChange = false) {
+    const contentEl = document.getElementById('packageStatusContent');
+    if (!contentEl) return;
+    try {
+        // 若非分頁跳轉，則重置有效與失效套票分頁為第一頁
+        if (!pageChange) {
+            if (paginationSettings.patientPackageStatusValid) {
+                paginationSettings.patientPackageStatusValid.currentPage = 1;
+            }
+            if (paginationSettings.patientPackageStatusInvalid) {
+                paginationSettings.patientPackageStatusInvalid.currentPage = 1;
+            }
+        }
+        // 取得所有套票，強制刷新避免跨裝置快取不一致
+        const pkgs = await getPatientPackages(patientId, true);
+        // 若無套票，顯示提示並隱藏分頁控制
+        if (!Array.isArray(pkgs) || pkgs.length === 0) {
+            contentEl.innerHTML = '' +
+                '<div class="bg-blue-50 border-blue-200 border rounded-lg p-3 text-center">' +
+                    '<div class="text-blue-400 mb-1">' +
+                        '<svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">' +
+                            '<path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"></path>' +
+                        '</svg>' +
+                    '</div>' +
+                    '<div class="text-sm font-medium text-blue-700">尚未購買套票</div>' +
+                    '<div class="text-xs text-blue-600 mt-1">可於診療時購買套票享優惠</div>' +
+                '</div>';
+            // 隱藏有效套票與失效套票分頁
+            const paginValid = ensurePaginationContainer('packageStatusValidList', 'patientPackageStatusPaginationValid');
+            if (paginValid) {
+                paginValid.innerHTML = '';
+                paginValid.classList.add('hidden');
+            }
+            const paginInvalid = ensurePaginationContainer('packageStatusInvalidList', 'patientPackageStatusPaginationInvalid');
+            if (paginInvalid) {
+                paginInvalid.innerHTML = '';
+                paginInvalid.classList.add('hidden');
+            }
+            return;
+        }
+        // 分類套票為有效與失效
+        const now = new Date();
+        const soonThreshold = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const validPkgs = [];
+        const invalidPkgs = [];
+        pkgs.forEach(function(pkg) {
+            const expDate = new Date(pkg.expiresAt);
+            const expired = expDate < now || (typeof pkg.remainingUses === 'number' && pkg.remainingUses <= 0);
+            if (expired) {
+                invalidPkgs.push(pkg);
+            } else {
+                validPkgs.push(pkg);
+            }
+        });
+        // 依到期日排序
+        validPkgs.sort(function(a, b) { return new Date(a.expiresAt) - new Date(b.expiresAt); });
+        invalidPkgs.sort(function(a, b) { return new Date(a.expiresAt) - new Date(b.expiresAt); });
+        // 分頁計算
+        const totalValid = validPkgs.length;
+        const totalInvalid = invalidPkgs.length;
+        const itemsPerPageValid = (paginationSettings.patientPackageStatusValid && paginationSettings.patientPackageStatusValid.itemsPerPage) || 6;
+        const itemsPerPageInvalid = (paginationSettings.patientPackageStatusInvalid && paginationSettings.patientPackageStatusInvalid.itemsPerPage) || 6;
+        let currentValid = (paginationSettings.patientPackageStatusValid && paginationSettings.patientPackageStatusValid.currentPage) || 1;
+        let currentInvalid = (paginationSettings.patientPackageStatusInvalid && paginationSettings.patientPackageStatusInvalid.currentPage) || 1;
+        const totalPagesValid = Math.ceil(totalValid / itemsPerPageValid);
+        const totalPagesInvalid = Math.ceil(totalInvalid / itemsPerPageInvalid);
+        if (currentValid < 1) currentValid = 1;
+        if (currentValid > totalPagesValid && totalPagesValid > 0) currentValid = totalPagesValid;
+        if (currentInvalid < 1) currentInvalid = 1;
+        if (currentInvalid > totalPagesInvalid && totalPagesInvalid > 0) currentInvalid = totalPagesInvalid;
+        if (paginationSettings.patientPackageStatusValid) paginationSettings.patientPackageStatusValid.currentPage = currentValid;
+        if (paginationSettings.patientPackageStatusInvalid) paginationSettings.patientPackageStatusInvalid.currentPage = currentInvalid;
+        const startValid = (currentValid - 1) * itemsPerPageValid;
+        const endValid = startValid + itemsPerPageValid;
+        const startInvalid = (currentInvalid - 1) * itemsPerPageInvalid;
+        const endInvalid = startInvalid + itemsPerPageInvalid;
+        const pageValid = validPkgs.slice(startValid, endValid);
+        const pageInvalid = invalidPkgs.slice(startInvalid, endInvalid);
+        // 建立 HTML
+        var parts = [];
+        parts.push('<div class="grid grid-cols-1 md:grid-cols-2 gap-4">');
+        // 有效套票區
+        parts.push('<div>');
+        parts.push('<div class="font-medium text-gray-700 mb-2">有效套票</div>');
+        parts.push('<div id="packageStatusValidList" class="space-y-2">');
+        if (pageValid.length > 0) {
+            pageValid.forEach(function(pkg) {
+                var safePkgName = window.escapeHtml(pkg.name || '');
+                var statusText = formatPackageStatus(pkg);
+                var safeStatusText = window.escapeHtml(statusText || '');
+                var remainingUses = (typeof pkg.remainingUses === 'number') ? pkg.remainingUses : '';
+                var totalUses = (typeof pkg.totalUses === 'number') ? pkg.totalUses : '';
+                var expDate = new Date(pkg.expiresAt);
+                var lowUses = (typeof pkg.remainingUses === 'number') && pkg.remainingUses <= 2;
+                var highlight = (expDate <= soonThreshold) || lowUses;
+                var containerClasses = highlight ? 'bg-red-50 border border-red-200' : 'bg-purple-50 border border-purple-200';
+                var nameClass = highlight ? 'text-red-700' : 'text-purple-900';
+                var statusClass = highlight ? 'text-red-600' : 'text-gray-600';
+                var usesClass = highlight ? 'text-red-700' : 'text-gray-800';
+                var card = '<div class="flex items-center justify-between ' + containerClasses + ' rounded p-2">' +
+                    '<div>' +
+                        '<div class="font-medium ' + nameClass + '">' + safePkgName + '</div>' +
+                        '<div class="text-xs ' + statusClass + '">' + safeStatusText + '</div>' +
+                    '</div>' +
+                    '<div class="text-sm ' + usesClass + '">' + remainingUses + (totalUses !== '' ? '/' + totalUses : '') + '</div>' +
+                '</div>';
+                parts.push(card);
+            });
+        } else {
+            parts.push('<div class="text-gray-500">無有效套票</div>');
+        }
+        parts.push('</div></div>');
+        // 失效套票區
+        parts.push('<div>');
+        parts.push('<div class="font-medium text-gray-700 mb-2">失效套票</div>');
+        parts.push('<div id="packageStatusInvalidList" class="space-y-2">');
+        if (pageInvalid.length > 0) {
+            pageInvalid.forEach(function(pkg) {
+                var safePkgName = window.escapeHtml(pkg.name || '');
+                var statusText = formatPackageStatus(pkg);
+                var safeStatusText = window.escapeHtml(statusText || '');
+                var remainingUses = (typeof pkg.remainingUses === 'number') ? pkg.remainingUses : '';
+                var totalUses = (typeof pkg.totalUses === 'number') ? pkg.totalUses : '';
+                var card = '<div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded p-2">' +
+                    '<div>' +
+                        '<div class="font-medium text-gray-500">' + safePkgName + '</div>' +
+                        '<div class="text-xs text-gray-400">' + safeStatusText + '</div>' +
+                    '</div>' +
+                    '<div class="text-sm text-gray-500">' + remainingUses + (totalUses !== '' ? '/' + totalUses : '') + '</div>' +
+                '</div>';
+                parts.push(card);
+            });
+        } else {
+            parts.push('<div class="text-gray-500">無失效套票</div>');
+        }
+        parts.push('</div></div></div>');
+        contentEl.innerHTML = parts.join('');
+        // 渲染有效套票分頁控制
+        var paginValidEl = ensurePaginationContainer('packageStatusValidList', 'patientPackageStatusPaginationValid');
+        renderPagination(totalValid, itemsPerPageValid, currentValid, function(newPage) {
+            if (paginationSettings.patientPackageStatusValid) {
+                paginationSettings.patientPackageStatusValid.currentPage = newPage;
+            }
+            renderPackageStatusSection(patientId, true);
+        }, paginValidEl);
+        // 渲染失效套票分頁控制
+        var paginInvalidEl = ensurePaginationContainer('packageStatusInvalidList', 'patientPackageStatusPaginationInvalid');
+        renderPagination(totalInvalid, itemsPerPageInvalid, currentInvalid, function(newPage) {
+            if (paginationSettings.patientPackageStatusInvalid) {
+                paginationSettings.patientPackageStatusInvalid.currentPage = newPage;
+            }
+            renderPackageStatusSection(patientId, true);
+        }, paginInvalidEl);
+    } catch (e) {
+        console.error('載入病人套票資料失敗:', e);
+        contentEl.innerHTML = '<div class="text-sm text-red-600">載入套票資料失敗</div>';
+        // 隱藏分頁容器
+        var paginValidEl = ensurePaginationContainer('packageStatusValidList', 'patientPackageStatusPaginationValid');
+        if (paginValidEl) {
+            paginValidEl.innerHTML = '';
+            paginValidEl.classList.add('hidden');
+        }
+        var paginInvalidEl = ensurePaginationContainer('packageStatusInvalidList', 'patientPackageStatusPaginationInvalid');
+        if (paginInvalidEl) {
+            paginInvalidEl.innerHTML = '';
+            paginInvalidEl.classList.add('hidden');
+        }
+    }
+};
 
 /**
  * 網路狀態檢測與提示。
