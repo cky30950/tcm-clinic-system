@@ -3531,11 +3531,13 @@ async function loadTodayAppointments() {
     try {
         // 優先使用快取的病人資料來避免重複從 Firebase 讀取。
         const patientsData = await fetchPatients();
-        
-        tbody.innerHTML = todayAppointments.map((appointment, index) => {
+
+        // 對於每一筆掛號資料，如果主訴缺失或為預設值，嘗試從最新病歷中取得主訴（symptoms）作為回填。
+        const rows = await Promise.all(todayAppointments.map(async (appointment, index) => {
             // 從資料集中尋找對應病人
             const patient = patientsData.find(p => p.id === appointment.patientId);
-            
+
+            // 若無對應病人資料，採用原本的處理邏輯
             if (!patient) {
                 // 如果在快取找不到，嘗試從全域陣列找（向後兼容）
                 const localPatient = patients.find(p => p.id === appointment.patientId);
@@ -3551,11 +3553,36 @@ async function loadTodayAppointments() {
                 // 使用本地病人資料
                 return createAppointmentRow(appointment, localPatient, index);
             }
-            
-            // 使用快取病人資料
-            return createAppointmentRow(appointment, patient, index);
-        }).join('');
-        
+
+            // 判斷目前掛號資料的主訴是否為缺省（無或無特殊主訴）
+            let displayChiefComplaint = appointment.chiefComplaint;
+            const noComplaint = !displayChiefComplaint || displayChiefComplaint === '無特殊主訴' || displayChiefComplaint === '無';
+            if (noComplaint) {
+                try {
+                    // 從病歷（診症記錄）中取得最新一筆記錄，並嘗試使用其主訴/症狀
+                    const consResult = await window.firebaseDataManager.getPatientConsultations(patient.id, true);
+                    if (consResult && consResult.success && Array.isArray(consResult.data) && consResult.data.length > 0) {
+                        const latestConsultation = consResult.data[0];
+                        // 病歷中的主訴字段可能為 chiefComplaint 或 symptoms，擇一使用
+                        if (latestConsultation) {
+                            const recordComplaint = latestConsultation.chiefComplaint || latestConsultation.symptoms;
+                            if (recordComplaint) {
+                                displayChiefComplaint = recordComplaint;
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('讀取病人病歷時發生錯誤:', err);
+                }
+            }
+
+            // 建立一個新的掛號對象以使用更新後的主訴顯示
+            const modifiedAppointment = { ...appointment, chiefComplaint: displayChiefComplaint };
+            return createAppointmentRow(modifiedAppointment, patient, index);
+        }));
+
+        tbody.innerHTML = rows.join('');
+
     } catch (error) {
         console.error('載入掛號列表錯誤:', error);
         tbody.innerHTML = `
