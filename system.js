@@ -311,7 +311,7 @@ async function commitPendingPackagePurchases() {
         }
         for (const purchase of pendingPackagePurchases) {
             if (!purchase || !purchase.patientId || !purchase.item) continue;
-            const { patientId, item, confirmUse } = purchase;
+            const { patientId, item, confirmUse, usageItemId } = purchase;
             // 先購買套票
             const purchasedPackage = await purchasePackage(patientId, item);
             if (purchasedPackage) {
@@ -320,21 +320,48 @@ async function commitPendingPackagePurchases() {
                     try {
                         const useResult = await consumePackage(patientId, purchasedPackage.id);
                         if (useResult && useResult.ok) {
-                            // 添加套票使用記錄到收費項目中
-                            const usedName = `${item.name} (使用套票)`;
-                            // 生成唯一 ID，避免重複
-                            selectedBillingItems.push({
-                                id: `use-${purchasedPackage.id}-${Date.now()}-${Math.random()}`,
-                                name: usedName,
-                                category: 'packageUse',
-                                price: 0,
-                                unit: '次',
-                                description: '套票抵扣一次',
-                                quantity: 1,
-                                includedInDiscount: false,
-                                patientId: (patientId !== undefined && patientId !== null) ? String(patientId) : '',
-                                packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : ''
-                            });
+                            // 嘗試更新預先加入的套票使用項目的 packageRecordId 與 patientId
+                            if (usageItemId) {
+                                const idx = selectedBillingItems.findIndex(it => it && it.id === usageItemId);
+                                if (idx >= 0) {
+                                    // 生成新的 ID 以符合統一的格式
+                                    const newId = `use-${purchasedPackage.id}-${Date.now()}-${Math.random()}`;
+                                    selectedBillingItems[idx] = {
+                                        ...selectedBillingItems[idx],
+                                        id: newId,
+                                        patientId: (patientId !== undefined && patientId !== null) ? String(patientId) : '',
+                                        packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : ''
+                                    };
+                                } else {
+                                    // 若找不到對應的暫存項目，則另行添加
+                                    selectedBillingItems.push({
+                                        id: `use-${purchasedPackage.id}-${Date.now()}-${Math.random()}`,
+                                        name: `${item.name} (使用套票)`,
+                                        category: 'packageUse',
+                                        price: 0,
+                                        unit: '次',
+                                        description: '套票抵扣一次',
+                                        quantity: 1,
+                                        includedInDiscount: false,
+                                        patientId: (patientId !== undefined && patientId !== null) ? String(patientId) : '',
+                                        packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : ''
+                                    });
+                                }
+                            } else {
+                                // 未記錄暫存使用項目，則直接添加
+                                selectedBillingItems.push({
+                                    id: `use-${purchasedPackage.id}-${Date.now()}-${Math.random()}`,
+                                    name: `${item.name} (使用套票)`,
+                                    category: 'packageUse',
+                                    price: 0,
+                                    unit: '次',
+                                    description: '套票抵扣一次',
+                                    quantity: 1,
+                                    includedInDiscount: false,
+                                    patientId: (patientId !== undefined && patientId !== null) ? String(patientId) : '',
+                                    packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : ''
+                                });
+                            }
                             showToast(
                                 `已使用套票：${item.name}，剩餘 ${useResult.record.remainingUses} 次`,
                                 'info'
@@ -351,7 +378,7 @@ async function commitPendingPackagePurchases() {
                 showToast(`套票「${item.name}」購買失敗`, 'error');
             }
         }
-        // 購買與使用處理完成後，更新收費顯示
+        // 購買與使用處理完成後，更新收費顯示（雖然表單即將關閉，但仍更新以避免留下錯誤狀態）
         if (typeof updateBillingDisplay === 'function') {
             updateBillingDisplay();
         }
@@ -368,6 +395,21 @@ async function commitPendingPackagePurchases() {
  * 只需清除 pendingPackagePurchases，因尚未購買資料庫並無需回滾。
  */
 function revertPendingPackagePurchases() {
+    try {
+        // 移除暫存的套票使用項目（id 以 pending-use- 開頭）
+        if (Array.isArray(selectedBillingItems) && selectedBillingItems.length > 0) {
+            selectedBillingItems = selectedBillingItems.filter(item => {
+                return !(item && typeof item.id === 'string' && item.id.startsWith('pending-use-'));
+            });
+            // 更新收費顯示
+            if (typeof updateBillingDisplay === 'function') {
+                updateBillingDisplay();
+            }
+        }
+    } catch (err) {
+        console.error('復原暫存套票購買時發生錯誤:', err);
+    }
+    // 清空暫存購買清單
     pendingPackagePurchases = [];
 }
 
@@ -381,6 +423,10 @@ async function revertPendingPackageChanges() {
     // 取消診症或退出編輯時，不再回復資料庫中的套票次數。
     // 只需清除暫存的變更並重新渲染套票列表，以恢復原始顯示。
     try {
+        // 先復原暫存的套票購買（包含移除暫存的使用項目）
+        if (typeof revertPendingPackagePurchases === 'function') {
+            revertPendingPackagePurchases();
+        }
         // 清除暫存套票使用變更
         pendingPackageChanges = [];
         // 清除暫存套票購買變更
@@ -4578,10 +4624,7 @@ async function showConsultationForm(appointment) {
             } catch (_e) {
                 // 若回復失敗，仍繼續關閉表單
             }
-            // 清除暫存的套票購買記錄，不進行購買
-            if (pendingPackagePurchases && pendingPackagePurchases.length > 0) {
-                revertPendingPackagePurchases();
-            }
+            // 清除暫存的套票購買記錄不需再次調用，已在 revertPendingPackageChanges 處理
             // 隱藏診症表單
             document.getElementById('consultationForm').classList.add('hidden');
             
@@ -4722,13 +4765,35 @@ async function saveConsultation() {
                     const confirmUse = confirm(
                         `套票「${item.name}」購買成功！\n\n是否立即使用第一次？\n\n套票詳情：\n• 總次數：${item.packageUses} 次\n• 有效期：${item.validityDays} 天`
                     );
-                    // 將擬購買項目與使用選擇存入暫存清單
+                    // 如使用者選擇立即使用，先在收費列表中加入一個套票使用項目（尚未取得 packageRecordId）
+                    let usageItemId = null;
+                    if (confirmUse) {
+                        usageItemId = `pending-use-${Date.now()}-${Math.random()}`;
+                        selectedBillingItems.push({
+                            id: usageItemId,
+                            name: `${item.name} (使用套票)`,
+                            category: 'packageUse',
+                            price: 0,
+                            unit: '次',
+                            description: '套票抵扣一次',
+                            quantity: 1,
+                            includedInDiscount: false,
+                            patientId: (appointment.patientId !== undefined && appointment.patientId !== null) ? String(appointment.patientId) : '',
+                            packageRecordId: ''
+                        });
+                    }
+                    // 將擬購買項目與使用選擇存入暫存清單，包括對應的暫存使用項目 ID
                     pendingPackagePurchases.push({
                         patientId: appointment.patientId,
                         item: item,
-                        confirmUse: confirmUse
+                        confirmUse: confirmUse,
+                        usageItemId: usageItemId
                     });
                 }
+            }
+            // 更新收費顯示以反映暫存的套票使用
+            if (typeof updateBillingDisplay === 'function') {
+                updateBillingDisplay();
             }
         } catch (e) {
             console.error('預處理套票購買時發生錯誤：', e);
