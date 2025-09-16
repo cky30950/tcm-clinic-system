@@ -569,6 +569,10 @@ window.translations = {
     }
 };
 
+// Declare isTranslating early so it is available wherever referenced.
+// Using var ensures the declaration is hoisted and accessible before use.
+var isTranslating = false;
+
 /**
  * Save the original text and placeholder values for each element.  This
  * allows switching languages back and forth by always referencing the
@@ -651,20 +655,33 @@ function setLanguage(lang) {
 // applied.  This helps ensure that dynamic content will also be
 // translated without needing to call applyTranslations manually in
 // every script.
-// Flag used to prevent the mutation observer from triggering
-// translations recursively.  When true, translation modifications
-// will not cause the observer to fire applyTranslations again.
-let isTranslating = false;
+
+// Debounce timer used to consolidate rapid mutation events into a single
+// translation call.  This prevents heavy repeated scanning when
+// elements are added/removed in quick succession (e.g. during large
+// list rendering).
+let translationTimeoutId;
 
 const observer = new MutationObserver(mutations => {
     // Do not react to mutations while a translation is being applied.
     if (isTranslating) return;
+    // Check if any nodes were added that could require translation
+    let hasAddedNodes = false;
     for (const m of mutations) {
         if (m.addedNodes && m.addedNodes.length > 0) {
-            applyTranslations();
+            hasAddedNodes = true;
             break;
         }
     }
+    if (!hasAddedNodes) return;
+    // Debounce translation: clear any pending update and schedule a new one
+    if (translationTimeoutId) {
+        clearTimeout(translationTimeoutId);
+    }
+    translationTimeoutId = setTimeout(() => {
+        applyTranslations();
+        translationTimeoutId = null;
+    }, 50);
 });
 
 // Setup event listeners on DOMContentLoaded
