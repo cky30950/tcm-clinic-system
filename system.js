@@ -4,6 +4,32 @@ let currentUser = null;
 let currentUserData = null;
 
 /**
+ * A simple debounce utility to delay the execution of a function until after a specified
+ * delay has passed since its last invocation. This helps to avoid triggering expensive
+ * operations (like filtering or AJAX requests) too frequently as a user types or
+ * performs repetitive actions.
+ *
+ * @param {Function} func - The function to debounce.
+ * @param {number} wait - The number of milliseconds to delay.
+ * @param {boolean} immediate - If `true`, trigger on the leading edge instead of the trailing.
+ * @returns {Function} A new debounced function.
+ */
+function debounce(func, wait, immediate = false) {
+    let timeout;
+    return function (...args) {
+        const context = this;
+        const later = function () {
+            timeout = null;
+            if (!immediate) func.apply(context, args);
+        };
+        const callNow = immediate && !timeout;
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+        if (callNow) func.apply(context, args);
+    };
+}
+
+/**
  * 全域的分頁設定，用於控制各模組的當前頁碼與每頁顯示數量。
  * 當搜尋或篩選條件改變時，應重置 currentPage 為 1。
  */
