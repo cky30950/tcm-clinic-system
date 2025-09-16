@@ -2328,7 +2328,7 @@ async function deletePatient(id) {
             return;
         }
 
-        const confirmMessage = `確定要刪除病人「${patient.name}」的資料嗎？\n\n注意：相關的診症記錄也會一併刪除！`;
+        const confirmMessage = `確定要刪除病人「${patient.name}」的資料嗎？\n\n注意：相關的診症記錄及套票也會一併刪除！`;
         
         if (confirm(confirmMessage)) {
             // 顯示刪除中狀態
