@@ -959,6 +959,21 @@ window.translations = {
             '更新日期：': 'Updated At:',
             '診症記錄摘要': 'Consultation Summary',
             '載入診症記錄中...': 'Loading consultation records...',
+            // -----------------------------------------------------------------
+            // Additional in‑progress status translations
+            // These strings appear on buttons or status labels while actions
+            // such as saving, updating or loading are underway.  Without
+            // corresponding English translations the UI will continue to show
+            // Chinese when the language is switched.  By defining them here
+            // they will be merged into both zh and en dictionaries below.
+            '保存中...': 'Saving...',
+            '儲存中...': 'Saving...',
+            '更新中...': 'Updating...',
+            '載入中...': 'Loading...',
+            '讀取中...': 'Loading...',
+            '列印中...': 'Printing...',
+            '掛號中...': 'Registering...',
+            '登入中...': 'Logging in...',
             '未設定': 'Not set',
             '未知': 'Unknown',
             '使用一次': 'Use once',
@@ -1192,15 +1207,59 @@ function storeOriginalText() {
  * @param {Object} dict The translation dictionary for the current language.
  */
 function translateNode(node, dict, lang) {
-    if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
-    // If the element has no child elements, it is a leaf node and can
-    // have its textContent and placeholder translated directly.
+    // Guard against null/undefined nodes
+    if (!node) return;
+    /**
+     * When encountering a text node, translate its contents directly.  We
+     * preserve the original trimmed Chinese text and leading/trailing
+     * whitespace so that repeated translations or language switches do
+     * not destroy the formatting.  The translated value is looked up
+     * from the provided dictionary; if none is found the original
+     * Chinese text is retained.  A custom __lastLang property is used
+     * to prevent re‑translating the same node multiple times when the
+     * language has not changed.
+     */
+    if (node.nodeType === Node.TEXT_NODE) {
+        const fullText = node.nodeValue || '';
+        // Extract the trimmed content (Chinese or previously translated) by
+        // removing leading and trailing whitespace.  If the trimmed text
+        // is empty there is nothing to translate.
+        const trimmed = fullText.trim();
+        if (!trimmed) return;
+        // Store original trimmed text and whitespace on first encounter
+        if (node.__originalText === undefined) {
+            node.__originalText = trimmed;
+            // Capture leading/trailing whitespace from the original node value
+            const leadingMatch = fullText.match(/^\s*/);
+            const trailingMatch = fullText.match(/\s*$/);
+            node.__leadingWhitespace = leadingMatch ? leadingMatch[0] : '';
+            node.__trailingWhitespace = trailingMatch ? trailingMatch[0] : '';
+        }
+        // Only update the text if we haven't already translated to this
+        // language.  This avoids unnecessary DOM mutations when
+        // MutationObserver triggers and ensures that switching languages
+        // restores the correct value.
+        if (node.__lastLang !== lang) {
+            const original = node.__originalText;
+            let replacement = original;
+            if (dict && Object.prototype.hasOwnProperty.call(dict, original)) {
+                replacement = dict[original];
+            }
+            // Combine preserved whitespace with the translated or original text
+            node.nodeValue = (node.__leadingWhitespace || '') + replacement + (node.__trailingWhitespace || '');
+            node.__lastLang = lang;
+        }
+        return;
+    }
+    // If the node is not an element, there is nothing further to do
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    // If the element has no child elements it is considered a leaf node for
+    // the purposes of translating its own textContent and placeholder.  We
+    // use dataset to persist the original text and placeholder values.
     if (node.children.length === 0) {
-        // Only translate if the node hasn't been translated to this language yet.
         if (node.dataset.lastLang !== lang) {
             const currentText = (node.textContent || '').trim();
             if (currentText) {
-                // Preserve the original text if not already stored
                 if (!node.dataset.originalText) {
                     node.dataset.originalText = currentText;
                 }
@@ -1209,7 +1268,7 @@ function translateNode(node, dict, lang) {
                     node.textContent = dict[original];
                 }
             }
-            // Handle placeholder attribute if present
+            // Translate the placeholder attribute on leaf elements
             if (node.hasAttribute('placeholder')) {
                 const phVal = node.getAttribute('placeholder').trim();
                 if (!node.dataset.originalPlaceholder && phVal) {
@@ -1220,12 +1279,12 @@ function translateNode(node, dict, lang) {
                     node.setAttribute('placeholder', dict[originalPh]);
                 }
             }
-            // Record the language this node has been translated into
             node.dataset.lastLang = lang;
         }
     }
-    // Recursively translate child elements
-    Array.from(node.children).forEach(child => translateNode(child, dict, lang));
+    // Recursively translate all child nodes.  We iterate over childNodes
+    // instead of children so that text nodes are also processed.
+    Array.from(node.childNodes).forEach(child => translateNode(child, dict, lang));
 }
 
 /**
