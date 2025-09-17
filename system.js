@@ -3471,25 +3471,22 @@ async function selectPatientForRegistration(patientId) {
                 }
             }
 
-            // 取得觸發此函式的按鈕，並於後續操作中啟用讀取圈效果。
-            // 使用事件物件（如果可用）以取得目前被點擊的按鈕；若無，透過查詢找到確認掛號按鈕。
-            let registrationButton = null;
+            // 取得按鈕元素並設定讀取圈效果
+            let confirmBtn = null;
             try {
+                // 嘗試從事件物件取得觸發的按鈕
                 if (typeof event !== 'undefined' && event && event.currentTarget) {
-                    registrationButton = event.currentTarget;
+                    confirmBtn = event.currentTarget;
                 }
-            } catch (_e) {
-                // 忽略事件取得錯誤
+            } catch (_e) {}
+            if (!confirmBtn) {
+                // 若事件物件不可用，透過 selector 找到對應的確認掛號按鈕
+                confirmBtn = document.querySelector('button[onclick="confirmRegistration()"]');
             }
-            if (!registrationButton) {
-                registrationButton = document.querySelector('button[onclick="confirmRegistration()"]');
+            if (confirmBtn) {
+                setButtonLoading(confirmBtn);
             }
-
             try {
-                // 在開始異步儲存操作前，顯示按鈕讀取圈並禁用按鈕，以避免重複點擊。
-                if (registrationButton) {
-                    setButtonLoading(registrationButton, '處理中...');
-                }
                 // 加入本地陣列
                 appointments.push(appointment);
                 // 將掛號資訊存入 Firebase Realtime Database
@@ -3507,11 +3504,10 @@ async function selectPatientForRegistration(patientId) {
             } catch (error) {
                 console.error('掛號失敗:', error);
                 showToast('掛號失敗，請稍後再試', 'error');
-            }
-            finally {
-                // 無論成功或失敗，操作結束後還原按鈕狀態
-                if (registrationButton) {
-                    clearButtonLoading(registrationButton);
+            } finally {
+                // 移除按鈕讀取圈效果
+                if (confirmBtn) {
+                    clearButtonLoading(confirmBtn);
                 }
             }
         }
@@ -4084,20 +4080,16 @@ function createAppointmentRow(appointment, patient, index) {
             </td>
             <td class="px-4 py-3 text-sm text-gray-900">
                 ${(() => {
-                    // 掛號列表的主訴文字僅顯示前六個字元，超出部分以「⋯」標示。
-                    // 這有助於避免過長內容影響版面，同時透過 title 屬性提供完整資訊。
+                    // 掛號列表的主訴文字僅顯示前八個字，以避免過長內容影響版面。若超過八個字，尾端顯示一個省略號「⋯」。
                     const fullComplaint = appointment.chiefComplaint || '';
                     // 如果沒有主訴或主訴為空字串，顯示「無」
                     if (!fullComplaint) {
                         return '<div class="max-w-xs truncate" title="無">無</div>';
                     }
-                    const displayLength = 6;
-                    let truncated;
-                    if (fullComplaint.length > displayLength) {
-                        truncated = fullComplaint.substring(0, displayLength) + '⋯';
-                    } else {
-                        truncated = fullComplaint;
-                    }
+                    // 若字數超過八個，截取前八個字並加上省略號「⋯」，否則全部顯示
+                    const truncated = fullComplaint.length > 8
+                        ? fullComplaint.substring(0, 8) + '⋯'
+                        : fullComplaint;
                     // 使用 title 屬性顯示完整內容
                     return '<div class="max-w-xs truncate" title="' + fullComplaint + '">' + truncated + '</div>';
                 })()}
@@ -10931,22 +10923,23 @@ async function initializeSystemAfterLogin() {
                     showToast(`${patient.name} 沒有上次收費記錄可載入`, 'warning');
                     return;
                 }
-                // 在載入上次收費資料之前，保留目前已選擇的收費項目。
-                // 這可避免當用戶在按下「載入上次收費」按鈕前已經新增了項目（例如使用套票），
-                // 這些項目在載入後被清空的情況下消失。
-                const existingItems = Array.isArray(selectedBillingItems) ? [...selectedBillingItems] : [];
-                // 清空現有收費項目並解析上次收費文字。
+                // 清空現有收費項目並解析
+                // 在清空之前先暫存所有套票相關項目（包含購買與使用），以免被覆寫
+                const existingPackageItems = Array.isArray(selectedBillingItems)
+                    ? selectedBillingItems.filter(item => item && (item.category === 'packageUse' || item.category === 'package'))
+                    : [];
                 selectedBillingItems = [];
                 parseBillingItemsFromText(lastConsultation.billingItems);
-                // 解析後的結果存放在 selectedBillingItems 中，將其複製到新陣列方便後續處理。
-                let loadedItems = Array.isArray(selectedBillingItems) ? [...selectedBillingItems] : [];
                 // 根據要求：載入上次收費時，排除任何「使用套票」的抵扣項目與套票購買項目。
-                // 因為這些項目僅在當次診症過程中出現，不應從歷史記錄帶入。
-                if (loadedItems.length > 0) {
-                    loadedItems = loadedItems.filter(item => item.category !== 'packageUse' && item.category !== 'package');
+                // 原先僅排除 category 為 'packageUse' 的項目（即使用套票時產生的抵扣），
+                // 但後續需求也要排除 category 為 'package' 的項目（即購買套票的收費項目）。
+                if (Array.isArray(selectedBillingItems) && selectedBillingItems.length > 0) {
+                    selectedBillingItems = selectedBillingItems.filter(item => item.category !== 'packageUse' && item.category !== 'package');
                 }
-                // 將歷史載入的收費項目與現有項目合併，現有項目排在前面。
-                selectedBillingItems = existingItems.concat(loadedItems);
+                // 將原本存在的套票項目重新加入，讓本次已使用或購買的套票不會被載入上一筆收費覆蓋
+                if (existingPackageItems && existingPackageItems.length > 0) {
+                    selectedBillingItems = existingPackageItems.concat(selectedBillingItems);
+                }
                 // 更新顯示
                 updateBillingDisplay();
             } catch (error) {
