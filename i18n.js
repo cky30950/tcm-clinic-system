@@ -14,6 +14,9 @@ window.translations = {
         // Chinese translations simply map original text to itself.  This
         // dictionary only needs entries for strings that have English
         // translations below – everything else will remain unchanged.
+        "已掛號": "已掛號",
+        "候診中": "候診中",
+        "診症中": "診症中",
         "+ 新增收費項目": "+ 新增收費項目",
         "+ 新增用戶": "+ 新增用戶",
         "+ 新增病人": "+ 新增病人",
@@ -370,6 +373,9 @@ window.translations = {
         "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
     },
     en: {
+        "已掛號": "Registered",
+        "候診中": "Waiting",
+        "診症中": "Seeing",
         "+ 新增收費項目": "+ Add Billing Item",
         "+ 新增用戶": "+ Add User",
         "+ 新增病人": "+ Add Patient",
