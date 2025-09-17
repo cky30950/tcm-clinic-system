@@ -3649,7 +3649,7 @@ async function loadTodayAppointments() {
         // 優先使用快取的病人資料來避免重複從 Firebase 讀取。
         const patientsData = await fetchPatients();
 
-        // 對於每一筆掛號資料，如果主訴缺失或為預設值，嘗試從最新病歷中取得主訴（symptoms）作為回填。
+        // 對於每一筆掛號資料，直接使用該次掛號的主訴，不再從病歷回填主訴。
         const rows = await Promise.all(todayAppointments.map(async (appointment, index) => {
             // 從資料集中尋找對應病人
             const patient = patientsData.find(p => p.id === appointment.patientId);
@@ -3671,31 +3671,8 @@ async function loadTodayAppointments() {
                 return createAppointmentRow(appointment, localPatient, index);
             }
 
-            // 判斷目前掛號資料的主訴是否為缺省（無或無特殊主訴）
-            let displayChiefComplaint = appointment.chiefComplaint;
-            const noComplaint = !displayChiefComplaint || displayChiefComplaint === '無特殊主訴' || displayChiefComplaint === '無';
-            if (noComplaint) {
-                try {
-                    // 從病歷（診症記錄）中取得最新一筆記錄，並嘗試使用其主訴/症狀
-                    const consResult = await window.firebaseDataManager.getPatientConsultations(patient.id, true);
-                    if (consResult && consResult.success && Array.isArray(consResult.data) && consResult.data.length > 0) {
-                        const latestConsultation = consResult.data[0];
-                        // 病歷中的主訴字段可能為 chiefComplaint 或 symptoms，擇一使用
-                        if (latestConsultation) {
-                            const recordComplaint = latestConsultation.chiefComplaint || latestConsultation.symptoms;
-                            if (recordComplaint) {
-                                displayChiefComplaint = recordComplaint;
-                            }
-                        }
-                    }
-                } catch (err) {
-                    console.error('讀取病人病歷時發生錯誤:', err);
-                }
-            }
-
-            // 建立一個新的掛號對象以使用更新後的主訴顯示
-            const modifiedAppointment = { ...appointment, chiefComplaint: displayChiefComplaint };
-            return createAppointmentRow(modifiedAppointment, patient, index);
+            // 移除從病歷取得主訴的回填，僅顯示此次掛號的主訴
+            return createAppointmentRow(appointment, patient, index);
         }));
 
         tbody.innerHTML = rows.join('');
@@ -4082,9 +4059,17 @@ function createAppointmentRow(appointment, patient, index) {
                 })}
             </td>
             <td class="px-4 py-3 text-sm text-gray-900">
-                <div class="max-w-xs truncate" title="${appointment.chiefComplaint || '無'}">
-                    ${appointment.chiefComplaint || '無'}
-                </div>
+                ${(() => {
+                    // 掛號列表的主訴文字僅顯示前九個字，以避免過長內容影響版面。
+                    const fullComplaint = appointment.chiefComplaint || '';
+                    // 如果沒有主訴或主訴為空字串，顯示「無」
+                    if (!fullComplaint) {
+                        return '<div class="max-w-xs truncate" title="無">無</div>';
+                    }
+                    const truncated = fullComplaint.length > 9 ? fullComplaint.substring(0, 9) : fullComplaint;
+                    // 使用 title 屬性顯示完整內容
+                    return '<div class="max-w-xs truncate" title="' + fullComplaint + '">' + truncated + '</div>';
+                })()}
             </td>
             <td class="px-4 py-3">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.class}">
@@ -4964,6 +4949,8 @@ async function saveConsultation() {
             appointmentId: currentConsultingAppointmentId,
             patientId: appointment.patientId,
             symptoms: symptoms,
+            // Also persist the chief complaint for backward compatibility and easier access.
+            chiefComplaint: symptoms,
             tongue: document.getElementById('formTongue').value.trim(),
             pulse: document.getElementById('formPulse').value.trim(),
             currentHistory: document.getElementById('formCurrentHistory').value.trim(),
@@ -5288,7 +5275,7 @@ if (!patient) {
                             <div class="space-y-4">
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">主訴</span>
-                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || '無記錄'}</div>
+                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || consultation.chiefComplaint || '無記錄'}</div>
                                 </div>
                                 
                                 ${consultation.tongue ? `
@@ -5616,7 +5603,7 @@ function displayConsultationMedicalHistoryPage() {
                     <div class="space-y-4">
                         <div>
                             <span class="text-sm font-semibold text-gray-700 block mb-2">主訴</span>
-                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || '無記錄'}</div>
+                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || consultation.chiefComplaint || '無記錄'}</div>
                         </div>
                         
                         ${consultation.tongue ? `

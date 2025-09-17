@@ -1087,7 +1087,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     applyTranslations();
-    // Observe only the main system container if present; fallback to body.
-    const target = document.getElementById('mainSystem') || document.body;
-    observer.observe(target, { childList: true, subtree: true });
+    // Observe the entire document body for dynamic content additions.  
+    // Previously we only observed the #mainSystem container which meant elements
+    // outside that container (e.g. login page, modals, or dynamically added
+    // content) were not automatically translated when the language changes.
+    observer.observe(document.body, { childList: true, subtree: true });
 });
