@@ -14,6 +14,10 @@ window.translations = {
         // Chinese translations simply map original text to itself.  This
         // dictionary only needs entries for strings that have English
         // translations below – everything else will remain unchanged.
+        "無": "無",
+        "無安排": "無安排",
+        "尚未購買套票": "尚未購買套票",
+        "可於診療時購買套票享優惠": "可於診療時購買套票享優惠",
         "下次複診": "下次複診",
         "套票情況": "套票情況",
         "有效套票": "有效套票",
@@ -469,6 +473,10 @@ window.translations = {
         "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
     },
     en: {
+        "無": "None",
+        "無安排": "No arrangements",
+        "尚未購買套票": "Has not purchased a package yet",
+        "可於診療時購買套票享優惠": "Can purchase a package during treatment to enjoy discounts",
         "下次複診": "Next Follow-up Visit",
         "套票情況": "Package Status",
         "有效套票": "Valid Packages",
