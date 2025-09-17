@@ -558,9 +558,35 @@ window.translations = {
         "無特殊主訴": "None",
         "病歷編號": "Record Number",
         "醫師": "Doctor",
-        "的診症記錄": "'s Record",
-        "的病歷記錄": "'s Record",
+        // Updated translations for dynamic record labels.  These translate
+        // the suffix portion only; the patient's name preceding
+        // "的診症記錄" or "的病歷記錄" will be retained during
+        // dynamic translation (see translateNode below).
+        "的診症記錄": "'s Consultation Records",
+        "的病歷記錄": "'s Medical Records",
         "當前用戶": "Current User",
+
+        // Additional variant with trailing colon for labels that include punctuation.
+        "當前用戶：": "Current User:",
+
+        // Add translations for meridian names.  These entries allow the
+        // translation logic to translate dynamic strings such as
+        // "手太陰肺經 (11)" by matching the base name and preserving
+        // the numeric suffix (see translateNode for dynamic logic).
+        "手太陰肺經": "Hand Taiyin Lung Meridian",
+        "手陽明大腸經": "Hand Yangming Large Intestine Meridian",
+        "足陽明胃經": "Foot Yangming Stomach Meridian",
+        "足太陰脾經": "Foot Taiyin Spleen Meridian",
+        "手少陰心經": "Hand Shaoyin Heart Meridian",
+        "手太陽小腸經": "Hand Taiyang Small Intestine Meridian",
+        "足太陽膀胱經": "Foot Taiyang Bladder Meridian",
+        "足少陰腎經": "Foot Shaoyin Kidney Meridian",
+        "手厥陰心包經": "Hand Jueyin Pericardium Meridian",
+        "手少陽三焦經": "Hand Shaoyang Sanjiao Meridian",
+        "足少陽膽經": "Foot Shaoyang Gallbladder Meridian",
+        "足厥陰肝經": "Foot Jueyin Liver Meridian",
+        "督脈": "Governing Vessel",
+        "任脈": "Conception Vessel",
         "編輯": "Edit",
         "病歷": "Record",
         "編輯病人資料": "Edit Patient Information",
@@ -1335,7 +1361,33 @@ function translateNode(node, dict, lang) {
             const original = node.__originalText;
             let replacement = original;
             if (dict && Object.prototype.hasOwnProperty.call(dict, original)) {
+                // Direct match found in dictionary
                 replacement = dict[original];
+            } else {
+                // Handle dynamic patterns such as counts in parentheses and
+                // suffixed medical/consultation record labels.  These
+                // patterns preserve the dynamic portion (e.g. patient name or
+                // numeric count) while translating the static Chinese part.
+                // 1. Patterns like "X (123)": translate X and keep
+                //    "(123)" suffix.
+                const parenMatch = original.match(/^(.*?)(\s*\(\d+\))$/);
+                if (parenMatch) {
+                    const base = parenMatch[1].trim();
+                    const suffix = parenMatch[2];
+                    if (dict && Object.prototype.hasOwnProperty.call(dict, base)) {
+                        replacement = dict[base] + suffix;
+                    }
+                } else {
+                    // 2. Patterns like "Name的診症記錄" or "Name的病歷記錄".
+                    //    Extract the name and translate the suffix.
+                    const diagMatch = original.match(/^(.+?)(的診症記錄)$/);
+                    const medMatch = original.match(/^(.+?)(的病歷記錄)$/);
+                    if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
+                        replacement = diagMatch[1] + dict[diagMatch[2]];
+                    } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
+                        replacement = medMatch[1] + dict[medMatch[2]];
+                    }
+                }
             }
             // Combine preserved whitespace with the translated or original text
             node.nodeValue = (node.__leadingWhitespace || '') + replacement + (node.__trailingWhitespace || '');
@@ -1356,9 +1408,30 @@ function translateNode(node, dict, lang) {
                     node.dataset.originalText = currentText;
                 }
                 const original = node.dataset.originalText;
+                let replacement = original;
                 if (dict && Object.prototype.hasOwnProperty.call(dict, original)) {
-                    node.textContent = dict[original];
+                    // Direct match
+                    replacement = dict[original];
+                } else {
+                    // Dynamic patterns similar to those used for text nodes
+                    const parenMatch = original && original.match(/^(.*?)(\s*\(\d+\))$/);
+                    if (parenMatch) {
+                        const base = parenMatch[1].trim();
+                        const suffix = parenMatch[2];
+                        if (dict && Object.prototype.hasOwnProperty.call(dict, base)) {
+                            replacement = dict[base] + suffix;
+                        }
+                    } else {
+                        const diagMatch = original && original.match(/^(.+?)(的診症記錄)$/);
+                        const medMatch = original && original.match(/^(.+?)(的病歷記錄)$/);
+                        if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
+                            replacement = diagMatch[1] + dict[diagMatch[2]];
+                        } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
+                            replacement = medMatch[1] + dict[medMatch[2]];
+                        }
+                    }
                 }
+                node.textContent = replacement;
             }
             // Translate the placeholder attribute on leaf elements
             if (node.hasAttribute('placeholder')) {
