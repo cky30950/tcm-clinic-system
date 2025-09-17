@@ -3471,7 +3471,25 @@ async function selectPatientForRegistration(patientId) {
                 }
             }
 
+            // 取得觸發此函式的按鈕，並於後續操作中啟用讀取圈效果。
+            // 使用事件物件（如果可用）以取得目前被點擊的按鈕；若無，透過查詢找到確認掛號按鈕。
+            let registrationButton = null;
             try {
+                if (typeof event !== 'undefined' && event && event.currentTarget) {
+                    registrationButton = event.currentTarget;
+                }
+            } catch (_e) {
+                // 忽略事件取得錯誤
+            }
+            if (!registrationButton) {
+                registrationButton = document.querySelector('button[onclick="confirmRegistration()"]');
+            }
+
+            try {
+                // 在開始異步儲存操作前，顯示按鈕讀取圈並禁用按鈕，以避免重複點擊。
+                if (registrationButton) {
+                    setButtonLoading(registrationButton, '處理中...');
+                }
                 // 加入本地陣列
                 appointments.push(appointment);
                 // 將掛號資訊存入 Firebase Realtime Database
@@ -3489,6 +3507,12 @@ async function selectPatientForRegistration(patientId) {
             } catch (error) {
                 console.error('掛號失敗:', error);
                 showToast('掛號失敗，請稍後再試', 'error');
+            }
+            finally {
+                // 無論成功或失敗，操作結束後還原按鈕狀態
+                if (registrationButton) {
+                    clearButtonLoading(registrationButton);
+                }
             }
         }
         
@@ -4060,13 +4084,20 @@ function createAppointmentRow(appointment, patient, index) {
             </td>
             <td class="px-4 py-3 text-sm text-gray-900">
                 ${(() => {
-                    // 掛號列表的主訴文字僅顯示前九個字，以避免過長內容影響版面。
+                    // 掛號列表的主訴文字僅顯示前六個字元，超出部分以「⋯」標示。
+                    // 這有助於避免過長內容影響版面，同時透過 title 屬性提供完整資訊。
                     const fullComplaint = appointment.chiefComplaint || '';
                     // 如果沒有主訴或主訴為空字串，顯示「無」
                     if (!fullComplaint) {
                         return '<div class="max-w-xs truncate" title="無">無</div>';
                     }
-                    const truncated = fullComplaint.length > 9 ? fullComplaint.substring(0, 9) : fullComplaint;
+                    const displayLength = 6;
+                    let truncated;
+                    if (fullComplaint.length > displayLength) {
+                        truncated = fullComplaint.substring(0, displayLength) + '⋯';
+                    } else {
+                        truncated = fullComplaint;
+                    }
                     // 使用 title 屬性顯示完整內容
                     return '<div class="max-w-xs truncate" title="' + fullComplaint + '">' + truncated + '</div>';
                 })()}
@@ -10900,15 +10931,22 @@ async function initializeSystemAfterLogin() {
                     showToast(`${patient.name} 沒有上次收費記錄可載入`, 'warning');
                     return;
                 }
-                // 清空現有收費項目並解析
+                // 在載入上次收費資料之前，保留目前已選擇的收費項目。
+                // 這可避免當用戶在按下「載入上次收費」按鈕前已經新增了項目（例如使用套票），
+                // 這些項目在載入後被清空的情況下消失。
+                const existingItems = Array.isArray(selectedBillingItems) ? [...selectedBillingItems] : [];
+                // 清空現有收費項目並解析上次收費文字。
                 selectedBillingItems = [];
                 parseBillingItemsFromText(lastConsultation.billingItems);
+                // 解析後的結果存放在 selectedBillingItems 中，將其複製到新陣列方便後續處理。
+                let loadedItems = Array.isArray(selectedBillingItems) ? [...selectedBillingItems] : [];
                 // 根據要求：載入上次收費時，排除任何「使用套票」的抵扣項目與套票購買項目。
-                // 原先僅排除 category 為 'packageUse' 的項目（即使用套票時產生的抵扣），
-                // 但後續需求也要排除 category 為 'package' 的項目（即購買套票的收費項目）。
-                if (Array.isArray(selectedBillingItems) && selectedBillingItems.length > 0) {
-                    selectedBillingItems = selectedBillingItems.filter(item => item.category !== 'packageUse' && item.category !== 'package');
+                // 因為這些項目僅在當次診症過程中出現，不應從歷史記錄帶入。
+                if (loadedItems.length > 0) {
+                    loadedItems = loadedItems.filter(item => item.category !== 'packageUse' && item.category !== 'package');
                 }
+                // 將歷史載入的收費項目與現有項目合併，現有項目排在前面。
+                selectedBillingItems = existingItems.concat(loadedItems);
                 // 更新顯示
                 updateBillingDisplay();
             } catch (error) {
