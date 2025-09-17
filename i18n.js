@@ -567,7 +567,8 @@ window.translations = {
         "當前用戶": "Current User",
 
         // Additional variant with trailing colon for labels that include punctuation.
-        "當前用戶：": "Current User:",
+        // Add trailing space after colon so that dynamic names are separated
+        "當前用戶：": "Current User: ",
 
         // Add translations for meridian names.  These entries allow the
         // translation logic to translate dynamic strings such as
@@ -1386,6 +1387,14 @@ function translateNode(node, dict, lang) {
                         replacement = diagMatch[1] + dict[diagMatch[2]];
                     } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
                         replacement = medMatch[1] + dict[medMatch[2]];
+                    } else {
+                        // 3. Generic pattern for base strings ending with a full‑width colon (：) and dynamic suffix.
+                        //    For example: "當前用戶：王五".  If the base (including colon) exists in the dictionary,
+                        //    translate it and preserve the trailing dynamic part.
+                        const colonMatch = original.match(/^(.+?：)(.*)$/);
+                        if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
+                            replacement = dict[colonMatch[1]] + colonMatch[2];
+                        }
                     }
                 }
             }
@@ -1428,6 +1437,12 @@ function translateNode(node, dict, lang) {
                             replacement = diagMatch[1] + dict[diagMatch[2]];
                         } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
                             replacement = medMatch[1] + dict[medMatch[2]];
+                        } else {
+                            // Generic colon pattern: base with colon and dynamic suffix
+                            const colonMatch = original && original.match(/^(.+?：)(.*)$/);
+                            if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
+                                replacement = dict[colonMatch[1]] + colonMatch[2];
+                            }
                         }
                     }
                 }
