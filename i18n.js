@@ -368,12 +368,8 @@ window.translations = {
         "項目類別": "項目類別",
         "查看醫囑與診斷模板": "查看醫囑與診斷模板",
         "查看中藥材及方劑資料": "查看中藥材及方劑資料",
-        "查看穴位資料": "查看穴位資料",
-        // ------- Added comma above to fix syntax error -------
+        "查看穴位資料": "查看穴位資料"
         "管理診療費用及收費項目": "管理診療費用及收費項目",
-        // 下面新增登入頁輸入欄位的佔位提示翻譯（中文版就是原文）
-        "請輸入電子郵件": "請輸入電子郵件",
-        "請輸入密碼": "請輸入密碼",
         "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
     },
     en: {
@@ -734,10 +730,6 @@ window.translations = {
         "查看穴位資料": "View acupoint information",
         "管理診療費用及收費項目": "Manage medical expenses and charges",
         "管理慣用藥方及穴位組合": "Manage commonly used prescriptions and acupoint combinations"
-        ,
-        // Added translations for login page input placeholders
-        "請輸入電子郵件": "Please enter your email",
-        "請輸入密碼": "Please enter your password"
     }
 };
 
@@ -1024,8 +1016,67 @@ function translateNode(node, dict, lang) {
             node.dataset.lastLang = lang;
         }
     }
+    // Translate text nodes directly under this element. Some elements contain mixed
+    // content (text nodes and child elements), e.g. "總計：<span>0</span> 人".
+    // These text nodes won't be processed by the leaf-element translation above,
+    // so handle them separately. We preserve whitespace and remember the
+    // original text on the text node for later restoration.
+    Array.from(node.childNodes).forEach(child => {
+        if (child.nodeType === Node.TEXT_NODE) {
+            translateTextNode(child, dict, lang);
+        }
+    });
     // Recursively translate child elements
     Array.from(node.children).forEach(child => translateNode(child, dict, lang));
+}
+
+/**
+ * Translate a text node based on the dictionary.  Text nodes may contain
+ * whitespace around the content. We store the original trimmed text on
+ * the node to allow switching back to the original language. Only the
+ * trimmed content is compared against the dictionary. If a direct match
+ * isn't found, attempt a prefix match to support cases where the text
+ * includes dynamic values (e.g. numbers) after a known key. Whitespace
+ * is preserved when replacing the text.
+ * @param {Text} textNode - the text node to translate
+ * @param {Object} dict - translation dictionary for the current language
+ * @param {string} lang - language code
+ */
+function translateTextNode(textNode, dict, lang) {
+    if (!textNode || textNode.nodeType !== Node.TEXT_NODE) return;
+    // Avoid re-translating the same text node to the same language
+    if (textNode._lastLang === lang) return;
+    const fullText = textNode.data;
+    const trimmed = fullText.trim();
+    if (!trimmed) {
+        textNode._lastLang = lang;
+        return; // skip pure whitespace
+    }
+    // Save original trimmed text if first time
+    if (!textNode._originalText) {
+        textNode._originalText = trimmed;
+    }
+    const original = textNode._originalText;
+    let translated = null;
+    if (dict && Object.prototype.hasOwnProperty.call(dict, original)) {
+        translated = dict[original];
+    } else if (dict) {
+        // Attempt prefix match for dynamic content, e.g. "總計：" at start of text
+        for (const key in dict) {
+            if (!Object.prototype.hasOwnProperty.call(dict, key)) continue;
+            if (original.startsWith(key)) {
+                translated = dict[key] + original.slice(key.length);
+                break;
+            }
+        }
+    }
+    if (translated !== null) {
+        // Preserve leading and trailing whitespace
+        const leading = fullText.match(/^\s*/)[0];
+        const trailing = fullText.match(/\s*$/)[0];
+        textNode.data = leading + translated + trailing;
+    }
+    textNode._lastLang = lang;
 }
 
 /**
@@ -1095,10 +1146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     applyTranslations();
-    // Observe the entire document body for dynamic content. Previously we only observed
-    // the #mainSystem container which meant elements outside of it (e.g. login page,
-    // toast notifications, or modals) were not automatically translated. By observing
-    // document.body we ensure all dynamically added content is translated when the
-    // language changes.
-    observer.observe(document.body, { childList: true, subtree: true });
+    // Observe only the main system container if present; fallback to body.
+    const target = document.getElementById('mainSystem') || document.body;
+    observer.observe(target, { childList: true, subtree: true });
 });
