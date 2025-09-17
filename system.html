@@ -541,9 +541,10 @@
                             </div>
                             <!-- 右側：總計人數顯示 -->
                             <div class="text-sm text-gray-600 flex items-center space-x-3">
-                                <span>
-                                    總計：<span id="todayTotal" class="font-semibold text-blue-600">0</span> 人
-                                </span>
+                                <!-- 將標籤、數值和單位拆分為獨立元素，方便 i18n.js 處理翻譯 -->
+                                <span>總計：</span>
+                                <span id="todayTotal" class="font-semibold text-blue-600">0</span>
+                                <span>人</span>
                             </div>
                         </div>
                     </div>
@@ -1497,8 +1498,10 @@
                             <h3 class="text-lg font-semibold text-gray-800 flex items-center">
                                 <span class="mr-2">📋</span><span>詳細財務報表</span>
                             </h3>
-                            <div class="text-sm text-gray-600">
-                                資料更新時間：<span id="lastUpdateTime">-</span>
+                            <div class="text-sm text-gray-600 flex items-center space-x-1">
+                                <!-- 將標籤與時間拆分，使多語系翻譯可以套用 -->
+                                <span>資料更新時間：</span>
+                                <span id="lastUpdateTime">-</span>
                             </div>
                         </div>
                     </div>
@@ -1653,8 +1656,13 @@
                         <div class="space-y-3">
                             <div class="text-center py-4" id="clinicSettingsDisplay">
                                 <div class="text-sm text-gray-700 mb-3">
-                                    <div class="font-medium">診所中文名稱：<span id="displayChineseName">名醫診所系統</span></div>
-                                    <div class="text-gray-600 mt-1">診所英文名稱：<span id="displayEnglishName">TCM Clinic</span></div>
+                                    <!-- 將標籤與值拆分為不同的元素，以便 i18n.js 處理翻譯 -->
+                                    <div class="font-medium flex items-center space-x-1">
+                                        <span>診所中文名稱：</span><span id="displayChineseName">名醫診所系統</span>
+                                    </div>
+                                    <div class="text-gray-600 mt-1 flex items-center space-x-1">
+                                        <span>診所英文名稱：</span><span id="displayEnglishName">TCM Clinic</span>
+                                    </div>
                                 </div>
                                 <button onclick="showClinicSettingsModal()" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200">
                                     診所資料修改
@@ -2015,6 +2023,7 @@
     <script src="i18n.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>

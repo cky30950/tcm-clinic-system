@@ -368,8 +368,82 @@ window.translations = {
         "項目類別": "項目類別",
         "查看醫囑與診斷模板": "查看醫囑與診斷模板",
         "查看中藥材及方劑資料": "查看中藥材及方劑資料",
-        "查看穴位資料": "查看穴位資料"
+        "查看穴位資料": "查看穴位資料",
+        // ------- Added comma above to fix syntax error -------
         "管理診療費用及收費項目": "管理診療費用及收費項目",
+        // 下面新增登入頁輸入欄位的佔位提示翻譯（中文版就是原文）
+        // 以下為新增的輸入欄位提示，中文版就是原文
+        "中醫病名診斷...": "中醫病名診斷...",
+        "例如：10": "例如：10",
+        "例如：180（半年）": "例如：180（半年）",
+        "例：0912-345-678": "例：0912-345-678",
+        "例：3-9g": "例：3-9g",
+        "例：7天、2週、1個月等...": "例：7天、2週、1個月等...",
+        "例：A123456789": "例：A123456789",
+        "例：傷寒論、金匱要略": "例：傷寒論、金匱要略",
+        "例：次、劑、包": "例：次、劑、包",
+        "例：肺、脾經": "例：肺、脾經",
+        "例：辛、溫": "例：辛、溫",
+        "例：週一至週五 09:00-18:00": "例：週一至週五 09:00-18:00",
+        "其他名稱或別名": "其他名稱或別名",
+        "搜尋中藥材、方劑名稱或功能...": "搜尋中藥材、方劑名稱或功能...",
+        "搜尋收費項目名稱...": "搜尋收費項目名稱...",
+        "搜尋用戶名稱或電子郵件...": "搜尋用戶名稱或電子郵件...",
+        "搜尋病人姓名、編號或電話...": "搜尋病人姓名、編號或電話...",
+        "搜尋病人編號、姓名或電話...": "搜尋病人編號、姓名或電話...",
+        "搜尋穴位、經絡名稱或功能...": "搜尋穴位、經絡名稱或功能...",
+        "搜尋穴位名稱、經絡或定位...": "搜尋穴位名稱、經絡或定位...",
+        "搜尋穴位組合名稱...": "搜尋穴位組合名稱...",
+        "搜尋藥方組合名稱...": "搜尋藥方組合名稱...",
+        "搜尋診斷模板名稱或內容...": "搜尋診斷模板名稱或內容...",
+        "搜尋醫囑模板名稱...": "搜尋醫囑模板名稱...",
+        "搜索中藥材、方劑名稱或功能...": "搜索中藥材、方劑名稱或功能...",
+        "搜索收費項目名稱...": "搜索收費項目名稱...",
+        "煎煮方法、服用時間、劑量等...": "煎煮方法、服用時間、劑量等...",
+        "病人主要不適症狀、發病時間、症狀特點等...": "病人主要不適症狀、發病時間、症狀特點等...",
+        "發病經過、症狀變化、治療經過等...": "發病經過、症狀變化、治療經過等...",
+        "禁忌、注意事項等": "禁忌、注意事項等",
+        "禁忌或注意事項": "禁忌或注意事項",
+        "系統自動計算": "系統自動計算",
+        "脈位、脈率、脈力、脈形等...": "脈位、脈率、脈力、脈形等...",
+        "舌質、舌苔、舌形等...": "舌質、舌苔、舌形等...",
+        "請描述主治": "請描述主治",
+        "請描述主要功效": "請描述主要功效",
+        "請描述收費項目的詳細內容": "請描述收費項目的詳細內容",
+        "請描述方劑主治": "請描述方劑主治",
+        "請描述方劑主要功效": "請描述方劑主要功效",
+        "請描述方劑用法": "請描述方劑用法",
+        "請簡述病人的主要症狀...": "請簡述病人的主要症狀...",
+        "請記錄重要病史、家族病史、慢性疾病等": "請記錄重要病史、家族病史、慢性疾病等",
+        "請詳細記錄藥物過敏或食物過敏史": "請詳細記錄藥物過敏或食物過敏史",
+        "請輸入 Firebase UID（可不填）": "請輸入 Firebase UID（可不填）",
+        "請輸入中藥材名稱": "請輸入中藥材名稱",
+        "請輸入中醫註冊編號": "請輸入中醫註冊編號",
+        "請輸入姓名": "請輸入姓名",
+        "請輸入完整地址": "請輸入完整地址",
+        "請輸入收費項目名稱": "請輸入收費項目名稱",
+        "請輸入方劑名稱": "請輸入方劑名稱",
+        "請輸入方劑組成，例如：&#10;人參&#10;白朮&#10;茯苓&#10;甘草": "請輸入方劑組成，例如：&#10;人參&#10;白朮&#10;茯苓&#10;甘草",
+        "請輸入真實姓名": "請輸入真實姓名",
+        "請輸入診所中文名稱": "請輸入診所中文名稱",
+        "請輸入診所完整地址": "請輸入診所完整地址",
+        "請輸入診所英文名稱": "請輸入診所英文名稱",
+        "請輸入診所電話號碼": "請輸入診所電話號碼",
+        "請輸入電話號碼": "請輸入電話號碼",
+        "輸入分類名稱...": "輸入分類名稱...",
+        "辨證分型、病機分析...": "辨證分型、病機分析...",
+        "針灸穴位、手法、注意事項等...": "針灸穴位、手法、注意事項等...",
+        "飲食宜忌、生活調護、注意事項等...": "飲食宜忌、生活調護、注意事項等...",
+        "搜尋診斷模板...": "搜尋診斷模板...",
+        "搜尋醫囑模板...": "搜尋醫囑模板...",
+        "搜索常用藥方...": "搜索常用藥方...",
+        "搜索常用穴位組合...": "搜索常用穴位組合...",
+        "搜尋常用藥方...": "搜尋常用藥方...",
+        "搜尋常用穴位...": "搜尋常用穴位...",
+        "穴位名稱": "穴位名稱",
+        "如：服藥完畢後": "如：服藥完畢後",
+        "請輸入電子郵件": "請輸入電子郵件",
+        "請輸入密碼": "請輸入密碼",
         "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
     },
     en: {
@@ -730,6 +804,80 @@ window.translations = {
         "查看穴位資料": "View acupoint information",
         "管理診療費用及收費項目": "Manage medical expenses and charges",
         "管理慣用藥方及穴位組合": "Manage commonly used prescriptions and acupoint combinations"
+        ,
+        // Additional placeholder translations
+        "中醫病名診斷...": "TCM disease name diagnosis...",
+        "例如：10": "e.g.: 10",
+        "例如：180（半年）": "e.g.: 180 (half year)",
+        "例：0912-345-678": "e.g.: 0912-345-678",
+        "例：3-9g": "e.g.: 3-9g",
+        "例：7天、2週、1個月等...": "e.g.: 7 days, 2 weeks, 1 month, etc...",
+        "例：A123456789": "e.g.: A123456789",
+        "例：傷寒論、金匱要略": "e.g.: Shang Han Lun, Jin Gui Yao Lue",
+        "例：次、劑、包": "e.g.: times, doses, packs",
+        "例：肺、脾經": "e.g.: Lung, Spleen meridian",
+        "例：辛、溫": "e.g.: Pungent, Warm",
+        "例：週一至週五 09:00-18:00": "e.g.: Mon-Fri 09:00-18:00",
+        "其他名稱或別名": "Other names or aliases",
+        "搜尋中藥材、方劑名稱或功能...": "Search herb or formula name or function...",
+        "搜尋收費項目名稱...": "Search billing item name...",
+        "搜尋用戶名稱或電子郵件...": "Search user name or email...",
+        "搜尋病人姓名、編號或電話...": "Search patient name, ID, or phone...",
+        "搜尋病人編號、姓名或電話...": "Search patient ID, name, or phone...",
+        "搜尋穴位、經絡名稱或功能...": "Search acupoint, meridian name, or function...",
+        "搜尋穴位名稱、經絡或定位...": "Search acupoint name, meridian, or location...",
+        "搜尋穴位組合名稱...": "Search acupoint combination name...",
+        "搜尋藥方組合名稱...": "Search formula combination name...",
+        "搜尋診斷模板名稱或內容...": "Search diagnosis template name or content...",
+        "搜尋醫囑模板名稱...": "Search advice template name...",
+        "搜索中藥材、方劑名稱或功能...": "Search herb or formula name or function...",
+        "搜索收費項目名稱...": "Search billing item name...",
+        "煎煮方法、服用時間、劑量等...": "Decoction method, administration time, dosage, etc...",
+        "病人主要不適症狀、發病時間、症狀特點等...": "Patient's main discomfort symptoms, onset time, symptom characteristics, etc...",
+        "發病經過、症狀變化、治療經過等...": "Course of illness, symptom changes, treatment process, etc...",
+        "禁忌、注意事項等": "Contraindications, precautions, etc.",
+        "禁忌或注意事項": "Contraindications or precautions",
+        "系統自動計算": "Automatically calculated by the system",
+        "脈位、脈率、脈力、脈形等...": "Pulse position, pulse rate, pulse strength, pulse shape, etc...",
+        "舌質、舌苔、舌形等...": "Tongue color, tongue coating, tongue shape, etc...",
+        "請描述主治": "Please describe indications",
+        "請描述主要功效": "Please describe main effects",
+        "請描述收費項目的詳細內容": "Please describe billing item details",
+        "請描述方劑主治": "Please describe the formula indications",
+        "請描述方劑主要功效": "Please describe the formula's main effects",
+        "請描述方劑用法": "Please describe the formula usage",
+        "請簡述病人的主要症狀...": "Please briefly describe the patient's main symptoms...",
+        "請記錄重要病史、家族病史、慢性疾病等": "Please record important medical history, family history, chronic diseases, etc.",
+        "請詳細記錄藥物過敏或食物過敏史": "Please record in detail any drug or food allergy history",
+        "請輸入 Firebase UID（可不填）": "Please enter Firebase UID (optional)",
+        "請輸入中藥材名稱": "Please enter herb name",
+        "請輸入中醫註冊編號": "Please enter TCM registration number",
+        "請輸入姓名": "Please enter name",
+        "請輸入完整地址": "Please enter full address",
+        "請輸入收費項目名稱": "Please enter billing item name",
+        "請輸入方劑名稱": "Please enter formula name",
+        "請輸入方劑組成，例如：&#10;人參&#10;白朮&#10;茯苓&#10;甘草": "Please enter formula composition, e.g.:&#10;Ginseng&#10;Atractylodes&#10;Poria&#10;Licorice",
+        "請輸入真實姓名": "Please enter real name",
+        "請輸入診所中文名稱": "Please enter clinic Chinese name",
+        "請輸入診所完整地址": "Please enter clinic full address",
+        "請輸入診所英文名稱": "Please enter clinic English name",
+        "請輸入診所電話號碼": "Please enter clinic phone number",
+        "請輸入電話號碼": "Please enter phone number",
+        "輸入分類名稱...": "Enter category name...",
+        "辨證分型、病機分析...": "Pattern classification, pathogenesis analysis...",
+        "針灸穴位、手法、注意事項等...": "Acupuncture points, techniques, precautions, etc...",
+        "飲食宜忌、生活調護、注意事項等...": "Dietary recommendations, lifestyle care, precautions, etc...",
+        "搜尋診斷模板...": "Search diagnosis templates...",
+        "搜尋醫囑模板...": "Search advice templates...",
+        "搜索常用藥方...": "Search common formulas...",
+        "搜索常用穴位組合...": "Search common acupoint combinations...",
+        "搜尋常用藥方...": "Search common formulas...",
+        "搜尋常用穴位...": "Search common acupoints...",
+        "穴位名稱": "Acupoint name",
+        "如：服藥完畢後": "e.g.: after finishing medication",
+        // Added translations for login page input placeholders
+        "請輸入電子郵件": "Please enter your email",
+        "請輸入密碼": "Please enter your password"
     }
 };
 
@@ -1016,67 +1164,8 @@ function translateNode(node, dict, lang) {
             node.dataset.lastLang = lang;
         }
     }
-    // Translate text nodes directly under this element. Some elements contain mixed
-    // content (text nodes and child elements), e.g. "總計：<span>0</span> 人".
-    // These text nodes won't be processed by the leaf-element translation above,
-    // so handle them separately. We preserve whitespace and remember the
-    // original text on the text node for later restoration.
-    Array.from(node.childNodes).forEach(child => {
-        if (child.nodeType === Node.TEXT_NODE) {
-            translateTextNode(child, dict, lang);
-        }
-    });
     // Recursively translate child elements
     Array.from(node.children).forEach(child => translateNode(child, dict, lang));
-}
-
-/**
- * Translate a text node based on the dictionary.  Text nodes may contain
- * whitespace around the content. We store the original trimmed text on
- * the node to allow switching back to the original language. Only the
- * trimmed content is compared against the dictionary. If a direct match
- * isn't found, attempt a prefix match to support cases where the text
- * includes dynamic values (e.g. numbers) after a known key. Whitespace
- * is preserved when replacing the text.
- * @param {Text} textNode - the text node to translate
- * @param {Object} dict - translation dictionary for the current language
- * @param {string} lang - language code
- */
-function translateTextNode(textNode, dict, lang) {
-    if (!textNode || textNode.nodeType !== Node.TEXT_NODE) return;
-    // Avoid re-translating the same text node to the same language
-    if (textNode._lastLang === lang) return;
-    const fullText = textNode.data;
-    const trimmed = fullText.trim();
-    if (!trimmed) {
-        textNode._lastLang = lang;
-        return; // skip pure whitespace
-    }
-    // Save original trimmed text if first time
-    if (!textNode._originalText) {
-        textNode._originalText = trimmed;
-    }
-    const original = textNode._originalText;
-    let translated = null;
-    if (dict && Object.prototype.hasOwnProperty.call(dict, original)) {
-        translated = dict[original];
-    } else if (dict) {
-        // Attempt prefix match for dynamic content, e.g. "總計：" at start of text
-        for (const key in dict) {
-            if (!Object.prototype.hasOwnProperty.call(dict, key)) continue;
-            if (original.startsWith(key)) {
-                translated = dict[key] + original.slice(key.length);
-                break;
-            }
-        }
-    }
-    if (translated !== null) {
-        // Preserve leading and trailing whitespace
-        const leading = fullText.match(/^\s*/)[0];
-        const trailing = fullText.match(/\s*$/)[0];
-        textNode.data = leading + translated + trailing;
-    }
-    textNode._lastLang = lang;
 }
 
 /**
@@ -1146,7 +1235,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     applyTranslations();
-    // Observe only the main system container if present; fallback to body.
-    const target = document.getElementById('mainSystem') || document.body;
-    observer.observe(target, { childList: true, subtree: true });
+    // Observe the entire document body for dynamic content. Previously we only observed
+    // the #mainSystem container which meant elements outside of it (e.g. login page,
+    // toast notifications, or modals) were not automatically translated. By observing
+    // document.body we ensure all dynamically added content is translated when the
+    // language changes.
+    observer.observe(document.body, { childList: true, subtree: true });
 });
