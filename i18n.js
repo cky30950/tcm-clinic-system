@@ -14,6 +14,12 @@ window.translations = {
         // Chinese translations simply map original text to itself.  This
         // dictionary only needs entries for strings that have English
         // translations below – everything else will remain unchanged.
+        "載入病歷": "載入病歷",
+        "無特殊主訴": "無特殊主訴",
+        "病歷編號": "病歷編號",
+        "醫師": "醫師",
+        "的診症記錄": "的診症記錄",
+        "的病歷記錄": "的病歷記錄",
         "當前用戶": "當前用戶",
         "編輯": "編輯",
         "病歷": "病歷",
@@ -452,6 +458,12 @@ window.translations = {
         "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
     },
     en: {
+        "載入病歷": "Load Record",
+        "無特殊主訴": "None",
+        "病歷編號": "Record Number",
+        "醫師": "Doctor",
+        "的診症記錄": "'s Record",
+        "的病歷記錄": "'s Record",
         "當前用戶": "Current User",
         "編輯": "Edit",
         "病歷": "Record",
