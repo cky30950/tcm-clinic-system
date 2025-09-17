@@ -14,6 +14,8 @@ window.translations = {
         // Chinese translations simply map original text to itself.  This
         // dictionary only needs entries for strings that have English
         // translations below – everything else will remain unchanged.
+        "暫無診症記錄": "暫無診症記錄",
+        "該病人尚未有診症記錄": "該病人尚未有診症記錄",
         "總診療次數": "總診療次數",
         "最近診療": "最近診療",
         "無": "無",
@@ -510,6 +512,8 @@ window.translations = {
         "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
     },
     en: {
+        "暫無診症記錄": "No medical records yet",
+        "該病人尚未有診症記錄": "This patient has no medical records yet",
         "總診療次數": "Total number of visits",
         "最近診療": "Last visit",
         "無": "None",
