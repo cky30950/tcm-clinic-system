@@ -368,8 +368,12 @@ window.translations = {
         "項目類別": "項目類別",
         "查看醫囑與診斷模板": "查看醫囑與診斷模板",
         "查看中藥材及方劑資料": "查看中藥材及方劑資料",
-        "查看穴位資料": "查看穴位資料"
+        "查看穴位資料": "查看穴位資料",
+        // ------- Added comma above to fix syntax error -------
         "管理診療費用及收費項目": "管理診療費用及收費項目",
+        // 下面新增登入頁輸入欄位的佔位提示翻譯（中文版就是原文）
+        "請輸入電子郵件": "請輸入電子郵件",
+        "請輸入密碼": "請輸入密碼",
         "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
     },
     en: {
@@ -730,6 +734,10 @@ window.translations = {
         "查看穴位資料": "View acupoint information",
         "管理診療費用及收費項目": "Manage medical expenses and charges",
         "管理慣用藥方及穴位組合": "Manage commonly used prescriptions and acupoint combinations"
+        ,
+        // Added translations for login page input placeholders
+        "請輸入電子郵件": "Please enter your email",
+        "請輸入密碼": "Please enter your password"
     }
 };
 
@@ -1087,9 +1095,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     applyTranslations();
-    // Observe the entire document body for dynamic content additions.  
-    // Previously we only observed the #mainSystem container which meant elements
-    // outside that container (e.g. login page, modals, or dynamically added
-    // content) were not automatically translated when the language changes.
+    // Observe the entire document body for dynamic content. Previously we only observed
+    // the #mainSystem container which meant elements outside of it (e.g. login page,
+    // toast notifications, or modals) were not automatically translated. By observing
+    // document.body we ensure all dynamically added content is translated when the
+    // language changes.
     observer.observe(document.body, { childList: true, subtree: true });
 });
