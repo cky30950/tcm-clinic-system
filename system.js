@@ -3846,8 +3846,7 @@ async function loadConsultationForEdit(consultationId) {
         }
         if (consultation) {
             // 載入診症記錄內容
-            // When editing a consultation, prefer symptoms; if not available fall back to chiefComplaint
-            document.getElementById('formSymptoms').value = consultation.symptoms || consultation.chiefComplaint || '';
+            document.getElementById('formSymptoms').value = consultation.symptoms || '';
             document.getElementById('formTongue').value = consultation.tongue || '';
             document.getElementById('formPulse').value = consultation.pulse || '';
             document.getElementById('formCurrentHistory').value = consultation.currentHistory || '';
@@ -4949,13 +4948,7 @@ async function saveConsultation() {
         const consultationData = {
             appointmentId: currentConsultingAppointmentId,
             patientId: appointment.patientId,
-            // Save symptoms as before, and also persist the same value as chiefComplaint. This
-            // ensures that if other parts of the system reference chiefComplaint for the
-            // consultation (e.g. when displaying records) it will be available. Without
-            // persisting chiefComplaint here, new consultations would lack that property,
-            // causing fallback logic to fail when symptoms are blank.
             symptoms: symptoms,
-            chiefComplaint: symptoms,
             tongue: document.getElementById('formTongue').value.trim(),
             pulse: document.getElementById('formPulse').value.trim(),
             currentHistory: document.getElementById('formCurrentHistory').value.trim(),
@@ -5028,6 +5021,12 @@ async function saveConsultation() {
                 if (idx >= 0) {
                     consultations[idx] = { ...consultations[idx], ...consultationData, updatedAt: new Date(), updatedBy: currentUser };
                 }
+                // 更新掛號資料中的主訴內容，確保掛號列表顯示最新的主訴
+                appointment.chiefComplaint = symptoms;
+                // 更新本地儲存的 appointments 陣列
+                localStorage.setItem('appointments', JSON.stringify(appointments));
+                // 同步更新到 Firebase
+                await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
                 showToast('診症記錄已更新！', 'success');
             } else {
                 showToast('更新診症記錄失敗，請稍後再試', 'error');
@@ -5046,6 +5045,8 @@ async function saveConsultation() {
                 appointment.completedAt = new Date().toISOString();
                 appointment.consultationId = result.id;
                 appointment.completedBy = currentUser;
+                // 將本次症狀保存至掛號資料中的主訴，確保掛號列表顯示最新主訴
+                appointment.chiefComplaint = symptoms;
                 localStorage.setItem('appointments', JSON.stringify(appointments));
                 await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
                 showToast('診症記錄已保存！', 'success');
@@ -5280,7 +5281,7 @@ if (!patient) {
                             <div class="space-y-4">
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">主訴</span>
-                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || consultation.chiefComplaint || '無記錄'}</div>
+                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || '無記錄'}</div>
                                 </div>
                                 
                                 ${consultation.tongue ? `
@@ -5608,7 +5609,7 @@ function displayConsultationMedicalHistoryPage() {
                     <div class="space-y-4">
                         <div>
                             <span class="text-sm font-semibold text-gray-700 block mb-2">主訴</span>
-                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || consultation.chiefComplaint || '無記錄'}</div>
+                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || '無記錄'}</div>
                         </div>
                         
                         ${consultation.tongue ? `
@@ -11079,8 +11080,7 @@ const consultationDate = (() => {
             // 若需要再次顯示確認提示，可重新加入 confirm 相關程式碼。
             
             // 載入診症資料
-            // When editing a consultation, prefer symptoms; if not available fall back to chiefComplaint
-            document.getElementById('formSymptoms').value = consultation.symptoms || consultation.chiefComplaint || '';
+            document.getElementById('formSymptoms').value = consultation.symptoms || '';
             document.getElementById('formTongue').value = consultation.tongue || '';
             document.getElementById('formPulse').value = consultation.pulse || '';
             document.getElementById('formCurrentHistory').value = consultation.currentHistory || '';
