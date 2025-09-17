@@ -362,7 +362,10 @@ window.translations = {
         "開始": "開始",
         "開立處方": "開立處方",
         "項目名稱": "項目名稱",
-        "項目類別": "項目類別"
+        "項目類別": "項目類別",
+        "查看醫囑與診斷模板": "查看醫囑與診斷模板",
+        "查看中藥材及方劑資料": "查看中藥材及方劑資料",
+        "查看穴位資料": "查看穴位資料"
     },
     en: {
         "+ 新增收費項目": "+ Add Billing Item",
@@ -713,7 +716,10 @@ window.translations = {
         "開始": "Start",
         "開立處方": "Prescribe",
         "項目名稱": "Item name",
-        "項目類別": "Item category"
+        "項目類別": "Item category",
+        "查看醫囑與診斷模板": "View medical order and diagnosis templates",
+        "查看中藥材及方劑資料": "View information on Chinese herbal medicines and prescriptions",
+        "查看穴位資料": "View acupoint information"
     }
 };
 
