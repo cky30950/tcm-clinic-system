@@ -4003,10 +4003,18 @@ function parseConsultationDate(dateInput) {
 function formatConsultationDateTime(dateInput) {
     const date = parseConsultationDate(dateInput);
     if (!date || isNaN(date.getTime())) {
-        return '時間未知';
+        // Return a language‑aware fallback when the date cannot be parsed.
+        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+        const dict = (window.translations && window.translations[lang]) ? window.translations[lang] : {};
+        // Use a fallback message if a translation is available; otherwise default to the Chinese phrase.
+        return dict['時間未知'] || '時間未知';
     }
-    
-    return date.toLocaleString('zh-TW', {
+    // Format the date/time according to the current language.  English uses
+    // en-US locale while Chinese uses zh-TW.  We intentionally keep the
+    // format consistent with two‑digit month/day and hour/minute fields.
+    const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+    const locale = lang === 'en' ? 'en-US' : 'zh-TW';
+    return date.toLocaleString(locale, {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -5160,8 +5168,20 @@ if (!patient) {
         
         function displayPatientMedicalHistoryPage() {
             const contentDiv = document.getElementById('patientMedicalHistoryContent');
+
+            // Determine current language and translation dictionary.  Use
+            // localStorage to fetch the persisted language; default to
+            // Chinese when not found.  This allows us to construct
+            // translated dynamic strings below.  The dictionary is used
+            // solely for static labels such as '診症記錄', '較舊', '較新',
+            // '醫師：', and '病歷編號：'.
+            const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+            const dict = (window.translations && window.translations[lang]) ? window.translations[lang] : {};
             
             if (currentPatientConsultations.length === 0) {
+                // Use Chinese strings here so the i18n observer can
+                // translate them if necessary.  For zero‑records state
+                // there are no dynamic numbers to handle.
                 contentDiv.innerHTML = `
                     <div class="text-center py-12 text-gray-500">
                         <div class="text-4xl mb-4">📋</div>
@@ -5176,17 +5196,31 @@ if (!patient) {
             const totalPages = currentPatientConsultations.length;
             const currentPageNumber = currentPatientHistoryPage + 1;
             const consultationNumber = currentPatientHistoryPage + 1;
-            
+
+            // Prepare dynamic translation segments.  We look up static labels
+            // from the dictionary and build English phrases when needed.
+            const recordTitle = dict['診症記錄'] || '診症記錄';
+            const visitText = lang === 'zh'
+                ? `第 ${consultationNumber} 次診症`
+                : `Visit ${consultationNumber}`;
+            const totalText = lang === 'zh'
+                ? `共 ${totalPages} 次診症記錄`
+                : `Total ${totalPages} consultation records`;
+            const prevLabel = dict['較舊'] || '較舊';
+            const nextLabel = dict['較新'] || '較新';
+            const doctorLabel = dict['醫師：'] || '醫師：';
+            const recordNumberLabel = dict['病歷編號：'] || '病歷編號：';
+
             contentDiv.innerHTML = `
                 <!-- 分頁導航 -->
                 <div class="mb-6 flex justify-between items-center bg-gray-50 rounded-lg p-4">
                     <div class="flex items-center space-x-4">
-                        <h4 class="text-lg font-semibold text-gray-800">診症記錄</h4>
+                        <h4 class="text-lg font-semibold text-gray-800">${recordTitle}</h4>
                         <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                            第 ${consultationNumber} 次診症
+                            ${visitText}
                         </span>
                         <span class="text-sm text-gray-600">
-                            共 ${totalPages} 次診症記錄
+                            ${totalText}
                         </span>
                     </div>
                     
@@ -5194,7 +5228,7 @@ if (!patient) {
                         <button onclick="changePatientHistoryPage(-1)" 
                                 ${currentPatientHistoryPage === 0 ? 'disabled' : ''}
                                 class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
-                            ← 較舊
+                            ← ${prevLabel}
                         </button>
                         <span class="text-sm text-gray-600 px-2">
                             ${currentPageNumber} / ${totalPages}
@@ -5202,7 +5236,7 @@ if (!patient) {
                         <button onclick="changePatientHistoryPage(1)" 
                                 ${currentPatientHistoryPage === totalPages - 1 ? 'disabled' : ''}
                                 class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
-                            較新 →
+                            ${nextLabel} →
                         </button>
                     </div>
                 </div>
@@ -5219,15 +5253,18 @@ if (!patient) {
                                         if (!parsedDate || isNaN(parsedDate.getTime())) {
                                             return '日期未知';
                                         }
-                                        // 顯示日期和時間
-                                        return parsedDate.toLocaleDateString('zh-TW') + ' ' + parsedDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+                                        // 根據語言設定輸出日期格式。英語使用 en-US，中文使用 zh-TW。
+                                        const locale = lang === 'en' ? 'en-US' : 'zh-TW';
+                                        const datePart = parsedDate.toLocaleDateString(locale);
+                                        const timePart = parsedDate.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+                                        return datePart + ' ' + timePart;
                                     })()}
                                 </span>
                                 <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded">
-                                    醫師：${getDoctorDisplayName(consultation.doctor)}
+                                    ${doctorLabel}${getDoctorDisplayName(consultation.doctor)}
                                 </span>
                                 <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded">
-                                    病歷編號：${consultation.medicalRecordNumber || consultation.id}
+                                    ${recordNumberLabel}${consultation.medicalRecordNumber || consultation.id}
                                 </span>
                                 ${consultation.updatedAt ? `
                                     <span class="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
@@ -5495,8 +5532,20 @@ async function viewPatientMedicalHistory(patientId) {
 // 修復病歷記錄顯示中的日期問題
 function displayConsultationMedicalHistoryPage() {
     const contentDiv = document.getElementById('medicalHistoryContent');
+
+    // Determine the current language and translation dictionary.  We rely on
+    // localStorage to persist the selected language (zh or en).  If an
+    // unsupported value is found we default to Chinese.  The translation
+    // dictionary is used for translating static labels while dynamic
+    // segments (such as numbered visits) are constructed below.
+    const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+    const dict = (window.translations && window.translations[lang]) ? window.translations[lang] : {};
     
     if (currentConsultationConsultations.length === 0) {
+        // When there are no consultation records, we still allow the text
+        // content to be translated by the i18n observer.  Therefore
+        // Chinese strings are left intact here and will be replaced if the
+        // language is set to English via the dictionary.
         contentDiv.innerHTML = `
             <div class="text-center py-12 text-gray-500">
                 <div class="text-4xl mb-4">📋</div>
@@ -5511,17 +5560,37 @@ function displayConsultationMedicalHistoryPage() {
     const totalPages = currentConsultationConsultations.length;
     const currentPageNumber = currentConsultationHistoryPage + 1;
     const consultationNumber = currentConsultationHistoryPage + 1;
-    
+
+    // Build translated dynamic strings.  For Chinese we keep the original
+    // formatting; for English we generate equivalent phrases.  The
+    // dictionary lookup is used for static terms like '診症記錄',
+    // '較舊', '較新', '醫師：', and '病歷編號：'.
+    const recordTitle = dict['診症記錄'] || '診症記錄';
+    const visitText = lang === 'zh'
+        ? `第 ${consultationNumber} 次診症`
+        : `Visit ${consultationNumber}`;
+    const totalText = lang === 'zh'
+        ? `共 ${totalPages} 次診症記錄`
+        : `Total ${totalPages} consultation records`;
+    const prevLabel = dict['較舊'] || '較舊';
+    const nextLabel = dict['較新'] || '較新';
+    const doctorLabel = dict['醫師：'] || '醫師：';
+    const recordNumberLabel = dict['病歷編號：'] || '病歷編號：';
+
+    // Compose the HTML content with translated dynamic labels.  Chinese
+    // strings remain in the markup for static phrases that the i18n
+    // framework can translate after insertion.  Dynamic segments are
+    // constructed above.
     contentDiv.innerHTML = `
         <!-- 分頁導航 -->
         <div class="mb-6 flex justify-between items-center bg-gray-50 rounded-lg p-4">
             <div class="flex items-center space-x-4">
-                <h4 class="text-lg font-semibold text-gray-800">診症記錄</h4>
+                <h4 class="text-lg font-semibold text-gray-800">${recordTitle}</h4>
                 <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                    第 ${consultationNumber} 次診症
+                    ${visitText}
                 </span>
                 <span class="text-sm text-gray-600">
-                    共 ${totalPages} 次診症記錄
+                    ${totalText}
                 </span>
             </div>
             
@@ -5529,7 +5598,7 @@ function displayConsultationMedicalHistoryPage() {
                 <button onclick="changeConsultationHistoryPage(-1)" 
                         ${currentConsultationHistoryPage === 0 ? 'disabled' : ''}
                         class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
-                    ← 較舊
+                    ← ${prevLabel}
                 </button>
                 <span class="text-sm text-gray-600 px-2">
                     ${currentPageNumber} / ${totalPages}
@@ -5537,7 +5606,7 @@ function displayConsultationMedicalHistoryPage() {
                 <button onclick="changeConsultationHistoryPage(1)" 
                         ${currentConsultationHistoryPage === totalPages - 1 ? 'disabled' : ''}
                         class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
-                    較新 →
+                    ${nextLabel} →
                 </button>
             </div>
         </div>
@@ -5551,11 +5620,11 @@ function displayConsultationMedicalHistoryPage() {
                             ${formatConsultationDateTime(consultation.date)}
                         </span>
                         <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded">
-                            醫師：${getDoctorDisplayName(consultation.doctor)}
+                            ${doctorLabel}${getDoctorDisplayName(consultation.doctor)}
                         </span>
                         <!-- 新增病歷編號顯示 -->
                         <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded">
-                            病歷編號：${consultation.medicalRecordNumber || consultation.id}
+                            ${recordNumberLabel}${consultation.medicalRecordNumber || consultation.id}
                         </span>
                         ${consultation.updatedAt ? `
                             <span class="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
@@ -9414,14 +9483,24 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
-            // 按類別分組顯示
+            // Determine current language and translation dictionary for category
+            // names.  We use localStorage to retrieve the saved language and
+            // fallback to Chinese if it isn't set.  The dictionary maps
+            // Chinese terms to English equivalents, which allows us to
+            // translate category names prior to appending counts.  Without
+            // pre‑translation the dynamic strings (e.g. "診療費 (3)") would
+            // not match any dictionary key and thus remain untranslated.
+            const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+            const dict = (window.translations && window.translations[lang]) ? window.translations[lang] : {};
+
+            // 按類別分組顯示。每個類別包含一個中文名稱以及對應圖示。
             const billingCategories = {
-                consultation: { name: '診療費', icon: '🩺', items: [] },
-                medicine: { name: '藥費', icon: '💊', items: [] },
-                treatment: { name: '治療費', icon: '🔧', items: [] },
-                other: { name: '其他', icon: '📋', items: [] },
-                discount: { name: '折扣項目', icon: '💸', items: [] },
-                package: { name: '套票項目', icon: '🎫', items: [] }
+                consultation: { baseName: '診療費', icon: '🩺', items: [] },
+                medicine: { baseName: '藥費', icon: '💊', items: [] },
+                treatment: { baseName: '治療費', icon: '🔧', items: [] },
+                other: { baseName: '其他', icon: '📋', items: [] },
+                discount: { baseName: '折扣項目', icon: '💸', items: [] },
+                package: { baseName: '套票項目', icon: '🎫', items: [] }
             };
 
             // 將過濾後的項目分配到對應的帳單分類中
@@ -9436,11 +9515,15 @@ async function initializeSystemAfterLogin() {
             // 建立各分類的顯示內容
             Object.keys(billingCategories).forEach(categoryKey => {
                 const category = billingCategories[categoryKey];
+                // Translate the category name based on the current language.
+                // We look up the base Chinese name in the dictionary; if no
+                // translation exists we fall back to the original Chinese.
+                const translatedName = dict[category.baseName] || category.baseName;
                 if (category.items.length > 0 && (currentBillingFilter === 'all' || currentBillingFilter === categoryKey)) {
                     html += `
                         <div class="mb-8">
                             <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                                <span class="mr-2">${category.icon}</span>${category.name} (${category.items.length})
+                                <span class="mr-2">${category.icon}</span>${translatedName} (${category.items.length})
                             </h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 ${category.items.map(item => createBillingItemCard(item)).join('')}
