@@ -14,6 +14,10 @@ window.translations = {
         // Chinese translations simply map original text to itself.  This
         // dictionary only needs entries for strings that have English
         // translations below – everything else will remain unchanged.
+        "刪除": "刪除",
+        "撤回診症": "撤回診症",
+        "移除掛號": "移除掛號",
+        "創建自己的組合": "創建自己的組合",
         "停用": "停用",
         "啟用": "啟用",
         "從未登入": "從未登入",
@@ -477,6 +481,10 @@ window.translations = {
         "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
     },
     en: {
+        "刪除": "Delete",
+        "撤回診症": "Withdraw",
+        "移除掛號": "Remove",
+        "創建自己的組合": "Create your own package",
         "停用": "Disable",
         "啟用": "Enable",
         "從未登入": "Never logged in",
