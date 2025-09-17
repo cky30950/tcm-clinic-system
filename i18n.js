@@ -14,6 +14,8 @@ window.translations = {
         // Chinese translations simply map original text to itself.  This
         // dictionary only needs entries for strings that have English
         // translations below – everything else will remain unchanged.
+        "套票使用": "套票使用",
+        "取消使用": "取消使用",
         "載入病歷": "載入病歷",
         "無特殊主訴": "無特殊主訴",
         "病歷編號": "病歷編號",
@@ -464,6 +466,8 @@ window.translations = {
         "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
     },
     en: {
+        "套票使用": "Package Use",
+        "取消使用": "Cancel Use",
         "載入病歷": "Load Record",
         "無特殊主訴": "None",
         "病歷編號": "Record Number",
