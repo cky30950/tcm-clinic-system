@@ -427,7 +427,7 @@
                 <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
                     <div class="mb-4">
                         <h3 class="text-lg font-semibold text-gray-800 flex items-center mb-2">
-                            <span class="mr-2">🔍</span>搜索病人掛號
+                            <span class="mr-2">🔍</span><span>搜索病人掛號</span>
                         </h3>
                         <p class="text-sm text-gray-600">請輸入病人姓名、編號或電話進行搜索</p>
                     </div>
@@ -477,7 +477,7 @@
                             
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                    <span class="mr-2">👨‍⚕️</span>掛號醫師 *
+                                    <span class="mr-2">👨‍⚕️</span><span>掛號醫師 *</span>
                                 </label>
                                 <select id="appointmentDoctor" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                     <option value="">請選擇醫師</option>
@@ -487,7 +487,7 @@
                             
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                    <span class="mr-2">⏰</span>掛號時間
+                                    <span class="mr-2">⏰</span><span>掛號時間</span>
                                 </label>
                                 <input type="datetime-local" id="appointmentDateTime" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                             </div>
@@ -495,7 +495,7 @@
                             <!-- 問診資料選擇：允許醫師於掛號時選擇患者先前填寫的問診資料 -->
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                    <span class="mr-2">🧾</span>選擇問診資料
+                                    <span class="mr-2">🧾</span><span>選擇問診資料</span>
                                 </label>
                                 <select id="inquirySelect" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                     <option value="">不使用問診資料</option>
@@ -505,7 +505,7 @@
 
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                    <span class="mr-2">📝</span>主訴症狀
+                                    <span class="mr-2">📝</span><span>主訴症狀</span>
                                 </label>
                                 <textarea id="quickChiefComplaint" placeholder="請簡述病人的主要症狀..." rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"></textarea>
                             </div>
@@ -528,7 +528,7 @@
                             <!-- 左側：標題與日期選擇器 -->
                             <div class="flex items-center space-x-3">
                                 <h3 class="text-lg font-semibold text-gray-800 flex items-center">
-                                    <span class="mr-2">📅</span>掛號列表
+                                    <span class="mr-2">📅</span><span>掛號列表</span>
                                 </h3>
                                 <div class="flex items-center space-x-1">
                                     <span class="whitespace-nowrap text-sm text-gray-600">日期</span>
@@ -1428,10 +1428,10 @@
                         
                         <div class="flex items-end space-x-2">
                             <button onclick="generateFinancialReport()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition duration-200 flex items-center">
-                                <span class="mr-2">🔄</span>更新報表
+                                <span class="mr-2">🔄</span><span>更新報表</span>
                             </button>
                             <button onclick="exportFinancialReport()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition duration-200 flex items-center">
-                                <span class="mr-2">📥</span>匯出
+                                <span class="mr-2">📥</span><span>匯出</span>
                             </button>
                         </div>
                     </div>
@@ -1495,7 +1495,7 @@
                     <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
                         <div class="flex justify-between items-center">
                             <h3 class="text-lg font-semibold text-gray-800 flex items-center">
-                                <span class="mr-2">📋</span>詳細財務報表
+                                <span class="mr-2">📋</span><span>詳細財務報表</span>
                             </h3>
                             <div class="text-sm text-gray-600">
                                 資料更新時間：<span id="lastUpdateTime">-</span>
@@ -2015,6 +2015,7 @@
     <script src="i18n.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
