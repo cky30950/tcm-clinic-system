@@ -808,7 +808,7 @@ window.translations = {
         "診斷模板": "Diagnosis Templates",
         "診症人次": "Number of Consultations",
         "診症系統": "Consultation System",
-        "診症記錄": "Consultation Records",
+        "診症記錄": "Records",
         // Added translations for colon variants and navigation terms
         "醫師：": "Doctor:",
         "病歷編號：": "Record Number:",
