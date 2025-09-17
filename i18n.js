@@ -705,6 +705,207 @@ window.translations = {
     }
 };
 
+    // Add translation helper and dynamic translations for runtime messages
+    (function() {
+        /**
+         * Helper function to translate a given text according to the currently selected language.
+         * Falls back to the original text if no translation is found.
+         * @param {string} text - The original Chinese text to translate.
+         * @returns {string} Translated text based on current language or original text if not found.
+         */
+        function t(text) {
+            try {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const dict = window.translations && window.translations[lang] || {};
+                return dict[text] || text;
+            } catch (e) {
+                return text;
+            }
+        }
+        // Expose translation helper globally so other scripts (e.g., system.js) can use it.
+        window.t = t;
+        // Define dynamic runtime translations. These keys correspond to messages created dynamically in system.js.
+        const dynamicTranslations = {
+            '不能停用自己的帳號！': 'You cannot disable your own account!',
+            '不能刪除最後一個診所管理帳號！': 'Cannot delete the last clinic admin account!',
+            '不能刪除自己的帳號！': 'You cannot delete your own account!',
+            '中藥材已新增！': 'Herb added!',
+            '中藥材資料已更新！': 'Herb data updated!',
+            '中藥資料匯入完成！': 'Herbal data import completed!',
+            '中醫診所收據已準備列印！': 'TCM clinic receipt is ready for printing!',
+            '主管理員帳號不可停用！': 'The super admin account cannot be disabled!',
+            '主管理員帳號不可刪除！': 'The super admin account cannot be deleted!',
+            '主管理員帳號不可編輯！': 'The super admin account cannot be edited!',
+            '使用套票時發生錯誤': 'An error occurred while using the package',
+            '保存成功！': 'Saved successfully!',
+            '保存掛號數據失敗': 'Failed to save registration data',
+            '保存時發生錯誤': 'An error occurred during saving',
+            '保存時發生錯誤，請稍後再試': 'An error occurred during saving, please try again later',
+            '保存用戶數據失敗': 'Failed to save user data',
+            '保存病人數據失敗': 'Failed to save patient data',
+            '保存診症記錄失敗': 'Failed to save consultation record',
+            '保存診症記錄失敗，請稍後再試': 'Failed to save consultation record, please try again later',
+            '備份資料匯入完成！': 'Backup data import completed!',
+            '備份資料已匯出！': 'Backup data has been exported!',
+            '出生日期不能晚於今天！': 'Date of birth cannot be later than today!',
+            '列印到診證明時發生錯誤': 'An error occurred while printing arrival certificate',
+            '列印收據時發生錯誤': 'An error occurred while printing receipt',
+            '列印病假證明時發生錯誤': 'An error occurred while printing medical certificate',
+            '列印藥單醫囑時發生錯誤': 'An error occurred while printing prescription instructions',
+            '刪除中...': 'Deleting...',
+            '刪除失敗，請稍後再試': 'Deletion failed, please try again later',
+            '刪除時發生錯誤': 'An error occurred during deletion',
+            '刪除用戶失敗，請稍後再試': 'Failed to delete user, please try again later',
+            '刪除用戶時發生錯誤': 'An error occurred while deleting user',
+            '刪除診症記錄時發生錯誤': 'An error occurred while deleting consultation record',
+            '到診證明書已準備列印！': 'Arrival certificate is ready for printing!',
+            '匯入中藥資料失敗，請確認檔案格式是否正確': 'Failed to import herb data, please check the file format',
+            '匯入備份失敗，請確認檔案格式是否正確': 'Failed to import backup, please check the file format',
+            '匯入模板資料失敗，請確認檔案格式是否正確': 'Failed to import template data, please check the file format',
+            '匯出備份失敗，請稍後再試': 'Failed to export backup, please try again later',
+            '取消套票使用時發生錯誤': 'An error occurred while canceling package usage',
+            '只有管理員可以刪除病人': 'Only administrators can delete patients',
+            '只有該掛號的醫師才能開始診症！': 'Only the doctor of this registration can start the consultation!',
+            '只能列印已完成診症的到診證明！': 'Only arrival certificates for completed consultations can be printed!',
+            '只能列印已完成診症的收據！': 'Only receipts for completed consultations can be printed!',
+            '只能列印已完成診症的病假證明！': 'Only medical certificates for completed consultations can be printed!',
+            '只能列印已完成診症的藥單醫囑！': 'Only prescription instructions for completed consultations can be printed!',
+            '只能載入相同病人的病歷記錄！': "Only the same patient's medical record can be loaded!",
+            '同名折扣項目僅能使用一項': 'Only one discount item with the same name can be used',
+            '已取消本次套票使用，次數已退回': 'Package usage has been canceled and the usage count has been returned',
+            '已成功登出': 'Logged out successfully',
+            '已移除套票使用項目，未退回次數': 'Package usage item removed without returning usage count',
+            '已載入常用穴位組合：': 'Common acupoint combo loaded:',
+            '已載入常用藥方組合：': 'Common herbal combo loaded:',
+            '已載入診斷模板': 'Diagnosis template loaded',
+            '已載入醫囑模板': 'Prescription template loaded',
+            '已退出病歷編輯模式': 'Exited medical record editing mode',
+            '您的帳號已被停用，請聯繫管理員': 'Your account has been disabled, please contact the administrator',
+            '找不到套票使用項目': 'Package usage item not found',
+            '找不到對應的套票，已移除項目': 'Corresponding package not found, item has been removed',
+            '找不到對應的診症記錄！': 'Corresponding consultation record not found!',
+            '找不到指定的診症記錄！': 'Specified consultation record not found!',
+            '找不到掛號記錄！': 'Registration record not found!',
+            '找不到當前診症記錄！': 'Current consultation record not found!',
+            '找不到病人資料': 'Patient data not found',
+            '找不到病人資料！': 'Patient data not found!',
+            '找不到診症記錄！': 'Consultation record not found!',
+            '找不到診症記錄，將使用空白表單': 'Consultation record not found, a blank form will be used',
+            '找不到選定的醫囑模板': 'Selected prescription template not found',
+            '折扣項目不允許修改數量': 'Quantity modification is not allowed for discount items',
+            '折扣項目已存在，無法重複使用': 'Discount item already exists and cannot be used again',
+            '掛號失敗，請稍後再試': 'Registration failed, please try again later',
+            '掛號時間不能早於現在時間！': 'The registration time cannot be earlier than the current time!',
+            '收費項目已新增！': 'Billing item added!',
+            '收費項目已更新！': 'Billing item updated!',
+            '數據管理器尚未準備就緒': 'Data manager is not ready yet',
+            '新增失敗，請稍後再試': 'Failed to add, please try again later',
+            '新增用戶失敗，請稍後再試': 'Failed to add user, please try again later',
+            '方劑已新增！': 'Formula added!',
+            '方劑資料已更新！': 'Formula data updated!',
+            '更新失敗，請稍後再試': 'Update failed, please try again later',
+            '更新用戶狀態時發生錯誤': 'An error occurred while updating user status',
+            '更新用戶資料失敗，請稍後再試': 'Failed to update user data, please try again later',
+            '更新診症記錄失敗，請稍後再試': 'Failed to update consultation record, please try again later',
+            '未偵測到有效的中藥庫資料': 'No valid herb library data detected',
+            '未偵測到有效的模板資料': 'No valid template data detected',
+            '模板資料匯入完成！': 'Template data import completed!',
+            '權限不足，您沒有存取此功能的權限': 'Insufficient privileges, you do not have access to this feature',
+            '權限不足，無法保存收費項目': 'Insufficient privileges to save billing items',
+            '權限不足，無法刪除收費項目': 'Insufficient privileges to delete billing items',
+            '權限不足，無法執行此操作': 'Insufficient privileges to perform this operation',
+            '權限不足，無法存取收費項目管理': 'Insufficient privileges to access billing items management',
+            '權限不足，無法存取穴位庫管理': 'Insufficient privileges to access acupoint library management',
+            '權限不足，無法新增收費項目': 'Insufficient privileges to add billing items',
+            '權限不足，無法編輯收費項目': 'Insufficient privileges to edit billing items',
+            '此帳號尚未被授權，請聯繫系統管理員': 'This account has not been authorized, please contact the system administrator',
+            '此電子郵件已存在，請使用其他電子郵件！': 'This email already exists, please use another one!',
+            '每個診症僅能使用一項折扣優惠': 'Only one discount can be used per consultation',
+            '無法讀取病人資料': 'Unable to read patient data',
+            '無法讀取病人資料！': 'Unable to read patient data!',
+            '無法讀取診症記錄': 'Unable to read consultation record',
+            '無法讀取診症記錄！': 'Unable to read consultation record!',
+            '無法連接到伺服器，請稍後再試': 'Unable to connect to the server, please try again later',
+            '無法顯示醫囑模板': 'Unable to display prescription templates',
+            '用戶已成功新增！': 'User added successfully!',
+            '用戶資料已成功更新！': 'User data updated successfully!',
+            '病人資料已刪除！': 'Patient data has been deleted!',
+            '病人資料已成功新增！': 'Patient data added successfully!',
+            '病人資料已成功更新！': 'Patient data updated successfully!',
+            '病假證明書已準備列印！': 'Medical certificate is ready for printing!',
+            '登入成功！': 'Login successful!',
+            '登出時發生錯誤': 'An error occurred during logout',
+            '移除掛號時發生錯誤': 'An error occurred while removing the registration',
+            '系統錯誤：找不到診症記錄！': 'System error: Consultation record not found!',
+            '系統錯誤：未選擇病人！': 'System error: No patient selected!',
+            '繼續診症時發生錯誤': 'An error occurred while continuing consultation',
+            '藥單醫囑已準備列印！': 'Prescription instructions are ready for printing!',
+            '處理中...': 'Processing...',
+            '處理確認到達時發生錯誤': 'An error occurred while processing arrival confirmation',
+            '診所資料已成功更新！': 'Clinic data updated successfully!',
+            '診症完成後無法刪除套票': 'Packages cannot be deleted after the consultation is completed',
+            '診症完成後無法新增套票': 'Packages cannot be added after the consultation is completed',
+            '診症完成後無法調整套票數量': 'Package quantities cannot be adjusted after the consultation is completed',
+            '診症記錄已保存！': 'Consultation record saved!',
+            '診症記錄已更新！': 'Consultation record updated!',
+            '請先開始診症！': 'Please start the consultation first!',
+            '請填寫必填欄位：主訴、中醫診斷！': 'Please fill in the required fields: chief complaint, TCM diagnosis!',
+            '請填寫必要資料（姓名、性別、電話、出生日期、身分證字號）！': 'Please fill in the required information (name, gender, phone, date of birth, ID number)!',
+            '請填寫必要資料（姓名、職位）！': 'Please fill in the required information (name, position)!',
+            '請確認出生日期是否正確！': 'Please confirm whether the date of birth is correct!',
+            '請至少添加一個穴位！': 'Please add at least one acupoint!',
+            '請至少添加一個藥材！': 'Please add at least one herb!',
+            '請輸入中藥材名稱！': 'Please enter the herb name!',
+            '請輸入套票可用次數！': 'Please enter the available uses of the package!',
+            '請輸入收費項目名稱！': 'Please enter the billing item name!',
+            '請輸入方劑名稱！': 'Please enter the formula name!',
+            '請輸入方劑組成！': 'Please enter the formula composition!',
+            '請輸入有效天數！': 'Please enter the valid number of days!',
+            '請輸入有效的收費金額！': 'Please enter a valid amount for the billing item!',
+            '請輸入有效的藥量（0.5-100克）': 'Please enter a valid medicine dosage (0.5-100 grams)',
+            '請輸入有效的電子郵件格式！': 'Please enter a valid email format!',
+            '請輸入有效的電話號碼！': 'Please enter a valid phone number!',
+            '請輸入模板名稱！': 'Please enter the template name!',
+            '請輸入組合名稱！': 'Please enter the combo name!',
+            '請輸入診所中文名稱！': 'Please enter the clinic name in Chinese!',
+            '請輸入電子郵件和密碼！': 'Please enter your email and password!',
+            '請選擇掛號時間！': 'Please choose a registration time!',
+            '請選擇掛號醫師！': 'Please choose a consulting doctor!',
+            '請選擇日期範圍！': 'Please select a date range!',
+            '請選擇項目類別！': 'Please select the item category!',
+            '讀取病人資料失敗': 'Failed to read patient data',
+            '讀取診症記錄失敗': 'Failed to read consultation record',
+            '財務報表已匯出！': 'Financial report exported!',
+            '財務報表已更新！': 'Financial report updated!',
+            '載入用戶數據時發生錯誤，使用本地數據': 'An error occurred while loading user data, using local data',
+            '載入診症表單時發生錯誤': 'An error occurred while loading the consultation form',
+            '載入診症記錄失敗，將使用空白表單': 'Failed to load consultation record, a blank form will be used',
+            '載入醫囑模板失敗': 'Failed to load prescription templates',
+            '退回套票時發生錯誤': 'An error occurred when returning package',
+            '選擇的醫師無效，請重新選擇！': 'The selected doctor is invalid, please choose again!',
+            '醫師職位必須填寫中醫註冊編號！': "The doctor's position must include a TCM registration number!",
+            '開始診症時發生錯誤': 'An error occurred while starting the consultation',
+            '除折扣項目外，收費金額不能為負數！': 'Except for discount items, the charge amount cannot be negative!',
+            '電子郵件格式不正確！': 'The email format is incorrect!',
+            '電話格式不正確，請輸入 7-15 位數字！': 'Invalid phone number format, please enter 7-15 digits!',
+            '載入失敗，請檢查網路連接': 'Load failed, please check your network connection',
+            '沒有找到符合條件的病人': 'No patients found that match the criteria',
+            '尚無病人資料': 'No patient data yet',
+            '匯入進度': 'Import progress',
+            '匯入完成！': 'Import complete!',
+            '匯入失敗！': 'Import failed!'
+        };
+        // Merge dynamic translations into the existing dictionaries.
+        Object.keys(dynamicTranslations).forEach(function(key) {
+            // Ensure the zh dictionary keeps the original Chinese text.
+            if (!window.translations.zh[key]) {
+                window.translations.zh[key] = key;
+            }
+            // Always set the English translation to the provided value.
+            window.translations.en[key] = dynamicTranslations[key];
+        });
+    })();
+
 // Declare isTranslating early so it is available wherever referenced.
 // Using var ensures the declaration is hoisted and accessible before use.
 // Track whether a translation is currently being applied to avoid recursive invocation

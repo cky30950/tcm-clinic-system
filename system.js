@@ -645,7 +645,19 @@ async function fetchUsers(forceRefresh = false) {
         
         // 浮動提示功能
         function showToast(message, type = 'info') {
-            // 移除現有的提示
+                 // 將訊息翻譯為當前語言，如果可用
+                 try {
+                     if (window.t) {
+                         message = window.t(message);
+                     } else {
+                         const lang = localStorage.getItem('lang') || 'zh';
+                         const dict = window.translations && window.translations[lang] || {};
+                         message = dict[message] || message;
+                     }
+                 } catch (e) {
+                     // 若翻譯失敗則保持原訊息
+                 }
+                 // 移除現有的提示
             const existingToast = document.querySelector('.toast');
             if (existingToast) {
                 existingToast.remove();
@@ -729,10 +741,23 @@ function showBackupProgressBar(totalSteps) {
     const bar = document.getElementById('backupProgressBar');
     const text = document.getElementById('backupProgressText');
     if (container && bar && text) {
-        container.classList.remove('hidden');
-        bar.style.width = '0%';
-        text.textContent = '匯入進度 0%';
-        container.dataset.totalSteps = totalSteps;
+             container.classList.remove('hidden');
+             bar.style.width = '0%';
+             // 取得匯入進度標籤的翻譯
+             let baseLabel = '匯入進度';
+             try {
+                 if (window.t) {
+                     baseLabel = window.t('匯入進度');
+                 } else {
+                     const lang = localStorage.getItem('lang') || 'zh';
+                     const dict = window.translations && window.translations[lang] || {};
+                     baseLabel = dict['匯入進度'] || baseLabel;
+                 }
+             } catch (e) {
+                 baseLabel = '匯入進度';
+             }
+             text.textContent = baseLabel + ' 0%';
+             container.dataset.totalSteps = totalSteps;
     }
 }
 
@@ -747,8 +772,20 @@ function updateBackupProgressBar(currentStep, totalSteps) {
     const text = document.getElementById('backupProgressText');
     if (container && bar && text) {
         const percent = totalSteps > 0 ? Math.round((currentStep / totalSteps) * 100) : 0;
-        bar.style.width = percent + '%';
-        text.textContent = '匯入進度 ' + percent + '%';
+             bar.style.width = percent + '%';
+             let baseLabel = '匯入進度';
+             try {
+                 if (window.t) {
+                     baseLabel = window.t('匯入進度');
+                 } else {
+                     const lang = localStorage.getItem('lang') || 'zh';
+                     const dict = window.translations && window.translations[lang] || {};
+                     baseLabel = dict['匯入進度'] || baseLabel;
+                 }
+             } catch (e) {
+                 baseLabel = '匯入進度';
+             }
+             text.textContent = baseLabel + ' ' + percent + '%';
     }
 }
 
@@ -761,8 +798,23 @@ function finishBackupProgressBar(success) {
     const bar = document.getElementById('backupProgressBar');
     const text = document.getElementById('backupProgressText');
     if (container && bar && text) {
-        bar.style.width = '100%';
-        text.textContent = success ? '匯入完成！' : '匯入失敗！';
+             bar.style.width = '100%';
+             let successMsg = '匯入完成！';
+             let failureMsg = '匯入失敗！';
+             try {
+                 if (window.t) {
+                     successMsg = window.t('匯入完成！');
+                     failureMsg = window.t('匯入失敗！');
+                 } else {
+                     const lang = localStorage.getItem('lang') || 'zh';
+                     const dict = window.translations && window.translations[lang] || {};
+                     successMsg = dict['匯入完成！'] || successMsg;
+                     failureMsg = dict['匯入失敗！'] || failureMsg;
+                 }
+             } catch (e) {
+                 // keep defaults
+             }
+             text.textContent = success ? successMsg : failureMsg;
         // 於 2 秒後隱藏進度條
         setTimeout(() => {
             container.classList.add('hidden');
@@ -780,10 +832,22 @@ function showImportProgressBar(totalSteps) {
     const bar = document.getElementById('importProgressBar');
     const text = document.getElementById('importProgressText');
     if (container && bar && text) {
-        container.classList.remove('hidden');
-        bar.style.width = '0%';
-        text.textContent = '匯入進度 0%';
-        container.dataset.totalSteps = totalSteps;
+             container.classList.remove('hidden');
+             bar.style.width = '0%';
+             let baseLabel = '匯入進度';
+             try {
+                 if (window.t) {
+                     baseLabel = window.t('匯入進度');
+                 } else {
+                     const lang = localStorage.getItem('lang') || 'zh';
+                     const dict = window.translations && window.translations[lang] || {};
+                     baseLabel = dict['匯入進度'] || baseLabel;
+                 }
+             } catch (e) {
+                 baseLabel = '匯入進度';
+             }
+             text.textContent = baseLabel + ' 0%';
+             container.dataset.totalSteps = totalSteps;
     }
 }
 
@@ -798,8 +862,20 @@ function updateImportProgressBar(currentStep, totalSteps) {
     const text = document.getElementById('importProgressText');
     if (container && bar && text) {
         const percent = totalSteps > 0 ? Math.round((currentStep / totalSteps) * 100) : 0;
-        bar.style.width = percent + '%';
-        text.textContent = '匯入進度 ' + percent + '%';
+             bar.style.width = percent + '%';
+             let baseLabel = '匯入進度';
+             try {
+                 if (window.t) {
+                     baseLabel = window.t('匯入進度');
+                 } else {
+                     const lang = localStorage.getItem('lang') || 'zh';
+                     const dict = window.translations && window.translations[lang] || {};
+                     baseLabel = dict['匯入進度'] || baseLabel;
+                 }
+             } catch (e) {
+                 baseLabel = '匯入進度';
+             }
+             text.textContent = baseLabel + ' ' + percent + '%';
     }
 }
 
@@ -812,8 +888,23 @@ function finishImportProgressBar(success) {
     const bar = document.getElementById('importProgressBar');
     const text = document.getElementById('importProgressText');
     if (container && bar && text) {
-        bar.style.width = '100%';
-        text.textContent = success ? '匯入完成！' : '匯入失敗！';
+             bar.style.width = '100%';
+             let successMsg = '匯入完成！';
+             let failureMsg = '匯入失敗！';
+             try {
+                 if (window.t) {
+                     successMsg = window.t('匯入完成！');
+                     failureMsg = window.t('匯入失敗！');
+                 } else {
+                     const lang = localStorage.getItem('lang') || 'zh';
+                     const dict = window.translations && window.translations[lang] || {};
+                     successMsg = dict['匯入完成！'] || successMsg;
+                     failureMsg = dict['匯入失敗！'] || failureMsg;
+                 }
+             } catch (e) {
+                 // keep defaults
+             }
+             text.textContent = success ? successMsg : failureMsg;
         setTimeout(() => {
             container.classList.add('hidden');
         }, 2000);
