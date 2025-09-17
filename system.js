@@ -1996,9 +1996,8 @@ async function logout() {
 
         function showAddPatientForm() {
             editingPatientId = null;
-            // Set the form title and button text using the translation helper if available.
-            document.getElementById('formTitle').textContent = typeof t === 'function' ? t('新增病人資料') : '新增病人資料';
-            document.getElementById('saveButtonText').textContent = typeof t === 'function' ? t('儲存') : '儲存';
+            document.getElementById('formTitle').textContent = '新增病人資料';
+            document.getElementById('saveButtonText').textContent = '儲存';
             document.getElementById('addPatientModal').classList.remove('hidden');
             clearPatientForm();
         }
@@ -2402,9 +2401,8 @@ async function editPatient(id) {
         }
 
         editingPatientId = id;
-        // Use the translation helper for dynamic labels when editing a patient
-        document.getElementById('formTitle').textContent = typeof t === 'function' ? t('編輯病人資料') : '編輯病人資料';
-        document.getElementById('saveButtonText').textContent = typeof t === 'function' ? t('更新') : '更新';
+        document.getElementById('formTitle').textContent = '編輯病人資料';
+        document.getElementById('saveButtonText').textContent = '更新';
         
         // 填入現有資料
         document.getElementById('patientName').value = patient.name || '';
@@ -2557,162 +2555,94 @@ async function viewPatient(id) {
             return;
         }
 
-        // 顯示病人詳細資料，使用翻譯輔助函式產生各種標籤
-        const _t = typeof t === 'function' ? t : (s) => s;
-        const labelBasicInfo = _t('基本資料');
-        const labelPatientID = _t('病人編號：');
-        const labelName = _t('姓名：');
-        const labelAge = _t('年齡：');
-        const labelGender = _t('性別：');
-        const labelPhone = _t('電話：');
-        const labelIdCard = _t('身分證：');
-        const labelDOB = _t('出生日期：');
-        const labelAddress = _t('地址：');
-        const labelMedicalInfo = _t('醫療資訊');
-        const labelHistory = _t('病史及備註：');
-        const labelAllergies = _t('過敏史：');
-        const labelCreatedAt = _t('建檔日期：');
-        const labelUpdatedAt = _t('更新日期：');
-        const labelConsultationSummary = _t('診症記錄摘要');
-        const labelLoadingConsultations = _t('載入診症記錄中...');
-        const labelNotSet = _t('未設定');
-        const labelUnknown = _t('未知');
-        let content = `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="space-y-4">
-                    <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">\${labelBasicInfo}</h4>
-                    <div class="space-y-2">
-                        <div><span class="font-medium">\${labelPatientID}</span><span class="text-blue-600 font-semibold">\${patient.patientNumber || labelNotSet}</span></div>
-                        <div><span class="font-medium">\${labelName}</span>\${patient.name}</div>
-                        <div><span class="font-medium">\${labelAge}</span>\${formatAge(patient.birthDate)}</div>
-                        <div><span class="font-medium">\${labelGender}</span>\${patient.gender}</div>
-                        <div><span class="font-medium">\${labelPhone}</span>\${patient.phone}</div>
-                        \${patient.idCard ? `<div><span class="font-medium">\${labelIdCard}</span>\${patient.idCard}</div>` : ''}
-                        \${patient.birthDate ? `<div><span class="font-medium">\${labelDOB}</span>\${new Date(patient.birthDate).toLocaleDateString('zh-TW')}</div>` : ''}
-                        \${patient.address ? `<div><span class="font-medium">\${labelAddress}</span>\${patient.address}</div>` : ''}
-                    </div>
-                </div>
-                
-                <div class="space-y-4">
-                    <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">\${labelMedicalInfo}</h4>
-                    <div class="space-y-2">
-                        \${patient.history ? `<div><span class="font-medium">\${labelHistory}</span><div class="mt-1 p-2 bg-gray-50 rounded text-sm medical-field">\${patient.history}</div></div>` : ''}
-                        \${patient.allergies ? `<div><span class="font-medium">\${labelAllergies}</span><div class="mt-1 p-2 bg-red-50 rounded text-sm medical-field">\${patient.allergies}</div></div>` : ''}
-                        <div><span class="font-medium">\${labelCreatedAt}</span>\${patient.createdAt ? (() => {
-                            const d = new Date(patient.createdAt.seconds * 1000);
-                            return d.toLocaleString('zh-TW', { hour12: false });
-                        })() : labelUnknown}</div>
-                        \${patient.updatedAt ? `<div><span class="font-medium">\${labelUpdatedAt}</span>\${(() => {
-                            const d = new Date(patient.updatedAt.seconds * 1000);
-                            return d.toLocaleString('zh-TW', { hour12: false });
-                        })()}</div>` : ''}
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 診症記錄摘要 -->
-            <div class="mt-6 pt-6 border-t border-gray-200">
-                <div class="flex justify-between items-center mb-4">
-                    <h4 class="text-lg font-semibold text-gray-800">\${labelConsultationSummary}</h4>
-                </div>
-                
-                <div id="patientConsultationSummary">
-                    <div class="text-center py-4">
-                        <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-                        <div class="mt-2 text-sm">\${labelLoadingConsultations}</div>
-                    </div>
-                </div>
-            </div>
-            `;
+        // Prepare safe fields to prevent XSS
+        // Declare content variable to hold the HTML for the patient detail. Without declaring
+        // it here, assignments below would create a global variable.
+        let content = '';
+        const safePatientNumber = window.escapeHtml(patient.patientNumber || '未設定');
+        const safeName = window.escapeHtml(patient.name);
+        const safeAge = window.escapeHtml(formatAge(patient.birthDate));
+        const safeGender = window.escapeHtml(patient.gender);
+        const safePhone = window.escapeHtml(patient.phone);
+        const safeIdCard = patient.idCard ? window.escapeHtml(patient.idCard) : null;
+        const safeAddress = patient.address ? window.escapeHtml(patient.address) : null;
+        const safeHistory = patient.history ? window.escapeHtml(patient.history) : null;
+        const safeAllergies = patient.allergies ? window.escapeHtml(patient.allergies) : null;
+        const birthDateString = patient.birthDate ? new Date(patient.birthDate).toLocaleDateString('zh-TW') : '';
+        // Format creation and update timestamps using 24-hour format
+        const createdAtStr = patient.createdAt ? (() => {
+            const d = new Date(patient.createdAt.seconds * 1000);
+            return d.toLocaleString('zh-TW', { hour12: false });
+        })() : '未知';
+        const updatedAtStr = patient.updatedAt ? (() => {
+            const d = new Date(patient.updatedAt.seconds * 1000);
+            return d.toLocaleString('zh-TW', { hour12: false });
+        })() : '';
+        // The package status section is rendered as part of the consultation summary,
+        // so leave this placeholder empty. It will be filled later by renderPackageStatusSection.
+        let packageStatusHtml = '';
 
-        // 為避免 XSS，建立替換後的 content
-        {
-            // If patientNumber is missing, translate '未設定' into current language before escaping
-            const safePatientNumber = window.escapeHtml(
-                patient.patientNumber || (typeof t === 'function' ? t('未設定') : '未設定')
-            );
-            const safeName = window.escapeHtml(patient.name);
-            const safeAge = window.escapeHtml(formatAge(patient.birthDate));
-            const safeGender = window.escapeHtml(patient.gender);
-            const safePhone = window.escapeHtml(patient.phone);
-            const safeIdCard = patient.idCard ? window.escapeHtml(patient.idCard) : null;
-            const safeAddress = patient.address ? window.escapeHtml(patient.address) : null;
-            const safeHistory = patient.history ? window.escapeHtml(patient.history) : null;
-            const safeAllergies = patient.allergies ? window.escapeHtml(patient.allergies) : null;
-            const birthDateString = patient.birthDate ? new Date(patient.birthDate).toLocaleDateString('zh-TW') : '';
-            // 將建檔與更新日期格式化為日期 + 時間字串，採 24 小時制
-            const createdAtStr = patient.createdAt ? (() => {
-                const d = new Date(patient.createdAt.seconds * 1000);
-                return d.toLocaleString('zh-TW', { hour12: false });
-            })() : '未知';
-            const updatedAtStr = patient.updatedAt ? (() => {
-                const d = new Date(patient.updatedAt.seconds * 1000);
-                return d.toLocaleString('zh-TW', { hour12: false });
-            })() : '';
-            // 套票區塊將由診療摘要下方的區塊顯示，這裡不再插入套票區塊。
-            let packageStatusHtml = '';
-            // 建立翻譯標籤以供後續安全內容使用
-            const _t2 = typeof t === 'function' ? t : (s) => s;
-            const labelBasicInfo2 = _t2('基本資料');
-            const labelPatientID2 = _t2('病人編號：');
-            const labelName2 = _t2('姓名：');
-            const labelAge2 = _t2('年齡：');
-            const labelGender2 = _t2('性別：');
-            const labelPhone2 = _t2('電話：');
-            const labelIdCard2 = _t2('身分證：');
-            const labelDOB2 = _t2('出生日期：');
-            const labelAddress2 = _t2('地址：');
-            const labelMedicalInfo2 = _t2('醫療資訊');
-            const labelHistory2 = _t2('病史及備註：');
-            const labelAllergies2 = _t2('過敏史：');
-            const labelCreatedAt2 = _t2('建檔日期：');
-            const labelUpdatedAt2 = _t2('更新日期：');
-            const labelConsultationSummary2 = _t2('診症記錄摘要');
-            const labelLoadingConsultations2 = _t2('載入診症記錄中...');
-            const labelNotSet2 = _t2('未設定');
-            const labelUnknown2 = _t2('未知');
-            // 組合安全的 HTML，並插入預先定義的套票區塊骨架（packageStatusHtml），以便 renderPackageStatusSection 後續填充內容。
-            content = `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="space-y-4">
-                    <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">${labelBasicInfo2}</h4>
-                    <div class="space-y-2">
-                        <div><span class="font-medium">${labelPatientID2}</span><span class="text-blue-600 font-semibold">${safePatientNumber || labelNotSet2}</span></div>
-                        <div><span class="font-medium">${labelName2}</span>${safeName}</div>
-                        <div><span class="font-medium">${labelAge2}</span>${safeAge}</div>
-                        <div><span class="font-medium">${labelGender2}</span>${safeGender}</div>
-                        <div><span class="font-medium">${labelPhone2}</span>${safePhone}</div>
-                        ${safeIdCard ? `<div><span class="font-medium">${labelIdCard2}</span>${safeIdCard}</div>` : ''}
-                        ${birthDateString ? `<div><span class="font-medium">${labelDOB2}</span>${birthDateString}</div>` : ''}
-                        ${safeAddress ? `<div><span class="font-medium">${labelAddress2}</span>${safeAddress}</div>` : ''}
-                    </div>
-                </div>
-                
-                <div class="space-y-4">
-                    <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">${labelMedicalInfo2}</h4>
-                    <div class="space-y-2">
-                        ${safeHistory ? `<div><span class="font-medium">${labelHistory2}</span><div class="mt-1 p-2 bg-gray-50 rounded text-sm medical-field">${safeHistory}</div></div>` : ''}
-                        ${safeAllergies ? `<div><span class="font-medium">${labelAllergies2}</span><div class="mt-1 p-2 bg-red-50 rounded text-sm medical-field">${safeAllergies}</div></div>` : ''}
-                        <div><span class="font-medium">${labelCreatedAt2}</span>${createdAtStr || labelUnknown2}</div>
-                        ${updatedAtStr ? `<div><span class="font-medium">${labelUpdatedAt2}</span>${updatedAtStr}</div>` : ''}
-                    </div>
+        // Translation helper. If t() is available, use it; otherwise fall back to the original key.
+        const _t = typeof t === 'function' ? t : (str) => str;
+        // Labels for translation
+        const lblBasicInfo = _t('基本資料');
+        const lblMedicalInfo = _t('醫療資訊');
+        const lblPatientNumber = _t('病人編號：');
+        const lblName = _t('姓名：');
+        const lblAge = _t('年齡：');
+        const lblGender = _t('性別：');
+        const lblPhone = _t('電話：');
+        const lblIdCard = _t('身分證：');
+        const lblBirthDate = _t('出生日期：');
+        const lblAddress = _t('地址：');
+        const lblHistoryAndNotes = _t('病史及備註：');
+        const lblAllergies = _t('過敏史：');
+        const lblCreatedAt = _t('建檔日期：');
+        const lblUpdatedAt = _t('更新日期：');
+        const lblConsultationSummary = _t('診症記錄摘要');
+        const lblLoadingConsultations = _t('載入診症記錄中...');
+
+        // Build the content HTML using sanitized values and translated labels.
+        content = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">${lblBasicInfo}</h4>
+                <div class="space-y-2">
+                    <div><span class="font-medium">${lblPatientNumber}</span><span class="text-blue-600 font-semibold">${safePatientNumber}</span></div>
+                    <div><span class="font-medium">${lblName}</span>${safeName}</div>
+                    <div><span class="font-medium">${lblAge}</span>${safeAge}</div>
+                    <div><span class="font-medium">${lblGender}</span>${safeGender}</div>
+                    <div><span class="font-medium">${lblPhone}</span>${safePhone}</div>
+                    ${safeIdCard ? `<div><span class="font-medium">${lblIdCard}</span>${safeIdCard}</div>` : ''}
+                    ${birthDateString ? `<div><span class="font-medium">${lblBirthDate}</span>${birthDateString}</div>` : ''}
+                    ${safeAddress ? `<div><span class="font-medium">${lblAddress}</span>${safeAddress}</div>` : ''}
                 </div>
             </div>
-            ${packageStatusHtml}
-            <!-- 診症記錄摘要 -->
-            <div class="mt-6 pt-6 border-t border-gray-200">
-                <div class="flex justify-between items-center mb-4">
-                    <h4 class="text-lg font-semibold text-gray-800">${labelConsultationSummary2}</h4>
-                </div>
-                <div id="patientConsultationSummary">
-                    <div class="text-center py-4">
-                        <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-                        <div class="mt-2 text-sm">${labelLoadingConsultations2}</div>
-                    </div>
+
+            <div class="space-y-4">
+                <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">${lblMedicalInfo}</h4>
+                <div class="space-y-2">
+                    ${safeHistory ? `<div><span class="font-medium">${lblHistoryAndNotes}</span><div class="mt-1 p-2 bg-gray-50 rounded text-sm medical-field">${safeHistory}</div></div>` : ''}
+                    ${safeAllergies ? `<div><span class="font-medium">${lblAllergies}</span><div class="mt-1 p-2 bg-red-50 rounded text-sm medical-field">${safeAllergies}</div></div>` : ''}
+                    <div><span class="font-medium">${lblCreatedAt}</span>${createdAtStr}</div>
+                    ${updatedAtStr ? `<div><span class="font-medium">${lblUpdatedAt}</span>${updatedAtStr}</div>` : ''}
                 </div>
             </div>
-            `;
-        }
+        </div>
+        ${packageStatusHtml}
+        <!-- 診症記錄摘要 -->
+        <div class="mt-6 pt-6 border-t border-gray-200">
+            <div class="flex justify-between items-center mb-4">
+                <h4 class="text-lg font-semibold text-gray-800">${lblConsultationSummary}</h4>
+            </div>
+            <div id="patientConsultationSummary">
+                <div class="text-center py-4">
+                    <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                    <div class="mt-2 text-sm">${lblLoadingConsultations}</div>
+                </div>
+            </div>
+        </div>
+        `;
         // 先將內容插入並顯示模態框
         const detailContainer = document.getElementById('patientDetailContent');
         if (detailContainer) {
@@ -13372,16 +13302,15 @@ function formatPackageStatus(pkg) {
     const now = new Date();
     const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
     const expired = daysLeft < 0;
-    // Determine current language for dynamic package status
-    const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-    if (lang === 'en') {
-        // English formatting
-        if (expired) {
-            return `Expired (${exp.toLocaleDateString('en-US')})`;
-        }
-        return `Remaining ${pkg.remainingUses}/${pkg.totalUses} uses · ${exp.toLocaleDateString('en-US')} expires (about ${daysLeft} days)`;
+    // 根據當前語言輸出不同的文字。en 表示英文，其餘以中文為預設。
+    const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+    if (lang && lang.toLowerCase().startsWith('en')) {
+        // Build English string
+        return expired
+            ? `Expired (${exp.toLocaleDateString('en-US')})`
+            : `Remaining ${pkg.remainingUses}/${pkg.totalUses} uses · ${exp.toLocaleDateString('en-US')} expires (about ${daysLeft} days)`;
     }
-    // Chinese formatting
+    // Default: Chinese
     return expired
         ? `已到期（${exp.toLocaleDateString('zh-TW')}）`
         : `剩餘 ${pkg.remainingUses}/${pkg.totalUses} 次 · ${exp.toLocaleDateString('zh-TW')} 到期（約 ${daysLeft} 天）`;

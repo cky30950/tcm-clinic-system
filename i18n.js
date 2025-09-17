@@ -912,6 +912,25 @@ window.translations = {
         window.t = t;
         // Define dynamic runtime translations. These keys correspond to messages created dynamically in system.js.
         const dynamicTranslations = {
+            '基本資料': 'Basic Information',
+            '醫療資訊': 'Medical Information',
+            '病人編號：': 'Patient ID:',
+            '姓名：': 'Name:',
+            '年齡：': 'Age:',
+            '性別：': 'Gender:',
+            '電話：': 'Phone:',
+            '身分證：': 'ID Number:',
+            '出生日期：': 'Date of Birth:',
+            '地址：': 'Address:',
+            '病史及備註：': 'Medical History & Notes:',
+            '過敏史：': 'Allergies:',
+            '建檔日期：': 'Created At:',
+            '更新日期：': 'Updated At:',
+            '診症記錄摘要': 'Consultation Summary',
+            '載入診症記錄中...': 'Loading consultation records...',
+            '未設定': 'Not set',
+            '未知': 'Unknown',
+            '使用一次': 'Use once',
             '不能停用自己的帳號！': 'You cannot disable your own account!',
             '不能刪除最後一個診所管理帳號！': 'Cannot delete the last clinic admin account!',
             '不能刪除自己的帳號！': 'You cannot delete your own account!',
@@ -1079,31 +1098,7 @@ window.translations = {
             '尚無病人資料': 'No patient data yet',
             '匯入進度': 'Import progress',
             '匯入完成！': 'Import complete!',
-            '匯入失敗！': 'Import failed!',
-            // Additional labels for patient details and package status
-            '基本資料': 'Basic Information',
-            '病人編號：': 'Patient ID:',
-            '姓名：': 'Name:',
-            '年齡：': 'Age:',
-            '性別：': 'Gender:',
-            '電話：': 'Phone:',
-            '身分證：': 'ID Card:',
-            '出生日期：': 'Date of Birth:',
-            '地址：': 'Address:',
-            '醫療資訊': 'Medical Information',
-            '病史及備註：': 'History & Notes:',
-            '過敏史：': 'Allergies:',
-            '建檔日期：': 'Created At:',
-            '更新日期：': 'Updated At:',
-            '診症記錄摘要': 'Consultation Summary',
-            '載入診症記錄中...': 'Loading consultation records...',
-            '未設定': 'Not set',
-            '未知': 'Unknown',
-            '已到期': 'Expired',
-            '剩餘': 'Remaining',
-            '到期': 'expires',
-            '約': 'about',
-            '天': 'days'
+            '匯入失敗！': 'Import failed!'
         };
         // Merge dynamic translations into the existing dictionaries.
         Object.keys(dynamicTranslations).forEach(function(key) {
