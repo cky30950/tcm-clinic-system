@@ -366,6 +366,8 @@ window.translations = {
         "查看醫囑與診斷模板": "查看醫囑與診斷模板",
         "查看中藥材及方劑資料": "查看中藥材及方劑資料",
         "查看穴位資料": "查看穴位資料"
+        "管理診療費用及收費項目": "管理診療費用及收費項目",
+        "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
     },
     en: {
         "+ 新增收費項目": "+ Add Billing Item",
@@ -719,7 +721,9 @@ window.translations = {
         "項目類別": "Item category",
         "查看醫囑與診斷模板": "View medical order and diagnosis templates",
         "查看中藥材及方劑資料": "View information on Chinese herbal medicines and prescriptions",
-        "查看穴位資料": "View acupoint information"
+        "查看穴位資料": "View acupoint information",
+        "管理診療費用及收費項目": "Manage medical expenses and charges",
+        "管理慣用藥方及穴位組合": "Manage commonly used prescriptions and acupoint combinations"
     }
 };
 
