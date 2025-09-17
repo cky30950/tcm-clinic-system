@@ -3442,6 +3442,14 @@ async function selectPatientForRegistration(patientId) {
                 showToast('掛號時間不能早於現在時間！', 'error');
                 return;
             }
+
+            // 在進入非同步處理前，為掛號按鈕顯示讀取圈。
+            // 使用通用輔助函式以兼容事件與非事件觸發的情況。
+            let loadingButton = getLoadingButtonFromEvent('button[onclick="confirmRegistration()"]');
+            if (loadingButton) {
+                // 傳入的文字僅用於語意描述，實際 setButtonLoading 只顯示讀取圈
+                setButtonLoading(loadingButton, '掛號中...');
+            }
             
             // 建立掛號物件，除了傳入 ID 與帳號之外，同時儲存病人姓名與醫師姓名。
             // 這可避免日後在監聽掛號狀態時為了取得姓名而再次查詢病人集合。
@@ -3471,21 +3479,6 @@ async function selectPatientForRegistration(patientId) {
                 }
             }
 
-            // 取得按鈕元素並設定讀取圈效果
-            let confirmBtn = null;
-            try {
-                // 嘗試從事件物件取得觸發的按鈕
-                if (typeof event !== 'undefined' && event && event.currentTarget) {
-                    confirmBtn = event.currentTarget;
-                }
-            } catch (_e) {}
-            if (!confirmBtn) {
-                // 若事件物件不可用，透過 selector 找到對應的確認掛號按鈕
-                confirmBtn = document.querySelector('button[onclick="confirmRegistration()"]');
-            }
-            if (confirmBtn) {
-                setButtonLoading(confirmBtn);
-            }
             try {
                 // 加入本地陣列
                 appointments.push(appointment);
@@ -3505,9 +3498,9 @@ async function selectPatientForRegistration(patientId) {
                 console.error('掛號失敗:', error);
                 showToast('掛號失敗，請稍後再試', 'error');
             } finally {
-                // 移除按鈕讀取圈效果
-                if (confirmBtn) {
-                    clearButtonLoading(confirmBtn);
+                // 無論成功或失敗，皆還原按鈕狀態
+                if (loadingButton) {
+                    clearButtonLoading(loadingButton);
                 }
             }
         }
@@ -4080,16 +4073,19 @@ function createAppointmentRow(appointment, patient, index) {
             </td>
             <td class="px-4 py-3 text-sm text-gray-900">
                 ${(() => {
-                    // 掛號列表的主訴文字僅顯示前八個字，以避免過長內容影響版面。若超過八個字，尾端顯示一個省略號「⋯」。
+                    // 掛號列表的主訴文字僅顯示前八個字，超過部分以「⋯」取代，避免過長內容影響版面。
                     const fullComplaint = appointment.chiefComplaint || '';
                     // 如果沒有主訴或主訴為空字串，顯示「無」
                     if (!fullComplaint) {
                         return '<div class="max-w-xs truncate" title="無">無</div>';
                     }
-                    // 若字數超過八個，截取前八個字並加上省略號「⋯」，否則全部顯示
-                    const truncated = fullComplaint.length > 8
-                        ? fullComplaint.substring(0, 8) + '⋯'
-                        : fullComplaint;
+                    let truncated = '';
+                    if (fullComplaint.length > 8) {
+                        // 若超過限制，截取前八個字並加上省略符號
+                        truncated = fullComplaint.substring(0, 8) + '⋯';
+                    } else {
+                        truncated = fullComplaint;
+                    }
                     // 使用 title 屬性顯示完整內容
                     return '<div class="max-w-xs truncate" title="' + fullComplaint + '">' + truncated + '</div>';
                 })()}
@@ -10923,11 +10919,11 @@ async function initializeSystemAfterLogin() {
                     showToast(`${patient.name} 沒有上次收費記錄可載入`, 'warning');
                     return;
                 }
-                // 清空現有收費項目並解析
-                // 在清空之前先暫存所有套票相關項目（包含購買與使用），以免被覆寫
-                const existingPackageItems = Array.isArray(selectedBillingItems)
-                    ? selectedBillingItems.filter(item => item && (item.category === 'packageUse' || item.category === 'package'))
+                // 保存當前診症中已使用的套票抵扣項目（category 為 packageUse）
+                const existingPackageUses = Array.isArray(selectedBillingItems)
+                    ? selectedBillingItems.filter(item => item.category === 'packageUse')
                     : [];
+                // 清空現有收費項目並解析
                 selectedBillingItems = [];
                 parseBillingItemsFromText(lastConsultation.billingItems);
                 // 根據要求：載入上次收費時，排除任何「使用套票」的抵扣項目與套票購買項目。
@@ -10936,9 +10932,9 @@ async function initializeSystemAfterLogin() {
                 if (Array.isArray(selectedBillingItems) && selectedBillingItems.length > 0) {
                     selectedBillingItems = selectedBillingItems.filter(item => item.category !== 'packageUse' && item.category !== 'package');
                 }
-                // 將原本存在的套票項目重新加入，讓本次已使用或購買的套票不會被載入上一筆收費覆蓋
-                if (existingPackageItems && existingPackageItems.length > 0) {
-                    selectedBillingItems = existingPackageItems.concat(selectedBillingItems);
+                // 合併先前的套票使用項目，使其不會被覆蓋
+                if (existingPackageUses && existingPackageUses.length > 0) {
+                    selectedBillingItems = existingPackageUses.concat(selectedBillingItems);
                 }
                 // 更新顯示
                 updateBillingDisplay();
@@ -11187,6 +11183,11 @@ const consultationDate = (() => {
             }
             
             // 載入收費項目
+            // 先保存當前診症中已使用的套票抵扣項目（category 為 packageUse），以避免覆蓋
+            const existingPackageUses = Array.isArray(selectedBillingItems)
+                ? selectedBillingItems.filter(item => item.category === 'packageUse')
+                : [];
+            // 清空現有收費項目
             selectedBillingItems = [];
             if (consultation.billingItems) {
                 // 直接將收費項目設置到隱藏文本域
@@ -11199,6 +11200,11 @@ const consultationDate = (() => {
                 // 這些項目在 parseBillingItemsFromText 中會被標記為 category === 'packageUse' 或 category === 'package'。
                 if (Array.isArray(selectedBillingItems) && selectedBillingItems.length > 0) {
                     selectedBillingItems = selectedBillingItems.filter(item => item.category !== 'packageUse' && item.category !== 'package');
+                }
+
+                // 合併保留下來的套票使用項目，使其不會被覆蓋
+                if (existingPackageUses && existingPackageUses.length > 0) {
+                    selectedBillingItems = existingPackageUses.concat(selectedBillingItems);
                 }
 
                 // 嘗試為舊記錄補全套票使用的 meta 資訊（patientId 與 packageRecordId）。
@@ -11217,8 +11223,13 @@ const consultationDate = (() => {
                 // 更新收費顯示
                 updateBillingDisplay();
             } else {
-                // 清空收費項目
+                // 沒有新收費項目，但仍保留先前的套票使用項目
+                if (existingPackageUses && existingPackageUses.length > 0) {
+                    selectedBillingItems = existingPackageUses;
+                }
+                // 清空隱藏文本域
                 document.getElementById('formBillingItems').value = '';
+                // 更新收費顯示
                 updateBillingDisplay();
             }
             
