@@ -14,21 +14,6 @@ window.translations = {
         // Chinese translations simply map original text to itself.  This
         // dictionary only needs entries for strings that have English
         // translations below – everything else will remain unchanged.
-        "無": "無",
-        "無安排": "無安排",
-        "尚未購買套票": "尚未購買套票",
-        "可於診療時購買套票享優惠": "可於診療時購買套票享優惠",
-        "下次複診": "下次複診",
-        "套票情況": "套票情況",
-        "有效套票": "有效套票",
-        "失效套票": "失效套票",
-        "下一頁": "下一頁",
-        "上一頁": "上一頁",
-        "刪除": "刪除",
-        "暫無診症記錄": "暫無診症記錄",
-        "該病人尚未有診症記錄": "該病人尚未有診症記錄",
-        "總診療次數": "總診療次數",
-        "最近診療": "最近診療",
         "載入病歷": "載入病歷",
         "無特殊主訴": "無特殊主訴",
         "病歷編號": "病歷編號",
@@ -329,6 +314,12 @@ window.translations = {
         "🔍 搜索穴位：": "🔍 搜索穴位：",
         "🔍 診斷模板": "🔍 診斷模板",
         "🔍 載入診斷模板": "🔍 載入診斷模板",
+        /*
+         * 加入個人設置與收費項目管理按鈕的完整字串，包含前導 + 號。這些字串在
+         * 英文介面中需要對應翻譯，中文介面則保持原樣。未添加將導致 i18n 在
+         * 找不到鍵時退回原字串。參見 system.html 中行 1715 與 1745。
+         */
+        "+ 管理分類": "+ 管理分類",
         /* 以下為補充的翻譯鍵，用於補齊介面上尚未翻譯的中文文字 */
         "不含模板庫與中藥庫": "不含模板庫與中藥庫",
         "中藥材名稱": "中藥材名稱",
@@ -473,21 +464,6 @@ window.translations = {
         "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
     },
     en: {
-        "無": "None",
-        "無安排": "No arrangements",
-        "尚未購買套票": "Has not purchased a package yet",
-        "可於診療時購買套票享優惠": "Can purchase a package during treatment to enjoy discounts",
-        "下次複診": "Next Follow-up Visit",
-        "套票情況": "Package Status",
-        "有效套票": "Valid Packages",
-        "失效套票": "Expired Package",
-        "下一頁": "Next Page",
-        "上一頁": "Previous Page",
-        "刪除": "Delete",
-        "暫無診症記錄": "No Consultation Records",
-        "該病人尚未有診症記錄": "No Consultation Records for This Patient",
-        "總診療次數": "Total Visits",
-        "最近診療": "Latest Visits",
         "載入病歷": "Load Record",
         "無特殊主訴": "None",
         "病歷編號": "Record Number",
@@ -788,6 +764,15 @@ window.translations = {
         "🔍 搜索穴位：": "🔍 Search Acupoints:",
         "🔍 診斷模板": "🔍 Diagnosis Templates",
         "🔍 載入診斷模板": "🔍 Load Diagnosis Templates",
+
+        /*
+         * Additional translations for action buttons in the personal settings and billing
+         * item management sections.  Without these exact mappings the English UI would
+         * still display Chinese when the language is switched.  The keys here include
+         * the leading "+" symbol and a space to match the actual button labels in
+         * system.html.  See lines 1715 and 1745 in system.html for reference.
+         */
+        "+ 管理分類": "+ Manage Categories",
         /* Additional translations to cover previously untranslated visible text */
         "不含模板庫與中藥庫": "Excluding template and herb libraries",
         "中藥材名稱": "Herbal ingredient name",
