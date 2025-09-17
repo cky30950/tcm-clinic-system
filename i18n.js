@@ -1079,7 +1079,31 @@ window.translations = {
             '尚無病人資料': 'No patient data yet',
             '匯入進度': 'Import progress',
             '匯入完成！': 'Import complete!',
-            '匯入失敗！': 'Import failed!'
+            '匯入失敗！': 'Import failed!',
+            // Additional labels for patient details and package status
+            '基本資料': 'Basic Information',
+            '病人編號：': 'Patient ID:',
+            '姓名：': 'Name:',
+            '年齡：': 'Age:',
+            '性別：': 'Gender:',
+            '電話：': 'Phone:',
+            '身分證：': 'ID Card:',
+            '出生日期：': 'Date of Birth:',
+            '地址：': 'Address:',
+            '醫療資訊': 'Medical Information',
+            '病史及備註：': 'History & Notes:',
+            '過敏史：': 'Allergies:',
+            '建檔日期：': 'Created At:',
+            '更新日期：': 'Updated At:',
+            '診症記錄摘要': 'Consultation Summary',
+            '載入診症記錄中...': 'Loading consultation records...',
+            '未設定': 'Not set',
+            '未知': 'Unknown',
+            '已到期': 'Expired',
+            '剩餘': 'Remaining',
+            '到期': 'expires',
+            '約': 'about',
+            '天': 'days'
         };
         // Merge dynamic translations into the existing dictionaries.
         Object.keys(dynamicTranslations).forEach(function(key) {
