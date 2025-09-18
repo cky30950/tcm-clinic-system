@@ -5237,7 +5237,7 @@ if (!patient) {
             contentDiv.innerHTML = `
                 <!-- 分頁導航 -->
                 <div class="mb-6 flex justify-between items-center bg-gray-50 rounded-lg p-4">
-                    <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+                    <div class="flex items-center space-x-4">
                         <h4 class="text-lg font-semibold text-gray-800">${recordTitle}</h4>
                         <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
                             ${visitText}
@@ -5268,7 +5268,7 @@ if (!patient) {
                 <div class="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
                     <div class="bg-gradient-to-r from-gray-50 to-blue-50 px-6 py-4 border-b border-gray-200">
                         <div class="flex justify-between items-center">
-<div class="flex flex-wrap items-center gap-2 sm:gap-4">
+                            <div class="flex items-center space-x-4">
                                 <span class="font-semibold text-gray-900 text-lg">
                                     ${(() => {
                                         // 使用通用日期解析函式處理各種日期格式
@@ -5607,7 +5607,7 @@ function displayConsultationMedicalHistoryPage() {
     contentDiv.innerHTML = `
         <!-- 分頁導航 -->
         <div class="mb-6 flex justify-between items-center bg-gray-50 rounded-lg p-4">
-            <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+            <div class="flex items-center space-x-4">
                 <h4 class="text-lg font-semibold text-gray-800">${recordTitle}</h4>
                 <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
                     ${visitText}
@@ -5638,7 +5638,7 @@ function displayConsultationMedicalHistoryPage() {
         <div class="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
             <div class="bg-gradient-to-r from-gray-50 to-blue-50 px-6 py-4 border-b border-gray-200">
                 <div class="flex justify-between items-center">
-                    <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+                    <div class="flex items-center space-x-4">
                         <span class="font-semibold text-gray-900 text-lg">
                             ${formatConsultationDateTime(consultation.date)}
                         </span>
