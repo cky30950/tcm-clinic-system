@@ -1490,6 +1490,17 @@ function translateNode(node, dict, lang) {
                     node.setAttribute('placeholder', dict[originalPh]);
                 }
             }
+            // Translate custom data-placeholder attributes (e.g., for contenteditable areas)
+            if (node.hasAttribute('data-placeholder')) {
+                const dpVal = node.getAttribute('data-placeholder').trim();
+                if (!node.dataset.originalDataPlaceholder && dpVal) {
+                    node.dataset.originalDataPlaceholder = dpVal;
+                }
+                const originalDp = node.dataset.originalDataPlaceholder;
+                if (originalDp && dict && Object.prototype.hasOwnProperty.call(dict, originalDp)) {
+                    node.setAttribute('data-placeholder', dict[originalDp]);
+                }
+            }
             node.dataset.lastLang = lang;
         }
     }

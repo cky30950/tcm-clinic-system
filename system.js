@@ -1069,43 +1069,46 @@ function generateMedicalRecordNumber() {
             return age;
         }
         
-        // 格式化年齡顯示
+        // 格式化年齡顯示，根據語言切換回傳不同單位
         function formatAge(birthDate) {
-            if (!birthDate) return '未知';
-            
+            // 若無出生日期，返回未知或 Unknown
+            if (!birthDate) {
+                // 使用翻譯函式以便切換語言
+                if (typeof window.t === 'function') {
+                    return window.t('未知');
+                }
+                return '未知';
+            }
             const birth = new Date(birthDate);
             const today = new Date();
-            
             let years = today.getFullYear() - birth.getFullYear();
             const monthDiff = today.getMonth() - birth.getMonth();
-            
+            // 若生日尚未到，則歲數減一
             if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
                 years--;
             }
-            
+            // 取得目前語言設定
+            const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+            // 超過一歲則顯示年齡
             if (years > 0) {
-                return `${years}歲`;
-            } else {
-                // 未滿一歲的嬰幼兒顯示月數
-                let months = today.getMonth() - birth.getMonth();
-                let days = today.getDate() - birth.getDate();
-                
-                if (days < 0) {
-                    months--;
-                    const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-                    days += lastMonth.getDate();
-                }
-                
-                if (months < 0) {
-                    months += 12;
-                }
-                
-                if (months > 0) {
-                    return `${months}個月`;
-                } else {
-                    return `${days}天`;
-                }
+                return lang === 'en' ? `${years} years` : `${years}歲`;
             }
+            // 未滿一歲顯示月或天
+            let months = today.getMonth() - birth.getMonth();
+            let days = today.getDate() - birth.getDate();
+            if (days < 0) {
+                months--;
+                // 上一個月的天數
+                const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+                days += lastMonth.getDate();
+            }
+            if (months < 0) {
+                months += 12;
+            }
+            if (months > 0) {
+                return lang === 'en' ? `${months} months` : `${months}個月`;
+            }
+            return lang === 'en' ? `${days} days` : `${days}天`;
         }
         
         // 移除原先依賴全域 patients 陣列產生病人編號的函式，以避免使用未同步的本地資料。
