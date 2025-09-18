@@ -510,6 +510,18 @@ window.translations = {
         "請輸入電子郵件": "請輸入電子郵件",
         "請輸入密碼": "請輸入密碼",
         "管理慣用藥方及穴位組合": "管理慣用藥方及穴位組合",
+        /* Additional keys added to fill missing translations in the zh dictionary.
+         * These entries mirror the Chinese originals and enable proper mapping
+         * when switching languages. */
+        "組合名稱 *": "組合名稱 *",
+        "個可用": "個可用",
+        "管理中藥分類": "管理中藥分類",
+        "管理穴位分類": "管理穴位分類",
+        "管理醫囑分類": "管理醫囑分類",
+        "管理診斷分類": "管理診斷分類",
+        // 簡體中文搜索提示變體
+        "搜索穴位、經絡名稱或功能...": "搜索穴位、經絡名稱或功能...",
+        "搜索穴位名稱、經絡或定位...": "搜索穴位名稱、經絡或定位...",
     },
     en: {
         "暫無診症記錄": "No medical records yet",
@@ -963,8 +975,18 @@ window.translations = {
         "查看中藥材及方劑資料": "View information on Chinese herbal medicines and prescriptions",
         "查看穴位資料": "View acupoint information",
         "管理診療費用及收費項目": "Manage medical expenses and charges",
-        "管理慣用藥方及穴位組合": "Manage commonly used prescriptions and acupoint combinations"
-        ,
+        "管理慣用藥方及穴位組合": "Manage commonly used prescriptions and acupoint combinations",
+        /* Additional translations added to cover previously untranslated Chinese labels.
+         * These keys correspond to new features like category management and dynamic labels. */
+        "組合名稱 *": "Combination Name *",
+        "個可用": "available",
+        "管理中藥分類": "Manage herb categories",
+        "管理穴位分類": "Manage acupoint categories",
+        "管理醫囑分類": "Manage prescription categories",
+        "管理診斷分類": "Manage diagnosis categories",
+        // Simplified Chinese search hints
+        "搜索穴位、經絡名稱或功能...": "Search acupoints, meridian name, or function...",
+        "搜索穴位名稱、經絡或定位...": "Search acupoint name, meridian, or location...",
         // Additional placeholder translations
         "中醫病名診斷...": "TCM disease name diagnosis...",
         "例如：10": "e.g.: 10",
@@ -1379,21 +1401,28 @@ function translateNode(node, dict, lang) {
                         replacement = dict[base] + suffix;
                     }
                 } else {
-                    // 2. Patterns like "Name的診症記錄" or "Name的病歷記錄".
-                    //    Extract the name and translate the suffix.
-                    const diagMatch = original.match(/^(.+?)(的診症記錄)$/);
-                    const medMatch = original.match(/^(.+?)(的病歷記錄)$/);
-                    if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
-                        replacement = diagMatch[1] + dict[diagMatch[2]];
-                    } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
-                        replacement = medMatch[1] + dict[medMatch[2]];
+                    // 2. Pattern for numeric available counts like "11 個可用".
+                    //    Extract the numeric prefix and translate the "個可用" suffix.
+                    const availableMatch = original.match(/^(\d+)\s*個可用$/);
+                    if (availableMatch && dict && Object.prototype.hasOwnProperty.call(dict, '個可用')) {
+                        replacement = availableMatch[1] + ' ' + dict['個可用'];
                     } else {
-                        // 3. Generic pattern for base strings ending with a full‑width colon (：) and dynamic suffix.
-                        //    For example: "當前用戶：王五".  If the base (including colon) exists in the dictionary,
-                        //    translate it and preserve the trailing dynamic part.
-                        const colonMatch = original.match(/^(.+?：)(.*)$/);
-                        if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
-                            replacement = dict[colonMatch[1]] + colonMatch[2];
+                        // 3. Patterns like "Name的診症記錄" or "Name的病歷記錄".
+                        //    Extract the name and translate the suffix.
+                        const diagMatch = original.match(/^(.+?)(的診症記錄)$/);
+                        const medMatch = original.match(/^(.+?)(的病歷記錄)$/);
+                        if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
+                            replacement = diagMatch[1] + dict[diagMatch[2]];
+                        } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
+                            replacement = medMatch[1] + dict[medMatch[2]];
+                        } else {
+                            // 4. Generic pattern for base strings ending with a full‑width colon (：) and dynamic suffix.
+                            //    For example: "當前用戶：王五".  If the base (including colon) exists in the dictionary,
+                            //    translate it and preserve the trailing dynamic part.
+                            const colonMatch = original.match(/^(.+?：)(.*)$/);
+                            if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
+                                replacement = dict[colonMatch[1]] + colonMatch[2];
+                            }
                         }
                     }
                 }
