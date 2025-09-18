@@ -14,7 +14,6 @@ window.translations = {
         // Chinese translations simply map original text to itself.  This
         // dictionary only needs entries for strings that have English
         // translations below – everything else will remain unchanged.
-        "搜尋穴位名稱、定位、功能或經絡...": "搜尋穴位名稱、定位、功能或經絡...",
         "暫無診症記錄": "暫無診症記錄",
         "該病人尚未有診症記錄": "該病人尚未有診症記錄",
         "總診療次數": "總診療次數",
@@ -493,17 +492,27 @@ window.translations = {
         "輸入分類名稱...": "輸入分類名稱...",
         "辨證分型、病機分析...": "辨證分型、病機分析...",
         "針灸穴位、手法、注意事項等...": "針灸穴位、手法、注意事項等...",
+        // Base versions without ellipsis or with trailing space.  Some placeholders
+        // may omit the dots or include a space before/after them.  Map these
+        // variants to themselves so that English translations can map them correctly.
+        "針灸穴位、手法、注意事項等": "針灸穴位、手法、注意事項等",
+        "針灸穴位、手法、注意事項等 ": "針灸穴位、手法、注意事項等 ",
+        "針灸穴位、手法、注意事項等 …": "針灸穴位、手法、注意事項等 …",
         // Variant with Chinese ellipsis character. Some placeholders may use the single
         // Unicode ellipsis (…); include this key to ensure translation works for
         // both versions.
         "針灸穴位、手法、注意事項等…": "針灸穴位、手法、注意事項等…",
         // Dietary/lifestyle note variants with ellipsis
+        "飲食宜忌、生活調護、注意事項等": "飲食宜忌、生活調護、注意事項等",
+        "飲食宜忌、生活調護、注意事項等 ": "飲食宜忌、生活調護、注意事項等 ",
+        "飲食宜忌、生活調護、注意事項等 …": "飲食宜忌、生活調護、注意事項等 …",
         "飲食宜忌、生活調護、注意事項等…": "飲食宜忌、生活調護、注意事項等…",
         // Age suffix.  When displaying ages such as "25歲" this suffix is
         // translated via dynamic pattern; the standalone translation maps to itself.
         "歲": "歲",
         "月": "月",
         "日": "日",
+        "搜尋穴位名稱、定位、功能或經絡...": "搜尋穴位名稱、定位、功能或經絡...",
         "飲食宜忌、生活調護、注意事項等...": "飲食宜忌、生活調護、注意事項等...",
         "搜尋診斷模板...": "搜尋診斷模板...",
         "搜尋醫囑模板...": "搜尋醫囑模板...",
@@ -536,7 +545,6 @@ window.translations = {
         "搜索穴位名稱、經絡或定位...": "搜索穴位名稱、經絡或定位...",
     },
     en: {
-        "搜尋穴位名稱、定位、功能或經絡...": "Search for acupoint names, locations, functions or meridians...",
         "暫無診症記錄": "No medical records yet",
         "該病人尚未有診症記錄": "This patient has no medical records yet",
         "總診療次數": "Total number of visits",
@@ -1061,15 +1069,25 @@ window.translations = {
         "輸入分類名稱...": "Enter category name...",
         "辨證分型、病機分析...": "Pattern classification, pathogenesis analysis...",
         "針灸穴位、手法、注意事項等...": "Acupuncture points, techniques, precautions, etc...",
+        // Base string variants without dots or with spacing.  Provide English
+        // translations for these too so that any form of the Chinese placeholder
+        // will be translated.
+        "針灸穴位、手法、注意事項等": "Acupuncture points, techniques, precautions, etc",
+        "針灸穴位、手法、注意事項等 ": "Acupuncture points, techniques, precautions, etc",
+        "針灸穴位、手法、注意事項等 …": "Acupuncture points, techniques, precautions, etc",
         // Variant with Unicode ellipsis to catch both forms
         "針灸穴位、手法、注意事項等…": "Acupuncture points, techniques, precautions, etc…",
         "飲食宜忌、生活調護、注意事項等…": "Dietary recommendations, lifestyle care, precautions, etc…",
+        "飲食宜忌、生活調護、注意事項等": "Dietary recommendations, lifestyle care, precautions, etc",
+        "飲食宜忌、生活調護、注意事項等 ": "Dietary recommendations, lifestyle care, precautions, etc",
+        "飲食宜忌、生活調護、注意事項等 …": "Dietary recommendations, lifestyle care, precautions, etc",
         // Age suffix translation.  When used standalone or in dynamic pattern
         // (e.g. "25歲"), this value will replace the suffix with the English
         // equivalent.  See dynamic pattern handling in translateNode().
-        "歲": "years",
+        "歲": "years old",
         "月": "months",
         "日": "days",
+        "搜尋穴位名稱、定位、功能或經絡...": "Search for acupoint names, locations, functions or meridians...",
         "飲食宜忌、生活調護、注意事項等...": "Dietary recommendations, lifestyle care, precautions, etc...",
         "搜尋診斷模板...": "Search diagnosis templates...",
         "搜尋醫囑模板...": "Search advice templates...",
