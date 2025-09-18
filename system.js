@@ -17556,7 +17556,30 @@ function refreshTemplateCategoryFilters() {
                 : 0;
               const countElem = document.getElementById('prescriptionCount');
               if (countElem) {
-                countElem.textContent = String(totalCount);
+                // Update the displayed total count
+                const newCount = String(totalCount);
+                countElem.textContent = newCount;
+                /*
+                 * Also update the i18n metadata on this element. When switching
+                 * languages, the translation script relies on dataset.originalText
+                 * to restore the original Chinese text. If this element was
+                 * initialised with a placeholder value (e.g. "1") it will be
+                 * stored as dataset.originalText and reused whenever the
+                 * language toggles, causing the count to revert to that initial
+                 * value. By refreshing dataset.originalText with the current
+                 * count we ensure the translation logic treats the updated
+                 * numeric value as the new "original" and does not revert it.
+                 */
+                try {
+                  if (countElem.dataset) {
+                    countElem.dataset.originalText = newCount;
+                    // Reset lastLang so translation will re-evaluate this node
+                    // the next time the language changes. An empty string
+                    // forces translateNode to process the element instead of
+                    // skipping it because of a matching lastLang.
+                    countElem.dataset.lastLang = '';
+                  }
+                } catch (_err) {}
               }
             } catch (_e) {}
             // 分頁：若非頁面跳轉則重置至第一頁
@@ -17658,7 +17681,25 @@ function refreshTemplateCategoryFilters() {
                 : 0;
               const countElem = document.getElementById('diagnosisCount');
               if (countElem) {
-                countElem.textContent = String(totalCount);
+                // Update the displayed total count
+                const newCount = String(totalCount);
+                countElem.textContent = newCount;
+                /*
+                 * Refresh the i18n metadata for this element. Without updating
+                 * dataset.originalText the translation system will revert this
+                 * count back to its initial value (often 1) whenever the
+                 * language is toggled. Setting dataset.originalText to the
+                 * current count ensures that language switching preserves the
+                 * correct value. Resetting dataset.lastLang forces the
+                 * translation function to reprocess this element when the
+                 * language changes, thereby using the updated originalText.
+                 */
+                try {
+                  if (countElem.dataset) {
+                    countElem.dataset.originalText = newCount;
+                    countElem.dataset.lastLang = '';
+                  }
+                } catch (_err) {}
               }
             } catch (_e) {}
             // 分頁：非頁面跳轉時重置頁數
