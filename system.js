@@ -388,12 +388,17 @@ async function commitPendingPackagePurchases() {
                                     packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : ''
                                 });
                             }
+                            // 將動態訊息拆分為靜態片段與變數，方便翻譯
                             showToast(
-                                `已使用套票：${item.name}，剩餘 ${useResult.record.remainingUses} 次`,
+                                t('已使用套票：') + item.name + t('，剩餘 ') + useResult.record.remainingUses + t(' 次'),
                                 'info'
                             );
                         } else {
-                            showToast(`使用套票失敗：${useResult && useResult.msg ? useResult.msg : '不明錯誤'}`, 'error');
+                            {
+                                // 使用套票失敗時，將錯誤訊息中的靜態部分翻譯，動態部分直接顯示
+                                const errorMsg = (useResult && useResult.msg) ? useResult.msg : t('不明錯誤');
+                                showToast(t('使用套票失敗：') + errorMsg, 'error');
+                            }
                         }
                     } catch (err) {
                         console.error('使用套票時發生錯誤:', err);
@@ -401,7 +406,8 @@ async function commitPendingPackagePurchases() {
                     }
                 }
             } else {
-                showToast(`套票「${item.name}」購買失敗`, 'error');
+                // 套票購買失敗訊息，分離靜態與動態內容以便翻譯
+                showToast(t('套票「') + item.name + t('」購買失敗'), 'error');
             }
         }
         // 購買與使用處理完成後，更新收費顯示（雖然表單即將關閉，但仍更新以避免留下錯誤狀態）
@@ -3767,7 +3773,8 @@ function subscribeToAppointments() {
                         }
                         if (patientName) {
                             // 顯示提示並播放音效
-                            showToast(`病人 ${patientName} 已進入候診中，請準備診症。`, 'info');
+                            // 使用翻譯函式將提示資訊分成靜態與動態內容
+                            showToast(t('病人 ') + patientName + t(' 已進入候診中，請準備診症。'), 'info');
                             playNotificationSound();
                         }
                     }
@@ -4259,7 +4266,8 @@ async function confirmPatientArrival(appointmentId) {
                 'completed': '已完成'
             };
             const currentStatusName = statusNames[appointment.status] || appointment.status;
-            showToast(`無法確認到達！病人 ${patient.name} 目前狀態為「${currentStatusName}」，只能對「已掛號」的病人確認到達。`, 'warning');
+            // 動態提示：無法確認到達
+            showToast(t('無法確認到達！病人 ') + patient.name + t(' 目前狀態為「') + currentStatusName + t('」，只能對「已掛號」的病人確認到達。'), 'warning');
             return;
         }
         // 更新狀態為候診中
@@ -4269,7 +4277,8 @@ async function confirmPatientArrival(appointmentId) {
         // 保存狀態變更
         localStorage.setItem('appointments', JSON.stringify(appointments));
         await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
-        showToast(`${patient.name} 已確認到達，進入候診狀態！`, 'success');
+        // 動態提示：確認到達成功
+        showToast(patient.name + t(' 已確認到達，進入候診狀態！'), 'success');
         loadTodayAppointments();
     } catch (error) {
         console.error('確認到達錯誤:', error);
@@ -4346,7 +4355,8 @@ async function removeAppointment(appointmentId) {
             localStorage.setItem('appointments', JSON.stringify(appointments));
             // 從遠端刪除掛號
             await window.firebaseDataManager.deleteAppointment(String(appointmentId));
-            showToast(`已移除 ${patient.name} 的掛號記錄`, 'success');
+            // 動態提示：移除掛號
+            showToast(t('已移除 ') + patient.name + t(' 的掛號記錄'), 'success');
             loadTodayAppointments();
             // 如果正在診症表單中顯示該病人，則關閉表單
             if (String(currentConsultingAppointmentId) === String(appointmentId)) {
@@ -4410,14 +4420,16 @@ async function startConsultation(appointmentId) {
                 'completed': '已完成'
             };
             const currentStatusName = statusNames[appointment.status] || appointment.status;
-            showToast(`無法開始診症！病人 ${patient.name} 目前狀態為「${currentStatusName}」，只能對「已掛號」或「候診中」的病人開始診症。`, 'error');
+            // 動態提示：無法開始診症
+            showToast(t('無法開始診症！病人 ') + patient.name + t(' 目前狀態為「') + currentStatusName + t('」，只能對「已掛號」或「候診中」的病人開始診症。'), 'error');
             return;
         }
         // 如果是已掛號狀態，自動確認到達
         if (appointment.status === 'registered') {
             appointment.arrivedAt = new Date().toISOString();
             appointment.confirmedBy = currentUserData ? currentUserData.username : currentUser;
-            showToast(`${patient.name} 已自動確認到達`, 'info');
+            // 動態提示：自動確認到達
+            showToast(patient.name + t(' 已自動確認到達'), 'info');
         }
         // 檢查是否已有其他病人在診症中（只檢查同一醫師的病人）
         const consultingAppointment = appointments.find(apt =>
@@ -4430,14 +4442,19 @@ async function startConsultation(appointmentId) {
         if (consultingAppointment) {
             const consultingPatient = result.data.find(p => p.id === consultingAppointment.patientId);
             const consultingPatientName = consultingPatient ? consultingPatient.name : '未知病人';
-            if (confirm(`您目前正在為 ${consultingPatientName} 診症。\n\n是否要結束該病人的診症並開始為 ${patient.name} 診症？\n\n注意：${consultingPatientName} 的狀態將改回候診中。`)) {
+            const confirmMessage =
+                t('您目前正在為 ') + consultingPatientName + t(' 診症。') + '\n\n' +
+                t('是否要結束該病人的診症並開始為 ') + patient.name + t(' 診症？') + '\n\n' +
+                t('注意：') + consultingPatientName + t(' 的狀態將改回候診中。');
+            if (confirm(confirmMessage)) {
                 consultingAppointment.status = 'waiting';
                 delete consultingAppointment.consultationStartTime;
                 delete consultingAppointment.consultingDoctor;
                 if (String(currentConsultingAppointmentId) === String(consultingAppointment.id)) {
                     closeConsultationForm();
                 }
-                showToast(`已結束 ${consultingPatientName} 的診症`, 'info');
+                // 動態提示：結束診症
+                showToast(t('已結束 ') + consultingPatientName + t(' 的診症'), 'info');
             } else {
                 return;
             }
@@ -4451,7 +4468,8 @@ async function startConsultation(appointmentId) {
         currentConsultingAppointmentId = appointmentId;
         showConsultationForm(appointment);
         loadTodayAppointments();
-        showToast(`開始為 ${patient.name} 診症`, 'success');
+        // 動態提示：開始診症
+        showToast(t('開始為 ') + patient.name + t(' 診症'), 'success');
     } catch (error) {
         console.error('開始診症錯誤:', error);
         showToast('開始診症時發生錯誤', 'error');
@@ -9180,11 +9198,13 @@ async function initializeSystemAfterLogin() {
             if (!item) return;
             
             const itemType = item.type === 'herb' ? '中藥材' : '方劑';
-            
-            if (confirm(`確定要刪除${itemType}「${item.name}」嗎？\n\n此操作無法復原！`)) {
+            // 使用翻譯函式組合確認訊息與結果訊息
+            const typeLabel = t(itemType);
+            const confirmMsg = t('確定要刪除') + typeLabel + t('「') + item.name + t('」嗎？') + '\n\n' + t('此操作無法復原！');
+            if (confirm(confirmMsg)) {
                 herbLibrary = herbLibrary.filter(h => h.id !== id);
                 // 不再從 Firestore 刪除資料
-                showToast(`${itemType}「${item.name}」已刪除！`, 'success');
+                showToast(typeLabel + t('「') + item.name + t('」已刪除！'), 'success');
                 displayHerbLibrary();
             }
         }
@@ -9760,7 +9780,9 @@ async function initializeSystemAfterLogin() {
             const item = billingItems.find(b => b.id === id);
             if (!item) return;
             
-            if (confirm(`確定要刪除收費項目「${item.name}」嗎？\n\n此操作無法復原！`)) {
+            // 使用翻譯函式組合確認訊息
+            const confirmMsg = t('確定要刪除收費項目') + t('「') + item.name + t('」嗎？') + '\n\n' + t('此操作無法復原！');
+            if (confirm(confirmMsg)) {
                 billingItems = billingItems.filter(b => b.id !== id);
                 try {
                     await window.firebase.deleteDoc(
@@ -9769,7 +9791,7 @@ async function initializeSystemAfterLogin() {
                 } catch (error) {
                     console.error('刪除收費項目資料至 Firestore 失敗:', error);
                 }
-                showToast(`收費項目「${item.name}」已刪除！`, 'success');
+                showToast(t('收費項目') + t('「') + item.name + t('」已刪除！'), 'success');
                 displayBillingItems();
             }
         }
@@ -12660,7 +12682,8 @@ function triggerBackupImport() {
  */
 async function handleBackupFile(file) {
     if (!file) return;
-    if (!window.confirm('匯入備份將覆蓋現有資料，確定要繼續嗎？')) {
+    // 使用翻譯函式顯示匯入備份確認訊息
+    if (!window.confirm(t('匯入備份將覆蓋現有資料，確定要繼續嗎？'))) {
         return;
     }
     const button = document.getElementById('backupImportBtn');
@@ -12841,7 +12864,8 @@ async function handleTemplateImportFile(file) {
   if (!file) return;
   try {
     // 提醒使用者匯入將新增資料，不會刪除現有資料
-    if (!window.confirm('匯入模板資料將新增資料（不會刪除現有模板庫資料），是否繼續？')) {
+    // 使用翻譯函式顯示匯入模板確認訊息
+    if (!window.confirm(t('匯入模板資料將新增資料（不會刪除現有模板庫資料），是否繼續？'))) {
       return;
     }
     const text = await file.text();
@@ -13089,7 +13113,8 @@ function triggerHerbImport() {
 async function handleHerbImportFile(file) {
   if (!file) return;
   try {
-    if (!window.confirm('匯入中藥資料將新增資料（不會刪除現有中藥庫資料），是否繼續？')) {
+    // 使用翻譯函式顯示匯入中藥庫確認訊息
+    if (!window.confirm(t('匯入中藥資料將新增資料（不會刪除現有中藥庫資料），是否繼續？'))) {
       return;
     }
     const text = await file.text();
@@ -16779,7 +16804,8 @@ function refreshTemplateCategoryFilters() {
           /* duplicateHerbCombination 函式已移除（未使用） */
 
           function deleteHerbCombination(id) {
-            if (!confirm('確定要刪除此藥方組合嗎？')) return;
+            // 使用翻譯函式顯示刪除藥方組合確認訊息
+            if (!confirm(t('確定要刪除此藥方組合嗎？'))) return;
             herbCombinations = herbCombinations.filter(h => h.id !== id);
             renderHerbCombinations();
             // Persist changes for personal herb combinations
@@ -16949,7 +16975,8 @@ function refreshTemplateCategoryFilters() {
           /* duplicateAcupointCombination 函式已移除（未使用） */
 
           function deleteAcupointCombination(id) {
-            if (!confirm('確定要刪除此穴位組合嗎？')) return;
+            // 使用翻譯函式顯示刪除穴位組合確認訊息
+            if (!confirm(t('確定要刪除此穴位組合嗎？'))) return;
             acupointCombinations = acupointCombinations.filter(a => a.id !== id);
             renderAcupointCombinations();
             // Persist changes for personal acupoint combinations
@@ -17663,7 +17690,8 @@ function refreshTemplateCategoryFilters() {
           /* duplicatePrescriptionTemplate 函式已移除（未使用） */
 
           async function deletePrescriptionTemplate(id) {
-            if (!confirm('確定要刪除此醫囑模板嗎？')) return;
+            // 使用翻譯函式顯示刪除醫囑模板確認訊息
+            if (!confirm(t('確定要刪除此醫囑模板嗎？'))) return;
             prescriptionTemplates = prescriptionTemplates.filter(p => p.id !== id);
             // 不再從 Firestore 刪除醫囑模板；直接重新渲染列表
             renderPrescriptionTemplates();
@@ -17810,7 +17838,8 @@ function refreshTemplateCategoryFilters() {
           /* duplicateDiagnosisTemplate 函式已移除（未使用） */
 
           async function deleteDiagnosisTemplate(id) {
-            if (!confirm('確定要刪除此診斷模板嗎？')) return;
+            // 使用翻譯函式顯示刪除診斷模板確認訊息
+            if (!confirm(t('確定要刪除此診斷模板嗎？'))) return;
             diagnosisTemplates = diagnosisTemplates.filter(d => d.id !== id);
             // 不再從 Firestore 刪除診斷模板；直接重新渲染列表
             renderDiagnosisTemplates();
@@ -18075,7 +18104,7 @@ function refreshTemplateCategoryFilters() {
           }
 
           function removeCategory(type, index) {
-            if (confirm('確定要刪除此分類嗎？')) {
+            if (confirm(t('確定要刪除此分類嗎？'))) {
               // 先從全域分類中移除目標分類並取得被移除的名稱
               let removedArr = [];
               try {
