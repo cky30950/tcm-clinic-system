@@ -13469,6 +13469,12 @@ async function renderPatientPackages(patientId) {
 async function renderPackageStatusSection(patientId, pageChange = false) {
     const contentEl = document.getElementById('packageStatusContent');
     if (!contentEl) return;
+    // Store the current patient ID on the container for language change re-rendering
+    try {
+        if (contentEl.dataset) {
+            contentEl.dataset.patientId = (patientId !== undefined && patientId !== null) ? String(patientId) : '';
+        }
+    } catch (_e) {}
     try {
         // 若非分頁跳轉，則重置頁碼為第一頁
         if (!pageChange) {
@@ -19449,6 +19455,53 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
   window.searchAcupointForNotes = searchAcupointForNotes;
   window.addAcupointToNotes = addAcupointToNotes;
   window.clearAcupointNotesSearch = clearAcupointNotesSearch;
+
+  /**
+   * Global handler invoked by the i18n module whenever the language is changed.
+   *
+   * The clinic system dynamically builds certain sections of the UI, such as
+   * the patient package list in the consultation view and the package status
+   * section within a patient's detail modal.  These sections incorporate
+   * dynamic strings (e.g., remaining uses and expiration dates) that depend
+   * on the current language.  Because these portions are rendered via
+   * JavaScript rather than being static in the HTML, they are not
+   * automatically retranslated by the MutationObserver in i18n.js when
+   * language changes occur.  This handler explicitly refreshes those
+   * sections so that they reflect the newly selected language.
+   *
+   * @param {string} lang - The new language code selected by the user.
+   */
+  window.onLanguageChange = function (lang) {
+    try {
+      // Refresh the patient package list in the consultation UI.  This
+      // function will invoke renderPatientPackages using the current
+      // consulting appointment to rebuild the package cards with the
+      // appropriate language.
+      if (typeof refreshPatientPackagesUI === 'function') {
+        // refreshPatientPackagesUI returns a promise; handle errors silently
+        Promise.resolve(refreshPatientPackagesUI()).catch(err => console.error('refreshPatientPackagesUI error', err));
+      }
+    } catch (e) {
+      console.error('Error refreshing patient packages after language change:', e);
+    }
+    try {
+      // Re-render the package status section in the patient detail view.
+      // During renderPackageStatusSection we stored the current patientId
+      // on the container element's dataset (packageStatusContent).  Use
+      // that identifier to re-render the section with the updated
+      // language.  This ensures the remaining uses and expiration text
+      // rebuild with the new locale.
+      const contentEl = document.getElementById('packageStatusContent');
+      if (contentEl && contentEl.dataset && contentEl.dataset.patientId) {
+        const pid = contentEl.dataset.patientId;
+        if (pid && typeof renderPackageStatusSection === 'function') {
+          Promise.resolve(renderPackageStatusSection(pid, false)).catch(err => console.error('renderPackageStatusSection error', err));
+        }
+      }
+    } catch (e) {
+      console.error('Error refreshing package status section after language change:', e);
+    }
+  };
 
           // 初始化
 document.addEventListener('DOMContentLoaded', function() {
