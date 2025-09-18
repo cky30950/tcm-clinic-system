@@ -388,20 +388,42 @@ async function commitPendingPackagePurchases() {
                                     packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : ''
                                 });
                             }
-                            showToast(
-                                `已使用套票：${item.name}，剩餘 ${useResult.record.remainingUses} 次`,
-                                'info'
-                            );
+                            {
+                                // Show package use success message in selected language
+                                const lang = localStorage.getItem('lang') || 'zh';
+                                const zhMsg = `已使用套票：${item.name}，剩餘 ${useResult.record.remainingUses} 次`;
+                                const enMsg = `Used package: ${item.name}, remaining ${useResult.record.remainingUses} uses`;
+                                const msg = lang === 'en' ? enMsg : zhMsg;
+                                showToast(msg, 'info');
+                            }
                         } else {
-                            showToast(`使用套票失敗：${useResult && useResult.msg ? useResult.msg : '不明錯誤'}`, 'error');
+                            {
+                                const lang = localStorage.getItem('lang') || 'zh';
+                                const zhMsg = `使用套票失敗：${useResult && useResult.msg ? useResult.msg : '不明錯誤'}`;
+                                const enMsg = `Failed to use package: ${useResult && useResult.msg ? useResult.msg : 'Unknown error'}`;
+                                const msg = lang === 'en' ? enMsg : zhMsg;
+                                showToast(msg, 'error');
+                            }
                         }
                     } catch (err) {
                         console.error('使用套票時發生錯誤:', err);
-                        showToast('使用套票時發生錯誤', 'error');
+                        {
+                            const lang = localStorage.getItem('lang') || 'zh';
+                            const zhMsg = '使用套票時發生錯誤';
+                            const enMsg = 'An error occurred while using the package';
+                            const msg = lang === 'en' ? enMsg : zhMsg;
+                            showToast(msg, 'error');
+                        }
                     }
                 }
             } else {
-                showToast(`套票「${item.name}」購買失敗`, 'error');
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    const zhMsg = `套票「${item.name}」購買失敗`;
+                    const enMsg = `Failed to purchase package "${item.name}"`;
+                    const msg = lang === 'en' ? enMsg : zhMsg;
+                    showToast(msg, 'error');
+                }
             }
         }
         // 購買與使用處理完成後，更新收費顯示（雖然表單即將關閉，但仍更新以避免留下錯誤狀態）
@@ -1741,7 +1763,14 @@ async function syncUserDataFromFirebase() {
             }
             // 統計資訊將在登入後初始化系統時更新
 
-            showToast(`歡迎回來，${getUserDisplayName(user)}！`, 'success');
+            // Show a welcome message in the appropriate language
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const zhMsg = `歡迎回來，${getUserDisplayName(user)}！`;
+                const enMsg = `Welcome back, ${getUserDisplayName(user)}!`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'success');
+            }
         }
 
         // 側邊選單控制
@@ -3204,7 +3233,14 @@ async function selectPatientForRegistration(patientId) {
             if (allPatients && allPatients.length > 0) {
                 const consultingPatient = allPatients.find(p => p.id === consultingAppointment.patientId);
                 const consultingPatientName = consultingPatient ? consultingPatient.name : '某位病人';
-                showToast(`無法進行掛號！您目前正在為 ${consultingPatientName} 診症中，請完成後再進行掛號操作。`, 'warning');
+                // If the doctor is currently consulting another patient, inform the user in their chosen language
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    const zhMsg = `無法進行掛號！您目前正在為 ${consultingPatientName} 診症中，請完成後再進行掛號操作。`;
+                    const enMsg = `Cannot register! You are currently consulting ${consultingPatientName}. Please finish before registering another patient.`;
+                    const msg = lang === 'en' ? enMsg : zhMsg;
+                    showToast(msg, 'warning');
+                }
                 return;
             }
         } catch (error) {
@@ -3463,7 +3499,14 @@ async function selectPatientForRegistration(patientId) {
                 // 更新本地儲存作為備份
                 localStorage.setItem('appointments', JSON.stringify(appointments));
                 if (result.success) {
-                    showToast(`${selectedPatientForRegistration.name} 已掛號給 ${selectedDoctor.name}醫師！`, 'success');
+                    {
+                        // Show registration success message based on language
+                        const lang = localStorage.getItem('lang') || 'zh';
+                        const zhMsg = `${selectedPatientForRegistration.name} 已掛號給 ${selectedDoctor.name}醫師！`;
+                        const enMsg = `${selectedPatientForRegistration.name} has been registered to Dr. ${selectedDoctor.name}`;
+                        const msg = lang === 'en' ? enMsg : zhMsg;
+                        showToast(msg, 'success');
+                    }
                     closeRegistrationModal();
                     clearPatientSearch();
                     loadTodayAppointments();
@@ -3767,8 +3810,15 @@ function subscribeToAppointments() {
                         }
                         if (patientName) {
                             // 顯示提示並播放音效
-                            showToast(`病人 ${patientName} 已進入候診中，請準備診症。`, 'info');
-                            playNotificationSound();
+                            {
+                                // Notify that the patient has entered the waiting state, with translation
+                                const lang = localStorage.getItem('lang') || 'zh';
+                                const zhMsg = `病人 ${patientName} 已進入候診中，請準備診症。`;
+                                const enMsg = `Patient ${patientName} has entered the waiting state, please prepare for consultation.`;
+                                const msg = lang === 'en' ? enMsg : zhMsg;
+                                showToast(msg, 'info');
+                                playNotificationSound();
+                            }
                         }
                     }
                 }
@@ -4259,7 +4309,20 @@ async function confirmPatientArrival(appointmentId) {
                 'completed': '已完成'
             };
             const currentStatusName = statusNames[appointment.status] || appointment.status;
-            showToast(`無法確認到達！病人 ${patient.name} 目前狀態為「${currentStatusName}」，只能對「已掛號」的病人確認到達。`, 'warning');
+            {
+                // Build a status name mapping for English
+                const lang = localStorage.getItem('lang') || 'zh';
+                const statusNamesEnMap = {
+                    '候診中': 'waiting',
+                    '診症中': 'consulting',
+                    '已完成': 'completed'
+                };
+                const currentStatusNameEn = statusNamesEnMap[currentStatusName] || currentStatusName;
+                const zhMsg = `無法確認到達！病人 ${patient.name} 目前狀態為「${currentStatusName}」，只能對「已掛號」的病人確認到達。`;
+                const enMsg = `Unable to confirm arrival! Patient ${patient.name} is currently "${currentStatusNameEn}". You can only confirm arrival for patients who are "registered".`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'warning');
+            }
             return;
         }
         // 更新狀態為候診中
@@ -4269,7 +4332,14 @@ async function confirmPatientArrival(appointmentId) {
         // 保存狀態變更
         localStorage.setItem('appointments', JSON.stringify(appointments));
         await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
-        showToast(`${patient.name} 已確認到達，進入候診狀態！`, 'success');
+        {
+            // Announce arrival confirmation in appropriate language
+            const lang = localStorage.getItem('lang') || 'zh';
+            const msg = lang === 'en'
+                ? `${patient.name} has been confirmed and is now waiting!`
+                : `${patient.name} 已確認到達，進入候診狀態！`;
+            showToast(msg, 'success');
+        }
         loadTodayAppointments();
     } catch (error) {
         console.error('確認到達錯誤:', error);
@@ -4319,15 +4389,33 @@ async function removeAppointment(appointmentId) {
         console.log(`移除掛號狀態檢查 - 病人: ${patient.name}, 當前狀態: ${appointment.status}`);
         // 檢查是否可以移除
         if (appointment.status === 'waiting') {
-            showToast(`無法移除掛號！病人 ${patient.name} 已確認到達候診中，請聯繫醫師處理。`, 'warning');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const zhMsg = `無法移除掛號！病人 ${patient.name} 已確認到達候診中，請聯繫醫師處理。`;
+                const enMsg = `Cannot remove registration! Patient ${patient.name} has already arrived and is waiting. Please contact the doctor to proceed.`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'warning');
+            }
             return;
         }
         if (appointment.status === 'consulting') {
-            showToast(`無法移除掛號！病人 ${patient.name} 目前正在診症中，請先結束診症後再移除。`, 'warning');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const zhMsg = `無法移除掛號！病人 ${patient.name} 目前正在診症中，請先結束診症後再移除。`;
+                const enMsg = `Cannot remove registration! Patient ${patient.name} is currently being consulted. Please finish the consultation before removing.`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'warning');
+            }
             return;
         }
         if (appointment.status === 'completed') {
-            showToast(`無法移除掛號！病人 ${patient.name} 已完成診症，已完成的記錄無法移除。`, 'warning');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const zhMsg = `無法移除掛號！病人 ${patient.name} 已完成診症，已完成的記錄無法移除。`;
+                const enMsg = `Cannot remove registration! Patient ${patient.name} has completed consultation, completed records cannot be removed.`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'warning');
+            }
             return;
         }
         // 確認移除
@@ -4357,7 +4445,14 @@ async function removeAppointment(appointmentId) {
             localStorage.setItem('appointments', JSON.stringify(appointments));
             // 從遠端刪除掛號
             await window.firebaseDataManager.deleteAppointment(String(appointmentId));
-            showToast(`已移除 ${patient.name} 的掛號記錄`, 'success');
+            // 根據語言顯示刪除掛號記錄提示
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const msg = lang === 'en'
+                    ? `Removed registration record for ${patient.name}`
+                    : `已移除 ${patient.name} 的掛號記錄`;
+                showToast(msg, 'success');
+            }
             loadTodayAppointments();
             // 如果正在診症表單中顯示該病人，則關閉表單
             if (String(currentConsultingAppointmentId) === String(appointmentId)) {
@@ -4416,19 +4511,37 @@ async function startConsultation(appointmentId) {
         console.log(`開始診症狀態檢查 - 病人: ${patient.name}, 當前狀態: ${appointment.status}`);
         // 檢查病人狀態是否允許開始診症
         if (!['waiting', 'registered'].includes(appointment.status)) {
+            // 狀態名稱映射，用於中英文提示
             const statusNames = {
                 'consulting': '診症中',
                 'completed': '已完成'
             };
             const currentStatusName = statusNames[appointment.status] || appointment.status;
-            showToast(`無法開始診症！病人 ${patient.name} 目前狀態為「${currentStatusName}」，只能對「已掛號」或「候診中」的病人開始診症。`, 'error');
+            const lang = localStorage.getItem('lang') || 'zh';
+            const statusNamesEnMap = {
+                '診症中': 'consulting',
+                '已完成': 'completed',
+                '候診中': 'waiting',
+                '已掛號': 'registered'
+            };
+            const currentStatusNameEn = statusNamesEnMap[currentStatusName] || currentStatusName;
+            const zhMsg = `無法開始診症！病人 ${patient.name} 目前狀態為「${currentStatusName}」，只能對「已掛號」或「候診中」的病人開始診症。`;
+            const enMsg = `Cannot start consultation! Patient ${patient.name} is currently "${currentStatusNameEn}". You can only start a consultation for patients who are "registered" or "waiting".`;
+            const msg = lang === 'en' ? enMsg : zhMsg;
+            showToast(msg, 'error');
             return;
         }
         // 如果是已掛號狀態，自動確認到達
         if (appointment.status === 'registered') {
             appointment.arrivedAt = new Date().toISOString();
             appointment.confirmedBy = currentUserData ? currentUserData.username : currentUser;
-            showToast(`${patient.name} 已自動確認到達`, 'info');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const msg = lang === 'en'
+                    ? `${patient.name} has been automatically confirmed as arrived`
+                    : `${patient.name} 已自動確認到達`;
+                showToast(msg, 'info');
+            }
         }
         // 檢查是否已有其他病人在診症中（只檢查同一醫師的病人）
         const consultingAppointment = appointments.find(apt =>
@@ -4453,7 +4566,13 @@ async function startConsultation(appointmentId) {
                 if (String(currentConsultingAppointmentId) === String(consultingAppointment.id)) {
                     closeConsultationForm();
                 }
-                showToast(`已結束 ${consultingPatientName} 的診症`, 'info');
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    const msg = lang === 'en'
+                        ? `Finished ${consultingPatientName}'s consultation`
+                        : `已結束 ${consultingPatientName} 的診症`;
+                    showToast(msg, 'info');
+                }
             } else {
                 return;
             }
@@ -4467,7 +4586,13 @@ async function startConsultation(appointmentId) {
         currentConsultingAppointmentId = appointmentId;
         showConsultationForm(appointment);
         loadTodayAppointments();
-        showToast(`開始為 ${patient.name} 診症`, 'success');
+        {
+            const lang = localStorage.getItem('lang') || 'zh';
+            const msg = lang === 'en'
+                ? `Started consultation for ${patient.name}`
+                : `開始為 ${patient.name} 診症`;
+            showToast(msg, 'success');
+        }
     } catch (error) {
         console.error('開始診症錯誤:', error);
         showToast('開始診症時發生錯誤', 'error');
@@ -4854,7 +4979,13 @@ async function showConsultationForm(appointment) {
                         await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
                         // 回復暫存套票變更
                         await revertPendingPackageChanges();
-                        showToast(`已取消 ${patient.name} 的診症，病人回到候診狀態`, 'info');
+                        {
+                            const lang = localStorage.getItem('lang') || 'zh';
+                            const msg = lang === 'en'
+                                ? `Cancelled ${patient.name}'s consultation and reverted to waiting`
+                                : `已取消 ${patient.name} 的診症，病人回到候診狀態`;
+                            showToast(msg, 'info');
+                        }
                         // 關閉表單並清理
                         closeConsultationForm();
                         currentConsultingAppointmentId = null;
@@ -7756,12 +7887,30 @@ async function withdrawConsultation(appointmentId) {
                 'consulting': '診症中'
             };
             const currentStatusName = statusNames[appointment.status] || appointment.status;
-            showToast(`無法撤回診症！病人 ${patient.name} 目前狀態為「${currentStatusName}」，只能撤回已完成的診症。`, 'warning');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const statusNamesEnMap = {
+                    '已掛號': 'registered',
+                    '候診中': 'waiting',
+                    '診症中': 'consulting'
+                };
+                const currentStatusNameEn = statusNamesEnMap[currentStatusName] || currentStatusName;
+                const zhMsg = `無法撤回診症！病人 ${patient.name} 目前狀態為「${currentStatusName}」，只能撤回已完成的診症。`;
+                const enMsg = `Cannot retract consultation! Patient ${patient.name} is currently "${currentStatusNameEn}". You can only retract completed consultations.`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'warning');
+            }
             return;
         }
         // 檢查是否有診症記錄
         if (!appointment.consultationId) {
-            showToast(`無法撤回診症！病人 ${patient.name} 沒有對應的診症記錄。`, 'error');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const zhMsg = `無法撤回診症！病人 ${patient.name} 沒有對應的診症記錄。`;
+                const enMsg = `Cannot retract consultation! Patient ${patient.name} has no corresponding consultation record.`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'error');
+            }
             return;
         }
         // 嘗試取得對應的診症記錄。
@@ -7826,10 +7975,13 @@ async function withdrawConsultation(appointmentId) {
 
         // Step 4: 若最終仍然找不到診症記錄，提示錯誤並返回。
         if (!consultation) {
-            showToast(
-                `無法撤回診症！找不到病人 ${patient.name} 的診症記錄資料。`,
-                'error'
-            );
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const zhMsg = `無法撤回診症！找不到病人 ${patient.name} 的診症記錄資料。`;
+                const enMsg = `Cannot retract consultation! Consultation record for ${patient.name} not found.`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'error');
+            }
             return;
         }
 
@@ -7925,10 +8077,13 @@ async function withdrawConsultation(appointmentId) {
         appointment
     );
 
-    showToast(
-        `已撤回 ${patient.name} 的診症，病人狀態回到已掛號`,
-        'success'
-    );
+    {
+        const lang = localStorage.getItem('lang') || 'zh';
+        const zhMsg = `已撤回 ${patient.name} 的診症，病人狀態回到已掛號`;
+        const enMsg = `Retracted consultation for ${patient.name} and reverted status to registered`;
+        const msg = lang === 'en' ? enMsg : zhMsg;
+        showToast(msg, 'success');
+    }
 
     // 如果正在編輯該病歷，則關閉表單
     if (
@@ -8029,12 +8184,30 @@ async function editMedicalRecord(appointmentId) {
                 'consulting': '診症中'
             };
             const currentStatusName = statusNames[appointment.status] || appointment.status;
-            showToast(`無法修改病歷！病人 ${patient.name} 目前狀態為「${currentStatusName}」，只能修改已完成診症的病歷。`, 'warning');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const statusNamesEnMap = {
+                    '已掛號': 'registered',
+                    '候診中': 'waiting',
+                    '診症中': 'consulting'
+                };
+                const currentStatusNameEn = statusNamesEnMap[currentStatusName] || currentStatusName;
+                const zhMsg = `無法修改病歷！病人 ${patient.name} 目前狀態為「${currentStatusName}」，只能修改已完成診症的病歷。`;
+                const enMsg = `Cannot modify medical record! Patient ${patient.name} is currently "${currentStatusNameEn}". You can only modify records of completed consultations.`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'warning');
+            }
             return;
         }
         // 檢查是否有診症記錄
         if (!appointment.consultationId) {
-            showToast(`無法修改病歷！病人 ${patient.name} 沒有對應的診症記錄。`, 'error');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const zhMsg = `無法修改病歷！病人 ${patient.name} 沒有對應的診症記錄。`;
+                const enMsg = `Cannot modify medical record! Patient ${patient.name} has no corresponding consultation record.`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'error');
+            }
             return;
         }
         // 嘗試從本地或 Firebase 取得診療記錄
@@ -8066,7 +8239,13 @@ async function editMedicalRecord(appointmentId) {
         }
         if (!consultation) {
             // 如果仍然找不到診症記錄，提示錯誤後結束
-            showToast(`無法修改病歷！找不到病人 ${patient.name} 的診症記錄資料。`, 'error');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const zhMsg = `無法修改病歷！找不到病人 ${patient.name} 的診症記錄資料。`;
+                const enMsg = `Cannot modify medical record! Consultation record for ${patient.name} not found.`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'error');
+            }
             return;
         }
         // 檢查是否有其他病人正在診症中（僅限制同一醫師）
@@ -8098,7 +8277,13 @@ async function editMedicalRecord(appointmentId) {
                 if (String(currentConsultingAppointmentId) === String(consultingAppointment.id)) {
                     closeConsultationForm();
                 }
-                showToast(`已結束 ${consultingPatientName} 的診症`, 'info');
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    const msg = lang === 'en'
+                        ? `Finished ${consultingPatientName}'s consultation`
+                        : `已結束 ${consultingPatientName} 的診症`;
+                    showToast(msg, 'info');
+                }
                 localStorage.setItem('appointments', JSON.stringify(appointments));
                 // 同步更新到 Firebase
                 await window.firebaseDataManager.updateAppointment(String(consultingAppointment.id), consultingAppointment);
@@ -8109,7 +8294,13 @@ async function editMedicalRecord(appointmentId) {
         // 設置為編輯模式
         currentConsultingAppointmentId = appointmentId;
         showConsultationForm(appointment);
-        showToast(`進入 ${patient.name} 的病歷編輯模式`, 'info');
+        {
+            const lang = localStorage.getItem('lang') || 'zh';
+            const msg = lang === 'en'
+                ? `Entered medical record edit mode for ${patient.name}`
+                : `進入 ${patient.name} 的病歷編輯模式`;
+            showToast(msg, 'info');
+        }
     } catch (error) {
         console.error('讀取病人資料錯誤:', error);
         showToast('讀取病人資料失敗', 'error');
@@ -9744,7 +9935,13 @@ async function initializeSystemAfterLogin() {
                     // 如果輸入1-10之間的數字，自動轉換為折扣比例
                     price = price / 10;
                     document.getElementById('billingItemPrice').value = price;
-                    showToast(`已自動轉換為${(price * 100).toFixed(0)}折`, 'info');
+                    {
+                        const lang = localStorage.getItem('lang') || 'zh';
+                        const zhMsg = `已自動轉換為${(price * 100).toFixed(0)}折`;
+                        const enMsg = `Automatically converted to ${(price * 100).toFixed(0)}% discount`;
+                        const msg = lang === 'en' ? enMsg : zhMsg;
+                        showToast(msg, 'info');
+                    }
                 }
             }
             
@@ -9911,7 +10108,13 @@ async function initializeSystemAfterLogin() {
             // 檢查是否已經添加過
             const existingIndex = selectedPrescriptionItems.findIndex(p => p.id === itemId);
             if (existingIndex !== -1) {
-                showToast(`${item.name} 已經在處方中！`, 'warning');
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    const zhMsg = `${item.name} 已經在處方中！`;
+                    const enMsg = `${item.name} is already in the prescription!`;
+                    const msg = lang === 'en' ? enMsg : zhMsg;
+                    showToast(msg, 'warning');
+                }
                 return;
             }
             
@@ -9940,7 +10143,15 @@ async function initializeSystemAfterLogin() {
             // 清除搜索
             clearPrescriptionSearch();
             
-            showToast(`已添加${type === 'herb' ? '中藥材' : '方劑'}：${item.name}`, 'success');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const zhLabel = type === 'herb' ? '中藥材' : '方劑';
+                const enLabel = type === 'herb' ? 'herb' : 'formula';
+                const zhMsg = `已添加${zhLabel}：${item.name}`;
+                const enMsg = `Added ${enLabel}: ${item.name}`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'success');
+            }
         }
         
 
@@ -10099,7 +10310,13 @@ async function initializeSystemAfterLogin() {
                 // 更新現有藥費項目的數量為天數
                 selectedBillingItems[existingMedicineFeeIndex].quantity = days;
                 updateBillingDisplay();
-                showToast(`已更新藥費：${medicineFeeItem.name} x${days}天`, 'info');
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    const zhMsg = `已更新藥費：${medicineFeeItem.name} x${days}天`;
+                    const enMsg = `Updated medicine fee: ${medicineFeeItem.name} x${days} days`;
+                    const msg = lang === 'en' ? enMsg : zhMsg;
+                    showToast(msg, 'info');
+                }
             } else {
                 // 如果沒有藥費項目，自動添加
                 const billingItem = {
@@ -10115,7 +10332,13 @@ async function initializeSystemAfterLogin() {
                 };
                 selectedBillingItems.push(billingItem);
                 updateBillingDisplay();
-                showToast(`已自動添加藥費：${medicineFeeItem.name} x${days}天`, 'info');
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    const zhMsg = `已自動添加藥費：${medicineFeeItem.name} x${days}天`;
+                    const enMsg = `Auto-added medicine fee: ${medicineFeeItem.name} x${days} days`;
+                    const msg = lang === 'en' ? enMsg : zhMsg;
+                    showToast(msg, 'info');
+                }
             }
         }
         
@@ -10392,7 +10615,13 @@ async function initializeSystemAfterLogin() {
             // 清除搜索
             clearBillingSearch();
 
-            showToast(`已添加收費項目：${item.name}`, 'success');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const zhMsg = `已添加收費項目：${item.name}`;
+                const enMsg = `Added billing item: ${item.name}`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'success');
+            }
         }
         
         // 更新收費項目顯示
@@ -10842,7 +11071,13 @@ async function initializeSystemAfterLogin() {
                 // 取得最近一次診症記錄
                 const lastConsultation = patientConsultations.length > 0 ? patientConsultations[0] : null;
                 if (!lastConsultation || !lastConsultation.prescription) {
-                    showToast(`${patient.name} 沒有上次處方記錄可載入`, 'warning');
+                    {
+                        const lang = localStorage.getItem('lang') || 'zh';
+                        const zhMsg = `${patient.name} 沒有上次處方記錄可載入`;
+                        const enMsg = `${patient.name} has no previous prescription record to load`;
+                        const msg = lang === 'en' ? enMsg : zhMsg;
+                        showToast(msg, 'warning');
+                    }
                     return;
                 }
                 // 清空並解析處方
@@ -11017,7 +11252,13 @@ async function initializeSystemAfterLogin() {
                 // 最近一次診症記錄
                 const lastConsultation = patientConsultations.length > 0 ? patientConsultations[0] : null;
                 if (!lastConsultation || !lastConsultation.billingItems) {
-                    showToast(`${patient.name} 沒有上次收費記錄可載入`, 'warning');
+                    {
+                        const lang = localStorage.getItem('lang') || 'zh';
+                        const zhMsg = `${patient.name} 沒有上次收費記錄可載入`;
+                        const enMsg = `${patient.name} has no previous billing record to load`;
+                        const msg = lang === 'en' ? enMsg : zhMsg;
+                        showToast(msg, 'warning');
+                    }
                     return;
                 }
                 // 保存當前診症中已使用的套票抵扣項目（category 為 packageUse）
@@ -11344,7 +11585,15 @@ const consultationDate = (() => {
             // 滾動到診症表單
             document.getElementById('consultationForm').scrollIntoView({ behavior: 'smooth' });
             
-            showToast(`已載入 ${patient ? patient.name : '未知病人'} 在 ${consultationDate} 的完整病歷記錄`, 'success');
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const nameStr = patient ? patient.name : '未知病人';
+                const nameEn = patient ? patient.name : 'unknown patient';
+                const zhMsg = `已載入 ${nameStr} 在 ${consultationDate} 的完整病歷記錄`;
+                const enMsg = `Loaded full medical record for ${nameEn} on ${consultationDate}`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'success');
+            }
         }
         
         // 清空診症表單時也要清空處方搜索
@@ -11898,9 +12147,26 @@ async function toggleUserStatus(id) {
                 
                 localStorage.setItem('users', JSON.stringify(users));
                 displayUsers();
-                showToast(`用戶「${user.name}」已${action}！`, 'success');
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    // Determine English action words
+                    const actionZh = action; // '停用' or '啟用'
+                    const actionEn = user.active ? 'disabled' : 'enabled';
+                    const zhMsg = `用戶「${user.name}」已${actionZh}！`;
+                    const enMsg = `User "${user.name}" has been ${actionEn}!`;
+                    const msg = lang === 'en' ? enMsg : zhMsg;
+                    showToast(msg, 'success');
+                }
             } else {
-                showToast(`${action}用戶失敗，請稍後再試`, 'error');
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    // For failure message, refer to the action in English or Chinese
+                    const actionEn = user.active ? 'disable' : 'enable';
+                    const zhMsg = `${action}用戶失敗，請稍後再試`;
+                    const enMsg = `Failed to ${actionEn} user, please try again later`;
+                    const msg = lang === 'en' ? enMsg : zhMsg;
+                    showToast(msg, 'error');
+                }
             }
         } catch (error) {
             console.error('更新用戶狀態錯誤:', error);
@@ -11957,7 +12223,13 @@ async function deleteUser(id) {
                 
                 localStorage.setItem('users', JSON.stringify(users));
                 displayUsers();
-                showToast(`用戶「${user.name}」已刪除！`, 'success');
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    const zhMsg = `用戶「${user.name}」已刪除！`;
+                    const enMsg = `User "${user.name}" has been deleted!`;
+                    const msg = lang === 'en' ? enMsg : zhMsg;
+                    showToast(msg, 'success');
+                }
             } else {
                 showToast('刪除用戶失敗，請稍後再試', 'error');
             }
@@ -13735,10 +14007,22 @@ async function useOnePackage(patientId, packageRecordId) {
         } catch (_e) {}
         updateBillingDisplay();
         await refreshPatientPackagesUI();
-        showToast(`已使用套票：${res.record.name}，剩餘 ${res.record.remainingUses} 次`, 'success');
+        {
+            const lang = localStorage.getItem('lang') || 'zh';
+            const zhMsg = `已使用套票：${res.record.name}，剩餘 ${res.record.remainingUses} 次`;
+            const enMsg = `Used package: ${res.record.name}, remaining ${res.record.remainingUses} uses`;
+            const msg = lang === 'en' ? enMsg : zhMsg;
+            showToast(msg, 'success');
+        }
     } catch (error) {
         console.error('使用套票時發生錯誤:', error);
-        showToast('使用套票時發生錯誤', 'error');
+        {
+            const lang = localStorage.getItem('lang') || 'zh';
+            const zhMsg = '使用套票時發生錯誤';
+            const enMsg = 'An error occurred while using the package';
+            const msg = lang === 'en' ? enMsg : zhMsg;
+            showToast(msg, 'error');
+        }
     } finally {
         if (loadingButton) {
             clearButtonLoading(loadingButton);
