@@ -1062,6 +1062,14 @@ window.translations = {
         // Added translations for login page input placeholders
         "請輸入電子郵件": "Please enter your email",
         "請輸入密碼": "Please enter your password"
+        ,
+        // Age units for dynamic age formatting.  These entries allow the
+        // translation logic to convert age suffixes such as "30歲", "6個月"
+        // and "5天" by matching the numeric prefix and appending the
+        // translated unit.  See translateNode for the corresponding regex.
+        "歲": "years",
+        "個月": "months",
+        "天": "days"
     }
 };
 
@@ -1406,10 +1414,15 @@ function translateNode(node, dict, lang) {
                     // 2. Pattern for numeric available counts like "11 個可用".
                     //    Extract the numeric prefix and translate the "個可用" suffix.
                     const availableMatch = original.match(/^(\d+)\s*個可用$/);
+                    // 3. Pattern for ages such as "30歲", "6個月" or "5天".
+                    //    Extract the numeric prefix and translate the suffix if present in the dictionary.
+                    const ageMatch = original.match(/^(\d+)\s*(歲|個月|天)$/);
                     if (availableMatch && dict && Object.prototype.hasOwnProperty.call(dict, '個可用')) {
                         replacement = availableMatch[1] + ' ' + dict['個可用'];
+                    } else if (ageMatch && dict && Object.prototype.hasOwnProperty.call(dict, ageMatch[2])) {
+                        replacement = ageMatch[1] + ' ' + dict[ageMatch[2]];
                     } else {
-                        // 3. Patterns like "Name的診症記錄" or "Name的病歷記錄".
+                        // 4. Patterns like "Name的診症記錄" or "Name的病歷記錄".
                         //    Extract the name and translate the suffix.
                         const diagMatch = original.match(/^(.+?)(的診症記錄)$/);
                         const medMatch = original.match(/^(.+?)(的病歷記錄)$/);
@@ -1418,7 +1431,7 @@ function translateNode(node, dict, lang) {
                         } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
                             replacement = medMatch[1] + dict[medMatch[2]];
                         } else {
-                            // 4. Generic pattern for base strings ending with a full‑width colon (：) and dynamic suffix.
+                            // 5. Generic pattern for base strings ending with a full‑width colon (：) and dynamic suffix.
                             //    For example: "當前用戶：王五".  If the base (including colon) exists in the dictionary,
                             //    translate it and preserve the trailing dynamic part.
                             const colonMatch = original.match(/^(.+?：)(.*)$/);
@@ -1462,17 +1475,23 @@ function translateNode(node, dict, lang) {
                             replacement = dict[base] + suffix;
                         }
                     } else {
-                        const diagMatch = original && original.match(/^(.+?)(的診症記錄)$/);
-                        const medMatch = original && original.match(/^(.+?)(的病歷記錄)$/);
-                        if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
-                            replacement = diagMatch[1] + dict[diagMatch[2]];
-                        } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
-                            replacement = medMatch[1] + dict[medMatch[2]];
+                        // Age pattern: e.g. "30歲", "6個月", "5天"
+                        const ageMatch = original && original.match(/^(\d+)\s*(歲|個月|天)$/);
+                        if (ageMatch && dict && Object.prototype.hasOwnProperty.call(dict, ageMatch[2])) {
+                            replacement = ageMatch[1] + ' ' + dict[ageMatch[2]];
                         } else {
-                            // Generic colon pattern: base with colon and dynamic suffix
-                            const colonMatch = original && original.match(/^(.+?：)(.*)$/);
-                            if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
-                                replacement = dict[colonMatch[1]] + colonMatch[2];
+                            const diagMatch = original && original.match(/^(.+?)(的診症記錄)$/);
+                            const medMatch = original && original.match(/^(.+?)(的病歷記錄)$/);
+                            if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
+                                replacement = diagMatch[1] + dict[diagMatch[2]];
+                            } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
+                                replacement = medMatch[1] + dict[medMatch[2]];
+                            } else {
+                                // Generic colon pattern: base with colon and dynamic suffix
+                                const colonMatch = original && original.match(/^(.+?：)(.*)$/);
+                                if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
+                                    replacement = dict[colonMatch[1]] + colonMatch[2];
+                                }
                             }
                         }
                     }
@@ -1488,6 +1507,17 @@ function translateNode(node, dict, lang) {
                 const originalPh = node.dataset.originalPlaceholder;
                 if (originalPh && dict && Object.prototype.hasOwnProperty.call(dict, originalPh)) {
                     node.setAttribute('placeholder', dict[originalPh]);
+                }
+            }
+            // Translate the data-placeholder attribute used for contenteditable placeholders
+            if (node.hasAttribute('data-placeholder')) {
+                const dpVal = node.getAttribute('data-placeholder').trim();
+                if (!node.dataset.originalDataPlaceholder && dpVal) {
+                    node.dataset.originalDataPlaceholder = dpVal;
+                }
+                const originalDP = node.dataset.originalDataPlaceholder;
+                if (originalDP && dict && Object.prototype.hasOwnProperty.call(dict, originalDP)) {
+                    node.setAttribute('data-placeholder', dict[originalDP]);
                 }
             }
             node.dataset.lastLang = lang;
