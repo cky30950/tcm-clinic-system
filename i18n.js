@@ -14,6 +14,9 @@ window.translations = {
         // Chinese translations simply map original text to itself.  This
         // dictionary only needs entries for strings that have English
         // translations below – everything else will remain unchanged.
+        "歲": "歲",
+        "月": "月",
+        "天": "天",
         "針灸穴位、手法、注意事項等...": "針灸穴位、手法、注意事項等...",
         "搜尋穴位名稱、定位、功能或經絡...": "搜尋穴位名稱、定位、功能或經絡...",
         "暫無診症記錄": "暫無診症記錄",
@@ -526,6 +529,9 @@ window.translations = {
         "搜索穴位名稱、經絡或定位...": "搜索穴位名稱、經絡或定位...",
     },
     en: {
+        "歲": "Years",
+        "月": "Months",
+        "天": "Days",
         "針灸穴位、手法、注意事項等...": "Acupuncture points, techniques, precautions, etc...",
         "搜尋穴位名稱、定位、功能或經絡...": "Search for acupoint names, locations, functions, or meridians...",
         "暫無診症記錄": "No medical records yet",
