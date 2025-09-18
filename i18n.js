@@ -14,10 +14,6 @@ window.translations = {
         // Chinese translations simply map original text to itself.  This
         // dictionary only needs entries for strings that have English
         // translations below – everything else will remain unchanged.
-        "歲": "歲",
-        "月": "月",
-        "天": "天",
-        "針灸穴位、手法、注意事項等...": "針灸穴位、手法、注意事項等...",
         "搜尋穴位名稱、定位、功能或經絡...": "搜尋穴位名稱、定位、功能或經絡...",
         "暫無診症記錄": "暫無診症記錄",
         "該病人尚未有診症記錄": "該病人尚未有診症記錄",
@@ -497,6 +493,15 @@ window.translations = {
         "輸入分類名稱...": "輸入分類名稱...",
         "辨證分型、病機分析...": "辨證分型、病機分析...",
         "針灸穴位、手法、注意事項等...": "針灸穴位、手法、注意事項等...",
+        // Variant with Chinese ellipsis character. Some placeholders may use the single
+        // Unicode ellipsis (…); include this key to ensure translation works for
+        // both versions.
+        "針灸穴位、手法、注意事項等…": "針灸穴位、手法、注意事項等…",
+        // Dietary/lifestyle note variants with ellipsis
+        "飲食宜忌、生活調護、注意事項等…": "飲食宜忌、生活調護、注意事項等…",
+        // Age suffix.  When displaying ages such as "25歲" this suffix is
+        // translated via dynamic pattern; the standalone translation maps to itself.
+        "歲": "歲",
         "飲食宜忌、生活調護、注意事項等...": "飲食宜忌、生活調護、注意事項等...",
         "搜尋診斷模板...": "搜尋診斷模板...",
         "搜尋醫囑模板...": "搜尋醫囑模板...",
@@ -529,11 +534,7 @@ window.translations = {
         "搜索穴位名稱、經絡或定位...": "搜索穴位名稱、經絡或定位...",
     },
     en: {
-        "歲": "Years",
-        "月": "Months",
-        "天": "Days",
-        "針灸穴位、手法、注意事項等...": "Acupuncture points, techniques, precautions, etc...",
-        "搜尋穴位名稱、定位、功能或經絡...": "Search for acupoint names, locations, functions, or meridians...",
+        "搜尋穴位名稱、定位、功能或經絡...": "Search for acupoint names, locations, functions or meridians...",
         "暫無診症記錄": "No medical records yet",
         "該病人尚未有診症記錄": "This patient has no medical records yet",
         "總診療次數": "Total number of visits",
@@ -1058,6 +1059,13 @@ window.translations = {
         "輸入分類名稱...": "Enter category name...",
         "辨證分型、病機分析...": "Pattern classification, pathogenesis analysis...",
         "針灸穴位、手法、注意事項等...": "Acupuncture points, techniques, precautions, etc...",
+        // Variant with Unicode ellipsis to catch both forms
+        "針灸穴位、手法、注意事項等…": "Acupuncture points, techniques, precautions, etc…",
+        "飲食宜忌、生活調護、注意事項等…": "Dietary recommendations, lifestyle care, precautions, etc…",
+        // Age suffix translation.  When used standalone or in dynamic pattern
+        // (e.g. "25歲"), this value will replace the suffix with the English
+        // equivalent.  See dynamic pattern handling in translateNode().
+        "歲": "years old",
         "飲食宜忌、生活調護、注意事項等...": "Dietary recommendations, lifestyle care, precautions, etc...",
         "搜尋診斷模板...": "Search diagnosis templates...",
         "搜尋醫囑模板...": "Search advice templates...",
@@ -1417,21 +1425,37 @@ function translateNode(node, dict, lang) {
                     if (availableMatch && dict && Object.prototype.hasOwnProperty.call(dict, '個可用')) {
                         replacement = availableMatch[1] + ' ' + dict['個可用'];
                     } else {
-                        // 3. Patterns like "Name的診症記錄" or "Name的病歷記錄".
-                        //    Extract the name and translate the suffix.
-                        const diagMatch = original.match(/^(.+?)(的診症記錄)$/);
-                        const medMatch = original.match(/^(.+?)(的病歷記錄)$/);
-                        if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
-                            replacement = diagMatch[1] + dict[diagMatch[2]];
-                        } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
-                            replacement = medMatch[1] + dict[medMatch[2]];
+                        // 3. Pattern for ages such as "25歲" or "25 歲".
+                        //    Extract the numeric part and translate the "歲" suffix.
+                        const ageMatch = original.match(/^(\d+)\s*歲$/);
+                        if (ageMatch && dict && Object.prototype.hasOwnProperty.call(dict, '歲')) {
+                            replacement = ageMatch[1] + ' ' + dict['歲'];
                         } else {
-                            // 4. Generic pattern for base strings ending with a full‑width colon (：) and dynamic suffix.
-                            //    For example: "當前用戶：王五".  If the base (including colon) exists in the dictionary,
-                            //    translate it and preserve the trailing dynamic part.
-                            const colonMatch = original.match(/^(.+?：)(.*)$/);
-                            if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
-                                replacement = dict[colonMatch[1]] + colonMatch[2];
+                            // 4. Patterns like "Name的診症記錄" or "Name的病歷記錄".
+                            //    Extract the name and translate the suffix.
+                            const diagMatch = original.match(/^(.+?)(的診症記錄)$/);
+                            const medMatch = original.match(/^(.+?)(的病歷記錄)$/);
+                            if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
+                                replacement = diagMatch[1] + dict[diagMatch[2]];
+                            } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
+                                replacement = medMatch[1] + dict[medMatch[2]];
+                            } else {
+                                // 5. Generic pattern for base strings ending with a full‑width colon (：) and dynamic suffix.
+                                //    For example: "當前用戶：王五".  If the base (including colon) exists in the dictionary,
+                                //    translate it and preserve the trailing dynamic part.
+                                const colonMatch = original.match(/^(.+?：)(.*)$/);
+                                if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
+                                    const baseTr = dict[colonMatch[1]];
+                                    const suffixPart = colonMatch[2];
+                                    // Translate age suffix if present after the colon.  For example, "年齡：25歲"
+                                    // should become "Age:25 years old".
+                                    const ageSuffixMatch = suffixPart.match(/^(\d+)\s*歲$/);
+                                    if (ageSuffixMatch && Object.prototype.hasOwnProperty.call(dict, '歲')) {
+                                        replacement = baseTr + ageSuffixMatch[1] + ' ' + dict['歲'];
+                                    } else {
+                                        replacement = baseTr + suffixPart;
+                                    }
+                                }
                             }
                         }
                     }
@@ -1445,6 +1469,25 @@ function translateNode(node, dict, lang) {
     }
     // If the node is not an element, there is nothing further to do
     if (node.nodeType !== Node.ELEMENT_NODE) return;
+    // Translate placeholder on any element (not just leaf nodes).  Some input
+    // elements such as complex text editors may have children, so we handle
+    // their placeholder attributes here.  We store the original placeholder
+    // in dataset.originalPlaceholder and then apply the translation based on
+    // the dictionary.
+    try {
+        if (typeof node.hasAttribute === 'function' && node.hasAttribute('placeholder')) {
+            const phVal = (node.getAttribute('placeholder') || '').trim();
+            if (phVal) {
+                if (!node.dataset.originalPlaceholder) {
+                    node.dataset.originalPlaceholder = phVal;
+                }
+                const originalPh = node.dataset.originalPlaceholder;
+                if (originalPh && dict && Object.prototype.hasOwnProperty.call(dict, originalPh)) {
+                    node.setAttribute('placeholder', dict[originalPh]);
+                }
+            }
+        }
+    } catch (_e) {}
     // If the element has no child elements it is considered a leaf node for
     // the purposes of translating its own textContent and placeholder.  We
     // use dataset to persist the original text and placeholder values.
@@ -1470,17 +1513,31 @@ function translateNode(node, dict, lang) {
                             replacement = dict[base] + suffix;
                         }
                     } else {
-                        const diagMatch = original && original.match(/^(.+?)(的診症記錄)$/);
-                        const medMatch = original && original.match(/^(.+?)(的病歷記錄)$/);
-                        if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
-                            replacement = diagMatch[1] + dict[diagMatch[2]];
-                        } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
-                            replacement = medMatch[1] + dict[medMatch[2]];
+                        // Handle age pattern for strings like "25歲" or "25 歲".
+                        const ageMatchLeaf = original && original.match(/^(\d+)\s*歲$/);
+                        if (ageMatchLeaf && dict && Object.prototype.hasOwnProperty.call(dict, '歲')) {
+                            replacement = ageMatchLeaf[1] + ' ' + dict['歲'];
                         } else {
-                            // Generic colon pattern: base with colon and dynamic suffix
-                            const colonMatch = original && original.match(/^(.+?：)(.*)$/);
-                            if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
-                                replacement = dict[colonMatch[1]] + colonMatch[2];
+                            const diagMatch = original && original.match(/^(.+?)(的診症記錄)$/);
+                            const medMatch = original && original.match(/^(.+?)(的病歷記錄)$/);
+                            if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
+                                replacement = diagMatch[1] + dict[diagMatch[2]];
+                            } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
+                                replacement = medMatch[1] + dict[medMatch[2]];
+                            } else {
+                                // Generic colon pattern: base with colon and dynamic suffix
+                                const colonMatch = original && original.match(/^(.+?：)(.*)$/);
+                                if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
+                                    const baseTr = dict[colonMatch[1]];
+                                    const suffixPart = colonMatch[2];
+                                    // Translate age suffix if present after the colon
+                                    const ageSuffixMatch = suffixPart.match(/^(\d+)\s*歲$/);
+                                    if (ageSuffixMatch && Object.prototype.hasOwnProperty.call(dict, '歲')) {
+                                        replacement = baseTr + ageSuffixMatch[1] + ' ' + dict['歲'];
+                                    } else {
+                                        replacement = baseTr + suffixPart;
+                                    }
+                                }
                             }
                         }
                     }
