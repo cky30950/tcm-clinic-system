@@ -143,39 +143,21 @@
             .bg-gradient-to-r.from-gray-50.to-blue-50 > .flex.justify-between.items-center > .flex.flex-wrap {
                 margin-top: 0.5rem !important;
             }
-
-            /*
-             * 為避免英文翻譯或長字串在小螢幕上導致文字溢出框外，
-             * 對常見文字容器設定自動換行與字元換行。
-             * 包含標題、按鈕、標籤、段落及表格的儲存格。
-             */
-            h1, h2, h3, h4, h5, h6,
-            button, label, p, td, th {
-                white-space: normal !important;
-                word-break: break-word !important;
-                overflow-wrap: break-word !important;
-            }
-
-            /* Toast 內容換行避免長字串溢出 */
-            .toast-content {
-                white-space: normal !important;
-                word-break: break-word !important;
-                overflow-wrap: break-word !important;
-            }
         }
     </style>
 </head>
 <body class="bg-gradient-to-br from-green-50 to-blue-50 min-h-screen">
-    <!-- 語言切換器：固定於頁面右上角 -->
-    <div class="fixed top-4 right-4 z-50">
-        <select id="languageSelector" class="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            <option value="zh">中文</option>
-            <option value="en">English</option>
-        </select>
-    </div>
+    <!-- 語言切換器將放置於登入卡片內 -->
     <!-- 登入頁面 -->
     <div id="loginPage" class="min-h-screen flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative">
+            <!-- 在登入卡片右上角放置語言切換器 -->
+            <div class="absolute top-2 right-2">
+                <select id="languageSelector" class="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="zh">中文</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
             <div class="text-center mb-8">
                 <div class="text-4xl mb-4">🏥</div>
                 <h1 id="loginTitle" class="text-2xl font-bold text-gray-800 mb-2">名醫診所系統</h1>
@@ -543,13 +525,13 @@
                 <!-- 掛號列表 -->
                 <div class="bg-white border border-gray-200 rounded-lg">
                     <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
-                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0">
+                        <div class="flex justify-between items-center">
                             <!-- 左側：標題與日期選擇器 -->
                             <div class="flex items-center space-x-3">
                                 <h3 class="text-lg font-semibold text-gray-800 flex items-center">
                                     <span class="mr-2">📅</span><span>掛號列表</span>
                                 </h3>
-                                <div class="flex flex-wrap items-center gap-1">
+                                <div class="flex items-center space-x-1">
                                     <span class="whitespace-nowrap text-sm text-gray-600">日期</span>
                                     <input
                                         type="date"
