@@ -1095,9 +1095,10 @@ function generateMedicalRecordNumber() {
             }
             // 取得目前語言設定
             const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+            const isEnglish = lang && typeof lang === 'string' && lang.toLowerCase().startsWith('en');
             // 超過一歲則顯示年齡
             if (years > 0) {
-                return lang === 'en' ? `${years} years` : `${years}歲`;
+                return isEnglish ? `${years} years` : `${years}歲`;
             }
             // 未滿一歲顯示月或天
             let months = today.getMonth() - birth.getMonth();
@@ -1112,9 +1113,48 @@ function generateMedicalRecordNumber() {
                 months += 12;
             }
             if (months > 0) {
-                return lang === 'en' ? `${months} months` : `${months}個月`;
+                return isEnglish ? `${months} months` : `${months}個月`;
             }
-            return lang === 'en' ? `${days} days` : `${days}天`;
+            return isEnglish ? `${days} days` : `${days}天`;
+        }
+
+        /**
+         * 取得性別顯示標籤，根據目前語言回傳對應文字。
+         * 若傳入的性別為英文 (Male/Female)，在中文環境下將翻譯為「男」/「女」。
+         * 若傳入的性別為中文 (男/女)，在英文環境下將翻譯為 "Male"/"Female"。
+         * 其他值則直接返回原文或透過翻譯函式尋找對應。
+         * @param {string} gender 原始性別值
+         * @returns {string} 翻譯後的性別文字
+         */
+        function getGenderLabel(gender) {
+            // 若無性別資料，回傳未知或 Unknown
+            if (!gender) {
+                // 利用翻譯函式取得「未知」對應
+                if (typeof window.t === 'function') {
+                    return window.t('未知');
+                }
+                return '未知';
+            }
+            const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+            const isEnglish = lang && typeof lang === 'string' && lang.toLowerCase().startsWith('en');
+            // 定義性別對映表
+            const map = {
+                Male: { zh: '男', en: 'Male' },
+                Female: { zh: '女', en: 'Female' },
+                '男': { zh: '男', en: 'Male' },
+                '女': { zh: '女', en: 'Female' }
+            };
+            const key = typeof gender === 'string' ? gender.trim() : gender;
+            if (map[key]) {
+                return isEnglish ? map[key].en : map[key].zh;
+            }
+            // 若不在對映表中，則嘗試使用翻譯函式
+            if (typeof window.t === 'function') {
+                const translated = window.t(key);
+                // 如果翻譯函式找不到對應，會回傳原文，此時再依語言決定是否返回原文
+                return translated;
+            }
+            return key;
         }
         
         // 移除原先依賴全域 patients 陣列產生病人編號的函式，以避免使用未同步的本地資料。
@@ -2293,7 +2333,9 @@ function renderPatientListTable(pageChange = false) {
         const safeNumber = window.escapeHtml(patient.patientNumber || '未設定');
         const safeName = window.escapeHtml(patient.name);
         const safeAge = window.escapeHtml(formatAge(patient.birthDate));
-        const safeGender = window.escapeHtml(patient.gender);
+        // 使用自訂函式取得性別標籤，並轉義以避免 XSS
+        const genderLabel = getGenderLabel(patient.gender);
+        const safeGender = window.escapeHtml(genderLabel);
         const safePhone = window.escapeHtml(patient.phone);
         let actions = `
                 <button onclick="viewPatient('${patient.id}')" class="text-blue-600 hover:text-blue-800">查看</button>
@@ -2361,7 +2403,9 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
         const safeNumber = window.escapeHtml(patient.patientNumber || '未設定');
         const safeName = window.escapeHtml(patient.name);
         const safeAge = window.escapeHtml(formatAge(patient.birthDate));
-        const safeGender = window.escapeHtml(patient.gender);
+        // 使用自訂函式取得性別標籤，並轉義以避免 XSS
+        const genderLabel = getGenderLabel(patient.gender);
+        const safeGender = window.escapeHtml(genderLabel);
         const safePhone = window.escapeHtml(patient.phone);
         let actions = `
                 <button onclick="viewPatient('${patient.id}')" class="text-blue-600 hover:text-blue-800">查看</button>
@@ -2571,7 +2615,9 @@ async function viewPatient(id) {
         const safePatientNumber = window.escapeHtml(patient.patientNumber || '未設定');
         const safeName = window.escapeHtml(patient.name);
         const safeAge = window.escapeHtml(formatAge(patient.birthDate));
-        const safeGender = window.escapeHtml(patient.gender);
+        // 使用自訂函式取得性別標籤，並轉義以避免 XSS
+        const genderLabel = getGenderLabel(patient.gender);
+        const safeGender = window.escapeHtml(genderLabel);
         const safePhone = window.escapeHtml(patient.phone);
         const safeIdCard = patient.idCard ? window.escapeHtml(patient.idCard) : null;
         const safeAddress = patient.address ? window.escapeHtml(patient.address) : null;
@@ -3165,7 +3211,9 @@ async function searchPatientsForRegistration() {
             const safeName = window.escapeHtml(patient.name);
             const safeNumber = window.escapeHtml(patient.patientNumber || '');
             const safeAge = window.escapeHtml(formatAge(patient.birthDate));
-            const safeGender = window.escapeHtml(patient.gender);
+            // 使用自訂函式取得性別標籤，並轉義以避免 XSS
+            const genderLabel = getGenderLabel(patient.gender);
+            const safeGender = window.escapeHtml(genderLabel);
             const safePhone = window.escapeHtml(patient.phone);
             return `
             <div class="p-4 hover:bg-gray-50 cursor-pointer transition duration-200" onclick="selectPatientForRegistration('${safeId}')">
@@ -3258,7 +3306,9 @@ async function selectPatientForRegistration(patientId) {
             const safeName = window.escapeHtml(patient.name);
             const safeNumber = window.escapeHtml(patient.patientNumber || '');
             const safeAge = window.escapeHtml(formatAge(patient.birthDate));
-            const safeGender = window.escapeHtml(patient.gender);
+            // 使用自訂函式取得性別標籤，並轉義以避免 XSS
+            const genderLabel = getGenderLabel(patient.gender);
+            const safeGender = window.escapeHtml(genderLabel);
             const safePhone = window.escapeHtml(patient.phone);
             document.getElementById('selectedPatientInfo').innerHTML = `
                 <div class="space-y-1">
@@ -4548,7 +4598,7 @@ async function showConsultationForm(appointment) {
         // 顯示病人性別，若沒有資料則顯示「未知」
         const genderEl = document.getElementById('formPatientGender');
         if (genderEl) {
-            genderEl.textContent = patient.gender || '未知';
+            genderEl.textContent = getGenderLabel(patient.gender);
         }
         // 顯示過敏史，如果有資料則填入並顯示容器，否則隱藏容器
         const allergiesContainer = document.getElementById('allergiesContainer');
@@ -5160,7 +5210,7 @@ if (!patient) {
                     </div>
                     <div>
                         <span class="font-medium text-gray-700">性別：</span>
-                        <span>${patient.gender}</span>
+                        <span>${getGenderLabel(patient.gender)}</span>
                     </div>
                 ${patient.history ? `
                     <div class="md:col-span-1 lg:col-span-2">
@@ -5501,6 +5551,9 @@ async function viewPatientMedicalHistory(patientId) {
         document.getElementById('medicalHistoryTitle').textContent = `${window.escapeHtml(patient.name)} 的診症記錄`;
         
         // 顯示病人基本資訊
+        // 使用自訂函式取得性別標籤，並轉義避免 XSS
+        const genderLabel = getGenderLabel(patient.gender);
+        const safeGenderMH = window.escapeHtml(genderLabel);
         document.getElementById('medicalHistoryPatientInfo').innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                 <div>
@@ -5517,7 +5570,7 @@ async function viewPatientMedicalHistory(patientId) {
                 </div>
                 <div>
                     <span class="font-medium text-gray-700">性別：</span>
-            <span>${window.escapeHtml(patient.gender)}</span>
+            <span>${safeGenderMH}</span>
                 </div>
                 ${patient.history ? `
                 <div class="md:col-span-1 lg:col-span-2">
@@ -6766,7 +6819,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                             </div>
                             <div class="info-row">
                                 <span class="info-label">性　　別：</span>
-                                <span class="info-value">${patient.gender}</span>
+                                <span class="info-value">${getGenderLabel(patient.gender)}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">年　　齡：</span>
@@ -7107,7 +7160,7 @@ async function printSickLeave(consultationId, consultationData = null) {
                             </div>
                             <div class="info-row">
                                 <span class="info-label">性　　別：</span>
-                                <span class="info-value">${patient.gender}</span>
+                                <span class="info-value">${getGenderLabel(patient.gender)}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">年　　齡：</span>

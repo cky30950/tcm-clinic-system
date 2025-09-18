@@ -1335,6 +1335,10 @@ window.translations = {
             '診症中': 'Consulting',
             '已完成': 'Completed'
             ,
+            // Gender translations
+            '男': 'Male',
+            '女': 'Female'
+            ,
             // Translations for package usage and welcome/login messages
             '已使用套票：': 'Package used: ',
             '，剩餘 ': ', remaining ',
