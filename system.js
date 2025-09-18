@@ -1711,23 +1711,6 @@ async function syncUserDataFromFirebase() {
             // 切換到主系統
             document.getElementById('loginPage').classList.add('hidden');
             document.getElementById('mainSystem').classList.remove('hidden');
-            // 隱藏語言切換器：登入後不再顯示語言選擇
-            (function hideLanguageSelector() {
-                try {
-                    const langSelect = document.getElementById('languageSelector');
-                    if (langSelect) {
-                        // 隱藏其父容器以避免佔用空間
-                        const parent = langSelect.parentElement;
-                        if (parent) {
-                            parent.style.display = 'none';
-                        } else {
-                            langSelect.style.display = 'none';
-                        }
-                    }
-                } catch (_e) {
-                    // 忽略任何錯誤，不影響登入流程
-                }
-            })();
             // 切換版權顯示：登入頁版權隱藏，顯示全局版權
             if (typeof showGlobalCopyright === 'function') {
                 try {
@@ -1831,6 +1814,24 @@ async function logout() {
         // 清空登入表單
         document.getElementById('mainLoginUsername').value = '';
         document.getElementById('mainLoginPassword').value = '';
+
+        // 登出後顯示語言切換器（如果先前登入時曾隱藏）
+        try {
+            const langSelect = document.getElementById('languageSelector');
+            if (langSelect) {
+                const parentElem = langSelect.parentElement;
+                if (parentElem) {
+                    parentElem.style.display = '';
+                } else {
+                    langSelect.style.display = '';
+                }
+                // 恢復語言選擇器的當前值，若存在於 localStorage
+                const savedLang = localStorage.getItem('lang') || 'zh';
+                langSelect.value = savedLang;
+            }
+        } catch (_e) {
+            // 若發生錯誤則忽略
+        }
         
         showToast('已成功登出', 'success');
         
