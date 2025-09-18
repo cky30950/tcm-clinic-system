@@ -502,6 +502,8 @@ window.translations = {
         // Age suffix.  When displaying ages such as "25歲" this suffix is
         // translated via dynamic pattern; the standalone translation maps to itself.
         "歲": "歲",
+        "月": "月",
+        "日": "日",
         "飲食宜忌、生活調護、注意事項等...": "飲食宜忌、生活調護、注意事項等...",
         "搜尋診斷模板...": "搜尋診斷模板...",
         "搜尋醫囑模板...": "搜尋醫囑模板...",
@@ -1065,7 +1067,9 @@ window.translations = {
         // Age suffix translation.  When used standalone or in dynamic pattern
         // (e.g. "25歲"), this value will replace the suffix with the English
         // equivalent.  See dynamic pattern handling in translateNode().
-        "歲": "years old",
+        "歲": "years",
+        "月": "months",
+        "日": "days",
         "飲食宜忌、生活調護、注意事項等...": "Dietary recommendations, lifestyle care, precautions, etc...",
         "搜尋診斷模板...": "Search diagnosis templates...",
         "搜尋醫囑模板...": "Search advice templates...",
