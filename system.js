@@ -7943,8 +7943,9 @@ async function withdrawConsultation(appointmentId) {
         // 重新載入該病人的診療摘要，確保病歷列表和套票狀態即時更新
         try {
             await loadPatientConsultationSummary(patient.id);
-        } catch (_e) {}
-}
+        } catch (_e) {
+            // ignore summary loading errors
+        }
     } catch (error) {
         console.error('讀取病人資料錯誤:', error);
         showToast('讀取病人資料失敗', 'error');
