@@ -263,7 +263,6 @@ let pendingPackagePurchases = [];
  * @param {string} packageRecordId
  * @returns {number}
  */
-// 已移除 getPendingPackageDelta 函式（未使用）
 
 /**
  * 將所有暫存的套票變更同步至 Firestore。
@@ -1716,7 +1715,6 @@ async function syncUserDataFromFirebase() {
     }
 }
 
-// 已移除 getUserNameFromEmail 與 getUserPositionFromEmail 函式（未使用）
         
         // 執行登入
         function performLogin(user) {
@@ -1913,7 +1911,6 @@ async function logout() {
          * @param {string[]} allowedRoles 允許存取的職位陣列
          * @returns {boolean} 若當前用戶存在且職位在允許名單中則回傳 true
          */
-// 已移除 hasPermission 函式（未使用）
 
         // 顯示指定區域
         function showSection(sectionId) {
@@ -4051,7 +4048,6 @@ function parseConsultationDate(dateInput) {
     }
 }
 // 修復格式化診症日期顯示
-// 已移除 formatConsultationDate 函式（未使用），請改用 formatConsultationDateTime()
 
 function formatConsultationDateTime(dateInput) {
     const date = parseConsultationDate(dateInput);
@@ -9163,7 +9159,7 @@ async function initializeSystemAfterLogin() {
                             <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
                             ${safeAlias ? `<p class="text-sm text-gray-600">${safeAlias}</p>` : ''}
                         </div>
-                        <!-- 操作區已移除：不提供編輯或刪除按鈕 -->
+
                     </div>
                     
                     <div class="space-y-2 text-sm">
@@ -9196,7 +9192,7 @@ async function initializeSystemAfterLogin() {
                             <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
                             ${safeSource ? `<p class="text-sm text-gray-600">出處：${safeSource}</p>` : ''}
                         </div>
-                        <!-- 操作區已移除：不提供編輯或刪除按鈕 -->
+
                     </div>
                     
                     <div class="space-y-3 text-sm">
@@ -9238,29 +9234,7 @@ async function initializeSystemAfterLogin() {
             });
         }
         
-        function editHerb(id) {
-            const herb = herbLibrary.find(item => item.id === id && item.type === 'herb');
-            if (!herb) return;
-            
-            editingHerbId = id;
-            document.getElementById('herbFormTitle').textContent = '編輯中藥材';
-            document.getElementById('herbSaveButtonText').textContent = '更新';
-            
-            document.getElementById('herbName').value = herb.name || '';
-            document.getElementById('herbAlias').value = herb.alias || '';
-            // 還原性味、歸經與主治欄位
-            const natureInput = document.getElementById('herbNature');
-            if (natureInput) natureInput.value = herb.nature || '';
-            const meridianInput = document.getElementById('herbMeridian');
-            if (meridianInput) meridianInput.value = herb.meridian || '';
-            document.getElementById('herbEffects').value = herb.effects || '';
-            const indicationsInput = document.getElementById('herbIndications');
-            if (indicationsInput) indicationsInput.value = herb.indications || '';
-            document.getElementById('herbDosage').value = herb.dosage || '';
-            document.getElementById('herbCautions').value = herb.cautions || '';
-            
-            document.getElementById('addHerbModal').classList.remove('hidden');
-        }
+        
         
         async function saveHerb() {
             const name = document.getElementById('herbName').value.trim();
@@ -9323,27 +9297,7 @@ async function initializeSystemAfterLogin() {
             });
         }
         
-        function editFormula(id) {
-            const formula = herbLibrary.find(item => item.id === id && item.type === 'formula');
-            if (!formula) return;
-            
-            editingFormulaId = id;
-            document.getElementById('formulaFormTitle').textContent = '編輯方劑';
-            document.getElementById('formulaSaveButtonText').textContent = '更新';
-            
-            document.getElementById('formulaName').value = formula.name || '';
-            document.getElementById('formulaSource').value = formula.source || '';
-            document.getElementById('formulaEffects').value = formula.effects || '';
-            // 還原主治與用法欄位
-            const formInd = document.getElementById('formulaIndications');
-            if (formInd) formInd.value = formula.indications || '';
-            document.getElementById('formulaComposition').value = formula.composition || '';
-            const formUsage = document.getElementById('formulaUsage');
-            if (formUsage) formUsage.value = formula.usage || '';
-            document.getElementById('formulaCautions').value = formula.cautions || '';
-            
-            document.getElementById('addFormulaModal').classList.remove('hidden');
-        }
+        
         
         async function saveFormula() {
             const name = document.getElementById('formulaName').value.trim();
@@ -9388,30 +9342,8 @@ async function initializeSystemAfterLogin() {
             displayHerbLibrary();
         }
         
-        // 刪除中藥材或方劑
-        async function deleteHerbItem(id) {
-            const item = herbLibrary.find(h => h.id === id);
-            if (!item) return;
-            
-            const itemType = item.type === 'herb' ? '中藥材' : '方劑';
-            // 刪除中藥材或方劑確認訊息支援中英文
-            {
-                const lang = localStorage.getItem('lang') || 'zh';
-                const zhConfirm = `確定要刪除${itemType}「${item.name}」嗎？\n\n此操作無法復原！`;
-                const itemTypeEn = item.type === 'herb' ? 'Herb' : 'Formula';
-                const enConfirm = `Are you sure you want to delete the ${itemTypeEn} \"${item.name}\"?\n\nThis action cannot be undone!`;
-                const confirmMsgDel = lang === 'en' ? enConfirm : zhConfirm;
-                if (confirm(confirmMsgDel)) {
-                    herbLibrary = herbLibrary.filter(h => h.id !== id);
-                    // 不再從 Firestore 刪除資料
-                    // 刪除後提示支援中英文
-                    const zhToast = `${itemType}「${item.name}」已刪除！`;
-                    const enToast = `${itemTypeEn} \"${item.name}\" has been deleted!`;
-                    showToast(lang === 'en' ? enToast : zhToast, 'success');
-                    displayHerbLibrary();
-                }
-            }
-        }
+        
+
 
         // 穴位庫管理功能
         /**
@@ -9639,13 +9571,12 @@ async function initializeSystemAfterLogin() {
             const safeIndications = inds.length > 0 ? inds.map(item => window.escapeHtml(item)).join('、') : '';
             const safeMethod = ac.method ? window.escapeHtml(ac.method) : '';
             const safeCategory = ac.category ? window.escapeHtml(ac.category) : '';
-            return `\n                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">\n                    <div class="flex justify-between items-start mb-3">\n                        <div>\n                            <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>\n                            ${safeMeridian ? `<p class="text-sm text-gray-600">${safeMeridian}</p>` : ''}\n                        </div>\n                        <!-- 編輯與刪除按鈕已移除，僅顯示資料 -->\n                    </div>\n                    <div class="space-y-2 text-sm">\n                        ${safeLocation ? `<div><span class="font-medium text-gray-700">定位：</span>${safeLocation}</div>` : ''}\n                        ${safeFunctions ? `<div><span class="font-medium text-gray-700">功能：</span>${safeFunctions}</div>` : ''}\n                        ${safeIndications ? `<div><span class="font-medium text-gray-700">主治：</span>${safeIndications}</div>` : ''}\n                        ${safeMethod ? `<div><span class="font-medium text-gray-700">針法：</span>${safeMethod}</div>` : ''}\n                        ${safeCategory ? `<div><span class="font-medium text-gray-700">穴性：</span>${safeCategory}</div>` : ''}\n                    </div>\n                </div>\n            `;
+            return `\n                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">\n                    <div class="flex justify-between items-start mb-3">\n                        <div>\n                            <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>\n                            ${safeMeridian ? `<p class="text-sm text-gray-600">${safeMeridian}</p>` : ''}\n                        </div>\n                    </div>\n                    <div class="space-y-2 text-sm">\n                        ${safeLocation ? `<div><span class="font-medium text-gray-700">定位：</span>${safeLocation}</div>` : ''}\n                        ${safeFunctions ? `<div><span class="font-medium text-gray-700">功能：</span>${safeFunctions}</div>` : ''}\n                        ${safeIndications ? `<div><span class="font-medium text-gray-700">主治：</span>${safeIndications}</div>` : ''}\n                        ${safeMethod ? `<div><span class="font-medium text-gray-700">針法：</span>${safeMethod}</div>` : ''}\n                        ${safeCategory ? `<div><span class="font-medium text-gray-700">穴性：</span>${safeCategory}</div>` : ''}\n                    </div>\n                </div>\n            `;
         }
 
         /**
          * 以下函式與 UI 操作相關，用於新增、編輯與刪除穴位資料。
-         * 現在系統改用只讀模式，故不再需要這些函式，已移除實作。
-         * 如需重新啟用此功能，可重新撰寫相應的表單與事件處理邏輯。
+         * 現在系統改用只讀模式，如需重新啟用此功能，可重新撰寫相應的表單與事件處理邏輯。
          */
 
         // 收費項目管理功能
@@ -10929,7 +10860,6 @@ async function initializeSystemAfterLogin() {
                 // 否則，單純移除
                 selectedBillingItems.splice(index, 1);
                 updateBillingDisplay();
-                // showToast(`已移除：${removedItem.name}`, 'info');
             }
         }
 
@@ -11384,7 +11314,6 @@ function parseBillingItemsFromText(billingText) {
     }
 }
         
-        // 已移除 loadPreviousBillingItemsFromConsultation 函式（未使用）
         
         // 載入指定病歷記錄到當前診症
         async function loadMedicalRecordToCurrentConsultation(consultationId) {
@@ -11597,7 +11526,6 @@ const consultationDate = (() => {
         }
         
         // 清空診症表單時也要清空處方搜索
-        /* clearConsultationFormOld 函式已移除（未使用） */
 
 
 
@@ -11882,7 +11810,6 @@ async function editUser(id) {
         saveBtnTextEl.textContent = '更新';
     }
     
-    // 帳號及密碼欄位已移除，無需填充相關資料
     // 填充表單資料
     const displayNameEl = document.getElementById('userDisplayName');
     if (displayNameEl) displayNameEl.value = user.name || '';
@@ -11916,7 +11843,6 @@ async function saveUser() {
         showToast('權限不足，無法執行此操作', 'error');
         return;
     }
-    // 帳號及密碼欄位已移除，使用 UID 或電子郵件自動產生內部識別名稱
     const name = document.getElementById('userDisplayName').value.trim();
     const position = document.getElementById('userPosition').value.trim();
     const email = document.getElementById('userEmail').value.trim();
@@ -12484,7 +12410,6 @@ async function deleteUser(id) {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
             const doctorFilter = document.getElementById('doctorFilter').value;
-            // 由於報表類型選單已移除，嘗試從舊的 reportType 元素讀取值，否則留空
             let reportType = '';
             const rptElem = document.getElementById('reportType');
             if (rptElem) {
@@ -13557,19 +13482,16 @@ async function importHerbLibraryData(items, progressCallback) {
  * 清除所有模板資料（醫囑與診斷模板）。
  * 顯示進度條並逐一刪除資料。
  */
-// 已移除 clearTemplateData 功能
 
 /**
  * 清除所有中藥資料。
  * 顯示進度條並逐一刪除資料。
  */
-// 已移除 clearHerbData 功能
 
 /**
  * 觸發匯入模板與中藥資料的檔案選擇器。
  * 清空檔案輸入框並打開檔案選擇對話框。
  */
-// 已移除 triggerTemplateAndHerbImport 功能
 
 /**
  * 處理選擇的模板及中藥資料檔案。
@@ -13577,13 +13499,11 @@ async function importHerbLibraryData(items, progressCallback) {
  * 在合併匯入模式下，將會抑制單項匯入時的確認提示與無效資料錯誤提示。
  * @param {File} file 使用者選擇的檔案
  */
-// 已移除 handleTemplateAndHerbImportFile 功能
 
 /**
  * 將模板與中藥庫資料匯出為 JSON 檔案。
  * 會從 Firestore 讀取醫囑模板、診斷模板及中藥庫資料，組合成單一檔案下載。
  */
-// 已移除 exportTemplateAndHerbData 功能
 
         
 // 套票管理函式
@@ -15839,7 +15759,6 @@ document.addEventListener('DOMContentLoaded', function() {
   window.triggerHerbImport = triggerHerbImport;
   window.handleHerbImportFile = handleHerbImportFile;
 
-  // 已移除合併匯入/匯出及清除資料相關函式
   // 預留 isCombinedImportMode 旗標為 false，以維持既有匯入流程的邏輯判斷
   window.isCombinedImportMode = false;
 
@@ -17146,7 +17065,6 @@ function refreshTemplateCategoryFilters() {
             showEditModal('herb', newItem.name);
           }
 
-          /* duplicateHerbCombination 函式已移除（未使用） */
 
 function deleteHerbCombination(id) {
             // 刪除藥方組合確認訊息支援中英文
@@ -17212,7 +17130,7 @@ function deleteHerbCombination(id) {
                   const nameMatch = (item.name && item.name.toLowerCase().includes(searchTerm));
                   const techniqueMatch = (item.technique && item.technique.toLowerCase().includes(searchTerm));
                   const pointsMatch = Array.isArray(item.points) && item.points.some(pt => {
-                    // 搜尋穴位名稱（已移除主穴/配穴）
+                    // 搜尋穴位名稱
                     return pt && pt.name && pt.name.toLowerCase().includes(searchTerm);
                   });
                   matchesSearch = nameMatch || techniqueMatch || pointsMatch;
@@ -17322,7 +17240,6 @@ function deleteHerbCombination(id) {
             showEditModal('acupoint', newItem.name);
           }
 
-          /* duplicateAcupointCombination 函式已移除（未使用） */
 
 function deleteAcupointCombination(id) {
             // 刪除穴位組合確認訊息支援中英文
@@ -17819,7 +17736,7 @@ function deleteAcupointCombination(id) {
               if (acuKeyword) {
                 combos = combos.filter(combo => {
                   const nameStr = combo.name ? combo.name.toLowerCase() : '';
-                  // 將穴位名稱串起來供搜尋（主穴/配穴已移除）
+                  // 將穴位名稱串起來供搜尋
                   let pointsStr = '';
                   if (Array.isArray(combo.points)) {
                     pointsStr = combo.points.map(pt => {
@@ -18006,7 +17923,7 @@ function deleteAcupointCombination(id) {
                     </div>
                   </div>
                   <div class="flex gap-2">
-                    <!-- 操作按鈕已移除 -->
+                    
                   </div>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
@@ -18023,39 +17940,6 @@ function deleteAcupointCombination(id) {
             }, paginEl);
           }
 
-          function addNewPrescriptionTemplate() {
-            // 使用編輯介面新增醫囑模板：建立空白項目並開啟編輯介面
-            const newItem = {
-              id: Date.now(),
-              name: '',
-              category: (typeof categories !== 'undefined' && categories.prescriptions && categories.prescriptions.length > 0) ? categories.prescriptions[0] : '',
-              duration: '',
-              followUp: '',
-              content: '',
-              note: '',
-              lastModified: new Date().toISOString().split('T')[0],
-              // 標記為新建項目，用於取消時移除
-              isNew: true
-            };
-            prescriptionTemplates.push(newItem);
-            renderPrescriptionTemplates();
-            showEditModal('prescription', newItem.name);
-          }
-
-          /* duplicatePrescriptionTemplate 函式已移除（未使用） */
-
-          async function deletePrescriptionTemplate(id) {
-            // 刪除醫囑模板確認訊息支援中英文
-            {
-              const lang = localStorage.getItem('lang') || 'zh';
-              const zhMsg = '確定要刪除此醫囑模板嗎？';
-              const enMsg = 'Are you sure you want to delete this prescription template?';
-              if (!confirm(lang === 'en' ? enMsg : zhMsg)) return;
-            }
-            prescriptionTemplates = prescriptionTemplates.filter(p => p.id !== id);
-            // 不再從 Firestore 刪除醫囑模板；直接重新渲染列表
-            renderPrescriptionTemplates();
-          }
 
           // 渲染診斷模板
           function renderDiagnosisTemplates(list, pageChange = false) {
@@ -18156,7 +18040,7 @@ function deleteAcupointCombination(id) {
                     </div>
                   </div>
                   <div class="flex gap-2">
-                    <!-- 操作按鈕已移除 -->
+                    
                   </div>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
@@ -18173,42 +18057,7 @@ function deleteAcupointCombination(id) {
             }, paginEl);
           }
 
-          function addNewDiagnosisTemplate() {
-            // 使用編輯介面新增診斷模板：建立空白項目並開啟編輯介面
-            const newItem = {
-              id: Date.now(),
-              name: '',
-              category: (typeof categories !== 'undefined' && categories.diagnosis && categories.diagnosis.length > 0) ? categories.diagnosis[0] : '',
-              // 新增診斷模板欄位：主訴、現病史、舌象、脈象、中醫診斷、證型診斷
-              chiefComplaint: '',
-              currentHistory: '',
-              tongue: '',
-              pulse: '',
-              tcmDiagnosis: '',
-              syndromeDiagnosis: '',
-              lastModified: new Date().toISOString().split('T')[0],
-              // 標記為新建項目，用於取消時移除
-              isNew: true
-            };
-            diagnosisTemplates.push(newItem);
-            renderDiagnosisTemplates();
-            showEditModal('diagnosis', newItem.name);
-          }
-
-          /* duplicateDiagnosisTemplate 函式已移除（未使用） */
-
-          async function deleteDiagnosisTemplate(id) {
-            // 刪除診斷模板確認訊息支援中英文
-            {
-              const lang = localStorage.getItem('lang') || 'zh';
-              const zhMsg = '確定要刪除此診斷模板嗎？';
-              const enMsg = 'Are you sure you want to delete this diagnosis template?';
-              if (!confirm(lang === 'en' ? enMsg : zhMsg)) return;
-            }
-            diagnosisTemplates = diagnosisTemplates.filter(d => d.id !== id);
-            // 不再從 Firestore 刪除診斷模板；直接重新渲染列表
-            renderDiagnosisTemplates();
-          }
+          
 
           /**
            * 初始化模板庫搜尋功能，綁定搜尋和分類變更事件。
@@ -18612,7 +18461,7 @@ function deleteAcupointCombination(id) {
             modal.classList.remove('hidden');
             // 若為穴位組合，使用搜尋介面及提示框顯示完整資料。此邏輯將在此返回，避免進入舊的穴位分支。
             if (itemType === 'acupoint') {
-              // 建立已存在穴位行的 HTML，每行包含提示資訊、名稱與刪除按鈕（已移除主穴/配穴選擇）
+              // 建立已存在穴位行的 HTML，每行包含提示資訊、名稱與刪除按鈕
               const acupointRowsHtml = Array.isArray(item.points)
                 ? item.points.map(pt => {
                     const nameVal = (pt && pt.name) ? pt.name : '';
@@ -19086,7 +18935,6 @@ ${item.points.map(pt => {
             hideEditModal();
           }
 
-          /* addHerbIngredientField 函式已移除（未使用） */
 
           function addAcupointPointField() {
             const container = document.getElementById('acupointPoints');
@@ -19962,7 +19810,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('初始化搜尋與分類監聽器時發生錯誤:', e);
             }
 
-            // 已移除舊版頁腳版權資訊初始化函式
+            
           });
 
 // 全局與登入版權聲明初始化：在 DOMContentLoaded 後插入對應的版權資訊。
