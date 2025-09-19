@@ -319,7 +319,7 @@
             <!-- 病人資料管理 -->
             <div id="patientManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800 flex items-center"><span class="mr-2">👥</span><span>病人資料管理</span></h2>
+                    <h2 class="text-2xl font-bold text-gray-800">病人資料管理</h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchPatient" placeholder="搜尋病人編號、姓名或電話..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
@@ -449,7 +449,7 @@
             <!-- 診症系統 -->
             <div id="consultationSystem" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="mb-6">
-                    <h2 class="text-2xl font-bold text-gray-800 flex items-center"><span class="mr-2">🩺</span><span>掛號診症系統</span></h2>
+                    <h2 class="text-2xl font-bold text-gray-800">掛號診症系統</h2>
                     <p class="text-gray-600 mt-2">簡潔的掛號流程管理</p>
                 </div>
                 
@@ -996,7 +996,7 @@
             <!-- 中藥庫 -->
             <div id="herbLibrary" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800 flex items-center"><span class="mr-2">🌿</span><span>中藥庫</span></h2>
+                    <h2 class="text-2xl font-bold text-gray-800">中藥庫</h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchHerb" placeholder="搜尋中藥材、方劑名稱或功能..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
@@ -1144,7 +1144,7 @@
             <!-- 穴位庫 -->
             <div id="acupointLibrary" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800 flex items-center"><span class="mr-2">📍</span><span>穴位庫</span></h2>
+                    <h2 class="text-2xl font-bold text-gray-800">穴位庫</h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchAcupoint" placeholder="搜尋穴位、經絡名稱或功能..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-64">
@@ -1171,7 +1171,7 @@
             <!-- 收費項目管理 -->
             <div id="billingManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800 flex items-center"><span class="mr-2">💰</span><span>收費項目管理</span></h2>
+                    <h2 class="text-2xl font-bold text-gray-800">收費項目管理</h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchBilling" placeholder="搜尋收費項目名稱..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
@@ -1413,19 +1413,10 @@
                 <!-- 篩選控制區 -->
                 <div class="bg-gray-50 rounded-lg p-4 mb-6">
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">報表類型</label>
-                            <select id="reportType" onchange="generateFinancialReport()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                                <option value="daily">日報表</option>
-                                <option value="weekly">週報表</option>
-                                <option value="monthly" selected>月報表</option>
-                                <option value="yearly">年報表</option>
-                                <option value="custom">自訂期間</option>
-                            </select>
-                        </div>
+                        <!-- 原有的報表類型選單已移除，僅保留快速日期選擇做為報表類型 -->
                         
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">快速選擇</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">報表類型</label>
                             <select id="quickDate" onchange="setQuickDate()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                 <option value="">請選擇...</option>
                                 <option value="today">今天</option>
@@ -1656,7 +1647,7 @@
             </div>
             <!-- 系統管理 -->
             <div id="systemManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center"><span class="mr-2">⚙️</span><span>系統管理</span></h2>
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">系統管理</h2>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
