@@ -12361,66 +12361,54 @@ async function deleteUser(id) {
             const quickDate = document.getElementById('quickDate').value;
             const today = new Date();
             let startDate, endDate;
+            // 新增：嘗試取得舊的 reportType 元素供回寫；如元素不存在則忽略
+            const rptElem = document.getElementById('reportType');
 
             switch (quickDate) {
                 case 'today':
                     startDate = endDate = today;
-                    // 在新版本中報表類型選單已移除，僅調整日期範圍；若存在舊的 reportType 元素則更新其值
-                    const rptElem = document.getElementById('reportType');
                     if (rptElem) rptElem.value = 'daily';
                     break;
                 case 'yesterday':
                     startDate = endDate = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-                    // 在新版本中報表類型選單已移除，僅調整日期範圍；若存在舊的 reportType 元素則更新其值
-                    const rptElem = document.getElementById('reportType');
                     if (rptElem) rptElem.value = 'daily';
                     break;
-                case 'thisWeek':
+                case 'thisWeek': {
                     const thisWeekStart = new Date(today);
                     thisWeekStart.setDate(today.getDate() - today.getDay());
                     startDate = thisWeekStart;
                     endDate = today;
-                    // 在新版本中報表類型選單已移除，僅調整日期範圍；若存在舊的 reportType 元素則更新其值
-                    const rptElem = document.getElementById('reportType');
                     if (rptElem) rptElem.value = 'weekly';
                     break;
-                case 'lastWeek':
+                }
+                case 'lastWeek': {
                     const lastWeekStart = new Date(today);
                     lastWeekStart.setDate(today.getDate() - today.getDay() - 7);
                     const lastWeekEnd = new Date(lastWeekStart);
                     lastWeekEnd.setDate(lastWeekStart.getDate() + 6);
                     startDate = lastWeekStart;
                     endDate = lastWeekEnd;
-                    // 在新版本中報表類型選單已移除，僅調整日期範圍；若存在舊的 reportType 元素則更新其值
-                    const rptElem = document.getElementById('reportType');
                     if (rptElem) rptElem.value = 'weekly';
                     break;
+                }
                 case 'thisMonth':
                     startDate = new Date(today.getFullYear(), today.getMonth(), 1);
                     endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                    // 在新版本中報表類型選單已移除，僅調整日期範圍；若存在舊的 reportType 元素則更新其值
-                    const rptElem = document.getElementById('reportType');
                     if (rptElem) rptElem.value = 'monthly';
                     break;
                 case 'lastMonth':
                     startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
                     endDate = new Date(today.getFullYear(), today.getMonth(), 0);
-                    // 在新版本中報表類型選單已移除，僅調整日期範圍；若存在舊的 reportType 元素則更新其值
-                    const rptElem = document.getElementById('reportType');
                     if (rptElem) rptElem.value = 'monthly';
                     break;
                 case 'thisYear':
                     startDate = new Date(today.getFullYear(), 0, 1);
                     endDate = new Date(today.getFullYear(), 11, 31);
-                    // 在新版本中報表類型選單已移除，僅調整日期範圍；若存在舊的 reportType 元素則更新其值
-                    const rptElem = document.getElementById('reportType');
                     if (rptElem) rptElem.value = 'yearly';
                     break;
                 case 'lastYear':
                     startDate = new Date(today.getFullYear() - 1, 0, 1);
                     endDate = new Date(today.getFullYear() - 1, 11, 31);
-                    // 在新版本中報表類型選單已移除，僅調整日期範圍；若存在舊的 reportType 元素則更新其值
-                    const rptElem = document.getElementById('reportType');
                     if (rptElem) rptElem.value = 'yearly';
                     break;
                 default:
@@ -12496,7 +12484,7 @@ async function deleteUser(id) {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
             const doctorFilter = document.getElementById('doctorFilter').value;
-            // 由於報表類型選單已移除，從存在的元素讀取值或留空
+            // 由於報表類型選單已移除，嘗試從舊的 reportType 元素讀取值，否則留空
             let reportType = '';
             const rptElem = document.getElementById('reportType');
             if (rptElem) {
@@ -12799,16 +12787,21 @@ async function deleteUser(id) {
 function exportFinancialReport() {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
-    // 由於報表類型選單已移除，嘗試從舊的 reportType 元素或 quickDate 取得類型；若都不存在則留空
+    // 嘗試取得報表類型：舊的 reportType 元素可能不存在，改用 quickDate 文字或值
     let reportType = '';
     const rptElem = document.getElementById('reportType');
     if (rptElem) {
         reportType = rptElem.value;
     } else {
-        // 若沒有 reportType 元素，使用 quickDate 代替
         const quickDateElem = document.getElementById('quickDate');
         if (quickDateElem) {
-            reportType = quickDateElem.options[quickDateElem.selectedIndex].text || quickDateElem.value;
+            // 使用選項的顯示文字，若沒有則使用值
+            const selIndex = quickDateElem.selectedIndex;
+            if (selIndex >= 0) {
+                reportType = quickDateElem.options[selIndex].text || quickDateElem.value;
+            } else {
+                reportType = quickDateElem.value;
+            }
         }
     }
     // 取得醫師篩選條件（若有）
