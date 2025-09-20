@@ -360,7 +360,7 @@ async function refreshHerbInventoryBadges() {
           const v = Number(addInput.value || 0);
           if (v > 0) {
             await addInventory(id, v);
-            await refreshHerbInventoryBadges();
+            refreshHerbInventoryBadges().catch(() => {});
             showToast('已入庫', 'success');
           }
         };
@@ -369,7 +369,7 @@ async function refreshHerbInventoryBadges() {
         thInput.onblur = async () => {
           const v = Number(thInput.value || 0);
           await setReorderPoint(id, v);
-          await refreshHerbInventoryBadges();
+          refreshHerbInventoryBadges().catch(() => {});
           showToast('已更新補貨門檻', 'success');
         };
       }
@@ -9230,7 +9230,7 @@ async function initializeSystemAfterLogin() {
             displayHerbLibrary();
         }
         
-        async function displayHerbLibrary() {
+        function displayHerbLibrary() {
             const searchTerm = document.getElementById('searchHerb').value.toLowerCase();
             const listContainer = document.getElementById('herbLibraryList');
 
@@ -9369,7 +9369,7 @@ async function initializeSystemAfterLogin() {
             }
             listContainer.innerHTML = html;
             
-            try { await refreshHerbInventoryBadges(); } catch (_e) {};
+            refreshHerbInventoryBadges().catch(() => {});
 // 產生分頁控制
             const paginationEl = ensurePaginationContainer('herbLibraryList', 'herbLibraryPagination');
             renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
@@ -9815,7 +9815,7 @@ async function initializeSystemAfterLogin() {
             });
             listContainer.innerHTML = html;
             
-            try { await refreshHerbInventoryBadges(); } catch (_e) {};
+            refreshHerbInventoryBadges().catch(() => {});
 // 渲染分頁控制
             const paginationEl = ensurePaginationContainer('acupointLibraryList', 'acupointLibraryPagination');
             renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
@@ -9961,7 +9961,7 @@ async function initializeSystemAfterLogin() {
             
             listContainer.innerHTML = html;
         
-            try { await refreshHerbInventoryBadges(); } catch (_e) {};
+            refreshHerbInventoryBadges().catch(() => {});
 }
         
         function createBillingItemCard(item) {
