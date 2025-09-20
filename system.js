@@ -263,7 +263,7 @@ async function getInventoryMap(forceRefresh = false) {
         name: d.name || '',
         type: d.type || 'herb',
         stockQty: Number(d.stockQty || 0),
-        reorderPoint: Number(d.reorderPoint ?? DEFAULT_REORDER_POINT),
+        reorderPoint: Number(d.reorderPoint || DEFAULT_REORDER_POINT),
         updatedAt: d.updatedAt || new Date()
       };
     });
@@ -281,7 +281,7 @@ async function upsertInventoryItem(item) {
     name: item.name || '',
     type: item.type || 'herb',
     stockQty: Number(item.stockQty || 0),
-    reorderPoint: Number(item.reorderPoint ?? DEFAULT_REORDER_POINT),
+    reorderPoint: Number(item.reorderPoint || DEFAULT_REORDER_POINT),
     updatedAt: new Date()
   };
   await window.firebase.setDoc(
