@@ -14,7 +14,7 @@ let currentUserData = null;
  * @param {boolean} immediate - If `true`, trigger on the leading edge instead of the trailing.
  * @returns {Function} A new debounced function.
  */
-function debounce(func, wait) {
+function debounce(func, wait, immediate = false) {
     let timeout;
     return function (...args) {
         const context = this;
@@ -243,140 +243,6 @@ let templateLibraryLoaded = false;
 // 快取診症記錄和用戶列表，避免重複從 Firestore 讀取
 let consultationCache = null;
 let userCache = null;
-
-// === Inventory (TCM) ===
-let inventoryMapCache = null; // { [id]: { id, name, type, stockQty, reorderPoint, updatedAt } }
-const DEFAULT_REORDER_POINT = 100;
-
-async function getInventoryMap(forceRefresh = false) {
-  if (!forceRefresh && inventoryMapCache) return inventoryMapCache;
-  try {
-    await (typeof waitForFirebaseDb === 'function' ? waitForFirebaseDb() : Promise.resolve());
-    const snap = await window.firebase.getDocs(
-      window.firebase.collection(window.firebase.db, 'inventory')
-    );
-    const map = {};
-    snap.forEach(doc => {
-      const d = doc.data() || {};
-      map[doc.id] = {
-        id: doc.id,
-        name: d.name || '',
-        type: d.type || 'herb',
-        stockQty: Number(d.stockQty || 0),
-        reorderPoint: Number(d.reorderPoint ?? DEFAULT_REORDER_POINT),
-        updatedAt: d.updatedAt || new Date()
-      };
-    });
-    inventoryMapCache = map;
-    return map;
-  } catch (e) {
-    console.error('讀取庫存失敗', e);
-    return {};
-  }
-}
-
-async function upsertInventoryItem(item) {
-  if (!item || !item.id) return;
-  const payload = {
-    name: item.name || '',
-    type: item.type || 'herb',
-    stockQty: Number(item.stockQty || 0),
-    reorderPoint: Number(item.reorderPoint ?? DEFAULT_REORDER_POINT),
-    updatedAt: new Date()
-  };
-  await window.firebase.setDoc(
-    window.firebase.doc(window.firebase.db, 'inventory', String(item.id)),
-    payload
-  );
-  if (!inventoryMapCache) inventoryMapCache = {};
-  inventoryMapCache[item.id] = { id: item.id, ...payload };
-}
-
-async function adjustInventoryBatch(usages, options = { revert: false }) {
-  if (!Array.isArray(usages) || usages.length === 0) return { ok: true };
-  const inv = await getInventoryMap();
-  const agg = {};
-  for (const u of usages) {
-    if (!u || !u.id || !u.qtyGram) continue;
-    const key = String(u.id);
-    if (!agg[key]) agg[key] = { id: u.id, name: u.name || '', type: u.type || 'herb', qtyGram: 0 };
-    agg[key].qtyGram += Number(u.qtyGram || 0);
-  }
-  for (const key of Object.keys(agg)) {
-    const row = inv[key] || { id: key, name: agg[key].name, type: agg[key].type, stockQty: 0, reorderPoint: DEFAULT_REORDER_POINT };
-    const delta = options.revert ? agg[key].qtyGram : -agg[key].qtyGram;
-    row.stockQty = Math.max(0, Number(row.stockQty || 0) + delta);
-    await upsertInventoryItem(row);
-  }
-  return { ok: true };
-}
-
-async function setReorderPoint(herbId, pointGram) {
-  const inv = await getInventoryMap();
-  const row = inv[herbId] || { id: herbId, stockQty: 0, reorderPoint: DEFAULT_REORDER_POINT };
-  row.reorderPoint = Math.max(0, Number(pointGram || 0));
-  await upsertInventoryItem(row);
-}
-
-async function addInventory(herbId, addGram) {
-  const inv = await getInventoryMap();
-  const row = inv[herbId] || { id: herbId, stockQty: 0, reorderPoint: DEFAULT_REORDER_POINT };
-  row.stockQty = Math.max(0, Number(row.stockQty || 0) + Number(addGram || 0));
-  await upsertInventoryItem(row);
-}
-
-async function refreshHerbInventoryBadges() {
-  try {
-    const inv = await getInventoryMap();
-    const nodes = document.querySelectorAll('[data-inv]');
-    nodes.forEach(node => {
-      const id = String(node.getAttribute('data-herb-id') || node.getAttribute('data-formula-id') || node.getAttribute('data-item-id') || '');
-      const row = inv[id] || { stockQty: 0, reorderPoint: DEFAULT_REORDER_POINT };
-      const stockEl = node.querySelector('[data-stock]');
-      const thEl = node.querySelector('[data-threshold]');
-      const warnEl = node.querySelector('[data-warning]');
-      const addInput = node.querySelector('input[data-add-input]');
-      const thInput = node.querySelector('input[data-threshold-input]');
-      const addBtn = node.querySelector('button[data-add-btn]');
-      const low = Number(row.stockQty) <= Number(row.reorderPoint);
-      if (stockEl) stockEl.textContent = (row.stockQty || 0).toLocaleString() + ' 克';
-      if (thEl) thEl.textContent = String(row.reorderPoint || DEFAULT_REORDER_POINT) + ' 克';
-      if (warnEl) {
-        if (low) {
-          warnEl.textContent = '低庫存，建議補貨';
-          warnEl.classList.remove('text-gray-400');
-          warnEl.classList.add('text-red-600','font-medium');
-        } else {
-          warnEl.textContent = '';
-          warnEl.classList.remove('text-red-600','font-medium');
-          warnEl.classList.add('text-gray-400');
-        }
-      }
-      if (thInput) thInput.value = String(row.reorderPoint || DEFAULT_REORDER_POINT);
-      if (addInput && addBtn) {
-        addBtn.onclick = async () => {
-          const v = Number(addInput.value || 0);
-          if (v > 0) {
-            await addInventory(id, v);
-            await refreshHerbInventoryBadges();
-            showToast('已入庫', 'success');
-          }
-        };
-      }
-      if (thInput) {
-        thInput.onblur = async () => {
-          const v = Number(thInput.value || 0);
-          await setReorderPoint(id, v);
-          await refreshHerbInventoryBadges();
-          showToast('已更新補貨門檻', 'success');
-        };
-      }
-    });
-  } catch (e) {
-    console.error('刷新庫存徽章失敗', e);
-  }
-}
-
 
 // 追蹤本次診症操作期間對套票使用造成的暫時變更。
 // 當使用者在開啟診症或編輯病歷時使用或取消使用套票，
@@ -5312,55 +5178,6 @@ async function saveConsultation() {
                 // 同步更新到 Firebase
                 await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
                 showToast('診症記錄已更新！', 'success');
-
-                // === 庫存：編輯診症後差額調整 ===
-                try {
-                    const items = Array.isArray(selectedPrescriptionItems) ? selectedPrescriptionItems : [];
-                    const medDays = Number((document.getElementById('medicationDays')?.value) || 0);
-                    const medFreq = Number((document.getElementById('medicationFrequency')?.value) || 0);
-                    const multiplier = Math.max(1, (isFinite(medDays) ? medDays : 0) * (isFinite(medFreq) ? medFreq : 0)) || 1;
-                    const newUsages = items.filter(it => it && it.id)
-                        .map(it => ({
-                            id: String(it.id),
-                            name: it.name || '',
-                            type: it.type || 'herb',
-                            qtyGram: Math.max(0, Number(it.customDosage || 0)) * multiplier
-                        }))
-                        .filter(u => u.qtyGram > 0);
-                    // 嘗試從本地 existing 或重新獲取
-                    let prevUsages = [];
-                    try {
-                      if (typeof existing !== 'undefined' && existing && Array.isArray(existing.inventoryUsage)) {
-                        prevUsages = existing.inventoryUsage;
-                      } else {
-                        const res = await window.firebaseDataManager.getConsultations();
-                        const found = (res && res.data || []).find(c => String(c.id) === String(appointment.consultationId));
-                        if (found && Array.isArray(found.inventoryUsage)) prevUsages = found.inventoryUsage;
-                      }
-                    } catch(_e) {}
-                    const prevMap = {}; prevUsages.forEach(u => { if (u && u.id) prevMap[String(u.id)] = Number(u.qtyGram || 0); });
-                    const newMap = {}; newUsages.forEach(u => { if (u && u.id) newMap[String(u.id)] = (newMap[String(u.id)] || 0) + Number(u.qtyGram || 0); });
-                    const revertBatch = []; const deductBatch = [];
-                    Object.keys(newMap).forEach(k => {
-                        const before = prevMap[k] || 0;
-                        const after = newMap[k] || 0;
-                        const diff = after - before;
-                        if (diff < 0) revertBatch.push({ id: k, qtyGram: Math.abs(diff) });
-                        if (diff > 0) deductBatch.push({ id: k, qtyGram: diff });
-                    });
-                    Object.keys(prevMap).forEach(k => {
-                        if (!(k in newMap)) {
-                            const qty = prevMap[k] || 0;
-                            if (qty > 0) revertBatch.push({ id: k, qtyGram: qty });
-                        }
-                    });
-                    if (revertBatch.length) await adjustInventoryBatch(revertBatch, { revert: true });
-                    if (deductBatch.length) await adjustInventoryBatch(deductBatch, { revert: false });
-                    await window.firebaseDataManager.updateConsultation(String(appointment.consultationId), { inventoryUsage: newUsages });
-                } catch (e) {
-                    console.error('庫存調整失敗(編輯診症)', e);
-                }
-        
             } else {
                 showToast('更新診症記錄失敗，請稍後再試', 'error');
             }
@@ -5383,29 +5200,6 @@ async function saveConsultation() {
                 localStorage.setItem('appointments', JSON.stringify(appointments));
                 await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
                 showToast('診症記錄已保存！', 'success');
-
-                // === 庫存：新增診症後扣減 ===
-                try {
-                    const items = Array.isArray(selectedPrescriptionItems) ? selectedPrescriptionItems : [];
-                    const medDays = Number((document.getElementById('medicationDays')?.value) || 0);
-                    const medFreq = Number((document.getElementById('medicationFrequency')?.value) || 0);
-                    const multiplier = Math.max(1, (isFinite(medDays) ? medDays : 0) * (isFinite(medFreq) ? medFreq : 0)) || 1;
-                    const usages = items.filter(it => it && it.id)
-                        .map(it => ({
-                            id: String(it.id),
-                            name: it.name || '',
-                            type: it.type || 'herb',
-                            qtyGram: Math.max(0, Number(it.customDosage || 0)) * multiplier
-                        }))
-                        .filter(u => u.qtyGram > 0);
-                    if (usages.length > 0) {
-                        await adjustInventoryBatch(usages, { revert: false });
-                        await window.firebaseDataManager.updateConsultation(String(result.id), { inventoryUsage: usages });
-                    }
-                } catch (e) {
-                    console.error('庫存扣減失敗(新增診症)', e);
-                }
-        
             } else {
                 showToast('保存診症記錄失敗，請稍後再試', 'error');
             }
@@ -5750,34 +5544,7 @@ if (!patient) {
                                 ` : ''}
                             </div>
                         </div>
-                    
-                    <div class="mt-3 pt-3 border-t" data-inv="formula" data-formula-id="${formula.id}">
-                      <div class="flex justify-end items-center gap-2 text-sm">
-                        <span class="text-gray-500">餘量：</span><span class="font-medium" data-stock>—</span>
-                        <span class="text-gray-500 ml-2">門檻：</span><span data-threshold>—</span>
-                      </div>
-                      <div class="mt-2 flex gap-2 justify-end">
-                        <input type="number" min="0" step="1" placeholder="門檻(克)" class="w-28 border rounded px-2 py-1" data-threshold-input />
-                        <input type="number" min="0" step="1" placeholder="新增存庫(克)" class="w-32 border rounded px-2 py-1" data-add-input />
-                        <button class="px-3 py-1 bg-green-600 text-white rounded" data-add-btn>新增存庫</button>
-                      </div>
-                      <div class="text-xs mt-1 text-gray-400" data-warning></div>
                     </div>
-
-                
-                    <div class="mt-3 pt-3 border-t" data-inv="herb" data-herb-id="${herb.id}">
-                      <div class="flex justify-end items-center gap-2 text-sm">
-                        <span class="text-gray-500">餘量：</span><span class="font-medium" data-stock>—</span>
-                        <span class="text-gray-500 ml-2">門檻：</span><span data-threshold>—</span>
-                      </div>
-                      <div class="mt-2 flex gap-2 justify-end">
-                        <input type="number" min="0" step="1" placeholder="門檻(克)" class="w-28 border rounded px-2 py-1" data-threshold-input />
-                        <input type="number" min="0" step="1" placeholder="新增存庫(克)" class="w-32 border rounded px-2 py-1" data-add-input />
-                        <button class="px-3 py-1 bg-green-600 text-white rounded" data-add-btn>新增存庫</button>
-                      </div>
-                      <div class="text-xs mt-1 text-gray-400" data-warning></div>
-                    </div>
-                </div>
                 </div>
             `;
         }
@@ -9387,7 +9154,6 @@ async function initializeSystemAfterLogin() {
                 `;
             }
             listContainer.innerHTML = html;
-            refreshHerbInventoryBadges().catch(() => {});
             // 產生分頁控制
             const paginationEl = ensurePaginationContainer('herbLibraryList', 'herbLibraryPagination');
             renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
@@ -9425,34 +9191,7 @@ async function initializeSystemAfterLogin() {
                         ${safeIndications ? `<div><span class="font-medium text-gray-700">主治：</span>${safeIndications}</div>` : ''}
                         ${safeDosage ? `<div><span class="font-medium text-gray-700">劑量：</span><span class="text-blue-600 font-medium">${safeDosage}</span></div>` : ''}
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
-                    
-                    <div class="mt-3 pt-3 border-t" data-inv="formula" data-formula-id="${formula.id}">
-                      <div class="flex justify-end items-center gap-2 text-sm">
-                        <span class="text-gray-500">餘量：</span><span class="font-medium" data-stock>—</span>
-                        <span class="text-gray-500 ml-2">門檻：</span><span data-threshold>—</span>
-                      </div>
-                      <div class="mt-2 flex gap-2 justify-end">
-                        <input type="number" min="0" step="1" placeholder="門檻(克)" class="w-28 border rounded px-2 py-1" data-threshold-input />
-                        <input type="number" min="0" step="1" placeholder="新增存庫(克)" class="w-32 border rounded px-2 py-1" data-add-input />
-                        <button class="px-3 py-1 bg-green-600 text-white rounded" data-add-btn>新增存庫</button>
-                      </div>
-                      <div class="text-xs mt-1 text-gray-400" data-warning></div>
                     </div>
-
-                
-                    <div class="mt-3 pt-3 border-t" data-inv="herb" data-herb-id="${herb.id}">
-                      <div class="flex justify-end items-center gap-2 text-sm">
-                        <span class="text-gray-500">餘量：</span><span class="font-medium" data-stock>—</span>
-                        <span class="text-gray-500 ml-2">門檻：</span><span data-threshold>—</span>
-                      </div>
-                      <div class="mt-2 flex gap-2 justify-end">
-                        <input type="number" min="0" step="1" placeholder="門檻(克)" class="w-28 border rounded px-2 py-1" data-threshold-input />
-                        <input type="number" min="0" step="1" placeholder="新增存庫(克)" class="w-32 border rounded px-2 py-1" data-add-input />
-                        <button class="px-3 py-1 bg-green-600 text-white rounded" data-add-btn>新增存庫</button>
-                      </div>
-                      <div class="text-xs mt-1 text-gray-400" data-warning></div>
-                    </div>
-                </div>
                 </div>
             `;
         }
@@ -9489,34 +9228,7 @@ async function initializeSystemAfterLogin() {
                         ` : ''}
                         ${safeUsage ? `<div><span class="font-medium text-gray-700">用法：</span>${safeUsage}</div>` : ''}
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
-                    
-                    <div class="mt-3 pt-3 border-t" data-inv="formula" data-formula-id="${formula.id}">
-                      <div class="flex justify-end items-center gap-2 text-sm">
-                        <span class="text-gray-500">餘量：</span><span class="font-medium" data-stock>—</span>
-                        <span class="text-gray-500 ml-2">門檻：</span><span data-threshold>—</span>
-                      </div>
-                      <div class="mt-2 flex gap-2 justify-end">
-                        <input type="number" min="0" step="1" placeholder="門檻(克)" class="w-28 border rounded px-2 py-1" data-threshold-input />
-                        <input type="number" min="0" step="1" placeholder="新增存庫(克)" class="w-32 border rounded px-2 py-1" data-add-input />
-                        <button class="px-3 py-1 bg-green-600 text-white rounded" data-add-btn>新增存庫</button>
-                      </div>
-                      <div class="text-xs mt-1 text-gray-400" data-warning></div>
                     </div>
-
-                
-                    <div class="mt-3 pt-3 border-t" data-inv="herb" data-herb-id="${herb.id}">
-                      <div class="flex justify-end items-center gap-2 text-sm">
-                        <span class="text-gray-500">餘量：</span><span class="font-medium" data-stock>—</span>
-                        <span class="text-gray-500 ml-2">門檻：</span><span data-threshold>—</span>
-                      </div>
-                      <div class="mt-2 flex gap-2 justify-end">
-                        <input type="number" min="0" step="1" placeholder="門檻(克)" class="w-28 border rounded px-2 py-1" data-threshold-input />
-                        <input type="number" min="0" step="1" placeholder="新增存庫(克)" class="w-32 border rounded px-2 py-1" data-add-input />
-                        <button class="px-3 py-1 bg-green-600 text-white rounded" data-add-btn>新增存庫</button>
-                      </div>
-                      <div class="text-xs mt-1 text-gray-400" data-warning></div>
-                    </div>
-                </div>
                 </div>
             `;
         }
@@ -9858,7 +9570,6 @@ async function initializeSystemAfterLogin() {
                 html += `\n                    <div class="mb-8">\n                        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">\n                            <span class="mr-2">📌</span>${window.escapeHtml(m)} (${totalForMeridian})\n                        </h3>\n                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">\n                            ${groups[m].map(ac => createAcupointCard(ac)).join('')}\n                        </div>\n                    </div>\n                `;
             });
             listContainer.innerHTML = html;
-            refreshHerbInventoryBadges().catch(() => {});
             // 渲染分頁控制
             const paginationEl = ensurePaginationContainer('acupointLibraryList', 'acupointLibraryPagination');
             renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
@@ -10003,7 +9714,6 @@ async function initializeSystemAfterLogin() {
             });
             
             listContainer.innerHTML = html;
-            refreshHerbInventoryBadges().catch(() => {});
         }
         
         function createBillingItemCard(item) {
@@ -10447,7 +10157,7 @@ async function initializeSystemAfterLogin() {
                         const encoded = encodeURIComponent(details.join('\n'));
                         // 建立 HTML，並綁定 tooltip 事件於整個項目容器
                         return `
-                            <div class="${bgColor} border rounded-lg p-3 cursor-pointer" data-presc-row data-id="${item.id}" data-dosage="${item.customDosage || \'6\'}"
+                            <div class="${bgColor} border rounded-lg p-3 cursor-pointer"
                                  data-tooltip="${encoded}"
                                  onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))"
                                  onmousemove="moveTooltip(event)"
@@ -10479,36 +10189,6 @@ async function initializeSystemAfterLogin() {
             `;
 
             container.innerHTML = displayHtml;
-            // === 處方庫存提示（不足/低庫存） ===
-            ;(async () => {
-              try {
-                const inv = await getInventoryMap();
-                const days = Number(document.getElementById('medicationDays')?.value || 0);
-                const freq = Number(document.getElementById('medicationFrequency')?.value || 0);
-                const mult = Math.max(1, (isFinite(days)?days:0) * (isFinite(freq)?freq:0)) || 1;
-                const rows = container.querySelectorAll('[data-presc-row]');
-                rows.forEach(row => {
-                  const id = String(row.getAttribute('data-id') || '');
-                  const dosage = Number(row.getAttribute('data-dosage') || '0') || 0;
-                  const need = dosage * mult;
-                  const r = inv[id] || { stockQty: 0, reorderPoint: DEFAULT_REORDER_POINT };
-                  const warn = row.querySelector('[data-stock-warning]');
-                  if (warn) {
-                    if (r.stockQty < need) {
-                      warn.textContent = `現有：${r.stockQty} 克　門檻：${r.reorderPoint} 克（庫存不足）`;
-                      warn.className = 'text-xs mt-1 text-red-600';
-                    } else if (r.stockQty <= r.reorderPoint) {
-                      warn.textContent = `現有：${r.stockQty} 克　門檻：${r.reorderPoint} 克（低庫存）`;
-                      warn.className = 'text-xs mt-1 text-red-600';
-                    } else {
-                      warn.textContent = `現有：${r.stockQty} 克　門檻：${r.reorderPoint} 克`;
-                      warn.className = 'text-xs mt-1 text-gray-400';
-                    }
-                  }
-                });
-              } catch (e) { console.warn('更新處方庫存提示失敗', e); }
-            })();
-
             
             // 更新隱藏的文本域
             let prescriptionText = '';
