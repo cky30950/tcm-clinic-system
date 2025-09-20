@@ -1141,109 +1141,6 @@ function generateMedicalRecordNumber() {
         // 移除穴位編輯狀態變數（不再支援新增/編輯/刪除）
         // let editingAcupointId = null;
         let currentAcupointFilter = 'all';
-        
-        // 中藥庫存管理變數
-        let herbInventory = [];
-        let herbInventoryLoaded = false;
-        
-        /**
-         * 初始化中藥庫存資料
-         * 從本地 JSON 檔案載入存庫資料，若找不到則創建新的存庫資料
-         */
-        async function initHerbInventory(forceRefresh = false) {
-            // 若已載入且不需要強制重新載入，直接返回以避免重複讀取
-            if (herbInventoryLoaded && !forceRefresh) {
-                return;
-            }
-            try {
-                // 嘗試從本地文件加載存庫數據
-                const response = await fetch('data/herbInventory.json');
-                const inventoryData = await response.json();
-                herbInventory = Array.isArray(inventoryData.items) ? inventoryData.items : [];
-                herbInventoryLoaded = true;
-            } catch (error) {
-                console.error('讀取中藥存庫資料失敗，初始化為空數據:', error);
-                herbInventory = [];
-                herbInventoryLoaded = true;
-            }
-        }
-        
-        /**
-         * 保存中藥庫存資料到本地文件
-         */
-        async function saveHerbInventory() {
-            try {
-                const inventoryData = {
-                    lastUpdated: new Date().toISOString(),
-                    items: herbInventory
-                };
-                // 保存到本地存儲
-                localStorage.setItem('herbInventory', JSON.stringify(inventoryData));
-                
-                // 在真實環境中，你可能需要將數據同步到服務器
-                console.log('中藥存庫資料已保存');
-            } catch (error) {
-                console.error('保存中藥存庫資料失敗:', error);
-                throw error;
-            }
-        }
-        
-        /**
-         * 更新中藥存庫數量
-         * @param {string} herbId - 中藥材ID
-         * @param {number} amount - 調整數量（正值增加，負值減少）
-         * @param {boolean} save - 是否立即保存
-         * @returns {boolean} - 更新是否成功
-         */
-        async function updateHerbInventory(herbId, amount, save = true) {
-            try {
-                // 確保存庫數據已加載
-                if (!herbInventoryLoaded) {
-                    await initHerbInventory();
-                }
-                
-                // 查找中藥材在存庫中的記錄
-                let inventoryItem = herbInventory.find(item => item.herbId === herbId);
-                
-                // 如果不存在，創建新的存庫記錄
-                if (!inventoryItem) {
-                    const herb = herbLibrary.find(h => h.id === herbId);
-                    if (!herb) {
-                        console.error(`找不到ID為${herbId}的中藥材`);
-                        return false;
-                    }
-                    
-                    inventoryItem = {
-                        herbId: herbId,
-                        name: herb.name,
-                        currentStock: 0,
-                        lowStockAlert: 50, // 默認低存庫提示值
-                        unit: 'g' // 默認克為單位
-                    };
-                    herbInventory.push(inventoryItem);
-                }
-                
-                // 更新存庫數量
-                const newStock = inventoryItem.currentStock + amount;
-                if (newStock < 0) {
-                    console.error(`更新存庫失敗：${inventoryItem.name}的存庫數量不能為負數`);
-                    return false;
-                }
-                
-                inventoryItem.currentStock = newStock;
-                
-                // 如果需要保存，調用保存函數
-                if (save) {
-                    await saveHerbInventory();
-                }
-                
-                return true;
-            } catch (error) {
-                console.error('更新中藥存庫數量失敗:', error);
-                return false;
-            }
-        }
-        
         /**
          * 從 Firestore 讀取中藥庫資料，若資料不存在則自動使用預設值初始化。
          * 此函式會等待 Firebase 初始化完成後再執行。
@@ -1261,9 +1158,6 @@ function generateMedicalRecordNumber() {
                 const formulaList = Array.isArray(formulaData.herbLibrary) ? formulaData.herbLibrary : [];
                 herbLibrary = [...herbList, ...formulaList];
                 herbLibraryLoaded = true;
-                
-                // 初始化存庫數據
-                await initHerbInventory();
             } catch (error) {
                 console.error('讀取本地 JSON 中藥庫資料失敗:', error);
             }
@@ -5318,40 +5212,6 @@ async function saveConsultation() {
             await commitPendingPackageChanges();
             // 提交後清空暫存變更
             pendingPackageChanges = [];
-            
-            // 扣減中藥庫存
-            try {
-                const prescription = document.getElementById('formPrescription').value.trim();
-                if (prescription) {
-                    // 簡單解析處方中的藥材和數量
-                    // 假設處方格式為每行：藥材名稱 數量g
-                    const lines = prescription.split('\n');
-                    for (const line of lines) {
-                        const trimmedLine = line.trim();
-                        if (!trimmedLine) continue;
-                        
-                        // 使用正則表達式提取藥材名稱和數量
-                        const match = trimmedLine.match(/^(.*?)\s+([\d.]+)\s*g?$/);
-                        if (match && match.length >= 3) {
-                            const herbName = match[1].trim();
-                            const quantity = parseFloat(match[2]);
-                            
-                            if (!isNaN(quantity) && quantity > 0) {
-                                // 查找藥材ID
-                                const herb = herbLibrary.find(h => h.name === herbName);
-                                if (herb && herb.id) {
-                                    // 扣減存庫（使用負數表示減少）
-                                    await updateHerbInventory(herb.id, -quantity);
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (inventoryError) {
-                console.error('扣減中藥庫存時發生錯誤:', inventoryError);
-                showToast('扣減中藥庫存時發生錯誤，但診症已保存', 'warning');
-            }
-            
             // 完成後關閉診症表單並更新 UI
             closeConsultationForm();
             loadTodayAppointments();
@@ -6396,10 +6256,10 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         // Rebuild medication information according to language
         let medInfoLocalized = '';
         if (medDays) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
         }
         if (medFreq) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
         }
         if (consultation.usage) {
             medInfoLocalized += '<strong>' + (isEnglish ? 'Administration Method' : '服用方法') + colon + '</strong>' + consultation.usage;
@@ -8211,38 +8071,6 @@ async function withdrawConsultation(appointmentId) {
     } catch (err) {
         console.error('退回套票使用時發生錯誤:', err);
         showToast('退回套票時發生錯誤', 'warning');
-    }
-    
-    // --- 回滾中藥庫存 ---
-    try {
-        if (consultation && consultation.prescription) {
-            const prescription = consultation.prescription;
-            // 簡單解析處方中的藥材和數量
-            const lines = prescription.split('\n');
-            for (const line of lines) {
-                const trimmedLine = line.trim();
-                if (!trimmedLine) continue;
-                
-                // 使用正則表達式提取藥材名稱和數量
-                const match = trimmedLine.match(/^(.*?)\s+([\d.]+)\s*g?$/);
-                if (match && match.length >= 3) {
-                    const herbName = match[1].trim();
-                    const quantity = parseFloat(match[2]);
-                    
-                    if (!isNaN(quantity) && quantity > 0) {
-                        // 查找藥材ID
-                        const herb = herbLibrary.find(h => h.name === herbName);
-                        if (herb && herb.id) {
-                            // 回滾存庫（使用正數表示增加）
-                            await updateHerbInventory(herb.id, quantity);
-                        }
-                    }
-                }
-            }
-        }
-    } catch (inventoryError) {
-        console.error('回滾中藥庫存時發生錯誤:', inventoryError);
-        showToast('回滾中藥庫存時發生錯誤，但診症已撤回', 'warning');
     }
     // 從病人診症快取中移除該紀錄
     try {
