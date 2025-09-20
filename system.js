@@ -263,7 +263,7 @@ async function getInventoryMap(forceRefresh = false) {
         name: d.name || '',
         type: d.type || 'herb',
         stockQty: Number(d.stockQty || 0),
-        reorderPoint: Number(d.reorderPoint || DEFAULT_REORDER_POINT),
+        reorderPoint: Number(d.reorderPoint ?? DEFAULT_REORDER_POINT),
         updatedAt: d.updatedAt || new Date()
       };
     });
@@ -281,7 +281,7 @@ async function upsertInventoryItem(item) {
     name: item.name || '',
     type: item.type || 'herb',
     stockQty: Number(item.stockQty || 0),
-    reorderPoint: Number(item.reorderPoint || DEFAULT_REORDER_POINT),
+    reorderPoint: Number(item.reorderPoint ?? DEFAULT_REORDER_POINT),
     updatedAt: new Date()
   };
   await window.firebase.setDoc(
@@ -325,7 +325,14 @@ async function addInventory(herbId, addGram) {
   await upsertInventoryItem(row);
 }
 
-async function refreshHerbInventoryBadges() {
+async funct
+async function addInventory(herbId, addGram) {
+  const inv = await getInventoryMap();
+  const row = inv[herbId] || { id: herbId, stockQty: 0, reorderPoint: DEFAULT_REORDER_POINT };
+  row.stockQty = Math.max(0, Number(row.stockQty || 0) + Number(addGram || 0));
+  await upsertInventoryItem(row);
+}
+ion refreshHerbInventoryBadges() {
   try {
     const inv = await getInventoryMap();
     const nodes = document.querySelectorAll('[data-inv]');
