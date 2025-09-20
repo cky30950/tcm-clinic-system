@@ -14,7 +14,7 @@ let currentUserData = null;
  * @param {boolean} immediate - If `true`, trigger on the leading edge instead of the trailing.
  * @returns {Function} A new debounced function.
  */
-function debounce(func, wait, immediate = false) {
+function debounce(func, wait) {
     let timeout;
     return function (...args) {
         const context = this;
@@ -325,14 +325,7 @@ async function addInventory(herbId, addGram) {
   await upsertInventoryItem(row);
 }
 
-async funct
-async function addInventory(herbId, addGram) {
-  const inv = await getInventoryMap();
-  const row = inv[herbId] || { id: herbId, stockQty: 0, reorderPoint: DEFAULT_REORDER_POINT };
-  row.stockQty = Math.max(0, Number(row.stockQty || 0) + Number(addGram || 0));
-  await upsertInventoryItem(row);
-}
-ion refreshHerbInventoryBadges() {
+async function refreshHerbInventoryBadges() {
   try {
     const inv = await getInventoryMap();
     const nodes = document.querySelectorAll('[data-inv]');
