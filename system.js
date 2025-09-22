@@ -15309,76 +15309,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     updateClinicSettingsDisplay();
 
-const addUserForm = document.getElementById('addUserForm');
-    if (addUserForm) {
-        addUserForm.addEventListener('submit', async function(e) {
-            e.preventDefault(); // 防止表單默認提交（避免頁面刷新）
-
-            // 收集表單資料
-            const data = {
-                name: document.getElementById('userName').value.trim(),
-                position: document.getElementById('userPosition').value,
-                regNumber: document.getElementById('userRegNumber').value.trim(),
-                email: document.getElementById('userEmail').value.trim(),
-                password: document.getElementById('userPassword').value, // 新增密碼
-                phone: document.getElementById('userPhone').value.trim(),
-                enabled: document.getElementById('userEnabled').checked,
-            };
-
-            // 驗證必填欄位
-            if (!data.name || !data.position || !data.email || !data.password) {
-                showToast('請填寫姓名、職位、電子郵件與初始密碼', 'error');
-                return;
-            }
-            if (data.position === '醫師' && !data.regNumber) {
-                showToast('醫師必須填寫註冊編號', 'error');
-                return;
-            }
-
-            try {
-                // 先創建 Firebase Auth 帳戶
-                const userCredential = await window.firebase.createUserWithEmailAndPassword(
-                    window.firebase.auth,
-                    data.email,
-                    data.password
-                );
-                const uid = userCredential.user.uid;
-
-                // 儲存用戶資料到 Firestore 的 'users' 集合
-                await window.firebase.addDoc(
-                    window.firebase.collection(window.firebase.db, 'users'),
-                    {
-                        ...data,
-                        uid: uid, // 儲存 UID
-                        createdAt: new Date().toISOString(),
-                        lastLogin: null // 初始無登入記錄
-                    }
-                );
-
-                // 顯示成功提示
-                showToast('用戶新增成功（已創建 Auth 帳戶）', 'success');
-
-                // 清空表單並關閉模態
-                addUserForm.reset();
-                closeModal('addUserModal'); // 假設你有 closeModal 函式
-                // 重新載入用戶列表（假設有此函式）
-                if (typeof renderUserList === 'function') {
-                    renderUserList();
-                }
-            } catch (error) {
-                console.error('新增用戶失敗:', error);
-                let msg = '新增用戶失敗';
-                if (error.code === 'auth/email-already-in-use') {
-                    msg = '電子郵件已被使用';
-                } else if (error.code === 'auth/invalid-email') {
-                    msg = '無效的電子郵件格式';
-                } else if (error.code === 'auth/weak-password') {
-                    msg = '密碼強度不足（至少6字符）';
-                }
-                showToast(msg, 'error');
-            }
-        });
-    }
+    // 保持所有中藥材及方劑欄位可見（包含性味、歸經、主治、用法）
+    
+    
     // 自動聚焦到電子郵件輸入框
     const usernameInput = document.getElementById('mainLoginUsername');
     if (usernameInput) {
