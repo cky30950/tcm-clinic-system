@@ -1924,6 +1924,16 @@ async function attemptMainLogin() {
             if (typeof initHerbLibrary === 'function') {
                 initTasks.push(initHerbLibrary());
             }
+            // 在登入時預先載入中藥庫存資料，避免未開啟中藥庫時處方餘量顯示為零
+            if (typeof initHerbInventory === 'function') {
+                initTasks.push((async () => {
+                    try {
+                        await initHerbInventory();
+                    } catch (err) {
+                        console.error('初始化中藥庫存資料失敗:', err);
+                    }
+                })());
+            }
             if (typeof initBillingItems === 'function') {
                 initTasks.push(initBillingItems());
             }
