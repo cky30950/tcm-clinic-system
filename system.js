@@ -46,6 +46,21 @@ const paginationSettings = {
 // 為穴位庫新增分頁設定，每頁顯示 6 筆資料
 paginationSettings.acupointLibrary = { currentPage: 1, itemsPerPage: 6 };
 
+// 單位轉換表與單位顯示名稱。
+// 將所有庫存與警戒量以克 (g) 為基準儲存；透過下方表格可將數值轉換為不同單位以供顯示。
+const UNIT_FACTOR_MAP = {
+    g: 1,
+    jin: 600,
+    liang: 37.5,
+    qian: 3.75
+};
+const UNIT_LABEL_MAP = {
+    g: '克',
+    jin: '斤',
+    liang: '兩',
+    qian: '錢'
+};
+
 // 為病人詳細資料中的套票情況新增分頁設定。
 // 若條件改變（例如重新查看另一位病人），應重置 currentPage 為 1。
 paginationSettings.patientPackageStatus = { currentPage: 1, itemsPerPage: 6 };
@@ -1218,7 +1233,15 @@ async function initHerbInventory(forceRefresh = false) {
  */
 function getHerbInventory(itemId) {
     const inv = herbInventory && herbInventory[String(itemId)];
-    return inv ? { quantity: inv.quantity ?? 0, threshold: inv.threshold ?? 0 } : { quantity: 0, threshold: 0 };
+    // 回傳庫存、警戒量與單位，若無資料則提供預設值
+    if (inv && typeof inv === 'object') {
+        return {
+            quantity: inv.quantity ?? 0,
+            threshold: inv.threshold ?? 0,
+            unit: inv.unit || 'g'
+        };
+    }
+    return { quantity: 0, threshold: 0, unit: 'g' };
 }
 
 /**
@@ -1228,7 +1251,7 @@ function getHerbInventory(itemId) {
  * @param {number} quantity
  * @param {number} threshold
  */
-async function setHerbInventory(itemId, quantity, threshold) {
+async function setHerbInventory(itemId, quantity, threshold, unit) {
     await waitForFirebaseDb();
     const data = {};
     if (quantity !== undefined && quantity !== null) {
@@ -1236,6 +1259,10 @@ async function setHerbInventory(itemId, quantity, threshold) {
     }
     if (threshold !== undefined && threshold !== null) {
         data.threshold = Number(threshold);
+    }
+    if (unit !== undefined && unit !== null) {
+        // 儲存使用者選擇的單位，以便日後顯示
+        data.unit = unit;
     }
     const refPath = window.firebase.ref(window.firebase.rtdb, 'herbInventory/' + String(itemId));
     await window.firebase.update(refPath, data);
@@ -1258,7 +1285,8 @@ async function revertInventoryForConsultation(consultationId) {
                 const consumption = Number(log[key]) || 0;
                 const inv = getHerbInventory(key);
                 const newQty = (inv.quantity || 0) + consumption;
-                await setHerbInventory(key, newQty, inv.threshold);
+                // 使用原單位更新庫存
+                await setHerbInventory(key, newQty, inv.threshold, inv.unit);
             }
             // 移除消耗記錄
             await window.firebase.remove(logRef);
@@ -1287,7 +1315,8 @@ async function updateInventoryAfterConsultation(consultationId, items, days, fre
             const consumption = Number(previousLog[key]) || 0;
             const inv = getHerbInventory(key);
             const newQty = (inv.quantity || 0) + consumption;
-            await setHerbInventory(key, newQty, inv.threshold);
+            // 使用原單位還原庫存
+            await setHerbInventory(key, newQty, inv.threshold, inv.unit);
         }
     }
     const log = {};
@@ -1299,7 +1328,7 @@ async function updateInventoryAfterConsultation(consultationId, items, days, fre
         const consumption = dosage * days * freq;
         const inv = getHerbInventory(item.id);
         const newQty = (inv.quantity || 0) - consumption;
-        await setHerbInventory(item.id, newQty, inv.threshold);
+        await setHerbInventory(item.id, newQty, inv.threshold, inv.unit);
         log[String(item.id)] = consumption;
     }
     // 將新的消耗量記錄到 inventoryLogs
@@ -1345,19 +1374,22 @@ async function openInventoryModal(itemId) {
         } catch (_e) {
             inv = { quantity: 0, threshold: 0 };
         }
-        if (qtyInput) {
-            qtyInput.value = inv.quantity ?? 0;
+        if (qtyInput || thrInput) {
+            // 根據儲存的單位將庫存與警戒量換算成相同單位顯示
+            const unit = inv.unit || 'g';
+            const factor = UNIT_FACTOR_MAP[unit] || 1;
+            if (qtyInput) {
+                qtyInput.value = ((inv.quantity ?? 0) / factor).toString();
+            }
+            if (thrInput) {
+                thrInput.value = ((inv.threshold ?? 0) / factor).toString();
+            }
+            // 設定單位選擇器的值
+            try {
+                const qtyUnitSel = document.getElementById('inventoryQuantityUnit');
+                if (qtyUnitSel) qtyUnitSel.value = unit;
+            } catch (_e) {}
         }
-        if (thrInput) {
-            thrInput.value = inv.threshold ?? 0;
-        }
-        // 重置單位選擇為克（g），使用者可自行切換其它單位
-        try {
-            const qtyUnitSel = document.getElementById('inventoryQuantityUnit');
-            const thrUnitSel = document.getElementById('inventoryThresholdUnit');
-            if (qtyUnitSel) qtyUnitSel.value = 'g';
-            if (thrUnitSel) thrUnitSel.value = 'g';
-        } catch (_e) {}
         if (modal) {
             modal.classList.remove('hidden');
         }
@@ -1388,36 +1420,26 @@ async function saveInventoryChanges() {
         const tVal = thrInput ? parseFloat(thrInput.value) : NaN;
         // 讀取單位選擇，預設為克
         const qtyUnitSelect = document.getElementById('inventoryQuantityUnit');
-        const thrUnitSelect = document.getElementById('inventoryThresholdUnit');
         const qtyUnit = qtyUnitSelect ? qtyUnitSelect.value : 'g';
-        const thrUnit = thrUnitSelect ? thrUnitSelect.value : 'g';
-        // 定義單位轉換係數。jin = 600g，liang = 37.5g，qian = 3.75g，g = 1g
-        const unitFactor = (unit) => {
-            switch (unit) {
-                case 'jin': return 600;
-                case 'liang': return 37.5;
-                case 'qian': return 3.75;
-                default: return 1;
-            }
-        };
+        // 使用全域的單位轉換表將輸入量轉換為基準克 (g)
+        const factor = UNIT_FACTOR_MAP[qtyUnit] || 1;
         let quantity = isNaN(qVal) ? 0 : qVal;
         let threshold = isNaN(tVal) ? 0 : tVal;
-        // 將輸入數量根據選擇的單位轉換為克
-        quantity = quantity * unitFactor(qtyUnit);
-        threshold = threshold * unitFactor(thrUnit);
+        const quantityBase = quantity * factor;
+        const thresholdBase = threshold * factor;
         const id = currentInventoryItemId;
-        // 更新 Realtime Database
+        // 更新 Realtime Database，包含所選單位
         if (typeof setHerbInventory === 'function') {
-            await setHerbInventory(id, quantity, threshold);
+            await setHerbInventory(id, quantityBase, thresholdBase, qtyUnit);
         }
-        // 更新本地 herbLibrary 的預設庫存值（若存在）
+        // 更新本地 herbLibrary 的預設庫存與單位（若存在）
         try {
             if (Array.isArray(herbLibrary)) {
                 const idx = herbLibrary.findIndex(h => h && String(h.id) === String(id));
                 if (idx >= 0 && herbLibrary[idx]) {
-                    // 儲存的 stock/threshold 欄位僅作為預設參考，不直接控制 Realtime 值
-                    herbLibrary[idx].stock = quantity;
-                    herbLibrary[idx].threshold = threshold;
+                    herbLibrary[idx].stock = quantityBase;
+                    herbLibrary[idx].threshold = thresholdBase;
+                    herbLibrary[idx].unit = qtyUnit;
                 }
             }
         } catch (_e) {}
@@ -9602,11 +9624,22 @@ async function initializeSystemAfterLogin() {
             const inv = typeof getHerbInventory === 'function' ? getHerbInventory(herb.id) : { quantity: 0, threshold: 0 };
             const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
             const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
+            const unit = (inv && inv.unit) ? inv.unit : 'g';
+            const factor = UNIT_FACTOR_MAP[unit] || 1;
+            const qtyDisplay = (() => {
+                const val = qty / factor;
+                return parseFloat(val.toFixed(3)).toString();
+            })();
+            const thrDisplay = (() => {
+                const val = thr / factor;
+                return parseFloat(val.toFixed(3)).toString();
+            })();
+            const unitLabel = UNIT_LABEL_MAP[unit] || '克';
             const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
             const inventoryHtml = `
                 <div class="mt-2 flex items-center text-xs space-x-3">
-                    <div><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qty}g</span></div>
-                    <div><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thr}g</span></div>
+                    <div><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qtyDisplay}${unitLabel}</span></div>
+                    <div><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thrDisplay}${unitLabel}</span></div>
                     <button onclick="openInventoryModal('${herb.id}')" class="ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
                 </div>
             `;
@@ -9646,11 +9679,22 @@ async function initializeSystemAfterLogin() {
             const inv = typeof getHerbInventory === 'function' ? getHerbInventory(formula.id) : { quantity: 0, threshold: 0 };
             const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
             const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
+            const unit = (inv && inv.unit) ? inv.unit : 'g';
+            const factor = UNIT_FACTOR_MAP[unit] || 1;
+            const qtyDisplay = (() => {
+                const val = qty / factor;
+                return parseFloat(val.toFixed(3)).toString();
+            })();
+            const thrDisplay = (() => {
+                const val = thr / factor;
+                return parseFloat(val.toFixed(3)).toString();
+            })();
+            const unitLabel = UNIT_LABEL_MAP[unit] || '克';
             const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
             const inventoryHtml = `
                 <div class="mt-2 flex items-center text-xs space-x-3">
-                    <div><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qty}g</span></div>
-                    <div><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thr}g</span></div>
+                    <div><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qtyDisplay}${unitLabel}</span></div>
+                    <div><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thrDisplay}${unitLabel}</span></div>
                     <button onclick="openInventoryModal('${formula.id}')" class="ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
                 </div>
             `;
@@ -9744,7 +9788,8 @@ async function initializeSystemAfterLogin() {
             // 同步庫存至 Firebase Realtime Database
             try {
                 if (typeof setHerbInventory === 'function') {
-                    await setHerbInventory(herb.id, herb.stock, herb.threshold);
+                    // 新增或更新中藥材時，預設使用克 (g) 為單位儲存庫存
+                    await setHerbInventory(herb.id, herb.stock, herb.threshold, 'g');
                 }
             } catch (err) {
                 console.error('更新中藥庫存至 Firebase 失敗:', err);
@@ -9824,7 +9869,8 @@ async function initializeSystemAfterLogin() {
             // 同步庫存至 Firebase Realtime Database
             try {
                 if (typeof setHerbInventory === 'function') {
-                    await setHerbInventory(formula.id, formula.stock, formula.threshold);
+                    // 新增或更新方劑時，預設使用克 (g) 為單位儲存庫存
+                    await setHerbInventory(formula.id, formula.stock, formula.threshold, 'g');
                 }
             } catch (err) {
                 console.error('更新方劑庫存至 Firebase 失敗:', err);
@@ -10512,6 +10558,13 @@ async function initializeSystemAfterLogin() {
                 }
                 const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
                 const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
+                const unit = (inv && inv.unit) ? inv.unit : 'g';
+                const factor = UNIT_FACTOR_MAP[unit] || 1;
+                const qtyDisplay = (() => {
+                    const val = qty / factor;
+                    return parseFloat(val.toFixed(3)).toString();
+                })();
+                const unitLabel = UNIT_LABEL_MAP[unit] || '克';
                 const stockClass = qty <= thr ? 'text-red-600' : 'text-gray-600';
                 return `
                     <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" data-tooltip="${encoded}"
@@ -10522,7 +10575,7 @@ async function initializeSystemAfterLogin() {
                             <div class="font-semibold text-gray-900 text-sm mb-1">${window.escapeHtml(item.name)}</div>
                             <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${typeName}</div>
                             ${item.effects ? `<div class="text-xs text-gray-600 mt-1">${window.escapeHtml(item.effects.substring(0, 30))}${item.effects.length > 30 ? '...' : ''}</div>` : ''}
-                            <div class="text-xs mt-1 ${stockClass}">餘量：${qty}g</div>
+                            <div class="text-xs mt-1 ${stockClass}">餘量：${qtyDisplay}${unitLabel}</div>
                         </div>
                     </div>
                 `;
@@ -10653,9 +10706,16 @@ async function initializeSystemAfterLogin() {
                                     <div class="flex items-center space-x-2">
                                         ${(() => {
                                             try {
-                                                const inv = typeof getHerbInventory === 'function' ? getHerbInventory(item.id) : { quantity: 0 };
+                                                const inv = typeof getHerbInventory === 'function' ? getHerbInventory(item.id) : { quantity: 0, unit: 'g' };
                                                 const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
-                                                return `<span class="text-xs text-gray-400">餘量：${qty}g</span>`;
+                                                const unit = inv && inv.unit ? inv.unit : 'g';
+                                                const factor = UNIT_FACTOR_MAP[unit] || 1;
+                                                const qtyDisplay = (() => {
+                                                    const val = qty / factor;
+                                                    return parseFloat(val.toFixed(3)).toString();
+                                                })();
+                                                const unitLabel = UNIT_LABEL_MAP[unit] || '克';
+                                                return `<span class="text-xs text-gray-400">餘量：${qtyDisplay}${unitLabel}</span>`;
                                             } catch (_e) {
                                                 return `<span class="text-xs text-gray-400">餘量：0g</span>`;
                                             }
