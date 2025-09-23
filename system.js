@@ -1435,9 +1435,9 @@ function generateMedicalRecordNumber() {
             // omit additional opacity here because border-current should provide sufficient
             // contrast; if the button text color is light on a light background, the
             // spinning border will still remain visible thanks to the missing top segment.
-            // 使用與系統其他部份一致的轉圈樣式：較大的圓並且僅顯示底部邊框，避免在深色背景上看不清。
-            // 改成 border-b-2 並使用 border-current，使其隨按鈕文字顏色而變化。
-            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-current"></div>`;
+            // 恢復原先的讀取圈樣式：使用較小的圓形並透過 border-t-transparent 產生缺口。
+            // border-current 讓外框顏色與按鈕文字顏色一致，適用於深色背景。
+            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>`;
         }
 
         // 清除按鈕讀取狀態，還原原始內容
