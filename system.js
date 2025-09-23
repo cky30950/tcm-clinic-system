@@ -2650,49 +2650,60 @@ async function logout() {
                 // 渲染柱狀圖
                 try {
                     const ctx = document.getElementById('herbUsageChart');
-                    if (ctx && typeof Chart !== 'undefined') {
-                        // 若先前已經建立圖表，先銷毀
-                        if (ctx._chartInstance) {
-                            ctx._chartInstance.destroy();
-                        }
-                        const data = {
-                            labels: topHerbNames,
-                            datasets: [{
-                                label: '使用次數',
-                                data: topHerbCounts,
-                                borderWidth: 1,
-                                backgroundColor: topHerbNames.map(() => 'rgba(54, 162, 235, 0.5)'),
-                                borderColor: topHerbNames.map(() => 'rgba(54, 162, 235, 1)')
-                            }]
-                        };
-                        const options = {
-                            responsive: true,
-                            scales: {
-                                x: {
-                                    title: { display: true, text: '藥材/方劑' },
-                                    ticks: { autoSkip: false }
-                                },
-                                y: {
-                                    beginAtZero: true,
-                                    title: { display: true, text: '使用次數' }
-                                }
+                    if (ctx) {
+                        // 如果 Chart 物件存在且有資料，才進行繪製
+                        if (typeof Chart !== 'undefined' && Array.isArray(topHerbNames) && topHerbNames.length > 0) {
+                            // 若先前已經建立圖表，先銷毀
+                            if (ctx._chartInstance) {
+                                ctx._chartInstance.destroy();
                             }
-                        };
-                        const chart = new Chart(ctx, { type: 'bar', data: data, options: options });
-                        // 將實例保存在元素上以便後續銷毀
-                        ctx._chartInstance = chart;
+                            const data = {
+                                labels: topHerbNames,
+                                datasets: [{
+                                    label: '使用次數',
+                                    data: topHerbCounts,
+                                    borderWidth: 1,
+                                    backgroundColor: topHerbNames.map(() => 'rgba(54, 162, 235, 0.5)'),
+                                    borderColor: topHerbNames.map(() => 'rgba(54, 162, 235, 1)')
+                                }]
+                            };
+                            const options = {
+                                responsive: true,
+                                scales: {
+                                    x: {
+                                        title: { display: true, text: '藥材/方劑' },
+                                        ticks: { autoSkip: false }
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: '使用次數' }
+                                    }
+                                }
+                            };
+                            const chart = new Chart(ctx, { type: 'bar', data: data, options: options });
+                            ctx._chartInstance = chart;
+                            ctx.style.display = '';
+                        } else {
+                            // 隱藏圖表畫布，避免顯示空白圖
+                            ctx.style.display = 'none';
+                        }
                     }
                 } catch (err) {
                     console.error('渲染個人統計圖表失敗:', err);
                 }
-                // 渲染前十名表格
+                // 渲染前十名用藥表格
                 const tableEl = document.getElementById('topHerbsTable');
                 if (tableEl) {
-                    let tableHtml = '<table class="min-w-full divide-y divide-gray-200 text-sm"><thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left">排名</th><th class="px-4 py-2 text-left">藥材/方劑</th><th class="px-4 py-2 text-right">使用次數</th></tr></thead><tbody class="bg-white divide-y divide-gray-100">';
-                    topEntries.forEach((entry, index) => {
-                        const name = getName(entry.id);
-                        tableHtml += `<tr><td class="px-4 py-2">${index + 1}</td><td class="px-4 py-2">${name}</td><td class="px-4 py-2 text-right">${entry.count}</td></tr>`;
-                    });
+                    let tableHtml = '<table class="min-w-full divide-y divide-gray-200 text-sm">' +
+                        '<thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left">排名</th><th class="px-4 py-2 text-left">藥材/方劑</th><th class="px-4 py-2 text-right">使用次數</th></tr></thead><tbody class="bg-white divide-y divide-gray-100">';
+                    if (!topEntries || topEntries.length === 0) {
+                        tableHtml += '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">暫無用藥記錄</td></tr>';
+                    } else {
+                        topEntries.forEach((entry, index) => {
+                            const name = getName(entry.id);
+                            tableHtml += `<tr><td class="px-4 py-2">${index + 1}</td><td class="px-4 py-2">${name}</td><td class="px-4 py-2 text-right">${entry.count}</td></tr>`;
+                        });
+                    }
                     tableHtml += '</tbody></table>';
                     tableEl.innerHTML = tableHtml;
                 }
@@ -2711,33 +2722,38 @@ async function logout() {
                 // 渲染穴位使用圖表
                 try {
                     const acuCtx = document.getElementById('acupointUsageChart');
-                    if (acuCtx && typeof Chart !== 'undefined') {
-                        if (acuCtx._chartInstance) {
-                            acuCtx._chartInstance.destroy();
-                        }
-                        const acuData = {
-                            labels: topAcuNames,
-                            datasets: [{
-                                label: '使用次數',
-                                data: topAcuCounts,
-                                borderWidth: 1
-                            }]
-                        };
-                        const acuOptions = {
-                            responsive: true,
-                            scales: {
-                                x: {
-                                    title: { display: true, text: '穴位' },
-                                    ticks: { autoSkip: false }
-                                },
-                                y: {
-                                    beginAtZero: true,
-                                    title: { display: true, text: '使用次數' }
-                                }
+                    if (acuCtx) {
+                        if (typeof Chart !== 'undefined' && Array.isArray(topAcuNames) && topAcuNames.length > 0) {
+                            if (acuCtx._chartInstance) {
+                                acuCtx._chartInstance.destroy();
                             }
-                        };
-                        const acuChart = new Chart(acuCtx, { type: 'bar', data: acuData, options: acuOptions });
-                        acuCtx._chartInstance = acuChart;
+                            const acuData = {
+                                labels: topAcuNames,
+                                datasets: [{
+                                    label: '使用次數',
+                                    data: topAcuCounts,
+                                    borderWidth: 1
+                                }]
+                            };
+                            const acuOptions = {
+                                responsive: true,
+                                scales: {
+                                    x: {
+                                        title: { display: true, text: '穴位' },
+                                        ticks: { autoSkip: false }
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: '使用次數' }
+                                    }
+                                }
+                            };
+                            const acuChart = new Chart(acuCtx, { type: 'bar', data: acuData, options: acuOptions });
+                            acuCtx._chartInstance = acuChart;
+                            acuCtx.style.display = '';
+                        } else {
+                            acuCtx.style.display = 'none';
+                        }
                     }
                 } catch (acuErr) {
                     console.error('渲染穴位統計圖表失敗:', acuErr);
@@ -2745,10 +2761,15 @@ async function logout() {
                 // 渲染穴位排行表格
                 const acuTableEl = document.getElementById('topAcupointsTable');
                 if (acuTableEl) {
-                    let acuTableHtml = '<table class="min-w-full divide-y divide-gray-200 text-sm"><thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left">排名</th><th class="px-4 py-2 text-left">穴位</th><th class="px-4 py-2 text-right">使用次數</th></tr></thead><tbody class="bg-white divide-y divide-gray-100">';
-                    topAcuEntries.forEach((entry, index) => {
-                        acuTableHtml += `<tr><td class="px-4 py-2">${index + 1}</td><td class="px-4 py-2">${entry.name}</td><td class="px-4 py-2 text-right">${entry.count}</td></tr>`;
-                    });
+                    let acuTableHtml = '<table class="min-w-full divide-y divide-gray-200 text-sm">' +
+                        '<thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left">排名</th><th class="px-4 py-2 text-left">穴位</th><th class="px-4 py-2 text-right">使用次數</th></tr></thead><tbody class="bg-white divide-y divide-gray-100">';
+                    if (!topAcuEntries || topAcuEntries.length === 0) {
+                        acuTableHtml += '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">暫無穴位記錄</td></tr>';
+                    } else {
+                        topAcuEntries.forEach((entry, index) => {
+                            acuTableHtml += `<tr><td class="px-4 py-2">${index + 1}</td><td class="px-4 py-2">${entry.name}</td><td class="px-4 py-2 text-right">${entry.count}</td></tr>`;
+                        });
+                    }
                     acuTableHtml += '</tbody></table>';
                     acuTableEl.innerHTML = acuTableHtml;
                 }
@@ -2794,44 +2815,49 @@ async function logout() {
                 // 渲染收入分類圖表
                 try {
                     const billingCtx = document.getElementById('billingCategoryChart');
-                    if (billingCtx && typeof Chart !== 'undefined') {
-                        if (billingCtx._chartInstance) {
-                            billingCtx._chartInstance.destroy();
-                        }
+                    if (billingCtx) {
                         const categories = ['consultation', 'medicine', 'treatment', 'package', 'discount', 'other'];
-                        const categoryLabels = {
-                            consultation: '診療',
-                            medicine: '藥材/方劑',
-                            treatment: '治療',
-                            package: '套票',
-                            discount: '折扣',
-                            other: '其他'
-                        };
-                        const billingData = categories.map(cat => revenueByCategory[cat] || 0);
-                        const catLabels = categories.map(cat => categoryLabels[cat]);
-                        const dataR = {
-                            labels: catLabels,
-                            datasets: [{
-                                label: '收入金額',
-                                data: billingData,
-                                borderWidth: 1
-                            }]
-                        };
-                        const optionsR = {
-                            responsive: true,
-                            scales: {
-                                x: {
-                                    title: { display: true, text: '收費類型' },
-                                    ticks: { autoSkip: false }
-                                },
-                                y: {
-                                    beginAtZero: true,
-                                    title: { display: true, text: '收入金額' }
-                                }
+                        if (typeof Chart !== 'undefined' && categories.some(cat => (revenueByCategory[cat] || 0) > 0)) {
+                            if (billingCtx._chartInstance) {
+                                billingCtx._chartInstance.destroy();
                             }
-                        };
-                        const billingChart = new Chart(billingCtx, { type: 'bar', data: dataR, options: optionsR });
-                        billingCtx._chartInstance = billingChart;
+                            const categoryLabels = {
+                                consultation: '診療',
+                                medicine: '藥材/方劑',
+                                treatment: '治療',
+                                package: '套票',
+                                discount: '折扣',
+                                other: '其他'
+                            };
+                            const billingData = categories.map(cat => revenueByCategory[cat] || 0);
+                            const catLabels = categories.map(cat => categoryLabels[cat]);
+                            const dataR = {
+                                labels: catLabels,
+                                datasets: [{
+                                    label: '收入金額',
+                                    data: billingData,
+                                    borderWidth: 1
+                                }]
+                            };
+                            const optionsR = {
+                                responsive: true,
+                                scales: {
+                                    x: {
+                                        title: { display: true, text: '收費類型' },
+                                        ticks: { autoSkip: false }
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: '收入金額' }
+                                    }
+                                }
+                            };
+                            const billingChart = new Chart(billingCtx, { type: 'bar', data: dataR, options: optionsR });
+                            billingCtx._chartInstance = billingChart;
+                            billingCtx.style.display = '';
+                        } else {
+                            billingCtx.style.display = 'none';
+                        }
                     }
                 } catch (billErr) {
                     console.error('渲染收費分析圖表失敗:', billErr);
