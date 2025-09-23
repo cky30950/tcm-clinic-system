@@ -6558,10 +6558,10 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         // Rebuild medication information according to language
         let medInfoLocalized = '';
         if (medDays) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
         }
         if (medFreq) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
         }
         if (consultation.usage) {
             medInfoLocalized += '<strong>' + (isEnglish ? 'Administration Method' : '服用方法') + colon + '</strong>' + consultation.usage;
@@ -9498,7 +9498,7 @@ async function initializeSystemAfterLogin() {
             const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
             const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
             const inventoryHtml = `
-                <div class="mt-2 flex items-center justify-between text-xs">
+                <div class="mt-2 flex items-center text-xs space-x-3">
                     <div><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qty}g</span></div>
                     <div><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thr}g</span></div>
                     <button onclick="openInventoryModal('${herb.id}')" class="ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
@@ -9542,7 +9542,7 @@ async function initializeSystemAfterLogin() {
             const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
             const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
             const inventoryHtml = `
-                <div class="mt-2 flex items-center justify-between text-xs">
+                <div class="mt-2 flex items-center text-xs space-x-3">
                     <div><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qty}g</span></div>
                     <div><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thr}g</span></div>
                     <button onclick="openInventoryModal('${formula.id}')" class="ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
@@ -10544,7 +10544,7 @@ async function initializeSystemAfterLogin() {
                                         <div class="font-semibold text-gray-900">${window.escapeHtml(item.name)}</div>
                                         ${item.type === 'formula' ? `<div class="text-xs text-gray-600">方劑</div>` : ''}
                                     </div>
-                                    <div class="flex items-center space-x-2 mr-3">
+                                    <div class="flex items-center space-x-2">
                                         <input type="number"
                                                value="${item.customDosage || '6'}"
                                                min="0.5"
@@ -10555,20 +10555,18 @@ async function initializeSystemAfterLogin() {
                                                onchange="updatePrescriptionDosage(${index}, this.value)"
                                                onclick="this.select()">
                                         <span class="text-sm text-gray-600 font-medium">g</span>
+                                        ${(() => {
+                                            try {
+                                                const inv = typeof getHerbInventory === 'function' ? getHerbInventory(item.id) : { quantity: 0 };
+                                                const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
+                                                return `<span class="text-xs text-gray-400">餘量：${qty}g</span>`;
+                                            } catch (_e) {
+                                                return `<span class="text-xs text-gray-400">餘量：0g</span>`;
+                                            }
+                                        })()}
                                     </div>
                                     <button onclick="removePrescriptionItem(${index})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>
                                 </div>
-                                ${(() => {
-                                    try {
-                                        const inv = typeof getHerbInventory === 'function' ? getHerbInventory(item.id) : { quantity: 0, threshold: 0 };
-                                        const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
-                                        const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
-                                        const col = qty <= thr ? 'text-red-600 font-bold' : 'text-gray-600';
-                                        return `<div class="text-xs mt-1"><span class="font-medium">餘量：</span><span class="${col}">${qty}g</span></div>`;
-                                    } catch (_e) {
-                                        return '';
-                                    }
-                                })()}
                             </div>
                         `;
                     }).join('')}
