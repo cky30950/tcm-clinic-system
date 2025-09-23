@@ -29,7 +29,7 @@ import { getDatabase, ref, set, get, update, remove, onValue, off,
         orderByChild,
         startAt,
         endAt } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
-import { getAuth, signInWithEmailAndPassword, signOut, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getAuth, signInWithEmailAndPassword, signOut, setPersistence, browserSessionPersistence, createUserWithEmailAndPassword, updateProfile } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 // 匯入外部配置檔案。請將您的 Firebase 設定值放在 firebaseConfig.js 中，並避免將其提交到版本控制。
 import firebaseConfig from './firebaseConfig.js';
@@ -102,6 +102,8 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         // 驗證函式
         signInWithEmailAndPassword,
         signOut,
+        createUserWithEmailAndPassword,
+        updateProfile,
         // 持久化設置
         setPersistence,
         browserSessionPersistence

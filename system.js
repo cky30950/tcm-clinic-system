@@ -12334,6 +12334,13 @@ function showAddUserForm() {
     if (modalEl) {
         modalEl.classList.remove('hidden');
     }
+    // 新增用戶時顯示密碼欄位
+    try {
+        const pwdField = document.getElementById('passwordFields');
+        if (pwdField) {
+            pwdField.classList.remove('hidden');
+        }
+    } catch (_e) {}
 }
 
 function hideAddUserForm() {
@@ -12343,8 +12350,9 @@ function hideAddUserForm() {
 }
 
 function clearUserForm() {
-    ['userDisplayName', 'userPosition', 'userEmail', 'userPhone', 'userRegistrationNumber', 'userUID'].forEach(id => {
-        document.getElementById(id).value = '';
+    ['userDisplayName', 'userPosition', 'userEmail', 'userPhone', 'userRegistrationNumber', 'userUID', 'userPassword', 'userPasswordConfirm'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
     });
     document.getElementById('userActive').checked = true;
     
@@ -12413,6 +12421,14 @@ async function editUser(id) {
     
     // 根據職位顯示或隱藏註冊編號欄位
     toggleRegistrationNumberField();
+
+    // 編輯用戶時隱藏密碼欄位
+    try {
+        const pwdField = document.getElementById('passwordFields');
+        if (pwdField) {
+            pwdField.classList.add('hidden');
+        }
+    } catch (_e) {}
     
     const modalEl = document.getElementById('addUserModal');
     if (modalEl) {
@@ -12433,6 +12449,10 @@ async function saveUser() {
     const registrationNumber = document.getElementById('userRegistrationNumber').value.trim();
     const active = document.getElementById('userActive').checked;
     const uid = document.getElementById('userUID').value.trim();
+
+    // 取得密碼與確認密碼（可能不存在於編輯模式）
+    const password = document.getElementById('userPassword') ? document.getElementById('userPassword').value : '';
+    const passwordConfirm = document.getElementById('userPasswordConfirm') ? document.getElementById('userPasswordConfirm').value : '';
 
     // 產生內部用戶識別名稱（username）
     let username;
@@ -12554,6 +12574,47 @@ async function saveUser() {
             }
         } else {
             // 新增用戶
+            // 若輸入了電子郵件且沒有輸入 UID，使用 Firebase Authentication 建立新帳戶
+            let newUid = uid || '';
+            if (email && !uid) {
+                // 驗證密碼與確認密碼
+                if (!password || !passwordConfirm) {
+                    showToast('請輸入並確認密碼！', 'error');
+                    clearButtonLoading(saveButton);
+                    return;
+                }
+                if (password !== passwordConfirm) {
+                    showToast('兩次輸入的密碼不一致！', 'error');
+                    clearButtonLoading(saveButton);
+                    return;
+                }
+                if (password.length < 6) {
+                    showToast('密碼長度至少需 6 位數！', 'error');
+                    clearButtonLoading(saveButton);
+                    return;
+                }
+                try {
+                    // 使用 Firebase Auth 創建新帳號
+                    const userCredential = await window.firebase.createUserWithEmailAndPassword(window.firebase.auth, email, password);
+                    if (userCredential && userCredential.user) {
+                        newUid = userCredential.user.uid;
+                        // 更新顯示名稱
+                        if (window.firebase.updateProfile && typeof window.firebase.updateProfile === 'function') {
+                            try {
+                                await window.firebase.updateProfile(userCredential.user, { displayName: name });
+                            } catch (_err) {
+                                console.error('更新新用戶顯示名稱失敗:', _err);
+                            }
+                        }
+                    }
+                } catch (authErr) {
+                    console.error('建立 Firebase 帳號失敗:', authErr);
+                    showToast('建立 Firebase 帳號失敗：' + (authErr && authErr.message ? authErr.message : ''), 'error');
+                    clearButtonLoading(saveButton);
+                    return;
+                }
+            }
+            // 構建用戶資料
             const userData = {
                 username: username,
                 name: name,
@@ -12561,13 +12622,11 @@ async function saveUser() {
                 registrationNumber: position === '醫師' ? registrationNumber : null,
                 email: email,
                 phone: phone,
-                uid: uid || '',
+                uid: newUid || '',
                 active: active,
                 lastLogin: null
             };
-
             const result = await window.firebaseDataManager.addUser(userData);
-            
             if (result.success) {
                 // 更新本地數據
                 const newUser = {
@@ -12578,10 +12637,10 @@ async function saveUser() {
                 };
                 users.push(newUser);
                 usersFromFirebase.push(newUser);
-                
                 showToast('用戶已成功新增！', 'success');
             } else {
                 showToast('新增用戶失敗，請稍後再試', 'error');
+                clearButtonLoading(saveButton);
                 return;
             }
         }
