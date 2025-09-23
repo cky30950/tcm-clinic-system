@@ -500,6 +500,9 @@ async function changeCurrentUserPassword() {
         showToast(msg, 'error');
         return;
     }
+    // 當所有輸入驗證通過後顯示讀取圈，避免一開始就覆蓋掉按鈕內容
+    const updateButton = document.querySelector('[onclick="changeCurrentUserPassword()"]');
+    setButtonLoading(updateButton, '更新中...');
     try {
         const auth = window.firebase.auth;
         const user = auth.currentUser;
@@ -544,6 +547,9 @@ async function changeCurrentUserPassword() {
             errMsg = lang === 'en' ? 'Failed to update password' : '更新密碼失敗';
         }
         showToast(errMsg, 'error');
+    } finally {
+        // 無論成功或失敗皆恢復按鈕狀態
+        clearButtonLoading(updateButton);
     }
 }
 
@@ -563,6 +569,7 @@ async function deleteCurrentUserAccount() {
         showToast(lang === 'en' ? 'Please enter your password' : '請輸入密碼', 'error');
         return;
     }
+    // 執行刪除前的異步流程。我們只在使用者確認刪除後顯示讀取圈，避免無意義地遮擋按鈕。
     try {
         const user = window.firebase.auth.currentUser;
         if (!user || !user.email) {
@@ -576,46 +583,63 @@ async function deleteCurrentUserAccount() {
         if (!confirm(confirmMsg)) {
             return;
         }
-        // 重新驗證
-        const credential = window.firebase.EmailAuthProvider.credential(user.email, password);
-        // 由於部分版本的 SDK 需要以 auth.currentUser 作為重新驗證函式的第一個參數，
-        // 因此使用 window.firebase.auth.currentUser 進行重新驗證，避免出現 invalid-credential。
-        await window.firebase.reauthenticateWithCredential(window.firebase.auth.currentUser, credential);
-        // 刪除帳號。使用 auth.currentUser 以符合模組化 API
-        await window.firebase.deleteAuthUser(window.firebase.auth.currentUser);
-
-        // 刪除對應的診所用戶紀錄（Firestore 文件）。
+        // 找到刪除按鈕並顯示讀取圈
+        const deleteButton = document.querySelector('[onclick="deleteCurrentUserAccount()"]');
+        setButtonLoading(deleteButton, '刪除中...');
         try {
-            const userRecordId = currentUserData && currentUserData.id;
-            if (userRecordId) {
-                await window.firebaseDataManager.deleteUser(userRecordId);
-                // 清除本地快取，避免刪除的用戶再次出現
-                if (Array.isArray(userCache)) {
-                    userCache = userCache.filter(u => u.id !== userRecordId);
-                }
-            }
-        } catch (delErr) {
-            console.error('刪除診所用戶紀錄失敗:', delErr);
-        }
+            // 重新驗證
+            const credential = window.firebase.EmailAuthProvider.credential(user.email, password);
+            // 由於部分版本的 SDK 需要以 auth.currentUser 作為重新驗證函式的第一個參數，
+            // 因此使用 window.firebase.auth.currentUser 進行重新驗證，避免出現 invalid-credential。
+            await window.firebase.reauthenticateWithCredential(window.firebase.auth.currentUser, credential);
 
-        showToast(lang === 'en' ? 'Account deleted' : '帳號已刪除', 'success');
-        // 登出並返回登入畫面
-        await logout();
-    } catch (error) {
-        console.error('刪除帳號錯誤:', error);
-        let errMsg;
-        if (error && error.code) {
-            switch (error.code) {
-                case 'auth/wrong-password':
-                case 'auth/invalid-credential':
-                    // 無效憑證或密碼錯誤皆視為密碼輸入錯誤
-                    errMsg = lang === 'en' ? 'Password is incorrect' : '密碼錯誤';
-                    break;
-                default:
-                    errMsg = error.message || (lang === 'en' ? 'Failed to delete account' : '刪除帳號失敗');
+            // 先刪除診所端用戶記錄（Firestore 文件）。若先刪除 Auth 帳號，可能導致使用者失去對 Firestore 的存取權限而無法刪除文件。
+            try {
+                const userRecordId = currentUserData && currentUserData.id;
+                if (userRecordId) {
+                    await window.firebaseDataManager.deleteUser(userRecordId);
+                    // 清除本地快取，避免刪除的用戶再次出現
+                    if (Array.isArray(userCache)) {
+                        userCache = userCache.filter(u => u.id !== userRecordId);
+                    }
+                }
+            } catch (delErr) {
+                console.error('刪除診所用戶紀錄失敗:', delErr);
             }
-        } else {
-            errMsg = lang === 'en' ? 'Failed to delete account' : '刪除帳號失敗';
+
+            // 再刪除 Firebase Authentication 帳號。使用 auth.currentUser 以符合模組化 API。
+            await window.firebase.deleteAuthUser(window.firebase.auth.currentUser);
+
+            showToast(lang === 'en' ? 'Account deleted' : '帳號已刪除', 'success');
+            // 登出並返回登入畫面
+            await logout();
+        } catch (error) {
+            console.error('刪除帳號錯誤:', error);
+            let errMsg;
+            if (error && error.code) {
+                switch (error.code) {
+                    case 'auth/wrong-password':
+                    case 'auth/invalid-credential':
+                        // 無效憑證或密碼錯誤皆視為密碼輸入錯誤
+                        errMsg = lang === 'en' ? 'Password is incorrect' : '密碼錯誤';
+                        break;
+                    default:
+                        errMsg = error.message || (lang === 'en' ? 'Failed to delete account' : '刪除帳號失敗');
+                }
+            } else {
+                errMsg = lang === 'en' ? 'Failed to delete account' : '刪除帳號失敗';
+            }
+            showToast(errMsg, 'error');
+        } finally {
+            // 不論結果如何，都要恢復按鈕狀態
+            clearButtonLoading(deleteButton);
+        }
+    } catch (error) {
+        // 外層捕獲錯誤，主要用於 user/email 不存在的早期返回
+        console.error('刪除帳號錯誤:', error);
+        let errMsg = lang === 'en' ? 'Failed to delete account' : '刪除帳號失敗';
+        if (error && error.message) {
+            errMsg = error.message;
         }
         showToast(errMsg, 'error');
     }
