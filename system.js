@@ -2575,42 +2575,66 @@ async function logout() {
                 let medicationCount = 0;
                 // 預先定義診症紀錄陣列，供後續分析
                 let consList = [];
-                // 讀取所有診症紀錄，計算醫師個人診症數量與病人數
-                if (window.firebaseDataManager && typeof window.firebaseDataManager.getConsultations === 'function') {
+                // 封裝讀取診症紀錄的函式：優先使用 firebaseDataManager，若不可用則改用 Firestore 直接讀取
+                async function fetchAllConsultations() {
                     try {
-                        const result = await window.firebaseDataManager.getConsultations(true);
-                        consList = (result && result.success && Array.isArray(result.data)) ? result.data : [];
-                        let hasMore = result ? result.hasMore : false;
-                        while (hasMore && window.firebaseDataManager.getConsultationsNextPage) {
-                            const next = await window.firebaseDataManager.getConsultationsNextPage();
-                            if (next && next.success && Array.isArray(next.data)) {
-                                consList = consList.concat(next.data);
-                                hasMore = next.hasMore;
-                            } else {
-                                hasMore = false;
-                            }
-                        }
-                        for (const c of consList) {
-                            if (!c) continue;
-                            let cUid = '';
-                            if (c.doctor && typeof c.doctor === 'object') {
-                                cUid = c.doctor.uid || c.doctor.id || '';
-                            } else if (c.doctor) {
-                                cUid = String(c.doctor);
-                            }
-                            if (doctorUid && doctorUid === cUid) {
-                                myConsultationCount++;
-                                if (c.patientId) myPatientSet.add(String(c.patientId));
-                                const days = c.medicationDays || 0;
-                                if (typeof days === 'number' && days > 0) {
-                                    totalMedicationDays += days;
-                                    medicationCount++;
+                        if (window.firebaseDataManager && typeof window.firebaseDataManager.getConsultations === 'function') {
+                            const result = await window.firebaseDataManager.getConsultations(true);
+                            let list = (result && result.success && Array.isArray(result.data)) ? result.data : [];
+                            let hasMore = result ? result.hasMore : false;
+                            while (hasMore && window.firebaseDataManager.getConsultationsNextPage) {
+                                const next = await window.firebaseDataManager.getConsultationsNextPage();
+                                if (next && next.success && Array.isArray(next.data)) {
+                                    list = list.concat(next.data);
+                                    hasMore = next.hasMore;
+                                } else {
+                                    hasMore = false;
                                 }
                             }
+                            return list;
                         }
-                    } catch (err) {
-                        console.error('讀取診症紀錄以統計個人資料失敗:', err);
+                    } catch (_err) {
+                        // ignore and fallback to Firestore
                     }
+                    // Fallback: 直接從 Firestore 讀取所有診症紀錄
+                    try {
+                        if (window.firebase && window.firebase.collection && window.firebase.getDocs) {
+                            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+                            const snapshot = await window.firebase.getDocs(colRef);
+                            const list = [];
+                            snapshot.forEach(doc => {
+                                list.push({ id: doc.id, ...doc.data() });
+                            });
+                            return list;
+                        }
+                    } catch (fsErr) {
+                        console.error('從 Firestore 讀取診症紀錄失敗:', fsErr);
+                    }
+                    return [];
+                }
+                try {
+                    consList = await fetchAllConsultations();
+                    // 計算醫師個人的統計數據
+                    consList.forEach(c => {
+                        if (!c) return;
+                        let cUid = '';
+                        if (c.doctor && typeof c.doctor === 'object') {
+                            cUid = c.doctor.uid || c.doctor.id || '';
+                        } else if (c.doctor) {
+                            cUid = String(c.doctor);
+                        }
+                        if (doctorUid && doctorUid === cUid) {
+                            myConsultationCount++;
+                            if (c.patientId) myPatientSet.add(String(c.patientId));
+                            const days = c.medicationDays || 0;
+                            if (typeof days === 'number' && days > 0) {
+                                totalMedicationDays += days;
+                                medicationCount++;
+                            }
+                        }
+                    });
+                } catch (fetchErr) {
+                    console.error('讀取診症紀錄以統計個人資料失敗:', fetchErr);
                 }
                 const avgMedicationDays = medicationCount > 0 ? (totalMedicationDays / medicationCount) : 0;
                 // 計算醫師個人用藥排行
