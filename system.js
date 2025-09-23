@@ -75,6 +75,109 @@ let patientListFiltered = [];
  */
 let herbSortOrder = '';
 
+// -------- 新增：中藥與方劑使用次數統計 --------
+/**
+ * 全院中藥及方劑使用次數統計結果。
+ * 鍵為藥名，值為出現次數。
+ * 透過 computeGlobalHerbUsageCounts() 生成。
+ */
+let globalHerbUsageCounts = {};
+
+// 儲存個人統計分析中產生的圖表實例，以便重新載入時銷毀
+let personalHerbChartInstance = null;
+let personalAcupointChartInstance = null;
+
+/**
+ * 計算全院中藥及方劑的總使用次數。
+ *
+ * 此函式會遍歷全域 consultations 陣列中的每筆診症記錄，解析其中的處方內容，
+ * 對每行開頭出現的藥名進行統計。統計結果將儲存於 globalHerbUsageCounts，
+ * 並同步更新 herbLibrary 中每個項目的 usageCount 屬性，用於排序與顯示。
+ */
+function computeGlobalHerbUsageCounts() {
+    globalHerbUsageCounts = {};
+    try {
+        if (Array.isArray(consultations)) {
+            consultations.forEach(cons => {
+                if (!cons || !cons.prescription) return;
+                const lines = String(cons.prescription).split('\n');
+                lines.forEach(line => {
+                    if (!line) return;
+                    const trimmed = line.trim();
+                    if (!trimmed) return;
+                    // 擷取行首非數字與空白的字串作為藥名
+                    const match = trimmed.match(/^([^\d\s]+)/);
+                    if (match && match[1]) {
+                        const name = match[1].trim();
+                        if (name) {
+                            globalHerbUsageCounts[name] = (globalHerbUsageCounts[name] || 0) + 1;
+                        }
+                    }
+                });
+            });
+        }
+        // 將統計結果寫回 herbLibrary
+        if (Array.isArray(herbLibrary)) {
+            herbLibrary.forEach(item => {
+                const name = item && item.name ? item.name : '';
+                item.usageCount = globalHerbUsageCounts[name] || 0;
+            });
+        }
+    } catch (e) {
+        console.error('計算中藥使用次數失敗:', e);
+    }
+}
+
+/**
+ * 計算指定醫師的用藥與穴位使用統計。
+ *
+ * 會遍歷 consultations 中指定醫師的診症紀錄，從處方文字與針灸備註中擷取藥名及穴位名稱，
+ * 並累加其使用次數。針灸備註中以 data-acupoint-name 屬性標示穴位名稱。
+ *
+ * @param {string} doctor 醫師標識（與 consultation.doctor 進行比對）
+ * @returns {{herbCounts: Object, acupointCounts: Object}} 統計結果
+ */
+function computePersonalStatistics(doctor) {
+    const herbCounts = {};
+    const acupointCounts = {};
+    try {
+        if (!doctor || !Array.isArray(consultations)) {
+            return { herbCounts, acupointCounts };
+        }
+        consultations.forEach(cons => {
+            if (!cons || cons.doctor !== doctor) return;
+            // 處方內容解析
+            const pres = cons.prescription || '';
+            const lines = String(pres).split('\n');
+            lines.forEach(line => {
+                if (!line) return;
+                const trimmed = line.trim();
+                if (!trimmed) return;
+                const match = trimmed.match(/^([^\d\s]+)/);
+                if (match && match[1]) {
+                    const name = match[1].trim();
+                    if (name) {
+                        herbCounts[name] = (herbCounts[name] || 0) + 1;
+                    }
+                }
+            });
+            // 針灸備註解析
+            const notesHtml = cons.acupunctureNotes || '';
+            const regex = /data-acupoint-name="([^"]+)"/g;
+            let m;
+            while ((m = regex.exec(notesHtml)) !== null) {
+                const acName = m[1];
+                if (acName) {
+                    acupointCounts[acName] = (acupointCounts[acName] || 0) + 1;
+                }
+            }
+        });
+    } catch (e) {
+        console.error('計算個人統計失敗:', e);
+    }
+    return { herbCounts, acupointCounts };
+}
+
 /**
  * 變更中藥庫排序方式並重新載入列表。
  * 當排序條件改變時會重置分頁至第一頁，以確保顯示正確。
@@ -219,10 +322,14 @@ function renderPagination(totalItems, itemsPerPage, currentPage, onPageChange, c
  * 每個角色可存取哪些頁面（功能），在此集中定義。
  */
 const ROLE_PERMISSIONS = {
-  '診所管理': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings'],
-  '醫師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'systemManagement', 'personalSettings'],
-      '護理師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary'],
-      '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary']
+  // 診所管理者可存取全部功能，包含個人統計分析
+  '診所管理': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics'],
+  // 醫師可以檢視個人統計分析，以瞭解自身用藥與穴位習慣
+  '醫師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'systemManagement', 'personalSettings', 'personalStatistics'],
+  // 護理師僅能存取既定功能
+  '護理師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary'],
+  // 一般用戶權限最少
+  '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary']
 };
 
 /**
@@ -2212,10 +2319,12 @@ async function logout() {
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
                 financialReports: { title: '財務報表', icon: '📊', description: '收入分析與財務統計' },
                 systemManagement: { title: '系統管理', icon: '⚙️', description: '統計資料、備份匯出' },
-                // 新增：個人設置（使用扳手符號作為圖示）
+                // 個人設置：慣用藥方及穴位組合
                 personalSettings: { title: '個人設置', icon: '🔧', description: '管理慣用藥方及穴位組合' },
-                // 新增：模板庫管理
-                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
+                // 模板庫管理
+                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' },
+                // 個人統計分析：呈現醫師個人用藥與穴位統計
+                personalStatistics: { title: '個人統計分析', icon: '📈', description: '分析個人用藥與穴位習慣' }
             };
 
             // 根據當前用戶職位決定可使用的功能列表
@@ -2301,13 +2410,18 @@ async function logout() {
                 loadFinancialReports();
             } else if (sectionId === 'userManagement') {
                 loadUserManagement();
+            } else if (sectionId === 'personalStatistics') {
+                // 載入個人統計分析
+                if (typeof loadPersonalStatistics === 'function') {
+                    loadPersonalStatistics();
+                }
             }
         }
 
         // 隱藏所有區域
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary', 'welcomePage'].forEach(id => {
+            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'templateLibrary', 'personalStatistics', 'welcomePage'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.add('hidden');
             });
@@ -9437,6 +9551,14 @@ async function initializeSystemAfterLogin() {
             if (typeof initHerbInventory === 'function') {
                 await initHerbInventory();
             }
+            // 在載入中藥庫時先計算全院用藥總使用次數
+            try {
+                if (typeof computeGlobalHerbUsageCounts === 'function') {
+                    computeGlobalHerbUsageCounts();
+                }
+            } catch (e) {
+                console.error('計算中藥使用次數失敗', e);
+            }
             displayHerbLibrary();
             
             // 搜尋功能：當搜尋條件變化時重置至第一頁並重新渲染
@@ -9539,16 +9661,28 @@ async function initializeSystemAfterLogin() {
                 return matchesSearch && matchesFilter;
             }) : [];
             // 依照排序條件重新排序 filteredItems
-            if (herbSortOrder && (herbSortOrder === 'most' || herbSortOrder === 'least')) {
+            if (herbSortOrder) {
                 try {
-                    filteredItems.sort((a, b) => {
-                        const invA = (typeof getHerbInventory === 'function') ? getHerbInventory(a.id) : { quantity: 0 };
-                        const invB = (typeof getHerbInventory === 'function') ? getHerbInventory(b.id) : { quantity: 0 };
-                        const qtyA = invA && typeof invA.quantity === 'number' ? invA.quantity : 0;
-                        const qtyB = invB && typeof invB.quantity === 'number' ? invB.quantity : 0;
-                        // 庫存最多則按數量由大到小排序；庫存最少則相反
-                        return herbSortOrder === 'most' ? qtyB - qtyA : qtyA - qtyB;
-                    });
+                    if (herbSortOrder === 'most' || herbSortOrder === 'least') {
+                        // 依庫存多寡排序
+                        filteredItems.sort((a, b) => {
+                            const invA = (typeof getHerbInventory === 'function') ? getHerbInventory(a.id) : { quantity: 0 };
+                            const invB = (typeof getHerbInventory === 'function') ? getHerbInventory(b.id) : { quantity: 0 };
+                            const qtyA = invA && typeof invA.quantity === 'number' ? invA.quantity : 0;
+                            const qtyB = invB && typeof invB.quantity === 'number' ? invB.quantity : 0;
+                            return herbSortOrder === 'most' ? qtyB - qtyA : qtyA - qtyB;
+                        });
+                    } else if (herbSortOrder === 'useMost' || herbSortOrder === 'useLeast') {
+                        // 依使用次數排序，先計算使用次數
+                        if (typeof computeGlobalHerbUsageCounts === 'function') {
+                            computeGlobalHerbUsageCounts();
+                        }
+                        filteredItems.sort((a, b) => {
+                            const uA = typeof a.usageCount === 'number' ? a.usageCount : 0;
+                            const uB = typeof b.usageCount === 'number' ? b.usageCount : 0;
+                            return herbSortOrder === 'useMost' ? uB - uA : uA - uB;
+                        });
+                    }
                 } catch (_e) {
                     // 若排序過程出現錯誤則忽略排序
                 }
@@ -9660,7 +9794,7 @@ async function initializeSystemAfterLogin() {
                 </div>
             `;
             return `
-                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 relative">
                     <div class="flex justify-between items-start mb-3">
                         <div>
                             <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
@@ -9676,6 +9810,10 @@ async function initializeSystemAfterLogin() {
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
                     ${inventoryHtml}
+                    <!-- 使用次數顯示在卡片右下角 -->
+                    <div class="absolute bottom-2 right-2 text-xs text-gray-500">
+                        使用次數：${typeof herb.usageCount === 'number' ? herb.usageCount : 0}
+                    </div>
                 </div>
             `;
         }
@@ -9715,7 +9853,7 @@ async function initializeSystemAfterLogin() {
                 </div>
             `;
             return `
-                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 relative">
                     <div class="flex justify-between items-start mb-3">
                         <div>
                             <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
@@ -9735,6 +9873,10 @@ async function initializeSystemAfterLogin() {
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
                     ${inventoryHtml}
+                    <!-- 使用次數顯示在卡片右下角 -->
+                    <div class="absolute bottom-2 right-2 text-xs text-gray-500">
+                        使用次數：${typeof formula.usageCount === 'number' ? formula.usageCount : 0}
+                    </div>
                 </div>
             `;
         }
@@ -12865,6 +13007,161 @@ async function deleteUser(id) {
             // 生成初始報表
             generateFinancialReport();
         }
+
+    /**
+     * 載入醫師個人統計分析。
+     *
+     * 此功能會先確保診症紀錄已載入，接著統計當前登入醫師的用藥及穴位使用次數，
+     * 然後以列表與條形圖呈現前幾名的統計結果。
+     */
+    async function loadPersonalStatistics() {
+        try {
+            // 確保已取得診症紀錄
+            if (!Array.isArray(consultations) || consultations.length === 0) {
+                try {
+                    const consResult = await window.firebaseDataManager.getConsultations();
+                    if (consResult && consResult.success && Array.isArray(consResult.data)) {
+                        consultations = consResult.data;
+                    }
+                } catch (e) {
+                    console.error('讀取診症紀錄失敗：', e);
+                }
+            }
+            // 當前登入醫師帳號（username），與 consultation.doctor 欄位比對
+            const doctor = currentUser;
+            // 計算個人統計
+            const stats = typeof computePersonalStatistics === 'function' ? computePersonalStatistics(doctor) : { herbCounts: {}, acupointCounts: {} };
+            const herbCounts = stats.herbCounts || {};
+            const acupointCounts = stats.acupointCounts || {};
+            // 依使用次數排序
+            const sortedHerbs = Object.entries(herbCounts).sort((a, b) => b[1] - a[1]);
+            const sortedAcupoints = Object.entries(acupointCounts).sort((a, b) => b[1] - a[1]);
+            // 取前 10 名
+            const topHerbs = sortedHerbs.slice(0, 10);
+            const topAcupoints = sortedAcupoints.slice(0, 10);
+            // 更新列表顯示
+            const herbListEl = document.getElementById('personalHerbList');
+            const acupointListEl = document.getElementById('personalAcupointList');
+            if (herbListEl) herbListEl.innerHTML = '';
+            if (acupointListEl) acupointListEl.innerHTML = '';
+            // 使用 HTML 轉義避免 XSS
+            const escape = window.escapeHtml || (str => str);
+            topHerbs.forEach(([name, count]) => {
+                if (!herbListEl) return;
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center border-b py-1 text-sm';
+                li.innerHTML = `<span class="truncate mr-2">${escape(name)}</span><span class="font-medium">${count}</span>`;
+                herbListEl.appendChild(li);
+            });
+            topAcupoints.forEach(([name, count]) => {
+                if (!acupointListEl) return;
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center border-b py-1 text-sm';
+                li.innerHTML = `<span class="truncate mr-2">${escape(name)}</span><span class="font-medium">${count}</span>`;
+                acupointListEl.appendChild(li);
+            });
+            // 更新圖表
+            try {
+                // 檢查 Chart.js 是否載入
+                if (typeof Chart !== 'undefined') {
+                    // 藥材圖表
+                    const herbCanvas = document.getElementById('personalHerbChart');
+                    if (herbCanvas) {
+                        const ctx = herbCanvas.getContext('2d');
+                        // 銷毀舊圖表避免記憶體洩漏
+                        if (personalHerbChartInstance) {
+                            personalHerbChartInstance.destroy();
+                        }
+                        personalHerbChartInstance = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: topHerbs.map(item => item[0]),
+                                datasets: [{
+                                    label: '使用次數',
+                                    data: topHerbs.map(item => item[1]),
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                indexAxis: 'y',
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    x: {
+                                        beginAtZero: true,
+                                        title: {
+                                            display: true,
+                                            text: '使用次數'
+                                        }
+                                    },
+                                    y: {
+                                        title: {
+                                            display: true,
+                                            text: '藥材/方劑'
+                                        }
+                                    }
+                                },
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: { enabled: true }
+                                }
+                            }
+                        });
+                    }
+                    // 穴位圖表
+                    const acCanvas = document.getElementById('personalAcupointChart');
+                    if (acCanvas) {
+                        const ctx2 = acCanvas.getContext('2d');
+                        if (personalAcupointChartInstance) {
+                            personalAcupointChartInstance.destroy();
+                        }
+                        personalAcupointChartInstance = new Chart(ctx2, {
+                            type: 'bar',
+                            data: {
+                                labels: topAcupoints.map(item => item[0]),
+                                datasets: [{
+                                    label: '使用次數',
+                                    data: topAcupoints.map(item => item[1]),
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                indexAxis: 'y',
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    x: {
+                                        beginAtZero: true,
+                                        title: {
+                                            display: true,
+                                            text: '使用次數'
+                                        }
+                                    },
+                                    y: {
+                                        title: {
+                                            display: true,
+                                            text: '穴位'
+                                        }
+                                    }
+                                },
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: { enabled: true }
+                                }
+                            }
+                        });
+                    }
+                }
+            } catch (chartErr) {
+                console.error('建立統計圖表失敗：', chartErr);
+            }
+        } catch (err) {
+            console.error('載入個人統計分析失敗：', err);
+        }
+    }
+
+    // 將函式暴露到全域作用域，以便在 showSection 中調用
+    window.loadPersonalStatistics = loadPersonalStatistics;
 
         // 格式化日期為 YYYY-MM-DD
         function formatFinancialDate(date) {
