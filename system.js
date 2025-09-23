@@ -1374,12 +1374,7 @@ async function saveInventoryChanges() {
         showToast('庫存已更新！', 'success');
         // 隱藏彈窗
         hideInventoryModal();
-        // 強制刷新庫存，以立即更新介面（可略過，因為 onValue 監聽會自動更新）
-        try {
-            if (typeof initHerbInventory === 'function') {
-                await initHerbInventory(true);
-            }
-        } catch (_e) {}
+        // 不需強制刷新庫存，依賴 Realtime Database 的 onValue 監聽自動更新，以減少資料庫讀取
         // 更新中藥庫與處方顯示
         try {
             if (typeof displayHerbLibrary === 'function') {
@@ -6558,10 +6553,10 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         // Rebuild medication information according to language
         let medInfoLocalized = '';
         if (medDays) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
         }
         if (medFreq) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
         }
         if (consultation.usage) {
             medInfoLocalized += '<strong>' + (isEnglish ? 'Administration Method' : '服用方法') + colon + '</strong>' + consultation.usage;
@@ -10545,6 +10540,15 @@ async function initializeSystemAfterLogin() {
                                         ${item.type === 'formula' ? `<div class="text-xs text-gray-600">方劑</div>` : ''}
                                     </div>
                                     <div class="flex items-center space-x-2">
+                                        ${(() => {
+                                            try {
+                                                const inv = typeof getHerbInventory === 'function' ? getHerbInventory(item.id) : { quantity: 0 };
+                                                const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
+                                                return `<span class="text-xs text-gray-400">餘量：${qty}g</span>`;
+                                            } catch (_e) {
+                                                return `<span class="text-xs text-gray-400">餘量：0g</span>`;
+                                            }
+                                        })()}
                                         <input type="number"
                                                value="${item.customDosage || '6'}"
                                                min="0.5"
@@ -10555,15 +10559,6 @@ async function initializeSystemAfterLogin() {
                                                onchange="updatePrescriptionDosage(${index}, this.value)"
                                                onclick="this.select()">
                                         <span class="text-sm text-gray-600 font-medium">g</span>
-                                        ${(() => {
-                                            try {
-                                                const inv = typeof getHerbInventory === 'function' ? getHerbInventory(item.id) : { quantity: 0 };
-                                                const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
-                                                return `<span class="text-xs text-gray-400">餘量：${qty}g</span>`;
-                                            } catch (_e) {
-                                                return `<span class="text-xs text-gray-400">餘量：0g</span>`;
-                                            }
-                                        })()}
                                     </div>
                                     <button onclick="removePrescriptionItem(${index})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>
                                 </div>
