@@ -501,7 +501,8 @@ async function changeCurrentUserPassword() {
         return;
     }
     // 當所有輸入驗證通過後顯示讀取圈，避免一開始就覆蓋掉按鈕內容
-    const updateButton = document.querySelector('[onclick="changeCurrentUserPassword()"]');
+    // 使用固定的 id 取得按鈕，避免因 onclick 屬性變化導致查找失敗
+    const updateButton = document.getElementById('updatePasswordButton');
     setButtonLoading(updateButton, '更新中...');
     try {
         const auth = window.firebase.auth;
@@ -584,7 +585,7 @@ async function deleteCurrentUserAccount() {
             return;
         }
         // 找到刪除按鈕並顯示讀取圈
-        const deleteButton = document.querySelector('[onclick="deleteCurrentUserAccount()"]');
+        const deleteButton = document.getElementById('deleteAccountButton');
         setButtonLoading(deleteButton, '刪除中...');
         try {
             // 重新驗證
@@ -1434,7 +1435,9 @@ function generateMedicalRecordNumber() {
             // omit additional opacity here because border-current should provide sufficient
             // contrast; if the button text color is light on a light background, the
             // spinning border will still remain visible thanks to the missing top segment.
-            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>`;
+            // 使用與系統其他部份一致的轉圈樣式：較大的圓並且僅顯示底部邊框，避免在深色背景上看不清。
+            // 改成 border-b-2 並使用 border-current，使其隨按鈕文字顏色而變化。
+            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-current"></div>`;
         }
 
         // 清除按鈕讀取狀態，還原原始內容
@@ -12976,7 +12979,8 @@ async function saveUser() {
     }
 
     // 顯示保存中狀態：在按鈕中顯示旋轉小圈並禁用按鈕
-    const saveButton = document.querySelector('[onclick="saveUser()"]');
+    // 透過 id 取得按鈕，以避免使用 onclick 選擇器時無法精確匹配
+    const saveButton = document.getElementById('userSaveButton');
     setButtonLoading(saveButton, '保存中...');
 
     try {

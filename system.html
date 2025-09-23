@@ -1441,7 +1441,8 @@
                                 <button onclick="hideAddUserForm()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition duration-200">
                                     取消
                                 </button>
-                                <button onclick="saveUser()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition duration-200">
+                                <!-- 為用戶儲存按鈕增加 id，便於顯示讀取圈 -->
+                                <button id="userSaveButton" onclick="saveUser()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition duration-200">
                                     <span id="userSaveButtonText">儲存</span>
                                 </button>
                             </div>
@@ -1949,7 +1950,8 @@
                   </div>
                 </div>
                 <div class="mt-4 flex justify-end">
-                  <button onclick="changeCurrentUserPassword()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition duration-200">更新密碼</button>
+                  <!-- 為更新密碼按鈕增加 id，以便 JavaScript 能準確找到此元素並顯示讀取圈 -->
+                  <button id="updatePasswordButton" onclick="changeCurrentUserPassword()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition duration-200">更新密碼</button>
                 </div>
               </div>
               <!-- 刪除帳號區塊 -->
@@ -1963,7 +1965,8 @@
                   </div>
                 </div>
                 <div class="mt-4 flex justify-end">
-                  <button onclick="deleteCurrentUserAccount()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg transition duration-200">刪除帳號</button>
+                  <!-- 為刪除帳號按鈕增加 id，以便 JavaScript 能準確找到此元素並顯示讀取圈 -->
+                  <button id="deleteAccountButton" onclick="deleteCurrentUserAccount()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg transition duration-200">刪除帳號</button>
                 </div>
               </div>
             </div>
