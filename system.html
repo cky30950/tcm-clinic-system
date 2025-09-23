@@ -1019,6 +1019,8 @@
                             <option value="">排序方式</option>
                             <option value="most">庫存最多</option>
                             <option value="least">庫存最少</option>
+                            <option value="mostUsed">使用次數最多</option>
+                            <option value="leastUsed">使用次數最少</option>
                         </select>
                     </div>
                 </div>
@@ -1856,6 +1858,49 @@
           </div>
         </div>
 
+        <!-- 個人統計分析區：分析醫師個人用藥習慣與診療情況 -->
+        <div id="personalStatistics" class="hidden max-w-7xl mx-auto px-4 py-6">
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <div>
+              <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <span class="text-3xl mr-3">📈</span>
+                個人統計分析
+              </h2>
+              <!-- 摘要指標：總診症次數、服務病人數、平均服藥天數等 -->
+              <div id="personalStatsSummary" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                <!-- 內容由 JS 動態插入 -->
+              </div>
+              <!-- 使用次數排行圖表 -->
+              <div class="mb-6">
+                <canvas id="herbUsageChart" class="w-full h-64"></canvas>
+              </div>
+              <!-- 前十名使用次數表格 -->
+              <div id="topHerbsTable" class="overflow-x-auto"></div>
+
+              <!-- ==== 個人統計分析擴展區：穴位排行與收費分析 === -->
+              <!-- 醫師個人穴位使用排行 -->
+              <div class="mt-8">
+                <h3 class="text-xl font-bold mb-4">穴位使用排行</h3>
+                <div class="mb-6">
+                  <canvas id="acupointUsageChart" class="w-full h-64"></canvas>
+                </div>
+                <!-- 穴位使用次數前十表 -->
+                <div id="topAcupointsTable" class="overflow-x-auto mb-8"></div>
+                <!-- 收費分析標題 -->
+                <h3 class="text-xl font-bold mb-4">收費分析</h3>
+                <!-- 收費摘要指標：總收入與平均收入 -->
+                <div id="personalBillingSummary" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4 mb-6"></div>
+                <!-- 收費分類圖表 -->
+                <div class="mb-6">
+                  <canvas id="billingCategoryChart" class="w-full h-64"></canvas>
+                </div>
+                <!-- 收費分類表格 -->
+                <div id="billingCategoryTable" class="overflow-x-auto"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 模板庫區：在外層加入與其他頁面一致的寬度與內邊距容器，卡片樣式位於內層 -->
         <!-- 模板庫區：包裝在與其他頁面相同的寬度限制與內外邊距容器中，使版面保持一致 -->
         <div id="templateLibrary" class="hidden max-w-7xl mx-auto px-4 py-6">
@@ -2097,6 +2142,8 @@
     <!-- 調整 z-index 並新增行內樣式，以確保 tooltip 在模態框或其他高層元素之上顯示 -->
     <div id="tooltip" class="hidden pointer-events-none fixed bg-gray-800 text-white text-xs px-3 py-1 rounded-lg shadow-lg z-50 whitespace-pre-line" style="z-index: 9999;"></div>
     <script src="system.js"></script>
+    <!-- 引入 Chart.js 用於個人統計分析圖表 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- 語言國際化腳本，必須在系統腳本之後載入 -->
     <script src="i18n.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
