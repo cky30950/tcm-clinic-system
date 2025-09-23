@@ -509,10 +509,14 @@ async function changeCurrentUserPassword() {
             return;
         }
         // 使用電子郵件與當前密碼進行重新驗證
+        // 在部分版本的 Firebase JS SDK 中，reauthenticateWithCredential 和 updatePassword
+        // 需要以 auth.currentUser 作為第一個參數傳入。因此這裡顯式使用 auth.currentUser
+        // 而非提前存取的 user 變數，避免因關聯錯誤導致 auth/invalid-credential
         const credential = window.firebase.EmailAuthProvider.credential(user.email, currentPassword);
-        await window.firebase.reauthenticateWithCredential(user, credential);
-        // 更新密碼
-        await window.firebase.updatePassword(user, newPassword);
+        // 重新驗證當前使用者。若密碼錯誤或憑證無效，會拋出錯誤。
+        await window.firebase.reauthenticateWithCredential(auth.currentUser, credential);
+        // 更新密碼。使用 auth.currentUser 做為目標使用者以符合模組化 API
+        await window.firebase.updatePassword(auth.currentUser, newPassword);
         const successMsg = lang === 'en' ? 'Password updated successfully' : '密碼更新成功';
         showToast(successMsg, 'success');
         // 清空輸入
@@ -526,6 +530,8 @@ async function changeCurrentUserPassword() {
             // 依據常見錯誤代碼提供更友好的提示
             switch (error.code) {
                 case 'auth/wrong-password':
+                case 'auth/invalid-credential':
+                    // 如果錯誤為無效憑證或密碼錯誤，皆視為當前密碼輸入錯誤
                     errMsg = lang === 'en' ? 'Current password is incorrect' : '當前密碼不正確';
                     break;
                 case 'auth/weak-password':
@@ -572,9 +578,11 @@ async function deleteCurrentUserAccount() {
         }
         // 重新驗證
         const credential = window.firebase.EmailAuthProvider.credential(user.email, password);
-        await window.firebase.reauthenticateWithCredential(user, credential);
-        // 刪除帳號
-        await window.firebase.deleteAuthUser(user);
+        // 由於部分版本的 SDK 需要以 auth.currentUser 作為重新驗證函式的第一個參數，
+        // 因此使用 window.firebase.auth.currentUser 進行重新驗證，避免出現 invalid-credential。
+        await window.firebase.reauthenticateWithCredential(window.firebase.auth.currentUser, credential);
+        // 刪除帳號。使用 auth.currentUser 以符合模組化 API
+        await window.firebase.deleteAuthUser(window.firebase.auth.currentUser);
         showToast(lang === 'en' ? 'Account deleted' : '帳號已刪除', 'success');
         // 登出並返回登入畫面
         await logout();
@@ -584,6 +592,8 @@ async function deleteCurrentUserAccount() {
         if (error && error.code) {
             switch (error.code) {
                 case 'auth/wrong-password':
+                case 'auth/invalid-credential':
+                    // 無效憑證或密碼錯誤皆視為密碼輸入錯誤
                     errMsg = lang === 'en' ? 'Password is incorrect' : '密碼錯誤';
                     break;
                 default:
