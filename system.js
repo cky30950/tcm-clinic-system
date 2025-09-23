@@ -34,7 +34,8 @@ function debounce(func, wait, immediate = false) {
  * 當搜尋或篩選條件改變時，應重置 currentPage 為 1。
  */
 const paginationSettings = {
-    herbLibrary: { currentPage: 1, itemsPerPage: 6 },
+    // 將中藥庫每頁顯示數量調整為 9，以滿足用戶需求
+    herbLibrary: { currentPage: 1, itemsPerPage: 9 },
     personalHerbCombos: { currentPage: 1, itemsPerPage: 6 },
     personalAcupointCombos: { currentPage: 1, itemsPerPage: 6 },
     prescriptionTemplates: { currentPage: 1, itemsPerPage: 6 },
@@ -51,6 +52,32 @@ paginationSettings.patientPackageStatus = { currentPage: 1, itemsPerPage: 6 };
 
 // 快取病人篩選結果，用於分頁顯示
 let patientListFiltered = [];
+
+/**
+ * 目前的中藥庫排序方式。
+ * 可設為 'most' 表示庫存最多優先，'least' 表示庫存最少優先，
+ * 或留空字串表示不進行特定排序。
+ */
+let herbSortOrder = '';
+
+/**
+ * 變更中藥庫排序方式並重新載入列表。
+ * 當排序條件改變時會重置分頁至第一頁，以確保顯示正確。
+ * @param {string} order 排序方式，可為 'most'、'least' 或空字串
+ */
+function changeHerbSortOrder(order) {
+    herbSortOrder = order || '';
+    // 當排序方式變更時，將中藥庫當前頁設為 1
+    if (paginationSettings && paginationSettings.herbLibrary) {
+        paginationSettings.herbLibrary.currentPage = 1;
+    }
+    if (typeof displayHerbLibrary === 'function') {
+        displayHerbLibrary();
+    }
+}
+
+// 將排序函式暴露到全域，供 HTML select 元素調用
+window.changeHerbSortOrder = changeHerbSortOrder;
 
 /**
  * 確保在指定父元素之後存在分頁容器，若不存在則建立。
@@ -1324,6 +1351,13 @@ async function openInventoryModal(itemId) {
         if (thrInput) {
             thrInput.value = inv.threshold ?? 0;
         }
+        // 重置單位選擇為克（g），使用者可自行切換其它單位
+        try {
+            const qtyUnitSel = document.getElementById('inventoryQuantityUnit');
+            const thrUnitSel = document.getElementById('inventoryThresholdUnit');
+            if (qtyUnitSel) qtyUnitSel.value = 'g';
+            if (thrUnitSel) thrUnitSel.value = 'g';
+        } catch (_e) {}
         if (modal) {
             modal.classList.remove('hidden');
         }
@@ -1352,8 +1386,25 @@ async function saveInventoryChanges() {
         const thrInput = document.getElementById('inventoryThreshold');
         const qVal = qtyInput ? parseFloat(qtyInput.value) : NaN;
         const tVal = thrInput ? parseFloat(thrInput.value) : NaN;
-        const quantity = isNaN(qVal) ? 0 : qVal;
-        const threshold = isNaN(tVal) ? 0 : tVal;
+        // 讀取單位選擇，預設為克
+        const qtyUnitSelect = document.getElementById('inventoryQuantityUnit');
+        const thrUnitSelect = document.getElementById('inventoryThresholdUnit');
+        const qtyUnit = qtyUnitSelect ? qtyUnitSelect.value : 'g';
+        const thrUnit = thrUnitSelect ? thrUnitSelect.value : 'g';
+        // 定義單位轉換係數。jin = 600g，liang = 37.5g，qian = 3.75g，g = 1g
+        const unitFactor = (unit) => {
+            switch (unit) {
+                case 'jin': return 600;
+                case 'liang': return 37.5;
+                case 'qian': return 3.75;
+                default: return 1;
+            }
+        };
+        let quantity = isNaN(qVal) ? 0 : qVal;
+        let threshold = isNaN(tVal) ? 0 : tVal;
+        // 將輸入數量根據選擇的單位轉換為克
+        quantity = quantity * unitFactor(qtyUnit);
+        threshold = threshold * unitFactor(thrUnit);
         const id = currentInventoryItemId;
         // 更新 Realtime Database
         if (typeof setHerbInventory === 'function') {
@@ -5379,6 +5430,19 @@ async function saveConsultation() {
             // date and doctor fields are assigned below depending on whether this is a new record or an edit
             status: 'completed'
         };
+        // 將服藥天數與每日次數存入診症資料，預設 0 代表未設定
+        try {
+            const daysInputEl = document.getElementById('medicationDays');
+            const freqInputEl = document.getElementById('medicationFrequency');
+            const daysVal = daysInputEl ? parseInt(daysInputEl.value) : 0;
+            const freqVal = freqInputEl ? parseInt(freqInputEl.value) : 0;
+            consultationData.medicationDays = isNaN(daysVal) ? 0 : daysVal;
+            consultationData.medicationFrequency = isNaN(freqVal) ? 0 : freqVal;
+        } catch (_e) {
+            // 若讀取失敗，仍保留預設值
+            consultationData.medicationDays = 0;
+            consultationData.medicationFrequency = 0;
+        }
 
         // --- 記錄本次診症所使用的套票變更，方便之後撤回診症時還原 ---
         try {
@@ -5805,10 +5869,26 @@ if (!patient) {
                                     <div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 whitespace-pre-line medical-field">${consultation.prescription || '無記錄'}</div>
                                 </div>
                                 
-                                ${consultation.usage ? `
+                        ${consultation.usage ? `
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">服用方法</span>
-                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.usage}</div>
+                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">
+                                        ${(() => {
+                                            try {
+                                                const parts = [];
+                                                if (consultation.medicationDays && Number(consultation.medicationDays) > 0) {
+                                                    parts.push('服藥天數：' + consultation.medicationDays + '天');
+                                                }
+                                                if (consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
+                                                    parts.push('每日次數：' + consultation.medicationFrequency + '次');
+                                                }
+                                                const prefix = parts.length > 0 ? parts.join('　') + '　' : '';
+                                                return prefix + consultation.usage;
+                                            } catch (_err) {
+                                                return consultation.usage;
+                                            }
+                                        })()}
+                                    </div>
                                 </div>
                                 ` : ''}
                                 
@@ -6168,7 +6248,23 @@ function displayConsultationMedicalHistoryPage() {
                         ${consultation.usage ? `
                         <div>
                             <span class="text-sm font-semibold text-gray-700 block mb-2">服用方法</span>
-                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.usage}</div>
+                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">
+                                ${(() => {
+                                    try {
+                                        const parts = [];
+                                        if (consultation.medicationDays && Number(consultation.medicationDays) > 0) {
+                                            parts.push('服藥天數：' + consultation.medicationDays + '天');
+                                        }
+                                        if (consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
+                                            parts.push('每日次數：' + consultation.medicationFrequency + '次');
+                                        }
+                                        const prefix = parts.length > 0 ? parts.join('　') + '　' : '';
+                                        return prefix + consultation.usage;
+                                    } catch (_err) {
+                                        return consultation.usage;
+                                    }
+                                })()}
+                            </div>
                         </div>
                         ` : ''}
                         
@@ -9404,6 +9500,21 @@ async function initializeSystemAfterLogin() {
                 const matchesFilter = currentHerbFilter === 'all' || item.type === currentHerbFilter;
                 return matchesSearch && matchesFilter;
             }) : [];
+            // 依照排序條件重新排序 filteredItems
+            if (herbSortOrder && (herbSortOrder === 'most' || herbSortOrder === 'least')) {
+                try {
+                    filteredItems.sort((a, b) => {
+                        const invA = (typeof getHerbInventory === 'function') ? getHerbInventory(a.id) : { quantity: 0 };
+                        const invB = (typeof getHerbInventory === 'function') ? getHerbInventory(b.id) : { quantity: 0 };
+                        const qtyA = invA && typeof invA.quantity === 'number' ? invA.quantity : 0;
+                        const qtyB = invB && typeof invB.quantity === 'number' ? invB.quantity : 0;
+                        // 庫存最多則按數量由大到小排序；庫存最少則相反
+                        return herbSortOrder === 'most' ? qtyB - qtyA : qtyA - qtyB;
+                    });
+                } catch (_e) {
+                    // 若排序過程出現錯誤則忽略排序
+                }
+            }
             // 若無資料，顯示提示並清除分頁
             if (!filteredItems || filteredItems.length === 0) {
                 listContainer.innerHTML = `
