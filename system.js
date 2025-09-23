@@ -1133,240 +1133,269 @@ function generateMedicalRecordNumber() {
         // 目前系統僅透過 generatePatientNumberFromFirebase 取得新編號。
 
 
-        // 初始化中藥庫資料
-        let herbLibrary = [];
+// 初始化中藥庫資料
+let herbLibrary = [];
 
-        // === 庫存管理相關全域變數 ===
-        // 儲存每個庫存項目的監聽解除函式
-        let inventoryRefs = {};
-        // 正在編輯庫存的藥材或方劑 ID/名稱
-        let editingStockItemId = null;
-        // 編輯診症時，記錄原始處方項目以計算庫存差異
-        let originalPrescriptionItemsForEdit = [];
+// 中藥庫存資料
+let herbInventory = {};
+let herbInventoryInitialized = false;
+let herbInventoryListenerAttached = false;
 
-        /**
-         * 初始化庫存監聽。
-         * 為 herbLibrary 中每個藥材或方劑建立一個 Realtime Database 監聽器，用來同步庫存資料。
-         * 如果資料庫尚未存在該項目的庫存資訊，則自動以 0 初始化。
-         */
-        async function initInventory() {
-            await waitForFirebaseDb();
-            if (!Array.isArray(herbLibrary) || herbLibrary.length === 0) return;
-            // 移除舊的監聽器以避免重複監聽
-            Object.keys(inventoryRefs).forEach(id => {
-                try {
-                    const refPath = window.firebase.ref(window.firebase.rtdb, 'inventory/' + id);
-                    window.firebase.off(refPath, inventoryRefs[id]);
-                } catch (_e) {}
-            });
-            inventoryRefs = {};
-            // 依序為每個藥材或方劑建立監聽
-            herbLibrary.forEach(item => {
-                const id = item.id || item.name;
-                const refPath = window.firebase.ref(window.firebase.rtdb, 'inventory/' + id);
-                const callback = (snapshot) => {
-                    const val = snapshot.val();
-                    if (val) {
-                        item.stock = typeof val.stock === 'number' ? val.stock : 0;
-                        item.reorderLevel = typeof val.reorderLevel === 'number' ? val.reorderLevel : 0;
-                    } else {
-                        // 若數據不存在，初始化為 0
-                        item.stock = item.stock || 0;
-                        item.reorderLevel = item.reorderLevel || 0;
-                        window.firebase.set(refPath, { stock: item.stock, reorderLevel: item.reorderLevel });
-                    }
-                    // 更新 UI
-                    try {
-                        updateStockUI();
-                    } catch (_e) {}
-                };
-                // 監聽資料變化
-                window.firebase.onValue(refPath, callback);
-                // 儲存 callback 以便後續取消監聽
-                inventoryRefs[id] = callback;
-            });
-        }
-
-        /**
-         * 從處方字串解析出每個藥材或方劑與用量。
-         * 假設每行格式為「名稱 數量g」，例如「黃耆 6g」。
-         * 返回陣列，每個元素包含 id/name、用量與類型（herb 或 formula）。
-         */
-        function extractItemsFromPrescriptionText(prescription) {
-            const items = [];
-            if (!prescription) return items;
-            const lines = prescription.split(/\n+/);
-            lines.forEach(line => {
-                const trimmed = line.trim();
-                if (!trimmed) return;
-                // 匹配名稱與數量
-                const match = trimmed.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*(?:g|克)?$/i);
-                if (match) {
-                    const name = match[1].trim();
-                    const dosage = parseFloat(match[2]);
-                    const found = herbLibrary.find(i => i && i.name === name);
-                    if (found) {
-                        items.push({
-                            id: found.id || found.name,
-                            name: found.name,
-                            type: found.type,
-                            dosage
-                        });
-                    }
-                }
-            });
-            return items;
-        }
-
-        /**
-         * 扣減庫存。
-         * 根據處方項目的用量，從 herbLibrary 中對應的庫存減去相應的數量，
-         * 並更新 Realtime Database。
-         */
-        async function deductInventory(items) {
-            await waitForFirebaseDb();
-            items.forEach(item => {
-                const refPath = window.firebase.ref(window.firebase.rtdb, 'inventory/' + item.id);
-                const currentStock = typeof item.stock === 'number' ? item.stock : (herbLibrary.find(h => h.id === item.id) || {}).stock || 0;
-                const newStock = Math.max(0, currentStock - (item.dosage || 0));
-                // 更新本地
-                const found = herbLibrary.find(h => h.id === item.id);
-                if (found) found.stock = newStock;
-                // 更新到資料庫
-                window.firebase.update(refPath, { stock: newStock });
-            });
-        }
-
-        /**
-         * 補回庫存。
-         * 根據處方項目的用量，將庫存加回 herbLibrary 和 Realtime Database。
-         */
-        async function addInventory(items) {
-            await waitForFirebaseDb();
-            items.forEach(item => {
-                const refPath = window.firebase.ref(window.firebase.rtdb, 'inventory/' + item.id);
-                const currentStock = typeof item.stock === 'number' ? item.stock : (herbLibrary.find(h => h.id === item.id) || {}).stock || 0;
-                const newStock = currentStock + (item.dosage || 0);
-                const found = herbLibrary.find(h => h.id === item.id);
-                if (found) found.stock = newStock;
-                window.firebase.update(refPath, { stock: newStock });
-            });
-        }
-
-        /**
-         * 在編輯處方時調整庫存差異。
-         * 先補回原處方使用的庫存，再扣除新處方使用的庫存。
-         */
-        async function adjustInventoryForEdit(originalItems, newItems) {
-            await addInventory(originalItems);
-            await deductInventory(newItems);
-        }
-
-        /**
-         * 根據 herbLibrary 中的庫存資訊，將處方內容每行附上剩餘庫存及補貨下限。
-         * 返回 HTML 字串，可直接用於 innerHTML。
-         */
-        function formatPrescriptionWithStock(prescription) {
-            if (!prescription) return '';
-            const lines = prescription.split(/\n+/);
-            const formatted = lines.map(line => {
-                const trimmed = line.trim();
-                if (!trimmed) return '';
-                // 匹配「名稱 數量」格式
-                // 使用更寬鬆的正則式：允許藥名與數字之間沒有或只有一點空格，
-                // 並支援單位為 g、克或錢，也可省略單位。例如「黃耆6g」「黃耆 6」等皆能匹配。
-                const match = trimmed.match(/^(.+?)\s*(\d+(?:\.\d+)?)\s*(?:g|克|錢)?$/i);
-                if (match) {
-                    const name = match[1].trim();
-                    const dosage = parseFloat(match[2]);
-                    const item = herbLibrary.find(i => i && i.name === name);
-                    if (item) {
-                        const stock = typeof item.stock === 'number' ? item.stock : 0;
-                        const reorder = typeof item.reorderLevel === 'number' ? item.reorderLevel : 0;
-                        const colorClass = stock <= reorder ? 'text-red-500' : 'text-blue-500';
-                        // 使用 escapeHtml 對名稱進行轉義避免 XSS
-                        const safeName = window.escapeHtml(name);
-                        return `${safeName} ${dosage}g <span class="${colorClass}">(餘 ${stock}g, 下限 ${reorder}g)</span>`;
-                    }
-                }
-                // 若無法解析，直接轉義顯示
-                return window.escapeHtml(trimmed);
-            });
-            return formatted.join('<br>');
-        }
-
-        /**
-         * 更新庫存相關的 UI 顯示，例如重新渲染中藥庫或處方顯示。
-         */
-        function updateStockUI() {
+/**
+ * 初始化中藥庫存資料，從 Firebase Realtime Database 讀取。
+ * 若已有資料且非強制刷新，直接返回。
+ * 此函式亦會監聽庫存實時更新並更新本地快取。
+ * @param {boolean} forceRefresh
+ */
+async function initHerbInventory(forceRefresh = false) {
+    if (herbInventoryInitialized && !forceRefresh) {
+        return;
+    }
+    await waitForFirebaseDb();
+    const inventoryRef = window.firebase.ref(window.firebase.rtdb, 'herbInventory');
+    try {
+        const snapshot = await window.firebase.get(inventoryRef);
+        herbInventory = snapshot && snapshot.exists() ? snapshot.val() || {} : {};
+        herbInventoryInitialized = true;
+    } catch (error) {
+        console.error('讀取中藥庫存資料失敗:', error);
+        herbInventory = {};
+        herbInventoryInitialized = true;
+    }
+    // 只註冊一次監聽器以避免重複回調
+    if (!herbInventoryListenerAttached) {
+        window.firebase.onValue(inventoryRef, (snap) => {
+            herbInventory = snap && snap.exists() ? snap.val() || {} : {};
+            // 若有顯示中藥庫，更新畫面
             try {
-                if (typeof displayHerbLibrary === 'function') {
+                if (document.getElementById('herbLibraryList')) {
                     displayHerbLibrary();
                 }
-            } catch (_e) {}
-        }
-
-        /**
-         * 開啟庫存編輯對話框。
-         * 設置當前正在編輯的藥材/方劑 ID，並將現有值填入表單。
-         */
-        function openStockEditModal(id) {
-            const modal = document.getElementById('stockModal');
-            const stockInput = document.getElementById('stockInput');
-            const reorderInput = document.getElementById('reorderInput');
-            const item = herbLibrary.find(h => h && (h.id || h.name) === id);
-            if (!item || !modal || !stockInput || !reorderInput) return;
-            editingStockItemId = id;
-            stockInput.value = typeof item.stock === 'number' ? item.stock : 0;
-            reorderInput.value = typeof item.reorderLevel === 'number' ? item.reorderLevel : 0;
-            modal.style.display = 'block';
-        }
-
-        /**
-         * 關閉庫存編輯對話框。
-         */
-        function closeStockModal() {
-            const modal = document.getElementById('stockModal');
-            if (modal) {
-                modal.style.display = 'none';
+                // 更新處方顯示，顯示庫存變化
+                if (typeof updatePrescriptionDisplay === 'function') {
+                    updatePrescriptionDisplay();
+                }
+            } catch (_e) {
+                /* 忽略 UI 更新錯誤 */
             }
-        }
+        });
+        herbInventoryListenerAttached = true;
+    }
+}
 
-        /**
-         * 儲存庫存編輯，更新 Realtime Database 以及本地資料。
-         */
-        async function saveStock() {
-            const stockInput = document.getElementById('stockInput');
-            const reorderInput = document.getElementById('reorderInput');
-            if (!editingStockItemId || !stockInput || !reorderInput) return;
-            const newStock = parseFloat(stockInput.value);
-            const newReorder = parseFloat(reorderInput.value);
-            const item = herbLibrary.find(h => h && (h.id || h.name) === editingStockItemId);
-            if (item) {
-                item.stock = isNaN(newStock) ? 0 : newStock;
-                item.reorderLevel = isNaN(newReorder) ? 0 : newReorder;
-                await waitForFirebaseDb();
-                const refPath = window.firebase.ref(window.firebase.rtdb, 'inventory/' + editingStockItemId);
-                // 更新資料庫
-                await window.firebase.update(refPath, { stock: item.stock, reorderLevel: item.reorderLevel });
-                // 更新 UI
-                updateStockUI();
+/**
+ * 取得指定中藥或方劑的庫存資料。
+ * 若資料不存在，回傳預設值 0。
+ * @param {string|number} itemId
+ * @returns {{quantity: number, threshold: number}}
+ */
+function getHerbInventory(itemId) {
+    const inv = herbInventory && herbInventory[String(itemId)];
+    return inv ? { quantity: inv.quantity ?? 0, threshold: inv.threshold ?? 0 } : { quantity: 0, threshold: 0 };
+}
+
+/**
+ * 更新指定中藥或方劑的庫存資料。
+ * 僅更新提供的欄位，不覆蓋其他欄位。
+ * @param {string|number} itemId
+ * @param {number} quantity
+ * @param {number} threshold
+ */
+async function setHerbInventory(itemId, quantity, threshold) {
+    await waitForFirebaseDb();
+    const data = {};
+    if (quantity !== undefined && quantity !== null) {
+        data.quantity = Number(quantity);
+    }
+    if (threshold !== undefined && threshold !== null) {
+        data.threshold = Number(threshold);
+    }
+    const refPath = window.firebase.ref(window.firebase.rtdb, 'herbInventory/' + String(itemId));
+    await window.firebase.update(refPath, data);
+}
+
+/**
+ * 在撤回或修改診症時，還原庫存。
+ * 讀取 inventoryLogs/{consultationId} 中記錄的消耗量，依序加回庫存並刪除該紀錄。
+ * @param {string|number} consultationId
+ */
+async function revertInventoryForConsultation(consultationId) {
+    if (!consultationId) return;
+    await waitForFirebaseDb();
+    const logRef = window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationId));
+    try {
+        const logSnap = await window.firebase.get(logRef);
+        if (logSnap && logSnap.exists()) {
+            const log = logSnap.val() || {};
+            for (const key in log) {
+                const consumption = Number(log[key]) || 0;
+                const inv = getHerbInventory(key);
+                const newQty = (inv.quantity || 0) + consumption;
+                await setHerbInventory(key, newQty, inv.threshold);
             }
-            editingStockItemId = null;
-            closeStockModal();
+            // 移除消耗記錄
+            await window.firebase.remove(logRef);
         }
+    } catch (err) {
+        console.error('還原診症庫存資料失敗:', err);
+    }
+}
 
-        // 將庫存相關函式掛到 window 以便外部可存取（例如 HTML 內 inline onclick）
-        window.openStockEditModal = openStockEditModal;
-        window.closeStockModal = closeStockModal;
-        window.saveStock = saveStock;
-        window.extractItemsFromPrescriptionText = extractItemsFromPrescriptionText;
-        window.deductInventory = deductInventory;
-        window.addInventory = addInventory;
-        window.adjustInventoryForEdit = adjustInventoryForEdit;
-        window.formatPrescriptionWithStock = formatPrescriptionWithStock;
-        window.initInventory = initInventory;
-        window.updateStockUI = updateStockUI;
+/**
+ * 在保存診症後更新庫存資料。
+ * 若為編輯模式，將先還原之前的消耗量，再扣除新的消耗量，並更新 inventoryLogs/{consultationId}。
+ * @param {string|number} consultationId
+ * @param {Array} items - selectedPrescriptionItems 陣列
+ * @param {number} days - 服藥天數
+ * @param {number} freq - 服藥次數
+ * @param {boolean} isEditing - 是否為編輯模式
+ * @param {Object|null} previousLog - 編輯模式下先前的消耗記錄，從 Realtime Database 讀取
+ */
+async function updateInventoryAfterConsultation(consultationId, items, days, freq, isEditing = false, previousLog = null) {
+    if (!consultationId || !Array.isArray(items)) return;
+    await waitForFirebaseDb();
+    // 還原舊的消耗量
+    if (isEditing && previousLog) {
+        for (const key in previousLog) {
+            const consumption = Number(previousLog[key]) || 0;
+            const inv = getHerbInventory(key);
+            const newQty = (inv.quantity || 0) + consumption;
+            await setHerbInventory(key, newQty, inv.threshold);
+        }
+    }
+    const log = {};
+    for (const item of items) {
+        if (!item || !item.id) continue;
+        const dosageStr = item.customDosage || item.dosage || '';
+        const dosage = parseFloat(dosageStr);
+        if (isNaN(dosage) || dosage <= 0) continue;
+        const consumption = dosage * days * freq;
+        const inv = getHerbInventory(item.id);
+        const newQty = (inv.quantity || 0) - consumption;
+        await setHerbInventory(item.id, newQty, inv.threshold);
+        log[String(item.id)] = consumption;
+    }
+    // 將新的消耗量記錄到 inventoryLogs
+    await window.firebase.set(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationId)), log);
+}
+
+// 用於追蹤正在編輯庫存的項目 ID
+let currentInventoryItemId = null;
+
+/**
+ * 開啟庫存編輯彈窗，填入當前庫存與警戒值。
+ * 會記錄正在編輯的項目 ID，以便保存時更新。
+ * @param {string|number} itemId 要編輯的中藥或方劑 ID
+ */
+async function openInventoryModal(itemId) {
+    try {
+        currentInventoryItemId = itemId;
+        // 初始化庫存資料（若尚未初始化）
+        if (typeof initHerbInventory === 'function' && !herbInventoryInitialized) {
+            try { await initHerbInventory(); } catch (_e) {}
+        }
+        const modal = document.getElementById('inventoryModal');
+        const qtyInput = document.getElementById('inventoryQuantity');
+        const thrInput = document.getElementById('inventoryThreshold');
+        const titleEl = document.getElementById('inventoryModalTitle');
+        // 設定彈窗標題包含藥材名稱
+        let nameStr = '';
+        try {
+            const item = Array.isArray(herbLibrary) ? herbLibrary.find(h => h && String(h.id) === String(itemId)) : null;
+            if (item && item.name) {
+                nameStr = String(item.name);
+            }
+        } catch (_e) {}
+        if (titleEl) {
+            titleEl.textContent = nameStr ? `編輯庫存 - ${nameStr}` : '編輯庫存';
+        }
+        // 取得現有庫存資料
+        let inv = { quantity: 0, threshold: 0 };
+        try {
+            if (typeof getHerbInventory === 'function') {
+                inv = getHerbInventory(itemId);
+            }
+        } catch (_e) {
+            inv = { quantity: 0, threshold: 0 };
+        }
+        if (qtyInput) {
+            qtyInput.value = inv.quantity ?? 0;
+        }
+        if (thrInput) {
+            thrInput.value = inv.threshold ?? 0;
+        }
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    } catch (err) {
+        console.error('開啟庫存編輯彈窗錯誤:', err);
+    }
+}
+
+/**
+ * 隱藏庫存編輯彈窗。
+ */
+function hideInventoryModal() {
+    const modal = document.getElementById('inventoryModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+/**
+ * 保存庫存變更到 Firebase Realtime Database。
+ * 會更新對應物件在 herbLibrary 的 stock/threshold 欄位，以保持一致。
+ */
+async function saveInventoryChanges() {
+    try {
+        const qtyInput = document.getElementById('inventoryQuantity');
+        const thrInput = document.getElementById('inventoryThreshold');
+        const qVal = qtyInput ? parseFloat(qtyInput.value) : NaN;
+        const tVal = thrInput ? parseFloat(thrInput.value) : NaN;
+        const quantity = isNaN(qVal) ? 0 : qVal;
+        const threshold = isNaN(tVal) ? 0 : tVal;
+        const id = currentInventoryItemId;
+        // 更新 Realtime Database
+        if (typeof setHerbInventory === 'function') {
+            await setHerbInventory(id, quantity, threshold);
+        }
+        // 更新本地 herbLibrary 的預設庫存值（若存在）
+        try {
+            if (Array.isArray(herbLibrary)) {
+                const idx = herbLibrary.findIndex(h => h && String(h.id) === String(id));
+                if (idx >= 0 && herbLibrary[idx]) {
+                    // 儲存的 stock/threshold 欄位僅作為預設參考，不直接控制 Realtime 值
+                    herbLibrary[idx].stock = quantity;
+                    herbLibrary[idx].threshold = threshold;
+                }
+            }
+        } catch (_e) {}
+        // 提示成功訊息
+        showToast('庫存已更新！', 'success');
+        // 隱藏彈窗
+        hideInventoryModal();
+        // 強制刷新庫存，以立即更新介面（可略過，因為 onValue 監聽會自動更新）
+        try {
+            if (typeof initHerbInventory === 'function') {
+                await initHerbInventory(true);
+            }
+        } catch (_e) {}
+        // 更新中藥庫與處方顯示
+        try {
+            if (typeof displayHerbLibrary === 'function') {
+                displayHerbLibrary();
+            }
+        } catch (_e) {}
+        try {
+            if (typeof updatePrescriptionDisplay === 'function') {
+                updatePrescriptionDisplay();
+            }
+        } catch (_e) {}
+    } catch (err) {
+        console.error('保存庫存變更時發生錯誤:', err);
+        showToast('保存庫存變更失敗！', 'error');
+    }
+}
         // 初始化穴位庫資料
         let acupointLibrary = [];
         // 穴位庫編輯狀態與篩選條件
@@ -1389,18 +1418,7 @@ function generateMedicalRecordNumber() {
                 const herbList = Array.isArray(herbData.herbLibrary) ? herbData.herbLibrary : [];
                 const formulaList = Array.isArray(formulaData.herbLibrary) ? formulaData.herbLibrary : [];
                 herbLibrary = [...herbList, ...formulaList];
-                // 為每個藥材初始化庫存屬性
-                herbLibrary.forEach(item => {
-                    if (item.stock === undefined) item.stock = 0;
-                    if (item.reorderLevel === undefined) item.reorderLevel = 0;
-                });
                 herbLibraryLoaded = true;
-                // 啟動庫存監聽與初始化
-                try {
-                    await initInventory();
-                } catch (e) {
-                    console.error('初始化庫存時發生錯誤:', e);
-                }
             } catch (error) {
                 console.error('讀取本地 JSON 中藥庫資料失敗:', error);
             }
@@ -4124,12 +4142,6 @@ async function loadConsultationForEdit(consultationId) {
             }
         }
         if (consultation) {
-            // 紀錄原始處方項目，以便編輯時調整庫存
-            try {
-                originalPrescriptionItemsForEdit = extractItemsFromPrescriptionText(consultation.prescription || '');
-            } catch (_e) {
-                originalPrescriptionItemsForEdit = [];
-            }
             // 載入診症記錄內容
             document.getElementById('formSymptoms').value = consultation.symptoms || '';
             document.getElementById('formTongue').value = consultation.tongue || '';
@@ -5337,6 +5349,8 @@ async function saveConsultation() {
         setButtonLoading(saveButton, '保存中...');
     }
     try {
+        // 預留變數以記錄新診症 ID，供後續更新庫存使用
+        let newConsultationIdForInventory = null;
         // 確認預先取得的 appointment 是否存在，若不存在則提示錯誤
         if (!appointment) {
             showToast('找不到掛號記錄！', 'error');
@@ -5449,6 +5463,8 @@ async function saveConsultation() {
                 localStorage.setItem('appointments', JSON.stringify(appointments));
                 await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
                 showToast('診症記錄已保存！', 'success');
+                // 記錄新產生的診症 ID 供後續庫存更新
+                newConsultationIdForInventory = result.id;
             } else {
                 showToast('保存診症記錄失敗，請稍後再試', 'error');
             }
@@ -5461,19 +5477,42 @@ async function saveConsultation() {
             await commitPendingPackageChanges();
             // 提交後清空暫存變更
             pendingPackageChanges = [];
-
-            // 更新庫存：根據處方內容扣減或調整庫存
+            // 更新中藥庫存
             try {
-                const newItems = extractItemsFromPrescriptionText(consultationData.prescription);
+                // 取得服藥天數與次數
+                const days = parseInt(document.getElementById('medicationDays') && document.getElementById('medicationDays').value) || 1;
+                const freq = parseInt(document.getElementById('medicationFrequency') && document.getElementById('medicationFrequency').value) || 1;
+                // 決定要使用的診症 ID
+                let consultationIdForInv = null;
                 if (isEditing) {
-                    await adjustInventoryForEdit(originalPrescriptionItemsForEdit, newItems);
-                    // 更新原始處方為此次的處方
-                    originalPrescriptionItemsForEdit = newItems;
+                    consultationIdForInv = appointment && appointment.consultationId;
                 } else {
-                    await deductInventory(newItems);
+                    consultationIdForInv = typeof newConsultationIdForInventory !== 'undefined' ? newConsultationIdForInventory : null;
+                }
+                // 讀取先前消耗紀錄（僅編輯模式）
+                let prevLog = null;
+                if (isEditing && consultationIdForInv) {
+                    try {
+                        const logSnap = await window.firebase.get(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationIdForInv)));
+                        if (logSnap && logSnap.exists()) {
+                            prevLog = logSnap.val();
+                        }
+                    } catch (_err) {
+                        prevLog = null;
+                    }
+                }
+                if (consultationIdForInv && typeof updateInventoryAfterConsultation === 'function') {
+                    await updateInventoryAfterConsultation(
+                        consultationIdForInv,
+                        Array.isArray(selectedPrescriptionItems) ? selectedPrescriptionItems : [],
+                        days,
+                        freq,
+                        isEditing,
+                        prevLog
+                    );
                 }
             } catch (invErr) {
-                console.error('更新庫存時發生錯誤:', invErr);
+                console.error('更新中藥庫存資料失敗:', invErr);
             }
             // 完成後關閉診症表單並更新 UI
             closeConsultationForm();
@@ -5768,7 +5807,7 @@ if (!patient) {
                             <div class="space-y-4">
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">處方內容</span>
-                                    <div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 medical-field">${window.formatPrescriptionWithStock(consultation.prescription) || '無記錄'}</div>
+                                    <div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 whitespace-pre-line medical-field">${consultation.prescription || '無記錄'}</div>
                                 </div>
                                 
                                 ${consultation.usage ? `
@@ -6128,7 +6167,7 @@ function displayConsultationMedicalHistoryPage() {
                     <div class="space-y-4">
                         <div>
                             <span class="text-sm font-semibold text-gray-700 block mb-2">處方內容</span>
-                            <div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 medical-field">${window.formatPrescriptionWithStock(consultation.prescription) || '無記錄'}</div>
+                            <div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 whitespace-pre-line medical-field">${consultation.prescription || '無記錄'}</div>
                         </div>
                         
                         ${consultation.usage ? `
@@ -6519,10 +6558,10 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         // Rebuild medication information according to language
         let medInfoLocalized = '';
         if (medDays) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
         }
         if (medFreq) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
         }
         if (consultation.usage) {
             medInfoLocalized += '<strong>' + (isEnglish ? 'Administration Method' : '服用方法') + colon + '</strong>' + consultation.usage;
@@ -8274,14 +8313,6 @@ async function withdrawConsultation(appointmentId) {
         if (!confirm(confirmMsg7)) {
             return;
         }
-
-        // 將處方用量加回庫存
-        try {
-            const itemsToReturn = extractItemsFromPrescriptionText(consultation.prescription);
-            await addInventory(itemsToReturn);
-        } catch (invErr) {
-            console.error('撤回診症時退回庫存失敗:', invErr);
-        }
     // 刪除診症記錄
     // 先從 Firebase 刪除該次診症記錄
     try {
@@ -8342,6 +8373,18 @@ async function withdrawConsultation(appointmentId) {
     } catch (err) {
         console.error('退回套票使用時發生錯誤:', err);
         showToast('退回套票時發生錯誤', 'warning');
+    }
+    // --- 還原庫存消耗 ---
+    try {
+        if (typeof revertInventoryForConsultation === 'function') {
+            // 使用掛號上的 consultationId 以還原庫存
+            const consultationIdForInv = appointment && appointment.consultationId;
+            if (consultationIdForInv) {
+                await revertInventoryForConsultation(consultationIdForInv);
+            }
+        }
+    } catch (invErr) {
+        console.error('撤回診症庫存回復錯誤:', invErr);
     }
     // 從病人診症快取中移除該紀錄
     try {
@@ -9261,6 +9304,10 @@ async function initializeSystemAfterLogin() {
             if (typeof initHerbLibrary === 'function' && (!Array.isArray(herbLibrary) || herbLibrary.length === 0)) {
                 await initHerbLibrary();
             }
+            // 初始化庫存資料
+            if (typeof initHerbInventory === 'function') {
+                await initHerbInventory();
+            }
             displayHerbLibrary();
             
             // 搜尋功能：當搜尋條件變化時重置至第一頁並重新渲染
@@ -9444,12 +9491,19 @@ async function initializeSystemAfterLogin() {
             const safeIndications = herb.indications ? window.escapeHtml(herb.indications) : null;
             const safeDosage = herb.dosage ? window.escapeHtml(String(herb.dosage)) : null;
             const safeCautions = herb.cautions ? window.escapeHtml(herb.cautions) : null;
-            // 取得庫存與補貨下限資訊
-            const stock = typeof herb.stock === 'number' ? herb.stock : 0;
-            const reorder = typeof herb.reorderLevel === 'number' ? herb.reorderLevel : 0;
-            const colorClass = stock <= reorder ? 'text-red-500' : 'text-blue-500';
-            const itemId = herb.id || herb.name;
-            // 中藥卡片：顯示資訊與庫存，可編輯庫存
+            // 中藥卡片：僅顯示資訊，不提供編輯/刪除操作
+            // 取得庫存資料
+            const inv = typeof getHerbInventory === 'function' ? getHerbInventory(herb.id) : { quantity: 0, threshold: 0 };
+            const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
+            const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
+            const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
+            const inventoryHtml = `
+                <div class="mt-2 flex items-center justify-between text-xs">
+                    <div><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qty}g</span></div>
+                    <div><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thr}g</span></div>
+                    <button onclick="openInventoryModal('${herb.id}')" class="ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
+                </div>
+            `;
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
@@ -9457,9 +9511,7 @@ async function initializeSystemAfterLogin() {
                             <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
                             ${safeAlias ? `<p class="text-sm text-gray-600">${safeAlias}</p>` : ''}
                         </div>
-
                     </div>
-                    
                     <div class="space-y-2 text-sm">
                         ${safeNature ? `<div><span class="font-medium text-gray-700">性味：</span>${safeNature}</div>` : ''}
                         ${safeMeridian ? `<div><span class="font-medium text-gray-700">歸經：</span>${safeMeridian}</div>` : ''}
@@ -9467,12 +9519,8 @@ async function initializeSystemAfterLogin() {
                         ${safeIndications ? `<div><span class="font-medium text-gray-700">主治：</span>${safeIndications}</div>` : ''}
                         ${safeDosage ? `<div><span class="font-medium text-gray-700">劑量：</span><span class="text-blue-600 font-medium">${safeDosage}</span></div>` : ''}
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
-                        <div><span class="font-medium text-gray-700">剩餘：</span><span class="${colorClass} font-medium">${stock}g</span></div>
-                        <div><span class="font-medium text-gray-700">下限：</span><span class="${colorClass} font-medium">${reorder}g</span></div>
-                        <div class="mt-2">
-                            <button onclick="openStockEditModal('${itemId}')" class="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600">編輯存庫</button>
-                        </div>
                     </div>
+                    ${inventoryHtml}
                 </div>
             `;
         }
@@ -9487,12 +9535,19 @@ async function initializeSystemAfterLogin() {
             const safeComposition = formula.composition ? window.escapeHtml(formula.composition).replace(/\n/g, '<br>') : null;
             const safeUsage = formula.usage ? window.escapeHtml(formula.usage) : null;
             const safeCautions = formula.cautions ? window.escapeHtml(formula.cautions) : null;
-            // 取得庫存與補貨下限資訊
-            const stock = typeof formula.stock === 'number' ? formula.stock : 0;
-            const reorder = typeof formula.reorderLevel === 'number' ? formula.reorderLevel : 0;
-            const colorClass = stock <= reorder ? 'text-red-500' : 'text-blue-500';
-            const itemId = formula.id || formula.name;
-            // 方劑卡片：顯示資訊與庫存，可編輯庫存
+            // 方劑卡片：僅顯示資訊，不提供編輯/刪除操作
+            // 取得庫存資料
+            const inv = typeof getHerbInventory === 'function' ? getHerbInventory(formula.id) : { quantity: 0, threshold: 0 };
+            const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
+            const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
+            const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
+            const inventoryHtml = `
+                <div class="mt-2 flex items-center justify-between text-xs">
+                    <div><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qty}g</span></div>
+                    <div><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thr}g</span></div>
+                    <button onclick="openInventoryModal('${formula.id}')" class="ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
+                </div>
+            `;
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
@@ -9500,9 +9555,7 @@ async function initializeSystemAfterLogin() {
                             <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
                             ${safeSource ? `<p class="text-sm text-gray-600">出處：${safeSource}</p>` : ''}
                         </div>
-
                     </div>
-                    
                     <div class="space-y-3 text-sm">
                         ${safeEffects ? `<div><span class="font-medium text-gray-700">功效：</span>${safeEffects}</div>` : ''}
                         ${safeIndications ? `<div><span class="font-medium text-gray-700">主治：</span>${safeIndications}</div>` : ''}
@@ -9514,12 +9567,8 @@ async function initializeSystemAfterLogin() {
                         ` : ''}
                         ${safeUsage ? `<div><span class="font-medium text-gray-700">用法：</span>${safeUsage}</div>` : ''}
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
-                        <div><span class="font-medium text-gray-700">剩餘：</span><span class="${colorClass} font-medium">${stock}g</span></div>
-                        <div><span class="font-medium text-gray-700">下限：</span><span class="${colorClass} font-medium">${reorder}g</span></div>
-                        <div class="mt-2">
-                            <button onclick="openStockEditModal('${itemId}')" class="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600">編輯存庫</button>
-                        </div>
                     </div>
+                    ${inventoryHtml}
                 </div>
             `;
         }
@@ -9541,7 +9590,7 @@ async function initializeSystemAfterLogin() {
         
         function clearHerbForm() {
             // 清除中藥材表單欄位（包含性味、歸經與主治）
-            ['herbName', 'herbAlias', 'herbNature', 'herbMeridian', 'herbEffects', 'herbIndications', 'herbDosage', 'herbCautions'].forEach(id => {
+            ['herbName', 'herbAlias', 'herbNature', 'herbMeridian', 'herbEffects', 'herbIndications', 'herbDosage', 'herbCautions', 'herbStock', 'herbThreshold'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
             });
@@ -9557,7 +9606,10 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
-            // 組合中藥物件（包含性味、歸經與主治欄位）
+            // 讀取庫存與警戒值
+            const stockVal = parseFloat(document.getElementById('herbStock') && document.getElementById('herbStock').value);
+            const thresholdVal = parseFloat(document.getElementById('herbThreshold') && document.getElementById('herbThreshold').value);
+            // 組合中藥物件（包含性味、歸經與主治欄位，以及庫存資訊）
             const herb = {
                 id: editingHerbId || Date.now(),
                 type: 'herb',
@@ -9569,6 +9621,8 @@ async function initializeSystemAfterLogin() {
                 indications: document.getElementById('herbIndications').value.trim(),
                 dosage: document.getElementById('herbDosage').value.trim(),
                 cautions: document.getElementById('herbCautions').value.trim(),
+                stock: isNaN(stockVal) ? 0 : stockVal,
+                threshold: isNaN(thresholdVal) ? 0 : thresholdVal,
                 createdAt: editingHerbId ? herbLibrary.find(h => h.id === editingHerbId).createdAt : new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
@@ -9581,7 +9635,14 @@ async function initializeSystemAfterLogin() {
                 herbLibrary.push(herb);
                 showToast('中藥材已新增！', 'success');
             }
-            
+            // 同步庫存至 Firebase Realtime Database
+            try {
+                if (typeof setHerbInventory === 'function') {
+                    await setHerbInventory(herb.id, herb.stock, herb.threshold);
+                }
+            } catch (err) {
+                console.error('更新中藥庫存至 Firebase 失敗:', err);
+            }
             // 不再將中藥材資料寫入 Firestore；資料僅保留於本地陣列
             hideAddHerbForm();
             displayHerbLibrary();
@@ -9604,7 +9665,7 @@ async function initializeSystemAfterLogin() {
         
         function clearFormulaForm() {
             // 清除方劑表單欄位（包含主治與用法）
-            ['formulaName', 'formulaSource', 'formulaEffects', 'formulaComposition', 'formulaCautions', 'formulaIndications', 'formulaUsage'].forEach(id => {
+            ['formulaName', 'formulaSource', 'formulaEffects', 'formulaComposition', 'formulaCautions', 'formulaIndications', 'formulaUsage', 'formulaStock', 'formulaThreshold'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
             });
@@ -9626,7 +9687,10 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
-            // 組合方劑物件（包含主治與用法欄位）
+            // 讀取庫存與警戒值
+            const stockValF = parseFloat(document.getElementById('formulaStock') && document.getElementById('formulaStock').value);
+            const thresholdValF = parseFloat(document.getElementById('formulaThreshold') && document.getElementById('formulaThreshold').value);
+            // 組合方劑物件（包含主治與用法欄位及庫存資訊）
             const formula = {
                 id: editingFormulaId || Date.now(),
                 type: 'formula',
@@ -9637,6 +9701,8 @@ async function initializeSystemAfterLogin() {
                 composition: composition,
                 usage: document.getElementById('formulaUsage').value.trim(),
                 cautions: document.getElementById('formulaCautions').value.trim(),
+                stock: isNaN(stockValF) ? 0 : stockValF,
+                threshold: isNaN(thresholdValF) ? 0 : thresholdValF,
                 createdAt: editingFormulaId ? herbLibrary.find(f => f.id === editingFormulaId).createdAt : new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
@@ -9649,7 +9715,14 @@ async function initializeSystemAfterLogin() {
                 herbLibrary.push(formula);
                 showToast('方劑已新增！', 'success');
             }
-            
+            // 同步庫存至 Firebase Realtime Database
+            try {
+                if (typeof setHerbInventory === 'function') {
+                    await setHerbInventory(formula.id, formula.stock, formula.threshold);
+                }
+            } catch (err) {
+                console.error('更新方劑庫存至 Firebase 失敗:', err);
+            }
             // 不再將方劑資料寫入 Firestore；資料僅保留於本地陣列
             hideAddFormulaForm();
             displayHerbLibrary();
@@ -10322,6 +10395,18 @@ async function initializeSystemAfterLogin() {
                 }
                 if (item.cautions) details.push('注意：' + item.cautions);
                 const encoded = encodeURIComponent(details.join('\n'));
+                // 取得庫存資料以顯示存量
+                let inv = { quantity: 0, threshold: 0 };
+                try {
+                    if (typeof getHerbInventory === 'function') {
+                        inv = getHerbInventory(item.id);
+                    }
+                } catch (_e) {
+                    inv = { quantity: 0, threshold: 0 };
+                }
+                const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
+                const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
+                const stockClass = qty <= thr ? 'text-red-600' : 'text-gray-600';
                 return `
                     <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" data-tooltip="${encoded}"
                          onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))"
@@ -10331,6 +10416,7 @@ async function initializeSystemAfterLogin() {
                             <div class="font-semibold text-gray-900 text-sm mb-1">${window.escapeHtml(item.name)}</div>
                             <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${typeName}</div>
                             ${item.effects ? `<div class="text-xs text-gray-600 mt-1">${window.escapeHtml(item.effects.substring(0, 30))}${item.effects.length > 30 ? '...' : ''}</div>` : ''}
+                            <div class="text-xs mt-1 ${stockClass}">餘量：${qty}g</div>
                         </div>
                     </div>
                 `;
@@ -10472,7 +10558,17 @@ async function initializeSystemAfterLogin() {
                                     </div>
                                     <button onclick="removePrescriptionItem(${index})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>
                                 </div>
-                                ${''}
+                                ${(() => {
+                                    try {
+                                        const inv = typeof getHerbInventory === 'function' ? getHerbInventory(item.id) : { quantity: 0, threshold: 0 };
+                                        const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
+                                        const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
+                                        const col = qty <= thr ? 'text-red-600 font-bold' : 'text-gray-600';
+                                        return `<div class="text-xs mt-1"><span class="font-medium">餘量：</span><span class="${col}">${qty}g</span></div>`;
+                                    } catch (_e) {
+                                        return '';
+                                    }
+                                })()}
                             </div>
                         `;
                     }).join('')}
@@ -16198,6 +16294,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // 將封裝函式掛載至全域，以便 HTML 按鈕呼叫
   window.openHerbCombo = openHerbCombo;
   window.openAcupointCombo = openAcupointCombo;
+  // 中藥庫庫存彈窗功能
+  window.openInventoryModal = openInventoryModal;
+  window.hideInventoryModal = hideInventoryModal;
+  window.saveInventoryChanges = saveInventoryChanges;
 
   // 模板庫：診斷模板與醫囑模板彈窗
   // 顯示診斷模板選擇彈窗，並動態生成模板列表
