@@ -1413,6 +1413,9 @@ function hideInventoryModal() {
  * 會更新對應物件在 herbLibrary 的 stock/threshold 欄位，以保持一致。
  */
 async function saveInventoryChanges() {
+    // 取得當前觸發此操作的按鈕，顯示讀取圈以防重複提交
+    const saveBtn = getLoadingButtonFromEvent('button[onclick="saveInventoryChanges()"]');
+    setButtonLoading(saveBtn);
     try {
         const qtyInput = document.getElementById('inventoryQuantity');
         const thrInput = document.getElementById('inventoryThreshold');
@@ -1460,10 +1463,13 @@ async function saveInventoryChanges() {
             }
         } catch (_e) {}
     } catch (err) {
-        console.error('保存庫存變更時發生錯誤:', err);
-        showToast('保存庫存變更失敗！', 'error');
+            console.error('保存庫存變更時發生錯誤:', err);
+            showToast('保存庫存變更失敗！', 'error');
+        } finally {
+            // 無論成功或失敗都恢復按鈕狀態
+            clearButtonLoading(saveBtn);
+        }
     }
-}
         // 初始化穴位庫資料
         let acupointLibrary = [];
         // 穴位庫編輯狀態與篩選條件
@@ -10363,11 +10369,11 @@ async function initializeSystemAfterLogin() {
         }
         
         async function saveBillingItem() {
-    // 權限檢查：無權限者不得儲存
-    if (!hasAccessToSection('billingManagement')) {
-        showToast('權限不足，無法保存收費項目', 'error');
-        return;
-    }
+            // 權限檢查：無權限者不得儲存
+            if (!hasAccessToSection('billingManagement')) {
+                showToast('權限不足，無法保存收費項目', 'error');
+                return;
+            }
             const name = document.getElementById('billingItemName').value.trim();
             const category = document.getElementById('billingItemCategory').value;
             let price = parseFloat(document.getElementById('billingItemPrice').value);
@@ -10424,40 +10430,49 @@ async function initializeSystemAfterLogin() {
                 }
             }
             
-            const item = {
-                id: editingBillingItemId || Date.now(),
-                name: name,
-                category: category,
-                price: price,
-                unit: document.getElementById('billingItemUnit').value.trim(),
-                description: document.getElementById('billingItemDescription').value.trim(),
-                packageUses: packageUses,
-                validityDays: validityDays,
-                active: document.getElementById('billingItemActive').checked,
-                createdAt: editingBillingItemId ? billingItems.find(b => b.id === editingBillingItemId).createdAt : new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            };
-            
-            if (editingBillingItemId) {
-                const index = billingItems.findIndex(b => b.id === editingBillingItemId);
-                billingItems[index] = item;
-                showToast('收費項目已更新！', 'success');
-            } else {
-                billingItems.push(item);
-                showToast('收費項目已新增！', 'success');
-            }
-            
+            // 取得當前觸發的按鈕並在開始執行儲存時顯示讀取圈
+            const saveBtn = getLoadingButtonFromEvent('button[onclick="saveBillingItem()"]');
+            setButtonLoading(saveBtn);
             try {
-                // 將收費項目寫入 Firestore
-                await window.firebase.setDoc(
-                    window.firebase.doc(window.firebase.db, 'billingItems', String(item.id)),
-                    item
-                );
-            } catch (error) {
-                console.error('儲存收費項目至 Firestore 失敗:', error);
+                const item = {
+                    id: editingBillingItemId || Date.now(),
+                    name: name,
+                    category: category,
+                    price: price,
+                    unit: document.getElementById('billingItemUnit').value.trim(),
+                    description: document.getElementById('billingItemDescription').value.trim(),
+                    packageUses: packageUses,
+                    validityDays: validityDays,
+                    active: document.getElementById('billingItemActive').checked,
+                    createdAt: editingBillingItemId ? billingItems.find(b => b.id === editingBillingItemId).createdAt : new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                // 更新本地資料及提示訊息
+                if (editingBillingItemId) {
+                    const index = billingItems.findIndex(b => b.id === editingBillingItemId);
+                    billingItems[index] = item;
+                    showToast('收費項目已更新！', 'success');
+                } else {
+                    billingItems.push(item);
+                    showToast('收費項目已新增！', 'success');
+                }
+
+                try {
+                    // 將收費項目寫入 Firestore
+                    await window.firebase.setDoc(
+                        window.firebase.doc(window.firebase.db, 'billingItems', String(item.id)),
+                        item
+                    );
+                } catch (error) {
+                    console.error('儲存收費項目至 Firestore 失敗:', error);
+                }
+                hideAddBillingItemForm();
+                displayBillingItems();
+            } finally {
+                // 恢復按鈕狀態與內容
+                clearButtonLoading(saveBtn);
             }
-            hideAddBillingItemForm();
-            displayBillingItems();
         }
         
         async function deleteBillingItem(id) {
