@@ -1869,36 +1869,51 @@
             </h2>
             <!-- 說明文字：指引使用者此功能用途 -->
             <p class="text-gray-600 mb-6">統計醫師個人用藥與穴位使用情況，提供用藥和穴位偏好分析。</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <!-- 常用中藥統計卡片 -->
-              <div class="bg-gray-50 rounded-lg p-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                  <span class="mr-2">🌿</span>常用中藥
-                </h3>
-                <canvas id="personalHerbChart" class="w-full h-60 mb-4"></canvas>
-                <ul id="personalHerbList" class="divide-y divide-gray-200 text-sm">
-                  <!-- 動態載入中藥統計 -->
-                </ul>
-              </div>
-              <!-- 常用方劑統計卡片 -->
+            <!-- 依序排列：方劑在上，中藥在下，穴位置底。每個卡片內部使用二欄佈局：圖表與列表並列 -->
+            <div class="space-y-8">
+              <!-- 常用方劑統計區塊 -->
               <div class="bg-gray-50 rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <span class="mr-2">📋</span>常用方劑
                 </h3>
-                <canvas id="personalFormulaChart" class="w-full h-60 mb-4"></canvas>
-                <ul id="personalFormulaList" class="divide-y divide-gray-200 text-sm">
-                  <!-- 動態載入方劑統計 -->
-                </ul>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                  <!-- 圖表 -->
+                  <div>
+                    <canvas id="personalFormulaChart" class="w-full h-60"></canvas>
+                  </div>
+                  <!-- 清單 -->
+                  <ul id="personalFormulaList" class="divide-y divide-gray-200 text-sm">
+                    <!-- 動態載入方劑統計 -->
+                  </ul>
+                </div>
               </div>
-              <!-- 常用穴位統計卡片 -->
+              <!-- 常用中藥統計區塊 -->
+              <div class="bg-gray-50 rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <span class="mr-2">🌿</span>常用中藥
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                  <div>
+                    <canvas id="personalHerbChart" class="w-full h-60"></canvas>
+                  </div>
+                  <ul id="personalHerbList" class="divide-y divide-gray-200 text-sm">
+                    <!-- 動態載入中藥統計 -->
+                  </ul>
+                </div>
+              </div>
+              <!-- 常用穴位統計區塊 -->
               <div class="bg-gray-50 rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <span class="mr-2">📍</span>常用穴位
                 </h3>
-                <canvas id="personalAcupointChart" class="w-full h-60 mb-4"></canvas>
-                <ul id="personalAcupointList" class="divide-y divide-gray-200 text-sm">
-                  <!-- 動態載入穴位統計 -->
-                </ul>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                  <div>
+                    <canvas id="personalAcupointChart" class="w-full h-60"></canvas>
+                  </div>
+                  <ul id="personalAcupointList" class="divide-y divide-gray-200 text-sm">
+                    <!-- 動態載入穴位統計 -->
+                  </ul>
+                </div>
               </div>
             </div>
             </div>
