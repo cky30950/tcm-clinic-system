@@ -1137,84 +1137,6 @@ function generateMedicalRecordNumber() {
         let herbLibrary = [];
         // 初始化穴位庫資料
         let acupointLibrary = [];
-// 庫存編輯模式下的臨時變數，紀錄當前正在編輯的藥品或方劑 ID
-let editingStockItemId = null;
-// 儲存編輯診症時的原始處方項目，用於調整庫存
-let originalPrescriptionItemsForEdit = [];
-// ==== 庫存管理函式 ====
-/**
- * 解析處方內容文字，回傳需調整庫存的項目陣列。
- * 解析格式為「名稱 劑量g」，僅支援 g 為單位。
- * @param {string} prescriptionText 處方內容
- * @returns {Array<{id: number|string, quantity: number, type: string}>}
- */
-function extractItemsFromPrescriptionText(prescriptionText) {
-    const items = [];
-    if (!prescriptionText) return items;
-    const lines = prescriptionText.split('\n');
-    for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        const match = trimmed.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
-        if (match) {
-            const itemName = match[1].trim();
-            const qty = parseFloat(match[2]);
-            const item = Array.isArray(herbLibrary) ? herbLibrary.find(i => i && i.name === itemName) : null;
-            if (item && !isNaN(qty)) {
-                items.push({ id: item.id, quantity: qty, type: item.type });
-            }
-        }
-    }
-    return items;
-}
-
-/**
- * 從庫存中扣除指定項目的數量，結果若小於 0 則限制為 0。
- * @param {Array<{id: number|string, quantity: number}>} items
- */
-function deductInventory(items) {
-    if (!Array.isArray(items)) return;
-    items.forEach(it => {
-        const index = Array.isArray(herbLibrary) ? herbLibrary.findIndex(item => item && item.id === it.id) : -1;
-        if (index >= 0) {
-            const current = Number(herbLibrary[index].stock) || 0;
-            const qty = Number(it.quantity) || 0;
-            herbLibrary[index].stock = Math.max(0, current - qty);
-        }
-    });
-    if (typeof displayHerbLibrary === 'function') {
-        displayHerbLibrary();
-    }
-}
-
-/**
- * 將指定項目的數量加回庫存。
- * @param {Array<{id: number|string, quantity: number}>} items
- */
-function addInventory(items) {
-    if (!Array.isArray(items)) return;
-    items.forEach(it => {
-        const index = Array.isArray(herbLibrary) ? herbLibrary.findIndex(item => item && item.id === it.id) : -1;
-        if (index >= 0) {
-            const current = Number(herbLibrary[index].stock) || 0;
-            const qty = Number(it.quantity) || 0;
-            herbLibrary[index].stock = current + qty;
-        }
-    });
-    if (typeof displayHerbLibrary === 'function') {
-        displayHerbLibrary();
-    }
-}
-
-/**
- * 編輯診症時的庫存調整：先加回原始處方用量，再扣除新的處方用量。
- * @param {Array<{id: number|string, quantity: number}>} originalItems
- * @param {Array<{id: number|string, quantity: number}>} newItems
- */
-function adjustInventoryForEdit(originalItems, newItems) {
-    addInventory(originalItems);
-    deductInventory(newItems);
-}
         // 穴位庫編輯狀態與篩選條件
         // 移除穴位編輯狀態變數（不再支援新增/編輯/刪除）
         // let editingAcupointId = null;
@@ -1235,10 +1157,11 @@ function adjustInventoryForEdit(originalItems, newItems) {
                 const herbList = Array.isArray(herbData.herbLibrary) ? herbData.herbLibrary : [];
                 const formulaList = Array.isArray(formulaData.herbLibrary) ? formulaData.herbLibrary : [];
                 herbLibrary = [...herbList, ...formulaList];
-                // 初始化庫存與補貨提醒欄位，若尚未存在則設為 0
-                herbLibrary.forEach(item => {
-                    if (item.stock === undefined) item.stock = 0;
-                    if (item.reorderLevel === undefined) item.reorderLevel = 0;
+                // 初始化庫存與補貨提醒屬性，若不存在則設為 0
+                herbLibrary = herbLibrary.map(item => {
+                    const stock = (typeof item.stock === 'number' && !isNaN(item.stock)) ? item.stock : 0;
+                    const reorderLevel = (typeof item.reorderLevel === 'number' && !isNaN(item.reorderLevel)) ? item.reorderLevel : 0;
+                    return { ...item, stock: stock, reorderLevel: reorderLevel };
                 });
                 herbLibraryLoaded = true;
             } catch (error) {
@@ -4032,6 +3955,12 @@ async function loadConsultationForEdit(consultationId) {
                 document.getElementById('formPrescription').value = consultation.prescription;
                 // 嘗試解析處方內容並生成處方項目列表
                 parsePrescriptionToItems(consultation.prescription);
+                // 保存原始處方項目以便編輯計算庫存
+                if (typeof extractItemsFromPrescriptionText === 'function') {
+                    originalPrescriptionItemsForEdit = extractItemsFromPrescriptionText(consultation.prescription);
+                } else {
+                    originalPrescriptionItemsForEdit = [];
+                }
                 updatePrescriptionDisplay();
                 // 如果未能解析出任何處方項目（例如庫中缺少相關藥材或方劑資料），
                 // 則直接將原始處方文本顯示於處方區域，避免顯示為空白
@@ -4050,14 +3979,6 @@ async function loadConsultationForEdit(consultationId) {
                 }
             }
             
-            // 儲存原始處方項目以便在編輯時調整庫存
-            try {
-                originalPrescriptionItemsForEdit = extractItemsFromPrescriptionText(consultation.prescription || '');
-            } catch (e) {
-                console.error('解析原始處方項目失敗:', e);
-                originalPrescriptionItemsForEdit = [];
-            }
-
             // 載入收費項目
             selectedBillingItems = [];
             if (consultation.billingItems) {
@@ -5297,20 +5218,29 @@ async function saveConsultation() {
         }
 
         if (operationSuccess) {
-            // 庫存調整：取得新的處方項目並根據新增或編輯模式進行庫存扣除或調整
+            // 保存成功後，依照新舊處方差異調整庫存
             try {
-                const newPrescriptionItems = extractItemsFromPrescriptionText(consultationData.prescription || '');
+                const newPrescriptionText = consultationData.prescription || '';
+                const newItems = (typeof extractItemsFromPrescriptionText === 'function') ? extractItemsFromPrescriptionText(newPrescriptionText) : [];
                 if (isEditing) {
-                    adjustInventoryForEdit(originalPrescriptionItemsForEdit || [], newPrescriptionItems);
-                    // 更新原始處方項目列表為當前版本，以便後續再次編輯
-                    originalPrescriptionItemsForEdit = JSON.parse(JSON.stringify(newPrescriptionItems));
+                    if (typeof adjustInventoryForEdit === 'function') {
+                        adjustInventoryForEdit(originalPrescriptionItemsForEdit, newItems);
+                    }
+                    // 更新原始處方項目以避免重複扣減
+                    originalPrescriptionItemsForEdit = newItems;
                 } else {
-                    deductInventory(newPrescriptionItems);
+                    if (typeof deductInventory === 'function') {
+                        deductInventory(newItems);
+                    }
                 }
-            } catch (e) {
-                console.error('調整庫存時發生錯誤:', e);
+                // 更新中藥庫顯示與處方顯示
+                if (typeof displayHerbLibrary === 'function') {
+                    displayHerbLibrary();
+                }
+                updatePrescriptionDisplay();
+            } catch (_e) {
+                console.warn('調整庫存時發生錯誤:', _e);
             }
-
             // 保存成功時，先提交暫存的套票購買與使用
             await commitPendingPackagePurchases();
             // 提交暫存套票購買後，提交本地暫存的套票使用變更至資料庫
@@ -5610,7 +5540,7 @@ if (!patient) {
                             <div class="space-y-4">
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">處方內容</span>
-                                    <div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 whitespace-pre-line medical-field">${consultation.prescription || '無記錄'}</div>
+                                    <div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 medical-field">${formatPrescriptionWithStock(consultation.prescription)}</div>
                                 </div>
                                 
                                 ${consultation.usage ? `
@@ -5970,7 +5900,7 @@ function displayConsultationMedicalHistoryPage() {
                     <div class="space-y-4">
                         <div>
                             <span class="text-sm font-semibold text-gray-700 block mb-2">處方內容</span>
-                            <div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 whitespace-pre-line medical-field">${consultation.prescription || '無記錄'}</div>
+                            <div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 medical-field">${formatPrescriptionWithStock(consultation.prescription)}</div>
                         </div>
                         
                         ${consultation.usage ? `
@@ -8116,15 +8046,20 @@ async function withdrawConsultation(appointmentId) {
         if (!confirm(confirmMsg7)) {
             return;
         }
-    // 在刪除診症記錄前，先將本次診症的用藥加回庫存
-    try {
-        if (consultation && consultation.prescription) {
-            const itemsToRestore = extractItemsFromPrescriptionText(consultation.prescription);
-            addInventory(itemsToRestore);
+        // 在撤回診症前，將處方用量補回庫存
+        try {
+            if (consultation && consultation.prescription && typeof extractItemsFromPrescriptionText === 'function' && typeof addInventory === 'function') {
+                const itemsToAdd = extractItemsFromPrescriptionText(consultation.prescription);
+                addInventory(itemsToAdd);
+                // 更新列表顯示
+                if (typeof displayHerbLibrary === 'function') {
+                    displayHerbLibrary();
+                }
+                updatePrescriptionDisplay();
+            }
+        } catch (_err) {
+            console.warn('撤回診症時補回庫存失敗:', _err);
         }
-    } catch (e) {
-        console.error('撤回診症時恢復庫存失敗:', e);
-    }
     // 刪除診症記錄
     // 先從 Firebase 刪除該次診症記錄
     try {
@@ -9287,7 +9222,13 @@ async function initializeSystemAfterLogin() {
             const safeIndications = herb.indications ? window.escapeHtml(herb.indications) : null;
             const safeDosage = herb.dosage ? window.escapeHtml(String(herb.dosage)) : null;
             const safeCautions = herb.cautions ? window.escapeHtml(herb.cautions) : null;
-            // 中藥卡片：僅顯示資訊，不提供編輯/刪除操作
+            // 計算庫存顏色：當庫存小於等於補貨提醒量時顯示紅色，否則顯示藍色
+            const stockValue = (typeof herb.stock === 'number' && !isNaN(herb.stock)) ? herb.stock : 0;
+            const reorderValue = (typeof herb.reorderLevel === 'number' && !isNaN(herb.reorderLevel)) ? herb.reorderLevel : 0;
+            const stockColorClass = stockValue <= reorderValue ? 'text-red-600' : 'text-blue-600';
+            const stockDisplay = `<div><span class="font-medium text-gray-700">存量：</span><span class="${stockColorClass} font-medium">${stockValue}g</span></div>`;
+            const reorderDisplay = `<div><span class="font-medium text-gray-700">補貨提醒：</span><span class="font-medium">${reorderValue}g</span></div>`;
+            // 中藥卡片：顯示資訊與庫存並提供編輯庫存按鈕
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
@@ -9305,9 +9246,9 @@ async function initializeSystemAfterLogin() {
                         ${safeIndications ? `<div><span class="font-medium text-gray-700">主治：</span>${safeIndications}</div>` : ''}
                         ${safeDosage ? `<div><span class="font-medium text-gray-700">劑量：</span><span class="text-blue-600 font-medium">${safeDosage}</span></div>` : ''}
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
-                        ${herb.stock !== undefined ? `<div><span class="font-medium text-gray-700">存量：</span><span class="${herb.stock <= (herb.reorderLevel || 0) ? 'text-red-600 font-bold' : 'text-blue-600 font-medium'}">${window.escapeHtml(String(herb.stock))}g</span></div>` : ''}
-                        ${herb.reorderLevel !== undefined ? `<div><span class="font-medium text-gray-700">補貨提醒：</span>${window.escapeHtml(String(herb.reorderLevel))}g</div>` : ''}
-                        <button onclick="openStockEditModal(${herb.id})" class="mt-1 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200">編輯存庫</button>
+                        ${stockDisplay}
+                        ${reorderDisplay}
+                        <div><button onclick="openStockEditModal('${herb.id}')" class="mt-1 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs">編輯存庫</button></div>
                     </div>
                 </div>
             `;
@@ -9323,7 +9264,13 @@ async function initializeSystemAfterLogin() {
             const safeComposition = formula.composition ? window.escapeHtml(formula.composition).replace(/\n/g, '<br>') : null;
             const safeUsage = formula.usage ? window.escapeHtml(formula.usage) : null;
             const safeCautions = formula.cautions ? window.escapeHtml(formula.cautions) : null;
-            // 方劑卡片：僅顯示資訊，不提供編輯/刪除操作
+            // 計算庫存顏色：當庫存小於等於補貨提醒量時顯示紅色，否則顯示藍色
+            const stockValue = (typeof formula.stock === 'number' && !isNaN(formula.stock)) ? formula.stock : 0;
+            const reorderValue = (typeof formula.reorderLevel === 'number' && !isNaN(formula.reorderLevel)) ? formula.reorderLevel : 0;
+            const stockColorClass = stockValue <= reorderValue ? 'text-red-600' : 'text-blue-600';
+            const stockDisplay = `<div><span class="font-medium text-gray-700">存量：</span><span class="${stockColorClass} font-medium">${stockValue}g</span></div>`;
+            const reorderDisplay = `<div><span class="font-medium text-gray-700">補貨提醒：</span><span class="font-medium">${reorderValue}g</span></div>`;
+            // 方劑卡片：顯示資訊與庫存並提供編輯庫存按鈕
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
@@ -9345,77 +9292,13 @@ async function initializeSystemAfterLogin() {
                         ` : ''}
                         ${safeUsage ? `<div><span class="font-medium text-gray-700">用法：</span>${safeUsage}</div>` : ''}
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
-                        ${formula.stock !== undefined ? `<div><span class="font-medium text-gray-700">存量：</span><span class="${formula.stock <= (formula.reorderLevel || 0) ? 'text-red-600 font-bold' : 'text-blue-600 font-medium'}">${window.escapeHtml(String(formula.stock))}g</span></div>` : ''}
-                        ${formula.reorderLevel !== undefined ? `<div><span class="font-medium text-gray-700">補貨提醒：</span>${window.escapeHtml(String(formula.reorderLevel))}g</div>` : ''}
-                        <button onclick="openStockEditModal(${formula.id})" class="mt-1 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200">編輯存庫</button>
+                        ${stockDisplay}
+                        ${reorderDisplay}
+                        <div><button onclick="openStockEditModal('${formula.id}')" class="mt-1 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs">編輯存庫</button></div>
                     </div>
                 </div>
             `;
         }
-
-        // 庫存編輯相關函式
-        /**
-         * 開啟庫存編輯彈窗，並填入當前藥品的存量與補貨提醒設置。
-         * @param {number|string} itemId 藥品或方劑的 ID
-         */
-        function openStockEditModal(itemId) {
-            try {
-                const modal = document.getElementById('stockModal');
-                if (!modal) return;
-                editingStockItemId = itemId;
-                const item = Array.isArray(herbLibrary) ? herbLibrary.find(it => it && it.id === itemId) : null;
-                if (!item) return;
-                const nameEl = document.getElementById('stockItemName');
-                if (nameEl) nameEl.textContent = item.name || '';
-                const qtyInput = document.getElementById('stockQuantityInput');
-                const reorderInput = document.getElementById('stockReorderLevelInput');
-                if (qtyInput) qtyInput.value = item.stock != null ? item.stock : 0;
-                if (reorderInput) reorderInput.value = item.reorderLevel != null ? item.reorderLevel : 0;
-                modal.classList.remove('hidden');
-            } catch (e) {
-                console.error('開啟庫存編輯彈窗失敗:', e);
-            }
-        }
-
-        /**
-         * 關閉庫存編輯彈窗並清除狀態。
-         */
-        function closeStockModal() {
-            const modal = document.getElementById('stockModal');
-            if (modal) {
-                modal.classList.add('hidden');
-            }
-            editingStockItemId = null;
-        }
-
-        /**
-         * 保存庫存設定，將填寫的數量與補貨提醒存回 herbLibrary。
-         */
-        function saveStock() {
-            try {
-                const itemId = editingStockItemId;
-                const qtyInput = document.getElementById('stockQuantityInput');
-                const reorderInput = document.getElementById('stockReorderLevelInput');
-                const qty = qtyInput ? Number(qtyInput.value) || 0 : 0;
-                const reorder = reorderInput ? Number(reorderInput.value) || 0 : 0;
-                const index = Array.isArray(herbLibrary) ? herbLibrary.findIndex(item => item && item.id === itemId) : -1;
-                if (index >= 0) {
-                    herbLibrary[index].stock = qty;
-                    herbLibrary[index].reorderLevel = reorder;
-                }
-                closeStockModal();
-                if (typeof displayHerbLibrary === 'function') {
-                    displayHerbLibrary();
-                }
-            } catch (e) {
-                console.error('保存庫存時發生錯誤:', e);
-            }
-        }
-
-        // 將庫存編輯函式掛載到全域，以供 HTML 直接呼叫
-        window.openStockEditModal = openStockEditModal;
-        window.closeStockModal = closeStockModal;
-        window.saveStock = saveStock;
         
         // 中藥材表單功能
         function showAddHerbForm() {
@@ -9465,16 +9348,6 @@ async function initializeSystemAfterLogin() {
                 createdAt: editingHerbId ? herbLibrary.find(h => h.id === editingHerbId).createdAt : new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
-
-            // 保留或初始化庫存與補貨提醒
-            if (editingHerbId) {
-                const existingItem = herbLibrary.find(item => item && item.id === editingHerbId);
-                herb.stock = existingItem && typeof existingItem.stock !== 'undefined' ? existingItem.stock : 0;
-                herb.reorderLevel = existingItem && typeof existingItem.reorderLevel !== 'undefined' ? existingItem.reorderLevel : 0;
-            } else {
-                herb.stock = 0;
-                herb.reorderLevel = 0;
-            }
             
             if (editingHerbId) {
                 const index = herbLibrary.findIndex(item => item.id === editingHerbId);
@@ -9543,16 +9416,6 @@ async function initializeSystemAfterLogin() {
                 createdAt: editingFormulaId ? herbLibrary.find(f => f.id === editingFormulaId).createdAt : new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
-
-            // 保留或初始化庫存與補貨提醒
-            if (editingFormulaId) {
-                const existingItem = herbLibrary.find(item => item && item.id === editingFormulaId);
-                formula.stock = existingItem && typeof existingItem.stock !== 'undefined' ? existingItem.stock : 0;
-                formula.reorderLevel = existingItem && typeof existingItem.reorderLevel !== 'undefined' ? existingItem.reorderLevel : 0;
-            } else {
-                formula.stock = 0;
-                formula.reorderLevel = 0;
-            }
             
             if (editingFormulaId) {
                 const index = herbLibrary.findIndex(item => item.id === editingFormulaId);
@@ -10254,6 +10117,12 @@ async function initializeSystemAfterLogin() {
         // 存儲已選擇的處方項目
         let selectedPrescriptionItems = [];
         
+        // -------- 庫存管理相關全域變數 --------
+        // 編輯處方時，保存原始處方項目以便計算庫存差異
+        let originalPrescriptionItemsForEdit = [];
+        // 當前正在編輯庫存的藥材/方劑 ID
+        let editingStockItemId = null;
+
         // 存儲已選擇的收費項目
         let selectedBillingItems = [];
         
@@ -10359,6 +10228,14 @@ async function initializeSystemAfterLogin() {
                             if (fullItem.cautions) details.push('注意：' + fullItem.cautions);
                         }
                         const encoded = encodeURIComponent(details.join('\n'));
+                        // 計算庫存顯示：若存在完整資料則顯示庫存及顏色
+                        let stockInfo = '';
+                        if (fullItem && typeof fullItem.stock !== 'undefined' && typeof fullItem.reorderLevel !== 'undefined') {
+                            const stockVal = (typeof fullItem.stock === 'number' && !isNaN(fullItem.stock)) ? fullItem.stock : 0;
+                            const reorderVal = (typeof fullItem.reorderLevel === 'number' && !isNaN(fullItem.reorderLevel)) ? fullItem.reorderLevel : 0;
+                            const colorCls = stockVal <= reorderVal ? 'text-red-600' : 'text-blue-600';
+                            stockInfo = `<div class="text-xs"><span class="font-medium">庫存：</span><span class="${colorCls}">${stockVal}g</span></div>`;
+                        }
                         // 建立 HTML，並綁定 tooltip 事件於整個項目容器
                         return `
                             <div class="${bgColor} border rounded-lg p-3 cursor-pointer"
@@ -10370,6 +10247,7 @@ async function initializeSystemAfterLogin() {
                                     <div class="flex-1">
                                         <div class="font-semibold text-gray-900">${window.escapeHtml(item.name)}</div>
                                         ${item.type === 'formula' ? `<div class="text-xs text-gray-600">方劑</div>` : ''}
+                                        ${stockInfo}
                                     </div>
                                     <div class="flex items-center space-x-2 mr-3">
                                         <input type="number"
@@ -10438,6 +10316,210 @@ async function initializeSystemAfterLogin() {
             if (selectedPrescriptionItems.length > 0) {
                 updatePrescriptionDisplay();
             }
+        }
+
+        /**
+         * ----------------------------------------------
+         * 庫存管理相關函式
+         * 1. 開啟庫存編輯彈窗
+         * 2. 關閉庫存編輯彈窗
+         * 3. 保存庫存設定
+         * 4. 從處方文字中提取使用的藥材與劑量
+         * 5. 庫存增減與差異計算
+         * ----------------------------------------------
+         */
+
+        // 打開庫存編輯彈窗並填入當前庫存與補貨提醒值
+        function openStockEditModal(itemId) {
+            editingStockItemId = itemId;
+            const item = Array.isArray(herbLibrary) ? herbLibrary.find(i => String(i.id) === String(itemId)) : null;
+            if (item) {
+                const stockVal = (typeof item.stock === 'number' && !isNaN(item.stock)) ? item.stock : 0;
+                const reorderVal = (typeof item.reorderLevel === 'number' && !isNaN(item.reorderLevel)) ? item.reorderLevel : 0;
+                const stockInput = document.getElementById('stockInput');
+                const reorderInput = document.getElementById('reorderInput');
+                if (stockInput) stockInput.value = stockVal;
+                if (reorderInput) reorderInput.value = reorderVal;
+            }
+            const modalEl = document.getElementById('stockModal');
+            if (modalEl) {
+                modalEl.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * 為了讓 HTML 中的 onclick 屬性可以找到這些函式，
+         * 需要將它們掛載到全域 window 物件上。某些函式在本檔案中
+         * 定義於內部作用域，若未掛載至 window，直接於 HTML 的
+         * onclick="openStockEditModal(...)" 會找不到對應的函式。
+         * 因此在此將庫存相關函式註冊到 window。
+         */
+        if (typeof window !== 'undefined') {
+            window.openStockEditModal = openStockEditModal;
+            window.closeStockModal = closeStockModal;
+            window.saveStock = saveStock;
+        }
+
+        // 關閉庫存編輯彈窗
+        function closeStockModal() {
+            const modalEl = document.getElementById('stockModal');
+            if (modalEl) {
+                modalEl.classList.add('hidden');
+            }
+            editingStockItemId = null;
+        }
+
+        // 保存庫存設定並刷新列表
+        function saveStock() {
+            const stockInput = document.getElementById('stockInput');
+            const reorderInput = document.getElementById('reorderInput');
+            const stockVal = parseFloat(stockInput && stockInput.value ? stockInput.value : 0);
+            const reorderVal = parseFloat(reorderInput && reorderInput.value ? reorderInput.value : 0);
+            const idx = Array.isArray(herbLibrary) ? herbLibrary.findIndex(i => String(i.id) === String(editingStockItemId)) : -1;
+            if (idx !== -1) {
+                const updated = { ...herbLibrary[idx], stock: (isNaN(stockVal) ? 0 : stockVal), reorderLevel: (isNaN(reorderVal) ? 0 : reorderVal) };
+                herbLibrary[idx] = updated;
+            }
+            // 更新處方區域中庫存資訊
+            updatePrescriptionDisplay();
+            // 刷新中藥庫列表
+            if (typeof displayHerbLibrary === 'function') {
+                displayHerbLibrary();
+            }
+            closeStockModal();
+        }
+
+        // 從處方文字中提取使用藥材/方劑與劑量（g），返回陣列 { id, name, type, dosage }
+        function extractItemsFromPrescriptionText(prescriptionText) {
+            const items = [];
+            if (!prescriptionText) return items;
+            const lines = prescriptionText.split(/\n+/).map(l => l.trim()).filter(l => l);
+            lines.forEach(line => {
+                // 匹配形式：「藥名 數字g」
+                const match = line.match(/^(.+?)\s+(\d+(?:\.\d+)?)g/i);
+                if (match) {
+                    const itemName = match[1].trim();
+                    const dosage = parseFloat(match[2]);
+                    if (!isNaN(dosage)) {
+                        // 找到對應的 herbLibrary 項目
+                        const herb = Array.isArray(herbLibrary) ? herbLibrary.find(h => h && h.name === itemName) : null;
+                        if (herb) {
+                            items.push({ id: herb.id, name: herb.name, type: herb.type, dosage: dosage });
+                        }
+                    }
+                }
+            });
+            return items;
+        }
+
+        // 扣減庫存：根據項目陣列減少庫存
+        function deductInventory(items) {
+            if (!Array.isArray(items)) return;
+            items.forEach(it => {
+                const herb = Array.isArray(herbLibrary) ? herbLibrary.find(h => String(h.id) === String(it.id)) : null;
+                if (herb) {
+                    const current = (typeof herb.stock === 'number' && !isNaN(herb.stock)) ? herb.stock : 0;
+                    const newStock = current - (typeof it.dosage === 'number' && !isNaN(it.dosage) ? it.dosage : 0);
+                    herb.stock = newStock < 0 ? 0 : newStock;
+                }
+            });
+        }
+
+        /**
+         * 將處方字串格式化為含庫存資訊的 HTML。
+         * 每行預期格式為「名稱 劑量g」，若能在 herbLibrary 中找到對應
+         * 藥材或方劑，則附加庫存顯示，低於或等於補貨提醒時以紅色標示；
+         * 否則以藍色標示。若處方為空或無法解析，回傳「無記錄」。
+         *
+         * @param {string} prescription - 原始處方字串
+         * @returns {string} 格式化後的 HTML 字串
+         */
+        function formatPrescriptionWithStock(prescription) {
+            if (!prescription) {
+                return '無記錄';
+            }
+            // 將處方拆成行並移除空白行
+            const lines = prescription.split(/\n+/).map(l => l.trim()).filter(l => l);
+            const formattedLines = [];
+            lines.forEach(line => {
+                // 比對「名稱 劑量g」格式
+                const match = line.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/i);
+                if (match) {
+                    const itemName = match[1].trim();
+                    const dosage = match[2];
+                    // 尋找 herbLibrary 中對應項目
+                    const herb = Array.isArray(herbLibrary) ? herbLibrary.find(h => h && h.name === itemName) : null;
+                    let stockStr = '';
+                    if (herb && typeof herb.stock !== 'undefined' && typeof herb.reorderLevel !== 'undefined') {
+                        const stockVal = (typeof herb.stock === 'number' && !isNaN(herb.stock)) ? herb.stock : 0;
+                        const reorderVal = (typeof herb.reorderLevel === 'number' && !isNaN(herb.reorderLevel)) ? herb.reorderLevel : 0;
+                        const color = stockVal <= reorderVal ? 'red' : 'blue';
+                        stockStr = ` <span style="color:${color};">${stockVal}g</span>`;
+                    }
+                    formattedLines.push(`${window.escapeHtml(itemName)} ${dosage}g${stockStr}`);
+                } else {
+                    // 不是藥材格式的行視為說明或其他內容，直接轉義顯示
+                    const escaped = window.escapeHtml ? window.escapeHtml(line) : line;
+                    formattedLines.push(escaped);
+                }
+            });
+            return formattedLines.join('<br>');
+        }
+
+        // 將格式化函式掛載至 window，方便於 HTML 模版內調用
+        if (typeof window !== 'undefined') {
+            window.formatPrescriptionWithStock = formatPrescriptionWithStock;
+        }
+
+        // 增加庫存：根據項目陣列增加庫存
+        function addInventory(items) {
+            if (!Array.isArray(items)) return;
+            items.forEach(it => {
+                const herb = Array.isArray(herbLibrary) ? herbLibrary.find(h => String(h.id) === String(it.id)) : null;
+                if (herb) {
+                    const current = (typeof herb.stock === 'number' && !isNaN(herb.stock)) ? herb.stock : 0;
+                    const addition = (typeof it.dosage === 'number' && !isNaN(it.dosage)) ? it.dosage : 0;
+                    herb.stock = current + addition;
+                }
+            });
+        }
+
+        // 根據原始處方項與新處方項調整庫存差異
+        function adjustInventoryForEdit(originalItems, newItems) {
+            const diffMap = {};
+            if (Array.isArray(originalItems)) {
+                originalItems.forEach(it => {
+                    const key = String(it.id);
+                    const dosage = (typeof it.dosage === 'number' && !isNaN(it.dosage)) ? it.dosage : 0;
+                    if (!diffMap[key]) diffMap[key] = 0;
+                    // 原始處方扣掉的劑量在差異圖上為負值
+                    diffMap[key] -= dosage;
+                });
+            }
+            if (Array.isArray(newItems)) {
+                newItems.forEach(it => {
+                    const key = String(it.id);
+                    const dosage = (typeof it.dosage === 'number' && !isNaN(it.dosage)) ? it.dosage : 0;
+                    if (!diffMap[key]) diffMap[key] = 0;
+                    // 新處方扣掉的劑量在差異圖上為正值
+                    diffMap[key] += dosage;
+                });
+            }
+            Object.keys(diffMap).forEach(key => {
+                const diff = diffMap[key];
+                const herb = Array.isArray(herbLibrary) ? herbLibrary.find(h => String(h.id) === String(key)) : null;
+                if (!herb) return;
+                if (diff > 0) {
+                    // 新處方多用，扣減庫存
+                    const current = (typeof herb.stock === 'number' && !isNaN(herb.stock)) ? herb.stock : 0;
+                    const newStock = current - diff;
+                    herb.stock = newStock < 0 ? 0 : newStock;
+                } else if (diff < 0) {
+                    // 新處方少用或移除，補回庫存
+                    const current = (typeof herb.stock === 'number' && !isNaN(herb.stock)) ? herb.stock : 0;
+                    herb.stock = current + Math.abs(diff);
+                }
+            });
         }
         
         // 根據開藥天數自動更新藥費
