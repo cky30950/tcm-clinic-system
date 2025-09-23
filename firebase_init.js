@@ -29,7 +29,9 @@ import { getDatabase, ref, set, get, update, remove, onValue, off,
         orderByChild,
         startAt,
         endAt } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
-import { getAuth, signInWithEmailAndPassword, signOut, setPersistence, browserSessionPersistence, createUserWithEmailAndPassword, updateProfile } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getAuth, signInWithEmailAndPassword, signOut, setPersistence, browserSessionPersistence, createUserWithEmailAndPassword, updateProfile,
+        // 新增更改密碼、刪除帳號、重新驗證等方法
+        updatePassword, deleteUser as firebaseDeleteUser, EmailAuthProvider, reauthenticateWithCredential } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 // 匯入外部配置檔案。請將您的 Firebase 設定值放在 firebaseConfig.js 中，並避免將其提交到版本控制。
 import firebaseConfig from './firebaseConfig.js';
@@ -104,6 +106,13 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         signOut,
         createUserWithEmailAndPassword,
         updateProfile,
+        // 新增：密碼重設與帳號刪除相關函式
+        updatePassword,
+        // 刪除 Firebase Authentication 使用者
+        deleteAuthUser: firebaseDeleteUser,
+        // 使用電子郵件提供者進行重新驗證
+        EmailAuthProvider,
+        reauthenticateWithCredential,
         // 持久化設置
         setPersistence,
         browserSessionPersistence

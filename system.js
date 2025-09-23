@@ -220,10 +220,10 @@ function renderPagination(totalItems, itemsPerPage, currentPage, onPageChange, c
  */
 const ROLE_PERMISSIONS = {
   // 新增個人統計分析 (personalStatistics) 權限，診所管理者與醫師可使用
-  '診所管理': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings'],
-  '醫師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'systemManagement', 'personalSettings', 'personalStatistics'],
-  '護理師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary'],
-  '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary']
+  '診所管理': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
+  '醫師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
+  '護理師': ['patientManagement', 'consultationSystem', 'templateLibrary', 'herbLibrary', 'acupointLibrary', 'accountSecurity'],
+  '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary', 'accountSecurity']
 };
 
 /**
@@ -448,6 +448,152 @@ function renderPersonalStatistics(stats) {
     personalFormulaChartInstance = renderChart(formulaEntries, 'personalFormulaChart', personalFormulaChartInstance);
     const acEntries = renderList(acupointCounts, 'personalAcupointList');
     personalAcupointChartInstance = renderChart(acEntries, 'personalAcupointChart', personalAcupointChartInstance);
+}
+
+/**
+ * 載入帳號安全設定頁。主要作用是重置輸入欄位，避免殘留前次輸入的密碼。
+ * 當使用者切換至帳號安全設定頁時呼叫此函式。
+ */
+function loadAccountSecurity() {
+    try {
+        const currentInput = document.getElementById('changeCurrentPassword');
+        const newInput = document.getElementById('changeNewPassword');
+        const confirmInput = document.getElementById('changeConfirmPassword');
+        const deleteInput = document.getElementById('deleteAccountPassword');
+        if (currentInput) currentInput.value = '';
+        if (newInput) newInput.value = '';
+        if (confirmInput) confirmInput.value = '';
+        if (deleteInput) deleteInput.value = '';
+    } catch (_e) {
+        // 無需處理錯誤，清空失敗可忽略
+    }
+}
+
+/**
+ * 變更目前使用者的密碼。使用者必須輸入現有密碼進行重新驗證，並指定新的密碼。
+ * 驗證成功後使用 updatePassword 更新密碼，並顯示操作結果。
+ */
+async function changeCurrentUserPassword() {
+    const currentPassEl = document.getElementById('changeCurrentPassword');
+    const newPassEl = document.getElementById('changeNewPassword');
+    const confirmEl = document.getElementById('changeConfirmPassword');
+    if (!currentPassEl || !newPassEl || !confirmEl) {
+        showToast('找不到輸入欄位，請重新載入頁面', 'error');
+        return;
+    }
+    const currentPassword = (currentPassEl.value || '').trim();
+    const newPassword = (newPassEl.value || '').trim();
+    const confirmPassword = (confirmEl.value || '').trim();
+    const lang = localStorage.getItem('lang') || 'zh';
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        const msg = lang === 'en' ? 'Please fill in all fields' : '請填寫所有欄位';
+        showToast(msg, 'error');
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        const msg = lang === 'en' ? 'New password and confirmation do not match' : '新密碼與確認密碼不一致';
+        showToast(msg, 'error');
+        return;
+    }
+    if (newPassword.length < 6) {
+        const msg = lang === 'en' ? 'Password must be at least 6 characters' : '新密碼長度至少 6 個字元';
+        showToast(msg, 'error');
+        return;
+    }
+    try {
+        const auth = window.firebase.auth;
+        const user = auth.currentUser;
+        if (!user || !user.email) {
+            const msg = lang === 'en' ? 'No authenticated user found' : '未找到已登入用戶';
+            showToast(msg, 'error');
+            return;
+        }
+        // 使用電子郵件與當前密碼進行重新驗證
+        const credential = window.firebase.EmailAuthProvider.credential(user.email, currentPassword);
+        await window.firebase.reauthenticateWithCredential(user, credential);
+        // 更新密碼
+        await window.firebase.updatePassword(user, newPassword);
+        const successMsg = lang === 'en' ? 'Password updated successfully' : '密碼更新成功';
+        showToast(successMsg, 'success');
+        // 清空輸入
+        currentPassEl.value = '';
+        newPassEl.value = '';
+        confirmEl.value = '';
+    } catch (error) {
+        console.error('更新密碼錯誤:', error);
+        let errMsg = '';
+        if (error && error.code) {
+            // 依據常見錯誤代碼提供更友好的提示
+            switch (error.code) {
+                case 'auth/wrong-password':
+                    errMsg = lang === 'en' ? 'Current password is incorrect' : '當前密碼不正確';
+                    break;
+                case 'auth/weak-password':
+                    errMsg = lang === 'en' ? 'New password is too weak' : '新密碼過於簡單';
+                    break;
+                default:
+                    errMsg = error.message || (lang === 'en' ? 'Failed to update password' : '更新密碼失敗');
+            }
+        } else {
+            errMsg = lang === 'en' ? 'Failed to update password' : '更新密碼失敗';
+        }
+        showToast(errMsg, 'error');
+    }
+}
+
+/**
+ * 刪除目前使用者的 Firebase Authentication 帳號。使用者需輸入密碼以重新驗證。
+ * 若刪除成功，將自動登出並返回登入頁面。
+ */
+async function deleteCurrentUserAccount() {
+    const pwdEl = document.getElementById('deleteAccountPassword');
+    const lang = localStorage.getItem('lang') || 'zh';
+    if (!pwdEl) {
+        showToast(lang === 'en' ? 'Cannot find password field' : '找不到密碼輸入欄位', 'error');
+        return;
+    }
+    const password = (pwdEl.value || '').trim();
+    if (!password) {
+        showToast(lang === 'en' ? 'Please enter your password' : '請輸入密碼', 'error');
+        return;
+    }
+    try {
+        const user = window.firebase.auth.currentUser;
+        if (!user || !user.email) {
+            showToast(lang === 'en' ? 'No authenticated user found' : '未找到已登入用戶', 'error');
+            return;
+        }
+        // 確認刪除
+        const confirmMsg = lang === 'en'
+            ? 'Are you sure you want to delete your account?\nThis action cannot be undone.'
+            : '確定要刪除您的帳號嗎？\n此操作無法復原！';
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+        // 重新驗證
+        const credential = window.firebase.EmailAuthProvider.credential(user.email, password);
+        await window.firebase.reauthenticateWithCredential(user, credential);
+        // 刪除帳號
+        await window.firebase.deleteAuthUser(user);
+        showToast(lang === 'en' ? 'Account deleted' : '帳號已刪除', 'success');
+        // 登出並返回登入畫面
+        await logout();
+    } catch (error) {
+        console.error('刪除帳號錯誤:', error);
+        let errMsg;
+        if (error && error.code) {
+            switch (error.code) {
+                case 'auth/wrong-password':
+                    errMsg = lang === 'en' ? 'Password is incorrect' : '密碼錯誤';
+                    break;
+                default:
+                    errMsg = error.message || (lang === 'en' ? 'Failed to delete account' : '刪除帳號失敗');
+            }
+        } else {
+            errMsg = lang === 'en' ? 'Failed to delete account' : '刪除帳號失敗';
+        }
+        showToast(errMsg, 'error');
+    }
 }
 
 // 病人套票與診療記錄的本地快取。
@@ -2407,6 +2553,8 @@ async function logout() {
                 personalStatistics: { title: '個人統計分析', icon: '📈', description: '統計個人用藥與穴位偏好' },
                 // 新增：個人設置（使用扳手符號作為圖示）
                 personalSettings: { title: '個人設置', icon: '🔧', description: '管理慣用藥方及穴位組合' },
+                // 新增：帳號安全設定（變更密碼與刪除帳號）
+                accountSecurity: { title: '帳號安全設定', icon: '🔐', description: '變更密碼及刪除帳號' },
                 // 新增：模板庫管理
                 templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
             };
@@ -2499,13 +2647,18 @@ async function logout() {
                 if (typeof loadPersonalStatistics === 'function') {
                     loadPersonalStatistics();
                 }
+            } else if (sectionId === 'accountSecurity') {
+                // 載入帳號安全設定：目前僅需要清除表單輸入
+                if (typeof loadAccountSecurity === 'function') {
+                    loadAccountSecurity();
+                }
             }
         }
 
         // 隱藏所有區域
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'templateLibrary', 'welcomePage'].forEach(id => {
+            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.add('hidden');
             });
@@ -16780,6 +16933,11 @@ document.addEventListener('DOMContentLoaded', function() {
   window.openInventoryModal = openInventoryModal;
   window.hideInventoryModal = hideInventoryModal;
   window.saveInventoryChanges = saveInventoryChanges;
+
+  // 帳號安全相關函式掛載至全域，供帳號安全設定頁的按鈕呼叫
+  window.loadAccountSecurity = loadAccountSecurity;
+  window.changeCurrentUserPassword = changeCurrentUserPassword;
+  window.deleteCurrentUserAccount = deleteCurrentUserAccount;
 
   // 模板庫：診斷模板與醫囑模板彈窗
   // 顯示診斷模板選擇彈窗，並動態生成模板列表
