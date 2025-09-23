@@ -191,6 +191,96 @@ async function initHerbUsageCounts(forceRefresh = false) {
         } catch (err) {
             console.error('讀取 inventoryLogs 並統計使用次數失敗:', err);
         }
+        // 如果從 inventoryLogs 中沒有取得任何用藥統計，嘗試從診症處方中補算
+        try {
+            if (Object.keys(herbUsageCounts).length === 0) {
+                // 讀取所有診症紀錄，以便從處方欄補算用藥次數
+                let consList = [];
+                // 優先使用 FirebaseDataManager
+                if (window.firebaseDataManager && typeof window.firebaseDataManager.getConsultations === 'function') {
+                    try {
+                        const result = await window.firebaseDataManager.getConsultations(true);
+                        if (result && result.success && Array.isArray(result.data)) {
+                            consList = result.data.slice();
+                            let hasMore = result.hasMore;
+                            while (hasMore && window.firebaseDataManager.getConsultationsNextPage) {
+                                const next = await window.firebaseDataManager.getConsultationsNextPage();
+                                if (next && next.success && Array.isArray(next.data)) {
+                                    consList = consList.concat(next.data);
+                                    hasMore = next.hasMore;
+                                } else {
+                                    hasMore = false;
+                                }
+                            }
+                        }
+                    } catch (dmErr) {
+                        console.warn('從 DataManager 讀取診症以補算用藥失敗:', dmErr);
+                    }
+                }
+                // 若 DataManager 未取得任何資料，改用 Firestore 直接讀取
+                if (consList.length === 0 && window.firebase && window.firebase.collection && window.firebase.getDocs) {
+                    try {
+                        const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+                        const snapshot = await window.firebase.getDocs(colRef);
+                        snapshot.forEach(doc => {
+                            consList.push({ id: doc.id, ...doc.data() });
+                        });
+                    } catch (fsErr) {
+                        console.error('從 Firestore 讀取診症以補算用藥失敗:', fsErr);
+                    }
+                }
+                if (consList.length > 0) {
+                    // 確保藥材庫已載入以便比對名稱
+                    try {
+                        if (typeof initHerbLibrary === 'function' && (!Array.isArray(herbLibrary) || herbLibrary.length === 0)) {
+                            await initHerbLibrary();
+                        }
+                    } catch (_e) {
+                        // ignore
+                    }
+                    consList.forEach(c => {
+                        if (!c) return;
+                        // 解析醫師 UID
+                        let doctorUid = '';
+                        try {
+                            if (c.doctor && typeof c.doctor === 'object') {
+                                doctorUid = c.doctor.uid || c.doctor.id || '';
+                            } else if (c.doctor) {
+                                doctorUid = String(c.doctor);
+                            }
+                        } catch (_e) {
+                            doctorUid = '';
+                        }
+                        const pres = c.prescription || '';
+                        if (!pres) return;
+                        const lines = pres.split(/\n+/);
+                        lines.forEach(line => {
+                            const trimmed = String(line).trim();
+                            if (!trimmed) return;
+                            const match = trimmed.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*([a-zA-Z斤兩錢克]*)$/);
+                            if (!match) return;
+                            const itemName = match[1].trim();
+                            // 在 herbLibrary 中尋找對應項目
+                            let itemId = null;
+                            if (Array.isArray(herbLibrary)) {
+                                const it = herbLibrary.find(i => i && i.name && String(i.name).trim() === itemName);
+                                itemId = it ? it.id : null;
+                            }
+                            const idToUse = itemId || itemName;
+                            herbUsageCounts[idToUse] = (herbUsageCounts[idToUse] || 0) + 1;
+                            if (doctorUid) {
+                                if (!herbUsageCountsPerDoctor[doctorUid]) {
+                                    herbUsageCountsPerDoctor[doctorUid] = {};
+                                }
+                                herbUsageCountsPerDoctor[doctorUid][idToUse] = (herbUsageCountsPerDoctor[doctorUid][idToUse] || 0) + 1;
+                            }
+                        });
+                    });
+                }
+            }
+        } catch (calcErr) {
+            console.error('補算用藥統計時發生錯誤:', calcErr);
+        }
         herbUsageCountsInitialized = true;
     } catch (error) {
         console.error('初始化用藥統計失敗:', error);
