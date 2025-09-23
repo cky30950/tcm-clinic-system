@@ -583,6 +583,21 @@ async function deleteCurrentUserAccount() {
         await window.firebase.reauthenticateWithCredential(window.firebase.auth.currentUser, credential);
         // 刪除帳號。使用 auth.currentUser 以符合模組化 API
         await window.firebase.deleteAuthUser(window.firebase.auth.currentUser);
+
+        // 刪除對應的診所用戶紀錄（Firestore 文件）。
+        try {
+            const userRecordId = currentUserData && currentUserData.id;
+            if (userRecordId) {
+                await window.firebaseDataManager.deleteUser(userRecordId);
+                // 清除本地快取，避免刪除的用戶再次出現
+                if (Array.isArray(userCache)) {
+                    userCache = userCache.filter(u => u.id !== userRecordId);
+                }
+            }
+        } catch (delErr) {
+            console.error('刪除診所用戶紀錄失敗:', delErr);
+        }
+
         showToast(lang === 'en' ? 'Account deleted' : '帳號已刪除', 'success');
         // 登出並返回登入畫面
         await logout();
@@ -13200,7 +13215,16 @@ async function deleteUser(id) {
                 // 更新本地數據
                 users = users.filter(u => u.id !== id);
                 usersFromFirebase = usersFromFirebase.filter(u => u.id !== id);
-                
+
+                // 同步移除全域快取，以免刪除的用戶重新出現
+                try {
+                    if (Array.isArray(userCache)) {
+                        userCache = userCache.filter(u => u.id !== id);
+                    }
+                } catch (_e) {
+                    // 如果 userCache 未定義或不可用則忽略
+                }
+
                 localStorage.setItem('users', JSON.stringify(users));
                 displayUsers();
                 {
