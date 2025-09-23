@@ -2621,7 +2621,67 @@ async function logout() {
                     entries.push({ id: id, count: myCounts[id] });
                 }
                 entries.sort((a, b) => b.count - a.count);
-                const topEntries = entries.slice(0, 10);
+                let topEntries = entries.slice(0, 10);
+                // 若沒有任何用藥統計資料，從診症的處方欄位補算一次
+                if ((!topEntries || topEntries.length === 0) && Array.isArray(consList) && consList.length > 0) {
+                    try {
+                        // 確保藥材庫已載入，便於名稱比對
+                        if (typeof initHerbLibrary === 'function' && (!Array.isArray(herbLibrary) || herbLibrary.length === 0)) {
+                            await initHerbLibrary();
+                        }
+                        const fallbackCounts = {};
+                        for (const c of consList) {
+                            if (!c) continue;
+                            let cUid = '';
+                            if (c.doctor && typeof c.doctor === 'object') {
+                                cUid = c.doctor.uid || c.doctor.id || '';
+                            } else if (c.doctor) {
+                                cUid = String(c.doctor);
+                            }
+                            if (doctorUid && doctorUid !== cUid) continue;
+                            const pres = c.prescription || '';
+                            if (!pres) continue;
+                            const lines = pres.split(/\n+/);
+                            for (const line of lines) {
+                                const trimmed = String(line).trim();
+                                if (!trimmed) continue;
+                                // 比對「名稱 數量單位」格式，單位可選擇 g、斤、兩、錢 或省略
+                                const match = trimmed.match(/^(.+?)\s+(\d+(?:\.\d+)?)([g斤兩錢])?$/);
+                                if (!match) continue;
+                                const itemName = match[1].trim();
+                                // 在藥材/方劑庫中尋找對應項目
+                                let item = null;
+                                if (Array.isArray(herbLibrary)) {
+                                    item = herbLibrary.find(i => i && i.name && String(i.name).trim() === itemName);
+                                }
+                                const id = item ? item.id : itemName;
+                                fallbackCounts[id] = (fallbackCounts[id] || 0) + 1;
+                            }
+                        }
+                        // 更新全球與醫師個人的用藥統計，以便排序與其他功能使用
+                        try {
+                            if (doctorUid) {
+                                herbUsageCountsPerDoctor[doctorUid] = herbUsageCountsPerDoctor[doctorUid] || {};
+                                for (const fid in fallbackCounts) {
+                                    if (!Object.prototype.hasOwnProperty.call(fallbackCounts, fid)) continue;
+                                    herbUsageCountsPerDoctor[doctorUid][fid] = (herbUsageCountsPerDoctor[doctorUid][fid] || 0) + fallbackCounts[fid];
+                                    herbUsageCounts[fid] = (herbUsageCounts[fid] || 0) + fallbackCounts[fid];
+                                }
+                            }
+                        } catch (_uErr) {
+                            // ignore update errors
+                        }
+                        const fbEntries = [];
+                        for (const fid in fallbackCounts) {
+                            if (!Object.prototype.hasOwnProperty.call(fallbackCounts, fid)) continue;
+                            fbEntries.push({ id: fid, count: fallbackCounts[fid] });
+                        }
+                        fbEntries.sort((a, b) => b.count - a.count);
+                        topEntries = fbEntries.slice(0, 10);
+                    } catch (fallbackErr) {
+                        console.error('使用處方欄位補算用藥統計時發生錯誤:', fallbackErr);
+                    }
+                }
                 const getName = (id) => {
                     if (!Array.isArray(herbLibrary)) return id;
                     const item = herbLibrary.find(h => h && String(h.id) === String(id));
