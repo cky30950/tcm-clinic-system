@@ -12340,6 +12340,11 @@ function showAddUserForm() {
         if (pwdField) {
             pwdField.classList.remove('hidden');
         }
+        // 新增用戶時隱藏 UID 欄位
+        const uidFieldEl = document.getElementById('uidField');
+        if (uidFieldEl) {
+            uidFieldEl.classList.add('hidden');
+        }
     } catch (_e) {}
 }
 
@@ -12428,6 +12433,11 @@ async function editUser(id) {
         if (pwdField) {
             pwdField.classList.add('hidden');
         }
+        // 編輯用戶時顯示 UID 欄位
+        const uidFieldEl = document.getElementById('uidField');
+        if (uidFieldEl) {
+            uidFieldEl.classList.remove('hidden');
+        }
     } catch (_e) {}
     
     const modalEl = document.getElementById('addUserModal');
@@ -12464,6 +12474,12 @@ async function saveUser() {
         username = 'user_' + Date.now();
     }
     
+    // 驗證必填欄位（姓名、職位與電子郵件）
+    if (!email) {
+        showToast('請填寫電子郵件地址！', 'error');
+        return;
+    }
+
     // 驗證必填欄位（姓名與職位）
     if (!name || !position) {
         showToast('請填寫必要資料（姓名、職位）！', 'error');
@@ -12575,8 +12591,9 @@ async function saveUser() {
         } else {
             // 新增用戶
             // 若輸入了電子郵件且沒有輸入 UID，使用 Firebase Authentication 建立新帳戶
-            let newUid = uid || '';
-            if (email && !uid) {
+            // 新增用戶一律透過 Firebase Auth 建立帳號，忽略手動輸入的 UID
+            let newUid = '';
+            if (email) {
                 // 驗證密碼與確認密碼
                 if (!password || !passwordConfirm) {
                     showToast('請輸入並確認密碼！', 'error');
