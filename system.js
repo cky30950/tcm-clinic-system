@@ -1581,11 +1581,23 @@ let herbInventoryListenerAttached = false;
  * @param {boolean} forceRefresh
  */
 async function initHerbInventory(forceRefresh = false) {
+    // 如果不是強制刷新且已初始化過，直接返回
     if (herbInventoryInitialized && !forceRefresh) {
         return;
     }
+    // 等待 Firebase 初始化完成
     await waitForFirebaseDb();
     const inventoryRef = window.firebase.ref(window.firebase.rtdb, 'herbInventory');
+    // 若為強制刷新且監聽已經掛載，先取消舊的監聽以避免多重回呼
+    if (forceRefresh && herbInventoryListenerAttached) {
+        try {
+            window.firebase.off(inventoryRef, 'value');
+            herbInventoryListenerAttached = false;
+        } catch (err) {
+            console.error('重置中藥庫存監聽時發生錯誤:', err);
+        }
+    }
+    // 讀取當前庫存快照
     try {
         const snapshot = await window.firebase.get(inventoryRef);
         herbInventory = snapshot && snapshot.exists() ? snapshot.val() || {} : {};
@@ -1595,7 +1607,7 @@ async function initHerbInventory(forceRefresh = false) {
         herbInventory = {};
         herbInventoryInitialized = true;
     }
-    // 只註冊一次監聽器以避免重複回調
+    // 若尚未掛載監聽器，或因強制刷新取消後需重新掛載，則註冊監聽器
     if (!herbInventoryListenerAttached) {
         window.firebase.onValue(inventoryRef, (snap) => {
             herbInventory = snap && snap.exists() ? snap.val() || {} : {};
@@ -1805,12 +1817,7 @@ function hideInventoryModal() {
  */
 async function saveInventoryChanges() {
     // 取得當前觸發此操作的按鈕，顯示讀取圈以防重複提交
-    // 優先透過指定 ID 取得按鈕，以確保能正確找到彈窗內的儲存按鈕
-    let saveBtn = document.getElementById('saveInventoryBtn');
-    if (!saveBtn) {
-        // 後備方案：若找不到指定 ID，就使用 getLoadingButtonFromEvent
-        saveBtn = getLoadingButtonFromEvent('button[onclick="saveInventoryChanges()"]');
-    }
+    const saveBtn = getLoadingButtonFromEvent('button[onclick="saveInventoryChanges()"]');
     setButtonLoading(saveBtn);
     try {
         const qtyInput = document.getElementById('inventoryQuantity');
@@ -1831,8 +1838,7 @@ async function saveInventoryChanges() {
         if (typeof setHerbInventory === 'function') {
             await setHerbInventory(id, quantityBase, thresholdBase, qtyUnit);
         }
-        // 更新本地 herbLibrary 的預設庫存與單位（若存在）。
-        // 這樣可以讓庫存修改後立即反映在庫存清單中，無需等待後端推播。
+        // 更新本地 herbLibrary 的預設庫存與單位（若存在）
         try {
             if (Array.isArray(herbLibrary)) {
                 const idx = herbLibrary.findIndex(h => h && String(h.id) === String(id));
@@ -1842,17 +1848,6 @@ async function saveInventoryChanges() {
                     herbLibrary[idx].unit = qtyUnit;
                 }
             }
-        } catch (_e) {}
-        // 同步更新本地的 herbInventory，以便 getHerbInventory() 立即返回最新值。
-        try {
-            if (!herbInventory || typeof herbInventory !== 'object') {
-                herbInventory = {};
-            }
-            herbInventory[String(id)] = {
-                quantity: quantityBase,
-                threshold: thresholdBase,
-                unit: qtyUnit
-            };
         } catch (_e) {}
         // 提示成功訊息
         showToast('庫存已更新！', 'success');
@@ -2340,9 +2335,11 @@ async function attemptMainLogin() {
             }
             // 在登入時預先載入中藥庫存資料，避免未開啟中藥庫時處方餘量顯示為零
             if (typeof initHerbInventory === 'function') {
+                // 使用強制刷新模式初始化中藥庫存
                 initTasks.push((async () => {
                     try {
-                        await initHerbInventory();
+                        // 強制刷新以確保監聽器重新掛載
+                        await initHerbInventory(true);
                     } catch (err) {
                         console.error('初始化中藥庫存資料失敗:', err);
                     }
@@ -2544,6 +2541,24 @@ async function logout() {
         // Firebase 登出
         if (window.firebase && window.firebase.auth) {
             await window.firebase.signOut(window.firebase.auth);
+        }
+
+        // --- 取消中藥庫存監聽器 ---
+        // 在登出時移除 Realtime Database 的中藥庫存監聽，
+        // 避免舊使用者的監聽回呼在新使用者登入後繼續執行造成資料不同步。
+        try {
+            // 確認變數存在且監聽器已掛載
+            if (typeof herbInventoryListenerAttached !== 'undefined' && herbInventoryListenerAttached) {
+                // 取得中藥庫存資料的參考路徑
+                const inventoryRef = window.firebase.ref(window.firebase.rtdb, 'herbInventory');
+                // 取消監聽 value 事件
+                window.firebase.off(inventoryRef, 'value');
+                // 重置旗標，下次初始化時重新掛載監聽
+                herbInventoryListenerAttached = false;
+                herbInventoryInitialized = false;
+            }
+        } catch (err) {
+            console.error('取消中藥庫存監聽器失敗:', err);
         }
         
         // 清理本地數據
