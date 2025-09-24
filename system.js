@@ -1768,7 +1768,10 @@ async function openInventoryModal(itemId) {
             }
         } catch (_e) {}
         if (titleEl) {
-            titleEl.textContent = nameStr ? `編輯庫存 - ${nameStr}` : '編輯庫存';
+            // Use translation function for the base title.  When nameStr exists,
+            // prefix the translated base title to ensure proper language switching.
+            const baseTitle = (typeof window.t === 'function') ? window.t('編輯庫存') : '編輯庫存';
+            titleEl.textContent = nameStr ? `${baseTitle} - ${nameStr}` : baseTitle;
         }
         // 取得現有庫存資料
         let inv = { quantity: 0, threshold: 0 };

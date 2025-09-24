@@ -555,6 +555,25 @@ window.translations = {
         // 新增：個人統計與帳號安全相關的側邊說明
         "統計個人用藥與穴位偏好": "統計個人用藥與穴位偏好",
         "變更密碼及刪除帳號": "變更密碼及刪除帳號",
+
+        // ==== Herb and inventory management translations (self‑mapping for Chinese) ====
+        "編輯庫存": "編輯庫存",
+        "剩餘數量": "剩餘數量",
+        "補貨警戒量": "補貨警戒量",
+        "存庫量 (g)": "存庫量 (g)",
+        "請輸入存庫量": "請輸入存庫量",
+        "補貨警戒量 (g)": "補貨警戒量 (g)",
+        "庫存低於此值顯示紅色": "庫存低於此值顯示紅色",
+        "斤": "斤",
+        "兩": "兩",
+        "錢": "錢",
+
+        // Herb library sorting labels
+        "排序方式": "排序方式",
+        "庫存最多": "庫存最多",
+        "庫存最少": "庫存最少",
+        "使用最多": "使用最多",
+        "使用最少": "使用最少",
     },
     en: {
         "找不到對應的診症記錄！": "Matching consultation record not found!",
@@ -571,6 +590,24 @@ window.translations = {
         "診症完成後無法調整套票數量": "Package quantity cannot be adjusted after the consultation is completed",
         "選擇的醫師無效，請重新選擇！": "Selected doctor is invalid, please choose again!",
         "未偵測到有效的中藥庫資料": "No valid Chinese medicine library data detected",
+        // Inventory management translations
+        "編輯庫存": "Edit Inventory",
+        "剩餘數量": "Remaining Quantity",
+        "補貨警戒量": "Restock Threshold",
+        "存庫量 (g)": "Stock Quantity (g)",
+        "請輸入存庫量": "Please enter stock quantity",
+        "補貨警戒量 (g)": "Restock Threshold (g)",
+        "庫存低於此值顯示紅色": "Displays red when inventory falls below this value",
+        "斤": "Jin",
+        "兩": "Liang",
+        "錢": "Qian",
+
+        // Herb library sorting labels
+        "排序方式": "Sort by",
+        "庫存最多": "Most Stock",
+        "庫存最少": "Least Stock",
+        "使用最多": "Most Used",
+        "使用最少": "Least Used",
         "折扣項目不允許修改數量": "The quantity of discount items cannot be modified",
         "請填寫必要資料（姓名、性別、電話、出生日期、身分證字號）！": "Please fill in the required fields (name, gender, phone, date of birth, ID number)!",
         "請至少添加一個藥材！": "Please add at least one herb!",
