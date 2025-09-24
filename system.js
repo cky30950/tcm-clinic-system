@@ -1583,8 +1583,10 @@ let herbInventoryListenerAttached = false;
  * @param {boolean} forceRefresh
  */
 async function initHerbInventory(forceRefresh = false) {
-    // 如果不是強制刷新且已初始化過，直接返回
-    if (herbInventoryInitialized && !forceRefresh) {
+    // 如果不是強制刷新且已初始化過，且監聽器仍然存在，直接返回。
+    // 若已初始化但監聽器已被取消（herbInventoryListenerAttached 為 false），
+    // 仍需重新掛載監聽以恢復即時更新。因此不應過早返回。
+    if (herbInventoryInitialized && herbInventoryListenerAttached && !forceRefresh) {
         return;
     }
     // 等待 Firebase 初始化完成
@@ -1739,32 +1741,9 @@ async function updateInventoryAfterConsultation(consultationId, items, days, fre
         const consumption = dosage * days * freq;
         const inv = getHerbInventory(item.id);
         const newQty = (inv.quantity || 0) - consumption;
-        // 寫入 Realtime Database
         await setHerbInventory(item.id, newQty, inv.threshold, inv.unit);
-        // 更新本地快取，使庫存數量即時反映
-        try {
-            if (typeof herbInventory === 'object') {
-                const key = String(item.id);
-                if (!herbInventory[key] || typeof herbInventory[key] !== 'object') {
-                    herbInventory[key] = {};
-                }
-                herbInventory[key].quantity = newQty;
-                // 保留門檻與單位資訊
-                if (inv.threshold !== undefined) herbInventory[key].threshold = inv.threshold;
-                if (inv.unit) herbInventory[key].unit = inv.unit;
-            }
-        } catch (_e) {}
         log[String(item.id)] = consumption;
     }
-    // 在更新本地庫存後，立即更新畫面，以便在監聽器被取消時仍能看到正確的餘量
-    try {
-        if (typeof updatePrescriptionDisplay === 'function') {
-            updatePrescriptionDisplay();
-        }
-        if (document.getElementById('herbLibraryList')) {
-            displayHerbLibrary();
-        }
-    } catch (_e) {}
     // 將新的消耗量記錄到 inventoryLogs
     await window.firebase.set(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationId)), log);
 }
@@ -10264,28 +10243,7 @@ async function initializeSystemAfterLogin() {
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
                     ${inventoryHtml}
-                    ${(() => {
-                        try {
-                            const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                            const usage = herb.usageCount || 0;
-                            if (lang === 'en') {
-                                return `<div class="mt-2 text-xs text-gray-500 text-right">Used ${usage} times</div>`;
-                            } else {
-                                return `<div class="mt-2 text-xs text-gray-500 text-right">使用 ${usage} 次</div>`;
-                            }
-                        } catch (_e) {
-                            // Fallback: attempt to use language preference again for usage count
-                            try {
-                                const lang2 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                const count = herb.usageCount || 0;
-                                return lang2 === 'en'
-                                    ? `<div class="mt-2 text-xs text-gray-500 text-right">Used ${count} times</div>`
-                                    : `<div class="mt-2 text-xs text-gray-500 text-right">使用 ${count} 次</div>`;
-                            } catch (_e2) {
-                                return `<div class="mt-2 text-xs text-gray-500 text-right">使用 ${herb.usageCount || 0} 次</div>`;
-                            }
-                        }
-                    })()}
+                    <div class="mt-2 text-xs text-gray-500 text-right">使用 ${herb.usageCount || 0} 次</div>
                 </div>
             `;
         }
@@ -10345,28 +10303,7 @@ async function initializeSystemAfterLogin() {
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
                     ${inventoryHtml}
-                    ${(() => {
-                        try {
-                            const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                            const usage = formula.usageCount || 0;
-                            if (lang === 'en') {
-                                return `<div class="mt-2 text-xs text-gray-500 text-right">Used ${usage} times</div>`;
-                            } else {
-                                return `<div class="mt-2 text-xs text-gray-500 text-right">使用 ${usage} 次</div>`;
-                            }
-                        } catch (_e) {
-                            // Fallback: attempt to use language preference again for usage count
-                            try {
-                                const lang2 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                const count = formula.usageCount || 0;
-                                return lang2 === 'en'
-                                    ? `<div class="mt-2 text-xs text-gray-500 text-right">Used ${count} times</div>`
-                                    : `<div class="mt-2 text-xs text-gray-500 text-right">使用 ${count} 次</div>`;
-                            } catch (_e2) {
-                                return `<div class="mt-2 text-xs text-gray-500 text-right">使用 ${formula.usageCount || 0} 次</div>`;
-                            }
-                        }
-                    })()}
+                    <div class="mt-2 text-xs text-gray-500 text-right">使用 ${formula.usageCount || 0} 次</div>
                 </div>
             `;
         }
@@ -11232,87 +11169,7 @@ async function initializeSystemAfterLogin() {
                             <div class="font-semibold text-gray-900 text-sm mb-1">${window.escapeHtml(item.name)}</div>
                             <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${typeName}</div>
                             ${item.effects ? `<div class="text-xs text-gray-600 mt-1">${window.escapeHtml(item.effects.substring(0, 30))}${item.effects.length > 30 ? '...' : ''}</div>` : ''}
-                            <div class="text-xs mt-1 ${stockClass}">
-                                ${(() => {
-                                    try {
-                                        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                        const label = lang === 'en' ? 'Remaining:' : '餘量：';
-                                        return `${label}${qtyDisplay}${unitLabel}`;
-                                    } catch (_e) {
-                                        // If we cannot directly read the language preference, attempt again using a fallback
-                                        try {
-                                            const lang2 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                            const fallbackLabel = lang2 === 'en' ? 'Remaining:' : '餘量：';
-                                            return `${fallbackLabel}${qtyDisplay}${unitLabel}`;
-                                        } catch (_e2) {
-                                            // Final fallback: attempt to localize the label one last time
-                                            try {
-                                                const lang3 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                const fallbackLabel2 = lang3 === 'en' ? 'Remaining:' : '餘量：';
-                                                return `${fallbackLabel2}${qtyDisplay}${unitLabel}`;
-                                            } catch (_e3) {
-                                                // Attempt to localize the label one final time in fallback
-                                                try {
-                                                    const lang4 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                    const fallbackLabel3 = lang4 === 'en' ? 'Remaining:' : '餘量：';
-                                                    return `${fallbackLabel3}${qtyDisplay}${unitLabel}`;
-                                                } catch (_e4) {
-                                                    // Final fallback: attempt to localize the label yet again
-                                                    try {
-                                                        const lang5 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                        const fallbackLabel4 = lang5 === 'en' ? 'Remaining:' : '餘量：';
-                                                        return `${fallbackLabel4}${qtyDisplay}${unitLabel}`;
-                                                    } catch (_e5) {
-                                                        // Final fallback: attempt to localize the label one more time
-                                                        try {
-                                                            const lang6 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                            const fallbackLabel5 = lang6 === 'en' ? 'Remaining:' : '餘量：';
-                                                            return `${fallbackLabel5}${qtyDisplay}${unitLabel}`;
-                                                        } catch (_e6) {
-                                                            // Final fallback: attempt to localize the label once more
-                                                            try {
-                                                                const lang8 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                const fallbackLabel7 = lang8 === 'en' ? 'Remaining:' : '餘量：';
-                                                                return `${fallbackLabel7}${qtyDisplay}${unitLabel}`;
-                                                            } catch (_e7) {
-                                                                // Final fallback: attempt to localize the label yet again
-                                                                try {
-                                                                    const lang9 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                    const fallbackLabel8 = lang9 === 'en' ? 'Remaining:' : '餘量：';
-                                                                    return `${fallbackLabel8}${qtyDisplay}${unitLabel}`;
-                                                                } catch (_e8) {
-                                                                    // Final fallback: attempt to localize the label yet again
-                                                                    try {
-                                                                        const lang10 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                        const fallbackLabel9 = lang10 === 'en' ? 'Remaining:' : '餘量：';
-                                                                        return `${fallbackLabel9}${qtyDisplay}${unitLabel}`;
-                                                                    } catch (_e9) {
-                                                                        // Final fallback: attempt to localize the label yet again
-                                                                        try {
-                                                                            const lang11 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                            const fallbackLabel10 = lang11 === 'en' ? 'Remaining:' : '餘量：';
-                                                                            return `${fallbackLabel10}${qtyDisplay}${unitLabel}`;
-                                                                        } catch (_e10) {
-                                                                            // Final fallback: attempt to localize the label one last time
-                                                                            try {
-                                                                                const lang12 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                const fallbackLabel11 = lang12 === 'en' ? 'Remaining:' : '餘量：';
-                                                                                return `${fallbackLabel11}${qtyDisplay}${unitLabel}`;
-                                                                            } catch (_e11) {
-                                                                                return `餘量：${qtyDisplay}${unitLabel}`;
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                })()}
-                            </div>
+                            <div class="text-xs mt-1 ${stockClass}">餘量：${qtyDisplay}${unitLabel}</div>
                         </div>
                     </div>
                 `;
@@ -11452,164 +11309,9 @@ async function initializeSystemAfterLogin() {
                                                     return parseFloat(val.toFixed(3)).toString();
                                                 })();
                                                 const unitLabel = UNIT_LABEL_MAP[unit] || '克';
-                                                return (() => {
-                                                    try {
-                                                        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                        const label = lang === 'en' ? 'Remaining:' : '餘量：';
-                                                        return `<span class="text-xs text-gray-400">${label}${qtyDisplay}${unitLabel}</span>`;
-                                                    } catch (_e) {
-                                                        return (() => {
-                                                            try {
-                                                                const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                const label = lang === 'en' ? 'Remaining:' : '餘量：';
-                                                                return `<span class="text-xs text-gray-400">${label}${qtyDisplay}${unitLabel}</span>`;
-                                                            } catch (_e2) {
-                                                                return (() => {
-                                                                    try {
-                                                                        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                        const label = lang === 'en' ? 'Remaining:' : '餘量：';
-                                                                        return `<span class="text-xs text-gray-400">${label}${qtyDisplay}${unitLabel}</span>`;
-                                                                    } catch (_e3) {
-                                                                        return (() => {
-                                                                            try {
-                                                                                const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                const label = lang === 'en' ? 'Remaining:' : '餘量：';
-                                                                                return `<span class="text-xs text-gray-400">${label}${qtyDisplay}${unitLabel}</span>`;
-                                                                            } catch (_e4) {
-                                                                                // Fallback: attempt to localize the "Remaining" label again
-                                                                                try {
-                                                                                    const lang2 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                    const fallbackLabel = lang2 === 'en' ? 'Remaining:' : '餘量：';
-                                                                                    return `<span class="text-xs text-gray-400">${fallbackLabel}${qtyDisplay}${unitLabel}</span>`;
-                                                                                } catch (_e5) {
-                                                                                    // Final fallback: attempt to localize the label one last time
-                                                                                    try {
-                                                                                        const lang3 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                        const label3 = lang3 === 'en' ? 'Remaining:' : '餘量：';
-                                                                                        return `<span class="text-xs text-gray-400">${label3}${qtyDisplay}${unitLabel}</span>`;
-                                                                                    } catch (_e6) {
-                                                                                        // Final fallback: attempt to localize the label again
-                                                                                        try {
-                                                                                            const lang4 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                            const fallbackLabel3 = lang4 === 'en' ? 'Remaining:' : '餘量：';
-                                                                                            return `<span class="text-xs text-gray-400">${fallbackLabel3}${qtyDisplay}${unitLabel}</span>`;
-                                                                                        } catch (_e7) {
-                                                                                            // Final fallback: attempt to localize the label yet again
-                                                                                            try {
-                                                                                                const lang5 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                                const fallbackLabel4 = lang5 === 'en' ? 'Remaining:' : '餘量：';
-                                                                                                return `<span class="text-xs text-gray-400">${fallbackLabel4}${qtyDisplay}${unitLabel}</span>`;
-                                                                                            } catch (_e8) {
-                                                                                                // Final fallback: attempt to localize the label one more time
-                                                                                                try {
-                                                                                                    const lang6 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                                    const fallbackLabel5 = lang6 === 'en' ? 'Remaining:' : '餘量：';
-                                                                                                    return `<span class="text-xs text-gray-400">${fallbackLabel5}${qtyDisplay}${unitLabel}</span>`;
-                                                                                                } catch (_e9) {
-                                                                                                    // Final fallback: attempt to localize the label yet again
-                                                                                                    try {
-                                                                                                        const lang7 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                                        const fallbackLabel6 = lang7 === 'en' ? 'Remaining:' : '餘量：';
-                                                                                                        return `<span class="text-xs text-gray-400">${fallbackLabel6}${qtyDisplay}${unitLabel}</span>`;
-                                                                                                    } catch (_e10) {
-                                                                                                        // Final fallback: attempt to localize the label once more
-                                                                                                        try {
-                                                                                                            const lang8 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                                            const fallbackLabel7 = lang8 === 'en' ? 'Remaining:' : '餘量：';
-                                                                                                            return `<span class="text-xs text-gray-400">${fallbackLabel7}${qtyDisplay}${unitLabel}</span>`;
-                                        } catch (_e11) {
-                                            // Final fallback: attempt to localize the label one final time
-                                            try {
-                                                const lang9 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                const fallbackLabel8 = lang9 === 'en' ? 'Remaining:' : '餘量：';
-                                                return `<span class="text-xs text-gray-400">${fallbackLabel8}${qtyDisplay}${unitLabel}</span>`;
-                                            } catch (_e12) {
-                                                // Final fallback: attempt to localize the label one last time
-                                                try {
-                                                    const lang10 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                    const fallbackLabel9 = lang10 === 'en' ? 'Remaining:' : '餘量：';
-                                                    return `<span class="text-xs text-gray-400">${fallbackLabel9}${qtyDisplay}${unitLabel}</span>`;
-                                                } catch (_e13) {
-                                                    // Final fallback: attempt to localize the label again
-                                                    try {
-                                                        const lang11 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                        const fallbackLabel10 = lang11 === 'en' ? 'Remaining:' : '餘量：';
-                                                        return `<span class="text-xs text-gray-400">${fallbackLabel10}${qtyDisplay}${unitLabel}</span>`;
-                                                    } catch (_e14) {
-                                                        // Final fallback: attempt to localize the label one more time
-                                                        try {
-                                                            const lang12 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                            const fallbackLabel11 = lang12 === 'en' ? 'Remaining:' : '餘量：';
-                                                            return `<span class="text-xs text-gray-400">${fallbackLabel11}${qtyDisplay}${unitLabel}</span>`;
-                                                        } catch (_e15) {
-                                                            return `<span class="text-xs text-gray-400">餘量：${qtyDisplay}${unitLabel}</span>`;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                                                                                    }
-                                                                                                }
-                                                                                            }
-                                                                                        }
-                                                                                    }
-                                                                                }
-                                                                            }
-                                                                        })();
-                                                                    }
-                                                                })();
-                                                            }
-                                                        })();
-                                                    }
-                                                })();
+                                                return `<span class="text-xs text-gray-400">餘量：${qtyDisplay}${unitLabel}</span>`;
                                             } catch (_e) {
-                                                return (() => {
-                                                    try {
-                                                        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                        const label = lang === 'en' ? 'Remaining:' : '餘量：';
-                                                        return `<span class="text-xs text-gray-400">${label}0g</span>`;
-                                                    } catch (_e) {
-                                                        return (() => {
-                                                            try {
-                                                                const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                const label = lang === 'en' ? 'Remaining:' : '餘量：';
-                                                                return `<span class="text-xs text-gray-400">${label}0g</span>`;
-                                                            } catch (_e2) {
-                                                                return (() => {
-                                                                    try {
-                                                                        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                        const label = lang === 'en' ? 'Remaining:' : '餘量：';
-                                                                        return `<span class="text-xs text-gray-400">${label}0g</span>`;
-                                                                    } catch (_e3) {
-                                                                        return (() => {
-                                                                            try {
-                                                                                const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                const label = lang === 'en' ? 'Remaining:' : '餘量：';
-                                                                                return `<span class="text-xs text-gray-400">${label}0g</span>`;
-                                                                            } catch (_e4) {
-                                                                                // Fallback: attempt to localize the "Remaining" label again for zero quantity
-                                                                                try {
-                                                                                    const lang2 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                    const fallbackLabel = lang2 === 'en' ? 'Remaining:' : '餘量：';
-                                                                                    return `<span class="text-xs text-gray-400">${fallbackLabel}0g</span>`;
-                                                                                } catch (_e5) {
-                                                                                    // Final fallback: attempt to localize the label one last time for zero quantity
-                                                                                    try {
-                                                                                        const lang3 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-                                                                                        const fallbackLabel2 = lang3 === 'en' ? 'Remaining:' : '餘量：';
-                                                                                        return `<span class="text-xs text-gray-400">${fallbackLabel2}0g</span>`;
-                                                                                    } catch (_e6) {
-                                                                                        return `<span class="text-xs text-gray-400">餘量：0g</span>`;
-                                                                                    }
-                                                                                }
-                                                                            }
-                                                                        })();
-                                                                    }
-                                                                })();
-                                                            }
-                                                        })();
-                                                    }
-                                                })();
+                                                return `<span class="text-xs text-gray-400">餘量：0g</span>`;
                                             }
                                         })()}
                                         <input type="number"
