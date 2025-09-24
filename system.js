@@ -17141,8 +17141,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
 
-      // 主訴
-      if (formSymptoms && !formSymptoms.value) {
+      // 主訴：若已有內容，則附加模板的主訴或症狀描述到現有內容
+      if (formSymptoms) {
         let value = '';
         if (template.chiefComplaint) {
           value = template.chiefComplaint;
@@ -17157,44 +17157,69 @@ document.addEventListener('DOMContentLoaded', function() {
             value = tmplContent;
           }
         }
-        formSymptoms.value = value;
+        // 若取得內容，附加或覆蓋
+        if (value) {
+          if (formSymptoms.value && formSymptoms.value.trim()) {
+            formSymptoms.value = formSymptoms.value.trim() + '\n' + value;
+          } else {
+            formSymptoms.value = value;
+          }
+        }
       }
 
-      // 現病史
-      if (formCurrentHistory && !formCurrentHistory.value) {
+      // 現病史：若已有內容，附加模板的現病史
+      if (formCurrentHistory) {
         let value = '';
         if (template.currentHistory) {
           value = template.currentHistory;
         } else {
           value = parseSection('現病史');
         }
-        if (value) formCurrentHistory.value = value;
+        if (value) {
+          if (formCurrentHistory.value && formCurrentHistory.value.trim()) {
+            formCurrentHistory.value = formCurrentHistory.value.trim() + '\n' + value;
+          } else {
+            formCurrentHistory.value = value;
+          }
+        }
       }
 
-      // 舌象
-      if (formTongue && !formTongue.value) {
+      // 舌象：若已有內容，附加模板的舌象
+      if (formTongue) {
         let value = '';
         if (template.tongue) {
           value = template.tongue;
         } else {
           value = parseSection('舌象');
         }
-        if (value) formTongue.value = value;
+        if (value) {
+          if (formTongue.value && formTongue.value.trim()) {
+            formTongue.value = formTongue.value.trim() + '\n' + value;
+          } else {
+            formTongue.value = value;
+          }
+        }
       }
 
-      // 脈象
-      if (formPulse && !formPulse.value) {
+      // 脈象：若已有內容，附加模板的脈象
+      if (formPulse) {
         let value = '';
         if (template.pulse) {
           value = template.pulse;
         } else {
           value = parseSection('脈象');
         }
-        if (value) formPulse.value = value;
+        if (value) {
+          if (formPulse.value && formPulse.value.trim()) {
+            formPulse.value = formPulse.value.trim() + '\n' + value;
+          } else {
+            formPulse.value = value;
+          }
+        }
       }
 
-      // 中醫診斷
-      if (formDiagnosis && !formDiagnosis.value) {
+      // 中醫診斷：若已有內容，附加模板的診斷
+      if (formDiagnosis) {
         let value = '';
         if (template.tcmDiagnosis) {
           value = template.tcmDiagnosis;
@@ -17205,18 +17230,30 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!value && template.name) {
           value = template.name;
         }
-        formDiagnosis.value = value;
+        if (value) {
+          if (formDiagnosis.value && formDiagnosis.value.trim()) {
+            formDiagnosis.value = formDiagnosis.value.trim() + '\n' + value;
+          } else {
+            formDiagnosis.value = value;
+          }
+        }
       }
 
-      // 證型診斷
-      if (formSyndrome && !formSyndrome.value) {
+      // 證型診斷：若已有內容，附加模板的證型診斷
+      if (formSyndrome) {
         let value = '';
         if (template.syndromeDiagnosis) {
           value = template.syndromeDiagnosis;
         } else {
           value = parseSection('證型診斷');
         }
-        if (value) formSyndrome.value = value;
+        if (value) {
+          if (formSyndrome.value && formSyndrome.value.trim()) {
+            formSyndrome.value = formSyndrome.value.trim() + '\n' + value;
+          } else {
+            formSyndrome.value = value;
+          }
+        }
       }
 
       hideDiagnosisTemplateModal();
