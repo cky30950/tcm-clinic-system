@@ -1805,7 +1805,12 @@ function hideInventoryModal() {
  */
 async function saveInventoryChanges() {
     // 取得當前觸發此操作的按鈕，顯示讀取圈以防重複提交
-    const saveBtn = getLoadingButtonFromEvent('button[onclick="saveInventoryChanges()"]');
+    // 優先透過指定 ID 取得按鈕，以確保能正確找到彈窗內的儲存按鈕
+    let saveBtn = document.getElementById('saveInventoryBtn');
+    if (!saveBtn) {
+        // 後備方案：若找不到指定 ID，就使用 getLoadingButtonFromEvent
+        saveBtn = getLoadingButtonFromEvent('button[onclick="saveInventoryChanges()"]');
+    }
     setButtonLoading(saveBtn);
     try {
         const qtyInput = document.getElementById('inventoryQuantity');
@@ -1826,7 +1831,8 @@ async function saveInventoryChanges() {
         if (typeof setHerbInventory === 'function') {
             await setHerbInventory(id, quantityBase, thresholdBase, qtyUnit);
         }
-        // 更新本地 herbLibrary 的預設庫存與單位（若存在）
+        // 更新本地 herbLibrary 的預設庫存與單位（若存在）。
+        // 這樣可以讓庫存修改後立即反映在庫存清單中，無需等待後端推播。
         try {
             if (Array.isArray(herbLibrary)) {
                 const idx = herbLibrary.findIndex(h => h && String(h.id) === String(id));
@@ -1836,6 +1842,17 @@ async function saveInventoryChanges() {
                     herbLibrary[idx].unit = qtyUnit;
                 }
             }
+        } catch (_e) {}
+        // 同步更新本地的 herbInventory，以便 getHerbInventory() 立即返回最新值。
+        try {
+            if (!herbInventory || typeof herbInventory !== 'object') {
+                herbInventory = {};
+            }
+            herbInventory[String(id)] = {
+                quantity: quantityBase,
+                threshold: thresholdBase,
+                unit: qtyUnit
+            };
         } catch (_e) {}
         // 提示成功訊息
         showToast('庫存已更新！', 'success');
