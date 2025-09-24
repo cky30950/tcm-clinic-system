@@ -1062,7 +1062,7 @@ window.translations = {
         "藥單醫囑": "Prescriptions",
         "到診證明": "Att. Certs",
         "病假證明": "Doctor's Note",
-        "修改病歷": "Edit records",
+        "修改病歷": "Edit",
         "已完成": "Done",
         "確認到達": "Confirm arrival",
         "開始診症": "Start consultation",
