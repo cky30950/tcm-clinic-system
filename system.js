@@ -10114,7 +10114,7 @@ async function initializeSystemAfterLogin() {
                 </div>
             `;
             return `
-                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 relative">
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
                         <div>
                             <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
@@ -10130,7 +10130,7 @@ async function initializeSystemAfterLogin() {
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
                     ${inventoryHtml}
-                    <div class="absolute bottom-2 right-2 text-xs text-gray-500">使用 ${herb.usageCount || 0} 次</div>
+                    <div class="mt-2 text-xs text-gray-500 text-right">使用 ${herb.usageCount || 0} 次</div>
                 </div>
             `;
         }
@@ -10170,7 +10170,7 @@ async function initializeSystemAfterLogin() {
                 </div>
             `;
             return `
-                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 relative">
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
                         <div>
                             <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
@@ -10190,7 +10190,7 @@ async function initializeSystemAfterLogin() {
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
                     ${inventoryHtml}
-                    <div class="absolute bottom-2 right-2 text-xs text-gray-500">使用 ${formula.usageCount || 0} 次</div>
+                    <div class="mt-2 text-xs text-gray-500 text-right">使用 ${formula.usageCount || 0} 次</div>
                 </div>
             `;
         }
