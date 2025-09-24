@@ -22,6 +22,9 @@ import {
   persistentLocalCache,
   // 新增多分頁快取管理器，允許多個分頁共用一個離線快取，避免 "Failed to obtain exclusive access" 錯誤
   persistentMultipleTabManager
+  ,
+  // 匯入批次寫入函式以支援批次操作
+  writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getDatabase, ref, set, get, update, remove, onValue, off,
         // 新增查詢相關方法，用於在 Realtime Database 上進行條件篩選
@@ -78,6 +81,8 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         updateDoc,
         deleteDoc,
         setDoc,
+        // 批次寫入函式
+        writeBatch,
         // 將 Firestore 查詢函式以 firestoreQuery 名稱暴露，避免與 Realtime Database 的 query 混淆
         firestoreQuery: query,
         where,

@@ -13959,23 +13959,13 @@ async function exportClinicBackup() {
         } catch (_fetchErr) {
             console.warn('匯出備份時取得用戶列表失敗，將不包含用戶資料');
         }
-        // 確保中藥庫與收費項目已載入
-        if (typeof initHerbLibrary === 'function') {
-            await initHerbLibrary();
-        }
-        if (typeof initBillingItems === 'function') {
-            await initBillingItems();
-        }
-        // 確保模板庫已載入以獲取最新模板資料
-        if (typeof initTemplateLibrary === 'function') {
-            try {
-                await initTemplateLibrary();
-            } catch (_e) {
-                // 若初始化失敗，略過並依據現有資料備份
+        // 只需確保收費項目已載入
+        // 如果 billingItems 已經是陣列，代表已經載入過，避免重複從 Firestore 讀取
+        if (typeof billingItems === 'undefined' || !Array.isArray(billingItems)) {
+            if (typeof initBillingItems === 'function') {
+                await initBillingItems();
             }
         }
-        const herbData = Array.isArray(herbLibrary) ? herbLibrary : [];
-        const billingData = Array.isArray(billingItems) ? billingItems : [];
         // 讀取所有套票資料
         let packageData = [];
         try {
@@ -13987,49 +13977,14 @@ async function exportClinicBackup() {
         } catch (e) {
             console.error('讀取套票資料失敗:', e);
         }
-        // 讀取醫囑模板資料
-        let prescriptionTemplatesData = [];
-        try {
-            const presSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'prescriptionTemplates'));
-            presSnap.forEach((docSnap) => {
-                prescriptionTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
-            });
-        } catch (e) {
-            console.error('讀取醫囑模板資料失敗:', e);
-        }
-        // 讀取診斷模板資料
-        let diagnosisTemplatesData = [];
-        try {
-            const diagSnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'diagnosisTemplates'));
-            diagSnap.forEach((docSnap) => {
-                diagnosisTemplatesData.push({ id: docSnap.id, ...docSnap.data() });
-            });
-        } catch (e) {
-            console.error('讀取診斷模板資料失敗:', e);
-        }
-        // 讀取問診資料
-        let inquiriesData = [];
-        try {
-            const inquirySnap = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'inquiries'));
-            inquirySnap.forEach((docSnap) => {
-                inquiriesData.push({ id: docSnap.id, ...docSnap.data() });
-            });
-        } catch (e) {
-            console.error('讀取問診資料失敗:', e);
-        }
-        // 組合備份資料
-        // Note: 中藥庫與模板庫資料不再納入備份檔案，僅保留其他核心資料
+        const billingData = Array.isArray(billingItems) ? billingItems : [];
+        // 組合備份資料：僅包含病人資料、診症記錄、用戶資料、套票資料與收費項目
         const backup = {
             patients: patientsData,
             consultations: consultationsData,
             users: usersData,
-            // herbLibrary: herbData, // 移除中藥庫資料備份
             billingItems: billingData,
-            patientPackages: packageData,
-            clinicSettings: clinicSettings,
-            // prescriptionTemplates: prescriptionTemplatesData, // 移除醫囑模板備份
-            // diagnosisTemplates: diagnosisTemplatesData, // 移除診斷模板備份
-            inquiries: inquiriesData
+            patientPackages: packageData
         };
         const json = JSON.stringify(backup, null, 2);
         const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
@@ -14078,16 +14033,17 @@ async function handleBackupFile(file) {
     }
     const button = document.getElementById('backupImportBtn');
     setButtonLoading(button);
-    // 顯示匯入進度條，由於不再涵蓋中藥庫及模板庫，總步驟數調整為 6
-    const totalStepsForBackupImport = 6;
+    // 顯示匯入進度條。只需還原病人資料、診症記錄、用戶資料、套票資料與收費項目
+    // 因此步驟數調整為 5
+    const totalStepsForBackupImport = 5;
     showBackupProgressBar(totalStepsForBackupImport);
     try {
         const text = await file.text();
         const data = JSON.parse(text);
-        // 傳入進度回調以更新匯入進度
+        // 傳入進度回調以更新匯入進度。進度步驟預設為 5
         await importClinicBackup(data, function(step, total) {
             updateBackupProgressBar(step, total);
-        });
+        }, totalStepsForBackupImport);
         showToast('備份資料匯入完成！', 'success');
         finishBackupProgressBar(true);
     } catch (error) {
@@ -14106,8 +14062,8 @@ async function handleBackupFile(file) {
  */
 async function importClinicBackup(data) {
     let progressCallback = null;
-    // 中藥庫與模板庫不再還原，總步驟數調整為 6
-    let totalSteps = 6;
+    // 僅還原病人資料、診症記錄、用戶資料、套票資料與收費項目，總步驟數為 5
+    let totalSteps = 5;
     // 若第二個參數為函式，視為進度回調；第三個參數為總步驟數（可選）
     if (arguments.length >= 2 && typeof arguments[1] === 'function') {
         progressCallback = arguments[1];
@@ -14117,35 +14073,77 @@ async function importClinicBackup(data) {
     }
     await ensureFirebaseReady();
     // helper：清空並覆寫集合資料
+    /**
+     * 將集合資料替換為指定項目，僅刪除不在 items 中的文件，並使用批次寫入以減少網路往返。
+     * @param {string} collectionName 集合名稱
+     * @param {Array} items 要寫入的新資料陣列，每個元素需包含 id 屬性
+     */
     async function replaceCollection(collectionName, items) {
         const colRef = window.firebase.collection(window.firebase.db, collectionName);
         try {
+            // 取得現有文件 ID
             const snap = await window.firebase.getDocs(colRef);
-            const deletions = [];
+            const existingIds = new Set();
             snap.forEach((docSnap) => {
-                deletions.push(window.firebase.deleteDoc(window.firebase.doc(window.firebase.db, collectionName, docSnap.id)));
+                existingIds.add(docSnap.id);
             });
-            if (deletions.length > 0) {
-                await Promise.all(deletions);
+            // 建立新資料 ID 集合
+            const newIds = new Set();
+            if (Array.isArray(items)) {
+                items.forEach(item => {
+                    if (item && item.id !== undefined && item.id !== null) {
+                        newIds.add(String(item.id));
+                    }
+                });
             }
-        } catch (err) {
-            console.error('刪除 ' + collectionName + ' 舊資料失敗:', err);
-        }
-        const writes = [];
-        if (Array.isArray(items)) {
-            items.forEach(item => {
-                if (item && item.id !== undefined && item.id !== null) {
-                    const idStr = String(item.id);
-                    writes.push(window.firebase.setDoc(window.firebase.doc(window.firebase.db, collectionName, idStr), item));
+            // 計算需要刪除的文件（現有但不在新的 ID 集合中）
+            const idsToDelete = [];
+            existingIds.forEach(id => {
+                if (!newIds.has(id)) {
+                    idsToDelete.push(id);
                 }
             });
-        }
-        if (writes.length > 0) {
-            await Promise.all(writes);
+            // 使用批次寫入刪除與寫入，單批次最多 500 個操作
+            let batch = window.firebase.writeBatch(window.firebase.db);
+            let opCount = 0;
+            const commitBatch = async () => {
+                if (opCount > 0) {
+                    await batch.commit();
+                    batch = window.firebase.writeBatch(window.firebase.db);
+                    opCount = 0;
+                }
+            };
+            // 先處理刪除
+            for (const id of idsToDelete) {
+                const docRef = window.firebase.doc(window.firebase.db, collectionName, id);
+                batch.delete(docRef);
+                opCount++;
+                if (opCount >= 500) {
+                    await commitBatch();
+                }
+            }
+            // 再處理寫入/更新
+            if (Array.isArray(items)) {
+                for (const item of items) {
+                    if (!item || item.id === undefined || item.id === null) continue;
+                    const idStr = String(item.id);
+                    const docRef = window.firebase.doc(window.firebase.db, collectionName, idStr);
+                    batch.set(docRef, item);
+                    opCount++;
+                    if (opCount >= 500) {
+                        await commitBatch();
+                    }
+                }
+            }
+            // 提交最後一批
+            await commitBatch();
+        } catch (err) {
+            console.error('更新 ' + collectionName + ' 資料時發生錯誤:', err);
         }
     }
     // 覆蓋各集合並更新進度
     let stepCount = 0;
+    // 覆蓋需要還原的集合，順序為：patients -> consultations -> users -> billingItems -> patientPackages
     await replaceCollection('patients', Array.isArray(data.patients) ? data.patients : []);
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
@@ -14158,8 +14156,6 @@ async function importClinicBackup(data) {
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
 
-    // 跳過 herbLibrary 匯入
-
     await replaceCollection('billingItems', Array.isArray(data.billingItems) ? data.billingItems : []);
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
@@ -14167,49 +14163,18 @@ async function importClinicBackup(data) {
     await replaceCollection('patientPackages', Array.isArray(data.patientPackages) ? data.patientPackages : []);
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
-
-    // 只覆蓋問診資料，不再覆蓋醫囑模板與診斷模板
-    await replaceCollection('inquiries', Array.isArray(data.inquiries) ? data.inquiries : []);
-    stepCount++;
-    if (progressCallback) progressCallback(stepCount, totalSteps);
-    // 更新診所設定
-    if (data.clinicSettings && typeof data.clinicSettings === 'object') {
-        clinicSettings = { ...data.clinicSettings };
-        localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
-        updateClinicSettingsDisplay();
-    }
-    // 清除本地快取
+    // 匯入完成後更新本地快取並刷新應用程序資料
     patientCache = null;
     consultationCache = null;
     userCache = null;
-    // 保持現有的中藥庫與模板庫資料，不從備份中還原
+    // 更新全域變數 billingItems 以同步到畫面
     billingItems = Array.isArray(data.billingItems) ? data.billingItems : [];
-    // 重新載入資料
+    // 重新載入必要資料（僅更新被備份的幾個範疇），避免不必要的 Firestore 讀取
     await fetchPatients(true);
     await fetchConsultations(true);
     await fetchUsers(true);
-    if (typeof initHerbLibrary === 'function') {
-        await initHerbLibrary();
-    }
     if (typeof initBillingItems === 'function') {
         await initBillingItems();
-    }
-    // 重新載入模板庫資料顯示
-    if (typeof renderPrescriptionTemplates === 'function') {
-        try {
-            renderPrescriptionTemplates();
-        } catch (_e) {}
-    }
-    if (typeof renderDiagnosisTemplates === 'function') {
-        try {
-            renderDiagnosisTemplates();
-        } catch (_e) {}
-    }
-    // 更新模板分類篩選
-    if (typeof refreshTemplateCategoryFilters === 'function') {
-        try {
-            refreshTemplateCategoryFilters();
-        } catch (_e) {}
     }
     // 更新界面
     if (typeof loadPatientList === 'function') {
