@@ -1730,6 +1730,18 @@ async function updateInventoryAfterConsultation(consultationId, items, days, fre
             const newQty = (inv.quantity || 0) + consumption;
             // 使用原單位還原庫存
             await setHerbInventory(key, newQty, inv.threshold, inv.unit);
+            // 即時更新本地快取，避免 UI 延遲更新
+            try {
+                if (typeof herbInventory !== 'undefined') {
+                    herbInventory[String(key)] = {
+                        quantity: newQty,
+                        threshold: inv.threshold,
+                        unit: inv.unit
+                    };
+                }
+            } catch (_e) {
+                /* 忽略本地更新錯誤 */
+            }
         }
     }
     const log = {};
@@ -1742,10 +1754,30 @@ async function updateInventoryAfterConsultation(consultationId, items, days, fre
         const inv = getHerbInventory(item.id);
         const newQty = (inv.quantity || 0) - consumption;
         await setHerbInventory(item.id, newQty, inv.threshold, inv.unit);
+        // 即時更新本地快取
+        try {
+            if (typeof herbInventory !== 'undefined') {
+                herbInventory[String(item.id)] = {
+                    quantity: newQty,
+                    threshold: inv.threshold,
+                    unit: inv.unit
+                };
+            }
+        } catch (_e) {
+            /* 忽略本地更新錯誤 */
+        }
         log[String(item.id)] = consumption;
     }
     // 將新的消耗量記錄到 inventoryLogs
     await window.firebase.set(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationId)), log);
+    // 保存後立即更新處方顯示，以便呈現最新庫存
+    try {
+        if (typeof updatePrescriptionDisplay === 'function') {
+            updatePrescriptionDisplay();
+        }
+    } catch (_e) {
+        /* 忽略 UI 更新錯誤 */
+    }
 }
 
 // 用於追蹤正在編輯庫存的項目 ID
@@ -10217,15 +10249,32 @@ async function initializeSystemAfterLogin() {
                 const val = thr / factor;
                 return parseFloat(val.toFixed(3)).toString();
             })();
-            const unitLabel = UNIT_LABEL_MAP[unit] || '克';
+            // Translate unit label and inventory/alert labels based on current language
+            const rawUnitLabel = UNIT_FACTOR_MAP && UNIT_LABEL_MAP ? UNIT_LABEL_MAP[unit] || '克' : '克';
+            const unitLabelTranslated = (typeof window.t === 'function') ? window.t(rawUnitLabel) : rawUnitLabel;
+            const inventoryLabel = (typeof window.t === 'function') ? window.t('庫存：') : '庫存：';
+            const alertLabel = (typeof window.t === 'function') ? window.t('警戒：') : '警戒：';
             const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
             const inventoryHtml = `
                 <div class="mt-2 flex flex-col sm:flex-row items-center text-xs gap-x-3 gap-y-1">
-                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qtyDisplay}${unitLabel}</span></div>
-                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thrDisplay}${unitLabel}</span></div>
+                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">${inventoryLabel}</span><span class="${stockColor}"> ${qtyDisplay}${unitLabelTranslated}</span></div>
+                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">${alertLabel}</span><span class="text-gray-600"> ${thrDisplay}${unitLabelTranslated}</span></div>
                     <button onclick="openInventoryModal('${herb.id}')" class="mt-2 sm:mt-0 sm:ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
                 </div>
             `;
+            // Build usage display based on language
+            const usageCount = herb.usageCount || 0;
+            const usageText = (() => {
+                try {
+                    const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                    if (langSel && langSel.toLowerCase().startsWith('en')) {
+                        return `Used ${usageCount} times`;
+                    }
+                } catch (_e) {
+                    // ignore errors reading localStorage
+                }
+                return `使用 ${usageCount} 次`;
+            })();
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
@@ -10243,7 +10292,7 @@ async function initializeSystemAfterLogin() {
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
                     ${inventoryHtml}
-                    <div class="mt-2 text-xs text-gray-500 text-right">使用 ${herb.usageCount || 0} 次</div>
+                    <div class="mt-2 text-xs text-gray-500 text-right">${usageText}</div>
                 </div>
             `;
         }
@@ -10273,15 +10322,31 @@ async function initializeSystemAfterLogin() {
                 const val = thr / factor;
                 return parseFloat(val.toFixed(3)).toString();
             })();
-            const unitLabel = UNIT_LABEL_MAP[unit] || '克';
+            const rawUnitLabel = UNIT_LABEL_MAP[unit] || '克';
+            const unitLabelTranslated = (typeof window.t === 'function') ? window.t(rawUnitLabel) : rawUnitLabel;
+            const inventoryLabel = (typeof window.t === 'function') ? window.t('庫存：') : '庫存：';
+            const alertLabel = (typeof window.t === 'function') ? window.t('警戒：') : '警戒：';
             const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
             const inventoryHtml = `
                 <div class="mt-2 flex flex-col sm:flex-row items-center text-xs gap-x-3 gap-y-1">
-                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qtyDisplay}${unitLabel}</span></div>
-                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thrDisplay}${unitLabel}</span></div>
+                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">${inventoryLabel}</span><span class="${stockColor}"> ${qtyDisplay}${unitLabelTranslated}</span></div>
+                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">${alertLabel}</span><span class="text-gray-600"> ${thrDisplay}${unitLabelTranslated}</span></div>
                     <button onclick="openInventoryModal('${formula.id}')" class="mt-2 sm:mt-0 sm:ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
                 </div>
             `;
+            // Build usage display based on language
+            const usageCountF = formula.usageCount || 0;
+            const usageTextF = (() => {
+                try {
+                    const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                    if (langSel && langSel.toLowerCase().startsWith('en')) {
+                        return `Used ${usageCountF} times`;
+                    }
+                } catch (_e) {
+                    /* ignore */
+                }
+                return `使用 ${usageCountF} 次`;
+            })();
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
@@ -10303,7 +10368,7 @@ async function initializeSystemAfterLogin() {
                         ${safeCautions ? `<div><span class="font-medium text-red-600">注意：</span><span class="text-red-700">${safeCautions}</span></div>` : ''}
                     </div>
                     ${inventoryHtml}
-                    <div class="mt-2 text-xs text-gray-500 text-right">使用 ${formula.usageCount || 0} 次</div>
+                    <div class="mt-2 text-xs text-gray-500 text-right">${usageTextF}</div>
                 </div>
             `;
         }
@@ -11158,7 +11223,9 @@ async function initializeSystemAfterLogin() {
                     const val = qty / factor;
                     return parseFloat(val.toFixed(3)).toString();
                 })();
-                const unitLabel = UNIT_LABEL_MAP[unit] || '克';
+                const rawUnitLabel = UNIT_LABEL_MAP[unit] || '克';
+                const unitTranslated = (typeof window.t === 'function') ? window.t(rawUnitLabel) : rawUnitLabel;
+                const remainLabel = (typeof window.t === 'function') ? window.t('餘量：') : '餘量：';
                 const stockClass = qty <= thr ? 'text-red-600' : 'text-gray-600';
                 return `
                     <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" data-tooltip="${encoded}"
@@ -11169,7 +11236,7 @@ async function initializeSystemAfterLogin() {
                             <div class="font-semibold text-gray-900 text-sm mb-1">${window.escapeHtml(item.name)}</div>
                             <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${typeName}</div>
                             ${item.effects ? `<div class="text-xs text-gray-600 mt-1">${window.escapeHtml(item.effects.substring(0, 30))}${item.effects.length > 30 ? '...' : ''}</div>` : ''}
-                            <div class="text-xs mt-1 ${stockClass}">餘量：${qtyDisplay}${unitLabel}</div>
+                            <div class="text-xs mt-1 ${stockClass}">${remainLabel} ${qtyDisplay}${unitTranslated}</div>
                         </div>
                     </div>
                 `;
@@ -11308,10 +11375,14 @@ async function initializeSystemAfterLogin() {
                                                     const val = qty / factor;
                                                     return parseFloat(val.toFixed(3)).toString();
                                                 })();
-                                                const unitLabel = UNIT_LABEL_MAP[unit] || '克';
-                                                return `<span class="text-xs text-gray-400">餘量：${qtyDisplay}${unitLabel}</span>`;
+                                                const rawUnitLabel = UNIT_LABEL_MAP[unit] || '克';
+                                                const unitTranslated = (typeof window.t === 'function') ? window.t(rawUnitLabel) : rawUnitLabel;
+                                                const remainLabel = (typeof window.t === 'function') ? window.t('餘量：') : '餘量：';
+                                                return `<span class="text-xs text-gray-400">${remainLabel} ${qtyDisplay}${unitTranslated}</span>`;
                                             } catch (_e) {
-                                                return `<span class="text-xs text-gray-400">餘量：0g</span>`;
+                                                const remainLabel = (typeof window.t === 'function') ? window.t('餘量：') : '餘量：';
+                                                const defaultUnit = (typeof window.t === 'function') ? window.t('克') : '克';
+                                                return `<span class="text-xs text-gray-400">${remainLabel} 0${defaultUnit}</span>`;
                                             }
                                         })()}
                                         <input type="number"
