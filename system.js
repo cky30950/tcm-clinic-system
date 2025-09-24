@@ -10107,10 +10107,10 @@ async function initializeSystemAfterLogin() {
             const unitLabel = UNIT_LABEL_MAP[unit] || '克';
             const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
             const inventoryHtml = `
-                <div class="mt-2 flex items-center text-xs space-x-3">
-                    <div><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qtyDisplay}${unitLabel}</span></div>
-                    <div><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thrDisplay}${unitLabel}</span></div>
-                    <button onclick="openInventoryModal('${herb.id}')" class="ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
+                <div class="mt-2 flex flex-col sm:flex-row items-center text-xs gap-x-3 gap-y-1">
+                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qtyDisplay}${unitLabel}</span></div>
+                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thrDisplay}${unitLabel}</span></div>
+                    <button onclick="openInventoryModal('${herb.id}')" class="mt-2 sm:mt-0 sm:ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
                 </div>
             `;
             return `
@@ -10163,10 +10163,10 @@ async function initializeSystemAfterLogin() {
             const unitLabel = UNIT_LABEL_MAP[unit] || '克';
             const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
             const inventoryHtml = `
-                <div class="mt-2 flex items-center text-xs space-x-3">
-                    <div><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qtyDisplay}${unitLabel}</span></div>
-                    <div><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thrDisplay}${unitLabel}</span></div>
-                    <button onclick="openInventoryModal('${formula.id}')" class="ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
+                <div class="mt-2 flex flex-col sm:flex-row items-center text-xs gap-x-3 gap-y-1">
+                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">庫存：</span><span class="${stockColor}">${qtyDisplay}${unitLabel}</span></div>
+                    <div class="whitespace-nowrap"><span class="font-medium text-gray-700">警戒：</span><span class="text-gray-600">${thrDisplay}${unitLabel}</span></div>
+                    <button onclick="openInventoryModal('${formula.id}')" class="mt-2 sm:mt-0 sm:ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>
                 </div>
             `;
             return `
