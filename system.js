@@ -14313,7 +14313,18 @@ async function importClinicBackup(data) {
                     if (!item || item.id === undefined || item.id === null) continue;
                     const idStr = String(item.id);
                     const docRef = window.firebase.doc(window.firebase.db, collectionName, idStr);
-                    batch.set(docRef, item);
+                    // 為避免文件內容包含 id 欄位，導致從 Firestore 讀取時覆寫 doc.id，
+                    // 僅針對某些集合（patients、consultations、users）移除 id 欄位再寫入。
+                    let dataToWrite = item;
+                    if (collectionName === 'patients' || collectionName === 'consultations' || collectionName === 'users') {
+                        try {
+                            const { id, ...rest } = item;
+                            dataToWrite = { ...rest };
+                        } catch (_omitErr) {
+                            dataToWrite = item;
+                        }
+                    }
+                    batch.set(docRef, dataToWrite);
                     opCount++;
                     if (opCount >= 500) {
                         await commitBatch();
