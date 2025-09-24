@@ -14133,10 +14133,11 @@ async function exportClinicBackup() {
         ]);
         const patientsData = patientsRes && patientsRes.success && Array.isArray(patientsRes.data) ? patientsRes.data : [];
         const consultationsData = consultationsRes && consultationsRes.success && Array.isArray(consultationsRes.data) ? consultationsRes.data : [];
-        // 使用 fetchUsers(true) 以取得最新用戶列表（並利用快取降低讀取次數）
+        // 取得用戶列表；使用預設參數以利用快取，避免強制刷新造成額外讀取量
         let usersData = [];
         try {
-            const fetchedUsers = await fetchUsers(true);
+            // 不傳遞 true 以便 fetchUsers 使用快取資料（若已載入）
+            const fetchedUsers = await fetchUsers();
             if (Array.isArray(fetchedUsers)) {
                 usersData = fetchedUsers;
             }
@@ -14347,34 +14348,125 @@ async function importClinicBackup(data) {
     await replaceCollection('patientPackages', Array.isArray(data.patientPackages) ? data.patientPackages : []);
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
-    // 匯入完成後更新本地快取並刷新應用程序資料
-    patientCache = null;
-    consultationCache = null;
-    userCache = null;
-    // 更新全域變數 billingItems 以同步到畫面
-    billingItems = Array.isArray(data.billingItems) ? data.billingItems : [];
-    // 同步收費項目至本地存儲，減少下一次載入時的讀取量
+    /*
+     * 匯入完成後更新本地快取並刷新應用程式資料。
+     * 為了節省 Firebase 讀取量，我們直接將備份資料寫入快取與全域變數，
+     * 並預先產生分頁快取與總數，讓後續 API 調用可使用快取而非再向 Firestore 讀取。
+     */
     try {
-        localStorage.setItem('billingItems', JSON.stringify(billingItems));
-    } catch (_lsErr) {
-        // 忽略 localStorage 錯誤
+        // 將患者、診症及用戶資料寫入本地快取
+        patientCache = Array.isArray(data.patients) ? data.patients : [];
+        // 將病人資料依 createdAt 由新至舊排序，以模擬 Firestore 預設排序
+        if (Array.isArray(patientCache) && patientCache.length > 1) {
+            patientCache.sort((a, b) => {
+                let dateA = 0;
+                let dateB = 0;
+                if (a && a.createdAt) {
+                    if (a.createdAt.seconds !== undefined) {
+                        dateA = a.createdAt.seconds * 1000;
+                    } else {
+                        const d = new Date(a.createdAt);
+                        dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                    }
+                }
+                if (b && b.createdAt) {
+                    if (b.createdAt.seconds !== undefined) {
+                        dateB = b.createdAt.seconds * 1000;
+                    } else {
+                        const d = new Date(b.createdAt);
+                        dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                    }
+                }
+                return dateB - dateA;
+            });
+        }
+        consultationCache = Array.isArray(data.consultations) ? data.consultations : [];
+        userCache = Array.isArray(data.users) ? data.users : [];
+        // 將資料同步至全域變數（部分功能直接引用）
+        consultations = Array.isArray(consultationCache) ? consultationCache.slice() : [];
+        // 同步 userCache 到全域 users 變數（去除 personalSettings 以減少冗餘）
+        if (Array.isArray(userCache)) {
+            users = userCache.map(u => {
+                try {
+                    const { personalSettings, ...rest } = u || {};
+                    return { ...rest };
+                } catch (_e) {
+                    return { ...(u || {}) };
+                }
+            });
+        } else {
+            users = [];
+        }
+        // 更新收費項目及其載入狀態
+        billingItems = Array.isArray(data.billingItems) ? data.billingItems : [];
+        billingItemsLoaded = true;
+        try {
+            localStorage.setItem('billingItems', JSON.stringify(billingItems));
+        } catch (_lsErr) {
+            // 忽略 localStorage 錯誤
+        }
+        // 更新病人總數快取
+        patientsCountCache = Array.isArray(patientCache) ? patientCache.length : 0;
+        // 重新產生病人分頁快取，使 fetchPatientsPage() 可以直接從快取取得資料
+        patientPagesCache = {};
+        patientPageCursors = {};
+        // 取得每頁顯示數量
+        const perPage = (paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage)
+            ? paginationSettings.patientList.itemsPerPage
+            : 10;
+        if (Array.isArray(patientCache)) {
+            // 先依 createdAt 由新至舊排序，模擬 Firestore 預設排序
+            const sortedPatients = patientCache.slice().sort((a, b) => {
+                let dateA = 0;
+                let dateB = 0;
+                if (a && a.createdAt) {
+                    if (a.createdAt.seconds !== undefined) {
+                        dateA = a.createdAt.seconds * 1000;
+                    } else {
+                        const d = new Date(a.createdAt);
+                        dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                    }
+                }
+                if (b && b.createdAt) {
+                    if (b.createdAt.seconds !== undefined) {
+                        dateB = b.createdAt.seconds * 1000;
+                    } else {
+                        const d = new Date(b.createdAt);
+                        dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                    }
+                }
+                return dateB - dateA;
+            });
+            // 依每頁大小切分分頁快取
+            for (let i = 0; i < sortedPatients.length; i += perPage) {
+                const pageNum = Math.floor(i / perPage) + 1;
+                patientPagesCache[pageNum] = sortedPatients.slice(i, i + perPage);
+            }
+            // 若未產生任何頁面快取（例如無資料），確保至少有第一頁空陣列，避免 fetchPatientsPage 讀取 Firestore
+            if (!patientPagesCache[1]) {
+                patientPagesCache[1] = [];
+            }
+        }
+        // 重新計算中藥庫使用次數（若有相關函式）
+        if (typeof computeGlobalUsageCounts === 'function') {
+            try { await computeGlobalUsageCounts(); } catch (_e) {}
+        }
+    } catch (_assignErr) {
+        console.error('匯入備份後更新本地快取失敗:', _assignErr);
     }
-    // 重新載入必要資料（僅更新被備份的幾個範疇），避免不必要的 Firestore 讀取
-    await fetchPatients(true);
-    await fetchConsultations(true);
-    await fetchUsers(true);
-    if (typeof initBillingItems === 'function') {
-        await initBillingItems();
-    }
-    // 更新界面
-    if (typeof loadPatientList === 'function') {
-        loadPatientList();
-    }
-    if (typeof loadTodayAppointments === 'function') {
-        await loadTodayAppointments();
-    }
-    if (typeof updateStatistics === 'function') {
-        updateStatistics();
+    // 更新界面（使用快取資料）
+    try {
+        if (typeof loadPatientList === 'function') {
+            loadPatientList();
+        }
+        if (typeof loadTodayAppointments === 'function') {
+            await loadTodayAppointments();
+        }
+        if (typeof updateStatistics === 'function') {
+            updateStatistics();
+        }
+    } catch (_uiErr) {
+        console.error('匯入備份後重新渲染介面時發生錯誤:', _uiErr);
     }
     // 若最後仍未達到總步驟數，進行最後一次更新以顯示 100%
     if (progressCallback && stepCount < totalSteps) {
