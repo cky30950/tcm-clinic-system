@@ -1583,8 +1583,10 @@ let herbInventoryListenerAttached = false;
  * @param {boolean} forceRefresh
  */
 async function initHerbInventory(forceRefresh = false) {
-    // 如果不是強制刷新且已初始化過，直接返回
-    if (herbInventoryInitialized && !forceRefresh) {
+    // 如果不是強制刷新且已初始化過，且監聽器仍然存在，直接返回。
+    // 若已初始化但監聽器已被取消（herbInventoryListenerAttached 為 false），
+    // 仍需重新掛載監聽以恢復即時更新。因此不應過早返回。
+    if (herbInventoryInitialized && herbInventoryListenerAttached && !forceRefresh) {
         return;
     }
     // 等待 Firebase 初始化完成
