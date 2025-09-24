@@ -14355,7 +14355,16 @@ async function importClinicBackup(data) {
      */
     try {
         // 將患者、診症及用戶資料寫入本地快取
-        patientCache = Array.isArray(data.patients) ? data.patients : [];
+        patientCache = Array.isArray(data.patients)
+            ? data.patients.map(p => {
+                // 確保 ID 為字串，避免數字與字串比較不相等而導致找不到病人
+                const cloned = { ...(p || {}) };
+                if (cloned.id !== undefined && cloned.id !== null) {
+                    cloned.id = String(cloned.id);
+                }
+                return cloned;
+            })
+            : [];
         // 將病人資料依 createdAt 由新至舊排序，以模擬 Firestore 預設排序
         if (Array.isArray(patientCache) && patientCache.length > 1) {
             patientCache.sort((a, b) => {
@@ -14380,8 +14389,27 @@ async function importClinicBackup(data) {
                 return dateB - dateA;
             });
         }
-        consultationCache = Array.isArray(data.consultations) ? data.consultations : [];
-        userCache = Array.isArray(data.users) ? data.users : [];
+        consultationCache = Array.isArray(data.consultations)
+            ? data.consultations.map(c => {
+                const clone = { ...(c || {}) };
+                if (clone.id !== undefined && clone.id !== null) {
+                    clone.id = String(clone.id);
+                }
+                if (clone.patientId !== undefined && clone.patientId !== null) {
+                    clone.patientId = String(clone.patientId);
+                }
+                return clone;
+            })
+            : [];
+        userCache = Array.isArray(data.users)
+            ? data.users.map(u => {
+                const clone = { ...(u || {}) };
+                if (clone.id !== undefined && clone.id !== null) {
+                    clone.id = String(clone.id);
+                }
+                return clone;
+            })
+            : [];
         // 將資料同步至全域變數（部分功能直接引用）
         consultations = Array.isArray(consultationCache) ? consultationCache.slice() : [];
         // 同步 userCache 到全域 users 變數（去除 personalSettings 以減少冗餘）
@@ -14396,6 +14424,14 @@ async function importClinicBackup(data) {
             });
         } else {
             users = [];
+        }
+        // 將病人資料同步至全域 patients 變數，以便不依賴 fetchPatients() 也能直接存取
+        patients = Array.isArray(patientCache) ? patientCache.slice() : [];
+        // 儲存到本地存儲以便離線使用或初始載入
+        try {
+            localStorage.setItem('patients', JSON.stringify(patients));
+        } catch (_lsErr) {
+            // 忽略 localStorage 錯誤
         }
         // 更新收費項目及其載入狀態
         billingItems = Array.isArray(data.billingItems) ? data.billingItems : [];
