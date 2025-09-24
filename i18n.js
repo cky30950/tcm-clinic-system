@@ -14,6 +14,8 @@ window.translations = {
         // Chinese translations simply map original text to itself.  This
         // dictionary only needs entries for strings that have English
         // translations below – everything else will remain unchanged.
+        "庫存：": "庫存：",
+        "警戒：": "警戒：",
         "您可以匯出診所資料備份（包含所有功能資料，不含模板庫、中藥庫及穴位庫），或匯入之前的備份檔案。實時掛號及問診資料不包含在備份中。": "您可以匯出診所資料備份（包含所有功能資料，不含模板庫、中藥庫及穴位庫），或匯入之前的備份檔案。實時掛號及問診資料不包含在備份中。",
         "搜尋穴位名稱、定位、功能或經絡...": "搜尋穴位名稱、定位、功能或經絡...",
         "暫無診症記錄": "暫無診症記錄",
@@ -577,6 +579,8 @@ window.translations = {
         "使用最少": "使用最少",
     },
     en: {
+        "庫存：": "Inventory :",
+        "警戒：": "Alert :",
         "您可以匯出診所資料備份（包含所有功能資料，不含模板庫、中藥庫及穴位庫），或匯入之前的備份檔案。實時掛號及問診資料不包含在備份中。": "You can export a backup of your clinic data (including all functional data, excluding the template library, Chinese medicine library, and acupoint library), or import a previous backup file. Real-time registration and consultation data are not included in the backup.",
         "找不到對應的診症記錄！": "Matching consultation record not found!",
         "請輸入方劑組成！": "Please enter the formula composition!",
