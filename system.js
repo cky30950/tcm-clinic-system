@@ -1590,6 +1590,12 @@ async function initHerbInventory(forceRefresh = false) {
     // 等待 Firebase 初始化完成
     await waitForFirebaseDb();
     const inventoryRef = window.firebase.ref(window.firebase.rtdb, 'herbInventory');
+    // 存儲全域參考以便離開頁面時可取消監聽，減少不必要的 Realtime Database 流量
+    try {
+        window.herbInventoryRef = inventoryRef;
+    } catch (_e) {
+        // 若無法設置全域，忽略
+    }
     // 若為強制刷新且監聽已經掛載，先取消舊的監聽以避免多重回呼
     if (forceRefresh && herbInventoryListenerAttached) {
         try {
@@ -1920,6 +1926,22 @@ async function saveInventoryChanges() {
             if (billingItemsLoaded && !forceRefresh) {
                 return;
             }
+            // 優先嘗試從 localStorage 載入收費項目
+            if (!forceRefresh) {
+                try {
+                    const stored = localStorage.getItem('billingItems');
+                    if (stored) {
+                        const localData = JSON.parse(stored);
+                        if (Array.isArray(localData)) {
+                            billingItems = localData;
+                            billingItemsLoaded = true;
+                            return;
+                        }
+                    }
+                } catch (lsErr) {
+                    console.warn('載入本地收費項目失敗:', lsErr);
+                }
+            }
             // 等待 Firebase 及其資料庫初始化
             await waitForFirebaseDb();
             try {
@@ -1938,6 +1960,12 @@ async function saveInventoryChanges() {
                     billingItems = itemsFromFirestore;
                 }
                 billingItemsLoaded = true;
+                // 將資料寫入 localStorage
+                try {
+                    localStorage.setItem('billingItems', JSON.stringify(billingItems));
+                } catch (lsErr) {
+                    console.warn('保存收費項目到本地失敗:', lsErr);
+                }
             } catch (error) {
                 console.error('讀取/初始化收費項目資料失敗:', error);
             }
@@ -2750,6 +2778,35 @@ async function logout() {
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
             ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
+                // 在隱藏中藥庫時，取消其資料監聽以減少 Realtime Database 讀取
+                if (id === 'herbLibrary') {
+                    try {
+                        if (typeof herbInventoryListenerAttached !== 'undefined' && herbInventoryListenerAttached) {
+                            // 使用先前存儲的參考取消監聽
+                            if (window.herbInventoryRef) {
+                                window.firebase.off(window.herbInventoryRef, 'value');
+                            } else {
+                                // 備援作法：重新取得參考並取消
+                                const tempRef = window.firebase.ref(window.firebase.rtdb, 'herbInventory');
+                                window.firebase.off(tempRef, 'value');
+                            }
+                            herbInventoryListenerAttached = false;
+                        }
+                    } catch (err) {
+                        console.error('離開中藥庫時取消監聽失敗:', err);
+                    }
+                }
+                // 在隱藏掛號系統時，取消掛號的 Realtime Database 監聽，減少讀取
+                if (id === 'consultationSystem') {
+                    try {
+                        if (window.appointmentsListenerAttached && window.appointmentsQuery && window.appointmentsListener) {
+                            window.firebase.off(window.appointmentsQuery, 'value', window.appointmentsListener);
+                            window.appointmentsListenerAttached = false;
+                        }
+                    } catch (err) {
+                        console.error('離開掛號系統時取消掛號監聽失敗:', err);
+                    }
+                }
                 const el = document.getElementById(id);
                 if (el) el.classList.add('hidden');
             });
@@ -3349,6 +3406,13 @@ async function deletePatientAssociatedData(patientId) {
             if (patientPackagesCache && patientPackagesCache[patientId]) {
                 delete patientPackagesCache[patientId];
             }
+            // 移除本地儲存的套票快取
+            try {
+                const localKey = `patientPackages_${patientId}`;
+                localStorage.removeItem(localKey);
+            } catch (e) {
+                console.warn('刪除本地患者套票快取失敗:', e);
+            }
         } catch (err) {
             console.error('查詢或刪除患者套票失敗:', err);
         }
@@ -3878,6 +3942,14 @@ async function loadInquiryOptions(patient) {
                     console.error('切換掛號系統時清除過期掛號錯誤:', err);
                 })
                 .finally(() => {
+                    // 每次進入掛號系統時啟動掛號監聽，只在此頁面開始監聽即時掛號變化
+                    try {
+                        if (typeof subscribeToAppointments === 'function') {
+                            subscribeToAppointments();
+                        }
+                    } catch (_err) {
+                        console.error('啟動掛號監聽時失敗:', _err);
+                    }
                     // 初始化掛號日期選擇器
                     try {
                         setupAppointmentDatePicker();
@@ -3915,9 +3987,14 @@ async function loadInquiryOptions(patient) {
                 if (!picker.dataset.bound) {
                     picker.addEventListener('change', function () {
                         try {
+                            // 重新啟動掛號實時監聽以監聽新的日期範圍
+                            if (typeof subscribeToAppointments === 'function') {
+                                subscribeToAppointments();
+                            }
+                            // 更新今日掛號列表
                             loadTodayAppointments();
                         } catch (_err) {
-                            console.error('更新掛號列表失敗：', _err);
+                            console.error('更新掛號列表或重新啟動監聽失敗：', _err);
                         }
                     });
                     picker.dataset.bound = 'true';
@@ -4619,8 +4696,14 @@ function subscribeToAppointments() {
         // 更新統計資訊
         updateStatistics();
     };
+    // 預先定義掛號監聽器狀態，用於動態掛載/取消監聽
+    if (typeof window.appointmentsListenerAttached === 'undefined') {
+        window.appointmentsListenerAttached = false;
+    }
     // 設置監聽器
     window.firebase.onValue(appointmentsQuery, window.appointmentsListener);
+    // 標記掛號監聽器已掛載，用於後續動態取消/重新掛載
+    window.appointmentsListenerAttached = true;
     // 在頁面卸載時自動取消監聽，以避免離開頁面後仍持續監聽造成資源浪費
     window.addEventListener('beforeunload', () => {
         if (window.appointmentsListener && window.appointmentsQuery) {
@@ -4631,6 +4714,30 @@ function subscribeToAppointments() {
             }
         }
     });
+
+    /**
+     * 確保掛號監聽器在需要時掛載。
+     * 若監聽器尚未掛載，且已存在查詢及回調，則重新掛載以獲取即時掛號更新。
+     * 這個函式可在進入掛號相關頁面時調用，以減少不必要的持續監聽。
+     */
+    function ensureAppointmentsListener() {
+        try {
+            if (window.appointmentsListenerAttached) return;
+            if (window.appointmentsQuery && window.appointmentsListener) {
+                window.firebase.onValue(window.appointmentsQuery, window.appointmentsListener);
+                window.appointmentsListenerAttached = true;
+            }
+        } catch (err) {
+            console.error('重新掛載掛號監聽器失敗:', err);
+        }
+    }
+
+    // 將函式暴露到全域，以便在其他地方（例如載入掛號頁面時）調用
+    try {
+        window.ensureAppointmentsListener = ensureAppointmentsListener;
+    } catch (_e) {
+        // 若無法設定全域函式則略過
+    }
 }
 
 
@@ -9768,8 +9875,7 @@ async function initializeSystemAfterLogin() {
         consultations = [];
     }
     // 不在此處更新統計或讀取掛號/病人資料。實時掛號監聽將在後續處理。
-    // 啟動實時掛號監聽，無需手動更新今日掛號列表
-    subscribeToAppointments();
+    // 不在此處啟動掛號實時監聽。改為在進入掛號系統頁面時才啟動監聽，避免在其他頁面也持續讀取掛號資料。
 }
 
 
@@ -14174,6 +14280,12 @@ async function importClinicBackup(data) {
     userCache = null;
     // 更新全域變數 billingItems 以同步到畫面
     billingItems = Array.isArray(data.billingItems) ? data.billingItems : [];
+    // 同步收費項目至本地存儲，減少下一次載入時的讀取量
+    try {
+        localStorage.setItem('billingItems', JSON.stringify(billingItems));
+    } catch (_lsErr) {
+        // 忽略 localStorage 錯誤
+    }
     // 重新載入必要資料（僅更新被備份的幾個範疇），避免不必要的 Firestore 讀取
     await fetchPatients(true);
     await fetchConsultations(true);
@@ -14632,7 +14744,24 @@ async function getPatientPackages(patientId, forceRefresh = false) {
         console.warn('FirebaseDataManager 尚未就緒，無法取得患者套票');
         return [];
     }
-    // 如果有快取且不需要強制刷新，直接回傳快取內容
+    // 如果有本地緩存且不需要強制刷新，優先從 localStorage 讀取
+    if (!forceRefresh) {
+        try {
+            const localKey = `patientPackages_${patientId}`;
+            const stored = localStorage.getItem(localKey);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) {
+                    // 更新內存快取並直接回傳
+                    patientPackagesCache[patientId] = parsed;
+                    return parsed;
+                }
+            }
+        } catch (e) {
+            console.warn('從本地讀取患者套票快取失敗:', e);
+        }
+    }
+    // 如果有內部快取且不需要強制刷新，直接回傳內部快取內容
     if (!forceRefresh && patientPackagesCache && Array.isArray(patientPackagesCache[patientId])) {
         return patientPackagesCache[patientId];
     }
@@ -14642,6 +14771,12 @@ async function getPatientPackages(patientId, forceRefresh = false) {
         // 將結果存入快取供下次使用
         if (packages) {
             patientPackagesCache[patientId] = packages;
+            try {
+                const localKey = `patientPackages_${patientId}`;
+                localStorage.setItem(localKey, JSON.stringify(packages));
+            } catch (e) {
+                console.warn('儲存患者套票至本地失敗:', e);
+            }
         }
         return packages;
     } catch (error) {
@@ -14678,6 +14813,14 @@ async function purchasePackage(patientId, item) {
             } else {
                 // 建立新的快取陣列
                 patientPackagesCache[patientId] = [newPkg];
+            }
+            // 同步到 localStorage
+            try {
+                const localKey = `patientPackages_${patientId}`;
+                const cached = patientPackagesCache[patientId];
+                localStorage.setItem(localKey, JSON.stringify(cached));
+            } catch (e) {
+                console.warn('儲存患者套票至本地失敗:', e);
             }
             return newPkg;
         }
@@ -14718,6 +14861,13 @@ async function consumePackage(patientId, packageRecordId) {
                     }
                     return p;
                 });
+                // 更新 localStorage 中的套票資料
+                try {
+                    const localKey = `patientPackages_${patientId}`;
+                    localStorage.setItem(localKey, JSON.stringify(patientPackagesCache[patientId]));
+                } catch (e) {
+                    console.warn('更新本地患者套票資料失敗:', e);
+                }
             }
             return { ok: true, record: updatedPackage };
         } else {
@@ -15390,8 +15540,13 @@ class FirebaseDataManager {
             );
             
             console.log('病人數據已添加到 Firebase:', docRef.id);
-            // 新增病人後清除緩存，讓下一次讀取時重新載入
+            // 新增病人後清除緩存並移除本地存檔，讓下一次讀取時重新載入
             this.patientsCache = null;
+            try {
+                localStorage.removeItem('patients');
+            } catch (_lsErr) {
+                // 忽略 localStorage 錯誤
+            }
             return { success: true, id: docRef.id };
         } catch (error) {
             console.error('添加病人數據失敗:', error);
@@ -15416,6 +15571,21 @@ class FirebaseDataManager {
             if (!forceRefresh && this.patientsCache !== null) {
                 return { success: true, data: this.patientsCache };
             }
+            // 嘗試從 localStorage 載入病人資料，以減少 Firebase 讀取次數
+            if (!forceRefresh) {
+                try {
+                    const stored = localStorage.getItem('patients');
+                    if (stored) {
+                        const localData = JSON.parse(stored);
+                        if (Array.isArray(localData)) {
+                            this.patientsCache = localData;
+                            return { success: true, data: this.patientsCache };
+                        }
+                    }
+                } catch (lsErr) {
+                    console.warn('載入本地病人資料失敗:', lsErr);
+                }
+            }
             const querySnapshot = await window.firebase.getDocs(
                 window.firebase.collection(window.firebase.db, 'patients')
             );
@@ -15423,8 +15593,13 @@ class FirebaseDataManager {
             querySnapshot.forEach((doc) => {
                 patients.push({ id: doc.id, ...doc.data() });
             });
-            // 將結果寫入快取
+            // 將結果寫入快取與 localStorage
             this.patientsCache = patients;
+            try {
+                localStorage.setItem('patients', JSON.stringify(patients));
+            } catch (lsErr) {
+                console.warn('保存病人資料到本地失敗:', lsErr);
+            }
             console.log('已從 Firebase 讀取病人數據:', patients.length, '筆');
             return { success: true, data: patients };
         } catch (error) {
@@ -15449,8 +15624,13 @@ class FirebaseDataManager {
                     updatedBy: currentUser || 'system'
                 }
             );
-            // 更新病人資料後清除緩存，讓下一次讀取時重新載入
+            // 更新病人資料後清除緩存並移除本地存檔，讓下一次讀取時重新載入
             this.patientsCache = null;
+            try {
+                localStorage.removeItem('patients');
+            } catch (_lsErr) {
+                // 忽略 localStorage 錯誤
+            }
             return { success: true };
         } catch (error) {
             console.error('更新病人數據失敗:', error);
@@ -15463,8 +15643,13 @@ class FirebaseDataManager {
             await window.firebase.deleteDoc(
                 window.firebase.doc(window.firebase.db, 'patients', patientId)
             );
-            // 刪除病人後清除緩存
+            // 刪除病人後清除緩存並移除本地存檔
             this.patientsCache = null;
+            try {
+                localStorage.removeItem('patients');
+            } catch (_lsErr) {
+                // 忽略 localStorage 錯誤
+            }
             return { success: true };
         } catch (error) {
             console.error('刪除病人數據失敗:', error);
@@ -15579,8 +15764,13 @@ class FirebaseDataManager {
             );
             
             console.log('診症記錄已添加到 Firebase:', docRef.id);
-            // 新增診症後清除全域診症快取
+            // 新增診症後清除全域診症快取並移除本地存檔
             this.consultationsCache = null;
+            try {
+                localStorage.removeItem('consultations');
+            } catch (_lsErr) {
+                // 忽略 localStorage 錯誤
+            }
             // 同時清除或更新單一病人的診症快取，以便下次重新讀取
             try {
                 if (consultationData && consultationData.patientId) {
@@ -15620,9 +15810,27 @@ class FirebaseDataManager {
     async getConsultations(forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
         try {
-            // 如果有快取且不需強制刷新，直接回傳快取資料及是否還有下一頁
+            // 有內存快取且不需強制刷新時直接返回
             if (!forceRefresh && this.consultationsCache !== null) {
                 return { success: true, data: this.consultationsCache, hasMore: !!this.consultationsHasMore };
+            }
+            // 優先從 localStorage 載入診症記錄（僅限第一頁）
+            if (!forceRefresh) {
+                try {
+                    const stored = localStorage.getItem('consultations');
+                    if (stored) {
+                        const localData = JSON.parse(stored);
+                        if (Array.isArray(localData)) {
+                            this.consultationsCache = localData;
+                            // 本地快取不保存分頁游標或是否有更多資料
+                            this.consultationsLastVisible = null;
+                            this.consultationsHasMore = false;
+                            return { success: true, data: this.consultationsCache, hasMore: this.consultationsHasMore };
+                        }
+                    }
+                } catch (lsErr) {
+                    console.warn('載入本地診症記錄失敗:', lsErr);
+                }
             }
             // 清除既有快取與游標
             this.consultationsCache = [];
@@ -15645,6 +15853,12 @@ class FirebaseDataManager {
             this.consultationsHasMore = querySnapshot.docs.length === pageSize;
             // 更新快取
             this.consultationsCache = consultations;
+            // 將結果寫入 localStorage 供下次使用
+            try {
+                localStorage.setItem('consultations', JSON.stringify(consultations));
+            } catch (lsErr) {
+                console.warn('保存診症記錄到本地失敗:', lsErr);
+            }
             console.log('已從 Firebase 讀取診症記錄，載入', consultations.length, '筆');
             return { success: true, data: consultations, hasMore: this.consultationsHasMore };
         } catch (error) {
@@ -15686,6 +15900,12 @@ class FirebaseDataManager {
             this.consultationsHasMore = snapshot.docs.length === pageSize;
             // 將新資料附加至快取
             this.consultationsCache = Array.isArray(this.consultationsCache) ? this.consultationsCache.concat(newData) : newData;
+            // 更新 localStorage 快取，用於下次頁面載入
+            try {
+                localStorage.setItem('consultations', JSON.stringify(this.consultationsCache));
+            } catch (lsErr) {
+                console.warn('保存診症記錄到本地失敗:', lsErr);
+            }
             return { success: true, data: this.consultationsCache, hasMore: this.consultationsHasMore };
         } catch (error) {
             console.error('讀取診症記錄下一頁失敗:', error);
@@ -15703,8 +15923,13 @@ class FirebaseDataManager {
                     updatedBy: currentUser
                 }
             );
-            // 更新診症後清除全域診症快取
+            // 更新診症後清除全域診症快取並移除本地存檔
             this.consultationsCache = null;
+            try {
+                localStorage.removeItem('consultations');
+            } catch (_lsErr) {
+                // 忽略 localStorage 錯誤
+            }
             // 更新單一病人診症快取或清除全部快取
             try {
                 if (consultationData && consultationData.patientId) {
@@ -15780,6 +16005,13 @@ class FirebaseDataManager {
             );
             
             console.log('用戶數據已添加到 Firebase:', docRef.id);
+            // 新增用戶後清除快取並移除本地存檔
+            this.usersCache = null;
+            try {
+                localStorage.removeItem('users');
+            } catch (_lsErr) {
+                // 忽略 localStorage 錯誤
+            }
             return { success: true, id: docRef.id };
         } catch (error) {
             console.error('添加用戶數據失敗:', error);
@@ -15803,6 +16035,24 @@ class FirebaseDataManager {
             if (!forceRefresh && this.usersCache !== null) {
                 return { success: true, data: this.usersCache, hasMore: !!this.usersHasMore };
             }
+            // 嘗試從 localStorage 載入用戶資料
+            if (!forceRefresh) {
+                try {
+                    const stored = localStorage.getItem('users');
+                    if (stored) {
+                        const localData = JSON.parse(stored);
+                        if (Array.isArray(localData)) {
+                            this.usersCache = localData;
+                            // localStorage 不保存游標與 hasMore，因為無分頁概念
+                            this.usersLastVisible = null;
+                            this.usersHasMore = false;
+                            return { success: true, data: this.usersCache, hasMore: false };
+                        }
+                    }
+                } catch (lsErr) {
+                    console.warn('載入本地用戶資料失敗:', lsErr);
+                }
+            }
             // 重置快取與游標
             this.usersCache = [];
             this.usersLastVisible = null;
@@ -15820,6 +16070,12 @@ class FirebaseDataManager {
             this.usersLastVisible = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
             this.usersHasMore = snapshot.docs.length === pageSize;
             this.usersCache = users;
+            // 存入 localStorage 以便下次載入
+            try {
+                localStorage.setItem('users', JSON.stringify(users));
+            } catch (lsErr) {
+                console.warn('保存用戶資料到本地失敗:', lsErr);
+            }
             console.log('已從 Firebase 讀取用戶數據，載入', users.length, '筆');
             return { success: true, data: users, hasMore: this.usersHasMore };
         } catch (error) {
@@ -15873,8 +16129,13 @@ class FirebaseDataManager {
                     updatedBy: currentUser || 'system'
                 }
             );
-            // 更新用戶後清除用戶緩存
+            // 更新用戶後清除用戶緩存並移除本地存檔
             this.usersCache = null;
+            try {
+                localStorage.removeItem('users');
+            } catch (_lsErr) {
+                // 忽略 localStorage 錯誤
+            }
             return { success: true };
         } catch (error) {
             console.error('更新用戶數據失敗:', error);
@@ -15887,8 +16148,13 @@ class FirebaseDataManager {
             await window.firebase.deleteDoc(
                 window.firebase.doc(window.firebase.db, 'users', userId)
             );
-            // 刪除用戶後清除緩存
+            // 刪除用戶後清除緩存並移除本地存檔
             this.usersCache = null;
+            try {
+                localStorage.removeItem('users');
+            } catch (_lsErr) {
+                // 忽略 localStorage 錯誤
+            }
             return { success: true };
         } catch (error) {
             console.error('刪除用戶數據失敗:', error);
@@ -16063,6 +16329,13 @@ class FirebaseDataManager {
                         }
                         return p;
                     });
+                    // 同步本地快取到 localStorage
+                    try {
+                        const localKey = `patientPackages_${pidStr}`;
+                        localStorage.setItem(localKey, JSON.stringify(patientPackagesCache[pidStr]));
+                    } catch (e) {
+                        console.warn('更新本地患者套票資料失敗:', e);
+                    }
                 }
             } catch (cacheErr) {
                 console.warn('更新套票後更新本地快取失敗:', cacheErr);
@@ -16107,34 +16380,21 @@ class FirebaseDataManager {
                 window.firebase.where('patientId', '==', patientId),
                 window.firebase.where('remainingUses', '>', 0)
             );
-            // 使用 Firestore 聚合查詢 count() 取得有效套票數量
+            // 使用單次 getDocs 取得所有有效套票，計算數量及剩餘次數
             let activeCount = 0;
-            try {
-                const countSnap = await window.firebase.getCountFromServer(activeQuery);
-                const cnt = countSnap && countSnap.data && typeof countSnap.data().count === 'number' ? countSnap.data().count : 0;
-                activeCount = cnt;
-            } catch (countErr) {
-                // 若聚合查詢失敗，退回使用 getDocs 計算文件數
-                try {
-                    const fallbackSnap = await window.firebase.getDocs(activeQuery);
-                    activeCount = fallbackSnap.size;
-                } catch (fallbackErr) {
-                    console.warn('取得有效套票數量失敗:', fallbackErr);
-                    activeCount = 0;
-                }
-            }
-            // 計算剩餘次數總和：讀取有效套票文件並累加 remainingUses
             let totalRemainingUses = 0;
             try {
                 const snap = await window.firebase.getDocs(activeQuery);
+                activeCount = snap.size;
                 snap.forEach((docSnap) => {
                     const d = docSnap.data();
                     if (d && typeof d.remainingUses === 'number') {
                         totalRemainingUses += d.remainingUses;
                     }
                 });
-            } catch (sumErr) {
-                console.warn('計算套票剩餘次數失敗:', sumErr);
+            } catch (err) {
+                console.warn('取得有效套票資料失敗:', err);
+                activeCount = 0;
                 totalRemainingUses = 0;
             }
             // 更新病人文件中的彙總欄位
@@ -16277,37 +16537,57 @@ class FirebaseDataManager {
             const docsToDelete = [];
 
             /*
-             * Firestore 支援條件查詢，我們將依據 createdAt 與 expireAt 分別查詢過期文件。
-             * 這樣只讀取符合篩選條件的文件，避免先讀取全部再過濾。
-             * 注意：若某筆文件同時具備 createdAt 與 expireAt 且皆小於今日凌晨，會在兩次查詢中出現，
-             *       因此需用 Set 去除重複，並再驗證目標日期以保險無誤。
+             * Firestore 支援條件查詢。如果 Firebase 提供 or 查詢，我們只執行一次查詢，
+             * 以 createdAt 或 expireAt 早於今日凌晨的文件作為刪除對象，減少讀取次數。
+             * 若環境中不支援 or 查詢，將回退到分別查詢 createdAt 與 expireAt 的方式。
              */
             try {
-                // 查詢 createdAt 在今日凌晨之前的文件
-                const qCreated = window.firebase.firestoreQuery(
-                    inquiriesRef,
-                    window.firebase.where('createdAt', '<', startOfToday)
-                );
-                const snapshotCreated = await window.firebase.getDocs(qCreated);
-                snapshotCreated.forEach((doc) => {
+                let fetchedDocs = [];
+                if (window.firebase && typeof window.firebase.or === 'function') {
+                    // 使用 or 條件一次查詢兩種過期條件
+                    const combinedQuery = window.firebase.firestoreQuery(
+                        inquiriesRef,
+                        window.firebase.or(
+                            window.firebase.where('createdAt', '<', startOfToday),
+                            window.firebase.where('expireAt', '<', startOfToday)
+                        )
+                    );
+                    const snapshot = await window.firebase.getDocs(combinedQuery);
+                    snapshot.forEach((doc) => {
+                        fetchedDocs.push(doc);
+                    });
+                } else {
+                    // 環境不支援 or，回退至原本的兩次查詢
+                    try {
+                        const qCreated = window.firebase.firestoreQuery(
+                            inquiriesRef,
+                            window.firebase.where('createdAt', '<', startOfToday)
+                        );
+                        const snapshotCreated = await window.firebase.getDocs(qCreated);
+                        snapshotCreated.forEach((doc) => {
+                            fetchedDocs.push(doc);
+                        });
+                    } catch (err) {
+                        console.warn('查詢過期 createdAt 問診資料失敗:', err);
+                    }
+                    try {
+                        const qExpire = window.firebase.firestoreQuery(
+                            inquiriesRef,
+                            window.firebase.where('expireAt', '<', startOfToday)
+                        );
+                        const snapshotExpire = await window.firebase.getDocs(qExpire);
+                        snapshotExpire.forEach((doc) => {
+                            fetchedDocs.push(doc);
+                        });
+                    } catch (err) {
+                        console.warn('查詢過期 expireAt 問診資料失敗:', err);
+                    }
+                }
+                fetchedDocs.forEach((doc) => {
                     docsToDelete.push(doc);
                 });
             } catch (err) {
-                console.warn('查詢過期 createdAt 問診資料失敗:', err);
-            }
-
-            try {
-                // 查詢 expireAt 在今日凌晨之前的文件
-                const qExpire = window.firebase.firestoreQuery(
-                    inquiriesRef,
-                    window.firebase.where('expireAt', '<', startOfToday)
-                );
-                const snapshotExpire = await window.firebase.getDocs(qExpire);
-                snapshotExpire.forEach((doc) => {
-                    docsToDelete.push(doc);
-                });
-            } catch (err) {
-                console.warn('查詢過期 expireAt 問診資料失敗:', err);
+                console.warn('查詢過期問診資料失敗:', err);
             }
 
             const deletions = [];
@@ -17936,8 +18216,9 @@ function refreshTemplateCategoryFilters() {
          */
         async function initCategoryData() {
           // 優先從本地載入分類資料
+          let stored;
           try {
-            const stored = localStorage.getItem('categories');
+            stored = localStorage.getItem('categories');
             if (stored) {
               const localData = JSON.parse(stored);
               if (localData && typeof localData === 'object') {
@@ -17957,6 +18238,11 @@ function refreshTemplateCategoryFilters() {
             }
           } catch (err) {
             console.error('從本地載入分類資料失敗:', err);
+          }
+
+          // 如果本地已經載入分類資料，則不再從 Firebase 讀取，減少讀取量
+          if (stored) {
+            return;
           }
 
           // 若 Firebase 未定義或缺少 getDoc，則直接結束，使用預設或本地資料
