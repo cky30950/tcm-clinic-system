@@ -505,7 +505,8 @@ async function changeCurrentUserPassword() {
     // 當所有輸入驗證通過後顯示讀取圈，避免一開始就覆蓋掉按鈕內容
     // 使用固定的 id 取得按鈕，避免因 onclick 屬性變化導致查找失敗
     const updateButton = document.getElementById('updatePasswordButton');
-    setButtonLoading(updateButton, '更新中...');
+    // 使用翻譯函式動態設定載入文字，根據當前語言顯示相應的文案
+    setButtonLoading(updateButton, window.t ? window.t('更新中...') : (lang === 'en' ? 'Updating...' : '更新中...'));
     try {
         const auth = window.firebase.auth;
         const user = auth.currentUser;
@@ -588,7 +589,8 @@ async function deleteCurrentUserAccount() {
         }
         // 找到刪除按鈕並顯示讀取圈
         const deleteButton = document.getElementById('deleteAccountButton');
-        setButtonLoading(deleteButton, '刪除中...');
+        // 使用翻譯函式動態設定載入文字，根據當前語言顯示相應的文案
+        setButtonLoading(deleteButton, window.t ? window.t('刪除中...') : (lang === 'en' ? 'Deleting...' : '刪除中...'));
         try {
             // 重新驗證
             const credential = window.firebase.EmailAuthProvider.credential(user.email, password);
