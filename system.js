@@ -1985,7 +1985,8 @@ async function saveInventoryChanges() {
                 );
                 const itemsFromFirestore = [];
                 querySnapshot.forEach((docSnap) => {
-                    itemsFromFirestore.push({ ...docSnap.data() });
+                    // 將文件 ID 作為 id 欄位，避免依賴資料內的 id
+                    itemsFromFirestore.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 if (itemsFromFirestore.length === 0) {
                     // Firestore 中沒有資料時，不自動載入預設資料，保持空陣列
@@ -11094,9 +11095,17 @@ async function initializeSystemAfterLogin() {
 
                 try {
                     // 將收費項目寫入 Firestore
+                    // 不儲存 id 欄位，避免與文件 ID 重複
+                    let dataToWrite;
+                    try {
+                        const { id, ...rest } = item || {};
+                        dataToWrite = { ...rest };
+                    } catch (_omitErr) {
+                        dataToWrite = item;
+                    }
                     await window.firebase.setDoc(
                         window.firebase.doc(window.firebase.db, 'billingItems', String(item.id)),
-                        item
+                        dataToWrite
                     );
                 } catch (error) {
                     console.error('儲存收費項目至 Firestore 失敗:', error);
@@ -14133,14 +14142,17 @@ async function exportClinicBackup() {
         ]);
         const patientsData = patientsRes && patientsRes.success && Array.isArray(patientsRes.data) ? patientsRes.data : [];
         const consultationsData = consultationsRes && consultationsRes.success && Array.isArray(consultationsRes.data) ? consultationsRes.data : [];
-        // 取得用戶列表；使用預設參數以利用快取，避免強制刷新造成額外讀取量
+        // 取得用戶列表；為確保包含個人設置（personalSettings），直接從 Firestore 讀取
+        // 不使用快取中的 trimmed 資料，以便包含所有欄位
         let usersData = [];
         try {
-            // 不傳遞 true 以便 fetchUsers 使用快取資料（若已載入）
-            const fetchedUsers = await fetchUsers();
-            if (Array.isArray(fetchedUsers)) {
-                usersData = fetchedUsers;
-            }
+            // 從 Firestore 讀取所有 users 文件
+            const userSnap = await window.firebase.getDocs(
+                window.firebase.collection(window.firebase.db, 'users')
+            );
+            userSnap.forEach((docSnap) => {
+                usersData.push({ id: docSnap.id, ...docSnap.data() });
+            });
         } catch (_fetchErr) {
             console.warn('匯出備份時取得用戶列表失敗，將不包含用戶資料');
         }
@@ -14313,16 +14325,13 @@ async function importClinicBackup(data) {
                     if (!item || item.id === undefined || item.id === null) continue;
                     const idStr = String(item.id);
                     const docRef = window.firebase.doc(window.firebase.db, collectionName, idStr);
-                    // 為避免文件內容包含 id 欄位，導致從 Firestore 讀取時覆寫 doc.id，
-                    // 僅針對某些集合（patients、consultations、users）移除 id 欄位再寫入。
-                    let dataToWrite = item;
-                    if (collectionName === 'patients' || collectionName === 'consultations' || collectionName === 'users') {
-                        try {
-                            const { id, ...rest } = item;
-                            dataToWrite = { ...rest };
-                        } catch (_omitErr) {
-                            dataToWrite = item;
-                        }
+                    // 移除 id 屬性，避免將 id 寫入文件內容
+                    let dataToWrite;
+                    try {
+                        const { id, ...rest } = item || {};
+                        dataToWrite = { ...rest };
+                    } catch (_omitErr) {
+                        dataToWrite = item;
                     }
                     batch.set(docRef, dataToWrite);
                     opCount++;
@@ -15737,10 +15746,18 @@ class FirebaseDataManager {
                 ...patientData,
                 patientNumber: patientData.patientNumber
             });
+            // 移除 id 屬性，避免儲存到文件內容
+            let dataToWrite;
+            try {
+                const { id, ...rest } = patientData || {};
+                dataToWrite = rest;
+            } catch (_omitErr) {
+                dataToWrite = patientData;
+            }
             const docRef = await window.firebase.addDoc(
                 window.firebase.collection(window.firebase.db, 'patients'),
                 {
-                    ...patientData,
+                    ...dataToWrite,
                     searchKeywords: keywords,
                     // 初始化套票彙總欄位，避免未購買套票時為 undefined
                     packageActiveCount: 0,
@@ -15827,10 +15844,18 @@ class FirebaseDataManager {
                 ...patientData,
                 patientNumber: patientData.patientNumber
             });
+            // 移除 id 屬性，以避免 id 被儲存到文件內容
+            let dataToWrite;
+            try {
+                const { id, ...rest } = patientData || {};
+                dataToWrite = rest;
+            } catch (_omitErr) {
+                dataToWrite = patientData;
+            }
             await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'patients', patientId),
                 {
-                    ...patientData,
+                    ...dataToWrite,
                     searchKeywords: keywords,
                     updatedAt: new Date(),
                     updatedBy: currentUser || 'system'
@@ -15966,10 +15991,18 @@ class FirebaseDataManager {
         try {
             // When creating a new consultation record we only set the createdAt timestamp
             // and createdBy. The updatedAt field should be reserved for subsequent edits.
+            // 移除 id 屬性，避免儲存到文件內容
+            let dataToWrite;
+            try {
+                const { id, ...rest } = consultationData || {};
+                dataToWrite = rest;
+            } catch (_omitErr) {
+                dataToWrite = consultationData;
+            }
             const docRef = await window.firebase.addDoc(
                 window.firebase.collection(window.firebase.db, 'consultations'),
                 {
-                    ...consultationData,
+                    ...dataToWrite,
                     createdAt: new Date(),
                     createdBy: currentUser
                 }
@@ -16127,10 +16160,18 @@ class FirebaseDataManager {
 
     async updateConsultation(consultationId, consultationData) {
         try {
+            // 移除 id 屬性，避免將 id 寫入文件內容
+            let dataToWrite;
+            try {
+                const { id, ...rest } = consultationData || {};
+                dataToWrite = rest;
+            } catch (_omitErr) {
+                dataToWrite = consultationData;
+            }
             await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'consultations', consultationId),
                 {
-                    ...consultationData,
+                    ...dataToWrite,
                     updatedAt: new Date(),
                     updatedBy: currentUser
                 }
@@ -16206,10 +16247,18 @@ class FirebaseDataManager {
         }
 
         try {
+            // 移除 id 屬性，避免儲存到文件內容
+            let dataToWrite;
+            try {
+                const { id, ...rest } = userData || {};
+                dataToWrite = rest;
+            } catch (_omitErr) {
+                dataToWrite = userData;
+            }
             const docRef = await window.firebase.addDoc(
                 window.firebase.collection(window.firebase.db, 'users'),
                 {
-                    ...userData,
+                    ...dataToWrite,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                     createdBy: currentUser || 'system'
@@ -16333,10 +16382,18 @@ class FirebaseDataManager {
 
     async updateUser(userId, userData) {
         try {
+            // 移除 id 屬性，避免將 id 寫入文件內容
+            let dataToWrite;
+            try {
+                const { id, ...rest } = userData || {};
+                dataToWrite = rest;
+            } catch (_omitErr) {
+                dataToWrite = userData;
+            }
             await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'users', userId),
                 {
-                    ...userData,
+                    ...dataToWrite,
                     updatedAt: new Date(),
                     updatedBy: currentUser || 'system'
                 }
@@ -16473,10 +16530,18 @@ class FirebaseDataManager {
         }
 
         try {
+            // 移除 id 屬性，避免儲存到文件內容
+            let dataToWrite;
+            try {
+                const { id, ...rest } = packageData || {};
+                dataToWrite = rest;
+            } catch (_omitErr) {
+                dataToWrite = packageData;
+            }
             const docRef = await window.firebase.addDoc(
                 window.firebase.collection(window.firebase.db, 'patientPackages'),
                 {
-                    ...packageData,
+                    ...dataToWrite,
                     createdAt: new Date(),
                     createdBy: currentUser || 'system'
                 }
@@ -16521,10 +16586,18 @@ class FirebaseDataManager {
 
     async updatePatientPackage(packageId, packageData) {
         try {
+            // 移除 id 屬性，避免將 id 寫入文件內容
+            let dataToWrite;
+            try {
+                const { id, ...rest } = packageData || {};
+                dataToWrite = rest;
+            } catch (_omitErr) {
+                dataToWrite = packageData;
+            }
             await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'patientPackages', packageId),
                 {
-                    ...packageData,
+                    ...dataToWrite,
                     updatedAt: new Date(),
                     updatedBy: currentUser || 'system'
                 }
