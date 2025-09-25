@@ -222,9 +222,9 @@ const ROLE_PERMISSIONS = {
   // 新增個人統計分析 (personalStatistics) 權限，診所管理者與醫師可使用
   // 管理員不需要個人設置與個人統計分析，故移除這兩項
   // 將模板庫移至穴位庫之後，使側邊選單順序為：患者管理 -> 診症系統 -> 中藥庫 -> 穴位庫 -> 模板庫 -> 收費管理 -> 用戶管理 -> 財務報表 -> 系統管理 -> 帳號安全
-  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
+  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'subscriptionManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
   // 醫師不需要系統管理權限，將模板庫移至穴位庫之後
-  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
+  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'subscriptionManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
   // 將模板庫移至穴位庫之後
   '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'accountSecurity'],
   // 用戶無中藥庫或穴位庫權限，維持模板庫在最後
@@ -2580,6 +2580,14 @@ async function syncUserDataFromFirebase() {
                     console.error('載入個人設置時發生錯誤:', err);
                 });
             }
+            // 檢查訂閱狀態：登入後確認用戶是否已訂閱
+            if (typeof checkSubscriptionStatus === 'function') {
+                try {
+                    checkSubscriptionStatus();
+                } catch (_e) {
+                    console.error('檢查訂閱狀態時發生錯誤:', _e);
+                }
+            }
             // 統計資訊將在登入後初始化系統時更新
 
             // Show a welcome message in the appropriate language
@@ -2702,6 +2710,8 @@ async function logout() {
                 // 新增：穴位庫管理
                 acupointLibrary: { title: '穴位庫', icon: '📌', description: '查看穴位資料' },
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
+                // 新增：訂閱管理
+                subscriptionManagement: { title: '訂閱管理', icon: '💳', description: '查看訂閱狀態與帳單' },
                 // 將診所用戶管理的圖示更新為單人符號，以符合交換後的配置
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
                 financialReports: { title: '財務報表', icon: '📊', description: '收入分析與財務統計' },
@@ -2809,13 +2819,18 @@ async function logout() {
                 if (typeof loadAccountSecurity === 'function') {
                     loadAccountSecurity();
                 }
+            } else if (sectionId === 'subscriptionManagement') {
+                // 載入訂閱管理頁面
+                if (typeof loadSubscriptionManagement === 'function') {
+                    loadSubscriptionManagement();
+                }
             }
         }
 
         // 隱藏所有區域
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
+            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'subscriptionManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
                 // 在隱藏中藥庫時，取消其資料監聽以減少 Realtime Database 讀取
                 if (id === 'herbLibrary') {
                     try {
@@ -15442,15 +15457,6 @@ async function useOnePackage(patientId, packageRecordId) {
             const enMsg = `Used package: ${res.record.name}, remaining ${res.record.remainingUses} uses`;
             const msg = lang === 'en' ? enMsg : zhMsg;
             showToast(msg, 'success');
-
-            // 登入後檢查使用者的訂閱狀態，若未訂閱則顯示訂閱覆蓋層
-            try {
-                if (typeof checkSubscriptionStatus === 'function') {
-                    checkSubscriptionStatus();
-                }
-            } catch (_e) {
-                console.error('檢查訂閱狀態失敗', _e);
-            }
         }
     } catch (error) {
         console.error('使用套票時發生錯誤:', error);
@@ -21736,141 +21742,264 @@ function hideGlobalCopyright() {
   document.addEventListener('DOMContentLoaded', updateNetworkStatus);
 })();
 
-/*
- * =====================================
- * Stripe 訂閱功能
- *
- * 以下程式碼提供前端與 Stripe Payment Element 的整合範例。
- * 用戶訂閱後才能使用完整系統功能，未訂閱則顯示覆蓋層並要求付款。
- * 這些函式會呼叫您的後端 API `/api/check-subscription?uid=...` 回傳
- * { active: boolean, clientSecret: string }，其中 clientSecret 用於初始化
- * Payment Element。實際實作中請依照您的後端設計調整端點與資料格式。
- */
+// ========== Stripe 訂閱整合 ==========
+// Publishable key for Stripe integration; replace with your own key from Stripe Dashboard.
+// Note: Do not include secret key on the client side!
+window.STRIPE_PUBLISHABLE_KEY = 'pk_test_51S94JkBrkOiynNSsODI6wwDq6Kmnu6swe1pdZFxGeD0SEq1i0CF5iV1WXvFpwe4bNkQDMbW8hVykevvaDi8LCtkT00bMdaJTUV';
 
-// 定義 Stripe 發布用金鑰（請於部署前替換為您在 Stripe 儀表板取得的金鑰）
-window.STRIPE_PUBLISHABLE_KEY = window.STRIPE_PUBLISHABLE_KEY || '';
-
-// 全域變數：Stripe 實例與 Elements 實例
 let stripeInstance = null;
 let stripeElementsInstance = null;
 
 /**
- * 初始化 Stripe 並使用提供的 clientSecret 建立 Payment Element。
- * @param {string} clientSecret 從後端取得的 PaymentIntent 或 SetupIntent 的 client secret。
+ * 初始化 Stripe Payment Element。
+ * 使用後端傳回的 clientSecret 在指定容器中掛載付款元素。
+ * @param {string} clientSecret
  */
 async function initializeStripePayment(clientSecret) {
-    try {
-        if (!window.STRIPE_PUBLISHABLE_KEY) {
-            console.error('未設定 Stripe Publishable Key，請將 window.STRIPE_PUBLISHABLE_KEY 設為您的公鑰。');
-            return;
-        }
-        // 初始化 Stripe 實例
-        if (!stripeInstance) {
-            stripeInstance = Stripe(window.STRIPE_PUBLISHABLE_KEY);
-        }
-        // 建立 Elements 並傳入 clientSecret
-        stripeElementsInstance = stripeInstance.elements({ clientSecret });
-        // 創建 Payment Element
-        const paymentElement = stripeElementsInstance.create('payment');
-        const container = document.getElementById('payment-element-container');
-        if (container) {
-            // 清空容器後重新掛載，以防重複渲染
-            container.innerHTML = '';
-            paymentElement.mount(container);
-        }
-    } catch (err) {
-        console.error('初始化 Stripe Payment Element 時發生錯誤:', err);
+  try {
+    if (!window.STRIPE_PUBLISHABLE_KEY) {
+      console.error('未設置 STRIPE_PUBLISHABLE_KEY');
+      return;
     }
+    if (!stripeInstance) {
+      stripeInstance = Stripe(window.STRIPE_PUBLISHABLE_KEY);
+    }
+    // 每次初始化都使用新的 elements
+    stripeElementsInstance = stripeInstance.elements({ clientSecret });
+    const paymentElement = stripeElementsInstance.create('payment');
+    const container = document.getElementById('payment-element-container');
+    if (container) {
+      container.innerHTML = '';
+      paymentElement.mount(container);
+    }
+  } catch (e) {
+    console.error('初始化 Stripe Payment Element 失敗:', e);
+  }
 }
 
 /**
- * 檢查當前使用者是否具有有效訂閱。
- * 如果沒有，顯示訂閱覆蓋層並初始化付款表單。
- * 後端端點應回傳 JSON { active: boolean, clientSecret?: string }
+ * 檢查用戶訂閱狀態。
+ * 從後端取得訂閱資訊並根據狀態決定是否顯示付款覆蓋層。
  */
 async function checkSubscriptionStatus() {
-    try {
-        // 若無登入用戶資料，則不檢查
-        if (!currentUserData || !currentUserData.id) return;
-        const userId = encodeURIComponent(currentUserData.id);
-        const response = await fetch(`/api/check-subscription?uid=${userId}`, { method: 'GET' });
-        const result = await response.json();
-        const overlay = document.getElementById('subscriptionOverlay');
-        if (!result) {
-            console.warn('後端未回傳訂閱狀態');
-            if (overlay) overlay.classList.remove('hidden');
-            return;
-        }
-        if (result.active) {
-            // 已訂閱：隱藏覆蓋層
-            if (overlay) overlay.classList.add('hidden');
-        } else {
-            // 未訂閱：顯示覆蓋層並載入付款表單
-            if (overlay) overlay.classList.remove('hidden');
-            if (result.clientSecret) {
-                await initializeStripePayment(result.clientSecret);
-            } else {
-                console.error('後端未提供 clientSecret，無法初始化 Payment Element');
-            }
-        }
-    } catch (error) {
-        console.error('檢查訂閱狀態時發生錯誤:', error);
+  try {
+    // 若尚未登入或無用戶資料，跳出
+    const uid = currentUserData && currentUserData.id ? currentUserData.id : '';
+    if (!uid) return;
+    const res = await fetch(`/api/check-subscription?uid=${encodeURIComponent(uid)}`);
+    if (!res.ok) {
+      throw new Error('無法取得訂閱狀態');
     }
+    const data = await res.json();
+    // 如果未訂閱或訂閱已失效，顯示付款覆蓋層並初始化 Payment Element
+    if (!data || !data.active) {
+      const overlay = document.getElementById('subscriptionOverlay');
+      if (overlay) {
+        overlay.classList.remove('hidden');
+      }
+      const overlayMsg = document.getElementById('subscriptionOverlayMessage');
+      if (overlayMsg) {
+        overlayMsg.textContent = (data && data.statusMessage) || '請完成訂閱付款以繼續使用系統功能。';
+      }
+      if (data && data.clientSecret) {
+        initializeStripePayment(data.clientSecret);
+      }
+    } else {
+      // 隱藏覆蓋層
+      const overlay = document.getElementById('subscriptionOverlay');
+      if (overlay) {
+        overlay.classList.add('hidden');
+      }
+    }
+    // 將取得的資料用於訂閱管理頁面 UI
+    if (typeof updateSubscriptionManagementUI === 'function') {
+      updateSubscriptionManagementUI(data);
+    }
+  } catch (e) {
+    console.error('檢查訂閱狀態時發生錯誤:', e);
+  }
 }
 
 /**
- * 處理訂閱付款提交，使用 Stripe.js 進行付款確認。
- * 付款成功後隱藏覆蓋層並可再次檢查訂閱狀態。
+ * 提交訂閱付款。
+ * 確認付款並在成功後重新檢查訂閱狀態。
  */
 async function subscribeSubmit() {
-    try {
-        if (!stripeInstance || !stripeElementsInstance) {
-            console.error('Stripe 未初始化，無法提交訂閱');
-            return;
-        }
-        const { error } = await stripeInstance.confirmPayment({
-            elements: stripeElementsInstance,
-            confirmParams: {
-                // return_url 可指定付款完成後跳轉的位置；此處選擇目前頁面
-                return_url: window.location.href
-            }
-        });
-        if (error) {
-            // 將錯誤資訊透過現有 toast 函式顯示
-            if (typeof showToast === 'function') {
-                showToast('付款失敗，請稍後再試。' + (error.message || ''), 'error');
-            } else {
-                alert('付款失敗：' + (error.message || '')); // 後備方案
-            }
-        } else {
-            // 成功：隱藏覆蓋層
-            const overlay = document.getElementById('subscriptionOverlay');
-            if (overlay) overlay.classList.add('hidden');
-            if (typeof showToast === 'function') {
-                showToast('付款成功！', 'success');
-            }
-            // 建議重新檢查訂閱狀態以更新前端狀態
-            if (typeof checkSubscriptionStatus === 'function') {
-                await checkSubscriptionStatus();
-            }
-        }
-    } catch (err) {
-        console.error('訂閱付款時發生錯誤:', err);
+  try {
+    if (!stripeInstance || !stripeElementsInstance) {
+      console.error('Stripe 尚未初始化');
+      return;
     }
+    const { error } = await stripeInstance.confirmPayment({
+      elements: stripeElementsInstance,
+      redirect: 'if_required',
+      confirmParams: {
+        return_url: window.location.href
+      }
+    });
+    if (error) {
+      console.error('確認付款失敗:', error);
+      showToast((error && error.message) || '付款失敗', 'error');
+    } else {
+      showToast('付款成功！', 'success');
+      // 隱藏付款覆蓋層
+      const overlay = document.getElementById('subscriptionOverlay');
+      if (overlay) {
+        overlay.classList.add('hidden');
+      }
+      // 重新檢查訂閱狀態，更新頁面
+      checkSubscriptionStatus();
+    }
+  } catch (e) {
+    console.error('提交訂閱付款時發生錯誤:', e);
+    showToast('付款發生錯誤', 'error');
+  }
 }
 
-// 在 DOM 載入完成後，綁定訂閱按鈕事件
-document.addEventListener('DOMContentLoaded', function() {
-    const subscribeBtn = document.getElementById('subscribeButton');
-    if (subscribeBtn) {
-        subscribeBtn.addEventListener('click', function(event) {
-            event.preventDefault();
-            subscribeSubmit();
+// 綁定確認付款按鈕事件
+document.addEventListener('DOMContentLoaded', function () {
+  const subscribeBtn = document.getElementById('subscribeButton');
+  if (subscribeBtn) {
+    subscribeBtn.addEventListener('click', function () {
+      subscribeSubmit();
+    });
+  }
+
+  // 綁定訂閱管理頁面的「立即訂閱 / 變更方案」按鈕
+  const subscribeNowBtn = document.getElementById('subscribeNowButton');
+  if (subscribeNowBtn) {
+    subscribeNowBtn.addEventListener('click', async function () {
+      try {
+        const planSelect = document.getElementById('subscriptionPlanSelect');
+        const selectedPlanId = planSelect ? planSelect.value : '';
+        const uid = currentUserData && currentUserData.id ? currentUserData.id : '';
+        const res = await fetch('/api/create-subscription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: uid, planId: selectedPlanId })
         });
-    }
+        if (!res.ok) {
+          throw new Error('建立訂閱失敗');
+        }
+        const data = await res.json();
+        if (data && data.clientSecret) {
+          // 顯示覆蓋層並初始化 Payment Element
+          const overlay = document.getElementById('subscriptionOverlay');
+          if (overlay) overlay.classList.remove('hidden');
+          initializeStripePayment(data.clientSecret);
+        } else {
+          throw new Error('回傳資料缺少 clientSecret');
+        }
+      } catch (e) {
+        console.error('建立訂閱時發生錯誤:', e);
+        showToast('無法建立訂閱，請稍後再試', 'error');
+      }
+    });
+  }
 });
 
-// 將函式掛載至 window 供其他模組或除錯用
-window.initializeStripePayment = initializeStripePayment;
-window.checkSubscriptionStatus = checkSubscriptionStatus;
-window.subscribeSubmit = subscribeSubmit;
+/**
+ * 載入訂閱管理資訊並更新介面。
+ * 呼叫後端 API `/api/subscription-info` 取得詳細資料。
+ */
+async function loadSubscriptionManagement() {
+  try {
+    const statusEl = document.getElementById('subscriptionStatusText');
+    const invoiceTbody = document.getElementById('invoiceTableBody');
+    const planSelect = document.getElementById('subscriptionPlanSelect');
+    const amountDisplay = document.getElementById('planAmountDisplay');
+    const nextPaymentDisplay = document.getElementById('nextPaymentDisplay');
+    // 清空現有內容
+    if (statusEl) statusEl.textContent = '載入中...';
+    if (invoiceTbody) invoiceTbody.innerHTML = '';
+    if (planSelect) planSelect.innerHTML = '';
+    if (amountDisplay) amountDisplay.textContent = '';
+    if (nextPaymentDisplay) nextPaymentDisplay.textContent = '';
+    // 取得用戶 ID
+    const uid = currentUserData && currentUserData.id ? currentUserData.id : '';
+    if (!uid) return;
+    const res = await fetch(`/api/subscription-info?uid=${encodeURIComponent(uid)}`);
+    if (!res.ok) {
+      throw new Error('無法取得訂閱資訊');
+    }
+    const data = await res.json();
+    updateSubscriptionManagementUI(data);
+  } catch (e) {
+    console.error('載入訂閱管理資訊時發生錯誤:', e);
+    showToast('無法載入訂閱資訊', 'error');
+  }
+}
+
+/**
+ * 更新訂閱管理頁面的 UI。
+ * @param {object} data 後端返回的訂閱資訊
+ */
+function updateSubscriptionManagementUI(data) {
+  if (!data) return;
+  // 更新訂閱狀態
+  const statusEl = document.getElementById('subscriptionStatusText');
+  if (statusEl) {
+    if (data.active) {
+      statusEl.textContent = '訂閱中';
+      statusEl.classList.remove('text-red-600');
+      statusEl.classList.add('text-green-600');
+    } else {
+      statusEl.textContent = '未訂閱';
+      statusEl.classList.remove('text-green-600');
+      statusEl.classList.add('text-red-600');
+    }
+  }
+  // 更新下次扣款日
+  const nextPaymentDisplay = document.getElementById('nextPaymentDisplay');
+  if (nextPaymentDisplay) {
+    nextPaymentDisplay.textContent = data.nextPayment || '';
+  }
+  // 渲染帳單紀錄
+  const invoiceTbody = document.getElementById('invoiceTableBody');
+  if (invoiceTbody) {
+    invoiceTbody.innerHTML = '';
+    if (Array.isArray(data.invoices)) {
+      data.invoices.forEach(inv => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b last:border-b-0';
+        const idCell = `<td class="px-4 py-2">${inv.id || ''}</td>`;
+        const amountCell = `<td class="px-4 py-2">${inv.amount || ''}</td>`;
+        const dateCell = `<td class="px-4 py-2">${inv.date || ''}</td>`;
+        const statusCell = `<td class="px-4 py-2">${inv.status || ''}</td>`;
+        tr.innerHTML = idCell + amountCell + dateCell + statusCell;
+        invoiceTbody.appendChild(tr);
+      });
+    }
+  }
+  // 渲染方案選項與金額
+  const planSelect = document.getElementById('subscriptionPlanSelect');
+  const amountDisplay = document.getElementById('planAmountDisplay');
+  if (planSelect && Array.isArray(data.plans)) {
+    planSelect.innerHTML = '';
+    data.plans.forEach(plan => {
+      const opt = document.createElement('option');
+      opt.value = plan.id || '';
+      opt.textContent = `${plan.name || ''} - ${plan.amount || ''}`;
+      opt.dataset.amount = plan.amount || '';
+      if (data.currentPlan && data.currentPlan.id === plan.id) {
+        opt.selected = true;
+      }
+      planSelect.appendChild(opt);
+    });
+    // 更新金額顯示
+    const selectedOpt = planSelect.options[planSelect.selectedIndex];
+    if (amountDisplay) {
+      amountDisplay.textContent = selectedOpt ? selectedOpt.dataset.amount : '';
+    }
+    // 變更選擇時更新金額
+    planSelect.onchange = function () {
+      const selected = this.options[this.selectedIndex];
+      if (amountDisplay) {
+        amountDisplay.textContent = selected ? selected.dataset.amount : '';
+      }
+    };
+  }
+}
+
+// 將函式掛載到 window，供 HTML 呼叫
+window.loadSubscriptionManagement = loadSubscriptionManagement;
