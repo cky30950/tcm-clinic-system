@@ -9,6 +9,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Firebase SDK -->
 <script type="module" src="firebase_init.js"></script>
+    <!-- Stripe.js library for Payment Elements -->
+    <!-- 載入 Stripe 的前端 SDK，用於嵌入付款表單和確認付款 -->
+    <script src="https://js.stripe.com/v3/"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Noto Sans TC', sans-serif; }
@@ -1745,6 +1748,17 @@
             匯入備份
         </button>
         <input type="file" id="backupFileInput" accept=".json" class="hidden" onchange="handleBackupFile(this.files[0])">
+    </div>
+
+    <!-- 訂閱覆蓋層：用於顯示訂閱提示與付款表單 -->
+    <div id="subscriptionOverlay" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-11/12 max-w-lg">
+            <h2 class="text-xl font-bold mb-4">訂閱服務</h2>
+            <p class="mb-2">為了使用完整功能，您需要訂閱。本系統每月收費 <strong>250 港元</strong>，如未完成付款將停用所有功能。</p>
+            <!-- Stripe Payment Element 會嵌入於下方容器 -->
+            <div id="payment-element-container" class="my-4"></div>
+            <button id="subscribeButton" class="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none">確認付款</button>
+        </div>
     </div>
     <!-- 匯入進度條 -->
     <div id="backupProgressContainer" class="hidden mt-4">

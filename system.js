@@ -2590,14 +2590,6 @@ async function syncUserDataFromFirebase() {
                 const msg = lang === 'en' ? enMsg : zhMsg;
                 showToast(msg, 'success');
             }
-            // 登入後檢查訂閱狀態，若未訂閱則顯示付款覆蓋層
-            try {
-                if (typeof checkSubscriptionStatus === 'function') {
-                    checkSubscriptionStatus();
-                }
-            } catch (_e) {
-                console.error('檢查訂閱狀態失敗', _e);
-            }
         }
 
         // 側邊選單控制
@@ -15450,6 +15442,15 @@ async function useOnePackage(patientId, packageRecordId) {
             const enMsg = `Used package: ${res.record.name}, remaining ${res.record.remainingUses} uses`;
             const msg = lang === 'en' ? enMsg : zhMsg;
             showToast(msg, 'success');
+
+            // 登入後檢查使用者的訂閱狀態，若未訂閱則顯示訂閱覆蓋層
+            try {
+                if (typeof checkSubscriptionStatus === 'function') {
+                    checkSubscriptionStatus();
+                }
+            } catch (_e) {
+                console.error('檢查訂閱狀態失敗', _e);
+            }
         }
     } catch (error) {
         console.error('使用套票時發生錯誤:', error);
@@ -21737,125 +21738,139 @@ function hideGlobalCopyright() {
 
 /*
  * =====================================
- * Stripe 訂閱功能整合
+ * Stripe 訂閱功能
  *
- * 以下程式碼將 Stripe Payment Element 內嵌至前端，並根據後端回傳的
- * 訂閱狀態動態顯示覆蓋層。本段程式碼使用使用者提供的 publishable key
- * 進行 Stripe 初始化，並示範如何在前端提交付款。請勿將秘密金鑰存入前端。
+ * 以下程式碼提供前端與 Stripe Payment Element 的整合範例。
+ * 用戶訂閱後才能使用完整系統功能，未訂閱則顯示覆蓋層並要求付款。
+ * 這些函式會呼叫您的後端 API `/api/check-subscription?uid=...` 回傳
+ * { active: boolean, clientSecret: string }，其中 clientSecret 用於初始化
+ * Payment Element。實際實作中請依照您的後端設計調整端點與資料格式。
  */
 
-// 使用者提供的 Stripe Publishable Key，用於前端初始化
-window.STRIPE_PUBLISHABLE_KEY = 'pk_test_51S94JkBrkOiynNSsODI6wwDq6Kmnu6swe1pdZFxGeD0SEq1i0CF5iV1WXvFpwe4bNkQDMbW8hVykevvaDi8LCtkT00bMdaJTUV';
+// 定義 Stripe 發布用金鑰（請於部署前替換為您在 Stripe 儀表板取得的金鑰）
+window.STRIPE_PUBLISHABLE_KEY = window.STRIPE_PUBLISHABLE_KEY || '';
 
-// 全域變數以存放 Stripe 實例與 Elements 實例
+// 全域變數：Stripe 實例與 Elements 實例
 let stripeInstance = null;
 let stripeElementsInstance = null;
 
 /**
- * 初始化 Stripe 並根據 clientSecret 建立 Payment Element。
- * @param {string} clientSecret 後端建立訂閱時回傳的 PaymentIntent 或 SetupIntent 的 client_secret。
+ * 初始化 Stripe 並使用提供的 clientSecret 建立 Payment Element。
+ * @param {string} clientSecret 從後端取得的 PaymentIntent 或 SetupIntent 的 client secret。
  */
 async function initializeStripePayment(clientSecret) {
     try {
         if (!window.STRIPE_PUBLISHABLE_KEY) {
-            console.error('Stripe Publishable Key 尚未設定');
+            console.error('未設定 Stripe Publishable Key，請將 window.STRIPE_PUBLISHABLE_KEY 設為您的公鑰。');
             return;
         }
+        // 初始化 Stripe 實例
         if (!stripeInstance) {
             stripeInstance = Stripe(window.STRIPE_PUBLISHABLE_KEY);
         }
+        // 建立 Elements 並傳入 clientSecret
         stripeElementsInstance = stripeInstance.elements({ clientSecret });
+        // 創建 Payment Element
         const paymentElement = stripeElementsInstance.create('payment');
         const container = document.getElementById('payment-element-container');
         if (container) {
+            // 清空容器後重新掛載，以防重複渲染
             container.innerHTML = '';
             paymentElement.mount(container);
         }
-    } catch (e) {
-        console.error('初始化 Stripe Payment Element 失敗:', e);
+    } catch (err) {
+        console.error('初始化 Stripe Payment Element 時發生錯誤:', err);
     }
 }
 
 /**
- * 檢查目前用戶的訂閱狀態：若 active 為 true 則隱藏覆蓋層；若為 false 則載入 Payment Element。
- * 後端端點範例：/api/check-subscription?uid=USER_ID
+ * 檢查當前使用者是否具有有效訂閱。
+ * 如果沒有，顯示訂閱覆蓋層並初始化付款表單。
+ * 後端端點應回傳 JSON { active: boolean, clientSecret?: string }
  */
 async function checkSubscriptionStatus() {
     try {
+        // 若無登入用戶資料，則不檢查
         if (!currentUserData || !currentUserData.id) return;
-        const uid = encodeURIComponent(currentUserData.id);
-        const res = await fetch(`/api/check-subscription?uid=${uid}`);
-        const data = await res.json();
+        const userId = encodeURIComponent(currentUserData.id);
+        const response = await fetch(`/api/check-subscription?uid=${userId}`, { method: 'GET' });
+        const result = await response.json();
         const overlay = document.getElementById('subscriptionOverlay');
-        if (!data) {
-            console.warn('後端未回傳資料');
+        if (!result) {
+            console.warn('後端未回傳訂閱狀態');
             if (overlay) overlay.classList.remove('hidden');
             return;
         }
-        if (data.active) {
+        if (result.active) {
+            // 已訂閱：隱藏覆蓋層
             if (overlay) overlay.classList.add('hidden');
         } else {
+            // 未訂閱：顯示覆蓋層並載入付款表單
             if (overlay) overlay.classList.remove('hidden');
-            if (data.clientSecret) {
-                await initializeStripePayment(data.clientSecret);
+            if (result.clientSecret) {
+                await initializeStripePayment(result.clientSecret);
             } else {
-                console.error('clientSecret 缺失，無法初始化 Payment Element');
+                console.error('後端未提供 clientSecret，無法初始化 Payment Element');
             }
         }
-    } catch (err) {
-        console.error('檢查訂閱狀態失敗:', err);
+    } catch (error) {
+        console.error('檢查訂閱狀態時發生錯誤:', error);
     }
 }
 
 /**
- * 提交訂閱付款：使用 confirmPayment 方法確認 PaymentIntent。
+ * 處理訂閱付款提交，使用 Stripe.js 進行付款確認。
+ * 付款成功後隱藏覆蓋層並可再次檢查訂閱狀態。
  */
 async function subscribeSubmit() {
     try {
         if (!stripeInstance || !stripeElementsInstance) {
-            console.error('Stripe 尚未初始化');
+            console.error('Stripe 未初始化，無法提交訂閱');
             return;
         }
         const { error } = await stripeInstance.confirmPayment({
             elements: stripeElementsInstance,
             confirmParams: {
+                // return_url 可指定付款完成後跳轉的位置；此處選擇目前頁面
                 return_url: window.location.href
             }
         });
         if (error) {
+            // 將錯誤資訊透過現有 toast 函式顯示
             if (typeof showToast === 'function') {
                 showToast('付款失敗，請稍後再試。' + (error.message || ''), 'error');
             } else {
-                alert('付款失敗：' + (error.message || ''));
+                alert('付款失敗：' + (error.message || '')); // 後備方案
             }
         } else {
+            // 成功：隱藏覆蓋層
             const overlay = document.getElementById('subscriptionOverlay');
             if (overlay) overlay.classList.add('hidden');
             if (typeof showToast === 'function') {
                 showToast('付款成功！', 'success');
             }
-            // 付款成功後重新檢查訂閱狀態
+            // 建議重新檢查訂閱狀態以更新前端狀態
             if (typeof checkSubscriptionStatus === 'function') {
                 await checkSubscriptionStatus();
             }
         }
     } catch (err) {
-        console.error('訂閱付款提交發生錯誤:', err);
+        console.error('訂閱付款時發生錯誤:', err);
     }
 }
 
-// 在 DOMContentLoaded 後綁定按鈕
+// 在 DOM 載入完成後，綁定訂閱按鈕事件
 document.addEventListener('DOMContentLoaded', function() {
-    const btn = document.getElementById('subscribeButton');
-    if (btn) {
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
+    const subscribeBtn = document.getElementById('subscribeButton');
+    if (subscribeBtn) {
+        subscribeBtn.addEventListener('click', function(event) {
+            event.preventDefault();
             subscribeSubmit();
         });
     }
 });
 
-// 將函式掛載至 window 方便其他模組調用
+// 將函式掛載至 window 供其他模組或除錯用
 window.initializeStripePayment = initializeStripePayment;
 window.checkSubscriptionStatus = checkSubscriptionStatus;
 window.subscribeSubmit = subscribeSubmit;
