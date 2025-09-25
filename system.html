@@ -1360,45 +1360,6 @@
                     </div>
                 </div>
             </div>
-            <!-- 訂閱管理 -->
-            <div id="subscriptionManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4"><span class="text-3xl mr-3">💳</span>訂閱管理</h2>
-                <!-- 訂閱狀態與下一次扣款日期 -->
-                <div class="mb-4">
-                    <p class="text-gray-700">訂閱狀態：<span id="subscriptionStatusText" class="font-semibold text-red-600">檢查中…</span></p>
-                    <p class="text-gray-700">下一次扣款日：<span id="nextPaymentText">—</span></p>
-                </div>
-                <!-- 方案選擇 -->
-                <div class="mb-4">
-                    <label for="planSelect" class="block text-gray-700 mb-1">選擇服務方案：</label>
-                    <select id="planSelect" class="border border-gray-300 rounded-lg px-3 py-2 w-full md:w-64"></select>
-                    <p class="mt-2 text-gray-700">方案金額：<span id="planAmountText">—</span></p>
-                </div>
-                <!-- 帳單紀錄 -->
-                <div class="mb-4">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-2">過往帳單</h3>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead>
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-gray-600">日期</th>
-                                    <th class="px-4 py-2 text-left text-gray-600">金額</th>
-                                    <th class="px-4 py-2 text-left text-gray-600">狀態</th>
-                                </tr>
-                            </thead>
-                            <tbody id="invoiceTableBody" class="divide-y divide-gray-200">
-                                <!-- 帳單資料將由 JS 動態插入 -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <!-- 訂閱或變更方案按鈕 -->
-                <div class="mt-4">
-                    <button id="subscribeNowButton" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
-                        立即訂閱 / 變更方案
-                    </button>
-                </div>
-            </div>
             <!-- 診所用戶管理 -->
             <div id="userManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -2357,22 +2318,6 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-    <!-- Stripe.js SDK 用於內嵌付款元件 -->
-    <script src="https://js.stripe.com/v3/"></script>
-    <!-- 訂閱付款覆蓋層：用於當用戶未訂閱或變更方案時顯示付款表單 -->
-    <div id="subscriptionOverlay" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">訂閱服務</h3>
-            <p class="text-gray-700 mb-4">請輸入付款資訊以訂閱本服務，每月將自動扣款。</p>
-            <div id="payment-element-container" class="mb-4">
-                <!-- Stripe Payment Element 將掛載於此 -->
-            </div>
-            <button id="confirmSubscribeButton" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">
-                確認付款
-            </button>
-        </div>
-    </div>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

@@ -222,9 +222,9 @@ const ROLE_PERMISSIONS = {
   // 新增個人統計分析 (personalStatistics) 權限，診所管理者與醫師可使用
   // 管理員不需要個人設置與個人統計分析，故移除這兩項
   // 將模板庫移至穴位庫之後，使側邊選單順序為：患者管理 -> 診症系統 -> 中藥庫 -> 穴位庫 -> 模板庫 -> 收費管理 -> 用戶管理 -> 財務報表 -> 系統管理 -> 帳號安全
-  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'subscriptionManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
+  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
   // 醫師不需要系統管理權限，將模板庫移至穴位庫之後
-  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'subscriptionManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
+  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
   // 將模板庫移至穴位庫之後
   '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'accountSecurity'],
   // 用戶無中藥庫或穴位庫權限，維持模板庫在最後
@@ -2580,15 +2580,6 @@ async function syncUserDataFromFirebase() {
                     console.error('載入個人設置時發生錯誤:', err);
                 });
             }
-
-            // 登入後檢查訂閱狀態，顯示或隱藏訂閱覆蓋層
-            if (typeof checkSubscriptionStatus === 'function') {
-                try {
-                    checkSubscriptionStatus();
-                } catch (_e) {
-                    console.error('檢查訂閱狀態時發生錯誤:', _e);
-                }
-            }
             // 統計資訊將在登入後初始化系統時更新
 
             // Show a welcome message in the appropriate language
@@ -2711,8 +2702,6 @@ async function logout() {
                 // 新增：穴位庫管理
                 acupointLibrary: { title: '穴位庫', icon: '📌', description: '查看穴位資料' },
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
-                // 新增：訂閱管理功能，用於查看訂閱狀態、過往帳單與方案選擇
-                subscriptionManagement: { title: '訂閱管理', icon: '💳', description: '查看訂閱狀態與帳單' },
                 // 將診所用戶管理的圖示更新為單人符號，以符合交換後的配置
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
                 financialReports: { title: '財務報表', icon: '📊', description: '收入分析與財務統計' },
@@ -2806,11 +2795,6 @@ async function logout() {
                 loadAcupointLibrary();
             } else if (sectionId === 'billingManagement') {
                 loadBillingManagement();
-            } else if (sectionId === 'subscriptionManagement') {
-                // 訂閱管理：載入訂閱相關資料
-                if (typeof loadSubscriptionManagement === 'function') {
-                    loadSubscriptionManagement();
-                }
             } else if (sectionId === 'financialReports') {
                 loadFinancialReports();
             } else if (sectionId === 'userManagement') {
@@ -2831,7 +2815,7 @@ async function logout() {
         // 隱藏所有區域
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'subscriptionManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
+            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
                 // 在隱藏中藥庫時，取消其資料監聽以減少 Realtime Database 讀取
                 if (id === 'herbLibrary') {
                     try {
@@ -10946,8 +10930,15 @@ async function initializeSystemAfterLogin() {
                                 ${statusText}
                             </span>
                             <div class="flex space-x-1">
-                                <button onclick="editBillingItem(${item.id})" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
-                                <button onclick="deleteBillingItem(${item.id})" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
+                                <!--
+                                  將 id 以字串形式傳遞給編輯與刪除函式，避免當文件 ID 為
+                                  字串時產生未宣告變數的錯誤。例如 Firestore 生成的文件 ID
+                                  多為隨機字串，若直接插入 onclick 中將導致瀏覽器將其當作
+                                  變數解析，觸發 ReferenceError。透過將 id 包裹在單引號內
+                                  （並轉換為字串）可確保 onclick 中傳遞的參數正確。
+                                -->
+                                <button onclick="editBillingItem('${item.id}')" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
+                                <button onclick="deleteBillingItem('${item.id}')" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
                             </div>
                         </div>
                     </div>
@@ -10999,10 +10990,13 @@ async function initializeSystemAfterLogin() {
         showToast('權限不足，無法編輯收費項目', 'error');
         return;
     }
-            const item = billingItems.find(b => b.id === id);
+            // 將 id 轉為字串以避免數字與字串比較不相等
+            const idStr = String(id);
+            const item = billingItems.find(b => String(b.id) === idStr);
             if (!item) return;
             
-            editingBillingItemId = id;
+            // 編輯狀態下儲存字串類型的 ID
+            editingBillingItemId = idStr;
             document.getElementById('billingItemFormTitle').textContent = '編輯收費項目';
             document.getElementById('billingItemSaveButtonText').textContent = '更新';
             
@@ -11088,8 +11082,10 @@ async function initializeSystemAfterLogin() {
             const saveBtn = getLoadingButtonFromEvent('button[onclick="saveBillingItem()"]');
             setButtonLoading(saveBtn);
             try {
+                // 始終使用字串作為 ID，以避免字串與數字比較造成的匹配問題
+                const newId = editingBillingItemId || String(Date.now());
                 const item = {
-                    id: editingBillingItemId || Date.now(),
+                    id: newId,
                     name: name,
                     category: category,
                     price: price,
@@ -11098,14 +11094,17 @@ async function initializeSystemAfterLogin() {
                     packageUses: packageUses,
                     validityDays: validityDays,
                     active: document.getElementById('billingItemActive').checked,
-                    createdAt: editingBillingItemId ? billingItems.find(b => b.id === editingBillingItemId).createdAt : new Date().toISOString(),
+                    createdAt: editingBillingItemId ? (billingItems.find(b => String(b.id) === String(editingBillingItemId)) || {}).createdAt : new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 };
 
                 // 更新本地資料及提示訊息
                 if (editingBillingItemId) {
-                    const index = billingItems.findIndex(b => b.id === editingBillingItemId);
-                    billingItems[index] = item;
+                    // 以字串形式比較 ID，以確保能正確找到並覆寫原項目
+                    const index = billingItems.findIndex(b => String(b.id) === String(editingBillingItemId));
+                    if (index !== -1) {
+                        billingItems[index] = item;
+                    }
                     showToast('收費項目已更新！', 'success');
                 } else {
                     billingItems.push(item);
@@ -11143,7 +11142,9 @@ async function initializeSystemAfterLogin() {
         showToast('權限不足，無法刪除收費項目', 'error');
         return;
     }
-            const item = billingItems.find(b => b.id === id);
+            // 將 id 轉為字串以避免數字與字串比較不相等
+            const idStr = String(id);
+            const item = billingItems.find(b => String(b.id) === idStr);
             if (!item) return;
             
             // 刪除收費項目確認訊息支援中英文
@@ -11153,7 +11154,7 @@ async function initializeSystemAfterLogin() {
                 const enMsgDel = `Are you sure you want to delete the billing item \"${item.name}\"?\n\nThis action cannot be undone!`;
                 const confirmDel = confirm(langDel === 'en' ? enMsgDel : zhMsgDel);
                 if (confirmDel) {
-                    billingItems = billingItems.filter(b => b.id !== id);
+                    billingItems = billingItems.filter(b => String(b.id) !== idStr);
                     try {
                         await window.firebase.deleteDoc(
                             window.firebase.doc(window.firebase.db, 'billingItems', String(id))
@@ -11710,7 +11711,7 @@ async function initializeSystemAfterLogin() {
                 const bgColor = getCategoryBgColor(item.category);
                 
                 return `
-                    <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToBilling(${item.id})">
+                    <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToBilling('${item.id}')">
                         <div class="text-center">
                             <div class="font-semibold text-gray-900 text-sm mb-1">${item.name}</div>
                             <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${categoryName}</div>
@@ -11745,7 +11746,9 @@ async function initializeSystemAfterLogin() {
         
         // 添加到收費項目
         function addToBilling(itemId) {
-            const item = billingItems.find(b => b.id === itemId);
+            // 將 ID 轉為字串以確保與資料中的 ID 比對一致
+            const idStr = String(itemId);
+            const item = billingItems.find(b => String(b.id) === idStr);
             if (!item) return;
 
             // 如為套票項目且目前不允許修改套票，則停止並顯示警告
@@ -11777,7 +11780,7 @@ async function initializeSystemAfterLogin() {
             }
 
             // 檢查是否已經添加過相同 ID
-            const existingIndex = selectedBillingItems.findIndex(b => b.id === itemId);
+            const existingIndex = selectedBillingItems.findIndex(b => String(b.id) === idStr);
             if (existingIndex !== -1) {
                 // 如果已存在
                 const existingItem = selectedBillingItems[existingIndex];
@@ -11791,7 +11794,7 @@ async function initializeSystemAfterLogin() {
             } else {
                 // 添加新項目
                 const billingItem = {
-                    id: itemId,
+                    id: idStr,
                     name: item.name,
                     category: item.category,
                     price: item.price,
@@ -12638,231 +12641,6 @@ const consultationDate = (() => {
     const d = parseConsultationDate(consultation.date);
     return d ? d.toLocaleDateString('zh-TW') : '未知日期';
 })();
-
-// -------------------- Stripe 訂閱管理與付款處理 --------------------
-// 使用者提供的 Stripe 公鑰，僅用於前端。請勿將 Secret Key 放在前端。
-window.STRIPE_PUBLISHABLE_KEY = 'pk_live_51S94JcPdaNspRDa9zFsCJR1byzISvUjXxKhqiyEnI3SJdhcsLxI4OrMNwvFI54HHAKUtsppCdx0CiMtl90X51PWp00BzXzEMmf';
-
-// 全域變數以儲存 Stripe 實例與元素實例
-let stripeInstance = null;
-let stripeElementsInstance = null;
-
-/**
- * 初始化 Stripe Payment Element 並掛載至指定容器。
- * @param {string} clientSecret 從後端取得的 client secret
- */
-function initializeStripePayment(clientSecret) {
-  if (!window.STRIPE_PUBLISHABLE_KEY) {
-    console.error('未設置 STRIPE_PUBLISHABLE_KEY，無法初始化 Stripe');
-    return;
-  }
-  if (!clientSecret) {
-    console.error('缺少 clientSecret，無法初始化 Payment Element');
-    return;
-  }
-  try {
-    // 若未初始化，先建立新的 Stripe 實例
-    if (!stripeInstance) {
-      stripeInstance = Stripe(window.STRIPE_PUBLISHABLE_KEY);
-    }
-    // 創建 Elements 實例
-    stripeElementsInstance = stripeInstance.elements({ clientSecret });
-    const paymentElement = stripeElementsInstance.create('payment');
-    // 將付款元件掛載至容器
-    const container = document.getElementById('payment-element-container');
-    if (container) {
-      // 先清空容器，確保不會重複掛載
-      container.innerHTML = '';
-      paymentElement.mount(container);
-    }
-  } catch (err) {
-    console.error('初始化 Stripe Payment Element 失敗：', err);
-  }
-}
-
-/**
- * 檢查當前用戶的訂閱狀態。
- * 如果沒有有效訂閱，顯示訂閱覆蓋層並初始化付款元件。
- * 在登入後或付款完成後呼叫。
- */
-async function checkSubscriptionStatus() {
-  try {
-    // 假設後端 API 接受 uid 參數，並回傳 { active: boolean, clientSecret?: string }
-    const uid = (currentUserData && currentUserData.id) || '';
-    const response = await fetch(`/api/check-subscription?uid=${encodeURIComponent(uid)}`);
-    const data = await response.json();
-    const overlay = document.getElementById('subscriptionOverlay');
-    if (!data.active) {
-      // 若未訂閱，顯示覆蓋層並初始化付款表單
-      if (overlay) {
-        overlay.classList.remove('hidden');
-      }
-      if (data.clientSecret) {
-        initializeStripePayment(data.clientSecret);
-      }
-    } else {
-      // 有效訂閱，隱藏覆蓋層
-      if (overlay) {
-        overlay.classList.add('hidden');
-      }
-    }
-  } catch (err) {
-    console.error('檢查訂閱狀態失敗：', err);
-  }
-}
-
-/**
- * 提交付款，確認用戶輸入的付款方式並完成訂閱。
- */
-async function subscribeSubmit() {
-  try {
-    if (!stripeInstance || !stripeElementsInstance) {
-      console.error('Stripe 尚未初始化');
-      return;
-    }
-    const { error } = await stripeInstance.confirmPayment({
-      elements: stripeElementsInstance,
-      confirmParams: {
-        return_url: window.location.href,
-      },
-    });
-    if (error) {
-      console.error('付款確認錯誤：', error);
-      showToast(error.message || '付款失敗', 'error');
-    } else {
-      showToast('付款完成，正在更新訂閱狀態…', 'success');
-      // 付款成功後重新檢查訂閱狀態
-      checkSubscriptionStatus();
-    }
-  } catch (err) {
-    console.error('付款處理失敗：', err);
-  }
-}
-
-/**
- * 載入訂閱管理頁面資料。
- * 會呼叫 /api/subscription-info 以取得訂閱狀態、下一次扣款日、可選方案與目前方案。
- * 然後更新 UI。
- */
-async function loadSubscriptionManagement() {
-  try {
-    const uid = (currentUserData && currentUserData.id) || '';
-    const resp = await fetch(`/api/subscription-info?uid=${encodeURIComponent(uid)}`);
-    const data = await resp.json();
-    updateSubscriptionManagementUI(data);
-  } catch (err) {
-    console.error('載入訂閱管理資訊失敗：', err);
-  }
-}
-
-/**
- * 更新訂閱管理 UI，包括訂閱狀態、方案選擇、下一次扣款日及帳單列表。
- * @param {Object} data 從後端取得的訂閱資訊
- */
-function updateSubscriptionManagementUI(data) {
-  const statusEl = document.getElementById('subscriptionStatusText');
-  const nextPaymentEl = document.getElementById('nextPaymentText');
-  const planSelect = document.getElementById('planSelect');
-  const planAmountEl = document.getElementById('planAmountText');
-  const invoiceTableBody = document.getElementById('invoiceTableBody');
-  if (statusEl) {
-    statusEl.textContent = data.active ? '已啟用' : '尚未啟用';
-    statusEl.className = data.active ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold';
-  }
-  if (nextPaymentEl) {
-    nextPaymentEl.textContent = data.nextPayment ? new Date(data.nextPayment).toLocaleDateString() : '—';
-  }
-  if (planSelect && Array.isArray(data.plans)) {
-    // 清除選項
-    planSelect.innerHTML = '';
-    data.plans.forEach(plan => {
-      const opt = document.createElement('option');
-      opt.value = plan.id;
-      opt.textContent = plan.name;
-      planSelect.appendChild(opt);
-    });
-    // 設定當前方案
-    if (data.currentPlan) {
-      planSelect.value = data.currentPlan.id;
-      if (planAmountEl) planAmountEl.textContent = data.currentPlan.amount;
-    } else if (planAmountEl) {
-      planAmountEl.textContent = '';
-    }
-    // 監聽選擇變更事件，更新顯示的金額
-    planSelect.onchange = function () {
-      const selected = data.plans.find(p => p.id === planSelect.value);
-      if (selected && planAmountEl) {
-        planAmountEl.textContent = selected.amount;
-      }
-    };
-  }
-  // 更新帳單列表（invoices）
-  if (invoiceTableBody) {
-    invoiceTableBody.innerHTML = '';
-    if (Array.isArray(data.invoices) && data.invoices.length > 0) {
-      data.invoices.forEach(inv => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="px-4 py-2">${inv.date || ''}</td>
-          <td class="px-4 py-2">${inv.amount || ''}</td>
-          <td class="px-4 py-2">${inv.status || ''}</td>
-        `;
-        invoiceTableBody.appendChild(tr);
-      });
-    } else {
-      const tr = document.createElement('tr');
-      tr.innerHTML = '<td colspan="3" class="text-center text-gray-500 py-4">尚無帳單紀錄</td>';
-      invoiceTableBody.appendChild(tr);
-    }
-  }
-}
-
-// 掛載至全域，供其他模組調用
-window.initializeStripePayment = initializeStripePayment;
-window.checkSubscriptionStatus = checkSubscriptionStatus;
-window.subscribeSubmit = subscribeSubmit;
-window.loadSubscriptionManagement = loadSubscriptionManagement;
-window.updateSubscriptionManagementUI = updateSubscriptionManagementUI;
-
-// 在 DOMContentLoaded 時綁定覆蓋層與訂閱按鈕事件
-document.addEventListener('DOMContentLoaded', function () {
-  // 覆蓋層的付款確認按鈕
-  const confirmBtn = document.getElementById('confirmSubscribeButton');
-  if (confirmBtn) {
-    confirmBtn.addEventListener('click', function () {
-      subscribeSubmit();
-    });
-  }
-  // 訂閱管理頁面的「立即訂閱 / 變更方案」按鈕
-  const subscribeNowBtn = document.getElementById('subscribeNowButton');
-  if (subscribeNowBtn) {
-    subscribeNowBtn.addEventListener('click', async function () {
-      const planSelectEl = document.getElementById('planSelect');
-      const selectedPlanId = planSelectEl ? planSelectEl.value : '';
-      const uid = (currentUserData && currentUserData.id) || '';
-      try {
-        const resp = await fetch('/api/create-subscription', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uid: uid, planId: selectedPlanId })
-        });
-        const respData = await resp.json();
-        if (respData && respData.clientSecret) {
-          const overlay = document.getElementById('subscriptionOverlay');
-          if (overlay) overlay.classList.remove('hidden');
-          initializeStripePayment(respData.clientSecret);
-        } else {
-          showToast('無法取得訂閱資訊', 'error');
-        }
-      } catch (err) {
-        console.error('建立訂閱失敗：', err);
-        showToast('建立訂閱失敗', 'error');
-      }
-    });
-  }
-});
-
-// -------------------------------------------------------------------
             
             // 直接載入病歷，不彈出確認提示視窗
             // 注意：此操作會覆蓋當前已填寫的診症內容（主訴、舌象、脈象、診斷、處方、收費項目、醫囑等），且無法復原。
