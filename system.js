@@ -7274,10 +7274,10 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         // Rebuild medication information according to language
         let medInfoLocalized = '';
         if (medDays) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
         }
         if (medFreq) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
         }
         if (consultation.usage) {
             medInfoLocalized += '<strong>' + (isEnglish ? 'Administration Method' : '服用方法') + colon + '</strong>' + consultation.usage;
@@ -10930,8 +10930,15 @@ async function initializeSystemAfterLogin() {
                                 ${statusText}
                             </span>
                             <div class="flex space-x-1">
-                                <button onclick="editBillingItem(${item.id})" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
-                                <button onclick="deleteBillingItem(${item.id})" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
+                                <!--
+                                  將 id 以字串形式傳遞給編輯與刪除函式，避免當文件 ID 為
+                                  字串時產生未宣告變數的錯誤。例如 Firestore 生成的文件 ID
+                                  多為隨機字串，若直接插入 onclick 中將導致瀏覽器將其當作
+                                  變數解析，觸發 ReferenceError。透過將 id 包裹在單引號內
+                                  （並轉換為字串）可確保 onclick 中傳遞的參數正確。
+                                -->
+                                <button onclick="editBillingItem('${item.id}')" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
+                                <button onclick="deleteBillingItem('${item.id}')" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
                             </div>
                         </div>
                     </div>
@@ -10983,10 +10990,13 @@ async function initializeSystemAfterLogin() {
         showToast('權限不足，無法編輯收費項目', 'error');
         return;
     }
-            const item = billingItems.find(b => b.id === id);
+            // 將 id 轉為字串以避免數字與字串比較不相等
+            const idStr = String(id);
+            const item = billingItems.find(b => String(b.id) === idStr);
             if (!item) return;
             
-            editingBillingItemId = id;
+            // 編輯狀態下儲存字串類型的 ID
+            editingBillingItemId = idStr;
             document.getElementById('billingItemFormTitle').textContent = '編輯收費項目';
             document.getElementById('billingItemSaveButtonText').textContent = '更新';
             
@@ -11072,8 +11082,10 @@ async function initializeSystemAfterLogin() {
             const saveBtn = getLoadingButtonFromEvent('button[onclick="saveBillingItem()"]');
             setButtonLoading(saveBtn);
             try {
+                // 始終使用字串作為 ID，以避免字串與數字比較造成的匹配問題
+                const newId = editingBillingItemId || String(Date.now());
                 const item = {
-                    id: editingBillingItemId || Date.now(),
+                    id: newId,
                     name: name,
                     category: category,
                     price: price,
@@ -11082,14 +11094,17 @@ async function initializeSystemAfterLogin() {
                     packageUses: packageUses,
                     validityDays: validityDays,
                     active: document.getElementById('billingItemActive').checked,
-                    createdAt: editingBillingItemId ? billingItems.find(b => b.id === editingBillingItemId).createdAt : new Date().toISOString(),
+                    createdAt: editingBillingItemId ? (billingItems.find(b => String(b.id) === String(editingBillingItemId)) || {}).createdAt : new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 };
 
                 // 更新本地資料及提示訊息
                 if (editingBillingItemId) {
-                    const index = billingItems.findIndex(b => b.id === editingBillingItemId);
-                    billingItems[index] = item;
+                    // 以字串形式比較 ID，以確保能正確找到並覆寫原項目
+                    const index = billingItems.findIndex(b => String(b.id) === String(editingBillingItemId));
+                    if (index !== -1) {
+                        billingItems[index] = item;
+                    }
                     showToast('收費項目已更新！', 'success');
                 } else {
                     billingItems.push(item);
@@ -11127,7 +11142,9 @@ async function initializeSystemAfterLogin() {
         showToast('權限不足，無法刪除收費項目', 'error');
         return;
     }
-            const item = billingItems.find(b => b.id === id);
+            // 將 id 轉為字串以避免數字與字串比較不相等
+            const idStr = String(id);
+            const item = billingItems.find(b => String(b.id) === idStr);
             if (!item) return;
             
             // 刪除收費項目確認訊息支援中英文
@@ -11137,7 +11154,7 @@ async function initializeSystemAfterLogin() {
                 const enMsgDel = `Are you sure you want to delete the billing item \"${item.name}\"?\n\nThis action cannot be undone!`;
                 const confirmDel = confirm(langDel === 'en' ? enMsgDel : zhMsgDel);
                 if (confirmDel) {
-                    billingItems = billingItems.filter(b => b.id !== id);
+                    billingItems = billingItems.filter(b => String(b.id) !== idStr);
                     try {
                         await window.firebase.deleteDoc(
                             window.firebase.doc(window.firebase.db, 'billingItems', String(id))
@@ -11694,7 +11711,7 @@ async function initializeSystemAfterLogin() {
                 const bgColor = getCategoryBgColor(item.category);
                 
                 return `
-                    <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToBilling(${item.id})">
+                    <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToBilling('${item.id}')">
                         <div class="text-center">
                             <div class="font-semibold text-gray-900 text-sm mb-1">${item.name}</div>
                             <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${categoryName}</div>
@@ -11729,7 +11746,9 @@ async function initializeSystemAfterLogin() {
         
         // 添加到收費項目
         function addToBilling(itemId) {
-            const item = billingItems.find(b => b.id === itemId);
+            // 將 ID 轉為字串以確保與資料中的 ID 比對一致
+            const idStr = String(itemId);
+            const item = billingItems.find(b => String(b.id) === idStr);
             if (!item) return;
 
             // 如為套票項目且目前不允許修改套票，則停止並顯示警告
@@ -11761,7 +11780,7 @@ async function initializeSystemAfterLogin() {
             }
 
             // 檢查是否已經添加過相同 ID
-            const existingIndex = selectedBillingItems.findIndex(b => b.id === itemId);
+            const existingIndex = selectedBillingItems.findIndex(b => String(b.id) === idStr);
             if (existingIndex !== -1) {
                 // 如果已存在
                 const existingItem = selectedBillingItems[existingIndex];
@@ -11775,7 +11794,7 @@ async function initializeSystemAfterLogin() {
             } else {
                 // 添加新項目
                 const billingItem = {
-                    id: itemId,
+                    id: idStr,
                     name: item.name,
                     category: item.category,
                     price: item.price,
