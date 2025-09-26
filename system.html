@@ -7,14 +7,11 @@
     <!-- 新增網站圖標 (favicon) -->
     <link rel="icon" type="image/png" href="images/myLogo.png">
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 FullCalendar 樣式 -->
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
-    <!-- 引入 FullCalendar Scheduler 樣式 -->
-    <link href="https://cdn.jsdelivr.net/npm/@fullcalendar/resource-timegrid@6.1.8/index.global.min.css" rel="stylesheet">
     <!-- Firebase SDK -->
 <script type="module" src="firebase_init.js"></script>
-    <!-- 引入 FullCalendar Scheduler 套件（包含核心、互動與資源排程插件） -->
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar-scheduler@6.1.8/index.global.min.js"></script>
+    <!-- FullCalendar CSS and JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Noto Sans TC', sans-serif; }
@@ -88,15 +85,6 @@
         #formAcupunctureNotes span[data-acupoint-name] {
             /* 使用與 Tailwind text-sm 相當的字體大小 (0.875rem) 以提升可讀性 */
             font-size: 0.875rem;
-        }
-
-        /*
-         * 保持行事曆容器至少有一定高度，避免在切換區域時因父層元素尚未計算尺寸而導致
-         * FullCalendar 初始化時計算出的高度為 0，造成日曆不顯示。設定最小高度後，
-         * 即使元素剛從 hidden 類別切換為顯示狀態，也能為日曆提供足夠的渲染空間。
-         */
-        #calendar {
-            min-height: 600px;
         }
 
         /*
@@ -235,6 +223,30 @@
                 
             </div>
             <!-- 登入頁面不再包含版權聲明，由全局頁腳統一呈現 -->
+        </div>
+
+        <!-- 行事曆排班區 -->
+        <div id="scheduleCalendar" class="hidden max-w-7xl mx-auto px-4 py-6">
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-blue-800 mb-6 flex items-center">
+              <span class="text-3xl mr-3">📅</span>
+              <span data-original-text="行事曆排班">行事曆排班</span>
+            </h2>
+            <!-- 選擇醫師或護理師與匯出按鈕 -->
+            <div class="flex flex-col md:flex-row items-start md:items-center gap-4 mb-4">
+              <div class="flex items-center gap-2">
+                <label for="scheduleUserSelect" class="text-sm font-medium text-gray-700 whitespace-nowrap">選擇醫師/護理師</label>
+                <select id="scheduleUserSelect" class="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <!-- 選項由系統.js 動態產生 -->
+                </select>
+              </div>
+              <button id="exportCalendarButton" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200 whitespace-nowrap">
+                <span data-original-text="匯出行事曆">匯出行事曆</span>
+              </button>
+            </div>
+            <!-- 行事曆容器 -->
+            <div id="calendar" class="mt-4"></div>
+          </div>
         </div>
 
     </div>
@@ -1500,21 +1512,6 @@
                     </table>
                 </div>
             </div>
-            <!-- 行事曆與排班頁面 -->
-            <div id="calendarSchedule" class="hidden bg-white rounded-xl shadow-lg p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4"><span class="text-3xl mr-3">📅</span>行事曆與排班</h2>
-                <!-- 工具列：可放置同步與導出按鈕 -->
-                <div id="calendarToolbar" class="mb-4 flex flex-wrap items-center gap-4">
-                    <!-- 導出 iCal 按鈕 -->
-                    <button id="exportICalButton" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
-                        匯出 iCal
-                    </button>
-                </div>
-                <!-- 日曆容器 -->
-                <!-- 日曆容器移除 overflow-hidden，以免 FullCalendar 內容被截斷 -->
-                <div id="calendar" class="bg-white rounded-lg shadow-inner"></div>
-            </div>
-
 <!-- 財務報表 -->
             <div id="financialReports" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="mb-6">
