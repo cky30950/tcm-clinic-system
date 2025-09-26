@@ -276,6 +276,97 @@ let personalHerbChartInstance = null;
 let personalFormulaChartInstance = null;
 let personalAcupointChartInstance = null;
 
+// ================== Jitsi 視訊診症支援 ==================
+// 全域變數：當前 Jitsi 視訊會議 API 實例
+// 用於控制和銷毀會議，避免重複初始化
+let currentJitsiApi = null;
+
+/**
+ * 開啟視訊診症彈窗並加入 Jitsi 房間。
+ *
+ * 若已有先前的會議實例，將先銷毀以避免重複串流。
+ * @param {number|string} appointmentId 掛號 ID，用於生成唯一房間名稱
+ */
+function openVideoConsultationModal(appointmentId) {
+  try {
+    const modal = document.getElementById('videoConsultationModal');
+    const container = document.getElementById('jitsiContainer');
+    if (!modal || !container) {
+      console.error('找不到視訊診症容器或彈窗。');
+      return;
+    }
+    // 如已有舊的會議，先銷毀
+    if (window.currentJitsiApi) {
+      try {
+        window.currentJitsiApi.dispose();
+      } catch (_e) {
+        // 忽略銷毀錯誤
+      }
+      window.currentJitsiApi = null;
+    }
+    // 清空會議容器內容
+    container.innerHTML = '';
+    // 使用掛號 ID 建立房間名稱，確保每場診症唯一
+    const roomName = 'consultation-' + appointmentId;
+    const domain = 'meet.jit.si';
+    const options = {
+      roomName: roomName,
+      parentNode: container,
+      // 將用戶資訊帶入會議顯示名稱
+      userInfo: {
+        displayName: (currentUserData && (currentUserData.name || currentUserData.username)) || ''
+      }
+    };
+    try {
+      // 建立新的 Jitsi 會議
+      const api = new JitsiMeetExternalAPI(domain, options);
+      window.currentJitsiApi = api;
+    } catch (e) {
+      console.error('建立 Jitsi 會議時發生錯誤', e);
+    }
+    // 顯示視訊診症彈窗
+    modal.classList.remove('hidden');
+  } catch (e) {
+    console.error('開啟視訊診症彈窗失敗', e);
+  }
+}
+
+/**
+ * 關閉視訊診症彈窗並銷毀會議。
+ */
+function closeVideoConsultationModal() {
+  try {
+    const modal = document.getElementById('videoConsultationModal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+    if (window.currentJitsiApi) {
+      try {
+        window.currentJitsiApi.dispose();
+      } catch (_e) {
+        // 忽略銷毀失敗
+      }
+      window.currentJitsiApi = null;
+    }
+  } catch (e) {
+    console.error('關閉視訊診症彈窗失敗', e);
+  }
+}
+
+/**
+ * 觸發視訊診症功能，供掛號操作按鈕使用。
+ *
+ * @param {number|string} appointmentId 掛號 ID
+ */
+function startVideoConsultation(appointmentId) {
+  openVideoConsultationModal(appointmentId);
+}
+
+// 將視訊診症相關函式掛到 window，使可從 HTML 按鈕調用
+window.openVideoConsultationModal = openVideoConsultationModal;
+window.closeVideoConsultationModal = closeVideoConsultationModal;
+window.startVideoConsultation = startVideoConsultation;
+
 /**
  * 計算全院中藥與方劑的使用次數。
  * 遍歷 consultations 中的 prescription，每行取出藥名並累計。
@@ -5253,6 +5344,8 @@ function getOperationButtons(appointment, patient = null) {
             } else {
                 if (isAppointmentDoctor) {
                     buttons.push(`<button onclick="startConsultation(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs transition duration-200">開始診症</button>`);
+                    // 新增視訊診症按鈕，僅供該掛號醫師使用
+                    buttons.push(`<button onclick="startVideoConsultation(${appointment.id})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs transition duration-200">視訊診症</button>`);
                 }
             }
             break;
@@ -5260,6 +5353,8 @@ function getOperationButtons(appointment, patient = null) {
         case 'consulting':
             if (isAppointmentDoctor) {
                 buttons.push(`<button onclick="continueConsultation(${appointment.id})" class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs transition duration-200">繼續診症</button>`);
+                // 新增視訊診症按鈕，診症中也可啟動
+                buttons.push(`<button onclick="startVideoConsultation(${appointment.id})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs transition duration-200">視訊診症</button>`);
             }
             break;
             
@@ -7377,10 +7472,10 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         // Rebuild medication information according to language
         let medInfoLocalized = '';
         if (medDays) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
         }
         if (medFreq) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
         }
         if (consultation.usage) {
             medInfoLocalized += '<strong>' + (isEnglish ? 'Administration Method' : '服用方法') + colon + '</strong>' + consultation.usage;
