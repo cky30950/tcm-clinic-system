@@ -21927,6 +21927,16 @@ function hideGlobalCopyright() {
           if (!calendarEl) return;
           calendarEl.innerHTML = '<div class="text-center text-gray-500 p-4">載入中...</div>';
           const doctors = await fetchDoctorsList();
+          // 若沒有任何醫師資料，顯示提示並停止初始化日曆
+          if (!doctors || doctors.length === 0) {
+              calendarEl.innerHTML = '<div class="text-center text-gray-500 p-4">尚無醫師資料，請先建立醫師用戶</div>';
+              // 移除匯出按鈕的綁定
+              const exportBtn = document.getElementById('exportICalButton');
+              if (exportBtn) {
+                  exportBtn.onclick = null;
+              }
+              return;
+          }
           const schedules = await fetchSchedules(true);
           const events = transformSchedulesToEvents(schedules);
           calendarInstance = new FullCalendar.Calendar(calendarEl, {
@@ -22010,6 +22020,14 @@ function hideGlobalCopyright() {
               }
           });
           calendarInstance.render();
+          // 在下一個事件循環呼叫 updateSize()，確保元素已完全顯示後再重新計算尺寸。
+          setTimeout(() => {
+              try {
+                  calendarInstance.updateSize();
+              } catch (_e) {
+                  // 忽略更新失敗
+              }
+          }, 0);
           const exportBtn = document.getElementById('exportICalButton');
           if (exportBtn) {
               exportBtn.onclick = () => {
