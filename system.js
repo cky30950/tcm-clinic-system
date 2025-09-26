@@ -2590,12 +2590,12 @@ async function syncUserDataFromFirebase() {
                 const msg = lang === 'en' ? enMsg : zhMsg;
                 showToast(msg, 'success');
 
-                // 登入後啟動閒置監控。在顯示歡迎訊息後立即啟動，以便後續長時間未操作可自動登出。
+                // 登入後啟動閒置監控，當使用者長時間未操作時自動登出
                 if (typeof window.startInactivityMonitoring === 'function') {
                     try {
                         window.startInactivityMonitoring();
                     } catch (_e) {
-                        // 若啟動失敗則忽略
+                        // 忽略啟動失敗
                     }
                 }
             }
@@ -2645,12 +2645,12 @@ async function logout() {
         currentUser = null;
         currentUserData = null;
 
-        // 登出時停止閒置監控，避免在使用者已登出後仍觸發自動登出。
+        // 登出時停止閒置監控，避免在已登出後仍觸發自動登出
         if (typeof window.stopInactivityMonitoring === 'function') {
             try {
                 window.stopInactivityMonitoring();
             } catch (_e) {
-                // 忽略停止閒置監控時的錯誤
+                // Ignore errors when stopping inactivity monitoring
             }
         }
         
@@ -21773,10 +21773,8 @@ function hideGlobalCopyright() {
 (function() {
   /**
    * 處理全局按鍵事件，提供在彈窗中按 Enter 確認與按 Esc 關閉的快捷操作。
-   * 當系統主畫面（mainSystem）顯示且有彈窗開啟時，攔截按鍵：
-   *  - Escape：尋找彈窗內的取消/關閉按鈕或直接隱藏彈窗。
-   *  - Enter：尋找彈窗內的主要操作按鈕（如儲存/確認/套用），並觸發其點擊事件。
-   * 若處於登入頁或無彈窗顯示，則不處理這些快捷鍵。
+   * 僅在主系統畫面顯示時運作，並且只對具有 id 包含 "Modal" 的視窗處理。
+   * 如果沒有彈窗開啟，按 Esc 則會關閉側邊功能選單（若其開啟中）。
    *
    * @param {KeyboardEvent} ev 鍵盤事件
    */
@@ -21790,58 +21788,89 @@ function hideGlobalCopyright() {
     if (!mainSystemEl || mainSystemEl.classList.contains('hidden')) {
       return;
     }
-    // 取得所有以 .fixed 定位且目前顯示的彈窗
-    const modals = Array.from(document.querySelectorAll('.fixed')).filter(el => !el.classList.contains('hidden'));
-    if (modals.length === 0) {
-      return;
-    }
-    // 取得頂層彈窗（假設後渲染者覆蓋先前者）
-    const modal = modals[modals.length - 1];
-    if (!modal) return;
+    // 收集所有固定定位且未隱藏的彈窗，限定 id 中包含 modal 字串（不分大小寫）
+    const modals = Array.from(document.querySelectorAll('.fixed')).filter(el => {
+      const id = el.id || '';
+      return !el.classList.contains('hidden') && /modal/i.test(id);
+    });
+    // 取得事件目標元素資訊，用於判斷是否為輸入欄位或可編輯元素
+    const target = ev.target;
+    const tagName = target && target.tagName ? target.tagName.toUpperCase() : '';
+    const isEditableInput =
+      tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || (target && target.isContentEditable);
+
     if (key === 'Escape') {
-      // 嘗試尋找取消或關閉按鈕：優先使用 id/onclick 名稱含 cancel/close/hide，或灰色背景按鈕
-      let cancelBtn =
-        modal.querySelector('button[id*="cancel" i]') ||
-        modal.querySelector('button[id*="hide" i]') ||
-        modal.querySelector('button[id*="close" i]') ||
-        modal.querySelector('button[onclick*="hide"]') ||
-        modal.querySelector('button[onclick*="close"]') ||
-        modal.querySelector('button[class*="bg-gray"]') ||
-        modal.querySelector('button[class*="text-gray-500"]');
-      // 若找不到，嘗試尋找內含叉號或任何按鈕
-      if (!cancelBtn) {
-        cancelBtn = modal.querySelector('button, span');
-      }
-      if (cancelBtn && typeof cancelBtn.click === 'function') {
-        cancelBtn.click();
+      if (modals.length > 0) {
+        // 取得最上層彈窗
+        const modal = modals[modals.length - 1];
+        // 嘗試尋找取消或關閉按鈕
+        let cancelBtn =
+          modal.querySelector('button[id*="cancel" i]') ||
+          modal.querySelector('button[id*="hide" i]') ||
+          modal.querySelector('button[id*="close" i]') ||
+          modal.querySelector('button[onclick*="hide"]') ||
+          modal.querySelector('button[onclick*="close"]') ||
+          modal.querySelector('button[class*="bg-gray"]') ||
+          modal.querySelector('button[class*="text-gray-500"]');
+        // 若找不到，嘗試找第一個按鈕或 span (通常為叉號)
+        if (!cancelBtn) {
+          cancelBtn = modal.querySelector('button, span');
+        }
+        if (cancelBtn && typeof cancelBtn.click === 'function') {
+          cancelBtn.click();
+        } else {
+          // 找不到可點擊的關閉按鈕則隱藏彈窗
+          modal.classList.add('hidden');
+        }
+        // 阻止事件的預設行為與冒泡，避免其他處理器重複處理
+        ev.preventDefault();
+        ev.stopPropagation();
       } else {
-        // 若找不到可點擊的關閉按鈕，直接隱藏彈窗
-        modal.classList.add('hidden');
+        // 無彈窗時，若側邊欄開啟，按 Esc 關閉側邊欄
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+          if (typeof toggleSidebar === 'function') {
+            toggleSidebar();
+            // 阻止事件的預設行為與冒泡
+            ev.preventDefault();
+            ev.stopPropagation();
+          }
+        }
       }
-      ev.preventDefault();
     } else if (key === 'Enter') {
-      // 搜尋主要操作按鈕：id 或文本含 save/confirm/apply/ok 或常見中文文案
+      // 若沒有彈窗開啟則不處理 Enter 鍵
+      if (modals.length === 0) {
+        return;
+      }
+      // 如果目前焦點在輸入框、文字區域或可編輯區域，則不攔截 Enter
+      if (isEditableInput) {
+        return;
+      }
+      const modal = modals[modals.length - 1];
+      // 尋找主要操作按鈕：id 或文本含 save/confirm/apply/ok 或常見中文文案
       const buttons = Array.from(modal.querySelectorAll('button')).filter(btn => !btn.disabled && btn.offsetParent !== null);
       let confirmBtn =
         buttons.find(btn => {
-          const id = btn.id || '';
-          return /save|confirm|apply|ok/i.test(id);
+          const idAttr = btn.id || '';
+          return /save|confirm|apply|ok/i.test(idAttr);
         }) ||
         buttons.find(btn => {
-          const text = btn.textContent || '';
+          const text = (btn.textContent || '').trim();
           return /儲存|保存|更新|確定|套用|新增/.test(text);
         });
       // 若未找到，取第一個背景非灰的按鈕
       if (!confirmBtn) {
         confirmBtn = buttons.find(btn => !/bg-gray/.test(btn.className || ''));
       }
-      // 若仍找不到則取最後一個按鈕（一般位於最右）
+      // 若仍找不到則取最後一個按鈕
       if (!confirmBtn && buttons.length > 0) {
         confirmBtn = buttons[buttons.length - 1];
       }
       if (confirmBtn && typeof confirmBtn.click === 'function') {
         confirmBtn.click();
+        // 阻止事件的預設行為與冒泡，避免重複觸發
         ev.preventDefault();
+        ev.stopPropagation();
       }
     }
   }
@@ -21849,14 +21878,15 @@ function hideGlobalCopyright() {
   // 註冊全局鍵盤監聽
   document.addEventListener('keydown', handleGlobalKeyDown);
 
-  // 以下為閒置自動登出機制
-  const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 分鐘未操作即自動登出
+  // ======== 閒置自動登出相關邏輯 ========
+  // 閒置時間限制（毫秒），預設為 30 分鐘
+  const INACTIVITY_LIMIT = 30 * 60 * 1000;
   let inactivityTimeoutId = null;
   let activityHandler = null;
   const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
 
   /**
-   * 重置閒置計時器。在使用者有互動時呼叫。
+   * 重置閒置計時器：當使用者有任何互動時呼叫。
    */
   function resetInactivityTimer() {
     if (inactivityTimeoutId) {
@@ -21866,7 +21896,6 @@ function hideGlobalCopyright() {
       try {
         // 提示使用者並自動登出
         if (typeof showToast === 'function') {
-          // 中文與英文提示皆給出，後續翻譯函式可根據語言切換正確文案
           const lang = localStorage.getItem('lang') || 'zh';
           const zhMsg = '閒置時間過長，自動登出';
           const enMsg = 'Logged out due to inactivity';
@@ -21876,49 +21905,44 @@ function hideGlobalCopyright() {
           logout();
         }
       } catch (e) {
-        // 若登出過程出現錯誤則輸出於控制台
         console.error('自動登出時發生錯誤:', e);
       }
     }, INACTIVITY_LIMIT);
   }
 
   /**
-   * 開始監測使用者互動並在閒置時登出。登入後應呼叫本函式。
+   * 啟動閒置監控：登入後呼叫。
    */
   function startInactivityMonitoring() {
-    // 先停止既有監控以避免重複綁定
+    // 避免重複綁定：先取消再重新綁定
     stopInactivityMonitoring();
-    // 建立事件處理函式
     activityHandler = function() {
       resetInactivityTimer();
     };
-    // 綁定所有監測事件
     activityEvents.forEach(evt => {
       document.addEventListener(evt, activityHandler);
     });
-    // 初始化計時
+    // 初始啟動計時器
     resetInactivityTimer();
   }
 
   /**
-   * 停止監測使用者互動並清除計時器。登出時呼叫。
+   * 停止閒置監控：登出後呼叫。
    */
   function stopInactivityMonitoring() {
-    // 移除事件監聽
     if (activityHandler) {
       activityEvents.forEach(evt => {
         document.removeEventListener(evt, activityHandler);
       });
       activityHandler = null;
     }
-    // 清除計時器
     if (inactivityTimeoutId) {
       clearTimeout(inactivityTimeoutId);
       inactivityTimeoutId = null;
     }
   }
 
-  // 將監控函式掛到 window，供其他模組調用
+  // 將控制函式掛到 window，供其他模組調用
   window.startInactivityMonitoring = startInactivityMonitoring;
   window.stopInactivityMonitoring = stopInactivityMonitoring;
 })();
