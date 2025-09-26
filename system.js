@@ -280,6 +280,14 @@ let personalAcupointChartInstance = null;
 async function computeGlobalUsageCounts() {
     // 確保 consultations 資料可用，如無資料則嘗試載入
     try {
+        // 登出時停止閒置監控，以免登出後仍然觸發自動登出回調
+        try {
+            if (typeof stopInactivityMonitoring === 'function') {
+                stopInactivityMonitoring();
+            }
+        } catch (_e) {
+            // 忽略停止監控時的錯誤
+        }
         if (!Array.isArray(consultations) || consultations.length === 0) {
             if (typeof loadConsultationsForFinancial === 'function') {
                 await loadConsultationsForFinancial();
@@ -2456,6 +2464,14 @@ async function attemptMainLogin() {
 
         // 登入成功，切換到主系統
         performLogin(currentUserData);
+        // 登入後啟動閒置監控，監測長時間未操作自動登出
+        try {
+            if (typeof startInactivityMonitoring === 'function') {
+                startInactivityMonitoring();
+            }
+        } catch (_e) {
+            // 忽略啟動閒置監控時的錯誤
+        }
         // 登入後初始化系統資料（載入掛號、診療記錄、患者等）
         await initializeSystemAfterLogin();
 
@@ -2589,15 +2605,6 @@ async function syncUserDataFromFirebase() {
                 const enMsg = `Welcome back, ${getUserDisplayName(user)}!`;
                 const msg = lang === 'en' ? enMsg : zhMsg;
                 showToast(msg, 'success');
-
-                // 登入後啟動閒置監控，當使用者長時間未操作時自動登出
-                if (typeof window.startInactivityMonitoring === 'function') {
-                    try {
-                        window.startInactivityMonitoring();
-                    } catch (_e) {
-                        // 忽略啟動失敗
-                    }
-                }
             }
         }
 
@@ -2644,15 +2651,6 @@ async function logout() {
         // 清理本地數據
         currentUser = null;
         currentUserData = null;
-
-        // 登出時停止閒置監控，避免在已登出後仍觸發自動登出
-        if (typeof window.stopInactivityMonitoring === 'function') {
-            try {
-                window.stopInactivityMonitoring();
-            } catch (_e) {
-                // Ignore errors when stopping inactivity monitoring
-            }
-        }
         
         // 切換頁面
         document.getElementById('loginPage').classList.remove('hidden');
@@ -21764,46 +21762,74 @@ function hideGlobalCopyright() {
   document.addEventListener('DOMContentLoaded', updateNetworkStatus);
 })();
 
-/**
- * 全域鍵盤快捷鍵與自動登出功能。
+/*
+ * 全域鍵盤快捷與閒置監控 IIFE
  *
- * 此 IIFE 會在系統載入後即刻執行，註冊全局的鍵盤事件處理器，
- * 以及閒置自動登出機制，以提升操作效率與安全性。
+ * 提供按鍵控制：
+ *  1. Esc：若有彈窗則關閉彈窗；若無彈窗則切換側邊功能選單（開啟或關閉）。
+ *  2. Enter：在彈窗中按下 Enter 會觸發主要操作，例如儲存、確定或確認掛號。
+ *  3. ArrowLeft / ArrowRight：當查看病歷或診症記錄彈窗開啟時，使用左右方向鍵切換較舊/較新紀錄。
+ *
+ * 此 IIFE 亦提供閒置自動登出功能。登入時可調用 startInactivityMonitoring() 開始監控；登出時調用 stopInactivityMonitoring() 停止。
  */
 (function() {
+  // ======== 全域按鍵處理邏輯 ========
   /**
-   * 處理全局按鍵事件，提供在彈窗中按 Enter 確認與按 Esc 關閉的快捷操作。
-   * 僅在主系統畫面顯示時運作，並且只對具有 id 包含 "Modal" 的視窗處理。
-   * 如果沒有彈窗開啟，按 Esc 則會關閉側邊功能選單（若其開啟中）。
-   *
-   * @param {KeyboardEvent} ev 鍵盤事件
+   * 全域鍵盤事件處理函式
+   * @param {KeyboardEvent} ev 
    */
   function handleGlobalKeyDown(ev) {
     const key = ev && ev.key;
-    if (!key || (key !== 'Escape' && key !== 'Enter')) {
+    // 只處理特定按鍵
+    if (!key || !(['Escape', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(key))) {
       return;
     }
-    // 僅在主系統畫面顯示時處理快捷鍵；登入頁面不處理
-    const mainSystemEl = document.getElementById('mainSystem');
-    if (!mainSystemEl || mainSystemEl.classList.contains('hidden')) {
+    // 僅在主系統頁面顯示時響應
+    const mainSystem = document.getElementById('mainSystem');
+    if (!mainSystem || mainSystem.classList.contains('hidden')) {
       return;
     }
-    // 收集所有固定定位且未隱藏的彈窗，限定 id 中包含 modal 字串（不分大小寫）
+    // 收集所有固定定位且 id 包含 modal 的彈窗，且未被隱藏的
     const modals = Array.from(document.querySelectorAll('.fixed')).filter(el => {
-      const id = el.id || '';
-      return !el.classList.contains('hidden') && /modal/i.test(id);
+      const id = (el.id || '').toLowerCase();
+      return !el.classList.contains('hidden') && id.includes('modal');
     });
-    // 取得事件目標元素資訊，用於判斷是否為輸入欄位或可編輯元素
+    // 取得事件目標元素，用於判斷是否在輸入欄位中
     const target = ev.target;
     const tagName = target && target.tagName ? target.tagName.toUpperCase() : '';
-    const isEditableInput =
-      tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || (target && target.isContentEditable);
+    const isEditableInput = tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || (target && target.isContentEditable);
 
+    // 處理左右方向鍵：僅當病歷或診症記錄彈窗開啟時有效
+    if (key === 'ArrowLeft' || key === 'ArrowRight') {
+      if (modals.length > 0 && !isEditableInput) {
+        const activeModal = modals[modals.length - 1];
+        const direction = key === 'ArrowLeft' ? -1 : 1;
+        const modalId = activeModal.id || '';
+        try {
+          if (modalId === 'patientMedicalHistoryModal' && typeof changePatientHistoryPage === 'function') {
+            changePatientHistoryPage(direction);
+            ev.preventDefault();
+            ev.stopPropagation();
+            return;
+          }
+          if (modalId === 'medicalHistoryModal' && typeof changeConsultationHistoryPage === 'function') {
+            changeConsultationHistoryPage(direction);
+            ev.preventDefault();
+            ev.stopPropagation();
+            return;
+          }
+        } catch (_e) {
+          // 若換頁失敗則忽略
+        }
+      }
+      return;
+    }
+
+    // 處理 Esc 鍵：關閉彈窗或切換側邊欄
     if (key === 'Escape') {
       if (modals.length > 0) {
-        // 取得最上層彈窗
         const modal = modals[modals.length - 1];
-        // 嘗試尋找取消或關閉按鈕
+        // 嘗試尋找取消/關閉按鈕
         let cancelBtn =
           modal.querySelector('button[id*="cancel" i]') ||
           modal.querySelector('button[id*="hide" i]') ||
@@ -21812,73 +21838,103 @@ function hideGlobalCopyright() {
           modal.querySelector('button[onclick*="close"]') ||
           modal.querySelector('button[class*="bg-gray"]') ||
           modal.querySelector('button[class*="text-gray-500"]');
-        // 若找不到，嘗試找第一個按鈕或 span (通常為叉號)
         if (!cancelBtn) {
+          // 若找不到，先嘗試尋找第一個按鈕或 span
           cancelBtn = modal.querySelector('button, span');
         }
         if (cancelBtn && typeof cancelBtn.click === 'function') {
           cancelBtn.click();
         } else {
-          // 找不到可點擊的關閉按鈕則隱藏彈窗
-          modal.classList.add('hidden');
+          // 若仍找不到可點擊的關閉按鈕，依彈窗 id 呼叫指定的關閉函式
+          try {
+            const id = modal.id || '';
+            if (id === 'patientDetailModal' && typeof closePatientDetail === 'function') {
+              closePatientDetail();
+            } else if (id === 'patientMedicalHistoryModal' && typeof closePatientMedicalHistoryModal === 'function') {
+              closePatientMedicalHistoryModal();
+            } else if (id === 'medicalHistoryModal' && typeof closeMedicalHistoryModal === 'function') {
+              closeMedicalHistoryModal();
+            } else {
+              // 最後直接隱藏彈窗
+              modal.classList.add('hidden');
+            }
+          } catch (_e) {
+            // 若調用關閉函式失敗，直接隱藏
+            modal.classList.add('hidden');
+          }
         }
-        // 阻止事件的預設行為與冒泡，避免其他處理器重複處理
         ev.preventDefault();
         ev.stopPropagation();
       } else {
-        // 無彈窗時，若側邊欄開啟，按 Esc 關閉側邊欄
+        // 無彈窗時切換側邊欄：開啟或關閉
         const sidebar = document.getElementById('sidebar');
-        if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
-          if (typeof toggleSidebar === 'function') {
-            toggleSidebar();
-            // 阻止事件的預設行為與冒泡
-            ev.preventDefault();
-            ev.stopPropagation();
-          }
+        if (sidebar && typeof toggleSidebar === 'function') {
+          toggleSidebar();
+          ev.preventDefault();
+          ev.stopPropagation();
         }
       }
-    } else if (key === 'Enter') {
-      // 若沒有彈窗開啟則不處理 Enter 鍵
+      return;
+    }
+
+    // 處理 Enter 鍵：在彈窗中觸發主要操作
+    if (key === 'Enter') {
       if (modals.length === 0) {
         return;
       }
-      // 如果目前焦點在輸入框、文字區域或可編輯區域，則不攔截 Enter
       if (isEditableInput) {
+        // 在輸入欄位中不攔截 Enter
         return;
       }
       const modal = modals[modals.length - 1];
-      // 尋找主要操作按鈕：id 或文本含 save/confirm/apply/ok 或常見中文文案
+      const modalId = modal.id || '';
+      // 特定彈窗：掛號彈窗按 Enter 執行 confirmRegistration
+      if (modalId === 'registrationModal' && typeof confirmRegistration === 'function') {
+        try {
+          confirmRegistration();
+        } catch (_e) {
+          // 忽略錯誤
+        }
+        ev.preventDefault();
+        ev.stopPropagation();
+        return;
+      }
+      // 一般彈窗：尋找主要確認按鈕
       const buttons = Array.from(modal.querySelectorAll('button')).filter(btn => !btn.disabled && btn.offsetParent !== null);
-      let confirmBtn =
-        buttons.find(btn => {
-          const idAttr = btn.id || '';
-          return /save|confirm|apply|ok/i.test(idAttr);
-        }) ||
-        buttons.find(btn => {
-          const text = (btn.textContent || '').trim();
-          return /儲存|保存|更新|確定|套用|新增/.test(text);
-        });
-      // 若未找到，取第一個背景非灰的按鈕
+      let confirmBtn = null;
+      // 優先根據 id 或 onclick 屬性匹配 save/confirm/apply/ok 或包含 confirm
+      confirmBtn = buttons.find(btn => {
+        const idAttr = btn.id || '';
+        const onclickAttr = (btn.getAttribute && btn.getAttribute('onclick')) || '';
+        return /save|confirm|apply|ok/i.test(idAttr) || /confirm/i.test(onclickAttr);
+      });
       if (!confirmBtn) {
+        // 再以按鈕文字匹配常見中文文案
+        confirmBtn = buttons.find(btn => {
+          const text = (btn.textContent || '').trim();
+          return /儲存|保存|更新|確定|套用|新增|確認|掛號/.test(text);
+        });
+      }
+      if (!confirmBtn) {
+        // 取第一個背景非灰色按鈕
         confirmBtn = buttons.find(btn => !/bg-gray/.test(btn.className || ''));
       }
-      // 若仍找不到則取最後一個按鈕
       if (!confirmBtn && buttons.length > 0) {
+        // 最後退而求其次取最後一個按鈕
         confirmBtn = buttons[buttons.length - 1];
       }
       if (confirmBtn && typeof confirmBtn.click === 'function') {
         confirmBtn.click();
-        // 阻止事件的預設行為與冒泡，避免重複觸發
         ev.preventDefault();
         ev.stopPropagation();
       }
+      return;
     }
   }
-
-  // 註冊全局鍵盤監聽
+  // 註冊全域鍵盤監聽
   document.addEventListener('keydown', handleGlobalKeyDown);
 
-  // ======== 閒置自動登出相關邏輯 ========
+  // ======== 閒置自動登出邏輯 ========
   // 閒置時間限制（毫秒），預設為 30 分鐘
   const INACTIVITY_LIMIT = 30 * 60 * 1000;
   let inactivityTimeoutId = null;
@@ -21886,7 +21942,7 @@ function hideGlobalCopyright() {
   const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
 
   /**
-   * 重置閒置計時器：當使用者有任何互動時呼叫。
+   * 重置閒置計時器。
    */
   function resetInactivityTimer() {
     if (inactivityTimeoutId) {
@@ -21894,7 +21950,7 @@ function hideGlobalCopyright() {
     }
     inactivityTimeoutId = setTimeout(() => {
       try {
-        // 提示使用者並自動登出
+        // 到達閒置時間後自動登出
         if (typeof showToast === 'function') {
           const lang = localStorage.getItem('lang') || 'zh';
           const zhMsg = '閒置時間過長，自動登出';
@@ -21911,10 +21967,9 @@ function hideGlobalCopyright() {
   }
 
   /**
-   * 啟動閒置監控：登入後呼叫。
+   * 開始閒置監控。在登入後調用。
    */
   function startInactivityMonitoring() {
-    // 避免重複綁定：先取消再重新綁定
     stopInactivityMonitoring();
     activityHandler = function() {
       resetInactivityTimer();
@@ -21922,12 +21977,11 @@ function hideGlobalCopyright() {
     activityEvents.forEach(evt => {
       document.addEventListener(evt, activityHandler);
     });
-    // 初始啟動計時器
     resetInactivityTimer();
   }
 
   /**
-   * 停止閒置監控：登出後呼叫。
+   * 停止閒置監控。在登出後調用。
    */
   function stopInactivityMonitoring() {
     if (activityHandler) {
@@ -21942,7 +21996,7 @@ function hideGlobalCopyright() {
     }
   }
 
-  // 將控制函式掛到 window，供其他模組調用
+  // 將控制函式掛到 window，使其可被外部調用
   window.startInactivityMonitoring = startInactivityMonitoring;
   window.stopInactivityMonitoring = stopInactivityMonitoring;
 })();
