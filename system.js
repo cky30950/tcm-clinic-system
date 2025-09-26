@@ -21780,6 +21780,7 @@ function hideGlobalCopyright() {
    */
   function handleGlobalKeyDown(ev) {
     const key = ev && ev.key;
+    const eventType = ev && ev.type;
     // 只處理特定按鍵
     if (!key || !(['Escape', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(key))) {
       return;
@@ -21800,8 +21801,12 @@ function hideGlobalCopyright() {
     // 將 SELECT 從可編輯輸入排除，讓在下拉選單中按 Enter 也能觸發快捷操作
     const isEditableInput = tagName === 'INPUT' || tagName === 'TEXTAREA' || (target && target.isContentEditable);
 
-    // 處理左右方向鍵：僅當病歷或診症記錄彈窗開啟時有效
-    if (key === 'ArrowLeft' || key === 'ArrowRight') {
+    // 處理左右方向鍵：僅在 keydown 階段且病歷或診症記錄彈窗開啟時有效
+    if ((key === 'ArrowLeft' || key === 'ArrowRight')) {
+      // 只在 keydown 事件處理方向鍵，避免 keypress 重複處理
+      if (eventType !== 'keydown') {
+        return;
+      }
       if (modals.length > 0 && !isEditableInput) {
         const activeModal = modals[modals.length - 1];
         const direction = key === 'ArrowLeft' ? -1 : 1;
@@ -21826,8 +21831,11 @@ function hideGlobalCopyright() {
       return;
     }
 
-    // 處理 Esc 鍵：關閉彈窗或切換側邊欄
+    // 處理 Esc 鍵：僅在 keydown 階段關閉彈窗或切換側邊欄
     if (key === 'Escape') {
+      if (eventType !== 'keydown') {
+        return;
+      }
       if (modals.length > 0) {
         const modal = modals[modals.length - 1];
         // 嘗試尋找取消/關閉按鈕，避免選中導覽按鈕（如上一頁/下一頁）
@@ -21873,8 +21881,12 @@ function hideGlobalCopyright() {
       return;
     }
 
-    // 處理 Enter 鍵：在彈窗中觸發主要操作
+    // 處理 Enter 鍵：在彈窗中觸發主要操作。僅在 keypress 階段處理，避免在 keydown 重複觸發。
     if (key === 'Enter') {
+      // 僅處理 keypress 事件，忽略 keydown 以避免重複觸發
+      if (eventType !== 'keypress') {
+        return;
+      }
       // 沒有彈窗時無需處理
       if (modals.length === 0) {
         return;
@@ -21929,7 +21941,10 @@ function hideGlobalCopyright() {
     }
   }
   // 註冊全域鍵盤監聽
-  document.addEventListener('keydown', handleGlobalKeyDown);
+  // 使用 capture 階段並同時監聽 keydown 與 keypress，以便在某些表單元件（如 <select>）中
+  // 按下 Enter 時仍能捕捉事件。對於不同事件類型使用同一處理函式。
+  document.addEventListener('keydown', handleGlobalKeyDown, true);
+  document.addEventListener('keypress', handleGlobalKeyDown, true);
 
   // ======== 閒置自動登出邏輯 ========
   // 閒置時間限制（毫秒），預設為 30 分鐘
