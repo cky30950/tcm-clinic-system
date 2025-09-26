@@ -21929,7 +21929,18 @@ function hideGlobalCopyright() {
           const doctors = await fetchDoctorsList();
           // 若沒有任何醫師資料，顯示提示並停止初始化日曆
           if (!doctors || doctors.length === 0) {
-              calendarEl.innerHTML = '<div class="text-center text-gray-500 p-4">尚無醫師資料，請先建立醫師用戶</div>';
+              // 清空日曆容器
+              calendarEl.innerHTML = '';
+              // 建立友善訊息元素，避免因 Tailwind 類別未生效而看不到文字
+              const msg = document.createElement('div');
+              msg.textContent = '尚無醫師資料，請先建立醫師用戶';
+              Object.assign(msg.style, {
+                  color: '#666666',
+                  textAlign: 'center',
+                  padding: '1rem',
+                  fontSize: '1rem'
+              });
+              calendarEl.appendChild(msg);
               // 移除匯出按鈕的綁定
               const exportBtn = document.getElementById('exportICalButton');
               if (exportBtn) {
