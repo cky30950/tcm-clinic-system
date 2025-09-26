@@ -222,11 +222,11 @@ const ROLE_PERMISSIONS = {
   // 新增個人統計分析 (personalStatistics) 權限，診所管理者與醫師可使用
   // 管理員不需要個人設置與個人統計分析，故移除這兩項
   // 將模板庫移至穴位庫之後，使側邊選單順序為：患者管理 -> 診症系統 -> 中藥庫 -> 穴位庫 -> 模板庫 -> 收費管理 -> 用戶管理 -> 財務報表 -> 系統管理 -> 帳號安全
-  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'scheduleCalendar', 'accountSecurity'],
+  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
   // 醫師不需要系統管理權限，將模板庫移至穴位庫之後
-  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'personalSettings', 'personalStatistics', 'scheduleCalendar', 'accountSecurity'],
+  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
   // 將模板庫移至穴位庫之後
-  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleCalendar', 'accountSecurity'],
+  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'accountSecurity'],
   // 用戶無中藥庫或穴位庫權限，維持模板庫在最後
   '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary', 'accountSecurity']
 };
@@ -1043,8 +1043,7 @@ async function getPatientsCount(forceRefresh = false) {
         return patientsCountCache;
     }
     try {
-        // 使用 window.waitForFirebaseDb()，避免因區域變數未定義而導致錯誤
-        await window.waitForFirebaseDb();
+        await waitForFirebaseDb();
         // 建立查詢（不指定排序或條件）
         const colRef = window.firebase.collection(window.firebase.db, 'patients');
         // 使用 Firestore 聚合查詢取得文件總數
@@ -2591,6 +2590,15 @@ async function syncUserDataFromFirebase() {
                 const msg = lang === 'en' ? enMsg : zhMsg;
                 showToast(msg, 'success');
             }
+
+            // 初始化自動登出計時器。使用者登入後應啟用空閒監聽以便在長時間未操作時自動登出。
+            try {
+                if (typeof initAutoLogout === 'function') {
+                    initAutoLogout();
+                }
+            } catch (_e) {
+                console.error('初始化自動登出功能失敗:', _e);
+            }
         }
 
         // 側邊選單控制
@@ -2610,6 +2618,14 @@ async function syncUserDataFromFirebase() {
         // 登出功能
 async function logout() {
     try {
+        // 在登出時清除自動登出計時器及相關事件監聽器
+        if (typeof clearAutoLogout === 'function') {
+            try {
+                clearAutoLogout();
+            } catch (_e) {
+                console.error('清除自動登出計時器失敗:', _e);
+            }
+        }
         // Firebase 登出
         if (window.firebase && window.firebase.auth) {
             await window.firebase.signOut(window.firebase.auth);
@@ -2690,6 +2706,149 @@ async function logout() {
     }
 }
 
+/**
+ * 自動登出機制與鍵盤操作增強
+ *
+ * 本區域新增全域函式與事件監聽器，以便在使用者長時間未操作時自動登出，
+ * 並統一於輸入框按下 Enter 鍵時觸發對應的搜尋行為。這些函式定義於
+ * 系統腳本的全域範圍內，可透過 logout() 等既有函式呼叫。修改此區域
+ * 不會影響既有邏輯。
+ */
+
+// 自動登出超時設定（毫秒）。預設為 30 分鐘，可依需求調整。
+const AUTO_LOGOUT_TIMEOUT = 30 * 60 * 1000;
+// 儲存目前的自動登出計時器 ID
+let inactivityTimerId = null;
+
+/**
+ * 重設自動登出計時器。
+ * 每當偵測到使用者互動時（例如鼠標移動、點擊、滾動或按鍵），
+ * 將取消舊有的計時器並重新啟動。若在指定時間內沒有任何互動，
+ * 將自動呼叫 logout() 登出使用者。
+ */
+function resetInactivityTimer() {
+    try {
+        if (inactivityTimerId) {
+            clearTimeout(inactivityTimerId);
+        }
+        // 僅在使用者已登入的情況下啟用計時器
+        // 若 currentUserData 為 null，表示尚未登入或已登出，不啟用自動登出
+        if (currentUserData) {
+            inactivityTimerId = setTimeout(() => {
+                try {
+                    logout();
+                } catch (err) {
+                    console.error('自動登出時發生錯誤:', err);
+                }
+            }, AUTO_LOGOUT_TIMEOUT);
+        }
+    } catch (e) {
+        console.error('重設自動登出計時器失敗:', e);
+    }
+}
+
+/**
+ * 啟用自動登出監聽。於使用者登入後呼叫此函式，
+ * 將註冊多個事件監聽器以偵測使用者互動，並啟動計時器。
+ */
+function initAutoLogout() {
+    try {
+        // 清除任何現有計時器
+        if (inactivityTimerId) {
+            clearTimeout(inactivityTimerId);
+            inactivityTimerId = null;
+        }
+        // 設定初始計時器
+        resetInactivityTimer();
+        // 定義需要監聽以判定使用者活躍的事件
+        const events = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
+        events.forEach(evName => {
+            document.addEventListener(evName, resetInactivityTimer, true);
+        });
+    } catch (e) {
+        console.error('啟用自動登出監聽失敗:', e);
+    }
+}
+
+/**
+ * 停用自動登出監聽並清除計時器。於 logout() 時呼叫，以
+ * 移除事件監聽器，避免在登出後仍繼續監聽並觸發不必要的行為。
+ */
+function clearAutoLogout() {
+    try {
+        if (inactivityTimerId) {
+            clearTimeout(inactivityTimerId);
+            inactivityTimerId = null;
+        }
+        const events = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
+        events.forEach(evName => {
+            document.removeEventListener(evName, resetInactivityTimer, true);
+        });
+    } catch (e) {
+        console.error('停用自動登出監聽失敗:', e);
+    }
+}
+
+// 將自動登出相關函式掛於 window 上，便於其他模組或 HTML 直接呼叫（可選）
+window.resetInactivityTimer = resetInactivityTimer;
+window.initAutoLogout = initAutoLogout;
+window.clearAutoLogout = clearAutoLogout;
+
+/**
+ * 鍵盤 Enter 鍵搜尋支援
+ *
+ * 在許多搜尋輸入欄位中，原本僅透過輸入事件觸發篩選或搜尋，使用者按下
+ * Enter 鍵時可能不會立即執行搜尋，或瀏覽器會嘗試提交表單導致頁面刷新。
+ * 以下邏輯統一攔截輸入框的 Enter 鍵事件：
+ * 若按下 Enter 的目標輸入框屬於指定的搜尋欄位，將阻止預設行為
+ * 並主動派發 input 事件，使既有的搜尋邏輯即刻執行。
+ */
+const ENTER_KEY_SEARCH_IDS = [
+    'searchPatient',
+    'patientSearchInput',
+    'searchHerb',
+    'searchAcupoint',
+    'searchBilling',
+    'searchUser',
+    // 個人慣用藥方搜尋相關輸入
+    'herbComboSearch',
+    'searchHerbCombo',
+    'searchHerbCombination',
+    'herbComboSearchInput',
+    // 個人慣用穴位搜尋相關輸入
+    'acupointComboSearch',
+    'searchAcupointCombo',
+    'acupointComboSearchInput',
+    // 模板搜尋
+    'diagnosisTemplateSearch',
+    'prescriptionTemplateSearch',
+    // 針灸備註搜尋
+    'acupointNotesSearch',
+    // 中藥庫選擇藥材時的搜尋輸入
+    'herbIngredientSearch',
+    // 穴位組合內的穴位搜尋輸入
+    'acupointPointSearch'
+];
+
+document.addEventListener('keypress', function(ev) {
+    try {
+        if (ev && ev.key === 'Enter') {
+            const target = ev.target;
+            if (target && target.id && ENTER_KEY_SEARCH_IDS.includes(target.id)) {
+                ev.preventDefault();
+                try {
+                    // 透過派發 input 事件以觸發既有的搜尋邏輯
+                    target.dispatchEvent(new Event('input', { bubbles: true }));
+                } catch (innerErr) {
+                    console.error('Enter 鍵搜尋事件錯誤:', innerErr);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('鍵盤搜尋事件綁定錯誤:', e);
+    }
+}, true);
+
         // 生成側邊選單
         function generateSidebarMenu() {
             const menuContainer = document.getElementById('sidebarMenu');
@@ -2714,9 +2873,7 @@ async function logout() {
                 // 新增：帳號安全設定（變更密碼與刪除帳號）
                 accountSecurity: { title: '帳號安全設定', icon: '🔐', description: '變更密碼及刪除帳號' },
                 // 新增：模板庫管理
-                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' },
-                // 行事曆排班功能
-                scheduleCalendar: { title: '行事曆排班', icon: '📅', description: '排班與行事曆管理' }
+                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
             };
 
             // 根據當前用戶職位決定可使用的功能列表
@@ -2807,11 +2964,6 @@ async function logout() {
                 if (typeof loadPersonalStatistics === 'function') {
                     loadPersonalStatistics();
                 }
-            } else if (sectionId === 'scheduleCalendar') {
-                // 載入行事曆排班功能
-                if (typeof loadScheduleCalendar === 'function') {
-                    loadScheduleCalendar();
-                }
             } else if (sectionId === 'accountSecurity') {
                 // 載入帳號安全設定：目前僅需要清除表單輸入
                 if (typeof loadAccountSecurity === 'function') {
@@ -2823,7 +2975,7 @@ async function logout() {
         // 隱藏所有區域
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'scheduleCalendar', 'welcomePage'].forEach(id => {
+            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
                 // 在隱藏中藥庫時，取消其資料監聽以減少 Realtime Database 讀取
                 if (id === 'herbLibrary') {
                     try {
@@ -21742,16 +21894,6 @@ function hideGlobalCopyright() {
 
   // 將更新函式掛至全域，以便其他模組呼叫
   window.updateNetworkStatus = updateNetworkStatus;
-  // 將部份內部函式掛載到全域，以便外部模組（如行事曆排班）調用。
-  if (!window.fetchUsers) {
-    window.fetchUsers = fetchUsers;
-  }
-  if (!window.waitForFirebaseDb) {
-    window.waitForFirebaseDb = waitForFirebaseDb;
-  }
-  if (!window.waitForFirebase) {
-    window.waitForFirebase = waitForFirebase;
-  }
 
   // 監聽瀏覽器線上/離線事件
   window.addEventListener('online', updateNetworkStatus);
@@ -21763,403 +21905,3 @@ function hideGlobalCopyright() {
   // 在 DOMContentLoaded 後立即檢測網路狀態
   document.addEventListener('DOMContentLoaded', updateNetworkStatus);
 })();
-
-// ====================================================================
-// 行事曆排班功能
-// 在文件底部定義行事曆排班相關的全域變數與函式，以避免與其他 IIFE 衝突。
-
-// 全局變數用於管理行事曆排班的狀態與顏色映射
-let scheduleCalendarInstance = null;
-let scheduleInitialized = false;
-let scheduleUserList = [];
-const scheduleUserColorMap = {};
-
-/**
- * 依據使用者 ID 取得用戶名稱。
- * @param {string} userId
- * @returns {string}
- */
-function getUserNameById(userId) {
-    if (!userId) return '';
-    const user = (scheduleUserList || []).find(u => {
-        const id = u && (u.id || u.uid);
-        return id === userId;
-    });
-    if (user) {
-        return user.name || user.displayName || user.username || user.email || userId;
-    }
-    return userId;
-}
-
-/**
- * 根據使用者 ID 取得對應的顏色。
- * 使用簡單的 hash 計算，確保相同的使用者會獲得相同的顏色。
- * @param {string} userId
- * @returns {string} 十六進位顏色字串
- */
-function getColorForUser(userId) {
-    if (!userId) return '#2196F3';
-    if (scheduleUserColorMap[userId]) return scheduleUserColorMap[userId];
-    // 預設調色盤，若顏色不足可擴充
-    const palette = ['#4caf50', '#ff9800', '#9c27b0', '#03a9f4', '#e91e63', '#009688', '#ff5722', '#673ab7'];
-    let hash = 0;
-    for (let i = 0; i < userId.length; i++) {
-        hash = userId.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash) % palette.length;
-    const color = palette[index];
-    scheduleUserColorMap[userId] = color;
-    return color;
-}
-
-/**
- * 載入行事曆排班頁面。
- * 若行事曆尚未初始化，將先初始化後載入事件；否則直接載入所選用戶的事件。
- */
-async function loadScheduleCalendar() {
-    try {
-        if (typeof hideAllSections === 'function') {
-            hideAllSections();
-        }
-    } catch (_e) {
-        // 忽略隱藏區域的錯誤
-    }
-    const section = document.getElementById('scheduleCalendar');
-    if (section) {
-        section.classList.remove('hidden');
-    }
-    try {
-        await waitForFirebaseDb();
-        if (!scheduleInitialized) {
-            await initializeScheduleCalendar();
-            scheduleInitialized = true;
-        } else {
-            await loadEventsForSelectedUser();
-        }
-    } catch (err) {
-        console.error('初始化行事曆失敗:', err);
-        if (typeof showToast === 'function') {
-            showToast('初始化行事曆失敗', 'error');
-        }
-    }
-}
-
-/**
- * 初始化排班行事曆。
- * 建立 FullCalendar 實例、載入用戶下拉選單以及匯出按鈕事件。
- */
-async function initializeScheduleCalendar() {
-    try {
-        await waitForFirebaseDb();
-        // 取得所有用戶並篩選出醫師與護理師
-        let users = [];
-        try {
-            // 透過 window.fetchUsers() 取得用戶清單，避免無法直接呼叫區域變數
-            users = await window.fetchUsers();
-        } catch (_er) {
-            users = [];
-        }
-        scheduleUserList = (Array.isArray(users) ? users : []).filter(u => {
-            const pos = u && u.position ? String(u.position).trim() : '';
-            return pos === '醫師' || pos === '護理師';
-        });
-        // 建立用戶下拉選單
-        const selectEl = document.getElementById('scheduleUserSelect');
-        if (selectEl) {
-            // 清空並插入預設選項
-            selectEl.innerHTML = '';
-            const placeholder = document.createElement('option');
-            placeholder.value = '';
-            placeholder.disabled = true;
-            placeholder.selected = true;
-            try {
-                placeholder.textContent = window.t ? window.t('請選擇醫師或護理師') : '請選擇醫師或護理師';
-            } catch (_e) {
-                placeholder.textContent = '請選擇醫師或護理師';
-            }
-            selectEl.appendChild(placeholder);
-            // 依用戶列表建立選項
-            scheduleUserList.forEach(u => {
-                const id = u && (u.id || u.uid);
-                const option = document.createElement('option');
-                option.value = id;
-                option.textContent = getUserNameById(id);
-                selectEl.appendChild(option);
-            });
-            // 監聽選取改變
-            selectEl.addEventListener('change', function () {
-                loadEventsForSelectedUser();
-            });
-        }
-        // 設定匯出按鈕事件
-        const exportBtn = document.getElementById('scheduleExportBtn');
-        if (exportBtn) {
-            exportBtn.addEventListener('click', function () {
-                exportCalendarToIcal();
-            });
-        }
-        // 建立 FullCalendar 實例
-        const calendarEl = document.getElementById('calendar');
-        if (calendarEl) {
-            // 在使用 FullCalendar 的標準 bundle (index.global.min.js) 時，不需要指定 plugins 屬性，
-            // 必要的插件（如 dayGrid、timeGrid、interaction）已經包含在內。直接設定其他選項即可。
-            scheduleCalendarInstance = new FullCalendar.Calendar(calendarEl, {
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                },
-                initialView: 'dayGridMonth',
-                selectable: true,
-                editable: true,
-                locale: 'zh-tw',
-                select: function (selectionInfo) {
-                    // 新增排班事件
-                    addScheduleEvent(selectionInfo.start, selectionInfo.end);
-                },
-                eventDrop: function (info) {
-                    // 拖曳後更新排班時間
-                    updateScheduleEvent(info.event);
-                },
-                eventResize: function (info) {
-                    // 調整大小後更新排班時間
-                    updateScheduleEvent(info.event);
-                },
-                eventClick: function (info) {
-                    // 點擊事件刪除排班
-                    const ev = info.event;
-                    let confirmMsg = '確定要刪除此排班嗎？';
-                    try {
-                        confirmMsg = window.t ? window.t('確定要刪除此排班嗎？') : confirmMsg;
-                    } catch (_e) {}
-                    if (confirm(confirmMsg)) {
-                        deleteScheduleEvent(ev);
-                    }
-                }
-            });
-            scheduleCalendarInstance.render();
-        }
-    } catch (error) {
-        console.error('初始化行事曆排班失敗:', error);
-        if (typeof showToast === 'function') {
-            showToast('初始化行事曆排班失敗', 'error');
-        }
-    }
-}
-
-/**
- * 依選取的用戶載入排班事件。
- * 從 Firestore 取得對應使用者的 schedules 事件並渲染至 FullCalendar。
- */
-async function loadEventsForSelectedUser() {
-    const selectEl = document.getElementById('scheduleUserSelect');
-    if (!selectEl || !scheduleCalendarInstance) return;
-    const userId = selectEl.value;
-    // 如果尚未選擇用戶，清空事件並返回
-    if (!userId) {
-        scheduleCalendarInstance.getEvents().forEach(ev => ev.remove());
-        return;
-    }
-    try {
-        await window.waitForFirebaseDb();
-        const colRef = window.firebase.collection(window.firebase.db, 'schedules');
-        const q = window.firebase.firestoreQuery(
-            colRef,
-            window.firebase.where('userId', '==', userId)
-        );
-        const snapshot = await window.firebase.getDocs(q);
-        // 清除現有事件
-        scheduleCalendarInstance.getEvents().forEach(ev => ev.remove());
-        snapshot.forEach((doc) => {
-            const data = doc.data() || {};
-            // 將時間從 ISO 字串轉回 Date 物件
-            let start = data.start;
-            let end = data.end;
-            try {
-                if (typeof start === 'string') start = new Date(start);
-                if (typeof end === 'string') end = new Date(end);
-            } catch (_e) {}
-            const title = data.title || (window.t ? window.t('值班') : '值班');
-            const color = getColorForUser(userId);
-            scheduleCalendarInstance.addEvent({
-                id: doc.id,
-                title: title,
-                start: start,
-                end: end,
-                backgroundColor: color,
-                borderColor: color
-            });
-        });
-    } catch (err) {
-        console.error('載入排班資料失敗:', err);
-        if (typeof showToast === 'function') {
-            showToast('載入排班資料失敗', 'error');
-        }
-    }
-}
-
-/**
- * 新增排班事件。
- * 將事件儲存至 Firestore 並同步到行事曆。
- * @param {Date} start
- * @param {Date} end
- */
-async function addScheduleEvent(start, end) {
-    const selectEl = document.getElementById('scheduleUserSelect');
-    if (!selectEl || !selectEl.value) {
-        if (typeof showToast === 'function') {
-            showToast('請先選擇醫師或護理師', 'warning');
-        }
-        if (scheduleCalendarInstance) scheduleCalendarInstance.unselect();
-        return;
-    }
-    const userId = selectEl.value;
-    let defaultTitle = '值班';
-    try {
-        defaultTitle = window.t ? window.t('值班') : defaultTitle;
-    } catch (_e) {}
-    let promptMsg = '輸入排班標題';
-    try {
-        promptMsg = window.t ? window.t('輸入排班標題') : promptMsg;
-    } catch (_e) {}
-    const title = prompt(promptMsg, defaultTitle);
-    if (!title) {
-        if (scheduleCalendarInstance) scheduleCalendarInstance.unselect();
-        return;
-    }
-    try {
-        await window.waitForFirebaseDb();
-        const colRef = window.firebase.collection(window.firebase.db, 'schedules');
-        const newDoc = {
-            title: title,
-            userId: userId,
-            start: start instanceof Date ? start.toISOString() : String(start),
-            end: end instanceof Date ? end.toISOString() : String(end),
-            createdAt: new Date(),
-            createdBy: (currentUser && currentUser.uid) ? currentUser.uid : null
-        };
-        const docRef = await window.firebase.addDoc(colRef, newDoc);
-        // 將事件加入行事曆
-        const color = getColorForUser(userId);
-        if (scheduleCalendarInstance) {
-            scheduleCalendarInstance.addEvent({
-                id: docRef.id,
-                title: title,
-                start: start,
-                end: end,
-                backgroundColor: color,
-                borderColor: color
-            });
-        }
-        if (typeof showToast === 'function') {
-            showToast('新增排班成功', 'success');
-        }
-    } catch (err) {
-        console.error('新增排班失敗:', err);
-        if (typeof showToast === 'function') {
-            showToast('新增排班失敗', 'error');
-        }
-    } finally {
-        if (scheduleCalendarInstance) scheduleCalendarInstance.unselect();
-    }
-}
-
-/**
- * 更新排班事件時間。
- * 將事件的開始與結束時間更新至 Firestore。
- * @param {object} event FullCalendar 事件對象
- */
-async function updateScheduleEvent(event) {
-    if (!event || !event.id) return;
-    try {
-        await window.waitForFirebaseDb();
-        const docRef = window.firebase.doc(window.firebase.db, 'schedules', event.id);
-        await window.firebase.updateDoc(docRef, {
-            start: event.start ? event.start.toISOString() : '',
-            end: event.end ? event.end.toISOString() : '',
-            updatedAt: new Date()
-        });
-        if (typeof showToast === 'function') {
-            showToast('更新排班成功', 'success');
-        }
-    } catch (err) {
-        console.error('更新排班失敗:', err);
-        if (typeof showToast === 'function') {
-            showToast('更新排班失敗', 'error');
-        }
-    }
-}
-
-/**
- * 刪除排班事件。
- * 從 Firestore 刪除對應文件並在行事曆中移除。
- * @param {object} event FullCalendar 事件對象
- */
-async function deleteScheduleEvent(event) {
-    if (!event || !event.id) return;
-    try {
-        await window.waitForFirebaseDb();
-        const docRef = window.firebase.doc(window.firebase.db, 'schedules', event.id);
-        await window.firebase.deleteDoc(docRef);
-        // 從行事曆刪除事件
-        if (typeof event.remove === 'function') {
-            event.remove();
-        }
-        if (typeof showToast === 'function') {
-            showToast('刪除排班成功', 'success');
-        }
-    } catch (err) {
-        console.error('刪除排班失敗:', err);
-        if (typeof showToast === 'function') {
-            showToast('刪除排班失敗', 'error');
-        }
-    }
-}
-
-/**
- * 將目前顯示的排班行事曆匯出為 iCal (.ics) 檔案。
- */
-function exportCalendarToIcal() {
-    if (!scheduleCalendarInstance) return;
-    const events = scheduleCalendarInstance.getEvents();
-    const lines = [];
-    lines.push('BEGIN:VCALENDAR');
-    lines.push('VERSION:2.0');
-    lines.push('PRODID:-//TCM Clinic//Schedule Calendar//EN');
-    const dtStamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-    events.forEach(ev => {
-        const uid = ev.id || '';
-        const startIso = ev.start ? ev.start.toISOString() : '';
-        const endIso = ev.end ? ev.end.toISOString() : '';
-        const dtStart = startIso.replace(/[-:]/g, '').split('.')[0] + 'Z';
-        const dtEnd = endIso.replace(/[-:]/g, '').split('.')[0] + 'Z';
-        let summary = ev.title || '';
-        summary = String(summary).replace(/,/g, '\\,').replace(/;/g, '\\;');
-        lines.push('BEGIN:VEVENT');
-        lines.push('UID:' + uid);
-        lines.push('DTSTAMP:' + dtStamp);
-        lines.push('DTSTART:' + dtStart);
-        lines.push('DTEND:' + dtEnd);
-        lines.push('SUMMARY:' + summary);
-        lines.push('END:VEVENT');
-    });
-    lines.push('END:VCALENDAR');
-    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    // 根據用戶名稱命名檔案
-    let filename = 'schedule';
-    const selectEl = document.getElementById('scheduleUserSelect');
-    if (selectEl && selectEl.value) {
-        const uname = getUserNameById(selectEl.value);
-        if (uname) {
-            filename = uname;
-        }
-    }
-    link.download = filename + '.ics';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-}
