@@ -226,11 +226,11 @@ const ROLE_PERMISSIONS = {
   // 新增個人統計分析 (personalStatistics) 權限，診所管理者與醫師可使用
   // 管理員不需要個人設置與個人統計分析，故移除這兩項
   // 將模板庫移至穴位庫之後，使側邊選單順序為：患者管理 -> 診症系統 -> 中藥庫 -> 穴位庫 -> 模板庫 -> 收費管理 -> 用戶管理 -> 財務報表 -> 系統管理 -> 帳號安全
-  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
+  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
   // 醫師不需要系統管理權限，將模板庫移至穴位庫之後
-  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
+  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
   // 將模板庫移至穴位庫之後
-  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'accountSecurity'],
+  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'accountSecurity'],
   // 用戶無中藥庫或穴位庫權限，維持模板庫在最後
   '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary', 'accountSecurity']
 };
@@ -2733,9 +2733,7 @@ async function logout() {
                 // 新增：帳號安全設定（變更密碼與刪除帳號）
                 accountSecurity: { title: '帳號安全設定', icon: '🔐', description: '變更密碼及刪除帳號' },
                 // 新增：模板庫管理
-                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' },
-                // 新增：排班管理功能
-                scheduleManagement: { title: '排班管理', icon: '📅', description: '醫護人員排班管理' }
+                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
             };
 
             // 根據當前用戶職位決定可使用的功能列表
@@ -2837,7 +2835,7 @@ async function logout() {
         // 隱藏所有區域
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'scheduleManagement', 'welcomePage'].forEach(id => {
+            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
                 // 在隱藏中藥庫時，取消其資料監聽以減少 Realtime Database 讀取
                 if (id === 'herbLibrary') {
                     try {
@@ -12746,47 +12744,6 @@ const consultationDate = (() => {
     const d = parseConsultationDate(consultation.date);
     return d ? d.toLocaleDateString('zh-TW') : '未知日期';
 })();
-
-// ======== 排班管理人員載入 ========
-// 定義全域函式 getScheduleStaffList，供排班管理系統在載入時呼叫。
-// 此函式會透過 firebaseDataManager 取得診所用戶資料，篩選出醫師、護理師與診所管理者，
-// 並映射成排班用的屬性格式返回。
-window.getScheduleStaffList = async function () {
-    try {
-        let res = null;
-        if (window.firebaseDataManager && typeof window.firebaseDataManager.getUsers === 'function') {
-            // 從 Firebase 或快取取得用戶清單
-            res = await window.firebaseDataManager.getUsers(false);
-        }
-        let list = [];
-        if (res) {
-            // 根據返回型態提取陣列
-            if (Array.isArray(res)) {
-                list = res;
-            } else if (Array.isArray(res.data)) {
-                list = res.data;
-            }
-        }
-        // 篩選出具有排班需要的職位
-        return list.filter(u => {
-            const pos = (u && u.position) || '';
-            return pos === '醫師' || pos === '護理師' || pos === '診所管理';
-        }).map(u => ({
-            id: u.id || '',
-            name: u.name || u.displayName || '',
-            position: u.position || '',
-            department: u.department || '',
-            level: u.level || '',
-            phone: u.phone || u.phoneNumber || '',
-            email: u.email || '',
-            maxHours: u.maxHours || 40,
-            role: (u.position === '醫師') ? 'doctor' : ((u.position === '護理師') ? 'nurse' : 'staff')
-        }));
-    } catch (e) {
-        console.error('getScheduleStaffList error', e);
-        return [];
-    }
-};
             
             // 直接載入病歷，不彈出確認提示視窗
             // 注意：此操作會覆蓋當前已填寫的診症內容（主訴、舌象、脈象、診斷、處方、收費項目、醫囑等），且無法復原。
