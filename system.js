@@ -276,183 +276,6 @@ let personalHerbChartInstance = null;
 let personalFormulaChartInstance = null;
 let personalAcupointChartInstance = null;
 
-// ================== Whereby 視訊診症支援 ==================
-// 全域變數：目前的 Whereby 會議嵌入元素
-// 用於在關閉彈窗時移除元素，避免重複初始化
-let currentWherebyEmbed = null;
-
-// 常數：Whereby 子網域或完整房間前綴
-// 請依實際註冊的 Whereby 子網域替換 example
-// 使用者指定的 Whereby 子網域，例如 great-tcm
-// 使用固定的 Whereby 房間 URL；如果不需動態生成房間，可直接指定。
-// ======================================
-//  Whereby 動態會議室設定
-//
-// 要動態建立每個掛號對應的 Whereby 房間，需要使用 Whereby 的 REST API。
-// 為了安全起見，API 金鑰不應直接硬編碼在前端代碼中。
-// 請將 WHEREBY_API_KEY 的值替換為您的實際 API 金鑰，或在後端提供一個
-// 建立會議室的端點，再在前端呼叫該端點取得 roomUrl。
-//
-// 參考 Whereby API 文件：https://docs.whereby.com/reference/whereby-rest-api-reference/meetings
-//
-// 提醒：不要把真正的 API Key 暴露在前端代碼。
-
-// Whereby API 端點（預設使用官方的 v1 端點）。
-const WHEREBY_API_URL = 'https://api.whereby.dev/v1/meetings';
-
-// 用於建立會議室的房間名稱前綴，例如 'consultation-123'。
-const WHEREBY_ROOM_PREFIX = 'consultation-';
-
-// 從環境或配置中讀取 Whereby API 金鑰，請在部署時替換為實際值。
-// 重要：不要將真實金鑰提交到版本控制或公開前端代碼。
-const WHEREBY_API_KEY = 'YOUR_WHEREBY_API_KEY';
-
-// 用於快取已建立的房間網址，避免重複建立相同掛號的房間。
-const wherebyRoomCache = {};
-
-/**
- * 使用 Whereby API 建立房間並回傳 roomUrl。
- *
- * 如果已經建立過對應 appointmentId 的房間，將回傳快取的網址。
- *
- * @param {number|string} appointmentId 掛號 ID
- * @returns {Promise<string|null>} 成功時回傳 roomUrl，失敗則回傳 null
- */
-async function createWherebyRoom(appointmentId) {
-  try {
-    // 若已有快取，直接回傳
-    if (wherebyRoomCache[appointmentId]) {
-      return wherebyRoomCache[appointmentId];
-    }
-    // 檢查 API 金鑰是否已設定
-    if (!WHEREBY_API_KEY || WHEREBY_API_KEY === 'YOUR_WHEREBY_API_KEY') {
-      console.error('Whereby API 金鑰未設定，無法建立會議室');
-      return null;
-    }
-    // 設定會議結束時間：預設為 1 小時後
-    const endDate = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    // 建立請求主體
-    const body = {
-      endDate,
-      roomNamePrefix: `${WHEREBY_ROOM_PREFIX}${appointmentId}`,
-      roomNamePattern: 'uuid'
-    };
-    const response = await fetch(WHEREBY_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${WHEREBY_API_KEY}`
-      },
-      body: JSON.stringify(body)
-    });
-    if (!response.ok) {
-      console.error('建立 Whereby 房間失敗', response.status, await response.text());
-      return null;
-    }
-    const data = await response.json();
-    const roomUrl = data.roomUrl;
-    if (roomUrl) {
-      // 快取結果
-      wherebyRoomCache[appointmentId] = roomUrl;
-      return roomUrl;
-    }
-    return null;
-  } catch (err) {
-    console.error('呼叫 Whereby API 發生錯誤', err);
-    return null;
-  }
-}
-
-
-/**
- * 開啟視訊診症彈窗並加入 Whereby 房間。
- *
- * 使用 appointmentId 生成唯一房間網址，動態建立 whereby-embed 元件。
- * 若已有先前的嵌入元素，將先移除以避免重複。
- *
- * @param {number|string} appointmentId 掛號 ID，用於生成唯一房間名稱
- */
-async function openVideoConsultationModal(appointmentId) {
-  try {
-    const modal = document.getElementById('videoConsultationModal');
-    const container = document.getElementById('wherebyContainer');
-    if (!modal || !container) {
-      console.error('找不到視訊診症容器或彈窗。');
-      return;
-    }
-    // 移除舊的 Whereby 嵌入元素
-    if (window.currentWherebyEmbed) {
-      try {
-        window.currentWherebyEmbed.remove();
-      } catch (_e) {
-        // 忽略移除錯誤
-      }
-      window.currentWherebyEmbed = null;
-    }
-    // 清空容器內容
-    container.innerHTML = '';
-    // 呼叫 API 建立房間
-    const roomUrl = await createWherebyRoom(appointmentId);
-    if (!roomUrl) {
-      showToast('建立視訊房間失敗，請稍後再試', 'error');
-      return;
-    }
-    // 建立 iframe 元件
-    const iframeEl = document.createElement('iframe');
-    iframeEl.src = roomUrl;
-    iframeEl.setAttribute('allow', 'camera; microphone; fullscreen; speaker; display-capture; compute-pressure');
-    // 設定尺寸：寬度 100%，高度 700px（可依需求調整）
-    iframeEl.style.width = '100%';
-    iframeEl.style.height = '700px';
-    iframeEl.style.border = '0';
-    // 插入至容器
-    container.appendChild(iframeEl);
-    // 保存參考以便之後移除
-    window.currentWherebyEmbed = iframeEl;
-    // 顯示彈窗
-    modal.classList.remove('hidden');
-  } catch (e) {
-    console.error('開啟視訊診症彈窗失敗', e);
-    showToast('開啟視訊診症彈窗失敗', 'error');
-  }
-}
-
-/**
- * 關閉視訊診症彈窗並移除 Whereby 嵌入。
- */
-function closeVideoConsultationModal() {
-  try {
-    const modal = document.getElementById('videoConsultationModal');
-    if (modal) {
-      modal.classList.add('hidden');
-    }
-    if (window.currentWherebyEmbed) {
-      try {
-        window.currentWherebyEmbed.remove();
-      } catch (_e) {
-        // 忽略移除失敗
-      }
-      window.currentWherebyEmbed = null;
-    }
-  } catch (e) {
-    console.error('關閉視訊診症彈窗失敗', e);
-  }
-}
-
-/**
- * 觸發視訊診症功能，供掛號操作按鈕使用。
- *
- * @param {number|string} appointmentId 掛號 ID
- */
-function startVideoConsultation(appointmentId) {
-  openVideoConsultationModal(appointmentId);
-}
-
-// 將視訊診症相關函式掛到 window，使可從 HTML 按鈕調用
-window.openVideoConsultationModal = openVideoConsultationModal;
-window.closeVideoConsultationModal = closeVideoConsultationModal;
-window.startVideoConsultation = startVideoConsultation;
-
 /**
  * 計算全院中藥與方劑的使用次數。
  * 遍歷 consultations 中的 prescription，每行取出藥名並累計。
@@ -5430,8 +5253,6 @@ function getOperationButtons(appointment, patient = null) {
             } else {
                 if (isAppointmentDoctor) {
                     buttons.push(`<button onclick="startConsultation(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs transition duration-200">開始診症</button>`);
-                    // 新增視訊診症按鈕，僅供該掛號醫師使用
-                    buttons.push(`<button onclick="startVideoConsultation(${appointment.id})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs transition duration-200">視訊診症</button>`);
                 }
             }
             break;
@@ -5439,8 +5260,6 @@ function getOperationButtons(appointment, patient = null) {
         case 'consulting':
             if (isAppointmentDoctor) {
                 buttons.push(`<button onclick="continueConsultation(${appointment.id})" class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs transition duration-200">繼續診症</button>`);
-                // 新增視訊診症按鈕，診症中也可啟動
-                buttons.push(`<button onclick="startVideoConsultation(${appointment.id})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs transition duration-200">視訊診症</button>`);
             }
             break;
             
