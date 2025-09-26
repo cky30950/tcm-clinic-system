@@ -2589,15 +2589,15 @@ async function syncUserDataFromFirebase() {
                 const enMsg = `Welcome back, ${getUserDisplayName(user)}!`;
                 const msg = lang === 'en' ? enMsg : zhMsg;
                 showToast(msg, 'success');
-            }
 
-            // 初始化自動登出計時器。使用者登入後應啟用空閒監聽以便在長時間未操作時自動登出。
-            try {
-                if (typeof initAutoLogout === 'function') {
-                    initAutoLogout();
+                // 登入後啟動閒置監控。在顯示歡迎訊息後立即啟動，以便後續長時間未操作可自動登出。
+                if (typeof window.startInactivityMonitoring === 'function') {
+                    try {
+                        window.startInactivityMonitoring();
+                    } catch (_e) {
+                        // 若啟動失敗則忽略
+                    }
                 }
-            } catch (_e) {
-                console.error('初始化自動登出功能失敗:', _e);
             }
         }
 
@@ -2618,14 +2618,6 @@ async function syncUserDataFromFirebase() {
         // 登出功能
 async function logout() {
     try {
-        // 在登出時清除自動登出計時器及相關事件監聽器
-        if (typeof clearAutoLogout === 'function') {
-            try {
-                clearAutoLogout();
-            } catch (_e) {
-                console.error('清除自動登出計時器失敗:', _e);
-            }
-        }
         // Firebase 登出
         if (window.firebase && window.firebase.auth) {
             await window.firebase.signOut(window.firebase.auth);
@@ -2652,6 +2644,15 @@ async function logout() {
         // 清理本地數據
         currentUser = null;
         currentUserData = null;
+
+        // 登出時停止閒置監控，避免在使用者已登出後仍觸發自動登出。
+        if (typeof window.stopInactivityMonitoring === 'function') {
+            try {
+                window.stopInactivityMonitoring();
+            } catch (_e) {
+                // 忽略停止閒置監控時的錯誤
+            }
+        }
         
         // 切換頁面
         document.getElementById('loginPage').classList.remove('hidden');
@@ -2705,149 +2706,6 @@ async function logout() {
         showToast('登出時發生錯誤', 'error');
     }
 }
-
-/**
- * 自動登出機制與鍵盤操作增強
- *
- * 本區域新增全域函式與事件監聽器，以便在使用者長時間未操作時自動登出，
- * 並統一於輸入框按下 Enter 鍵時觸發對應的搜尋行為。這些函式定義於
- * 系統腳本的全域範圍內，可透過 logout() 等既有函式呼叫。修改此區域
- * 不會影響既有邏輯。
- */
-
-// 自動登出超時設定（毫秒）。預設為 30 分鐘，可依需求調整。
-const AUTO_LOGOUT_TIMEOUT = 30 * 60 * 1000;
-// 儲存目前的自動登出計時器 ID
-let inactivityTimerId = null;
-
-/**
- * 重設自動登出計時器。
- * 每當偵測到使用者互動時（例如鼠標移動、點擊、滾動或按鍵），
- * 將取消舊有的計時器並重新啟動。若在指定時間內沒有任何互動，
- * 將自動呼叫 logout() 登出使用者。
- */
-function resetInactivityTimer() {
-    try {
-        if (inactivityTimerId) {
-            clearTimeout(inactivityTimerId);
-        }
-        // 僅在使用者已登入的情況下啟用計時器
-        // 若 currentUserData 為 null，表示尚未登入或已登出，不啟用自動登出
-        if (currentUserData) {
-            inactivityTimerId = setTimeout(() => {
-                try {
-                    logout();
-                } catch (err) {
-                    console.error('自動登出時發生錯誤:', err);
-                }
-            }, AUTO_LOGOUT_TIMEOUT);
-        }
-    } catch (e) {
-        console.error('重設自動登出計時器失敗:', e);
-    }
-}
-
-/**
- * 啟用自動登出監聽。於使用者登入後呼叫此函式，
- * 將註冊多個事件監聽器以偵測使用者互動，並啟動計時器。
- */
-function initAutoLogout() {
-    try {
-        // 清除任何現有計時器
-        if (inactivityTimerId) {
-            clearTimeout(inactivityTimerId);
-            inactivityTimerId = null;
-        }
-        // 設定初始計時器
-        resetInactivityTimer();
-        // 定義需要監聽以判定使用者活躍的事件
-        const events = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
-        events.forEach(evName => {
-            document.addEventListener(evName, resetInactivityTimer, true);
-        });
-    } catch (e) {
-        console.error('啟用自動登出監聽失敗:', e);
-    }
-}
-
-/**
- * 停用自動登出監聽並清除計時器。於 logout() 時呼叫，以
- * 移除事件監聽器，避免在登出後仍繼續監聽並觸發不必要的行為。
- */
-function clearAutoLogout() {
-    try {
-        if (inactivityTimerId) {
-            clearTimeout(inactivityTimerId);
-            inactivityTimerId = null;
-        }
-        const events = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
-        events.forEach(evName => {
-            document.removeEventListener(evName, resetInactivityTimer, true);
-        });
-    } catch (e) {
-        console.error('停用自動登出監聽失敗:', e);
-    }
-}
-
-// 將自動登出相關函式掛於 window 上，便於其他模組或 HTML 直接呼叫（可選）
-window.resetInactivityTimer = resetInactivityTimer;
-window.initAutoLogout = initAutoLogout;
-window.clearAutoLogout = clearAutoLogout;
-
-/**
- * 鍵盤 Enter 鍵搜尋支援
- *
- * 在許多搜尋輸入欄位中，原本僅透過輸入事件觸發篩選或搜尋，使用者按下
- * Enter 鍵時可能不會立即執行搜尋，或瀏覽器會嘗試提交表單導致頁面刷新。
- * 以下邏輯統一攔截輸入框的 Enter 鍵事件：
- * 若按下 Enter 的目標輸入框屬於指定的搜尋欄位，將阻止預設行為
- * 並主動派發 input 事件，使既有的搜尋邏輯即刻執行。
- */
-const ENTER_KEY_SEARCH_IDS = [
-    'searchPatient',
-    'patientSearchInput',
-    'searchHerb',
-    'searchAcupoint',
-    'searchBilling',
-    'searchUser',
-    // 個人慣用藥方搜尋相關輸入
-    'herbComboSearch',
-    'searchHerbCombo',
-    'searchHerbCombination',
-    'herbComboSearchInput',
-    // 個人慣用穴位搜尋相關輸入
-    'acupointComboSearch',
-    'searchAcupointCombo',
-    'acupointComboSearchInput',
-    // 模板搜尋
-    'diagnosisTemplateSearch',
-    'prescriptionTemplateSearch',
-    // 針灸備註搜尋
-    'acupointNotesSearch',
-    // 中藥庫選擇藥材時的搜尋輸入
-    'herbIngredientSearch',
-    // 穴位組合內的穴位搜尋輸入
-    'acupointPointSearch'
-];
-
-document.addEventListener('keypress', function(ev) {
-    try {
-        if (ev && ev.key === 'Enter') {
-            const target = ev.target;
-            if (target && target.id && ENTER_KEY_SEARCH_IDS.includes(target.id)) {
-                ev.preventDefault();
-                try {
-                    // 透過派發 input 事件以觸發既有的搜尋邏輯
-                    target.dispatchEvent(new Event('input', { bubbles: true }));
-                } catch (innerErr) {
-                    console.error('Enter 鍵搜尋事件錯誤:', innerErr);
-                }
-            }
-        }
-    } catch (e) {
-        console.error('鍵盤搜尋事件綁定錯誤:', e);
-    }
-}, true);
 
         // 生成側邊選單
         function generateSidebarMenu() {
@@ -21904,4 +21762,163 @@ function hideGlobalCopyright() {
 
   // 在 DOMContentLoaded 後立即檢測網路狀態
   document.addEventListener('DOMContentLoaded', updateNetworkStatus);
+})();
+
+/**
+ * 全域鍵盤快捷鍵與自動登出功能。
+ *
+ * 此 IIFE 會在系統載入後即刻執行，註冊全局的鍵盤事件處理器，
+ * 以及閒置自動登出機制，以提升操作效率與安全性。
+ */
+(function() {
+  /**
+   * 處理全局按鍵事件，提供在彈窗中按 Enter 確認與按 Esc 關閉的快捷操作。
+   * 當系統主畫面（mainSystem）顯示且有彈窗開啟時，攔截按鍵：
+   *  - Escape：尋找彈窗內的取消/關閉按鈕或直接隱藏彈窗。
+   *  - Enter：尋找彈窗內的主要操作按鈕（如儲存/確認/套用），並觸發其點擊事件。
+   * 若處於登入頁或無彈窗顯示，則不處理這些快捷鍵。
+   *
+   * @param {KeyboardEvent} ev 鍵盤事件
+   */
+  function handleGlobalKeyDown(ev) {
+    const key = ev && ev.key;
+    if (!key || (key !== 'Escape' && key !== 'Enter')) {
+      return;
+    }
+    // 僅在主系統畫面顯示時處理快捷鍵；登入頁面不處理
+    const mainSystemEl = document.getElementById('mainSystem');
+    if (!mainSystemEl || mainSystemEl.classList.contains('hidden')) {
+      return;
+    }
+    // 取得所有以 .fixed 定位且目前顯示的彈窗
+    const modals = Array.from(document.querySelectorAll('.fixed')).filter(el => !el.classList.contains('hidden'));
+    if (modals.length === 0) {
+      return;
+    }
+    // 取得頂層彈窗（假設後渲染者覆蓋先前者）
+    const modal = modals[modals.length - 1];
+    if (!modal) return;
+    if (key === 'Escape') {
+      // 嘗試尋找取消或關閉按鈕：優先使用 id/onclick 名稱含 cancel/close/hide，或灰色背景按鈕
+      let cancelBtn =
+        modal.querySelector('button[id*="cancel" i]') ||
+        modal.querySelector('button[id*="hide" i]') ||
+        modal.querySelector('button[id*="close" i]') ||
+        modal.querySelector('button[onclick*="hide"]') ||
+        modal.querySelector('button[onclick*="close"]') ||
+        modal.querySelector('button[class*="bg-gray"]') ||
+        modal.querySelector('button[class*="text-gray-500"]');
+      // 若找不到，嘗試尋找內含叉號或任何按鈕
+      if (!cancelBtn) {
+        cancelBtn = modal.querySelector('button, span');
+      }
+      if (cancelBtn && typeof cancelBtn.click === 'function') {
+        cancelBtn.click();
+      } else {
+        // 若找不到可點擊的關閉按鈕，直接隱藏彈窗
+        modal.classList.add('hidden');
+      }
+      ev.preventDefault();
+    } else if (key === 'Enter') {
+      // 搜尋主要操作按鈕：id 或文本含 save/confirm/apply/ok 或常見中文文案
+      const buttons = Array.from(modal.querySelectorAll('button')).filter(btn => !btn.disabled && btn.offsetParent !== null);
+      let confirmBtn =
+        buttons.find(btn => {
+          const id = btn.id || '';
+          return /save|confirm|apply|ok/i.test(id);
+        }) ||
+        buttons.find(btn => {
+          const text = btn.textContent || '';
+          return /儲存|保存|更新|確定|套用|新增/.test(text);
+        });
+      // 若未找到，取第一個背景非灰的按鈕
+      if (!confirmBtn) {
+        confirmBtn = buttons.find(btn => !/bg-gray/.test(btn.className || ''));
+      }
+      // 若仍找不到則取最後一個按鈕（一般位於最右）
+      if (!confirmBtn && buttons.length > 0) {
+        confirmBtn = buttons[buttons.length - 1];
+      }
+      if (confirmBtn && typeof confirmBtn.click === 'function') {
+        confirmBtn.click();
+        ev.preventDefault();
+      }
+    }
+  }
+
+  // 註冊全局鍵盤監聽
+  document.addEventListener('keydown', handleGlobalKeyDown);
+
+  // 以下為閒置自動登出機制
+  const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 分鐘未操作即自動登出
+  let inactivityTimeoutId = null;
+  let activityHandler = null;
+  const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
+
+  /**
+   * 重置閒置計時器。在使用者有互動時呼叫。
+   */
+  function resetInactivityTimer() {
+    if (inactivityTimeoutId) {
+      clearTimeout(inactivityTimeoutId);
+    }
+    inactivityTimeoutId = setTimeout(() => {
+      try {
+        // 提示使用者並自動登出
+        if (typeof showToast === 'function') {
+          // 中文與英文提示皆給出，後續翻譯函式可根據語言切換正確文案
+          const lang = localStorage.getItem('lang') || 'zh';
+          const zhMsg = '閒置時間過長，自動登出';
+          const enMsg = 'Logged out due to inactivity';
+          showToast(lang === 'en' ? enMsg : zhMsg, 'warning');
+        }
+        if (typeof logout === 'function') {
+          logout();
+        }
+      } catch (e) {
+        // 若登出過程出現錯誤則輸出於控制台
+        console.error('自動登出時發生錯誤:', e);
+      }
+    }, INACTIVITY_LIMIT);
+  }
+
+  /**
+   * 開始監測使用者互動並在閒置時登出。登入後應呼叫本函式。
+   */
+  function startInactivityMonitoring() {
+    // 先停止既有監控以避免重複綁定
+    stopInactivityMonitoring();
+    // 建立事件處理函式
+    activityHandler = function() {
+      resetInactivityTimer();
+    };
+    // 綁定所有監測事件
+    activityEvents.forEach(evt => {
+      document.addEventListener(evt, activityHandler);
+    });
+    // 初始化計時
+    resetInactivityTimer();
+  }
+
+  /**
+   * 停止監測使用者互動並清除計時器。登出時呼叫。
+   */
+  function stopInactivityMonitoring() {
+    // 移除事件監聽
+    if (activityHandler) {
+      activityEvents.forEach(evt => {
+        document.removeEventListener(evt, activityHandler);
+      });
+      activityHandler = null;
+    }
+    // 清除計時器
+    if (inactivityTimeoutId) {
+      clearTimeout(inactivityTimeoutId);
+      inactivityTimeoutId = null;
+    }
+  }
+
+  // 將監控函式掛到 window，供其他模組調用
+  window.startInactivityMonitoring = startInactivityMonitoring;
+  window.stopInactivityMonitoring = stopInactivityMonitoring;
 })();
