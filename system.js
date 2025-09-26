@@ -21794,10 +21794,11 @@ function hideGlobalCopyright() {
       const id = (el.id || '').toLowerCase();
       return !el.classList.contains('hidden') && id.includes('modal');
     });
-    // 取得事件目標元素，用於判斷是否在輸入欄位中
+    // 取得事件目標元素，用於判斷是否在可編輯欄位中
     const target = ev.target;
     const tagName = target && target.tagName ? target.tagName.toUpperCase() : '';
-    const isEditableInput = tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || (target && target.isContentEditable);
+    // 將 SELECT 從可編輯輸入排除，讓在下拉選單中按 Enter 也能觸發快捷操作
+    const isEditableInput = tagName === 'INPUT' || tagName === 'TEXTAREA' || (target && target.isContentEditable);
 
     // 處理左右方向鍵：僅當病歷或診症記錄彈窗開啟時有效
     if (key === 'ArrowLeft' || key === 'ArrowRight') {
@@ -21829,23 +21830,17 @@ function hideGlobalCopyright() {
     if (key === 'Escape') {
       if (modals.length > 0) {
         const modal = modals[modals.length - 1];
-        // 嘗試尋找取消/關閉按鈕
+        // 嘗試尋找取消/關閉按鈕，避免選中導覽按鈕（如上一頁/下一頁）
         let cancelBtn =
           modal.querySelector('button[id*="cancel" i]') ||
           modal.querySelector('button[id*="hide" i]') ||
           modal.querySelector('button[id*="close" i]') ||
           modal.querySelector('button[onclick*="hide"]') ||
-          modal.querySelector('button[onclick*="close"]') ||
-          modal.querySelector('button[class*="bg-gray"]') ||
-          modal.querySelector('button[class*="text-gray-500"]');
-        if (!cancelBtn) {
-          // 若找不到，先嘗試尋找第一個按鈕或 span
-          cancelBtn = modal.querySelector('button, span');
-        }
+          modal.querySelector('button[onclick*="close"]');
         if (cancelBtn && typeof cancelBtn.click === 'function') {
           cancelBtn.click();
         } else {
-          // 若仍找不到可點擊的關閉按鈕，依彈窗 id 呼叫指定的關閉函式
+          // 若找不到可點擊的關閉按鈕，依彈窗 id 呼叫指定的關閉函式或直接隱藏
           try {
             const id = modal.id || '';
             if (id === 'patientDetailModal' && typeof closePatientDetail === 'function') {
@@ -21854,8 +21849,9 @@ function hideGlobalCopyright() {
               closePatientMedicalHistoryModal();
             } else if (id === 'medicalHistoryModal' && typeof closeMedicalHistoryModal === 'function') {
               closeMedicalHistoryModal();
+            } else if (id === 'registrationModal' && typeof closeRegistrationModal === 'function') {
+              closeRegistrationModal();
             } else {
-              // 最後直接隱藏彈窗
               modal.classList.add('hidden');
             }
           } catch (_e) {
@@ -21879,16 +21875,13 @@ function hideGlobalCopyright() {
 
     // 處理 Enter 鍵：在彈窗中觸發主要操作
     if (key === 'Enter') {
+      // 沒有彈窗時無需處理
       if (modals.length === 0) {
-        return;
-      }
-      if (isEditableInput) {
-        // 在輸入欄位中不攔截 Enter
         return;
       }
       const modal = modals[modals.length - 1];
       const modalId = modal.id || '';
-      // 特定彈窗：掛號彈窗按 Enter 執行 confirmRegistration
+      // 若為掛號彈窗，直接執行 confirmRegistration（即使焦點在下拉選單中）
       if (modalId === 'registrationModal' && typeof confirmRegistration === 'function') {
         try {
           confirmRegistration();
@@ -21897,6 +21890,10 @@ function hideGlobalCopyright() {
         }
         ev.preventDefault();
         ev.stopPropagation();
+        return;
+      }
+      // 在其他可編輯輸入（如 INPUT/TEXTAREA/contentEditable）中，不攔截 Enter
+      if (isEditableInput) {
         return;
       }
       // 一般彈窗：尋找主要確認按鈕
