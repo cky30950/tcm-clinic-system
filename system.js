@@ -276,55 +276,61 @@ let personalHerbChartInstance = null;
 let personalFormulaChartInstance = null;
 let personalAcupointChartInstance = null;
 
-// ================== Jitsi 視訊診症支援 ==================
-// 全域變數：當前 Jitsi 視訊會議 API 實例
-// 用於控制和銷毀會議，避免重複初始化
-let currentJitsiApi = null;
+// ================== Whereby 視訊診症支援 ==================
+// 全域變數：目前的 Whereby 會議嵌入元素
+// 用於在關閉彈窗時移除元素，避免重複初始化
+let currentWherebyEmbed = null;
+
+// 常數：Whereby 子網域或完整房間前綴
+// 請依實際註冊的 Whereby 子網域替換 example
+// 使用者指定的 Whereby 子網域，例如 great-tcm
+const WHEREBY_SUBDOMAIN = 'great-tcm';
+const WHEREBY_ROOM_PREFIX = `https://${WHEREBY_SUBDOMAIN}.whereby.com/consultation-`;
 
 /**
- * 開啟視訊診症彈窗並加入 Jitsi 房間。
+ * 開啟視訊診症彈窗並加入 Whereby 房間。
  *
- * 若已有先前的會議實例，將先銷毀以避免重複串流。
+ * 使用 appointmentId 生成唯一房間網址，動態建立 whereby-embed 元件。
+ * 若已有先前的嵌入元素，將先移除以避免重複。
+ *
  * @param {number|string} appointmentId 掛號 ID，用於生成唯一房間名稱
  */
 function openVideoConsultationModal(appointmentId) {
   try {
     const modal = document.getElementById('videoConsultationModal');
-    const container = document.getElementById('jitsiContainer');
+    const container = document.getElementById('wherebyContainer');
     if (!modal || !container) {
       console.error('找不到視訊診症容器或彈窗。');
       return;
     }
-    // 如已有舊的會議，先銷毀
-    if (window.currentJitsiApi) {
+    // 移除舊的 Whereby 嵌入元素
+    if (window.currentWherebyEmbed) {
       try {
-        window.currentJitsiApi.dispose();
+        window.currentWherebyEmbed.remove();
       } catch (_e) {
-        // 忽略銷毀錯誤
+        // 忽略移除錯誤
       }
-      window.currentJitsiApi = null;
+      window.currentWherebyEmbed = null;
     }
-    // 清空會議容器內容
+    // 清空容器內容
     container.innerHTML = '';
-    // 使用掛號 ID 建立房間名稱，確保每場診症唯一
-    const roomName = 'consultation-' + appointmentId;
-    const domain = 'meet.jit.si';
-    const options = {
-      roomName: roomName,
-      parentNode: container,
-      // 將用戶資訊帶入會議顯示名稱
-      userInfo: {
-        displayName: (currentUserData && (currentUserData.name || currentUserData.username)) || ''
-      }
-    };
-    try {
-      // 建立新的 Jitsi 會議
-      const api = new JitsiMeetExternalAPI(domain, options);
-      window.currentJitsiApi = api;
-    } catch (e) {
-      console.error('建立 Jitsi 會議時發生錯誤', e);
+    // 建立房間網址：`https://<subdomain>.whereby.com/consultation-<id>`
+    const roomUrl = `${WHEREBY_ROOM_PREFIX}${appointmentId}`;
+    // 動態建立 whereby-embed 元件
+    const embedEl = document.createElement('whereby-embed');
+    embedEl.setAttribute('room', roomUrl);
+    // 可視需要設定顯示名稱或語言，例如 displayName
+    if (typeof currentUserData !== 'undefined' && currentUserData && (currentUserData.name || currentUserData.username)) {
+      embedEl.setAttribute('displayname', currentUserData.name || currentUserData.username);
     }
-    // 顯示視訊診症彈窗
+    // 將元件大小設為占滿容器
+    embedEl.style.width = '100%';
+    embedEl.style.height = '100%';
+    // 插入至容器
+    container.appendChild(embedEl);
+    // 保存參考以便之後移除
+    window.currentWherebyEmbed = embedEl;
+    // 顯示彈窗
     modal.classList.remove('hidden');
   } catch (e) {
     console.error('開啟視訊診症彈窗失敗', e);
@@ -332,7 +338,7 @@ function openVideoConsultationModal(appointmentId) {
 }
 
 /**
- * 關閉視訊診症彈窗並銷毀會議。
+ * 關閉視訊診症彈窗並移除 Whereby 嵌入。
  */
 function closeVideoConsultationModal() {
   try {
@@ -340,13 +346,13 @@ function closeVideoConsultationModal() {
     if (modal) {
       modal.classList.add('hidden');
     }
-    if (window.currentJitsiApi) {
+    if (window.currentWherebyEmbed) {
       try {
-        window.currentJitsiApi.dispose();
+        window.currentWherebyEmbed.remove();
       } catch (_e) {
-        // 忽略銷毀失敗
+        // 忽略移除失敗
       }
-      window.currentJitsiApi = null;
+      window.currentWherebyEmbed = null;
     }
   } catch (e) {
     console.error('關閉視訊診症彈窗失敗', e);
