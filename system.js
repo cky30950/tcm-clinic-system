@@ -2714,7 +2714,7 @@ async function logout() {
                 accountSecurity: { title: '帳號安全設定', icon: '🔐', description: '變更密碼及刪除帳號' },
                 // 新增：模板庫管理
                 templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' },
-                // 新增：行事曆排班功能
+                // 行事曆排班功能
                 scheduleCalendar: { title: '行事曆排班', icon: '📅', description: '排班與行事曆管理' }
             };
 
@@ -2806,15 +2806,15 @@ async function logout() {
                 if (typeof loadPersonalStatistics === 'function') {
                     loadPersonalStatistics();
                 }
-            } else if (sectionId === 'accountSecurity') {
-                // 載入帳號安全設定：目前僅需要清除表單輸入
-                if (typeof loadAccountSecurity === 'function') {
-                    loadAccountSecurity();
-                }
             } else if (sectionId === 'scheduleCalendar') {
                 // 載入行事曆排班功能
                 if (typeof loadScheduleCalendar === 'function') {
                     loadScheduleCalendar();
+                }
+            } else if (sectionId === 'accountSecurity') {
+                // 載入帳號安全設定：目前僅需要清除表單輸入
+                if (typeof loadAccountSecurity === 'function') {
+                    loadAccountSecurity();
                 }
             }
         }
@@ -2822,7 +2822,6 @@ async function logout() {
         // 隱藏所有區域
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
-            // 新增 scheduleCalendar 於隱藏區塊列表，以確保切換其他功能時行事曆排班頁能被隱藏
             ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'scheduleCalendar', 'welcomePage'].forEach(id => {
                 // 在隱藏中藥庫時，取消其資料監聽以減少 Realtime Database 讀取
                 if (id === 'herbLibrary') {
@@ -7282,10 +7281,10 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         // Rebuild medication information according to language
         let medInfoLocalized = '';
         if (medDays) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Medication Days' : '服藥天數') + colon + '</strong>' + medDays + (isEnglish ? ' days ' : '天　');
         }
         if (medFreq) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
         }
         if (consultation.usage) {
             medInfoLocalized += '<strong>' + (isEnglish ? 'Administration Method' : '服用方法') + colon + '</strong>' + consultation.usage;
@@ -21666,6 +21665,401 @@ function hideGlobalCopyright() {
   }
 }
 
+        // ========== 行事曆排班功能 ==========
+        // 全局變數用於管理行事曆排班的狀態與顏色映射
+        let scheduleCalendarInstance = null;
+        let scheduleInitialized = false;
+        let scheduleUserList = [];
+        const scheduleUserColorMap = {};
+
+        /**
+         * 依據使用者 ID 取得用戶名稱。
+         * @param {string} userId
+         * @returns {string}
+         */
+        function getUserNameById(userId) {
+            if (!userId) return '';
+            const user = (scheduleUserList || []).find(u => {
+                const id = u && (u.id || u.uid);
+                return id === userId;
+            });
+            if (user) {
+                return user.name || user.displayName || user.username || user.email || userId;
+            }
+            return userId;
+        }
+
+        /**
+         * 根據使用者 ID 取得對應的顏色。
+         * 使用簡單的 hash 計算，確保相同的使用者會獲得相同的顏色。
+         * @param {string} userId
+         * @returns {string} 十六進位顏色字串
+         */
+        function getColorForUser(userId) {
+            if (!userId) return '#2196F3';
+            if (scheduleUserColorMap[userId]) return scheduleUserColorMap[userId];
+            // 預設調色盤，若顏色不足可擴充
+            const palette = ['#4caf50', '#ff9800', '#9c27b0', '#03a9f4', '#e91e63', '#009688', '#ff5722', '#673ab7'];
+            let hash = 0;
+            for (let i = 0; i < userId.length; i++) {
+                hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const index = Math.abs(hash) % palette.length;
+            const color = palette[index];
+            scheduleUserColorMap[userId] = color;
+            return color;
+        }
+
+        /**
+         * 載入行事曆排班頁面。
+         * 若行事曆尚未初始化，將先初始化後載入事件；否則直接載入所選用戶的事件。
+         */
+        async function loadScheduleCalendar() {
+            try {
+                if (typeof hideAllSections === 'function') {
+                    hideAllSections();
+                }
+            } catch (_e) {
+                // 忽略隱藏區域的錯誤
+            }
+            const section = document.getElementById('scheduleCalendar');
+            if (section) {
+                section.classList.remove('hidden');
+            }
+            try {
+                await waitForFirebaseDb();
+                if (!scheduleInitialized) {
+                    await initializeScheduleCalendar();
+                    scheduleInitialized = true;
+                } else {
+                    await loadEventsForSelectedUser();
+                }
+            } catch (err) {
+                console.error('初始化行事曆失敗:', err);
+                if (typeof showToast === 'function') {
+                    showToast('初始化行事曆失敗', 'error');
+                }
+            }
+        }
+
+        /**
+         * 初始化排班行事曆。
+         * 建立 FullCalendar 實例、載入用戶下拉選單以及匯出按鈕事件。
+         */
+        async function initializeScheduleCalendar() {
+            try {
+                await waitForFirebaseDb();
+                // 取得所有用戶並篩選出醫師與護理師
+                let users = [];
+                try {
+                    users = await fetchUsers();
+                } catch (_er) {
+                    users = [];
+                }
+                scheduleUserList = (Array.isArray(users) ? users : []).filter(u => {
+                    const pos = u && u.position ? String(u.position).trim() : '';
+                    return pos === '醫師' || pos === '護理師';
+                });
+                // 建立用戶下拉選單
+                const selectEl = document.getElementById('scheduleUserSelect');
+                if (selectEl) {
+                    // 清空並插入預設選項
+                    selectEl.innerHTML = '';
+                    const placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.disabled = true;
+                    placeholder.selected = true;
+                    try {
+                        placeholder.textContent = window.t ? window.t('請選擇醫師或護理師') : '請選擇醫師或護理師';
+                    } catch (_e) {
+                        placeholder.textContent = '請選擇醫師或護理師';
+                    }
+                    selectEl.appendChild(placeholder);
+                    // 依用戶列表建立選項
+                    scheduleUserList.forEach(u => {
+                        const id = u && (u.id || u.uid);
+                        const option = document.createElement('option');
+                        option.value = id;
+                        option.textContent = getUserNameById(id);
+                        selectEl.appendChild(option);
+                    });
+                    // 監聽選取改變
+                    selectEl.addEventListener('change', function () {
+                        loadEventsForSelectedUser();
+                    });
+                }
+                // 設定匯出按鈕事件
+                const exportBtn = document.getElementById('scheduleExportBtn');
+                if (exportBtn) {
+                    exportBtn.addEventListener('click', function () {
+                        exportCalendarToIcal();
+                    });
+                }
+                // 建立 FullCalendar 實例
+                const calendarEl = document.getElementById('calendar');
+                if (calendarEl) {
+                    scheduleCalendarInstance = new FullCalendar.Calendar(calendarEl, {
+                        plugins: [FullCalendar.dayGridPlugin, FullCalendar.timeGridPlugin, FullCalendar.interactionPlugin],
+                        headerToolbar: {
+                            left: 'prev,next today',
+                            center: 'title',
+                            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                        },
+                        initialView: 'dayGridMonth',
+                        selectable: true,
+                        editable: true,
+                        locale: 'zh-tw',
+                        select: function (selectionInfo) {
+                            // 新增排班事件
+                            addScheduleEvent(selectionInfo.start, selectionInfo.end);
+                        },
+                        eventDrop: function (info) {
+                            // 拖曳後更新排班時間
+                            updateScheduleEvent(info.event);
+                        },
+                        eventResize: function (info) {
+                            // 調整大小後更新排班時間
+                            updateScheduleEvent(info.event);
+                        },
+                        eventClick: function (info) {
+                            // 點擊事件刪除排班
+                            const ev = info.event;
+                            let confirmMsg = '確定要刪除此排班嗎？';
+                            try {
+                                confirmMsg = window.t ? window.t('確定要刪除此排班嗎？') : confirmMsg;
+                            } catch (_e) {}
+                            if (confirm(confirmMsg)) {
+                                deleteScheduleEvent(ev);
+                            }
+                        }
+                    });
+                    scheduleCalendarInstance.render();
+                }
+            } catch (error) {
+                console.error('初始化行事曆排班失敗:', error);
+                if (typeof showToast === 'function') {
+                    showToast('初始化行事曆排班失敗', 'error');
+                }
+            }
+        }
+
+        /**
+         * 依選取的用戶載入排班事件。
+         * 從 Firestore 取得對應使用者的 schedules 事件並渲染至 FullCalendar。
+         */
+        async function loadEventsForSelectedUser() {
+            const selectEl = document.getElementById('scheduleUserSelect');
+            if (!selectEl || !scheduleCalendarInstance) return;
+            const userId = selectEl.value;
+            // 如果尚未選擇用戶，清空事件並返回
+            if (!userId) {
+                scheduleCalendarInstance.getEvents().forEach(ev => ev.remove());
+                return;
+            }
+            try {
+                await waitForFirebaseDb();
+                const colRef = window.firebase.collection(window.firebase.db, 'schedules');
+                const q = window.firebase.firestoreQuery(
+                    colRef,
+                    window.firebase.where('userId', '==', userId)
+                );
+                const snapshot = await window.firebase.getDocs(q);
+                // 清除現有事件
+                scheduleCalendarInstance.getEvents().forEach(ev => ev.remove());
+                snapshot.forEach((doc) => {
+                    const data = doc.data() || {};
+                    // 將時間從 ISO 字串轉回 Date 物件
+                    let start = data.start;
+                    let end = data.end;
+                    try {
+                        if (typeof start === 'string') start = new Date(start);
+                        if (typeof end === 'string') end = new Date(end);
+                    } catch (_e) {}
+                    const title = data.title || (window.t ? window.t('值班') : '值班');
+                    const color = getColorForUser(userId);
+                    scheduleCalendarInstance.addEvent({
+                        id: doc.id,
+                        title: title,
+                        start: start,
+                        end: end,
+                        backgroundColor: color,
+                        borderColor: color
+                    });
+                });
+            } catch (err) {
+                console.error('載入排班資料失敗:', err);
+                if (typeof showToast === 'function') {
+                    showToast('載入排班資料失敗', 'error');
+                }
+            }
+        }
+
+        /**
+         * 新增排班事件。
+         * 將事件儲存至 Firestore 並同步到行事曆。
+         * @param {Date} start
+         * @param {Date} end
+         */
+        async function addScheduleEvent(start, end) {
+            const selectEl = document.getElementById('scheduleUserSelect');
+            if (!selectEl || !selectEl.value) {
+                if (typeof showToast === 'function') {
+                    showToast('請先選擇醫師或護理師', 'warning');
+                }
+                if (scheduleCalendarInstance) scheduleCalendarInstance.unselect();
+                return;
+            }
+            const userId = selectEl.value;
+            let defaultTitle = '值班';
+            try {
+                defaultTitle = window.t ? window.t('值班') : defaultTitle;
+            } catch (_e) {}
+            let promptMsg = '輸入排班標題';
+            try {
+                promptMsg = window.t ? window.t('輸入排班標題') : promptMsg;
+            } catch (_e) {}
+            const title = prompt(promptMsg, defaultTitle);
+            if (!title) {
+                if (scheduleCalendarInstance) scheduleCalendarInstance.unselect();
+                return;
+            }
+            try {
+                await waitForFirebaseDb();
+                const colRef = window.firebase.collection(window.firebase.db, 'schedules');
+                const newDoc = {
+                    title: title,
+                    userId: userId,
+                    start: start instanceof Date ? start.toISOString() : String(start),
+                    end: end instanceof Date ? end.toISOString() : String(end),
+                    createdAt: new Date(),
+                    createdBy: (currentUser && currentUser.uid) ? currentUser.uid : null
+                };
+                const docRef = await window.firebase.addDoc(colRef, newDoc);
+                // 將事件加入行事曆
+                const color = getColorForUser(userId);
+                if (scheduleCalendarInstance) {
+                    scheduleCalendarInstance.addEvent({
+                        id: docRef.id,
+                        title: title,
+                        start: start,
+                        end: end,
+                        backgroundColor: color,
+                        borderColor: color
+                    });
+                }
+                if (typeof showToast === 'function') {
+                    showToast('新增排班成功', 'success');
+                }
+            } catch (err) {
+                console.error('新增排班失敗:', err);
+                if (typeof showToast === 'function') {
+                    showToast('新增排班失敗', 'error');
+                }
+            } finally {
+                if (scheduleCalendarInstance) scheduleCalendarInstance.unselect();
+            }
+        }
+
+        /**
+         * 更新排班事件時間。
+         * 將事件的開始與結束時間更新至 Firestore。
+         * @param {object} event FullCalendar 事件對象
+         */
+        async function updateScheduleEvent(event) {
+            if (!event || !event.id) return;
+            try {
+                await waitForFirebaseDb();
+                const docRef = window.firebase.doc(window.firebase.db, 'schedules', event.id);
+                await window.firebase.updateDoc(docRef, {
+                    start: event.start ? event.start.toISOString() : '',
+                    end: event.end ? event.end.toISOString() : '',
+                    updatedAt: new Date()
+                });
+                if (typeof showToast === 'function') {
+                    showToast('更新排班成功', 'success');
+                }
+            } catch (err) {
+                console.error('更新排班失敗:', err);
+                if (typeof showToast === 'function') {
+                    showToast('更新排班失敗', 'error');
+                }
+            }
+        }
+
+        /**
+         * 刪除排班事件。
+         * 從 Firestore 刪除對應文件並在行事曆中移除。
+         * @param {object} event FullCalendar 事件對象
+         */
+        async function deleteScheduleEvent(event) {
+            if (!event || !event.id) return;
+            try {
+                await waitForFirebaseDb();
+                const docRef = window.firebase.doc(window.firebase.db, 'schedules', event.id);
+                await window.firebase.deleteDoc(docRef);
+                // 從行事曆刪除事件
+                if (typeof event.remove === 'function') {
+                    event.remove();
+                }
+                if (typeof showToast === 'function') {
+                    showToast('刪除排班成功', 'success');
+                }
+            } catch (err) {
+                console.error('刪除排班失敗:', err);
+                if (typeof showToast === 'function') {
+                    showToast('刪除排班失敗', 'error');
+                }
+            }
+        }
+
+        /**
+         * 將目前顯示的排班行事曆匯出為 iCal (.ics) 檔案。
+         */
+        function exportCalendarToIcal() {
+            if (!scheduleCalendarInstance) return;
+            const events = scheduleCalendarInstance.getEvents();
+            const lines = [];
+            lines.push('BEGIN:VCALENDAR');
+            lines.push('VERSION:2.0');
+            lines.push('PRODID:-//TCM Clinic//Schedule Calendar//EN');
+            const dtStamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+            events.forEach(ev => {
+                const uid = ev.id || '';
+                const startIso = ev.start ? ev.start.toISOString() : '';
+                const endIso = ev.end ? ev.end.toISOString() : '';
+                const dtStart = startIso.replace(/[-:]/g, '').split('.')[0] + 'Z';
+                const dtEnd = endIso.replace(/[-:]/g, '').split('.')[0] + 'Z';
+                let summary = ev.title || '';
+                summary = String(summary).replace(/,/g, '\\,').replace(/;/g, '\\;');
+                lines.push('BEGIN:VEVENT');
+                lines.push('UID:' + uid);
+                lines.push('DTSTAMP:' + dtStamp);
+                lines.push('DTSTART:' + dtStart);
+                lines.push('DTEND:' + dtEnd);
+                lines.push('SUMMARY:' + summary);
+                lines.push('END:VEVENT');
+            });
+            lines.push('END:VCALENDAR');
+            const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            // 根據用戶名稱命名檔案
+            let filename = 'schedule';
+            const selectEl = document.getElementById('scheduleUserSelect');
+            if (selectEl && selectEl.value) {
+                const uname = getUserNameById(selectEl.value);
+                if (uname) {
+                    filename = uname;
+                }
+            }
+            link.download = filename + '.ics';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
 /**
  * 網路狀態檢測與提示。
  *
@@ -21752,327 +22146,4 @@ function hideGlobalCopyright() {
 
   // 在 DOMContentLoaded 後立即檢測網路狀態
   document.addEventListener('DOMContentLoaded', updateNetworkStatus);
-
-  /**
-   * ===== 行事曆排班功能 =====
-   * 提供多醫師與護理師排班功能，支援月、週、日檢視以及拖曳調整行程。
-   * 排班資料儲存在 Firestore 的 "schedules" 集合中，欄位包含：
-   *  - title: 排班標題
-   *  - userId: 使用者文件 ID
-   *  - start: ISO 格式的開始時間字串
-   *  - end: ISO 格式的結束時間字串
-   *  - createdAt: 建立時間（ISO 字串）
-   *  - createdBy: 建立者（當前登入者 ID 或帳號）
-   *  - updatedAt: 更新時間（ISO 字串，僅在更新時寫入）
-   */
-  let scheduleCalendarInstance = null;
-  let scheduleInitialized = false;
-  let scheduleEventsCache = [];
-
-  // 載入行事曆排班頁面，若尚未初始化則初始化行事曆
-  async function loadScheduleCalendar(forceRefresh = false) {
-    try {
-      // 等待 Firebase 準備就緒
-      await waitForFirebaseDb();
-      // 檢查 FullCalendar 是否已載入
-      if (!window.FullCalendar || !window.FullCalendar.Calendar) {
-        showToast('行事曆元件載入失敗，請檢查網絡連線', 'error');
-        return;
-      }
-      // 首次載入時初始化
-      if (!scheduleInitialized) {
-        await initializeScheduleCalendar();
-        scheduleInitialized = true;
-      } else if (forceRefresh) {
-        await loadEventsForSelectedUser();
-      } else {
-        // 每次進入頁面都重新載入事件
-        await loadEventsForSelectedUser();
-      }
-    } catch (err) {
-      console.error('載入行事曆排班時發生錯誤:', err);
-      showToast('載入行事曆時發生錯誤', 'error');
-    }
-  }
-
-  // 初始化行事曆排班功能
-  async function initializeScheduleCalendar() {
-    // 載入使用者列表（醫師與護理師）
-    let userList = [];
-    try {
-      userList = await fetchUsers(true);
-    } catch (_e) {
-      // 若讀取用戶快取失敗則使用全域 users
-      userList = Array.isArray(users) ? users : [];
-    }
-    // 選出啟用且為醫師或護理師之使用者
-    const staff = (userList || []).filter(u => u.active && (u.position === '醫師' || u.position === '護理師'));
-    const userSelect = document.getElementById('scheduleUserSelect');
-    if (userSelect) {
-      // 建立選項
-      userSelect.innerHTML = '';
-      const allOption = document.createElement('option');
-      allOption.value = '';
-      allOption.setAttribute('data-original-text', '全部');
-      allOption.textContent = (window.translations && window.translations.zh && window.translations.zh['全部']) || '全部';
-      userSelect.appendChild(allOption);
-      staff.forEach(u => {
-        const opt = document.createElement('option');
-        // 儲存使用者文件 ID 作為值
-        opt.value = u.id || u.username;
-        opt.textContent = `${u.name}${u.position ? ' ' + u.position : ''}`;
-        userSelect.appendChild(opt);
-      });
-      userSelect.addEventListener('change', () => {
-        loadEventsForSelectedUser();
-      });
-    }
-    // 綁定匯出按鈕
-    const exportBtn = document.getElementById('exportCalendarButton');
-    if (exportBtn) {
-      exportBtn.addEventListener('click', exportCalendarToIcal);
-    }
-    // 初始化 FullCalendar
-    const calendarEl = document.getElementById('calendar');
-    if (!calendarEl) return;
-    scheduleCalendarInstance = new FullCalendar.Calendar(calendarEl, {
-      initialView: 'dayGridMonth',
-      headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,timeGridWeek,timeGridDay'
-      },
-      selectable: true,
-      editable: true,
-      selectMirror: true,
-      // 新增排班事件
-      select: function(info) {
-        const selector = document.getElementById('scheduleUserSelect');
-        const selectedUserId = selector ? selector.value : '';
-        if (!selectedUserId) {
-          showToast('請選擇醫師或護理師', 'warning');
-          scheduleCalendarInstance.unselect();
-          return;
-        }
-        const titlePrompt = window.t ? window.t('輸入排班標題') : '輸入排班標題';
-        const defaultTitle = window.t ? window.t('值班') : '值班';
-        let title = prompt(titlePrompt, defaultTitle);
-        if (title === null) {
-          scheduleCalendarInstance.unselect();
-          return;
-        }
-        title = String(title).trim();
-        if (!title) {
-          scheduleCalendarInstance.unselect();
-          return;
-        }
-        addScheduleEvent(title, selectedUserId, info.startStr, info.endStr)
-          .then((eventData) => {
-            const userColor = getColorForUser(selectedUserId);
-            scheduleCalendarInstance.addEvent({
-              id: eventData.id,
-              title: title,
-              start: info.start,
-              end: info.end,
-              extendedProps: {
-                userId: selectedUserId,
-                userName: getUserNameById(selectedUserId)
-              },
-              backgroundColor: userColor,
-              borderColor: userColor
-            });
-          })
-          .catch((err) => {
-            console.error('新增排班事件失敗:', err);
-            showToast('新增排班事件失敗', 'error');
-          });
-        scheduleCalendarInstance.unselect();
-      },
-      // 拖曳事件後更新
-      eventDrop: function(info) {
-        updateScheduleEvent(info.event.id, info.event.startStr, info.event.endStr)
-          .catch((err) => {
-            console.error('更新排班事件失敗:', err);
-            showToast('更新排班事件失敗', 'error');
-          });
-      },
-      eventResize: function(info) {
-        updateScheduleEvent(info.event.id, info.event.startStr, info.event.endStr)
-          .catch((err) => {
-            console.error('更新排班事件失敗:', err);
-            showToast('更新排班事件失敗', 'error');
-          });
-      },
-      // 點擊刪除
-      eventClick: function(info) {
-        const confirmDelete = confirm('刪除此排班嗎？');
-        if (confirmDelete) {
-          deleteScheduleEvent(info.event.id)
-            .then(() => {
-              info.event.remove();
-            })
-            .catch((err) => {
-              console.error('刪除排班事件失敗:', err);
-              showToast('刪除排班事件失敗', 'error');
-            });
-        }
-      }
-    });
-    scheduleCalendarInstance.render();
-    await loadEventsForSelectedUser();
-  }
-
-  // 根據選擇的使用者重新載入排班事件
-  async function loadEventsForSelectedUser() {
-    if (!scheduleCalendarInstance) return;
-    try {
-      await waitForFirebaseDb();
-      const selector = document.getElementById('scheduleUserSelect');
-      const selectedUserId = selector ? selector.value : '';
-      const schedulesRef = window.firebase.collection(window.firebase.db, 'schedules');
-      let q;
-      if (selectedUserId) {
-        q = window.firebase.firestoreQuery(schedulesRef, window.firebase.where('userId', '==', selectedUserId));
-      } else {
-        q = schedulesRef;
-      }
-      const snapshot = await window.firebase.getDocs(q);
-      const existingEvents = scheduleCalendarInstance.getEvents();
-      existingEvents.forEach(e => e.remove());
-      scheduleEventsCache = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const ev = {
-          id: docSnap.id,
-          title: data.title || '',
-          userId: data.userId || '',
-          start: data.start,
-          end: data.end,
-          userName: getUserNameById(data.userId)
-        };
-        scheduleEventsCache.push(ev);
-      });
-      scheduleEventsCache.forEach(ev => {
-        const userColor = getColorForUser(ev.userId);
-        scheduleCalendarInstance.addEvent({
-          id: ev.id,
-          title: ev.title,
-          start: new Date(ev.start),
-          end: new Date(ev.end),
-          extendedProps: {
-            userId: ev.userId,
-            userName: ev.userName
-          },
-          backgroundColor: userColor,
-          borderColor: userColor
-        });
-      });
-    } catch (err) {
-      console.error('載入排班事件時發生錯誤:', err);
-      showToast('載入排班事件失敗', 'error');
-    }
-  }
-
-  // 新增排班事件
-  async function addScheduleEvent(title, userId, startStr, endStr) {
-    await waitForFirebaseDb();
-    const schedulesRef = window.firebase.collection(window.firebase.db, 'schedules');
-    const nowIso = new Date().toISOString();
-    const payload = {
-      title: title,
-      userId: userId,
-      start: startStr,
-      end: endStr,
-      createdAt: nowIso,
-      createdBy: currentUserData && (currentUserData.id || currentUserData.username) ? (currentUserData.id || currentUserData.username) : ''
-    };
-    const docRef = await window.firebase.addDoc(schedulesRef, payload);
-    return { id: docRef.id, ...payload };
-  }
-
-  // 更新排班事件（時間）
-  async function updateScheduleEvent(eventId, newStartStr, newEndStr) {
-    await waitForFirebaseDb();
-    const docRef = window.firebase.doc(window.firebase.db, 'schedules', eventId);
-    const updateData = {
-      start: newStartStr,
-      end: newEndStr,
-      updatedAt: new Date().toISOString()
-    };
-    await window.firebase.updateDoc(docRef, updateData);
-  }
-
-  // 刪除排班事件
-  async function deleteScheduleEvent(eventId) {
-    await waitForFirebaseDb();
-    const docRef = window.firebase.doc(window.firebase.db, 'schedules', eventId);
-    await window.firebase.deleteDoc(docRef);
-  }
-
-  // 依據使用者 ID 取得使用者名稱
-  function getUserNameById(id) {
-    try {
-      if (!id) return '';
-      const list = Array.isArray(users) ? users : [];
-      const user = list.find(u => (u.id === id) || (u.username === id));
-      return user && user.name ? user.name : '';
-    } catch (_e) {
-      return '';
-    }
-  }
-
-  // 為使用者指定顏色，使排班易於區分
-  const scheduleColors = ['#60A5FA', '#F87171', '#34D399', '#FBBF24', '#A78BFA', '#F472B6', '#FCD34D', '#38BDF8', '#A3E635', '#FB7185'];
-  function getColorForUser(id) {
-    if (!id) return scheduleColors[0];
-    let sum = 0;
-    for (let i = 0; i < id.length; i++) {
-      sum = (sum + id.charCodeAt(i)) % scheduleColors.length;
-    }
-    return scheduleColors[sum];
-  }
-
-  // 匯出行事曆為 iCal 檔案，可匯入至 Google Calendar 或 iCal
-  function exportCalendarToIcal() {
-    try {
-      const events = scheduleEventsCache || [];
-      if (!events.length) {
-        showToast('沒有排班資料可匯出', 'warning');
-        return;
-      }
-      let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//TCM Clinic//Schedule//EN\nCALSCALE:GREGORIAN\n';
-      const now = new Date();
-      const dtstamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-      events.forEach(ev => {
-        const uid = ev.id + '@clinic';
-        const dtstart = new Date(ev.start).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-        const dtend = new Date(ev.end).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-        const summary = ev.title + (ev.userName ? ' (' + ev.userName + ')' : '');
-        ics += 'BEGIN:VEVENT\n';
-        ics += 'UID:' + uid + '\n';
-        ics += 'DTSTAMP:' + dtstamp + '\n';
-        ics += 'DTSTART:' + dtstart + '\n';
-        ics += 'DTEND:' + dtend + '\n';
-        ics += 'SUMMARY:' + summary + '\n';
-        ics += 'END:VEVENT\n';
-      });
-      ics += 'END:VCALENDAR';
-      // 將行事曆內容直接作為 blob
-      const blob = new Blob([ics], { type: 'text/calendar' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'schedule_calendar.ics';
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        if (link.parentNode) link.parentNode.removeChild(link);
-      }, 0);
-      showToast('已匯出行事曆', 'success');
-    } catch (err) {
-      console.error('匯出行事曆失敗:', err);
-      showToast('匯出行事曆失敗', 'error');
-    }
-  }
 })();
