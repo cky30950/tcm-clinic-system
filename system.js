@@ -61,6 +61,10 @@ const UNIT_LABEL_MAP = {
     qian: '錢'
 };
 
+// 用於掛號搜尋結果的鍵盤導航索引
+// 當病人搜尋結果出現時，此索引用於記錄當前選中項目；-1 表示未選中
+let patientSearchSelectionIndex = -1;
+
 // 為病人詳細資料中的套票情況新增分頁設定。
 // 若條件改變（例如重新查看另一位病人），應重置 currentPage 為 1。
 paginationSettings.patientPackageStatus = { currentPage: 1, itemsPerPage: 6 };
@@ -4098,6 +4102,7 @@ async function searchPatientsForRegistration() {
             return;
         }
         // 顯示搜索結果，使用 escapeHtml 轉義顯示內容
+        // 生成搜尋結果項目，並為每個項目設定 data 屬性以利鍵盤選擇時取得病人 ID
         resultsList.innerHTML = matchedPatients.map(patient => {
             const safeId = String(patient.id).replace(/"/g, '&quot;');
             const safeName = window.escapeHtml(patient.name);
@@ -4106,7 +4111,7 @@ async function searchPatientsForRegistration() {
             const safeGender = window.escapeHtml(patient.gender);
             const safePhone = window.escapeHtml(patient.phone);
             return `
-            <div class="p-4 hover:bg-gray-50 cursor-pointer transition duration-200" onclick="selectPatientForRegistration('${safeId}')">
+            <div class="p-4 hover:bg-gray-50 cursor-pointer transition duration-200" data-patient-id="${safeId}" onclick="selectPatientForRegistration('${safeId}')">
                 <div>
                     <div class="font-semibold text-gray-900">${safeName}</div>
                     <div class="text-sm text-gray-600">編號：${safeNumber} | 年齡：${safeAge} | 性別：${safeGender}</div>
@@ -4115,7 +4120,9 @@ async function searchPatientsForRegistration() {
             </div>
             `;
         }).join('');
-        
+
+        // 每次載入搜尋結果時重置鍵盤選擇索引
+        patientSearchSelectionIndex = -1;
         resultsContainer.classList.remove('hidden');
     } catch (error) {
         console.error('搜尋病人資料錯誤:', error);
@@ -4124,6 +4131,76 @@ async function searchPatientsForRegistration() {
                 搜尋失敗，請檢查網路連接
             </div>
         `;
+    }
+}
+
+/**
+ * 處理掛號搜尋輸入框的鍵盤事件，支援上下鍵選擇搜尋結果項目，並按 Enter 執行掛號。
+ * 當搜尋結果列表顯示時：
+ *  - ArrowDown 會移動到下一個結果；
+ *  - ArrowUp 會移動到上一個結果；
+ *  - Enter 會選中當前高亮的病人並執行 selectPatientForRegistration。
+ * 若沒有搜尋結果或列表未顯示，則不做任何處理。
+ * @param {KeyboardEvent} ev 鍵盤事件
+ */
+function handlePatientSearchKeyDown(ev) {
+    const key = ev && ev.key;
+    if (!key || !(['ArrowUp', 'ArrowDown', 'Enter'].includes(key))) {
+        return;
+    }
+    try {
+        const resultsContainer = document.getElementById('patientSearchResults');
+        const resultsList = document.getElementById('searchResultsList');
+        // 僅當結果容器存在且為顯示狀態時處理
+        if (!resultsContainer || resultsContainer.classList.contains('hidden')) {
+            return;
+        }
+        const items = Array.from(resultsList.querySelectorAll('[data-patient-id]'));
+        if (!items || items.length === 0) {
+            return;
+        }
+        if (key === 'ArrowDown') {
+            ev.preventDefault();
+            // 選擇下一項目，超出範圍則回到第一項
+            patientSearchSelectionIndex = (patientSearchSelectionIndex + 1) % items.length;
+            // 更新高亮
+            items.forEach((el, idx) => {
+                if (idx === patientSearchSelectionIndex) {
+                    el.classList.add('bg-blue-100');
+                } else {
+                    el.classList.remove('bg-blue-100');
+                }
+            });
+        } else if (key === 'ArrowUp') {
+            ev.preventDefault();
+            // 選擇上一項目，超出範圍則回到最後一項
+            patientSearchSelectionIndex = (patientSearchSelectionIndex - 1 + items.length) % items.length;
+            // 更新高亮
+            items.forEach((el, idx) => {
+                if (idx === patientSearchSelectionIndex) {
+                    el.classList.add('bg-blue-100');
+                } else {
+                    el.classList.remove('bg-blue-100');
+                }
+            });
+        } else if (key === 'Enter') {
+            // 僅在已選中某項時處理 Enter
+            if (patientSearchSelectionIndex >= 0 && patientSearchSelectionIndex < items.length) {
+                ev.preventDefault();
+                const selectedEl = items[patientSearchSelectionIndex];
+                const pid = selectedEl && selectedEl.dataset ? selectedEl.dataset.patientId : null;
+                if (pid) {
+                    try {
+                        // 直接呼叫選擇病人函式
+                        selectPatientForRegistration(pid);
+                    } catch (_err) {
+                        console.error('鍵盤選擇掛號病人失敗:', _err);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('處理掛號搜尋鍵盤事件錯誤:', err);
     }
 }
         
@@ -17059,6 +17136,29 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 300);
         patientSearchInput.addEventListener('input', debouncedSearchPatients);
+        // 加入鍵盤事件處理，支援方向鍵導航搜尋結果及 Enter 快捷掛號
+        patientSearchInput.addEventListener('keydown', handlePatientSearchKeyDown);
+    }
+
+    // 掛號時選擇醫師的下拉選單：按下 Enter 時直接確認掛號
+    const appointmentDoctorSelect = document.getElementById('appointmentDoctor');
+    if (appointmentDoctorSelect) {
+        // 避免重複綁定事件，可透過自定義屬性判斷是否已綁定
+        if (!appointmentDoctorSelect.dataset.bindEnterListener) {
+            appointmentDoctorSelect.addEventListener('keydown', function (ev) {
+                if (ev && ev.key === 'Enter') {
+                    ev.preventDefault();
+                    try {
+                        if (typeof confirmRegistration === 'function') {
+                            confirmRegistration();
+                        }
+                    } catch (_err) {
+                        console.error('從醫師下拉選單按 Enter 確認掛號失敗:', _err);
+                    }
+                }
+            });
+            appointmentDoctorSelect.dataset.bindEnterListener = 'true';
+        }
     }
 
     // 當選擇問診資料時，自動隱藏主訴症狀輸入欄位。
