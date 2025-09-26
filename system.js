@@ -4171,6 +4171,11 @@ function handlePatientSearchKeyDown(ev) {
                     el.classList.remove('bg-blue-100');
                 }
             });
+            // 確保目前選中項目可見
+            const currentEl = items[patientSearchSelectionIndex];
+            if (currentEl && typeof currentEl.scrollIntoView === 'function') {
+                currentEl.scrollIntoView({ block: 'nearest' });
+            }
         } else if (key === 'ArrowUp') {
             ev.preventDefault();
             // 選擇上一項目，超出範圍則回到最後一項
@@ -4183,6 +4188,11 @@ function handlePatientSearchKeyDown(ev) {
                     el.classList.remove('bg-blue-100');
                 }
             });
+            // 確保目前選中項目可見
+            const currentEl = items[patientSearchSelectionIndex];
+            if (currentEl && typeof currentEl.scrollIntoView === 'function') {
+                currentEl.scrollIntoView({ block: 'nearest' });
+            }
         } else if (key === 'Enter') {
             // 僅在已選中某項時處理 Enter
             if (patientSearchSelectionIndex >= 0 && patientSearchSelectionIndex < items.length) {
@@ -17158,6 +17168,65 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             appointmentDoctorSelect.dataset.bindEnterListener = 'true';
+        }
+    }
+
+    // 掛號時間輸入欄及其他欄位：按下 Enter 時直接確認掛號
+    // 日期時間輸入欄 (datetime-local)
+    const appointmentDateTimeInput = document.getElementById('appointmentDateTime');
+    if (appointmentDateTimeInput) {
+        if (!appointmentDateTimeInput.dataset.bindEnterListener) {
+            appointmentDateTimeInput.addEventListener('keydown', function(ev) {
+                if (ev && ev.key === 'Enter') {
+                    ev.preventDefault();
+                    try {
+                        if (typeof confirmRegistration === 'function') {
+                            confirmRegistration();
+                        }
+                    } catch (err) {
+                        console.error('按 Enter 確認掛號（時間輸入）失敗:', err);
+                    }
+                }
+            });
+            appointmentDateTimeInput.dataset.bindEnterListener = 'true';
+        }
+    }
+    // 問診資料下拉選單
+    const inquirySelectInput = document.getElementById('inquirySelect');
+    if (inquirySelectInput) {
+        if (!inquirySelectInput.dataset.bindEnterListener) {
+            inquirySelectInput.addEventListener('keydown', function(ev) {
+                if (ev && ev.key === 'Enter') {
+                    ev.preventDefault();
+                    try {
+                        if (typeof confirmRegistration === 'function') {
+                            confirmRegistration();
+                        }
+                    } catch (err) {
+                        console.error('按 Enter 確認掛號（問診選擇）失敗:', err);
+                    }
+                }
+            });
+            inquirySelectInput.dataset.bindEnterListener = 'true';
+        }
+    }
+    // 主訴症狀輸入欄 (textarea)
+    const chiefComplaintInput = document.getElementById('quickChiefComplaint');
+    if (chiefComplaintInput) {
+        if (!chiefComplaintInput.dataset.bindEnterListener) {
+            chiefComplaintInput.addEventListener('keydown', function(ev) {
+                if (ev && ev.key === 'Enter') {
+                    ev.preventDefault();
+                    try {
+                        if (typeof confirmRegistration === 'function') {
+                            confirmRegistration();
+                        }
+                    } catch (err) {
+                        console.error('按 Enter 確認掛號（主訴症狀）失敗:', err);
+                    }
+                }
+            });
+            chiefComplaintInput.dataset.bindEnterListener = 'true';
         }
     }
 
