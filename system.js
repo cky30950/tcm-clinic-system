@@ -226,13 +226,12 @@ const ROLE_PERMISSIONS = {
   // 新增個人統計分析 (personalStatistics) 權限，診所管理者與醫師可使用
   // 管理員不需要個人設置與個人統計分析，故移除這兩項
   // 將模板庫移至穴位庫之後，使側邊選單順序為：患者管理 -> 診症系統 -> 中藥庫 -> 穴位庫 -> 模板庫 -> 收費管理 -> 用戶管理 -> 財務報表 -> 系統管理 -> 帳號安全
-  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'templateLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
+  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'scheduleManagement', 'accountSecurity'],
   // 醫師不需要系統管理權限，將模板庫移至穴位庫之後
-  // 加入 scheduleManagement 功能，讓診所管理者、醫師與護理師可以存取醫療排班管理
-  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'templateLibrary', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
-  // 將模板庫移至穴位庫之後，同時新增排班管理
-  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'templateLibrary', 'accountSecurity'],
-  // 用戶無中藥庫或穴位庫權限，維持模板庫在最後；一般用戶不允許查看排班管理
+  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'personalSettings', 'personalStatistics', 'scheduleManagement', 'accountSecurity'],
+  // 將模板庫移至穴位庫之後
+  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'accountSecurity'],
+  // 用戶無中藥庫或穴位庫權限，維持模板庫在最後
   '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary', 'accountSecurity']
 };
 
@@ -2722,8 +2721,6 @@ async function logout() {
                 herbLibrary: { title: '中藥庫', icon: '🌿', description: '查看中藥材及方劑資料' },
                 // 新增：穴位庫管理
                 acupointLibrary: { title: '穴位庫', icon: '📌', description: '查看穴位資料' },
-                // 新增：醫療排班管理
-                scheduleManagement: { title: '醫療排班管理', icon: '📅', description: '安排醫療人員排班' },
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
                 // 將診所用戶管理的圖示更新為單人符號，以符合交換後的配置
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
@@ -2736,7 +2733,9 @@ async function logout() {
                 // 新增：帳號安全設定（變更密碼與刪除帳號）
                 accountSecurity: { title: '帳號安全設定', icon: '🔐', description: '變更密碼及刪除帳號' },
                 // 新增：模板庫管理
-                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
+                // 新增：醫療排班管理
+scheduleManagement: { title: '醫療排班管理', icon: '📅', description: '排班與行事曆管理' },
+templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
             };
 
             // 根據當前用戶職位決定可使用的功能列表
@@ -2816,15 +2815,6 @@ async function logout() {
                 loadHerbLibrary();
             } else if (sectionId === 'acupointLibrary') {
                 loadAcupointLibrary();
-            } else if (sectionId === 'scheduleManagement') {
-                // 初始化排班管理系統。僅在需要時呼叫，避免重複初始化
-                try {
-                    if (typeof initScheduleManagement === 'function') {
-                        initScheduleManagement();
-                    }
-                } catch (e) {
-                    console.error('初始化排班管理系統時出錯：', e);
-                }
             } else if (sectionId === 'billingManagement') {
                 loadBillingManagement();
             } else if (sectionId === 'financialReports') {
@@ -2847,7 +2837,7 @@ async function logout() {
         // 隱藏所有區域
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
+            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'scheduleManagement', 'welcomePage'].forEach(id => {
                 // 在隱藏中藥庫時，取消其資料監聽以減少 Realtime Database 讀取
                 if (id === 'herbLibrary') {
                     try {
