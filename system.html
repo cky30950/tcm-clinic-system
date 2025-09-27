@@ -3452,13 +3452,12 @@
             element.dataset.shiftId = shift.id;
 
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
-            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌'; // 保留計算，但不顯示
+            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌';
 
             // 使用包裝函式避免 inline 事件中包含多個語句，否則 system.js 解析會出錯
             element.innerHTML = `
                 <div class="shift-header">
-                    <!-- 在排班卡標頭顯示人員姓名與職位，例如「張XX醫師」 -->
-                    <div class="shift-name">${staffMember.name}${staffMember.level || ''}</div>
+                    <div class="shift-name">${staffMember.name}</div>
                     <div class="shift-actions">
                         <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
                         <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="刪除">🗑️</button>
@@ -3466,8 +3465,8 @@
                 </div>
                 <div class="shift-details">
                     ${shift.startTime}-${shift.endTime} (${duration}h)<br>
-                    <!-- 不再顯示狀態圖示與部門，僅顯示備註 -->
-                    ${shift.notes || '一般排班'}
+                    ${statusIcon} ${shift.notes || '一般排班'}<br>
+                    <small>${staffMember.department} - ${staffMember.level}</small>
                 </div>
             `;
 
@@ -3629,9 +3628,8 @@
 
 
 
-                // 顯示人員姓名與職位，例如「張XX醫師」
                 card.innerHTML = `
-                    <div class="staff-name">${member.name}${member.level || ''}</div>
+                    <div class="staff-name">${member.name}</div>
                     <div class="drag-hint">🖱️</div>
                 `;
 
@@ -4191,6 +4189,6 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"b2074e7888b746fe9fbbc15492b4c3d4","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
