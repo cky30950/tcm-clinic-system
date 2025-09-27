@@ -226,13 +226,13 @@ const ROLE_PERMISSIONS = {
   // 新增個人統計分析 (personalStatistics) 權限，診所管理者與醫師可使用
   // 管理員不需要個人設置與個人統計分析，故移除這兩項
   // 將模板庫移至穴位庫之後，使側邊選單順序為：患者管理 -> 診症系統 -> 中藥庫 -> 穴位庫 -> 模板庫 -> 收費管理 -> 用戶管理 -> 財務報表 -> 系統管理 -> 帳號安全
-  '診所管理': ['patientManagement', 'consultationSystem', 'scheduleManagement', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
+  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'templateLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
   // 醫師不需要系統管理權限，將模板庫移至穴位庫之後
-  '醫師': ['patientManagement', 'consultationSystem', 'scheduleManagement', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
+  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'templateLibrary', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
   // 將模板庫移至穴位庫之後
-  '護理師': ['patientManagement', 'consultationSystem', 'scheduleManagement', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'accountSecurity'],
+  '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'templateLibrary', 'accountSecurity'],
   // 用戶無中藥庫或穴位庫權限，維持模板庫在最後
-  '用戶': ['patientManagement', 'consultationSystem', 'scheduleManagement', 'templateLibrary', 'accountSecurity']
+  '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary', 'accountSecurity']
 };
 
 /**
@@ -2721,6 +2721,8 @@ async function logout() {
                 herbLibrary: { title: '中藥庫', icon: '🌿', description: '查看中藥材及方劑資料' },
                 // 新增：穴位庫管理
                 acupointLibrary: { title: '穴位庫', icon: '📌', description: '查看穴位資料' },
+                // 新增：醫療排班管理
+                scheduleManagement: { title: '醫療排班管理', icon: '📅', description: '排班與人員管理' },
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
                 // 將診所用戶管理的圖示更新為單人符號，以符合交換後的配置
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
@@ -2733,9 +2735,7 @@ async function logout() {
                 // 新增：帳號安全設定（變更密碼與刪除帳號）
                 accountSecurity: { title: '帳號安全設定', icon: '🔐', description: '變更密碼及刪除帳號' },
                 // 新增：模板庫管理
-                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' },
-                // 新增：排班管理功能，讓用戶管理醫護人員排班表
-                scheduleManagement: { title: '排班管理', icon: '📅', description: '管理醫護人員排班及值班表' }
+                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
             };
 
             // 根據當前用戶職位決定可使用的功能列表
@@ -2792,7 +2792,7 @@ async function logout() {
             try {
                 const wrapper = document.getElementById('contentWrapper');
                 if (wrapper) {
-                    if (sectionId === 'personalSettings' || sectionId === 'templateLibrary' || sectionId === 'scheduleManagement') {
+                    if (sectionId === 'personalSettings' || sectionId === 'templateLibrary') {
                         wrapper.classList.add('hidden');
                     } else {
                         wrapper.classList.remove('hidden');
@@ -2831,18 +2831,13 @@ async function logout() {
                 if (typeof loadAccountSecurity === 'function') {
                     loadAccountSecurity();
                 }
-            } else if (sectionId === 'scheduleManagement') {
-                // 若切換至排班管理，初始化並載入排班模組
-                if (typeof showScheduleModule === 'function') {
-                    showScheduleModule();
-                }
             }
         }
 
         // 隱藏所有區域
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'scheduleManagement', 'welcomePage'].forEach(id => {
+            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
                 // 在隱藏中藥庫時，取消其資料監聽以減少 Realtime Database 讀取
                 if (id === 'herbLibrary') {
                     try {
@@ -22188,476 +22183,3 @@ function hideGlobalCopyright() {
   window.startInactivityMonitoring = startInactivityMonitoring;
   window.stopInactivityMonitoring = stopInactivityMonitoring;
 })();
-
-// === Scheduler integration (drag & drop schedule management) ===
-// 源自原先的 cander.html，使用 gzip 壓縮後的程式碼與樣式內容以 Base64 字串表示。
-// 在需要顯示排班管理功能時動態解壓、載入與初始化，避免在系統初始載入時造成負擔。
-
-// Gzip-compressed and Base64-encoded scheduler JavaScript. Newlines and whitespace are ignored during decompression.
-const schedulerScriptGzipBase64 = `
-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
-`;
-
-// Gzip-compressed and Base64-encoded scheduler CSS. Newlines and whitespace are ignored during decompression.
-const schedulerStyleGzipBase64 = `
-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
-`;
-
-// Flags to prevent multiple script/style injections and repeated initialization
-window.schedulerLoaded = false;
-window.schedulerInitialized = false;
-window.schedulerStylesInserted = false;
-
-/**
- * 解壓縮 Base64 編碼的 gzip 字串為純文字。可處理包含空白或換行的字串。
- * Uses the modern DecompressionStream API to decompress gzip content.
- * @param {string} base64 - Base64 字串（可能含有空白或換行）。
- * @returns {Promise<string>} 解壓縮後的字串
- */
-async function decompressBase64Gzip(base64) {
-  // 移除所有空白字元（包括換行）
-  const clean = base64.replace(/\s+/g, '');
-  const binaryString = atob(clean);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  const ds = new DecompressionStream('gzip');
-  const decompressedResponse = new Response(new Blob([bytes]).stream().pipeThrough(ds));
-  return decompressedResponse.text();
-}
-
-/**
- * 顯示排班模組：動態解壓縮與評估程式碼、套用樣式，並初始化拖曳排程功能。
- * 此函式會在使用者切換至排班管理區域時呼叫，確保程式碼與樣式僅載入一次。
- */
-function showScheduleModule() {
-  // 顯示排班管理區域
-  const scheduleContainer = document.getElementById('scheduleManagement');
-  if (scheduleContainer) {
-    scheduleContainer.classList.remove('hidden');
-  }
-  // 插入樣式
-  if (!window.schedulerStylesInserted) {
-    decompressBase64Gzip(schedulerStyleGzipBase64)
-      .then(css => {
-        const styleEl = document.createElement('style');
-        styleEl.id = 'scheduler-module-styles';
-        styleEl.textContent = css;
-        document.head.appendChild(styleEl);
-        window.schedulerStylesInserted = true;
-      })
-      .catch(err => {
-        console.error('排班模組樣式解壓縮失敗:', err);
-      });
-  }
-  // 載入並執行腳本
-  const loadScript = () => {
-    if (!window.schedulerLoaded) {
-      decompressBase64Gzip(schedulerScriptGzipBase64)
-        .then(code => {
-          try {
-            // 在全域範圍評估腳本
-            // eslint-disable-next-line no-eval
-            eval(code);
-            window.schedulerLoaded = true;
-            // 初始化排班模組
-            if (typeof initScheduler === 'function' && !window.schedulerInitialized) {
-              initScheduler();
-              window.schedulerInitialized = true;
-            }
-          } catch (e) {
-            console.error('排班模組腳本執行失敗:', e);
-          }
-        })
-        .catch(err => {
-          console.error('排班模組腳本解壓縮失敗:', err);
-        });
-    } else if (typeof initScheduler === 'function' && !window.schedulerInitialized) {
-      // 若腳本已載入但尚未初始化
-      initScheduler();
-      window.schedulerInitialized = true;
-    }
-  };
-  // 若樣式載入不需等待腳本，直接載入腳本
-  loadScript();
-}
-
-// 將排班模組函式掛到 window，以便在 showSection 中調用
-window.showScheduleModule = showScheduleModule;
-
-// === Simplified Scheduler integration (drag & drop schedule management) ===
-// 為了降低對原始 cander.html 的依賴，這裡實作一個簡化的排班模組，
-// 主要功能為月曆顯示及醫護人員拖曳排程。樣式使用系統既有的 Tailwind 工具類，
-// 因此無需額外載入大量 CSS。
-
-// 標記避免重複初始化
-window.__schedulerInited = false;
-
-/**
- * 初始化簡化排班模組。建立月曆與人員清單，並綁定拖放事件。
- * 此函式只會在第一次顯示排班管理區域時執行。
- */
-function initScheduler() {
-  if (window.__schedulerInited) return;
-  window.__schedulerInited = true;
-  const container = document.getElementById('scheduleModule');
-  if (!container) return;
-  // 清空原容器內容，以防止重複渲染
-  container.innerHTML = '';
-  // 建立標題列與控制按鈕
-  const header = document.createElement('div');
-  header.className = 'flex items-center justify-between mb-4';
-  const prevBtn = document.createElement('button');
-  prevBtn.textContent = '◀ 上月';
-  prevBtn.className = 'px-2 py-1 bg-blue-500 text-white rounded';
-  const nextBtn = document.createElement('button');
-  nextBtn.textContent = '下月 ▶';
-  nextBtn.className = 'px-2 py-1 bg-blue-500 text-white rounded';
-  const todayBtn = document.createElement('button');
-  todayBtn.textContent = '今天';
-  todayBtn.className = 'px-2 py-1 bg-green-500 text-white rounded ml-2';
-  const currentDateEl = document.createElement('div');
-  currentDateEl.id = 'schedulerCurrentDate';
-  currentDateEl.className = 'text-xl font-bold';
-  header.append(prevBtn, currentDateEl, nextBtn, todayBtn);
-  container.appendChild(header);
-  // 月曆容器
-  const calendarGrid = document.createElement('div');
-  calendarGrid.id = 'schedulerCalendar';
-  calendarGrid.className = 'grid gap-2';
-  container.appendChild(calendarGrid);
-  // 人員清單
-  const staffSection = document.createElement('div');
-  staffSection.className = 'mt-6';
-  const staffTitle = document.createElement('h2');
-  staffTitle.textContent = '醫護人員';
-  staffTitle.className = 'text-lg font-semibold mb-2';
-  const staffList = document.createElement('div');
-  staffList.id = 'schedulerStaffList';
-  staffList.className = 'flex flex-wrap gap-2';
-  staffSection.append(staffTitle, staffList);
-  container.appendChild(staffSection);
-  // 資料模型：簡易的醫護人員與排班
-  const staff = [
-    { id: 1, name: '王醫師' },
-    { id: 2, name: '李醫師' },
-    { id: 3, name: '張醫師' },
-    { id: 4, name: '陳護理師' },
-    { id: 5, name: '林護理師' }
-  ];
-  let shifts = [];
-  let currentDate = new Date();
-  // 渲染人員列表
-  function renderStaff() {
-    staffList.innerHTML = '';
-    staff.forEach(member => {
-      const item = document.createElement('div');
-      item.className = 'cursor-move px-2 py-1 bg-gray-200 rounded';
-      item.draggable = true;
-      item.dataset.staffId = member.id;
-      item.textContent = member.name;
-      item.addEventListener('dragstart', e => {
-        e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'staff', id: member.id }));
-        item.classList.add('opacity-50');
-      });
-      item.addEventListener('dragend', () => {
-        item.classList.remove('opacity-50');
-      });
-      staffList.appendChild(item);
-    });
-  }
-  // 產生某月的日期陣列，包括前後補齊至完整周
-  function getMonthDates(date) {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const dates = [];
-    const startOffset = firstDay.getDay();
-    for (let i = 0; i < startOffset; i++) {
-      dates.push(null);
-    }
-    for (let d = 1; d <= lastDay.getDate(); d++) {
-      dates.push(new Date(year, month, d));
-    }
-    while (dates.length % 7 !== 0) {
-      dates.push(null);
-    }
-    return dates;
-  }
-  // 根據日期渲染月曆網格與排班
-  function renderCalendar() {
-    calendarGrid.innerHTML = '';
-    const dates = getMonthDates(currentDate);
-    const monthStr = `${currentDate.getFullYear()} 年 ${currentDate.getMonth() + 1} 月`;
-    currentDateEl.textContent = monthStr;
-    calendarGrid.className = 'grid gap-2 grid-cols-7';
-    dates.forEach(date => {
-      const cell = document.createElement('div');
-      cell.className = 'border rounded p-1 min-h-[80px] relative';
-      cell.addEventListener('dragover', e => {
-        e.preventDefault();
-        cell.classList.add('bg-blue-50');
-      });
-      cell.addEventListener('dragleave', () => {
-        cell.classList.remove('bg-blue-50');
-      });
-      cell.addEventListener('drop', e => {
-        e.preventDefault();
-        cell.classList.remove('bg-blue-50');
-        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-        if (!date) return;
-        const dateStr = date.toISOString().slice(0, 10);
-        if (data.type === 'staff') {
-          const newId = Date.now();
-          shifts.push({ id: newId, staffId: data.id, date: dateStr });
-        } else if (data.type === 'shift') {
-          const shift = shifts.find(s => s.id === data.id);
-          if (shift) {
-            shift.date = dateStr;
-          }
-        }
-        renderCalendar();
-      });
-      if (date) {
-        const dateLabel = document.createElement('div');
-        dateLabel.className = 'text-xs mb-1';
-        dateLabel.textContent = date.getDate();
-        cell.appendChild(dateLabel);
-        const dayStr = date.toISOString().slice(0, 10);
-        const dayShifts = shifts.filter(s => s.date === dayStr);
-        dayShifts.forEach(shift => {
-          const shiftEl = document.createElement('div');
-          shiftEl.className = 'mt-1 px-1 text-xs rounded bg-yellow-200 cursor-move';
-          const member = staff.find(m => m.id === shift.staffId);
-          shiftEl.textContent = member ? member.name : '';
-          shiftEl.draggable = true;
-          shiftEl.dataset.shiftId = shift.id;
-          shiftEl.addEventListener('dragstart', e => {
-            e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'shift', id: shift.id }));
-            shiftEl.classList.add('opacity-50');
-          });
-          shiftEl.addEventListener('dragend', () => {
-            shiftEl.classList.remove('opacity-50');
-          });
-          cell.appendChild(shiftEl);
-        });
-      }
-      calendarGrid.appendChild(cell);
-    });
-  }
-  // 按鈕事件
-  prevBtn.addEventListener('click', () => {
-    currentDate.setMonth(currentDate.getMonth() - 1);
-    renderCalendar();
-  });
-  nextBtn.addEventListener('click', () => {
-    currentDate.setMonth(currentDate.getMonth() + 1);
-    renderCalendar();
-  });
-  todayBtn.addEventListener('click', () => {
-    currentDate = new Date();
-    renderCalendar();
-  });
-  // 初始化
-  renderStaff();
-  renderCalendar();
-}
-
-/**
- * 顯示簡化排班模組：隱藏其他區域並初始化排班介面。
- */
-function showScheduleModule() {
-  // 隱藏所有其他區塊（contentWrapper 內部）
-  const wrapper = document.getElementById('contentWrapper');
-  if (wrapper) {
-    Array.from(wrapper.children).forEach(child => child.classList.add('hidden'));
-  }
-  // 顯示排班管理區域
-  const scheduleContainer = document.getElementById('scheduleManagement');
-  if (scheduleContainer) {
-    scheduleContainer.classList.remove('hidden');
-  }
-  // 初始化排班模組
-  initScheduler();
-}
-
-// 將排班模組函式重新掛到 window，以覆蓋原先的實作
-window.showScheduleModule = showScheduleModule;
