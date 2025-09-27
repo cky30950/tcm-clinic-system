@@ -2271,15 +2271,15 @@
             width: 100%;
             margin: 0;
             /*
-             * Provide horizontal padding inside the internal container so that
-             * the schedule management content does not appear too close to
-             * the card’s edges. This mirrors the side padding provided
-             * implicitly by the content wrapper (px-4) in other modules like
-             * the billing management card. Vertical padding remains 0 because
-             * the outer card’s p-6 already supplies top and bottom space.
+             * Provide generous internal padding: 4rem at the top and 2rem on the
+             * left and right. This mirrors other modules’ spacing and ensures
+             * the content does not cling to the edges. The bottom padding is
+             * intentionally left unset so it can be controlled by the child
+             * elements or outer card’s padding.
              */
-            padding-left: 1rem; /* 16px */
-            padding-right: 1rem;
+            padding-top: 4rem; /* 64px */
+            padding-left: 2rem; /* 32px */
+            padding-right: 2rem;
         }
 
 #scheduleManagement .header {
@@ -2955,7 +2955,9 @@
         }
     </style>
 <div class="container">
-        <div class="header">
+        <!-- Group header and filters in a gradient box similar to the search patient registration -->
+        <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
+            <div class="header">
             <h1>🏥 進階醫療排班管理系統</h1>
 
             <div class="controls">
@@ -2974,10 +2976,10 @@
                     <button class="sync-btn" onclick="schedulePrintSchedule()">🖨️ 列印</button>
                 </div>
             </div>
-        </div>
+            </div>
 
-        <!-- 篩選面板 -->
-        <div class="filter-panel">
+            <!-- 篩選面板 -->
+            <div class="filter-panel">
             <div class="filter-grid">
                 <div class="filter-group">
                     <label class="filter-label">部門篩選</label>
@@ -3018,9 +3020,8 @@
                     <button class="quick-btn danger" onclick="scheduleClearAllShifts()">🗑️ 清空排班</button>
                 </div>
             </div>
+            </div>
         </div>
-
-
 
         <div class="calendar-container">
             <div class="calendar-grid month-view" id="calendarGrid"></div>
