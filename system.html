@@ -2246,6 +2246,16 @@
              */
             background: #ffffff;
             min-height: auto;
+            /*
+             * Limit the width of the schedule management card so it matches
+             * other management modules like the billing item management card. This
+             * prevents the card from stretching across the full viewport.
+             * Tailwind's `max-w-7xl` is 80rem (1280px), so we mirror that
+             * setting here and center the card horizontally.
+             */
+            max-width: 80rem;
+            margin-left: auto;
+            margin-right: auto;
         }
 
 #scheduleManagement .container {
