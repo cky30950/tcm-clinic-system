@@ -3192,6 +3192,33 @@
         // 並儲存在全域 window.staff 中。此處僅從 window.staff 取得引用，若尚未載入則為空陣列。
         let staff = window.staff || [];
 
+        // 包裝函式：處理班表上按鈕點擊，避免 inline 事件包含多個語句而無法被 system.js 解析。
+        // 這些函式會處理事件的 stopPropagation / preventDefault，然後呼叫實際的編輯或刪除函式。
+        function handleEditShift(e, shiftId) {
+            if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+            // 如果 scheduleEditShift 函式存在（由 schedule_management.js 或其他腳本暴露），優先使用
+            if (typeof window.scheduleEditShift === 'function') {
+                window.scheduleEditShift(shiftId);
+            } else if (typeof editShift === 'function') {
+                // 否則退回本地定義的 editShift
+                editShift(shiftId);
+            }
+        }
+
+        function handleDeleteShift(e, shiftId) {
+            if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+            if (e && typeof e.preventDefault === 'function') e.preventDefault();
+            if (typeof window.scheduleDeleteShift === 'function') {
+                window.scheduleDeleteShift(shiftId);
+            } else if (typeof deleteShift === 'function') {
+                deleteShift(shiftId);
+            }
+        }
+
+        // 將包裝函式掛載到全域（window），供 inline 事件呼叫
+        window.handleEditShift = handleEditShift;
+        window.handleDeleteShift = handleDeleteShift;
+
         // 排班資料 - 使用當前月份的日期
         let shifts = [];
 
@@ -3409,12 +3436,13 @@
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
             const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌';
 
+            // 使用包裝函式避免 inline 事件中包含多個語句，否則 system.js 解析會出錯
             element.innerHTML = `
                 <div class="shift-header">
                     <div class="shift-name">${staffMember.name}</div>
                     <div class="shift-actions">
-                        <button class="shift-action-btn" onclick="event.stopPropagation(); editShift(${shift.id})" title="編輯">✏️</button>
-                        <button class="shift-action-btn" onclick="event.stopPropagation(); event.preventDefault(); deleteShift(${shift.id})" title="刪除">🗑️</button>
+                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
+                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="刪除">🗑️</button>
                     </div>
                 </div>
                 <div class="shift-details">
@@ -3957,9 +3985,8 @@
 
         // 刪除排班
         function deleteShift(shiftId) {
-            // 強制停止事件傳播
-            event.stopPropagation();
-            event.preventDefault();
+
+            // 事件傳播在 handleDeleteShift 中處理，此函式僅執行刪除邏輯
 
             // 獲取排班資訊用於確認對話框
             const shift = shifts.find(s => s.id == shiftId);
@@ -4042,6 +4069,7 @@
             printWindow.document.close();
             printWindow.print();
         }
+    </script>
     <!-- 新排班管理區結束 -->
 </div>
 

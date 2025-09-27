@@ -142,6 +142,36 @@
             staffSearch: ''
         };
 
+        // 包裝函式：處理班表上的編輯與刪除按鈕點擊。
+        // 這些函式僅在內部調用 event.stopPropagation() / preventDefault() 並呼叫實際的
+        // 編輯或刪除函式。若 scheduleEditShift / scheduleDeleteShift 不存在，則回退到本地函式。
+        function handleEditShift(e, shiftId) {
+            if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+            // 使用 scheduleEditShift（global）如果可用
+            if (typeof window.scheduleEditShift === 'function') {
+                window.scheduleEditShift(shiftId);
+            } else if (typeof editShift === 'function') {
+                // fallback
+                editShift(shiftId);
+            }
+        }
+
+        function handleDeleteShift(e, shiftId) {
+            if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+            if (e && typeof e.preventDefault === 'function') e.preventDefault();
+            if (typeof window.scheduleDeleteShift === 'function') {
+                window.scheduleDeleteShift(shiftId);
+            } else if (typeof deleteShift === 'function') {
+                deleteShift(shiftId);
+            }
+        }
+
+        // 將包裝函式掛載至 window，使 inline onclick 可以順利呼叫
+        if (typeof window !== 'undefined') {
+            window.handleEditShift = handleEditShift;
+            window.handleDeleteShift = handleDeleteShift;
+        }
+
         // 初始化
         document.addEventListener('DOMContentLoaded', async function() {
             // 載入示範排班資料（在沒有後端排班資料的情況下仍顯示範例）
@@ -336,12 +366,17 @@
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
             const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌';
             
+            // 使用單一函式處理按鈕點擊以便 inline 事件僅包含函式呼叫。
+            // 直接在 onclick 中調用多個語句（例如 event.stopPropagation(); editShift(...)) 會導致
+            // system.js 的 parseArgs 函式無法正確解析，產生 SyntaxError。
+            // 因此改為調用包裝函式 handleEditShift / handleDeleteShift，由包裝函式自行處理
+            // 停止事件冒泡和觸發實際的編輯或刪除邏輯。
             element.innerHTML = `
                 <div class="shift-header">
                     <div class="shift-name">${staffMember.name}</div>
                     <div class="shift-actions">
-                        <button class="shift-action-btn" onclick="event.stopPropagation(); editShift(${shift.id})" title="編輯">✏️</button>
-                        <button class="shift-action-btn" onclick="event.stopPropagation(); event.preventDefault(); deleteShift(${shift.id})" title="刪除">🗑️</button>
+                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
+                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="刪除">🗑️</button>
                     </div>
                 </div>
                 <div class="shift-details">
@@ -884,9 +919,8 @@
 
         // 刪除排班
         function deleteShift(shiftId) {
-            // 強制停止事件傳播
-            event.stopPropagation();
-            event.preventDefault();
+
+            // 事件傳播在 handleDeleteShift 中處理，此函式僅執行刪除邏輯
             
             // 獲取排班資訊用於確認對話框
             const shift = shifts.find(s => s.id == shiftId);
