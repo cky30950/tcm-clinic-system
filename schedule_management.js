@@ -174,8 +174,7 @@
 
         // 初始化
         document.addEventListener('DOMContentLoaded', async function() {
-            // 載入示範排班資料（在沒有後端排班資料的情況下仍顯示範例）
-            initializeSampleShifts();
+            // 不再載入示範排班資料，直接更新日期和渲染空行事曆
             updateCurrentDate();
             renderCalendar();
             setupEventListeners();
@@ -1358,7 +1357,7 @@ if (typeof document !== 'undefined') {
       window.scheduleInitialized = true;
       try {
         // Some functions may not exist if script is not included
-        if (typeof initializeSampleShifts === 'function') initializeSampleShifts();
+        // 不再載入示範排班資料，將留待實際數據載入
         if (typeof updateCurrentDate === 'function') updateCurrentDate();
         if (typeof renderCalendar === 'function') renderCalendar();
         if (typeof renderStaffPanel === 'function') renderStaffPanel();

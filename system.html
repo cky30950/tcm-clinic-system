@@ -3192,6 +3192,24 @@
         // 並儲存在全域 window.staff 中。此處僅從 window.staff 取得引用，若尚未載入則為空陣列。
         let staff = window.staff || [];
 
+        // 透過人員 ID 取得人員資料。由於 staff 可能尚未載入，或找不到對應人員，
+        // 因此此函式會從 window.staff 或本地 staff 陣列中查找，若無結果則回傳預設物件。
+        function getStaffMemberById(id) {
+            // 嘗試從最新的 window.staff 取得
+            const arr = (window.staff && Array.isArray(window.staff)) ? window.staff : staff;
+            const member = Array.isArray(arr) ? arr.find(s => s.id == id) : undefined;
+            // 如果沒有找到，提供預設值以避免 undefined 屬性存取錯誤
+            return member || {
+                id: id,
+                name: '未知人員',
+                role: '',
+                department: '',
+                level: '',
+                phone: '',
+                email: ''
+            };
+        }
+
         // 包裝函式：處理班表上按鈕點擊，避免 inline 事件包含多個語句而無法被 system.js 解析。
         // 這些函式會處理事件的 stopPropagation / preventDefault，然後呼叫實際的編輯或刪除函式。
         function handleEditShift(e, shiftId) {
@@ -3253,7 +3271,7 @@
 
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
-            initializeSampleShifts(); // 載入示範排班資料
+            // 不再載入示範排班資料
             updateCurrentDate();
             renderCalendar();
             renderStaffPanel();
@@ -3422,7 +3440,7 @@
 
         // 創建排班元素
         function createShiftElement(shift) {
-            const staffMember = staff.find(s => s.id === shift.staffId);
+            const staffMember = getStaffMemberById(shift.staffId);
             const element = document.createElement('div');
 
             let shiftClasses = `shift-item ${staffMember.role}`;
@@ -3518,8 +3536,9 @@
 
                 if (staffId) {
                     // 人員拖拽 - 快速新增排班
-                    const staffMember = staff.find(s => s.id == staffId);
-                    if (staffMember) {
+                    const staffMember = getStaffMemberById(staffId);
+                    // 如果找到有效人員則快速新增排班；若為未知人員則不處理
+                    if (staffMember && staffMember.name !== '未知人員') {
                         quickAddShiftFromDrag(staffMember, this.dataset.date);
                     }
                 } else if (draggedShift) {
@@ -3799,15 +3818,15 @@
         function syncToGoogle() {
             // 創建 Google Calendar 事件格式
             const events = shifts.map(shift => {
-                const staff = staff.find(s => s.id === shift.staffId);
+                const member = getStaffMemberById(shift.staffId);
                 const startDateTime = `${shift.date}T${shift.startTime}:00`;
                 const endDateTime = `${shift.date}T${shift.endTime}:00`;
 
                 return {
-                    title: `${staff.name} - ${staff.role === 'doctor' ? '醫師' : '護理師'}排班`,
+                    title: `${member.name} - ${member.role === 'doctor' ? '醫師' : '護理師'}排班`,
                     start: startDateTime,
                     end: endDateTime,
-                    description: `部門: ${staff.department}\n班別: ${shift.type}`
+                    description: `部門: ${member.department}\n班別: ${shift.type}`
                 };
             });
 
@@ -3838,7 +3857,7 @@
             ];
 
             shifts.forEach(shift => {
-                const staffMember = staff.find(s => s.id === shift.staffId);
+                const staffMember = getStaffMemberById(shift.staffId);
                 const startDateTime = `${shift.date.replace(/-/g, '')}T${shift.startTime.replace(':', '')}00`;
                 const endDateTime = `${shift.date.replace(/-/g, '')}T${shift.endTime.replace(':', '')}00`;
 
@@ -3893,7 +3912,7 @@
 
         // 檢查排班是否符合篩選條件
         function passesFilter(shift) {
-            const staffMember = staff.find(s => s.id === shift.staffId);
+            const staffMember = getStaffMemberById(shift.staffId);
 
             if (currentFilters.department && staffMember.department !== currentFilters.department) return false;
             if (currentFilters.role && staffMember.role !== currentFilters.role) return false;
@@ -3921,8 +3940,8 @@
 
             let message = `發現 ${conflicts.length} 個排班衝突：\n\n`;
             conflicts.forEach((conflict, index) => {
-                const staff1 = staff.find(s => s.id === conflict.shift1.staffId);
-                const staff2 = staff.find(s => s.id === conflict.shift2.staffId);
+                const staff1 = getStaffMemberById(conflict.shift1.staffId);
+                const staff2 = getStaffMemberById(conflict.shift2.staffId);
                 message += `${index + 1}. ${staff1.name} 在 ${conflict.shift1.date} 有重疊排班\n`;
             });
 
@@ -3995,7 +4014,7 @@
                 return;
             }
 
-            const staffMember = staff.find(s => s.id === shift.staffId);
+            const staffMember = getStaffMemberById(shift.staffId);
             const confirmMessage = `確定要刪除以下排班嗎？\n\n` +
                                  `人員：${staffMember.name}\n` +
                                  `日期：${shift.date}\n` +
@@ -4018,7 +4037,7 @@
 
         // 顯示排班詳情
         function showShiftDetails(shift) {
-            const staffMember = staff.find(s => s.id === shift.staffId);
+            const staffMember = getStaffMemberById(shift.staffId);
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
 
             alert(`排班詳情：
