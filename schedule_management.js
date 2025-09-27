@@ -503,3 +503,12 @@ window.scheduleAddShift = scheduleAddShift;
 window.scheduleSyncToGoogle = scheduleSyncToGoogle;
 window.scheduleExportToICal = scheduleExportToICal;
 window.initScheduleManagement = initScheduleManagement;
+// 自動初始化排班管理模塊，如果存在於頁面中
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', function() {
+    var el = document.getElementById('scheduleManagement');
+    if (el && typeof initScheduleManagement === 'function') {
+      initScheduleManagement();
+    }
+  });
+}
