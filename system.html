@@ -1485,12 +1485,15 @@
                     </table>
                 </div>
             </div>
-            <!-- 醫療排班管理 -->
-            <div id="scheduleManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
-                <style id="scheduleStyles">
+                <!-- 醫療排班管理 -->
+                <div id="scheduleManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
+                    <style id="scheduleStyles">
 @import url('new_schedule.css');
 #scheduleManagement {
-    background: transparent;
+    /* Override only the background image defined in new_schedule.css.  We set
+       `background-image` to none so that the Tailwind `bg-white` class
+       can supply the white card background. */
+    background-image: none;
     min-height: auto;
 }
 #scheduleManagement .container {
@@ -1499,225 +1502,232 @@
     padding: 0;
 }
 #scheduleManagement .header {
-    background: transparent;
+    /* Remove the inner header background so it blends with the parent card */
+    background: none;
     box-shadow: none;
     padding: 0;
     margin-bottom: 1rem;
     border-bottom: 1px solid #e5e7eb;
 }
 #scheduleManagement .filter-panel {
-    background: transparent;
+    background: none;
     box-shadow: none;
     padding: 0;
     margin-bottom: 1rem;
 }
 #scheduleManagement .calendar-container {
-    background: transparent;
+    background: none;
     box-shadow: none;
 }
-                </style>
-                <div class="container">
-                    <div class="header">
-                        <h1>🏥 進階醫療排班管理系統</h1>
-                        <div class="controls">
-                            <div class="nav-controls">
-                                <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
-                                <div class="current-date" id="currentDate"></div>
-                                <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個 ▶</button>
-                                <button class="nav-btn" onclick="scheduleGoToToday()">📅 今天</button>
-                            </div>
-                            <div class="view-controls">
-                                <button class="view-btn active">月視圖</button>
-                            </div>
-                            <div class="sync-controls">
-                                <button class="sync-btn" onclick="scheduleSyncToGoogle()">📅 同步 Google</button>
-                                <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
-                                <button class="sync-btn" onclick="schedulePrintSchedule()">🖨️ 列印</button>
-                            </div>
-                        </div>
-                        <div class="filter-grid">
-                            <div class="filter-group">
-                                <label class="filter-label">部門篩選</label>
-                                <select class="filter-select" id="departmentFilter" onchange="scheduleApplyFilters()">
-                                    <option value="">所有部門</option>
-                                    <option value="內科">內科</option>
-                                    <option value="外科">外科</option>
-                                    <option value="急診科">急診科</option>
-                                    <option value="兒科">兒科</option>
-                                    <option value="婦產科">婦產科</option>
-                                </select>
-                            </div>
-                            <div class="filter-group">
-                                <label class="filter-label">職位篩選</label>
-                                <select class="filter-select" id="roleFilter" onchange="scheduleApplyFilters()">
-                                    <option value="">所有職位</option>
-                                    <option value="doctor">醫師</option>
-                                    <option value="nurse">護理師</option>
-                                </select>
-                            </div>
-                            <div class="filter-group">
-                                <label class="filter-label">班別篩選</label>
-                                <select class="filter-select" id="shiftTypeFilter" onchange="scheduleApplyFilters()">
-                                    <option value="">所有班別</option>
-                                    <option value="morning">早班</option>
-                                    <option value="afternoon">中班</option>
-                                    <option value="night">夜班</option>
-                                    <option value="emergency">急診</option>
-                                </select>
-                            </div>
-                            <div class="filter-group">
-                                <label class="filter-label">搜尋人員</label>
-                                <input type="text" class="filter-input" id="staffSearch" placeholder="輸入姓名..." oninput="scheduleApplyFilters()">
-                            </div>
-                            <div class="quick-actions">
-                                <button class="quick-btn" onclick="scheduleOpenFixedScheduleModal()">📅 固定上班</button>
-                                <button class="quick-btn" onclick="scheduleCheckConflicts()">⚠️ 檢查衝突</button>
-                                <button class="quick-btn danger" onclick="scheduleClearAllShifts()">🗑️ 清空排班</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="calendar-container">
-                        <div class="calendar-grid month-view" id="calendarGrid"></div>
-                    </div>
-                    <div class="staff-panel">
-                        <h3>👨‍⚕️👩‍⚕️ 醫護人員管理 <span style="font-size: 12px; color: #718096; font-weight: normal;">拖拽人員到行事曆新增排班</span></h3>
-                        <div class="staff-filter">
-                            <button class="staff-filter-btn active" onclick="scheduleFilterStaff('all')">全部</button>
-                            <button class="staff-filter-btn" onclick="scheduleFilterStaff('doctor')">醫師</button>
-                            <button class="staff-filter-btn" onclick="scheduleFilterStaff('nurse')">護理師</button>
-                        </div>
-                        <div class="staff-grid" id="staffGrid"></div>
-                    </div>
-                </div>
-                <!-- 新增排班模態框 -->
-                <div class="modal" id="shiftModal">
-                    <div class="modal-content">
-                        <h3>新增排班</h3>
-                        <form id="shiftForm">
-                            <div class="form-group">
-                                <label class="form-label">人員</label>
-                                <select class="form-select" id="staffSelect" required></select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">日期</label>
-                                <input type="date" class="form-input" id="shiftDate" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">開始時間</label>
-                                <input type="time" class="form-input" id="startTime" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">結束時間</label>
-                                <input type="time" class="form-input" id="endTime" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">班別</label>
-                                <select class="form-select" id="shiftType" required>
-                                    <option value="morning">早班 (08:00-16:00)</option>
-                                    <option value="afternoon">中班 (16:00-24:00)</option>
-                                    <option value="night">夜班 (00:00-08:00)</option>
-                                    <option value="emergency">急診班</option>
-                                    <option value="custom">自訂時間</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">備註</label>
-                                <input type="text" class="form-input" id="shiftNotes" placeholder="輸入備註資訊...">
-                            </div>
-                            <div class="form-buttons">
-                                <button type="button" class="btn btn-secondary" onclick="scheduleCloseModal()">取消</button>
-                                <button type="submit" class="btn btn-primary">新增排班</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                <!-- 固定上班模態框 -->
-                <div class="modal" id="fixedScheduleModal">
-                    <div class="modal-content">
-                        <h3>設定固定上班時間</h3>
-                        <form id="fixedScheduleForm">
-                            <div class="form-group">
-                                <label class="form-label">選擇人員</label>
-                                <select class="form-select" id="fixedStaffSelect" required></select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">固定班別</label>
-                                <select class="form-select" id="fixedShiftType" required>
-                                    <option value="morning">早班 (08:00-16:00)</option>
-                                    <option value="afternoon">中班 (16:00-24:00)</option>
-                                    <option value="night">夜班 (00:00-08:00)</option>
-                                    <option value="custom">自訂時間</option>
-                                </select>
-                            </div>
-                            <div class="form-group" id="customTimeGroup" style="display: none;">
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                    <div>
-                                        <label class="form-label">開始時間</label>
-                                        <input type="time" class="form-input" id="fixedStartTime">
-                                    </div>
-                                    <div>
-                                        <label class="form-label">結束時間</label>
-                                        <input type="time" class="form-input" id="fixedEndTime">
-                                    </div>
+#scheduleManagement .staff-panel {
+    /* Remove default white panel background for the staff panel so it merges
+       with the unified card. */
+    background: none;
+    box-shadow: none;
+}
+                    </style>
+                    <div class="container">
+                        <div class="header">
+                            <h1>🏥 進階醫療排班管理系統</h1>
+                            <div class="controls">
+                                <div class="nav-controls">
+                                    <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
+                                    <div class="current-date" id="currentDate"></div>
+                                    <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個 ▶</button>
+                                    <button class="nav-btn" onclick="scheduleGoToToday()">📅 今天</button>
+                                </div>
+                                <div class="view-controls">
+                                    <button class="view-btn active">月視圖</button>
+                                </div>
+                                <div class="sync-controls">
+                                    <button class="sync-btn" onclick="scheduleSyncToGoogle()">📅 同步 Google</button>
+                                    <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
+                                    <button class="sync-btn" onclick="schedulePrintSchedule()">🖨️ 列印</button>
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">工作日選擇</label>
-                                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 10px;">
-                                    <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
-                                        <input type="checkbox" id="day0" value="0"> 日
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
-                                        <input type="checkbox" id="day1" value="1" checked> 一
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
-                                        <input type="checkbox" id="day2" value="2" checked> 二
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
-                                        <input type="checkbox" id="day3" value="3" checked> 三
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
-                                        <input type="checkbox" id="day4" value="4" checked> 四
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
-                                        <input type="checkbox" id="day5" value="5" checked> 五
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
-                                        <input type="checkbox" id="day6" value="6"> 六
-                                    </label>
+                            <div class="filter-grid">
+                                <div class="filter-group">
+                                    <label class="filter-label">部門篩選</label>
+                                    <select class="filter-select" id="departmentFilter" onchange="scheduleApplyFilters()">
+                                        <option value="">所有部門</option>
+                                        <option value="內科">內科</option>
+                                        <option value="外科">外科</option>
+                                        <option value="急診科">急診科</option>
+                                        <option value="兒科">兒科</option>
+                                        <option value="婦產科">婦產科</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">職位篩選</label>
+                                    <select class="filter-select" id="roleFilter" onchange="scheduleApplyFilters()">
+                                        <option value="">所有職位</option>
+                                        <option value="doctor">醫師</option>
+                                        <option value="nurse">護理師</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">班別篩選</label>
+                                    <select class="filter-select" id="shiftTypeFilter" onchange="scheduleApplyFilters()">
+                                        <option value="">所有班別</option>
+                                        <option value="morning">早班</option>
+                                        <option value="afternoon">中班</option>
+                                        <option value="night">夜班</option>
+                                        <option value="emergency">急診</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">搜尋人員</label>
+                                    <input type="text" class="filter-input" id="staffSearch" placeholder="輸入姓名..." oninput="scheduleApplyFilters()">
+                                </div>
+                                <div class="quick-actions">
+                                    <button class="quick-btn" onclick="scheduleOpenFixedScheduleModal()">📅 固定上班</button>
+                                    <button class="quick-btn" onclick="scheduleCheckConflicts()">⚠️ 檢查衝突</button>
+                                    <button class="quick-btn danger" onclick="scheduleClearAllShifts()">🗑️ 清空排班</button>
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">應用範圍</label>
-                                <select class="form-select" id="scheduleRange" required>
-                                    <option value="current-month">本月份</option>
-                                    <option value="next-month">下個月</option>
-                                    <option value="current-and-next">本月及下個月</option>
-                                    <option value="custom-range">自訂日期範圍</option>
-                                </select>
+                        </div>
+                        <div class="calendar-container">
+                            <div class="calendar-grid month-view" id="calendarGrid"></div>
+                        </div>
+                        <div class="staff-panel">
+                            <h3>👨‍⚕️👩‍⚕️ 醫護人員管理 <span style="font-size: 12px; color: #718096; font-weight: normal;">拖拽人員到行事曆新增排班</span></h3>
+                            <div class="staff-filter">
+                                <button class="staff-filter-btn active" onclick="scheduleFilterStaff('all')">全部</button>
+                                <button class="staff-filter-btn" onclick="scheduleFilterStaff('doctor')">醫師</button>
+                                <button class="staff-filter-btn" onclick="scheduleFilterStaff('nurse')">護理師</button>
                             </div>
-                            <div class="form-group" id="customRangeGroup" style="display: none;">
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                    <div>
-                                        <label class="form-label">開始日期</label>
-                                        <input type="date" class="form-input" id="rangeStartDate">
-                                    </div>
-                                    <div>
-                                        <label class="form-label">結束日期</label>
-                                        <input type="date" class="form-input" id="rangeEndDate">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-buttons">
-                                <button type="button" class="btn btn-secondary" onclick="scheduleCloseFixedScheduleModal()">取消</button>
-                                <button type="submit" class="btn btn-primary">套用</button>
-                            </div>
-                        </form>
+                            <div class="staff-grid" id="staffGrid"></div>
+                        </div>
                     </div>
+                    <!-- 新增排班模態框 -->
+                    <div class="modal" id="shiftModal">
+                        <div class="modal-content">
+                            <h3>新增排班</h3>
+                            <form id="shiftForm">
+                                <div class="form-group">
+                                    <label class="form-label">人員</label>
+                                    <select class="form-select" id="staffSelect" required></select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">日期</label>
+                                    <input type="date" class="form-input" id="shiftDate" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">開始時間</label>
+                                    <input type="time" class="form-input" id="startTime" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">結束時間</label>
+                                    <input type="time" class="form-input" id="endTime" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">班別</label>
+                                    <select class="form-select" id="shiftType" required>
+                                        <option value="morning">早班 (08:00-16:00)</option>
+                                        <option value="afternoon">中班 (16:00-24:00)</option>
+                                        <option value="night">夜班 (00:00-08:00)</option>
+                                        <option value="emergency">急診班</option>
+                                        <option value="custom">自訂時間</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">備註</label>
+                                    <input type="text" class="form-input" id="shiftNotes" placeholder="輸入備註資訊...">
+                                </div>
+                                <div class="form-buttons">
+                                    <button type="button" class="btn btn-secondary" onclick="scheduleCloseModal()">取消</button>
+                                    <button type="submit" class="btn btn-primary">新增排班</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <!-- 固定上班模態框 -->
+                    <div class="modal" id="fixedScheduleModal">
+                        <div class="modal-content">
+                            <h3>設定固定上班時間</h3>
+                            <form id="fixedScheduleForm">
+                                <div class="form-group">
+                                    <label class="form-label">選擇人員</label>
+                                    <select class="form-select" id="fixedStaffSelect" required></select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">固定班別</label>
+                                    <select class="form-select" id="fixedShiftType" required>
+                                        <option value="morning">早班 (08:00-16:00)</option>
+                                        <option value="afternoon">中班 (16:00-24:00)</option>
+                                        <option value="night">夜班 (00:00-08:00)</option>
+                                        <option value="custom">自訂時間</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" id="customTimeGroup" style="display: none;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                        <div>
+                                            <label class="form-label">開始時間</label>
+                                            <input type="time" class="form-input" id="fixedStartTime">
+                                        </div>
+                                        <div>
+                                            <label class="form-label">結束時間</label>
+                                            <input type="time" class="form-input" id="fixedEndTime">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">工作日選擇</label>
+                                    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 10px;">
+                                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
+                                            <input type="checkbox" id="day0" value="0"> 日
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
+                                            <input type="checkbox" id="day1" value="1" checked> 一
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
+                                            <input type="checkbox" id="day2" value="2" checked> 二
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
+                                            <input type="checkbox" id="day3" value="3" checked> 三
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
+                                            <input type="checkbox" id="day4" value="4" checked> 四
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
+                                            <input type="checkbox" id="day5" value="5" checked> 五
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
+                                            <input type="checkbox" id="day6" value="6"> 六
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">應用範圍</label>
+                                    <select class="form-select" id="scheduleRange" required>
+                                        <option value="current-month">本月份</option>
+                                        <option value="next-month">下個月</option>
+                                        <option value="current-and-next">本月及下個月</option>
+                                        <option value="custom-range">自訂日期範圍</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" id="customRangeGroup" style="display: none;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                        <div>
+                                            <label class="form-label">開始日期</label>
+                                            <input type="date" class="form-input" id="rangeStartDate">
+                                        </div>
+                                        <div>
+                                            <label class="form-label">結束日期</label>
+                                            <input type="date" class="form-input" id="rangeEndDate">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-buttons">
+                                    <button type="button" class="btn btn-secondary" onclick="scheduleCloseFixedScheduleModal()">取消</button>
+                                    <button type="submit" class="btn btn-primary">套用</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="toast" id="scheduleToast"></div>
                 </div>
-                <div class="toast" id="scheduleToast"></div>
-            </div>
-            <!-- 醫療排班管理 結束 -->
+                <!-- 醫療排班管理 結束 -->
 <!-- 財務報表 -->
             <div id="financialReports" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="mb-6">
@@ -2409,8 +2419,7 @@
                     <!-- 動態載入醫囑模板 -->
                 </div>
             </div>
-        
-</div>
+        </div>
 
         <!-- 主系統頁面不再單獨呈現版權聲明，由全局頁腳統一呈現 -->
     </div>
