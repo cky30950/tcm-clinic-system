@@ -2919,6 +2919,20 @@
             transform: translateX(0);
         }
 
+        /*
+         * When the viewport is narrow (mobile devices), leave a small margin on
+         * both sides of the schedule management card. Without this, the card
+         * can visually cling to the edge of the screen. Matching other
+         * management modules, we apply a 1rem margin on left and right when
+         * the screen width is less than 640px.
+         */
+        @media (max-width: 640px) {
+            #scheduleManagement {
+                margin-left: 1rem !important;
+                margin-right: 1rem !important;
+            }
+        }
+
 
 
         @media (max-width: 768px) {
@@ -2954,74 +2968,74 @@
 
         }
     </style>
-<div class="container">
-        <!-- Group header and filters in a gradient box similar to the search patient registration -->
-        <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
+        <div class="container">
+            <!-- Module title (kept outside of the gradient box) -->
             <div class="header">
-            <h1>🏥 進階醫療排班管理系統</h1>
-
-            <div class="controls">
-                <div class="nav-controls">
-                    <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
-                    <div class="current-date" id="currentDate"></div>
-                    <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個 ▶</button>
-                    <button class="nav-btn" onclick="scheduleGoToToday()">📅 今天</button>
+                <h1>🏥 進階醫療排班管理系統</h1>
+            </div>
+            <!-- Navigation and filters wrapped in gradient box -->
+            <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
+                <!-- Controls: navigation, view and sync buttons -->
+                <div class="controls">
+                    <div class="nav-controls">
+                        <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
+                        <div class="current-date" id="currentDate"></div>
+                        <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個 ▶</button>
+                        <button class="nav-btn" onclick="scheduleGoToToday()">📅 今天</button>
+                    </div>
+                    <div class="view-controls">
+                        <button class="view-btn active">月視圖</button>
+                    </div>
+                    <div class="sync-controls">
+                        <button class="sync-btn" onclick="scheduleSyncToGoogle()">📅 同步 Google</button>
+                        <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
+                        <button class="sync-btn" onclick="schedulePrintSchedule()">🖨️ 列印</button>
+                    </div>
                 </div>
-                <div class="view-controls">
-                    <button class="view-btn active">月視圖</button>
-                </div>
-                <div class="sync-controls">
-                    <button class="sync-btn" onclick="scheduleSyncToGoogle()">📅 同步 Google</button>
-                    <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
-                    <button class="sync-btn" onclick="schedulePrintSchedule()">🖨️ 列印</button>
+                <!-- Filter panel -->
+                <div class="filter-panel">
+                    <div class="filter-grid">
+                        <div class="filter-group">
+                            <label class="filter-label">部門篩選</label>
+                            <select class="filter-select" id="departmentFilter" onchange="scheduleApplyFilters()">
+                                <option value="">所有部門</option>
+                                <option value="內科">內科</option>
+                                <option value="外科">外科</option>
+                                <option value="急診科">急診科</option>
+                                <option value="兒科">兒科</option>
+                                <option value="婦產科">婦產科</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">職位篩選</label>
+                            <select class="filter-select" id="roleFilter" onchange="scheduleApplyFilters()">
+                                <option value="">所有職位</option>
+                                <option value="doctor">醫師</option>
+                                <option value="nurse">護理師</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">班別篩選</label>
+                            <select class="filter-select" id="shiftTypeFilter" onchange="scheduleApplyFilters()">
+                                <option value="">所有班別</option>
+                                <option value="morning">早班</option>
+                                <option value="afternoon">中班</option>
+                                <option value="night">夜班</option>
+                                <option value="emergency">急診</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">搜尋人員</label>
+                            <input type="text" class="filter-input" id="staffSearch" placeholder="輸入姓名..." oninput="scheduleApplyFilters()">
+                        </div>
+                        <div class="quick-actions">
+                            <button class="quick-btn" onclick="scheduleOpenFixedScheduleModal()">📅 固定上班</button>
+                            <button class="quick-btn" onclick="scheduleCheckConflicts()">⚠️ 檢查衝突</button>
+                            <button class="quick-btn danger" onclick="scheduleClearAllShifts()">🗑️ 清空排班</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            </div>
-
-            <!-- 篩選面板 -->
-            <div class="filter-panel">
-            <div class="filter-grid">
-                <div class="filter-group">
-                    <label class="filter-label">部門篩選</label>
-                    <select class="filter-select" id="departmentFilter" onchange="scheduleApplyFilters()">
-                        <option value="">所有部門</option>
-                        <option value="內科">內科</option>
-                        <option value="外科">外科</option>
-                        <option value="急診科">急診科</option>
-                        <option value="兒科">兒科</option>
-                        <option value="婦產科">婦產科</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">職位篩選</label>
-                    <select class="filter-select" id="roleFilter" onchange="scheduleApplyFilters()">
-                        <option value="">所有職位</option>
-                        <option value="doctor">醫師</option>
-                        <option value="nurse">護理師</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">班別篩選</label>
-                    <select class="filter-select" id="shiftTypeFilter" onchange="scheduleApplyFilters()">
-                        <option value="">所有班別</option>
-                        <option value="morning">早班</option>
-                        <option value="afternoon">中班</option>
-                        <option value="night">夜班</option>
-                        <option value="emergency">急診</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">搜尋人員</label>
-                    <input type="text" class="filter-input" id="staffSearch" placeholder="輸入姓名..." oninput="scheduleApplyFilters()">
-                </div>
-                <div class="quick-actions">
-                    <button class="quick-btn" onclick="scheduleOpenFixedScheduleModal()">📅 固定上班</button>
-                    <button class="quick-btn" onclick="scheduleCheckConflicts()">⚠️ 檢查衝突</button>
-                    <button class="quick-btn danger" onclick="scheduleClearAllShifts()">🗑️ 清空排班</button>
-                </div>
-            </div>
-            </div>
-        </div>
 
         <div class="calendar-container">
             <div class="calendar-grid month-view" id="calendarGrid"></div>
@@ -4057,6 +4071,7 @@
     <script src="i18n.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
