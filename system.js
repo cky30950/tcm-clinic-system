@@ -22461,3 +22461,203 @@ function showScheduleModule() {
 
 // 將排班模組函式掛到 window，以便在 showSection 中調用
 window.showScheduleModule = showScheduleModule;
+
+// === Simplified Scheduler integration (drag & drop schedule management) ===
+// 為了降低對原始 cander.html 的依賴，這裡實作一個簡化的排班模組，
+// 主要功能為月曆顯示及醫護人員拖曳排程。樣式使用系統既有的 Tailwind 工具類，
+// 因此無需額外載入大量 CSS。
+
+// 標記避免重複初始化
+window.__schedulerInited = false;
+
+/**
+ * 初始化簡化排班模組。建立月曆與人員清單，並綁定拖放事件。
+ * 此函式只會在第一次顯示排班管理區域時執行。
+ */
+function initScheduler() {
+  if (window.__schedulerInited) return;
+  window.__schedulerInited = true;
+  const container = document.getElementById('scheduleModule');
+  if (!container) return;
+  // 清空原容器內容，以防止重複渲染
+  container.innerHTML = '';
+  // 建立標題列與控制按鈕
+  const header = document.createElement('div');
+  header.className = 'flex items-center justify-between mb-4';
+  const prevBtn = document.createElement('button');
+  prevBtn.textContent = '◀ 上月';
+  prevBtn.className = 'px-2 py-1 bg-blue-500 text-white rounded';
+  const nextBtn = document.createElement('button');
+  nextBtn.textContent = '下月 ▶';
+  nextBtn.className = 'px-2 py-1 bg-blue-500 text-white rounded';
+  const todayBtn = document.createElement('button');
+  todayBtn.textContent = '今天';
+  todayBtn.className = 'px-2 py-1 bg-green-500 text-white rounded ml-2';
+  const currentDateEl = document.createElement('div');
+  currentDateEl.id = 'schedulerCurrentDate';
+  currentDateEl.className = 'text-xl font-bold';
+  header.append(prevBtn, currentDateEl, nextBtn, todayBtn);
+  container.appendChild(header);
+  // 月曆容器
+  const calendarGrid = document.createElement('div');
+  calendarGrid.id = 'schedulerCalendar';
+  calendarGrid.className = 'grid gap-2';
+  container.appendChild(calendarGrid);
+  // 人員清單
+  const staffSection = document.createElement('div');
+  staffSection.className = 'mt-6';
+  const staffTitle = document.createElement('h2');
+  staffTitle.textContent = '醫護人員';
+  staffTitle.className = 'text-lg font-semibold mb-2';
+  const staffList = document.createElement('div');
+  staffList.id = 'schedulerStaffList';
+  staffList.className = 'flex flex-wrap gap-2';
+  staffSection.append(staffTitle, staffList);
+  container.appendChild(staffSection);
+  // 資料模型：簡易的醫護人員與排班
+  const staff = [
+    { id: 1, name: '王醫師' },
+    { id: 2, name: '李醫師' },
+    { id: 3, name: '張醫師' },
+    { id: 4, name: '陳護理師' },
+    { id: 5, name: '林護理師' }
+  ];
+  let shifts = [];
+  let currentDate = new Date();
+  // 渲染人員列表
+  function renderStaff() {
+    staffList.innerHTML = '';
+    staff.forEach(member => {
+      const item = document.createElement('div');
+      item.className = 'cursor-move px-2 py-1 bg-gray-200 rounded';
+      item.draggable = true;
+      item.dataset.staffId = member.id;
+      item.textContent = member.name;
+      item.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'staff', id: member.id }));
+        item.classList.add('opacity-50');
+      });
+      item.addEventListener('dragend', () => {
+        item.classList.remove('opacity-50');
+      });
+      staffList.appendChild(item);
+    });
+  }
+  // 產生某月的日期陣列，包括前後補齊至完整周
+  function getMonthDates(date) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const dates = [];
+    const startOffset = firstDay.getDay();
+    for (let i = 0; i < startOffset; i++) {
+      dates.push(null);
+    }
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      dates.push(new Date(year, month, d));
+    }
+    while (dates.length % 7 !== 0) {
+      dates.push(null);
+    }
+    return dates;
+  }
+  // 根據日期渲染月曆網格與排班
+  function renderCalendar() {
+    calendarGrid.innerHTML = '';
+    const dates = getMonthDates(currentDate);
+    const monthStr = `${currentDate.getFullYear()} 年 ${currentDate.getMonth() + 1} 月`;
+    currentDateEl.textContent = monthStr;
+    calendarGrid.className = 'grid gap-2 grid-cols-7';
+    dates.forEach(date => {
+      const cell = document.createElement('div');
+      cell.className = 'border rounded p-1 min-h-[80px] relative';
+      cell.addEventListener('dragover', e => {
+        e.preventDefault();
+        cell.classList.add('bg-blue-50');
+      });
+      cell.addEventListener('dragleave', () => {
+        cell.classList.remove('bg-blue-50');
+      });
+      cell.addEventListener('drop', e => {
+        e.preventDefault();
+        cell.classList.remove('bg-blue-50');
+        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+        if (!date) return;
+        const dateStr = date.toISOString().slice(0, 10);
+        if (data.type === 'staff') {
+          const newId = Date.now();
+          shifts.push({ id: newId, staffId: data.id, date: dateStr });
+        } else if (data.type === 'shift') {
+          const shift = shifts.find(s => s.id === data.id);
+          if (shift) {
+            shift.date = dateStr;
+          }
+        }
+        renderCalendar();
+      });
+      if (date) {
+        const dateLabel = document.createElement('div');
+        dateLabel.className = 'text-xs mb-1';
+        dateLabel.textContent = date.getDate();
+        cell.appendChild(dateLabel);
+        const dayStr = date.toISOString().slice(0, 10);
+        const dayShifts = shifts.filter(s => s.date === dayStr);
+        dayShifts.forEach(shift => {
+          const shiftEl = document.createElement('div');
+          shiftEl.className = 'mt-1 px-1 text-xs rounded bg-yellow-200 cursor-move';
+          const member = staff.find(m => m.id === shift.staffId);
+          shiftEl.textContent = member ? member.name : '';
+          shiftEl.draggable = true;
+          shiftEl.dataset.shiftId = shift.id;
+          shiftEl.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'shift', id: shift.id }));
+            shiftEl.classList.add('opacity-50');
+          });
+          shiftEl.addEventListener('dragend', () => {
+            shiftEl.classList.remove('opacity-50');
+          });
+          cell.appendChild(shiftEl);
+        });
+      }
+      calendarGrid.appendChild(cell);
+    });
+  }
+  // 按鈕事件
+  prevBtn.addEventListener('click', () => {
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    renderCalendar();
+  });
+  nextBtn.addEventListener('click', () => {
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    renderCalendar();
+  });
+  todayBtn.addEventListener('click', () => {
+    currentDate = new Date();
+    renderCalendar();
+  });
+  // 初始化
+  renderStaff();
+  renderCalendar();
+}
+
+/**
+ * 顯示簡化排班模組：隱藏其他區域並初始化排班介面。
+ */
+function showScheduleModule() {
+  // 隱藏所有其他區塊（contentWrapper 內部）
+  const wrapper = document.getElementById('contentWrapper');
+  if (wrapper) {
+    Array.from(wrapper.children).forEach(child => child.classList.add('hidden'));
+  }
+  // 顯示排班管理區域
+  const scheduleContainer = document.getElementById('scheduleManagement');
+  if (scheduleContainer) {
+    scheduleContainer.classList.remove('hidden');
+  }
+  // 初始化排班模組
+  initScheduler();
+}
+
+// 將排班模組函式重新掛到 window，以覆蓋原先的實作
+window.showScheduleModule = showScheduleModule;
