@@ -43,15 +43,37 @@
          */
         async function loadClinicStaff() {
             try {
+                // 在嘗試讀取 Firebase 用戶資料前，等待 FirebaseDataManager 準備完成。
+                // 系統在 window.load 事件時才初始化 firebaseDataManager，
+                // 而排班管理腳本於 DOMContentLoaded 即會執行，可能導致 fetchUsers 尚未可用。
+                if (typeof waitForFirebaseDataManager === 'function') {
+                    // 使用系統提供的等待函式確保 firebaseDataManager.isReady
+                    try {
+                        await waitForFirebaseDataManager();
+                    } catch (e) {
+                        // 若等待過程出錯，僅記錄警告而不終止流程
+                        console.warn('等待 FirebaseDataManager 就緒時發生錯誤:', e);
+                    }
+                } else {
+                    // 若沒有 waitForFirebaseDataManager，則自行輪詢等待一段時間
+                    for (let i = 0; i < 50 && (!window.firebaseDataManager || !window.firebaseDataManager.isReady); i++) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                }
+
                 let usersList = [];
                 // 優先使用 fetchUsers 函式從 Firebase 讀取診所用戶
                 if (typeof fetchUsers === 'function') {
-                    usersList = await fetchUsers();
-                } else if (window.usersFromFirebase && Array.isArray(window.usersFromFirebase)) {
-                    // 若 fetchUsers 尚未定義但 system.js 已經載入並有緩存，用它
+                    try {
+                        usersList = await fetchUsers();
+                    } catch (e) {
+                        console.warn('呼叫 fetchUsers 失敗:', e);
+                    }
+                }
+                // 若尚未取得資料，嘗試從全域緩存或本地資料取得
+                if ((!usersList || usersList.length === 0) && window.usersFromFirebase && Array.isArray(window.usersFromFirebase)) {
                     usersList = window.usersFromFirebase;
-                } else if (window.users && Array.isArray(window.users)) {
-                    // 使用本地 users 作為後備資料
+                } else if ((!usersList || usersList.length === 0) && window.users && Array.isArray(window.users)) {
                     usersList = window.users;
                 }
                 // 將用戶資料轉換為排班人員格式
