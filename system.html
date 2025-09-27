@@ -2919,20 +2919,6 @@
             transform: translateX(0);
         }
 
-        /*
-         * When the viewport is narrow (mobile devices), leave a small margin on
-         * both sides of the schedule management card. Without this, the card
-         * can visually cling to the edge of the screen. Matching other
-         * management modules, we apply a 1rem margin on left and right when
-         * the screen width is less than 640px.
-         */
-        @media (max-width: 640px) {
-            #scheduleManagement {
-                margin-left: 1rem !important;
-                margin-right: 1rem !important;
-            }
-        }
-
 
 
         @media (max-width: 768px) {
@@ -2968,74 +2954,74 @@
 
         }
     </style>
-        <div class="container">
-            <!-- Module title (kept outside of the gradient box) -->
+<div class="container">
+        <!-- Group header and filters in a gradient box similar to the search patient registration -->
+        <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
             <div class="header">
-                <h1>🏥 進階醫療排班管理系統</h1>
-            </div>
-            <!-- Navigation and filters wrapped in gradient box -->
-            <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
-                <!-- Controls: navigation, view and sync buttons -->
-                <div class="controls">
-                    <div class="nav-controls">
-                        <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
-                        <div class="current-date" id="currentDate"></div>
-                        <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個 ▶</button>
-                        <button class="nav-btn" onclick="scheduleGoToToday()">📅 今天</button>
-                    </div>
-                    <div class="view-controls">
-                        <button class="view-btn active">月視圖</button>
-                    </div>
-                    <div class="sync-controls">
-                        <button class="sync-btn" onclick="scheduleSyncToGoogle()">📅 同步 Google</button>
-                        <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
-                        <button class="sync-btn" onclick="schedulePrintSchedule()">🖨️ 列印</button>
-                    </div>
+            <h1>🏥 進階醫療排班管理系統</h1>
+
+            <div class="controls">
+                <div class="nav-controls">
+                    <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
+                    <div class="current-date" id="currentDate"></div>
+                    <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個 ▶</button>
+                    <button class="nav-btn" onclick="scheduleGoToToday()">📅 今天</button>
                 </div>
-                <!-- Filter panel -->
-                <div class="filter-panel">
-                    <div class="filter-grid">
-                        <div class="filter-group">
-                            <label class="filter-label">部門篩選</label>
-                            <select class="filter-select" id="departmentFilter" onchange="scheduleApplyFilters()">
-                                <option value="">所有部門</option>
-                                <option value="內科">內科</option>
-                                <option value="外科">外科</option>
-                                <option value="急診科">急診科</option>
-                                <option value="兒科">兒科</option>
-                                <option value="婦產科">婦產科</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label class="filter-label">職位篩選</label>
-                            <select class="filter-select" id="roleFilter" onchange="scheduleApplyFilters()">
-                                <option value="">所有職位</option>
-                                <option value="doctor">醫師</option>
-                                <option value="nurse">護理師</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label class="filter-label">班別篩選</label>
-                            <select class="filter-select" id="shiftTypeFilter" onchange="scheduleApplyFilters()">
-                                <option value="">所有班別</option>
-                                <option value="morning">早班</option>
-                                <option value="afternoon">中班</option>
-                                <option value="night">夜班</option>
-                                <option value="emergency">急診</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label class="filter-label">搜尋人員</label>
-                            <input type="text" class="filter-input" id="staffSearch" placeholder="輸入姓名..." oninput="scheduleApplyFilters()">
-                        </div>
-                        <div class="quick-actions">
-                            <button class="quick-btn" onclick="scheduleOpenFixedScheduleModal()">📅 固定上班</button>
-                            <button class="quick-btn" onclick="scheduleCheckConflicts()">⚠️ 檢查衝突</button>
-                            <button class="quick-btn danger" onclick="scheduleClearAllShifts()">🗑️ 清空排班</button>
-                        </div>
-                    </div>
+                <div class="view-controls">
+                    <button class="view-btn active">月視圖</button>
+                </div>
+                <div class="sync-controls">
+                    <button class="sync-btn" onclick="scheduleSyncToGoogle()">📅 同步 Google</button>
+                    <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
+                    <button class="sync-btn" onclick="schedulePrintSchedule()">🖨️ 列印</button>
                 </div>
             </div>
+            </div>
+
+            <!-- 篩選面板 -->
+            <div class="filter-panel">
+            <div class="filter-grid">
+                <div class="filter-group">
+                    <label class="filter-label">部門篩選</label>
+                    <select class="filter-select" id="departmentFilter" onchange="scheduleApplyFilters()">
+                        <option value="">所有部門</option>
+                        <option value="內科">內科</option>
+                        <option value="外科">外科</option>
+                        <option value="急診科">急診科</option>
+                        <option value="兒科">兒科</option>
+                        <option value="婦產科">婦產科</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">職位篩選</label>
+                    <select class="filter-select" id="roleFilter" onchange="scheduleApplyFilters()">
+                        <option value="">所有職位</option>
+                        <option value="doctor">醫師</option>
+                        <option value="nurse">護理師</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">班別篩選</label>
+                    <select class="filter-select" id="shiftTypeFilter" onchange="scheduleApplyFilters()">
+                        <option value="">所有班別</option>
+                        <option value="morning">早班</option>
+                        <option value="afternoon">中班</option>
+                        <option value="night">夜班</option>
+                        <option value="emergency">急診</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">搜尋人員</label>
+                    <input type="text" class="filter-input" id="staffSearch" placeholder="輸入姓名..." oninput="scheduleApplyFilters()">
+                </div>
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="scheduleOpenFixedScheduleModal()">📅 固定上班</button>
+                    <button class="quick-btn" onclick="scheduleCheckConflicts()">⚠️ 檢查衝突</button>
+                    <button class="quick-btn danger" onclick="scheduleClearAllShifts()">🗑️ 清空排班</button>
+                </div>
+            </div>
+            </div>
+        </div>
 
         <div class="calendar-container">
             <div class="calendar-grid month-view" id="calendarGrid"></div>
@@ -3202,18 +3188,9 @@
         let currentStaffFilter = 'all';
 
         // 醫護人員資料
-        const staff = [
-            { id: 1, name: '王志明', role: 'doctor', department: '內科', level: '主治醫師', phone: '0912-345-678', email: 'wang@hospital.com', maxHours: 40 },
-            { id: 2, name: '李美玲', role: 'doctor', department: '外科', level: '住院醫師', phone: '0923-456-789', email: 'li@hospital.com', maxHours: 36 },
-            { id: 3, name: '張建國', role: 'doctor', department: '急診科', level: '主治醫師', phone: '0934-567-890', email: 'zhang@hospital.com', maxHours: 42 },
-            { id: 4, name: '陳淑芬', role: 'nurse', department: '內科', level: '護理師', phone: '0945-678-901', email: 'chen@hospital.com', maxHours: 40 },
-            { id: 5, name: '林雅婷', role: 'nurse', department: '外科', level: '資深護理師', phone: '0956-789-012', email: 'lin@hospital.com', maxHours: 38 },
-            { id: 6, name: '黃志華', role: 'nurse', department: '急診科', level: '護理師', phone: '0967-890-123', email: 'huang@hospital.com', maxHours: 44 },
-            { id: 7, name: '劉佳慧', role: 'doctor', department: '兒科', level: '主治醫師', phone: '0978-901-234', email: 'liu@hospital.com', maxHours: 36 },
-            { id: 8, name: '吳明珠', role: 'nurse', department: '兒科', level: '護理師', phone: '0989-012-345', email: 'wu@hospital.com', maxHours: 40 },
-            { id: 9, name: '蔡文雄', role: 'doctor', department: '婦產科', level: '主治醫師', phone: '0990-123-456', email: 'tsai@hospital.com', maxHours: 38 },
-            { id: 10, name: '鄭麗華', role: 'nurse', department: '婦產科', level: '資深護理師', phone: '0901-234-567', email: 'zheng@hospital.com', maxHours: 36 }
-        ];
+        // 預設不使用任何示範用戶。實際人員資料將由 schedule_management.js 載入，
+        // 並儲存在全域 window.staff 中。此處僅從 window.staff 取得引用，若尚未載入則為空陣列。
+        let staff = window.staff || [];
 
         // 排班資料 - 使用當前月份的日期
         let shifts = [];

@@ -6,18 +6,87 @@
         let currentStaffFilter = 'all';
         
         // 醫護人員資料
-        const staff = [
-            { id: 1, name: '王志明', role: 'doctor', department: '內科', level: '主治醫師', phone: '0912-345-678', email: 'wang@hospital.com', maxHours: 40 },
-            { id: 2, name: '李美玲', role: 'doctor', department: '外科', level: '住院醫師', phone: '0923-456-789', email: 'li@hospital.com', maxHours: 36 },
-            { id: 3, name: '張建國', role: 'doctor', department: '急診科', level: '主治醫師', phone: '0934-567-890', email: 'zhang@hospital.com', maxHours: 42 },
-            { id: 4, name: '陳淑芬', role: 'nurse', department: '內科', level: '護理師', phone: '0945-678-901', email: 'chen@hospital.com', maxHours: 40 },
-            { id: 5, name: '林雅婷', role: 'nurse', department: '外科', level: '資深護理師', phone: '0956-789-012', email: 'lin@hospital.com', maxHours: 38 },
-            { id: 6, name: '黃志華', role: 'nurse', department: '急診科', level: '護理師', phone: '0967-890-123', email: 'huang@hospital.com', maxHours: 44 },
-            { id: 7, name: '劉佳慧', role: 'doctor', department: '兒科', level: '主治醫師', phone: '0978-901-234', email: 'liu@hospital.com', maxHours: 36 },
-            { id: 8, name: '吳明珠', role: 'nurse', department: '兒科', level: '護理師', phone: '0989-012-345', email: 'wu@hospital.com', maxHours: 40 },
-            { id: 9, name: '蔡文雄', role: 'doctor', department: '婦產科', level: '主治醫師', phone: '0990-123-456', email: 'tsai@hospital.com', maxHours: 38 },
-            { id: 10, name: '鄭麗華', role: 'nurse', department: '婦產科', level: '資深護理師', phone: '0901-234-567', email: 'zheng@hospital.com', maxHours: 36 }
-        ];
+        // 預設為空陣列，實際人員資料將透過載入診所用戶後填充。
+        // 我們同時將此陣列引用存放於 window.staff，使得其他程式碼（如 system.html 中的排班管理程式）
+        // 可以共用同一份人員資料，避免因為預設示範資料而與實際資料不一致。
+        let staff = [];
+        // 將 staff 指向全域，便於舊有程式碼讀取
+        window.staff = staff;
+
+        /**
+         * 透過人員 ID 查詢人員資料。若找不到對應的人員，回傳一個預設物件
+         * 以避免程式在存取 undefined 屬性時產生錯誤。
+         * @param {number|string} id 人員 ID
+         * @returns {Object} 人員物件
+         */
+        function findStaffById(id) {
+            const member = staff.find(s => s.id === id);
+            if (member) return member;
+            // 提供基本預設值，確保後續程式可以安全存取屬性
+            return {
+                id: id,
+                name: '未知人員',
+                role: 'doctor',
+                department: '',
+                level: '',
+                phone: '',
+                email: '',
+                maxHours: 0
+            };
+        }
+
+        /**
+         * 從系統的診所用戶載入醫護人員。此函式嘗試從全域函式 fetchUsers (由
+         * system.js 提供) 取得用戶清單，並過濾出職位為「醫師」或「護理師」的
+         * 用戶，將其映射為排班系統需要的 staff 結構。若無法取得用戶資料，
+         * 將維持 staff 為空陣列，以避免載入預設示範用戶。
+         */
+        async function loadClinicStaff() {
+            try {
+                let usersList = [];
+                // 優先使用 fetchUsers 函式從 Firebase 讀取診所用戶
+                if (typeof fetchUsers === 'function') {
+                    usersList = await fetchUsers();
+                } else if (window.usersFromFirebase && Array.isArray(window.usersFromFirebase)) {
+                    // 若 fetchUsers 尚未定義但 system.js 已經載入並有緩存，用它
+                    usersList = window.usersFromFirebase;
+                } else if (window.users && Array.isArray(window.users)) {
+                    // 使用本地 users 作為後備資料
+                    usersList = window.users;
+                }
+                // 將用戶資料轉換為排班人員格式
+                // 清空原陣列以維持同一個引用，避免其他腳本無法取得最新資料
+                staff.splice(0, staff.length);
+                usersList.forEach(u => {
+                    // 僅納入醫師與護理師
+                    if (u.position === '醫師' || u.position === '護理師') {
+                        staff.push({
+                            id: u.id,
+                            name: u.name || '',
+                            role: u.position === '醫師' ? 'doctor' : 'nurse',
+                            // 部門若無資料則使用空字串，避免 undefined
+                            department: u.department || '',
+                            // level 可使用 position 表示，例如主治醫師或護理師
+                            level: u.position || '',
+                            phone: u.phone || '',
+                            email: u.email || '',
+                            // 若有 maxHours 欄位則使用，否則預設 40
+                            maxHours: typeof u.maxHours === 'number' ? u.maxHours : 40
+                        });
+                    }
+                });
+                // 更新全域 staff 指向最新的資料陣列，確保其他腳本能取得最新人員
+                // 由於我們使用 splice 清空陣列並重新填充，不會改變引用，
+                // 這裡仍然將 window.staff 指向同一個陣列以防止遺漏。
+                window.staff = staff;
+            } catch (err) {
+                console.error('載入診所用戶時發生錯誤：', err);
+                // 若出錯則維持 staff 為空陣列
+                staff.splice(0, staff.length);
+                // 同步全域 staff（仍指向同一陣列）
+                window.staff = staff;
+            }
+        }
 
         // 排班資料 - 使用當前月份的日期
         let shifts = [];
@@ -52,12 +121,21 @@
         };
 
         // 初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeSampleShifts(); // 載入示範排班資料
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 載入示範排班資料（在沒有後端排班資料的情況下仍顯示範例）
+            initializeSampleShifts();
             updateCurrentDate();
             renderCalendar();
-            renderStaffPanel();
             setupEventListeners();
+
+            // 載入診所實際人員資料
+            await loadClinicStaff();
+
+            // 依照載入後的人員重新渲染人員卡片與下拉選單
+            renderStaffPanel();
+            updateStaffSelects();
+
+            // 更新統計顯示
             updateStats();
         });
 
@@ -222,7 +300,7 @@
 
         // 創建排班元素
         function createShiftElement(shift) {
-            const staffMember = staff.find(s => s.id === shift.staffId);
+            const staffMember = findStaffById(shift.staffId);
             const element = document.createElement('div');
             
             let shiftClasses = `shift-item ${staffMember.role}`;
@@ -317,7 +395,7 @@
                 
                 if (staffId) {
                     // 人員拖拽 - 快速新增排班
-                    const staffMember = staff.find(s => s.id == staffId);
+                    const staffMember = findStaffById(staffId);
                     if (staffMember) {
                         quickAddShiftFromDrag(staffMember, this.dataset.date);
                     }
@@ -598,15 +676,15 @@
         function syncToGoogle() {
             // 創建 Google Calendar 事件格式
             const events = shifts.map(shift => {
-                const staff = staff.find(s => s.id === shift.staffId);
+                // 透過 ID 找到對應的人員
+                const staffMember = findStaffById(shift.staffId);
                 const startDateTime = `${shift.date}T${shift.startTime}:00`;
                 const endDateTime = `${shift.date}T${shift.endTime}:00`;
-                
                 return {
-                    title: `${staff.name} - ${staff.role === 'doctor' ? '醫師' : '護理師'}排班`,
+                    title: `${staffMember.name} - ${staffMember.role === 'doctor' ? '醫師' : '護理師'}排班`,
                     start: startDateTime,
                     end: endDateTime,
-                    description: `部門: ${staff.department}\n班別: ${shift.type}`
+                    description: `部門: ${staffMember.department}\n班別: ${shift.type}`
                 };
             });
 
@@ -637,7 +715,7 @@
             ];
 
             shifts.forEach(shift => {
-                const staffMember = staff.find(s => s.id === shift.staffId);
+                const staffMember = findStaffById(shift.staffId);
                 const startDateTime = `${shift.date.replace(/-/g, '')}T${shift.startTime.replace(':', '')}00`;
                 const endDateTime = `${shift.date.replace(/-/g, '')}T${shift.endTime.replace(':', '')}00`;
                 
@@ -692,7 +770,7 @@
 
         // 檢查排班是否符合篩選條件
         function passesFilter(shift) {
-            const staffMember = staff.find(s => s.id === shift.staffId);
+            const staffMember = findStaffById(shift.staffId);
             
             if (currentFilters.department && staffMember.department !== currentFilters.department) return false;
             if (currentFilters.role && staffMember.role !== currentFilters.role) return false;
@@ -720,8 +798,8 @@
 
             let message = `發現 ${conflicts.length} 個排班衝突：\n\n`;
             conflicts.forEach((conflict, index) => {
-                const staff1 = staff.find(s => s.id === conflict.shift1.staffId);
-                const staff2 = staff.find(s => s.id === conflict.shift2.staffId);
+                const staff1 = findStaffById(conflict.shift1.staffId);
+                const staff2 = findStaffById(conflict.shift2.staffId);
                 message += `${index + 1}. ${staff1.name} 在 ${conflict.shift1.date} 有重疊排班\n`;
             });
 
@@ -795,7 +873,7 @@
                 return;
             }
             
-            const staffMember = staff.find(s => s.id === shift.staffId);
+            const staffMember = findStaffById(shift.staffId);
             const confirmMessage = `確定要刪除以下排班嗎？\n\n` +
                                  `人員：${staffMember.name}\n` +
                                  `日期：${shift.date}\n` +
@@ -818,7 +896,7 @@
 
         // 顯示排班詳情
         function showShiftDetails(shift) {
-            const staffMember = staff.find(s => s.id === shift.staffId);
+            const staffMember = findStaffById(shift.staffId);
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
             
             alert(`排班詳情：
@@ -901,7 +979,7 @@
                 .sort((a, b) => new Date(a.date) - new Date(b.date));
 
             sortedShifts.forEach(shift => {
-                const staffMember = staff.find(s => s.id === shift.staffId);
+                const staffMember = findStaffById(shift.staffId);
                 const statusText = shift.status === 'confirmed' ? '已確認' : shift.status === 'pending' ? '待確認' : '已取消';
                 const rowClass = staffMember.role === 'doctor' ? 'shift-doctor' : 'shift-nurse';
                 
@@ -1113,7 +1191,7 @@
             closeFixedScheduleModal();
             
             // 顯示結果
-            const staffMember = staff.find(s => s.id === staffId);
+            const staffMember = findStaffById(staffId);
             let message = `固定排班建立完成！\n\n`;
             message += `人員：${staffMember.name}\n`;
             message += `新增排班：${addedCount} 天\n`;
@@ -1156,7 +1234,7 @@
 
         // 查看人員排班
         function viewStaffSchedule(staffId) {
-            const staffMember = staff.find(s => s.id === staffId);
+            const staffMember = findStaffById(staffId);
             const staffShifts = shifts.filter(s => s.staffId === staffId)
                 .sort((a, b) => new Date(a.date) - new Date(b.date));
             
@@ -1178,7 +1256,7 @@
 
         // 聯絡人員
         function contactStaff(staffId) {
-            const staffMember = staff.find(s => s.id === staffId);
+            const staffMember = findStaffById(staffId);
             const contactInfo = `聯絡 ${staffMember.name}：\n\n` +
                               `📞 電話: ${staffMember.phone}\n` +
                               `📧 信箱: ${staffMember.email}\n` +
