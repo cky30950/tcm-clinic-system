@@ -112,19 +112,6 @@
 
         // 排班資料 - 使用當前月份的日期
         let shifts = [];
-
-        /**
-         * 將日期物件轉換為 YYYY-MM-DD 格式的字串，使用本地時間而非 UTC，
-         * 以避免使用 toISOString() 造成日期提前一天的問題。
-         * @param {Date} date 日期物件
-         * @returns {string} 格式化後的日期字串
-         */
-        function formatDate(date) {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
         
         // 初始化一些示範排班資料
         function initializeSampleShifts() {
@@ -331,8 +318,7 @@
                 
                 const cell = document.createElement('div');
                 cell.className = 'calendar-cell';
-                // 使用本地日期格式避免時區誤差
-                cell.dataset.date = formatDate(cellDate);
+                cell.dataset.date = cellDate.toISOString().split('T')[0];
                 
                 if (cellDate.getMonth() !== currentDate.getMonth()) {
                     cell.classList.add('other-month');
@@ -377,7 +363,8 @@
             element.dataset.shiftId = shift.id;
             
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
-            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌'; // 保留計算但不顯示
+            // 計算狀態圖示，但目前卡片不再顯示狀態圖示，僅計算以便未來擴充
+            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌';
             
             // 使用單一函式處理按鈕點擊以便 inline 事件僅包含函式呼叫。
             // 直接在 onclick 中調用多個語句（例如 event.stopPropagation(); editShift(...)) 會導致
@@ -386,7 +373,7 @@
             // 停止事件冒泡和觸發實際的編輯或刪除邏輯。
             element.innerHTML = `
                 <div class="shift-header">
-                    <!-- 顯示人員姓名與職位，例如「張XX醫師」 -->
+                    <!-- 在班卡標頭顯示員工名稱與職位，例如「張XX醫師」 -->
                     <div class="shift-name">${staffMember.name}${staffMember.level || ''}</div>
                     <div class="shift-actions">
                         <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
@@ -395,7 +382,7 @@
                 </div>
                 <div class="shift-details">
                     ${shift.startTime}-${shift.endTime} (${duration}h)<br>
-                    <!-- 僅顯示排班備註，不再顯示狀態圖示與部門 -->
+                    <!-- 不再顯示狀態圖示與部門，僅顯示排班備註 -->
                     ${shift.notes || '一般排班'}
                 </div>
             `;
@@ -538,7 +525,7 @@
         }
 
         function getShiftsForDate(date) {
-            const dateStr = formatDate(date);
+            const dateStr = date.toISOString().split('T')[0];
             return shifts.filter(shift => shift.date === dateStr);
         }
 
@@ -557,7 +544,7 @@
                 
 
                 
-                // 顯示人員姓名與職位，例如「張XX醫師」
+                // 顯示人員名稱與職位。例如「張XX醫師」。若無 level 則僅顯示姓名
                 card.innerHTML = `
                     <div class="staff-name">${member.name}${member.level || ''}</div>
                     <div class="drag-hint">🖱️</div>
@@ -619,7 +606,7 @@
 
         // 獲取今日人員排班
         function getTodayShiftsForStaff(staffId) {
-            const today = formatDate(new Date());
+            const today = new Date().toISOString().split('T')[0];
             return shifts.filter(shift => shift.staffId === staffId && shift.date === today);
         }
 
@@ -670,8 +657,7 @@
             if (date) {
                 document.getElementById('shiftDate').value = date;
             } else {
-                // 使用本地日期格式
-                document.getElementById('shiftDate').value = formatDate(currentDate);
+                document.getElementById('shiftDate').value = currentDate.toISOString().split('T')[0];
             }
             
             if (staffId) {
@@ -1219,7 +1205,7 @@
                 const dayOfWeek = date.getDay();
                 
                 if (selectedDays.includes(dayOfWeek)) {
-                    const dateStr = formatDate(date);
+                    const dateStr = date.toISOString().split('T')[0];
                     
                     // 檢查是否已有排班
                     const existingShiftIndex = shifts.findIndex(s =>

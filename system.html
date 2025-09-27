@@ -2282,14 +2282,6 @@
             padding-right: 2rem;
         }
 
-        /* 在小螢幕時保持左右邊距，避免內容貼邊 */
-        @media (max-width: 640px) {
-            #scheduleManagement .container {
-                padding-left: 1rem;
-                padding-right: 1rem;
-            }
-        }
-
 #scheduleManagement .header {
             background: transparent;
             border-radius: 0;
@@ -2963,12 +2955,11 @@
         }
     </style>
 <div class="container">
-        <!-- Page title -->
-        <div class="header">
-            <h1>🏥 進階醫療排班管理系統</h1>
-        </div>
-        <!-- Navigation and filters in a gradient box starting from the navigation buttons -->
+        <!-- Group header and filters in a gradient box similar to the search patient registration -->
         <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
+            <div class="header">
+            <h1>🏥 進階醫療排班管理系統</h1>
+
             <div class="controls">
                 <div class="nav-controls">
                     <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
@@ -2984,6 +2975,7 @@
                     <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
                     <button class="sync-btn" onclick="schedulePrintSchedule()">🖨️ 列印</button>
                 </div>
+            </div>
             </div>
 
             <!-- 篩選面板 -->
@@ -3415,8 +3407,7 @@
 
                 const cell = document.createElement('div');
                 cell.className = 'calendar-cell';
-                // 以本地日期組合字串，避免使用 toISOString() 導致日期提前一天
-                cell.dataset.date = cellDate.getFullYear() + '-' + String(cellDate.getMonth() + 1).padStart(2, '0') + '-' + String(cellDate.getDate()).padStart(2, '0');
+                cell.dataset.date = cellDate.toISOString().split('T')[0];
 
                 if (cellDate.getMonth() !== currentDate.getMonth()) {
                     cell.classList.add('other-month');
@@ -3461,12 +3452,12 @@
             element.dataset.shiftId = shift.id;
 
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
-            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌'; // 保留計算但不顯示
+            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌'; // 保留計算，但不顯示
 
             // 使用包裝函式避免 inline 事件中包含多個語句，否則 system.js 解析會出錯
             element.innerHTML = `
                 <div class="shift-header">
-                    <!-- 顯示人員姓名與職位，例如「張XX醫師」 -->
+                    <!-- 在排班卡標頭顯示人員姓名與職位，例如「張XX醫師」 -->
                     <div class="shift-name">${staffMember.name}${staffMember.level || ''}</div>
                     <div class="shift-actions">
                         <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
@@ -3475,6 +3466,7 @@
                 </div>
                 <div class="shift-details">
                     ${shift.startTime}-${shift.endTime} (${duration}h)<br>
+                    <!-- 不再顯示狀態圖示與部門，僅顯示備註 -->
                     ${shift.notes || '一般排班'}
                 </div>
             `;
@@ -3618,7 +3610,7 @@
         }
 
         function getShiftsForDate(date) {
-            const dateStr = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+            const dateStr = date.toISOString().split('T')[0];
             return shifts.filter(shift => shift.date === dateStr);
         }
 
@@ -3699,8 +3691,7 @@
 
         // 獲取今日人員排班
         function getTodayShiftsForStaff(staffId) {
-            const d = new Date();
-            const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            const today = new Date().toISOString().split('T')[0];
             return shifts.filter(shift => shift.staffId === staffId && shift.date === today);
         }
 
@@ -3751,8 +3742,7 @@
             if (date) {
                 document.getElementById('shiftDate').value = date;
             } else {
-                // 使用本地日期格式避免時區錯誤
-                document.getElementById('shiftDate').value = currentDate.getFullYear() + '-' + String(currentDate.getMonth() + 1).padStart(2, '0') + '-' + String(currentDate.getDate()).padStart(2, '0');
+                document.getElementById('shiftDate').value = currentDate.toISOString().split('T')[0];
             }
 
             if (staffId) {
