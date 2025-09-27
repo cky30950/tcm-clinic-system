@@ -114,81 +114,16 @@
         let shifts = [];
 
         /**
-         * 從 Firebase Realtime Database 載入排班資料。
-         * 只在進入排班管理系統時讀取一次，不使用實時監聽。
-         * 讀取完成後會更新全域 shifts 陣列，但不會自動渲染畫面，需由呼叫者重新渲染。
+         * 將日期物件轉換為 YYYY-MM-DD 格式的字串，使用本地時間而非 UTC，
+         * 以避免使用 toISOString() 造成日期提前一天的問題。
+         * @param {Date} date 日期物件
+         * @returns {string} 格式化後的日期字串
          */
-        async function loadShiftsFromDb() {
-            try {
-                // 優先使用系統提供的等待函式，確保 Firebase 資料庫已就緒
-                if (typeof waitForFirebaseDb === 'function') {
-                    try {
-                        await waitForFirebaseDb();
-                    } catch (e) {
-                        // 如果等待失敗則忽略，後續將自行檢查 firebase 物件
-                    }
-                } else {
-                    // 如果沒有 waitForFirebaseDb，則簡單輪詢直到 firebase.rtdb 可用
-                    for (let i = 0; i < 50 && (!window.firebase || !window.firebase.rtdb); i++) {
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-                }
-                if (!window.firebase || !window.firebase.rtdb) {
-                    console.warn('Firebase Realtime Database 尚未準備就緒，無法載入排班資料');
-                    return;
-                }
-                // 從預設路徑載入排班資料
-                const shiftsRef = window.firebase.ref(window.firebase.rtdb, 'scheduleShifts');
-                const snapshot = await window.firebase.get(shiftsRef);
-                const data = snapshot && snapshot.exists() ? snapshot.val() : null;
-                // 清空現有資料，保持陣列引用不變
-                shifts.splice(0, shifts.length);
-                if (data) {
-                    Object.keys(data).forEach(key => {
-                        const shiftObj = data[key] || {};
-                        // 將鍵轉為數字 ID，並合併資料
-                        shifts.push({ id: isNaN(Number(key)) ? key : Number(key), ...shiftObj });
-                    });
-                }
-            } catch (err) {
-                console.error('載入排班資料失敗:', err);
-            }
-        }
-
-        /**
-         * 將當前 shifts 陣列寫入 Firebase Realtime Database。
-         * 每當新增、編輯或刪除排班後呼叫本函式，以確保資料持久化。
-         */
-        async function saveShiftsToDb() {
-            try {
-                if (typeof waitForFirebaseDb === 'function') {
-                    try {
-                        await waitForFirebaseDb();
-                    } catch (e) {
-                        // 忽略等待失敗
-                    }
-                } else {
-                    for (let i = 0; i < 50 && (!window.firebase || !window.firebase.rtdb); i++) {
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-                }
-                if (!window.firebase || !window.firebase.rtdb) {
-                    console.warn('Firebase Realtime Database 尚未準備就緒，無法保存排班資料');
-                    return;
-                }
-                // 將 shifts 陣列轉換為物件，以便儲存至 Realtime Database
-                const dataObj = {};
-                shifts.forEach(shift => {
-                    // 使用 shift.id 作為鍵，避免覆蓋不同 ID 的資料
-                    const { id, ...rest } = shift;
-                    // 將所有屬性（除了 id）寫入資料庫
-                    dataObj[id] = rest;
-                });
-                const shiftsRef = window.firebase.ref(window.firebase.rtdb, 'scheduleShifts');
-                await window.firebase.set(shiftsRef, dataObj);
-            } catch (err) {
-                console.error('保存排班資料失敗:', err);
-            }
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
         
         // 初始化一些示範排班資料
@@ -252,26 +187,20 @@
 
         // 初始化
         document.addEventListener('DOMContentLoaded', async function() {
-            // 更新當前日期
+            // 不再載入示範排班資料，直接更新日期和渲染空行事曆
             updateCurrentDate();
-            // 設定事件監聽器
+            renderCalendar();
             setupEventListeners();
+
             // 載入診所實際人員資料
             await loadClinicStaff();
-            // 讀取已存在的排班資料，不使用即時監聽
-            await loadShiftsFromDb();
-            // 渲染行事曆與人員面板
-            renderCalendar();
+
+            // 依照載入後的人員重新渲染人員卡片與下拉選單
             renderStaffPanel();
             updateStaffSelects();
-            // 更新統計資訊
+
+            // 更新統計顯示
             updateStats();
-            // 標記排班系統已初始化，避免重複初始化
-            try {
-                window.scheduleInitialized = true;
-            } catch (_e) {
-                // 忽略
-            }
         });
 
         // 設定事件監聽器
@@ -402,7 +331,8 @@
                 
                 const cell = document.createElement('div');
                 cell.className = 'calendar-cell';
-                cell.dataset.date = cellDate.toISOString().split('T')[0];
+                // 使用本地日期格式避免時區誤差
+                cell.dataset.date = formatDate(cellDate);
                 
                 if (cellDate.getMonth() !== currentDate.getMonth()) {
                     cell.classList.add('other-month');
@@ -447,7 +377,7 @@
             element.dataset.shiftId = shift.id;
             
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
-            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌';
+            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌'; // 保留計算但不顯示
             
             // 使用單一函式處理按鈕點擊以便 inline 事件僅包含函式呼叫。
             // 直接在 onclick 中調用多個語句（例如 event.stopPropagation(); editShift(...)) 會導致
@@ -456,7 +386,8 @@
             // 停止事件冒泡和觸發實際的編輯或刪除邏輯。
             element.innerHTML = `
                 <div class="shift-header">
-                    <div class="shift-name">${staffMember.name}</div>
+                    <!-- 顯示人員姓名與職位，例如「張XX醫師」 -->
+                    <div class="shift-name">${staffMember.name}${staffMember.level || ''}</div>
                     <div class="shift-actions">
                         <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
                         <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="刪除">🗑️</button>
@@ -464,8 +395,8 @@
                 </div>
                 <div class="shift-details">
                     ${shift.startTime}-${shift.endTime} (${duration}h)<br>
-                    ${statusIcon} ${shift.notes || '一般排班'}<br>
-                    <small>${staffMember.department} - ${staffMember.level}</small>
+                    <!-- 僅顯示排班備註，不再顯示狀態圖示與部門 -->
+                    ${shift.notes || '一般排班'}
                 </div>
             `;
 
@@ -527,7 +458,7 @@
                 }
             });
 
-            cell.addEventListener('drop', async function(e) {
+            cell.addEventListener('drop', function(e) {
                 e.preventDefault();
                 this.classList.remove('drop-zone');
                 
@@ -542,17 +473,11 @@
                 } else if (draggedShift) {
                     // 排班拖拽 - 移動排班
                     const newDate = this.dataset.date;
+                    
                     // 更新排班日期
                     draggedShift.date = newDate;
-                    // 儲存更新後的排班資料
-                    try {
-                        await saveShiftsToDb();
-                    } catch (_err) {
-                        /* 保存錯誤已在函式中記錄 */
-                    }
-                    // 重新渲染日曆並更新統計
+                    
                     renderCalendar();
-                    updateStats();
                     showNotification('排班已成功移動！');
                 }
             });
@@ -567,7 +492,7 @@
         }
 
         // 快速新增排班（從拖拽）
-        async function quickAddShiftFromDrag(staffMember, date, hour) {
+        function quickAddShiftFromDrag(staffMember, date, hour) {
             // 月視圖 - 預設早班
             const startTime = '08:00';
             const endTime = '16:00';
@@ -598,12 +523,6 @@
             };
             
             shifts.push(newShift);
-            // 儲存排班至資料庫（非阻塞，如出錯則在 console 顯示）
-            try {
-                await saveShiftsToDb();
-            } catch (_err) {
-                /* 忽略保存錯誤，已在 saveShiftsToDb 中記錄 */
-            }
             renderCalendar();
             renderStaffPanel(); // 更新人員狀態
             updateStats();
@@ -619,7 +538,7 @@
         }
 
         function getShiftsForDate(date) {
-            const dateStr = date.toISOString().split('T')[0];
+            const dateStr = formatDate(date);
             return shifts.filter(shift => shift.date === dateStr);
         }
 
@@ -638,8 +557,9 @@
                 
 
                 
+                // 顯示人員姓名與職位，例如「張XX醫師」
                 card.innerHTML = `
-                    <div class="staff-name">${member.name}</div>
+                    <div class="staff-name">${member.name}${member.level || ''}</div>
                     <div class="drag-hint">🖱️</div>
                 `;
 
@@ -699,7 +619,7 @@
 
         // 獲取今日人員排班
         function getTodayShiftsForStaff(staffId) {
-            const today = new Date().toISOString().split('T')[0];
+            const today = formatDate(new Date());
             return shifts.filter(shift => shift.staffId === staffId && shift.date === today);
         }
 
@@ -750,7 +670,8 @@
             if (date) {
                 document.getElementById('shiftDate').value = date;
             } else {
-                document.getElementById('shiftDate').value = currentDate.toISOString().split('T')[0];
+                // 使用本地日期格式
+                document.getElementById('shiftDate').value = formatDate(currentDate);
             }
             
             if (staffId) {
@@ -768,8 +689,8 @@
             document.getElementById('shiftModal').classList.remove('show');
         }
 
-        // 新增或編輯排班
-        async function addShift() {
+        // 新增排班
+        function addShift() {
             const form = document.getElementById('shiftForm');
             const modal = document.getElementById('shiftModal');
             const editId = modal.dataset.editId;
@@ -813,13 +734,6 @@
                 };
                 shifts.push(newShift);
                 showNotification('排班新增成功！');
-            }
-
-            // 儲存排班至 Realtime Database
-            try {
-                await saveShiftsToDb();
-            } catch (_err) {
-                /* 錯誤已在 saveShiftsToDb 中處理 */
             }
             
             // 重置表單並關閉視窗
@@ -991,15 +905,9 @@
         }
 
         // 清空所有排班
-        async function clearAllShifts() {
+        function clearAllShifts() {
             if (confirm('確定要清空所有排班嗎？此操作無法復原。')) {
                 shifts = [];
-                // 儲存變更
-                try {
-                    await saveShiftsToDb();
-                } catch (_err) {
-                    /* 錯誤已在函式中處理 */
-                }
                 renderCalendar();
                 updateStats();
                 showNotification('所有排班已清空！');
@@ -1026,7 +934,7 @@
         }
 
         // 刪除排班
-        async function deleteShift(shiftId) {
+        function deleteShift(shiftId) {
 
             // 事件傳播在 handleDeleteShift 中處理，此函式僅執行刪除邏輯
             
@@ -1049,12 +957,6 @@
                 const shiftIndex = shifts.findIndex(s => s.id == shiftId);
                 if (shiftIndex !== -1) {
                     shifts.splice(shiftIndex, 1);
-                    // 儲存刪除後的排班
-                    try {
-                        await saveShiftsToDb();
-                    } catch (_err) {
-                        /* 保存錯誤已在函式中處理 */
-                    }
                     renderCalendar();
                     updateStats();
                     showNotification('排班已刪除！');
@@ -1237,7 +1139,7 @@
         }
 
         // 建立固定排班
-        async function createFixedSchedule() {
+        function createFixedSchedule() {
             const staffId = parseInt(document.getElementById('fixedStaffSelect').value);
             const shiftType = document.getElementById('fixedShiftType').value;
             const scheduleRange = document.getElementById('scheduleRange').value;
@@ -1248,6 +1150,8 @@
             const selectedDays = [];
             for (let i = 0; i < 7; i++) {
                 if (document.getElementById(`day${i}`).checked) {
+                  if (window.scheduleInitialized) return;
+                  window.scheduleInitialized = true;
                     selectedDays.push(i);
                 }
             }
@@ -1315,7 +1219,7 @@
                 const dayOfWeek = date.getDay();
                 
                 if (selectedDays.includes(dayOfWeek)) {
-                    const dateStr = date.toISOString().split('T')[0];
+                    const dateStr = formatDate(date);
                     
                     // 檢查是否已有排班
                     const existingShiftIndex = shifts.findIndex(s =>
@@ -1353,12 +1257,6 @@
                 }
             }
             
-            // 儲存排班變更
-            try {
-                await saveShiftsToDb();
-            } catch (_err) {
-                /* 錯誤已在函式中處理 */
-            }
             // 更新顯示
             renderCalendar();
             updateStats();
@@ -1470,33 +1368,19 @@
 
 // Initialize on DOMContentLoaded
 if (typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', async function() {
-    // 僅在排班管理元素存在時執行初始化
+  document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('scheduleManagement')) {
       if (window.scheduleInitialized) return;
       window.scheduleInitialized = true;
       try {
-        // 更新當前日期顯示
+        // Some functions may not exist if script is not included
+        // 不再載入示範排班資料，將留待實際數據載入
         if (typeof updateCurrentDate === 'function') updateCurrentDate();
-        // 設定事件監聽器
-        if (typeof setupEventListeners === 'function') setupEventListeners();
-        // 載入診所人員
-        if (typeof loadClinicStaff === 'function') {
-          await loadClinicStaff();
-        }
-        // 從 Realtime Database 載入排班資料
-        if (typeof loadShiftsFromDb === 'function') {
-          await loadShiftsFromDb();
-        }
-        // 渲染行事曆與人員面板
         if (typeof renderCalendar === 'function') renderCalendar();
         if (typeof renderStaffPanel === 'function') renderStaffPanel();
-        if (typeof updateStaffSelects === 'function') updateStaffSelects();
-        // 更新統計資訊
+        if (typeof setupEventListeners === 'function') setupEventListeners();
         if (typeof updateStats === 'function') updateStats();
-      } catch (e) {
-        console.error('Schedule init error', e);
-      }
+      } catch (e) { console.error('Schedule init error', e); }
     }
   });
 }
