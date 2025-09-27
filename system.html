@@ -2178,450 +2178,450 @@
             </div>
         </div>
 
-        <!-- 排班管理區（由 cander.html 移植） -->
-        <div id="scheduleManagement" class="hidden">
-            <style id="scheduleStyles">
-            /* 排班管理樣式範圍限制在 scheduleManagement 之內，避免污染全局 */
-            #scheduleManagement {
-                box-sizing: border-box;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                margin: 0;
-                padding: 0;
-                min-height: 100vh;
-            }
-            #scheduleManagement .container {
-                max-width: 1400px;
-                margin: 0 auto;
-                padding: 20px;
-            }
-            #scheduleManagement .header {
-                background: white;
-                border-radius: 15px;
-                padding: 25px;
-                margin-bottom: 20px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            }
-            #scheduleManagement .header h1 {
-                margin: 0 0 20px 0;
-                color: #2d3748;
-                font-size: 28px;
-                font-weight: 700;
-            }
-            #scheduleManagement .controls {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                flex-wrap: wrap;
-                gap: 15px;
-            }
-            #scheduleManagement .nav-controls {
-                display: flex;
-                align-items: center;
-                gap: 15px;
-            }
-            #scheduleManagement .nav-btn {
-                background: #4299e1;
-                color: white;
-                border: none;
-                padding: 10px 15px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: 600;
-                transition: all 0.3s ease;
-            }
-            #scheduleManagement .nav-btn:hover {
-                background: #3182ce;
-                transform: translateY(-2px);
-            }
-            #scheduleManagement .current-date {
-                font-size: 20px;
-                font-weight: 700;
-                color: #2d3748;
-                margin: 0 20px;
-            }
-            #scheduleManagement .view-controls {
-                display: flex;
-                gap: 10px;
-            }
-            #scheduleManagement .view-btn {
-                background: #e2e8f0;
-                color: #4a5568;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: 600;
-                transition: all 0.3s ease;
-            }
-            #scheduleManagement .view-btn.active {
-                background: #48bb78;
-                color: white;
-            }
-            #scheduleManagement .view-btn:hover {
-                transform: translateY(-2px);
-            }
-            #scheduleManagement .sync-controls {
-                display: flex;
-                gap: 10px;
-            }
-            #scheduleManagement .sync-btn {
-                background: #805ad5;
-                color: white;
-                border: none;
-                padding: 10px 15px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: 600;
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                gap: 5px;
-            }
-            #scheduleManagement .sync-btn:hover {
-                background: #6b46c1;
-                transform: translateY(-2px);
-            }
-            #scheduleManagement .calendar-container {
-                background: white;
-                border-radius: 15px;
-                padding: 25px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-                min-height: 600px;
-            }
-            #scheduleManagement .calendar-grid {
-                display: grid;
-                gap: 1px;
-                background: #e2e8f0;
-                border-radius: 10px;
-                overflow: hidden;
-            }
-            #scheduleManagement .month-view {
-                grid-template-columns: repeat(7, 1fr);
-                grid-template-rows: auto repeat(6, 1fr);
-            }
-            #scheduleManagement .week-view {
-                grid-template-columns: 100px repeat(7, 1fr);
-                grid-template-rows: auto repeat(24, 40px);
-            }
-            #scheduleManagement .day-view {
-                grid-template-columns: 100px 1fr;
-                grid-template-rows: auto repeat(24, 50px);
-            }
-            #scheduleManagement .calendar-header {
-                background: #4a5568;
-                color: white;
-                padding: 15px;
-                text-align: center;
-                font-weight: 700;
-                font-size: 14px;
-            }
-            #scheduleManagement .time-slot {
-                background: #f7fafc;
-                padding: 8px;
-                font-size: 12px;
-                color: #718096;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-right: 1px solid #e2e8f0;
-            }
-            #scheduleManagement .calendar-cell {
-                background: white;
-                padding: 8px;
-                min-height: 80px;
-                position: relative;
-                cursor: pointer;
-                transition: all 0.2s ease;
-            }
-            #scheduleManagement .calendar-cell:hover {
-                background: #f0fff4;
-            }
-            #scheduleManagement .calendar-cell.other-month {
-                background: #f8f9fa;
-                color: #adb5bd;
-            }
-            #scheduleManagement .calendar-cell.today {
-                background: #e6fffa;
-                border: 2px solid #38b2ac;
-            }
-            #scheduleManagement .day-number {
-                font-weight: 700;
-                color: #2d3748;
-                margin-bottom: 5px;
-            }
-            #scheduleManagement .shift-item {
-                background: linear-gradient(135deg, #4299e1, #3182ce);
-                color: white;
-                padding: 4px 8px;
-                border-radius: 6px;
-                font-size: 11px;
-                margin: 2px 0;
-                cursor: move;
-                transition: all 0.3s ease;
-                position: relative;
-                overflow: hidden;
-            }
-            #scheduleManagement .shift-item:hover {
-                transform: scale(1.05);
-                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            }
-            #scheduleManagement .shift-item.doctor {
-                background: linear-gradient(135deg, #48bb78, #38a169);
-            }
-            #scheduleManagement .shift-item.nurse {
-                background: linear-gradient(135deg, #ed8936, #dd6b20);
-            }
-            #scheduleManagement .shift-item.dragging {
-                opacity: 0.7;
-                transform: rotate(5deg);
-            }
-            #scheduleManagement .drop-zone {
-                border: 2px dashed #4299e1;
-                background: rgba(66, 153, 225, 0.1);
-            }
-            #scheduleManagement .staff-panel {
-                background: white;
-                border-radius: 15px;
-                padding: 20px;
-                margin-top: 20px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            }
-            #scheduleManagement .staff-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 15px;
-                margin-top: 15px;
-            }
-            #scheduleManagement .staff-card {
-                background: #f7fafc;
-                border-radius: 10px;
-                padding: 15px;
-                border-left: 4px solid #4299e1;
-            }
-            #scheduleManagement .staff-card.doctor {
-                border-left-color: #48bb78;
-            }
-            #scheduleManagement .staff-card.nurse {
-                border-left-color: #ed8936;
-            }
-            #scheduleManagement .staff-name {
-                font-weight: 700;
-                color: #2d3748;
-                margin-bottom: 5px;
-            }
-            #scheduleManagement .staff-role {
-                font-size: 12px;
-                color: #718096;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-            #scheduleManagement .add-shift-btn {
-                background: #48bb78;
-                color: white;
-                border: none;
-                padding: 8px 12px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 11px;
-                margin-top: 8px;
-                transition: all 0.3s ease;
-            }
-            #scheduleManagement .add-shift-btn:hover {
-                background: #38a169;
-                transform: translateY(-1px);
-            }
-            #scheduleManagement .modal {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.5);
-                z-index: 1000;
-                align-items: center;
-                justify-content: center;
-            }
-            #scheduleManagement .modal.show {
-                display: flex;
-            }
-            #scheduleManagement .modal-content {
-                background: white;
-                border-radius: 15px;
-                padding: 30px;
-                max-width: 500px;
-                width: 90%;
-                max-height: 80vh;
-                overflow-y: auto;
-            }
-            #scheduleManagement .form-group {
-                margin-bottom: 20px;
-            }
-            #scheduleManagement .form-label {
-                display: block;
-                margin-bottom: 8px;
-                font-weight: 600;
-                color: #2d3748;
-            }
-            #scheduleManagement .form-input,
-            #scheduleManagement .form-select {
-                width: 100%;
-                padding: 12px;
-                border: 2px solid #e2e8f0;
-                border-radius: 8px;
-                font-size: 14px;
-                transition: border-color 0.3s ease;
-            }
-            #scheduleManagement .form-input:focus,
-            #scheduleManagement .form-select:focus {
-                outline: none;
-                border-color: #4299e1;
-            }
-            #scheduleManagement .form-buttons {
-                display: flex;
-                gap: 10px;
-                justify-content: flex-end;
-                margin-top: 25px;
-            }
-            #scheduleManagement .btn {
-                padding: 12px 24px;
-                border: none;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: 600;
-                transition: all 0.3s ease;
-            }
-            #scheduleManagement .btn-primary {
-                background: #4299e1;
-                color: white;
-            }
-            #scheduleManagement .btn-primary:hover {
-                background: #3182ce;
-            }
-            #scheduleManagement .btn-secondary {
-                background: #e2e8f0;
-                color: #4a5568;
-            }
-            #scheduleManagement .btn-secondary:hover {
-                background: #cbd5e0;
-            }
-            #scheduleManagement .notification {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #48bb78;
-                color: white;
-                padding: 15px 20px;
-                border-radius: 10px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-                transform: translateX(400px);
-                transition: transform 0.3s ease;
-                z-index: 1001;
-            }
-            #scheduleManagement .notification.show {
-                transform: translateX(0);
-            }
-            @media (max-width: 768px) {
-                #scheduleManagement .controls {
-                    flex-direction: column;
-                    align-items: stretch;
-                }
-                #scheduleManagement .nav-controls,
-                #scheduleManagement .view-controls,
-                #scheduleManagement .sync-controls {
-                    justify-content: center;
-                }
-                #scheduleManagement .current-date {
-                    margin: 10px 0;
-                    text-align: center;
-                }
-                #scheduleManagement .calendar-grid.month-view {
-                    grid-template-columns: repeat(7, 1fr);
-                    font-size: 12px;
-                }
-                #scheduleManagement .calendar-cell {
-                    min-height: 60px;
-                    padding: 4px;
-                }
-                #scheduleManagement .shift-item {
-                    font-size: 10px;
-                    padding: 2px 4px;
-                }
-            }
-            </style>
-            <div class="container">
-                <div class="header">
-                    <h1>🏥 醫療排班行事曆系統</h1>
-                    <div class="controls">
-                        <div class="nav-controls">
-                            <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
-                            <div class="current-date" id="currentDate"></div>
-                            <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個 ▶</button>
-                        </div>
-                        <div class="view-controls">
-                            <button class="view-btn active" onclick="scheduleChangeView('month', event)" data-view="month">月視圖</button>
-                            <button class="view-btn" onclick="scheduleChangeView('week', event)" data-view="week">週視圖</button>
-                            <button class="view-btn" onclick="scheduleChangeView('day', event)" data-view="day">日視圖</button>
-                        </div>
-                        <div class="sync-controls">
-                            <button class="sync-btn" onclick="scheduleSyncToGoogle()">📅 同步 Google</button>
-                            <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="calendar-container">
-                    <div class="calendar-grid month-view" id="calendarGrid"></div>
-                </div>
-                <div class="staff-panel">
-                    <h3>👨‍⚕️👩‍⚕️ 醫護人員管理</h3>
-                    <div class="staff-grid" id="staffGrid"></div>
-                </div>
-            </div>
-            <!-- 新增排班模態框 -->
-            <div class="modal" id="shiftModal">
-                <div class="modal-content">
-                    <h3>新增排班</h3>
-                    <form id="shiftForm">
-                        <div class="form-group">
-                            <label class="form-label">人員</label>
-                            <select class="form-select" id="staffSelect" required></select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">日期</label>
-                            <input type="date" class="form-input" id="shiftDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">開始時間</label>
-                            <input type="time" class="form-input" id="startTime" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">結束時間</label>
-                            <input type="time" class="form-input" id="endTime" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">班別</label>
-                            <select class="form-select" id="shiftType" required>
-                                <option value="morning">早班 (08:00-16:00)</option>
-                                <option value="afternoon">中班 (16:00-24:00)</option>
-                                <option value="night">夜班 (00:00-08:00)</option>
-                                <option value="custom">自訂時間</option>
-                            </select>
-                        </div>
-                        <div class="form-buttons">
-                            <button type="button" class="btn btn-secondary" onclick="scheduleCloseModal()">取消</button>
-                            <button type="submit" class="btn btn-primary">新增排班</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            <!-- 通知 -->
-            <div class="notification" id="notification"></div>
-        </div>
-
         <!-- 主系統頁面不再單獨呈現版權聲明，由全局頁腳統一呈現 -->
     </div>
-    <!-- 診所資料修改彈窗 -->
+    
+        <!-- 排班管理區（由 cander.html 移植） -->
+<div id="scheduleManagement" class="hidden">
+        <style id="scheduleStyles">
+        /* 排班管理樣式範圍限制在 scheduleManagement 之內，避免污染全局 */
+        #scheduleManagement {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        #scheduleManagement .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #scheduleManagement .header {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        #scheduleManagement .header h1 {
+            margin: 0 0 20px 0;
+            color: #2d3748;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        #scheduleManagement .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        #scheduleManagement .nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        #scheduleManagement .nav-btn {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        #scheduleManagement .nav-btn:hover {
+            background: #3182ce;
+            transform: translateY(-2px);
+        }
+        #scheduleManagement .current-date {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2d3748;
+            margin: 0 20px;
+        }
+        #scheduleManagement .view-controls {
+            display: flex;
+            gap: 10px;
+        }
+        #scheduleManagement .view-btn {
+            background: #e2e8f0;
+            color: #4a5568;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        #scheduleManagement .view-btn.active {
+            background: #48bb78;
+            color: white;
+        }
+        #scheduleManagement .view-btn:hover {
+            transform: translateY(-2px);
+        }
+        #scheduleManagement .sync-controls {
+            display: flex;
+            gap: 10px;
+        }
+        #scheduleManagement .sync-btn {
+            background: #805ad5;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #scheduleManagement .sync-btn:hover {
+            background: #6b46c1;
+            transform: translateY(-2px);
+        }
+        #scheduleManagement .calendar-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            min-height: 600px;
+        }
+        #scheduleManagement .calendar-grid {
+            display: grid;
+            gap: 1px;
+            background: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #scheduleManagement .month-view {
+            grid-template-columns: repeat(7, 1fr);
+            grid-template-rows: auto repeat(6, 1fr);
+        }
+        #scheduleManagement .week-view {
+            grid-template-columns: 100px repeat(7, 1fr);
+            grid-template-rows: auto repeat(24, 40px);
+        }
+        #scheduleManagement .day-view {
+            grid-template-columns: 100px 1fr;
+            grid-template-rows: auto repeat(24, 50px);
+        }
+        #scheduleManagement .calendar-header {
+            background: #4a5568;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        #scheduleManagement .time-slot {
+            background: #f7fafc;
+            padding: 8px;
+            font-size: 12px;
+            color: #718096;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid #e2e8f0;
+        }
+        #scheduleManagement .calendar-cell {
+            background: white;
+            padding: 8px;
+            min-height: 80px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        #scheduleManagement .calendar-cell:hover {
+            background: #f0fff4;
+        }
+        #scheduleManagement .calendar-cell.other-month {
+            background: #f8f9fa;
+            color: #adb5bd;
+        }
+        #scheduleManagement .calendar-cell.today {
+            background: #e6fffa;
+            border: 2px solid #38b2ac;
+        }
+        #scheduleManagement .day-number {
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+        #scheduleManagement .shift-item {
+            background: linear-gradient(135deg, #4299e1, #3182ce);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            margin: 2px 0;
+            cursor: move;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        #scheduleManagement .shift-item:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        #scheduleManagement .shift-item.doctor {
+            background: linear-gradient(135deg, #48bb78, #38a169);
+        }
+        #scheduleManagement .shift-item.nurse {
+            background: linear-gradient(135deg, #ed8936, #dd6b20);
+        }
+        #scheduleManagement .shift-item.dragging {
+            opacity: 0.7;
+            transform: rotate(5deg);
+        }
+        #scheduleManagement .drop-zone {
+            border: 2px dashed #4299e1;
+            background: rgba(66, 153, 225, 0.1);
+        }
+        #scheduleManagement .staff-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        #scheduleManagement .staff-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        #scheduleManagement .staff-card {
+            background: #f7fafc;
+            border-radius: 10px;
+            padding: 15px;
+            border-left: 4px solid #4299e1;
+        }
+        #scheduleManagement .staff-card.doctor {
+            border-left-color: #48bb78;
+        }
+        #scheduleManagement .staff-card.nurse {
+            border-left-color: #ed8936;
+        }
+        #scheduleManagement .staff-name {
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+        #scheduleManagement .staff-role {
+            font-size: 12px;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        #scheduleManagement .add-shift-btn {
+            background: #48bb78;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-top: 8px;
+            transition: all 0.3s ease;
+        }
+        #scheduleManagement .add-shift-btn:hover {
+            background: #38a169;
+            transform: translateY(-1px);
+        }
+        #scheduleManagement .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        #scheduleManagement .modal.show {
+            display: flex;
+        }
+        #scheduleManagement .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        #scheduleManagement .form-group {
+            margin-bottom: 20px;
+        }
+        #scheduleManagement .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        #scheduleManagement .form-input,
+        #scheduleManagement .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        #scheduleManagement .form-input:focus,
+        #scheduleManagement .form-select:focus {
+            outline: none;
+            border-color: #4299e1;
+        }
+        #scheduleManagement .form-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 25px;
+        }
+        #scheduleManagement .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        #scheduleManagement .btn-primary {
+            background: #4299e1;
+            color: white;
+        }
+        #scheduleManagement .btn-primary:hover {
+            background: #3182ce;
+        }
+        #scheduleManagement .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+        #scheduleManagement .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+        #scheduleManagement .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #48bb78;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 1001;
+        }
+        #scheduleManagement .notification.show {
+            transform: translateX(0);
+        }
+        @media (max-width: 768px) {
+            #scheduleManagement .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            #scheduleManagement .nav-controls,
+            #scheduleManagement .view-controls,
+            #scheduleManagement .sync-controls {
+                justify-content: center;
+            }
+            #scheduleManagement .current-date {
+                margin: 10px 0;
+                text-align: center;
+            }
+            #scheduleManagement .calendar-grid.month-view {
+                grid-template-columns: repeat(7, 1fr);
+                font-size: 12px;
+            }
+            #scheduleManagement .calendar-cell {
+                min-height: 60px;
+                padding: 4px;
+            }
+            #scheduleManagement .shift-item {
+                font-size: 10px;
+                padding: 2px 4px;
+            }
+        }
+        </style>
+        <div class="container">
+            <div class="header">
+                <h1>🏥 醫療排班行事曆系統</h1>
+                <div class="controls">
+                    <div class="nav-controls">
+                        <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
+                        <div class="current-date" id="currentDate"></div>
+                        <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個 ▶</button>
+                    </div>
+                    <div class="view-controls">
+                        <button class="view-btn active" onclick="scheduleChangeView('month', event)" data-view="month">月視圖</button>
+                        <button class="view-btn" onclick="scheduleChangeView('week', event)" data-view="week">週視圖</button>
+                        <button class="view-btn" onclick="scheduleChangeView('day', event)" data-view="day">日視圖</button>
+                    </div>
+                    <div class="sync-controls">
+                        <button class="sync-btn" onclick="scheduleSyncToGoogle()">📅 同步 Google</button>
+                        <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
+                    </div>
+                </div>
+            </div>
+            <div class="calendar-container">
+                <div class="calendar-grid month-view" id="calendarGrid"></div>
+            </div>
+            <div class="staff-panel">
+                <h3>👨‍⚕️👩‍⚕️ 醫護人員管理</h3>
+                <div class="staff-grid" id="staffGrid"></div>
+            </div>
+        </div>
+        <!-- 新增排班模態框 -->
+        <div class="modal" id="shiftModal">
+            <div class="modal-content">
+                <h3>新增排班</h3>
+                <form id="shiftForm">
+                    <div class="form-group">
+                        <label class="form-label">人員</label>
+                        <select class="form-select" id="staffSelect" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">日期</label>
+                        <input type="date" class="form-input" id="shiftDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">開始時間</label>
+                        <input type="time" class="form-input" id="startTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">結束時間</label>
+                        <input type="time" class="form-input" id="endTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">班別</label>
+                        <select class="form-select" id="shiftType" required>
+                            <option value="morning">早班 (08:00-16:00)</option>
+                            <option value="afternoon">中班 (16:00-24:00)</option>
+                            <option value="night">夜班 (00:00-08:00)</option>
+                            <option value="custom">自訂時間</option>
+                        </select>
+                    </div>
+                    <div class="form-buttons">
+                        <button type="button" class="btn btn-secondary" onclick="scheduleCloseModal()">取消</button>
+                        <button type="submit" class="btn btn-primary">新增排班</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 通知 -->
+        <div class="notification" id="notification"></div>
+    </div>
+<!-- 診所資料修改彈窗 -->
     <div id="clinicSettingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
