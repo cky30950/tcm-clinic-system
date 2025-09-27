@@ -2180,17 +2180,18 @@
 
         <!-- 主系統頁面不再單獨呈現版權聲明，由全局頁腳統一呈現 -->
     </div>
+    <!-- 診所資料修改彈窗 -->
     
-        <!-- 排班管理區（由 cander_NEW.html 移植，新版本） -->
-        <div id="scheduleManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
-            <style>
+<!-- 排班管理區（由 cander_NEW.html 移植，新版本） -->
+<div id="scheduleManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
+    <style>
 
 #scheduleManagement {
             box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 0;
-            background: #f3f4f6;
+            background: transparent;
             min-height: 100vh;
         }
 
@@ -2201,11 +2202,12 @@
         }
 
 #scheduleManagement .header {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            /* Remove separate card styling for header to blend with the surrounding container */
+            background: transparent;
+            border-radius: 0;
+            padding: 0 0 20px 0;
+            margin-bottom: 0;
+            box-shadow: none;
         }
 
 #scheduleManagement .header h1 {
@@ -2218,11 +2220,13 @@
 
 
 #scheduleManagement .filter-panel {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            /* Remove separate card styling for filters to unify with header */
+            background: transparent;
+            border-radius: 0;
+            padding: 0;
+            margin: 0 0 20px 0;
+            box-shadow: none;
+            padding-top: 15px;
         }
 
 #scheduleManagement .filter-grid {
@@ -2385,10 +2389,11 @@
         }
 
 #scheduleManagement .calendar-container {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            /* Remove separate card styling so the calendar blends into the module */
+            background: transparent;
+            border-radius: 0;
+            padding: 0;
+            box-shadow: none;
             min-height: 600px;
         }
 
@@ -2873,7 +2878,8 @@
     
 
 #scheduleManagement {
-  background: #f3f4f6;
+  /* 讓外層容器背景由其 Tailwind 類控制（白底），故不覆寫背景色 */
+  background: white;
   padding: 20px;
 }
 #scheduleManagement .filter-panel {
@@ -2889,7 +2895,7 @@
   flex-wrap: wrap;
 }
 
-            </style>
+    </style>
 <div class="container">
         <div class="header">
             <h1>🏥 進階醫療排班管理系統</h1>
@@ -3114,9 +3120,8 @@
 
     <!-- 通知 -->
     <div class="notification" id="notification"></div>
-        </div>
-<!-- 診所資料修改彈窗 -->
-    <div id="clinicSettingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+</div>
+<div id="clinicSettingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                 <h3 class="text-xl font-bold text-gray-800">診所資料修改</h3>
