@@ -2270,7 +2270,16 @@
             max-width: none;
             width: 100%;
             margin: 0;
-            padding: 0;
+            /*
+             * Provide horizontal padding inside the internal container so that
+             * the schedule management content does not appear too close to
+             * the card’s edges. This mirrors the side padding provided
+             * implicitly by the content wrapper (px-4) in other modules like
+             * the billing management card. Vertical padding remains 0 because
+             * the outer card’s p-6 already supplies top and bottom space.
+             */
+            padding-left: 1rem; /* 16px */
+            padding-right: 1rem;
         }
 
 #scheduleManagement .header {
