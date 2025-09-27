@@ -228,10 +228,11 @@ const ROLE_PERMISSIONS = {
   // 將模板庫移至穴位庫之後，使側邊選單順序為：患者管理 -> 診症系統 -> 中藥庫 -> 穴位庫 -> 模板庫 -> 收費管理 -> 用戶管理 -> 財務報表 -> 系統管理 -> 帳號安全
   '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'templateLibrary', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
   // 醫師不需要系統管理權限，將模板庫移至穴位庫之後
+  // 加入 scheduleManagement 功能，讓診所管理者、醫師與護理師可以存取醫療排班管理
   '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'templateLibrary', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
-  // 將模板庫移至穴位庫之後
+  // 將模板庫移至穴位庫之後，同時新增排班管理
   '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'templateLibrary', 'accountSecurity'],
-  // 用戶無中藥庫或穴位庫權限，維持模板庫在最後
+  // 用戶無中藥庫或穴位庫權限，維持模板庫在最後；一般用戶不允許查看排班管理
   '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary', 'accountSecurity']
 };
 
@@ -2722,7 +2723,7 @@ async function logout() {
                 // 新增：穴位庫管理
                 acupointLibrary: { title: '穴位庫', icon: '📌', description: '查看穴位資料' },
                 // 新增：醫療排班管理
-                scheduleManagement: { title: '醫療排班管理', icon: '📅', description: '排班與人員管理' },
+                scheduleManagement: { title: '醫療排班管理', icon: '📅', description: '安排醫療人員排班' },
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
                 // 將診所用戶管理的圖示更新為單人符號，以符合交換後的配置
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
@@ -2815,6 +2816,15 @@ async function logout() {
                 loadHerbLibrary();
             } else if (sectionId === 'acupointLibrary') {
                 loadAcupointLibrary();
+            } else if (sectionId === 'scheduleManagement') {
+                // 初始化排班管理系統。僅在需要時呼叫，避免重複初始化
+                try {
+                    if (typeof initScheduleManagement === 'function') {
+                        initScheduleManagement();
+                    }
+                } catch (e) {
+                    console.error('初始化排班管理系統時出錯：', e);
+                }
             } else if (sectionId === 'billingManagement') {
                 loadBillingManagement();
             } else if (sectionId === 'financialReports') {
