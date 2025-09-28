@@ -1640,13 +1640,80 @@
             }
         }
 
+        // 列印當前月份排班表
+        // 使用 currentDate 決定月份，並考慮目前篩選條件。
+        function printCurrentMonthSchedule() {
+            try {
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                const lastDay = new Date(year, month + 1, 0).getDate();
+                const weekdays = ['日','一','二','三','四','五','六'];
+                let html = '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>排班表</title>';
+                html += '<style>';
+                html += 'body{font-family:\'Noto Sans TC\',sans-serif;padding:20px;}';
+                html += 'h2{text-align:center;margin:0 0 20px;font-size:20px;}';
+                html += 'table{width:100%;border-collapse:collapse;margin-top:10px;}';
+                html += 'th,td{border:1px solid #ccc;padding:6px;vertical-align:top;font-size:14px;}';
+                html += 'th{background:#f3f4f6;font-weight:600;}';
+                html += 'ul{margin:0;padding-left:20px;}';
+                html += 'li{margin-bottom:4px;line-height:1.4;}';
+                html += 'em{color:#6b7280;}';
+                html += '</style></head><body>';
+                const title = year + ' 年 ' + (month + 1) + ' 月排班表';
+                html += '<h2>' + title + '</h2>';
+                html += '<table><thead><tr><th style="width:120px;">日期</th><th>排班</th></tr></thead><tbody>';
+                for (let day = 1; day <= lastDay; day++) {
+                    const dateObj = new Date(year, month, day);
+                    const dateStr = formatDate(dateObj);
+                    const dayShifts = shifts.filter(s => s.date === dateStr && passesFilter(s));
+                    let cellContent;
+                    if (dayShifts.length === 0) {
+                        cellContent = '<em>無排班</em>';
+                    } else {
+                        dayShifts.sort((a,b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
+                        cellContent = '<ul>';
+                        dayShifts.forEach(shift => {
+                            const staffMember = findStaffById(shift.staffId);
+                            const duration = calculateShiftDuration(shift.startTime, shift.endTime);
+                            const typeName = getShiftTypeName(shift.type);
+                            let info = staffMember.name;
+                            if (staffMember.level) info += ' ' + staffMember.level;
+                            info += ' ' + shift.startTime + '-' + shift.endTime + ' (' + duration + 'h)';
+                            info += ' - ' + typeName;
+                            if (shift.notes) info += ' - ' + shift.notes;
+                            cellContent += '<li>' + info + '</li>';
+                        });
+                        cellContent += '</ul>';
+                    }
+                    const weekday = weekdays[dateObj.getDay()];
+                    const displayDate = (month + 1) + '月' + day + '日 (' + weekday + ')';
+                    html += '<tr><td>' + displayDate + '</td><td>' + cellContent + '</td></tr>';
+                }
+                html += '</tbody></table></body></html>';
+                const printWin = window.open('', '_blank');
+                if (printWin) {
+                    printWin.document.open();
+                    printWin.document.write(html);
+                    printWin.document.close();
+                    printWin.focus();
+                    setTimeout(() => {
+                        try { printWin.print(); } catch(_) {} finally { printWin.close(); }
+                    }, 300);
+                } else {
+                    alert('無法開啟列印視窗，請檢查瀏覽器設定。');
+                }
+            } catch (err) {
+                console.error('printCurrentMonthSchedule error', err);
+                alert('列印排班表時發生錯誤！');
+            }
+        }
+
 // Expose functions to global schedule namespace
   window.scheduleNavigateCalendar = navigateCalendar;
   window.scheduleGoToToday = goToToday;
   window.scheduleSyncToGoogle = syncToGoogle;
   window.scheduleExportToICal = exportToICal;
-  // 將列印功能指向新的當月列印函式，並保留舊名稱供向後相容
-  // 列印功能已移除，不再暴露 schedulePrintMonthlySchedule 與 schedulePrintSchedule
+  // 列印功能：暴露 schedulePrintShiftTable 以列印當前月份的排班表
   window.scheduleApplyFilters = applyFilters;
   window.scheduleOpenFixedScheduleModal = openFixedScheduleModal;
   window.scheduleCloseFixedScheduleModal = closeFixedScheduleModal;
@@ -1666,8 +1733,7 @@
   window.scheduleShowShiftDetailsById = showShiftDetailsById;
   window.scheduleUpdateStats = updateStats;
 
-  // 將列印當月排班表函式暴露至全域。使用者可透過 schedulePrintShiftTable()
-  // 觸發列印當前月份的排班表。函式名稱帶有 ShiftTable，避免與舊版列印 API 衝突。
+  // 列印當月排班表函式
   window.schedulePrintShiftTable = printCurrentMonthSchedule;
 
   // ----------------------------------------------------------------------
