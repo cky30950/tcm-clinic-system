@@ -988,6 +988,15 @@
             if (titleEl) {
                 titleEl.textContent = '新增排班';
             }
+            // 根據目前模式調整提交按鈕文字為「新增排班」
+            try {
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.textContent = '新增排班';
+                }
+            } catch (_e) {
+                /* 若表單不存在按鈕則忽略 */
+            }
             modal.classList.add('show');
         }
 
@@ -1290,6 +1299,16 @@
             const modal = document.getElementById('shiftModal');
             modal.dataset.editId = shiftId;
             modal.querySelector('h3').textContent = '編輯排班';
+            // 根據目前模式調整提交按鈕文字為「編輯排班」
+            try {
+                const form = document.getElementById('shiftForm');
+                const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+                if (submitBtn) {
+                    submitBtn.textContent = '編輯排班';
+                }
+            } catch (_e) {
+                /* 忽略錯誤 */
+            }
             modal.classList.add('show');
         }
 
