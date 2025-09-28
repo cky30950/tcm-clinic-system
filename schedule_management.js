@@ -4,6 +4,73 @@
         let currentView = 'month';
         let draggedShift = null;
         let currentStaffFilter = 'all';
+        // 公眾假期顯示控制：'' 表示不顯示，'hk' 表示顯示香港公眾假期，'us' 表示顯示美國公眾假期
+        let selectedHolidayRegion = '';
+
+        // 定義 2025 年香港與美國公眾假期列表。若擴充其他年份，可新增相應物件。
+        const hkHolidays2025 = [
+            { date: '2025-01-01', name: '元旦' },
+            { date: '2025-01-29', name: '農曆新年初一' },
+            { date: '2025-01-30', name: '農曆新年初二' },
+            { date: '2025-01-31', name: '農曆新年初三' },
+            { date: '2025-04-04', name: '清明節' },
+            { date: '2025-04-18', name: '耶穌受難日' },
+            { date: '2025-04-19', name: '耶穌受難日翌日' },
+            { date: '2025-04-21', name: '復活節星期一' },
+            { date: '2025-05-01', name: '勞動節' },
+            { date: '2025-05-05', name: '佛誕' },
+            { date: '2025-05-31', name: '端午節' },
+            { date: '2025-07-01', name: '香港特區成立紀念日' },
+            { date: '2025-10-01', name: '國慶日' },
+            { date: '2025-10-07', name: '中秋節翌日' },
+            { date: '2025-10-29', name: '重陽節' },
+            { date: '2025-12-25', name: '聖誕節' },
+            { date: '2025-12-26', name: '聖誕節後第一個周日' }
+        ];
+
+        const usHolidays2025 = [
+            { date: '2025-01-01', name: 'New Year’s Day' },
+            { date: '2025-01-20', name: 'Martin Luther King Jr. Day' },
+            { date: '2025-01-20', name: 'Inauguration Day' },
+            { date: '2025-02-17', name: 'Washington’s Birthday' },
+            { date: '2025-05-26', name: 'Memorial Day' },
+            { date: '2025-06-19', name: 'Juneteenth National Independence Day' },
+            { date: '2025-07-04', name: 'Independence Day' },
+            { date: '2025-09-01', name: 'Labor Day' },
+            { date: '2025-10-13', name: 'Columbus Day' },
+            { date: '2025-11-11', name: 'Veterans Day' },
+            { date: '2025-11-27', name: 'Thanksgiving Day' },
+            { date: '2025-12-25', name: 'Christmas Day' }
+        ];
+
+        /**
+         * 取得特定日期的公眾假期資訊。
+         * 如果目前沒有設定顯示任何假期，回傳 null。
+         * @param {Date} date 日期物件
+         * @returns {{date:string,name:string}|null} 假期資料
+         */
+        function getHolidayForDate(date) {
+            if (!selectedHolidayRegion) return null;
+            const dateStr = formatDate(date);
+            if (selectedHolidayRegion === 'hk') {
+                return hkHolidays2025.find(h => h.date === dateStr) || null;
+            } else if (selectedHolidayRegion === 'us') {
+                return usHolidays2025.find(h => h.date === dateStr) || null;
+            }
+            return null;
+        }
+
+        /**
+         * 更改顯示的公眾假期地區，並重新渲染行事曆。
+         * @param {string} region '' 表示不顯示，'hk' 表示香港，'us' 表示美國
+         */
+        function changeHolidayRegion(region) {
+            selectedHolidayRegion = region || '';
+            // 重新渲染行事曆以套用假期變更
+            if (typeof renderCalendar === 'function') {
+                renderCalendar();
+            }
+        }
         
         // 醫護人員資料
         // 預設為空陣列，實際人員資料將透過載入診所用戶後填充。
@@ -498,6 +565,16 @@
                 dayNumber.className = 'day-number';
                 dayNumber.textContent = cellDate.getDate();
                 cell.appendChild(dayNumber);
+
+                // 如果啟用了公眾假期顯示，並且今天是假期，則加上假期樣式與標籤
+                const holidayInfo = getHolidayForDate(cellDate);
+                if (holidayInfo) {
+                    cell.classList.add('holiday');
+                    const holidayLabel = document.createElement('div');
+                    holidayLabel.className = 'holiday-label';
+                    holidayLabel.textContent = holidayInfo.name;
+                    cell.appendChild(holidayLabel);
+                }
 
                 // 添加排班
                 const dayShifts = getShiftsForDate(cellDate).filter(passesFilter);
@@ -1104,50 +1181,6 @@
 
 
 
-        // 檢查衝突
-        function checkConflicts() {
-            const conflicts = checkAllConflicts();
-            
-            if (conflicts.length === 0) {
-                showNotification('沒有發現排班衝突！');
-                return;
-            }
-
-            let message = `發現 ${conflicts.length} 個排班衝突：\n\n`;
-            conflicts.forEach((conflict, index) => {
-                const staff1 = findStaffById(conflict.shift1.staffId);
-                const staff2 = findStaffById(conflict.shift2.staffId);
-                message += `${index + 1}. ${staff1.name} 在 ${conflict.shift1.date} 有重疊排班\n`;
-            });
-
-            alert(message);
-        }
-
-        // 檢查所有衝突
-        function checkAllConflicts() {
-            // 檢查同一人員在同一天的班次是否有重疊，使用分鐘計算以支援跨日情況
-            const conflicts = [];
-            for (let i = 0; i < shifts.length; i++) {
-                for (let j = i + 1; j < shifts.length; j++) {
-                    const shift1 = shifts[i];
-                    const shift2 = shifts[j];
-                    if (shift1.staffId === shift2.staffId && shift1.date === shift2.date) {
-                        let start1 = parseTimeToMinutes(shift1.startTime);
-                        let end1 = parseTimeToMinutes(shift1.endTime);
-                        let start2 = parseTimeToMinutes(shift2.startTime);
-                        let end2 = parseTimeToMinutes(shift2.endTime);
-                        // 跨日處理：若結束分鐘不大於開始，則補加 24 小時
-                        if (end1 <= start1) end1 += 24 * 60;
-                        if (end2 <= start2) end2 += 24 * 60;
-                        // 判定是否重疊：其中一個開始在另一個結束前，且另一個開始在第一個結束前
-                        if (start1 < end2 && start2 < end1) {
-                            conflicts.push({ shift1, shift2 });
-                        }
-                    }
-                }
-            }
-            return conflicts;
-        }
 
         // 清空所有排班
         async function clearAllShifts() {
@@ -1315,6 +1348,11 @@
 
             const sortedShifts = shifts
                 .filter(passesFilter)
+                // 僅列印當前月份的排班
+                .filter(shift => {
+                    const d = new Date(shift.date);
+                    return d.getFullYear() === currentDate.getFullYear() && d.getMonth() === currentDate.getMonth();
+                })
                 .sort((a, b) => new Date(a.date) - new Date(b.date));
 
             sortedShifts.forEach(shift => {
@@ -1633,7 +1671,7 @@
   window.scheduleOpenFixedScheduleModal = openFixedScheduleModal;
   window.scheduleCloseFixedScheduleModal = closeFixedScheduleModal;
   window.scheduleCreateFixedSchedule = createFixedSchedule;
-  window.scheduleCheckConflicts = checkConflicts;
+  // 已移除檢查衝突功能：不再將 checkConflicts 暴露至全域
   window.scheduleClearAllShifts = clearAllShifts;
   window.scheduleOpenShiftModal = openShiftModal;
   window.scheduleCloseModal = closeModal;
@@ -1647,6 +1685,9 @@
   window.scheduleShowShiftDetails = showShiftDetails;
   window.scheduleShowShiftDetailsById = showShiftDetailsById;
   window.scheduleUpdateStats = updateStats;
+
+  // 公眾假期選擇函式暴露至全域，供 HTML 選單呼叫
+  window.scheduleChangeHolidayRegion = changeHolidayRegion;
 
 // Initialize on DOMContentLoaded
 if (typeof document !== 'undefined') {
