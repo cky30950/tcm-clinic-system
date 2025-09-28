@@ -14,6 +14,23 @@
         window.staff = staff;
 
         /**
+         * 檢查當前使用者是否具備管理員權限。
+         * 若 currentUserData 或 currentUser 尚未載入，預設回傳 false。
+         * 管理員定義：職位為「診所管理」或電子郵件為 admin@clinic.com。
+         * @returns {boolean} 是否為管理員
+         */
+        window.isAdminUser = function() {
+            try {
+                const user = window.currentUserData || window.currentUser || {};
+                const position = user.position || '';
+                const email = (user.email || '').toLowerCase();
+                return position === '診所管理' || email === 'admin@clinic.com';
+            } catch (_e) {
+                return false;
+            }
+        };
+
+        /**
          * 透過人員 ID 查詢人員資料。若找不到對應的人員，回傳一個預設物件
          * 以避免程式在存取 undefined 屬性時產生錯誤。
          * @param {number|string} id 人員 ID
@@ -438,33 +455,31 @@
         function createShiftElement(shift) {
             const staffMember = findStaffById(shift.staffId);
             const element = document.createElement('div');
-            
+
             let shiftClasses = `shift-item ${staffMember.role}`;
             if (shift.type === 'emergency') shiftClasses += ' emergency';
             if (shift.status === 'overtime') shiftClasses += ' overtime';
-            
+
             element.className = shiftClasses;
             element.draggable = true;
             element.dataset.shiftId = shift.id;
-            
+
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
-            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌';
-            
-            // 使用單一函式處理按鈕點擊以便 inline 事件僅包含函式呼叫。
-            // 直接在 onclick 中調用多個語句（例如 event.stopPropagation(); editShift(...)) 會導致
-            // system.js 的 parseArgs 函式無法正確解析，產生 SyntaxError。
-            // 因此改為調用包裝函式 handleEditShift / handleDeleteShift，由包裝函式自行處理
-            // 停止事件冒泡和觸發實際的編輯或刪除邏輯。
             // 根據職位顯示中文名稱，如果 level 為空則從 role 推斷
             const positionLabel = staffMember.level || (staffMember.role === 'doctor' ? '醫師' : staffMember.role === 'nurse' ? '護理師' : '');
+            // 根據權限決定是否顯示編輯刪除按鈕
+            const isAdmin = window.isAdminUser && window.isAdminUser();
+            const actionsHtml = isAdmin
+                ? `<button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
+                   <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="刪除">🗑️</button>`
+                : '';
             element.innerHTML = `
                 <div class="shift-header">
                     <div class="shift-name">
                         ${staffMember.name}<span class="staff-position"> ${positionLabel}</span>
                     </div>
                     <div class="shift-actions">
-                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
-                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="刪除">🗑️</button>
+                        ${actionsHtml}
                     </div>
                 </div>
                 <div class="shift-details">
@@ -534,30 +549,39 @@
             cell.addEventListener('drop', async function(e) {
                 e.preventDefault();
                 this.classList.remove('drop-zone');
-                
+
                 const staffId = e.dataTransfer.getData('text/plain');
-                
+
                 if (staffId) {
                     // 人員拖拽 - 快速新增排班
                     const staffMember = findStaffById(staffId);
                     if (staffMember) {
-                        quickAddShiftFromDrag(staffMember, this.dataset.date);
+                        // 僅管理員可新增排班
+                        if (window.isAdminUser && window.isAdminUser()) {
+                            quickAddShiftFromDrag(staffMember, this.dataset.date);
+                        } else {
+                            showNotification('您沒有權限新增排班');
+                        }
                     }
                 } else if (draggedShift) {
                     // 排班拖拽 - 移動排班
-                    const newDate = this.dataset.date;
-                    // 更新排班日期
-                    draggedShift.date = newDate;
-                    // 儲存更新後的排班資料
-                    try {
-                        await saveShiftsToDb();
-                    } catch (_err) {
-                        /* 保存錯誤已在函式中記錄 */
+                    if (window.isAdminUser && window.isAdminUser()) {
+                        const newDate = this.dataset.date;
+                        // 更新排班日期
+                        draggedShift.date = newDate;
+                        // 儲存更新後的排班資料
+                        try {
+                            await saveShiftsToDb();
+                        } catch (_err) {
+                            /* 保存錯誤已在函式中記錄 */
+                        }
+                        // 重新渲染日曆並更新統計
+                        renderCalendar();
+                        updateStats();
+                        showNotification('排班已成功移動！');
+                    } else {
+                        showNotification('您沒有權限調整排班');
                     }
-                    // 重新渲染日曆並更新統計
-                    renderCalendar();
-                    updateStats();
-                    showNotification('排班已成功移動！');
                 }
             });
 
@@ -565,7 +589,12 @@
             cell.addEventListener('click', function(e) {
                 // 避免在拖拽操作時觸發點擊
                 if (!e.target.closest('.shift-item')) {
-                    openShiftModal(this.dataset.date);
+                    // 僅管理員可以開啟新增排班表單
+                    if (window.isAdminUser && window.isAdminUser()) {
+                        openShiftModal(this.dataset.date);
+                    } else {
+                        showNotification('您沒有權限新增排班');
+                    }
                 }
             });
         }
@@ -852,35 +881,44 @@
 
         // 同步到 Google Calendar
         function syncToGoogle() {
-            // 創建 Google Calendar 事件格式
-            const events = shifts.map(shift => {
-                // 透過 ID 找到對應的人員
-                const staffMember = findStaffById(shift.staffId);
-                const startDateTime = `${shift.date}T${shift.startTime}:00`;
-                const endDateTime = `${shift.date}T${shift.endTime}:00`;
-                return {
-                    title: `${staffMember.name} - ${staffMember.role === 'doctor' ? '醫師' : '護理師'}排班`,
-                    start: startDateTime,
-                    end: endDateTime,
-                    description: `部門: ${staffMember.department}\n班別: ${shift.type}`
-                };
-            });
-
-            // 生成 Google Calendar URL
-            const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-            const event = events[0]; // 示範用第一個事件
-            if (event) {
-                const params = new URLSearchParams({
-                    text: event.title,
-                    dates: `${event.start.replace(/[-:]/g, '')}/${event.end.replace(/[-:]/g, '')}`,
-                    details: event.description
-                });
-                
-                window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
-                showNotification('正在開啟 Google Calendar...');
-            } else {
+            // 如果沒有排班資料，直接通知使用者
+            if (!shifts || shifts.length === 0) {
                 showNotification('沒有排班資料可同步');
+                return;
             }
+
+            // 只使用第一個排班作為事件範例，但修正結束時間為 24:00 的情況
+            const shift = shifts[0];
+            const staffMember = findStaffById(shift.staffId);
+            let startDateTime = `${shift.date}T${shift.startTime}:00`;
+            let endDateTime;
+
+            // 如果結束時間為 24:00，將日期調整為隔日 00:00
+            if (shift.endTime === '24:00') {
+                const dateObj = new Date(shift.date);
+                dateObj.setDate(dateObj.getDate() + 1);
+                const nextDateStr = dateObj.toISOString().split('T')[0];
+                endDateTime = `${nextDateStr}T00:00:00`;
+            } else {
+                endDateTime = `${shift.date}T${shift.endTime}:00`;
+            }
+
+            const event = {
+                title: `${staffMember.name} - ${staffMember.role === 'doctor' ? '醫師' : '護理師'}排班`,
+                start: startDateTime,
+                end: endDateTime,
+                description: `部門: ${staffMember.department}\n班別: ${shift.type}`
+            };
+
+            const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+            const params = new URLSearchParams({
+                text: event.title,
+                dates: `${event.start.replace(/[-:]/g, '')}/${event.end.replace(/[-:]/g, '')}`,
+                details: event.description
+            });
+            
+            window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
+            showNotification('正在開啟 Google Calendar...');
         }
 
         // 匯出 iCal
@@ -894,14 +932,25 @@
 
             shifts.forEach(shift => {
                 const staffMember = findStaffById(shift.staffId);
-                const startDateTime = `${shift.date.replace(/-/g, '')}T${shift.startTime.replace(':', '')}00`;
-                const endDateTime = `${shift.date.replace(/-/g, '')}T${shift.endTime.replace(':', '')}00`;
-                
+                // 處理開始時間
+                const dtStart = shift.date.replace(/-/g, '') + 'T' + shift.startTime.replace(':', '') + '00';
+
+                // 處理結束時間：若為 24:00，日期加一天並設為 000000
+                let dtEndDate = shift.date;
+                let dtEndTime = shift.endTime;
+                if (shift.endTime === '24:00') {
+                    const dateObj = new Date(shift.date);
+                    dateObj.setDate(dateObj.getDate() + 1);
+                    dtEndDate = dateObj.toISOString().split('T')[0];
+                    dtEndTime = '00:00';
+                }
+                const dtEnd = dtEndDate.replace(/-/g, '') + 'T' + dtEndTime.replace(':', '') + '00';
+
                 icalContent.push(
                     'BEGIN:VEVENT',
                     `UID:${shift.id}@medical-schedule.com`,
-                    `DTSTART:${startDateTime}`,
-                    `DTEND:${endDateTime}`,
+                    `DTSTART:${dtStart}`,
+                    `DTEND:${dtEnd}`,
                     `SUMMARY:${staffMember.name} - ${staffMember.role === 'doctor' ? '醫師' : '護理師'}排班`,
                     `DESCRIPTION:部門: ${staffMember.department}\\n班別: ${shift.type}`,
                     `LOCATION:醫院`,
@@ -984,6 +1033,19 @@
             alert(message);
         }
 
+        // 將時間字串轉換為分鐘，支援 '24:00' 這樣的字串。
+        function parseTimeToMinutes(timeStr) {
+            if (!timeStr) return 0;
+            const [hourStr, minuteStr] = timeStr.split(':');
+            let hours = parseInt(hourStr, 10);
+            const minutes = parseInt(minuteStr, 10);
+            // 允許 24:00 表示一天的結束
+            if (hours === 24 && minutes === 0) {
+                return 24 * 60;
+            }
+            return hours * 60 + minutes;
+        }
+
         // 檢查所有衝突
         function checkAllConflicts() {
             const conflicts = [];
@@ -994,10 +1056,14 @@
                     const shift2 = shifts[j];
                     
                     if (shift1.staffId === shift2.staffId && shift1.date === shift2.date) {
-                        const start1 = new Date(`2000-01-01T${shift1.startTime}:00`);
-                        const end1 = new Date(`2000-01-01T${shift1.endTime}:00`);
-                        const start2 = new Date(`2000-01-01T${shift2.startTime}:00`);
-                        const end2 = new Date(`2000-01-01T${shift2.endTime}:00`);
+                        const start1 = parseTimeToMinutes(shift1.startTime);
+                        let end1 = parseTimeToMinutes(shift1.endTime);
+                        const start2 = parseTimeToMinutes(shift2.startTime);
+                        let end2 = parseTimeToMinutes(shift2.endTime);
+                        
+                        // 如果結束時間早於開始時間，或為 0，視為跨日結束，將結束時間加 24 小時
+                        if (end1 <= start1) end1 += 24 * 60;
+                        if (end2 <= start2) end2 += 24 * 60;
                         
                         if (start1 < end2 && start2 < end1) {
                             conflicts.push({ shift1, shift2 });
@@ -1011,6 +1077,11 @@
 
         // 清空所有排班
         async function clearAllShifts() {
+            // 僅管理員可清空排班
+            if (!(window.isAdminUser && window.isAdminUser())) {
+                showNotification('您沒有權限清空排班');
+                return;
+            }
             if (confirm('確定要清空所有排班嗎？此操作無法復原。')) {
                 shifts = [];
                 // 儲存變更
@@ -1027,6 +1098,11 @@
 
         // 編輯排班
         function editShift(shiftId) {
+            // 僅管理員可編輯排班
+            if (!(window.isAdminUser && window.isAdminUser())) {
+                showNotification('您沒有權限編輯排班');
+                return;
+            }
             const shift = shifts.find(s => s.id === shiftId);
             if (!shift) return;
 
@@ -1046,6 +1122,11 @@
 
         // 刪除排班
         async function deleteShift(shiftId) {
+            // 僅管理員可刪除排班
+            if (!(window.isAdminUser && window.isAdminUser())) {
+                showNotification('您沒有權限刪除排班');
+                return;
+            }
 
             // 事件傳播在 handleDeleteShift 中處理，此函式僅執行刪除邏輯
             
@@ -1091,10 +1172,8 @@
             alert(`排班詳情：
 姓名：${staffMember.name}
 職位：${staffMember.level}
-部門：${staffMember.department}
 日期：${shift.date}
 時間：${shift.startTime} - ${shift.endTime} (${duration} 小時)
-狀態：${shift.status === 'confirmed' ? '已確認' : shift.status === 'pending' ? '待確認' : '已取消'}
 備註：${shift.notes || '無'}
 聯絡電話：${staffMember.phone}
 電子郵件：${staffMember.email}`);
@@ -1223,6 +1302,11 @@
         
         // 開啟固定排班模態框
         function openFixedScheduleModal() {
+            // 僅管理員可開啟固定排班模態框
+            if (!(window.isAdminUser && window.isAdminUser())) {
+                showNotification('您沒有權限建立固定排班');
+                return;
+            }
             const modal = document.getElementById('fixedScheduleModal');
             const form = document.getElementById('fixedScheduleForm');
             
@@ -1234,7 +1318,8 @@
             document.getElementById('fixedStartTime').value = '08:00';
             document.getElementById('fixedEndTime').value = '16:00';
             document.getElementById('scheduleRange').value = 'current-month';
-            document.getElementById('fixedScheduleNotes').value = '固定上班排程';
+            // 預設不填入備註，僅保留 placeholder
+            document.getElementById('fixedScheduleNotes').value = '';
             
             // 預設選擇週一到週五
             for (let i = 1; i <= 5; i++) {
