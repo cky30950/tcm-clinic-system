@@ -88,13 +88,81 @@
         }
 
         /**
+         * 將各種格式的時間值正規化為 HH:MM 形式的字串。
+         * Firebase 儲存的時間有可能是字串（如 "08:00"）、整數（如 800 或 480）或分鐘數。
+         * 此函式嘗試判斷來源格式並轉換為標準時間字串，若無法解析則原樣返回。
+         * @param {string|number|null|undefined} timeVal 原始時間值
+         * @returns {string} 正規化後的時間字串
+         */
+        function normalizeTime(timeVal) {
+            if (timeVal === null || typeof timeVal === 'undefined') return '';
+            // 如果已是字串且包含冒號，直接回傳
+            if (typeof timeVal === 'string') {
+                const trimmed = timeVal.trim();
+                if (trimmed.includes(':')) {
+                    // 若格式為 HH:MM 或 H:MM
+                    const parts = trimmed.split(':');
+                    if (parts.length === 2) {
+                        const hh = parts[0].padStart(2, '0');
+                        const mm = parts[1].padStart(2, '0');
+                        return `${hh}:${mm}`;
+                    }
+                }
+                // 字串不含冒號但為純數字，可能是 HHMM 格式
+                if (/^\d+$/.test(trimmed)) {
+                    const num = parseInt(trimmed, 10);
+                    if (!isNaN(num)) {
+                        if (trimmed.length <= 2) {
+                            // 僅有小時，例如 "8" -> 08:00
+                            const hh = num;
+                            return `${String(hh).padStart(2, '0')}:00`;
+                        } else {
+                            // 可能是 HHMM，例如 "800" 或 "0830"
+                            const hh = Math.floor(num / 100);
+                            const mm = num % 100;
+                            return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+                        }
+                    }
+                }
+                // 其他情況回傳原字串
+                return trimmed;
+            }
+            if (typeof timeVal === 'number') {
+                const num = timeVal;
+                // 小於 24 視為小時
+                if (num >= 0 && num < 24) {
+                    return `${String(num).padStart(2, '0')}:00`;
+                }
+                // 介於 0 到 2359 可能是 HHMM，例如 800, 1730
+                if (num >= 0 && num <= 2359) {
+                    const hh = Math.floor(num / 100);
+                    const mm = num % 100;
+                    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+                }
+                // 可能是分鐘數，轉換為 HH:MM
+                if (num >= 0 && num < 24 * 60 * 2) {
+                    const hh = Math.floor(num / 60);
+                    const mm = num % 60;
+                    // 若 hh >=24，取模以支援 24:00 之後的時間
+                    const normalizedHh = hh % 24;
+                    return `${String(normalizedHh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+                }
+                // 其他情況回傳數字轉字串
+                return String(num);
+            }
+            // 不支援的類型，直接返回字串表示
+            return String(timeVal);
+        }
+
+        /**
          * 透過人員 ID 查詢人員資料。若找不到對應的人員，回傳一個預設物件
          * 以避免程式在存取 undefined 屬性時產生錯誤。
          * @param {number|string} id 人員 ID
          * @returns {Object} 人員物件
          */
         function findStaffById(id) {
-            // 使用非嚴格比對以支援字串與數字間的相等，例如 '1' 與 1
+            // Firebase 或 HTML 元件的值可能是字串，資料庫存的是數字。
+            // 使用寬鬆比較 (==) 以避免類型不一致導致找不到對應人員。
             const member = staff.find(s => s.id == id);
             if (member) return member;
             // 提供基本預設值，確保後續程式可以安全存取屬性
@@ -122,9 +190,11 @@
                 // 系統在 window.load 事件時才初始化 firebaseDataManager，
                 // 而排班管理腳本於 DOMContentLoaded 即會執行，可能導致 fetchUsers 尚未可用。
                 if (typeof waitForFirebaseDataManager === 'function') {
+                    // 使用系統提供的等待函式確保 firebaseDataManager.isReady
                     try {
                         await waitForFirebaseDataManager();
                     } catch (e) {
+                        // 若等待過程出錯，僅記錄警告而不終止流程
                         console.warn('等待 FirebaseDataManager 就緒時發生錯誤:', e);
                     }
                 } else {
@@ -153,25 +223,26 @@
                 // 清空原陣列以維持同一個引用，避免其他腳本無法取得最新資料
                 staff.splice(0, staff.length);
                 usersList.forEach(u => {
-                    // 排班系統主要針對醫療人員，但若非醫師/護理師，也納入列表以避免未知人員
-                    // 根據職稱含義推斷 role：包含「護」視為 nurse，包含「醫」視為 doctor，其餘預設為 doctor
-                    let role = 'doctor';
-                    const pos = (u.position || '').toString();
-                    if (pos.includes('護')) role = 'nurse';
-                    else if (pos.includes('醫')) role = 'doctor';
-                    staff.push({
-                        id: u.id,
-                        name: u.name || '',
-                        role: role,
-                        department: u.department || '',
-                        // level 使用原始 position
-                        level: u.position || '',
-                        phone: u.phone || '',
-                        email: u.email || '',
-                        maxHours: typeof u.maxHours === 'number' ? u.maxHours : 40
-                    });
+                    // 僅納入醫師與護理師
+                    if (u.position === '醫師' || u.position === '護理師') {
+                        staff.push({
+                            id: u.id,
+                            name: u.name || '',
+                            role: u.position === '醫師' ? 'doctor' : 'nurse',
+                            // 部門若無資料則使用空字串，避免 undefined
+                            department: u.department || '',
+                            // level 可使用 position 表示，例如主治醫師或護理師
+                            level: u.position || '',
+                            phone: u.phone || '',
+                            email: u.email || '',
+                            // 若有 maxHours 欄位則使用，否則預設 40
+                            maxHours: typeof u.maxHours === 'number' ? u.maxHours : 40
+                        });
+                    }
                 });
                 // 更新全域 staff 指向最新的資料陣列，確保其他腳本能取得最新人員
+                // 由於我們使用 splice 清空陣列並重新填充，不會改變引用，
+                // 這裡仍然將 window.staff 指向同一個陣列以防止遺漏。
                 window.staff = staff;
             } catch (err) {
                 console.error('載入診所用戶時發生錯誤：', err);
@@ -218,8 +289,16 @@
                 if (data) {
                     Object.keys(data).forEach(key => {
                         const shiftObj = data[key] || {};
+                        // 正規化時間欄位，支援字串、數字或分鐘數
+                        const normalizedStart = normalizeTime(shiftObj.startTime);
+                        const normalizedEnd = normalizeTime(shiftObj.endTime);
                         // 將鍵轉為數字 ID，並合併資料
-                        shifts.push({ id: isNaN(Number(key)) ? key : Number(key), ...shiftObj });
+                        shifts.push({
+                            id: isNaN(Number(key)) ? key : Number(key),
+                            ...shiftObj,
+                            startTime: normalizedStart,
+                            endTime: normalizedEnd
+                        });
                     });
                 }
             } catch (err) {
@@ -529,7 +608,6 @@
             // 停止事件冒泡和觸發實際的編輯或刪除邏輯。
             // 根據職位顯示中文名稱，如果 level 為空則從 role 推斷
             const positionLabel = staffMember.level || (staffMember.role === 'doctor' ? '醫師' : staffMember.role === 'nurse' ? '護理師' : '');
-            // 不修改 24:00 顯示，直接使用原始結束時間
             element.innerHTML = `
                 <div class="shift-header">
                     <div class="shift-name">
@@ -660,7 +738,8 @@
             
             // 檢查是否已有排班衝突
             const existingShift = shifts.find(s =>
-                s.staffId === staffMember.id &&
+                // 使用寬鬆比較 ID，避免類型不一致
+                s.staffId == staffMember.id &&
                 s.date === date &&
                 s.startTime === startTime
             );
@@ -799,8 +878,9 @@
 
         // 獲取今日人員排班
         function getTodayShiftsForStaff(staffId) {
-            const today = new Date().toISOString().split('T')[0];
-            return shifts.filter(shift => shift.staffId === staffId && shift.date === today);
+            // 以本地日期而非 ISO 字串來判斷今日，避免時區偏差
+            const today = formatDate(new Date());
+            return shifts.filter(shift => shift.staffId == staffId && shift.date === today);
         }
 
         // 獲取人員狀態
@@ -854,7 +934,8 @@
             if (date) {
                 document.getElementById('shiftDate').value = date;
             } else {
-                document.getElementById('shiftDate').value = currentDate.toISOString().split('T')[0];
+                // 使用本地日期字串填入預設日期
+                document.getElementById('shiftDate').value = formatDate(currentDate);
             }
             
             if (staffId) {
@@ -957,7 +1038,8 @@
                 if (endMinutes <= startMinutes || endMinutes >= 24 * 60) {
                     const dateObj = new Date(shift.date);
                     dateObj.setDate(dateObj.getDate() + 1);
-                    endDateStr = dateObj.toISOString().split('T')[0];
+                    // 使用本地日期格式，避免 ISO 轉換時區偏移
+                    endDateStr = formatDate(dateObj);
                     // 24:00 或跨日情況下結束時間設為 00:00
                     endTimeStr = '00:00';
                 }
@@ -1008,7 +1090,8 @@
                 if (endMinutes <= startMinutes || endMinutes >= 24 * 60) {
                     const dateObj = new Date(shift.date);
                     dateObj.setDate(dateObj.getDate() + 1);
-                    endDateStr = dateObj.toISOString().split('T')[0];
+                    // 使用本地日期格式，避免 ISO 轉換造成日期偏移
+                    endDateStr = formatDate(dateObj);
                     if (endMinutes >= 24 * 60) {
                         endTimeStr = '00:00';
                     }
@@ -1119,7 +1202,7 @@
                 for (let j = i + 1; j < shifts.length; j++) {
                     const shift1 = shifts[i];
                     const shift2 = shifts[j];
-                    if (shift1.staffId === shift2.staffId && shift1.date === shift2.date) {
+                    if (shift1.staffId == shift2.staffId && shift1.date === shift2.date) {
                         let start1 = parseTimeToMinutes(shift1.startTime);
                         let end1 = parseTimeToMinutes(shift1.endTime);
                         let start2 = parseTimeToMinutes(shift2.startTime);
@@ -1481,11 +1564,13 @@
                 const dayOfWeek = date.getDay();
                 
                 if (selectedDays.includes(dayOfWeek)) {
-                    const dateStr = date.toISOString().split('T')[0];
+                    // 使用本地日期格式而非 ISO 字串，避免時區偏移導致日期提前或延後
+                    const dateStr = formatDate(date);
                     
                     // 檢查是否已有排班
                     const existingShiftIndex = shifts.findIndex(s =>
-                        s.staffId === staffId && s.date === dateStr
+                        // 使用寬鬆比較，支援 ID 類型為字串或數字
+                        s.staffId == staffId && s.date === dateStr
                     );
                     
                     if (existingShiftIndex !== -1) {
@@ -1575,7 +1660,7 @@
         // 查看人員排班
         function viewStaffSchedule(staffId) {
             const staffMember = findStaffById(staffId);
-            const staffShifts = shifts.filter(s => s.staffId === staffId)
+            const staffShifts = shifts.filter(s => s.staffId == staffId)
                 .sort((a, b) => new Date(a.date) - new Date(b.date));
             
             if (staffShifts.length === 0) {
@@ -1633,15 +1718,6 @@
   window.scheduleShowShiftDetails = showShiftDetails;
   window.scheduleShowShiftDetailsById = showShiftDetailsById;
   window.scheduleUpdateStats = updateStats;
-
-  // 將部分核心函式同步暴露至全域名稱，供舊版 system.html 直接呼叫。
-  // 一些舊代碼直接呼叫 createFixedSchedule() 等，為了兼容舊版本，將對應函式直接掛載到 window。
-  if (typeof window.createFixedSchedule !== 'function') {
-    window.createFixedSchedule = createFixedSchedule;
-  }
-  if (typeof window.openFixedScheduleModal !== 'function') {
-    window.openFixedScheduleModal = openFixedScheduleModal;
-  }
 
 // Initialize on DOMContentLoaded
 if (typeof document !== 'undefined') {
