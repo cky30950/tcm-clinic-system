@@ -1351,13 +1351,13 @@
                 </html>
             `);
             printWindow.document.close();
-            // 使用 onload 事件等待內容完成載入後再列印，避免在某些瀏覽器中出現空白頁的情況。
-            printWindow.onload = () => {
-                printWindow.focus();
+            printWindow.focus();
+            setTimeout(() => {
+                // 觸發列印
                 printWindow.print();
-                // 列印完成後關閉新開的視窗，避免留下空白標籤
+                // 列印後關閉視窗
                 printWindow.close();
-            };
+            }, 100);
         }
 
         // 生成列印內容
@@ -1726,38 +1726,6 @@
   window.scheduleShowShiftDetails = showShiftDetails;
   window.scheduleShowShiftDetailsById = showShiftDetailsById;
   window.scheduleUpdateStats = updateStats;
-
-  // ----------------------------------------------------------------------
-  // Inline event handler wrappers
-  //
-  // schedule_management.js 為行事曆排班系統暴露了一組以 schedule* 為前綴的 API，
-  // 其中包含編輯與刪除排班的函式。排班項目的 HTML 標記使用了 onclick="handleEditShift(...)"
-  // 與 onclick="handleDeleteShift(...)" 等 inline 事件。在某些佈署環境中，
-  // 這些包裝函式是由 system.html 內嵌腳本提供的。但當我們停用舊有腳本時，
-  // handleEditShift / handleDeleteShift 可能不存在。
-  // 為了保證排班項目按鈕可以正常工作，我們在此為 window 物件提供後備實作。
-
-  if (typeof window.handleEditShift !== 'function') {
-    window.handleEditShift = function (e, shiftId) {
-      // 停止事件向上冒泡，以免點擊事件被父元素捕獲
-      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
-      // 調用 scheduleEditShift 以開啟編輯介面
-      if (typeof window.scheduleEditShift === 'function') {
-        window.scheduleEditShift(shiftId);
-      }
-    };
-  }
-  if (typeof window.handleDeleteShift !== 'function') {
-    window.handleDeleteShift = function (e, shiftId) {
-      // 停止事件冒泡並阻止預設行為（例如點擊後跳轉）
-      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
-      if (e && typeof e.preventDefault === 'function') e.preventDefault();
-      // 調用 scheduleDeleteShift 以刪除排班
-      if (typeof window.scheduleDeleteShift === 'function') {
-        window.scheduleDeleteShift(shiftId);
-      }
-    };
-  }
 
   // 公眾假期選擇函式暴露至全域，供 HTML 選單呼叫
   window.scheduleChangeHolidayRegion = changeHolidayRegion;
