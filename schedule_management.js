@@ -94,7 +94,12 @@
          * @returns {Object} 人員物件
          */
         function findStaffById(id) {
-            const member = staff.find(s => s.id === id);
+            /**
+             * 在比較人員 ID 時，避免直接使用嚴格等號比對，因為資料來源（例如 Firebase）
+             * 可能會將 ID 存為字串，而表單元素的值也通常為字串。為了避免因型別不一致
+             * 造成無法匹配，將兩者轉為字串後比較。
+             */
+            const member = staff.find(s => String(s.id) === String(id));
             if (member) return member;
             // 提供基本預設值，確保後續程式可以安全存取屬性
             return {
@@ -363,7 +368,8 @@
                         break;
                     case 'afternoon':
                         startTime.value = '16:00';
-                        endTime.value = '24:00';
+                        // 將原本的 24:00 改為 00:00，以避免 HTML <input type="time"> 不接受 24:00
+                        endTime.value = '00:00';
                         break;
                     case 'night':
                         startTime.value = '00:00';
@@ -390,7 +396,8 @@
                             break;
                         case 'afternoon':
                             startTime.value = '16:00';
-                            endTime.value = '24:00';
+                            // 改用 00:00，避免 HTML <input type="time"> 不支援 24:00
+                            endTime.value = '00:00';
                             break;
                         case 'night':
                             startTime.value = '00:00';
@@ -661,7 +668,7 @@
             
             // 檢查是否已有排班衝突
             const existingShift = shifts.find(s =>
-                s.staffId === staffMember.id &&
+                String(s.staffId) === String(staffMember.id) &&
                 s.date === date &&
                 s.startTime === startTime
             );
@@ -674,7 +681,8 @@
             // 新增排班
             const newShift = {
                 id: Date.now(),
-                staffId: staffMember.id,
+                // 使用字串型別存儲 staffId，以避免型別不一致
+                staffId: String(staffMember.id),
                 date: date,
                 startTime: startTime,
                 endTime: endTime,
@@ -801,7 +809,8 @@
         // 獲取今日人員排班
         function getTodayShiftsForStaff(staffId) {
             const today = new Date().toISOString().split('T')[0];
-            return shifts.filter(shift => shift.staffId === staffId && shift.date === today);
+            // 以字串比對人員 ID，避免型別不一致
+            return shifts.filter(shift => String(shift.staffId) === String(staffId) && shift.date === today);
         }
 
         // 獲取人員狀態
@@ -888,19 +897,21 @@
             const editId = modal.dataset.editId;
             
             // 驗證必填欄位
+            // 直接使用下拉選單的值，避免將字串 ID 轉成數字導致與實際人員資料型別不一致
             const staffId = document.getElementById('staffSelect').value;
             const date = document.getElementById('shiftDate').value;
             const startTime = document.getElementById('startTime').value;
             const endTime = document.getElementById('endTime').value;
             const type = document.getElementById('shiftType').value;
-            
+
             if (!staffId || !date || !startTime || !endTime || !type) {
                 alert('請填寫所有必填欄位！');
                 return;
             }
             
             const shiftData = {
-                staffId: parseInt(staffId),
+                // 將 staffId 保持為字串型別，以確保與 staff 陣列中的 id 一致
+                staffId: staffId,
                 date: date,
                 startTime: startTime,
                 endTime: endTime,
@@ -1405,7 +1416,8 @@
             if (!ensureAdmin('建立固定排班')) {
                 return;
             }
-            const staffId = parseInt(document.getElementById('fixedStaffSelect').value);
+            // 直接使用字串型別的 ID，避免因 parseInt 造成與 staff.id 之間的型別不一致
+            const staffId = document.getElementById('fixedStaffSelect').value;
             const shiftType = document.getElementById('fixedShiftType').value;
             const scheduleRange = document.getElementById('scheduleRange').value;
             const notes = document.getElementById('fixedScheduleNotes').value;
@@ -1436,7 +1448,8 @@
             } else {
                 const timeMap = {
                     'morning': { start: '08:00', end: '16:00' },
-                    'afternoon': { start: '16:00', end: '24:00' },
+                    // 將下午班的結束時間設為 00:00，表示跨日到隔天凌晨
+                    'afternoon': { start: '16:00', end: '00:00' },
                     'night': { start: '00:00', end: '08:00' }
                 };
                 startTime = timeMap[shiftType].start;
@@ -1474,21 +1487,20 @@
             
             // 生成排班
             const newShifts = [];
+            // 使用當前時間戳作為起始 ID，後續自增；不將 ID 轉為數字
             let shiftIdCounter = Date.now();
             let addedCount = 0;
             let replacedCount = 0;
             
-            for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
-                const dayOfWeek = date.getDay();
-                
+            for (let dt = new Date(startDate); dt <= endDate; dt.setDate(dt.getDate() + 1)) {
+                const dayOfWeek = dt.getDay();
                 if (selectedDays.includes(dayOfWeek)) {
-                    const dateStr = date.toISOString().split('T')[0];
-                    
-                    // 檢查是否已有排班
+                    // 使用本地時區格式化日期，避免 toISOString() 造成日期提早或延後
+                    const dateStr = formatDate(dt);
+                    // 檢查是否已有排班（使用字串比對人員 ID）
                     const existingShiftIndex = shifts.findIndex(s =>
-                        s.staffId === staffId && s.date === dateStr
+                        String(s.staffId) === String(staffId) && s.date === dateStr
                     );
-                    
                     if (existingShiftIndex !== -1) {
                         if (replaceExisting) {
                             // 替換現有排班
@@ -1506,6 +1518,7 @@
                         // 新增排班
                         const newShift = {
                             id: shiftIdCounter++,
+                            // 以字串存放 staffId
                             staffId: staffId,
                             date: dateStr,
                             startTime: startTime,
@@ -1576,7 +1589,7 @@
         // 查看人員排班
         function viewStaffSchedule(staffId) {
             const staffMember = findStaffById(staffId);
-            const staffShifts = shifts.filter(s => s.staffId === staffId)
+            const staffShifts = shifts.filter(s => String(s.staffId) === String(staffId))
                 .sort((a, b) => new Date(a.date) - new Date(b.date));
             
             if (staffShifts.length === 0) {
