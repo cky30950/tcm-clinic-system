@@ -3018,17 +3018,7 @@
             <!-- 篩選面板 -->
             <div class="filter-panel">
             <div class="filter-grid">
-                <div class="filter-group">
-                    <label class="filter-label">部門篩選</label>
-                    <select class="filter-select" id="departmentFilter" onchange="scheduleApplyFilters()">
-                        <option value="">所有部門</option>
-                        <option value="內科">內科</option>
-                        <option value="外科">外科</option>
-                        <option value="急診科">急診科</option>
-                        <option value="兒科">兒科</option>
-                        <option value="婦產科">婦產科</option>
-                    </select>
-                </div>
+                <!-- 部門篩選已移除。若要重新啟用，請在此加入對應的下拉選單。 -->
                 <div class="filter-group">
                     <label class="filter-label">職位篩選</label>
                     <select class="filter-select" id="roleFilter" onchange="scheduleApplyFilters()">
@@ -4059,7 +4049,12 @@
 
         // 應用篩選
         function applyFilters() {
-            currentFilters.department = document.getElementById('departmentFilter').value;
+            // The department filter has been removed from the UI.  Always use a
+            // blank string so that all departments are shown and avoid querying
+            // a non‑existent DOM element.
+            currentFilters.department = '';
+
+            // Retrieve the remaining filters.  These inputs still exist.
             currentFilters.role = document.getElementById('roleFilter').value;
             currentFilters.shiftType = document.getElementById('shiftTypeFilter').value;
             currentFilters.staffSearch = document.getElementById('staffSearch').value.toLowerCase();
@@ -4072,7 +4067,7 @@
         function passesFilter(shift) {
             const staffMember = getStaffMemberById(shift.staffId);
 
-            if (currentFilters.department && staffMember.department !== currentFilters.department) return false;
+            // Department filtering has been disabled.  Do not restrict by department.
             if (currentFilters.role && staffMember.role !== currentFilters.role) return false;
             if (currentFilters.shiftType && shift.type !== currentFilters.shiftType) return false;
             if (currentFilters.staffSearch && !staffMember.name.toLowerCase().includes(currentFilters.staffSearch)) return false;
@@ -4255,8 +4250,15 @@
                 </body>
                 </html>
             `);
+            // Close and focus the document before printing.  Without a
+            // delay the print preview may appear blank in some browsers.
             printWindow.document.close();
-            printWindow.print();
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+                // Close the window after printing to prevent leaving an empty tab.
+                printWindow.close();
+            }, 100);
         }
     </script>
     <!-- 新排班管理區結束 -->
@@ -4360,6 +4362,7 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"b2074e7888b746fe9fbbc15492b4c3d4","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>

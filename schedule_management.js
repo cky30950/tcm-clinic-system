@@ -1153,7 +1153,14 @@
 
         // 應用篩選
         function applyFilters() {
-            currentFilters.department = document.getElementById('departmentFilter').value;
+            // The department filter has been removed from the UI.  Assign a blank
+            // value here to ensure we always include all departments and to avoid
+            // querying a missing element in the DOM.  Leaving it unset can
+            // inadvertently retain an old filter value.
+            currentFilters.department = '';
+
+            // Continue retrieving the other filter values normally.  These
+            // elements still exist in the UI, so it's safe to access them.
             currentFilters.role = document.getElementById('roleFilter').value;
             currentFilters.shiftType = document.getElementById('shiftTypeFilter').value;
             currentFilters.staffSearch = document.getElementById('staffSearch').value.toLowerCase();
@@ -1166,7 +1173,8 @@
         function passesFilter(shift) {
             const staffMember = findStaffById(shift.staffId);
             
-            if (currentFilters.department && staffMember.department !== currentFilters.department) return false;
+            // Do not filter by department.  The department filter has been
+            // removed from the UI, so always allow all departments.
             if (currentFilters.role && staffMember.role !== currentFilters.role) return false;
             if (currentFilters.shiftType && shift.type !== currentFilters.shiftType) return false;
             if (currentFilters.staffSearch && !staffMember.name.toLowerCase().includes(currentFilters.staffSearch)) return false;
@@ -1317,8 +1325,19 @@
                 </html>
             `);
             
+            // Ensure the new window's document is fully written and focused before printing.
             printWindow.document.close();
-            printWindow.print();
+            printWindow.focus();
+            // Printing immediately after document.close() can result in a blank
+            // page in some browsers.  Delay the call slightly to allow the
+            // browser to finish rendering the new document.
+            setTimeout(() => {
+                printWindow.print();
+                // Close the print window after printing to avoid leaving a
+                // blank tab open.  Removing this line will keep the tab
+                // open after printing.
+                printWindow.close();
+            }, 100);
         }
 
         // 生成列印內容
