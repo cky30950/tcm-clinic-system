@@ -3181,7 +3181,8 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">備註</label>
-                    <input type="text" class="form-input" id="fixedScheduleNotes" placeholder="固定上班排程" value="固定上班排程">
+                    <!-- 清除預設值，僅顯示提示文字 -->
+                    <input type="text" class="form-input" id="fixedScheduleNotes" placeholder="固定上班排程">
                 </div>
                 <div class="form-group">
                     <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #4a5568;">
@@ -3432,7 +3433,15 @@
             // 固定排班表單提交
             document.getElementById('fixedScheduleForm').addEventListener('submit', function(e) {
                 e.preventDefault();
-                createFixedSchedule();
+                // 呼叫 schedule 管理模組的固定排班函式，兼容舊版函式名稱
+                if (typeof scheduleCreateFixedSchedule === 'function') {
+                    scheduleCreateFixedSchedule();
+                } else if (typeof createFixedSchedule === 'function') {
+                    // 若全域 createFixedSchedule 存在則調用
+                    createFixedSchedule();
+                } else {
+                    console.error('無法建立固定排班：函式未定義');
+                }
             });
         }
 
@@ -3548,6 +3557,7 @@
                     </div>`;
             }
 
+            // 不修改 24:00 顯示，直接使用原始結束時間
             // 組合內部 HTML，非管理員將不顯示操作按鈕
             element.innerHTML = `
                 <div class="shift-header">

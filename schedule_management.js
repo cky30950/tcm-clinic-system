@@ -94,7 +94,8 @@
          * @returns {Object} 人員物件
          */
         function findStaffById(id) {
-            const member = staff.find(s => s.id === id);
+            // 使用非嚴格比對以支援字串與數字間的相等，例如 '1' 與 1
+            const member = staff.find(s => s.id == id);
             if (member) return member;
             // 提供基本預設值，確保後續程式可以安全存取屬性
             return {
@@ -121,11 +122,9 @@
                 // 系統在 window.load 事件時才初始化 firebaseDataManager，
                 // 而排班管理腳本於 DOMContentLoaded 即會執行，可能導致 fetchUsers 尚未可用。
                 if (typeof waitForFirebaseDataManager === 'function') {
-                    // 使用系統提供的等待函式確保 firebaseDataManager.isReady
                     try {
                         await waitForFirebaseDataManager();
                     } catch (e) {
-                        // 若等待過程出錯，僅記錄警告而不終止流程
                         console.warn('等待 FirebaseDataManager 就緒時發生錯誤:', e);
                     }
                 } else {
@@ -154,26 +153,25 @@
                 // 清空原陣列以維持同一個引用，避免其他腳本無法取得最新資料
                 staff.splice(0, staff.length);
                 usersList.forEach(u => {
-                    // 僅納入醫師與護理師
-                    if (u.position === '醫師' || u.position === '護理師') {
-                        staff.push({
-                            id: u.id,
-                            name: u.name || '',
-                            role: u.position === '醫師' ? 'doctor' : 'nurse',
-                            // 部門若無資料則使用空字串，避免 undefined
-                            department: u.department || '',
-                            // level 可使用 position 表示，例如主治醫師或護理師
-                            level: u.position || '',
-                            phone: u.phone || '',
-                            email: u.email || '',
-                            // 若有 maxHours 欄位則使用，否則預設 40
-                            maxHours: typeof u.maxHours === 'number' ? u.maxHours : 40
-                        });
-                    }
+                    // 排班系統主要針對醫療人員，但若非醫師/護理師，也納入列表以避免未知人員
+                    // 根據職稱含義推斷 role：包含「護」視為 nurse，包含「醫」視為 doctor，其餘預設為 doctor
+                    let role = 'doctor';
+                    const pos = (u.position || '').toString();
+                    if (pos.includes('護')) role = 'nurse';
+                    else if (pos.includes('醫')) role = 'doctor';
+                    staff.push({
+                        id: u.id,
+                        name: u.name || '',
+                        role: role,
+                        department: u.department || '',
+                        // level 使用原始 position
+                        level: u.position || '',
+                        phone: u.phone || '',
+                        email: u.email || '',
+                        maxHours: typeof u.maxHours === 'number' ? u.maxHours : 40
+                    });
                 });
                 // 更新全域 staff 指向最新的資料陣列，確保其他腳本能取得最新人員
-                // 由於我們使用 splice 清空陣列並重新填充，不會改變引用，
-                // 這裡仍然將 window.staff 指向同一個陣列以防止遺漏。
                 window.staff = staff;
             } catch (err) {
                 console.error('載入診所用戶時發生錯誤：', err);
@@ -531,6 +529,7 @@
             // 停止事件冒泡和觸發實際的編輯或刪除邏輯。
             // 根據職位顯示中文名稱，如果 level 為空則從 role 推斷
             const positionLabel = staffMember.level || (staffMember.role === 'doctor' ? '醫師' : staffMember.role === 'nurse' ? '護理師' : '');
+            // 不修改 24:00 顯示，直接使用原始結束時間
             element.innerHTML = `
                 <div class="shift-header">
                     <div class="shift-name">
@@ -1634,6 +1633,15 @@
   window.scheduleShowShiftDetails = showShiftDetails;
   window.scheduleShowShiftDetailsById = showShiftDetailsById;
   window.scheduleUpdateStats = updateStats;
+
+  // 將部分核心函式同步暴露至全域名稱，供舊版 system.html 直接呼叫。
+  // 一些舊代碼直接呼叫 createFixedSchedule() 等，為了兼容舊版本，將對應函式直接掛載到 window。
+  if (typeof window.createFixedSchedule !== 'function') {
+    window.createFixedSchedule = createFixedSchedule;
+  }
+  if (typeof window.openFixedScheduleModal !== 'function') {
+    window.openFixedScheduleModal = openFixedScheduleModal;
+  }
 
 // Initialize on DOMContentLoaded
 if (typeof document !== 'undefined') {
