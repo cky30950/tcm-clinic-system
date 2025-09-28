@@ -402,7 +402,8 @@
                 
                 const cell = document.createElement('div');
                 cell.className = 'calendar-cell';
-                cell.dataset.date = cellDate.toISOString().split('T')[0];
+                // 使用本地時間格式化日期，避免使用 ISO 字串導致時區偏移
+                cell.dataset.date = formatDate(cellDate);
                 
                 if (cellDate.getMonth() !== currentDate.getMonth()) {
                     cell.classList.add('other-month');
@@ -454,9 +455,13 @@
             // system.js 的 parseArgs 函式無法正確解析，產生 SyntaxError。
             // 因此改為調用包裝函式 handleEditShift / handleDeleteShift，由包裝函式自行處理
             // 停止事件冒泡和觸發實際的編輯或刪除邏輯。
+            // 根據職位顯示中文名稱，如果 level 為空則從 role 推斷
+            const positionLabel = staffMember.level || (staffMember.role === 'doctor' ? '醫師' : staffMember.role === 'nurse' ? '護理師' : '');
             element.innerHTML = `
                 <div class="shift-header">
-                    <div class="shift-name">${staffMember.name}</div>
+                    <div class="shift-name">
+                        ${staffMember.name}<span class="staff-position"> ${positionLabel}</span>
+                    </div>
                     <div class="shift-actions">
                         <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
                         <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="刪除">🗑️</button>
@@ -464,8 +469,7 @@
                 </div>
                 <div class="shift-details">
                     ${shift.startTime}-${shift.endTime} (${duration}h)<br>
-                    ${statusIcon} ${shift.notes || '一般排班'}<br>
-                    <small>${staffMember.department} - ${staffMember.level}</small>
+                    ${shift.notes || '一般排班'}
                 </div>
             `;
 
@@ -618,8 +622,21 @@
             return date.toDateString() === today.toDateString();
         }
 
+        /**
+         * 格式化日期為 YYYY-MM-DD，使用本地時間，而非 toISOString 以避免時區偏移導致日期提前或延後。
+         * @param {Date} date 日期物件
+         * @returns {string} 格式化後的日期字串
+         */
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
         function getShiftsForDate(date) {
-            const dateStr = date.toISOString().split('T')[0];
+            // 使用本地時間格式化日期，避免時區導致日期錯誤
+            const dateStr = formatDate(date);
             return shifts.filter(shift => shift.date === dateStr);
         }
 
@@ -638,8 +655,10 @@
                 
 
                 
+                // 顯示人員姓名與職位（level 為中文職稱）。若無 level 則根據 role 推斷
+                const positionLabel = member.level || (member.role === 'doctor' ? '醫師' : member.role === 'nurse' ? '護理師' : '');
                 card.innerHTML = `
-                    <div class="staff-name">${member.name}</div>
+                    <div class="staff-name">${member.name}<span class="staff-position"> ${positionLabel}</span></div>
                     <div class="drag-hint">🖱️</div>
                 `;
 

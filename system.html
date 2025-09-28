@@ -2634,6 +2634,20 @@
             line-height: 1.1;
         }
 
+        /* 顯示職位名稱的樣式 */
+        #scheduleManagement .shift-item .staff-position {
+            margin-left: 2px;
+            font-size: 9px;
+            font-weight: 500;
+            opacity: 0.85;
+        }
+        #scheduleManagement .staff-name .staff-position {
+            margin-left: 2px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #4a5568;
+        }
+
         @keyframes pulse {
 #scheduleManagement 0%, #scheduleManagement 100% { opacity: 1; }
 #scheduleManagement 50% { opacity: 0.7; }
@@ -2951,15 +2965,22 @@
                 padding: 2px 4px;
             }
 
+        /* 在窄螢幕下為排班管理卡片添加左右內邊距，避免內容緊貼螢幕邊緣 */
+        #scheduleManagement {
+                padding-left: 1rem;
+                padding-right: 1rem;
+        }
+
 
         }
     </style>
-<div class="container">
-        <!-- Group header and filters in a gradient box similar to the search patient registration -->
-        <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
-            <div class="header">
+        <div class="container">
+        <!-- 將標題獨立顯示，不納入漸層背景區塊 -->
+        <div class="header">
             <h1>🏥 進階醫療排班管理系統</h1>
-
+        </div>
+        <!-- 控制按鈕與篩選面板包裹於漸層背景方框中 -->
+        <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
             <div class="controls">
                 <div class="nav-controls">
                     <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
@@ -2975,7 +2996,6 @@
                     <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
                     <button class="sync-btn" onclick="schedulePrintSchedule()">🖨️ 列印</button>
                 </div>
-            </div>
             </div>
 
             <!-- 篩選面板 -->
@@ -4190,5 +4210,6 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"b2074e7888b746fe9fbbc15492b4c3d4","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
