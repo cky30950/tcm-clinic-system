@@ -59,6 +59,14 @@
             { date: '2025-12-25', name: 'Christmas Day' }
         ];
 
+        /*
+         * 為了滿足「假期只顯示 1 個月」的問題需求，允許假期資訊在未來年份也能正確顯示。
+         * 本系統目前僅列出 2025 年的公眾假期，但如果使用者瀏覽的月份位於其他年份，
+         * 仍希望根據同一月份與日期顯示對應的假期名稱。例如 2026-01-01 仍顯示元旦假期。
+         * 因此在 getHolidayForDate 函式中將會以月份與日期為鍵，從 2025 年資料中尋找假期，
+         * 並回傳相同名稱的假期資訊。這樣即使日期超出預設的假期年份，也能顯示未來一年或更久的假期。
+         */
+
         /**
          * 取得特定日期的公眾假期資訊。
          * 如果目前沒有設定顯示任何假期，回傳 null。
@@ -66,12 +74,25 @@
          * @returns {{date:string,name:string}|null} 假期資料
          */
         function getHolidayForDate(date) {
+            // 如果沒有選擇假期地區，直接不顯示假期
             if (!selectedHolidayRegion) return null;
             const dateStr = formatDate(date);
+            // 取月份與日期（MM-DD）以供匹配 2025 年的假期資料
+            const mmdd = dateStr.slice(5);
+            let list = [];
             if (selectedHolidayRegion === 'hk') {
-                return hkHolidays2025.find(h => h.date === dateStr) || null;
+                list = hkHolidays2025;
             } else if (selectedHolidayRegion === 'us') {
-                return usHolidays2025.find(h => h.date === dateStr) || null;
+                list = usHolidays2025;
+            }
+            // 嘗試在相應的假期列表中尋找相同月份與日期的假期
+            const match = list.find(h => {
+                // 假期日期格式為 YYYY-MM-DD，取出 MM-DD 進行比較
+                return h.date.slice(5) === mmdd;
+            });
+            if (match) {
+                // 回傳包含目前日期字串與假期名稱的物件
+                return { date: dateStr, name: match.name };
             }
             return null;
         }
@@ -1139,7 +1160,15 @@
                     dates: `${event.start.replace(/[-:]/g, '')}/${event.end.replace(/[-:]/g, '')}`,
                     details: event.description
                 });
-                
+                // 從本地取得診所設定，以設定事件的地點
+                try {
+                    const clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
+                    if (clinicSettings && clinicSettings.address) {
+                        params.set('location', clinicSettings.address);
+                    }
+                } catch (_e) {
+                    /* 如果解析失敗，忽略地點設定 */
+                }
                 window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
                 showNotification('正在開啟 Google Calendar...');
             } else {
@@ -1182,6 +1211,16 @@
                 }
                 const descriptionString = descriptionLines.join('\\n');
                 
+                // 從本地取得診所設定，如果有地址則作為地點
+                let location = '醫院';
+                try {
+                    const clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
+                    if (clinicSettings && clinicSettings.address) {
+                        location = clinicSettings.address;
+                    }
+                } catch (_e) {
+                    /* 如果解析失敗，保持預設地點 */
+                }
                 icalContent.push(
                     'BEGIN:VEVENT',
                     `UID:${shift.id}@medical-schedule.com`,
@@ -1189,7 +1228,7 @@
                     `DTEND:${endDateTime}`,
                     `SUMMARY:${staffMember.name} - ${staffMember.role === 'doctor' ? '醫師' : '護理師'}排班`,
                     `DESCRIPTION:${descriptionString}`,
-                    `LOCATION:醫院`,
+                    `LOCATION:${location}`,
                     'END:VEVENT'
                 );
             });
