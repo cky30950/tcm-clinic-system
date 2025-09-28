@@ -349,8 +349,8 @@
             shifts = [
                 { id: 1, staffId: 1, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${baseDate.toString().padStart(2, '0')}`, startTime: '08:00', endTime: '16:00', type: 'morning', status: 'confirmed', notes: '門診' },
                 { id: 2, staffId: 4, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${baseDate.toString().padStart(2, '0')}`, startTime: '08:00', endTime: '16:00', type: 'morning', status: 'confirmed', notes: '病房' },
-                { id: 3, staffId: 2, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate + 1).toString().padStart(2, '0')}`, startTime: '16:00', endTime: '00:00', type: 'afternoon', status: 'pending', notes: '手術房' },
-                { id: 4, staffId: 5, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate + 1).toString().padStart(2, '0')}`, startTime: '16:00', endTime: '00:00', type: 'afternoon', status: 'confirmed', notes: '病房' },
+                { id: 3, staffId: 2, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate + 1).toString().padStart(2, '0')}`, startTime: '16:00', endTime: '24:00', type: 'afternoon', status: 'pending', notes: '手術房' },
+                { id: 4, staffId: 5, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate + 1).toString().padStart(2, '0')}`, startTime: '16:00', endTime: '24:00', type: 'afternoon', status: 'confirmed', notes: '病房' },
                 { id: 5, staffId: 3, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate + 2).toString().padStart(2, '0')}`, startTime: '00:00', endTime: '08:00', type: 'night', status: 'confirmed', notes: '急診' },
                 { id: 6, staffId: 6, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate + 2).toString().padStart(2, '0')}`, startTime: '00:00', endTime: '08:00', type: 'night', status: 'confirmed', notes: '急診' },
                 { id: 7, staffId: 7, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate - 1).toString().padStart(2, '0')}`, startTime: '09:00', endTime: '17:00', type: 'morning', status: 'confirmed', notes: '兒科門診' },
@@ -398,14 +398,6 @@
 
         // 初始化
         document.addEventListener('DOMContentLoaded', async function() {
-            // 移除表單必填屬性，避免瀏覽器內建驗證訊息干擾
-            (function removeRequiredAttributes() {
-                const fields = ['shiftDate','staffSelect','startTime','endTime','shiftType','fixedStartTime','fixedEndTime','fixedStaffSelect','scheduleRange','fixedShiftType'];
-                fields.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.removeAttribute('required');
-                });
-            })();
             // 更新當前日期
             updateCurrentDate();
             // 設定事件監聽器
@@ -750,19 +742,19 @@
             const startTime = '08:00';
             const endTime = '16:00';
             const shiftType = 'morning';
-
+            
             // 檢查是否已有排班衝突
             const existingShift = shifts.find(s =>
                 String(s.staffId) === String(staffMember.id) &&
                 s.date === date &&
                 s.startTime === startTime
             );
-
+            
             if (existingShift) {
                 showNotification(`${staffMember.name} 在該時段已有排班！`);
                 return;
             }
-
+            
             // 新增排班
             const newShift = {
                 id: Date.now(),
@@ -773,10 +765,10 @@
                 endTime: endTime,
                 type: shiftType,
                 status: 'confirmed',
-                // 將備註預設為空白，避免顯示「拖拽快速新增」字樣
+                // 拖拽新增排班不再自動加入備註文字
                 notes: ''
             };
-
+            
             shifts.push(newShift);
             // 儲存排班至資料庫（非阻塞，如出錯則在 console 顯示）
             try {
@@ -787,7 +779,7 @@
             renderCalendar();
             renderStaffPanel(); // 更新人員狀態
             updateStats();
-
+            
             const shiftTypeName = getShiftTypeName(shiftType);
             showNotification(`已為 ${staffMember.name} 新增 ${shiftTypeName} (${startTime}-${endTime})！`);
         }
@@ -965,6 +957,12 @@
             if (document.getElementById('shiftNotes')) {
                 document.getElementById('shiftNotes').value = '';
             }
+            // 移除編輯模式標記並將標題重設為「新增排班」。
+            delete modal.dataset.editId;
+            const titleEl = modal.querySelector('h3');
+            if (titleEl) {
+                titleEl.textContent = '新增排班';
+            }
             modal.classList.add('show');
         }
 
@@ -988,16 +986,27 @@
             const date = document.getElementById('shiftDate').value;
             const startTime = document.getElementById('startTime').value;
             const endTime = document.getElementById('endTime').value;
-            // 取得班別值，如為空則預設早班
-            const typeSelectEl = document.getElementById('shiftType');
-            const type = typeSelectEl && typeSelectEl.value ? typeSelectEl.value : 'morning';
+            const type = document.getElementById('shiftType').value;
 
-            // 僅驗證人員、日期與時間必填，班別若未選擇則自動設為早班
-            if (!staffId || !date || !startTime || !endTime) {
+            if (!staffId || !date || !startTime || !endTime || !type) {
                 alert('請填寫所有必填欄位！');
                 return;
             }
 
+            // 檢查是否已有相同人員在相同日期與開始時間的排班，避免重複建立
+            const conflict = shifts.find(s =>
+                // 排除正在編輯的排班
+                (editId ? String(s.id) !== String(editId) : true) &&
+                String(s.staffId) === String(staffId) &&
+                s.date === date &&
+                s.startTime === startTime
+            );
+            if (conflict) {
+                const staffMember = findStaffById(staffId);
+                showNotification(`${staffMember.name} 在 ${date} ${startTime} 已有排班，無法重複安排！`);
+                return;
+            }
+            
             const shiftData = {
                 // 將 staffId 保持為字串型別，以確保與 staff 陣列中的 id 一致
                 staffId: staffId,
@@ -1311,19 +1320,17 @@
             }
         }
 
-        // 列印排班表
-        function printSchedule() {
-            // 先產生列印內容
+        /**
+         * 列印當月排班表。
+         * 舊的列印功能已移除並改為僅列印當前月份的排班資料。
+         * 此函式會開啟一個新視窗顯示排班表並觸發瀏覽器的列印對話框。
+         */
+        function printMonthlySchedule() {
+            // 產生排班表內容（僅包含當月資料）
             const printContent = generatePrintContent();
-            // 使用有限的特性開啟新視窗，以避免被彈窗阻擋器攔截
-            const printWindow = window.open('', 'printWindow', 'width=800,height=600,noopener,noreferrer');
-            // 若無法開啟新視窗，顯示錯誤通知
-            if (!printWindow) {
-                showNotification('無法開啟列印視窗，請確認瀏覽器允許彈窗。');
-                return;
-            }
-            // 建立完整 HTML
-            const html = `
+            // 建立列印視窗
+            const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+            printWindow.document.write(`
                 <html>
                 <head>
                     <title>醫療排班表</title>
@@ -1341,20 +1348,16 @@
                 <body>
                     ${printContent}
                 </body>
-                </html>`;
-            // 寫入並關閉文件
-            printWindow.document.open();
-            printWindow.document.write(html);
+                </html>
+            `);
             printWindow.document.close();
-            // 等待新視窗完成載入後再列印，避免空白頁
-            printWindow.addEventListener('load', () => {
-                try {
-                    printWindow.focus();
-                    printWindow.print();
-                } finally {
-                    printWindow.close();
-                }
-            }, { once: true });
+            printWindow.focus();
+            setTimeout(() => {
+                // 觸發列印
+                printWindow.print();
+                // 列印後關閉視窗
+                printWindow.close();
+            }, 100);
         }
 
         // 生成列印內容
@@ -1702,7 +1705,9 @@
   window.scheduleGoToToday = goToToday;
   window.scheduleSyncToGoogle = syncToGoogle;
   window.scheduleExportToICal = exportToICal;
-  window.schedulePrintSchedule = printSchedule;
+  // 將列印功能指向新的當月列印函式，並保留舊名稱供向後相容
+  window.schedulePrintMonthlySchedule = printMonthlySchedule;
+  window.schedulePrintSchedule = printMonthlySchedule;
   window.scheduleApplyFilters = applyFilters;
   window.scheduleOpenFixedScheduleModal = openFixedScheduleModal;
   window.scheduleCloseFixedScheduleModal = closeFixedScheduleModal;
@@ -1733,14 +1738,6 @@ if (typeof document !== 'undefined') {
       if (window.scheduleInitialized) return;
       window.scheduleInitialized = true;
       try {
-        // 移除表單必填屬性，避免瀏覽器內建驗證
-        (function removeRequiredAttributes() {
-          const fields = ['shiftDate','staffSelect','startTime','endTime','shiftType','fixedStartTime','fixedEndTime','fixedStaffSelect','scheduleRange','fixedShiftType'];
-          fields.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.removeAttribute('required');
-          });
-        })();
         // 更新當前日期顯示
         if (typeof updateCurrentDate === 'function') updateCurrentDate();
         // 設定事件監聽器

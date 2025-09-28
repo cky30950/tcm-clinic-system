@@ -3011,7 +3011,8 @@
                 <div class="sync-controls">
                     <button class="sync-btn" onclick="scheduleSyncToGoogle()">📅 同步 Google</button>
                     <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
-                    <button class="sync-btn" onclick="schedulePrintSchedule()">🖨️ 列印</button>
+                    <!-- 修改列印按鈕以呼叫新的當月排班列印函式 -->
+                    <button class="sync-btn" onclick="schedulePrintMonthlySchedule()">🖨️ 列印</button>
                 </div>
             </div>
 
@@ -3375,6 +3376,7 @@
                 const type = this.value;
                 const startTime = document.getElementById('startTime');
                 const endTime = document.getElementById('endTime');
+
                 switch(type) {
                     case 'morning':
                         startTime.value = '08:00';
@@ -3382,8 +3384,7 @@
                         break;
                     case 'afternoon':
                         startTime.value = '16:00';
-                        // 將下午班的結束時間設為 00:00，避免 HTML <input type="time"> 不接受 24:00
-                        endTime.value = '00:00';
+                        endTime.value = '24:00';
                         break;
                     case 'night':
                         startTime.value = '00:00';
@@ -3398,7 +3399,7 @@
                 const customTimeGroup = document.getElementById('customTimeGroup');
                 const startTime = document.getElementById('fixedStartTime');
                 const endTime = document.getElementById('fixedEndTime');
-                
+
                 if (type === 'custom') {
                     customTimeGroup.style.display = 'block';
                 } else {
@@ -3410,8 +3411,7 @@
                             break;
                         case 'afternoon':
                             startTime.value = '16:00';
-                            // 將下午班的結束時間設為 00:00，表示跨日，避免 24:00 無效
-                            endTime.value = '00:00';
+                            endTime.value = '24:00';
                             break;
                         case 'night':
                             startTime.value = '00:00';
@@ -3686,7 +3686,7 @@
                 return;
             }
 
-            // 新增排班，備註預設為空白以免顯示「拖拽快速新增」
+            // 新增排班
             const newShift = {
                 id: Date.now(),
                 staffId: staffMember.id,
@@ -3695,7 +3695,7 @@
                 endTime: endTime,
                 type: shiftType,
                 status: 'confirmed',
-                notes: ''
+                notes: '拖拽快速新增'
             };
 
             shifts.push(newShift);
@@ -3885,12 +3885,9 @@
             const date = document.getElementById('shiftDate').value;
             const startTime = document.getElementById('startTime').value;
             const endTime = document.getElementById('endTime').value;
-            const typeSelectEl = document.getElementById('shiftType');
-            // 取得班別，如未選擇則預設早班
-            const type = typeSelectEl && typeSelectEl.value ? typeSelectEl.value : 'morning';
+            const type = document.getElementById('shiftType').value;
 
-            // 僅驗證人員、日期與時間必填，班別若未選擇則自動設為早班
-            if (!staffId || !date || !startTime || !endTime) {
+            if (!staffId || !date || !startTime || !endTime || !type) {
                 alert('請填寫所有必填欄位！');
                 return;
             }
@@ -4231,14 +4228,10 @@
 
         // 列印排班表
         function printSchedule() {
+            const printWindow = window.open('', '_blank', 'noopener,noreferrer');
             const printContent = generatePrintContent();
-            // 嘗試開啟新視窗印列內容，若失敗則提示使用者允許彈窗
-            const printWindow = window.open('', 'printWindow', 'width=800,height=600,noopener,noreferrer');
-            if (!printWindow) {
-                showNotification('無法開啟列印視窗，請確認瀏覽器允許彈窗。');
-                return;
-            }
-            const html = `
+
+            printWindow.document.write(`
                 <html>
                 <head>
                     <title>醫療排班表</title>
@@ -4256,18 +4249,17 @@
                 <body>
                     ${printContent}
                 </body>
-                </html>`;
-            printWindow.document.open();
-            printWindow.document.write(html);
+                </html>
+            `);
+            // Close and focus the document before printing.  Without a
+            // delay the print preview may appear blank in some browsers.
             printWindow.document.close();
-            printWindow.addEventListener('load', () => {
-                try {
-                    printWindow.focus();
-                    printWindow.print();
-                } finally {
-                    printWindow.close();
-                }
-            }, { once: true });
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+                // Close the window after printing to prevent leaving an empty tab.
+                printWindow.close();
+            }, 100);
         }
     </script>
     <!-- 新排班管理區結束 -->
