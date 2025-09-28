@@ -2563,7 +2563,8 @@
             color: white;
             padding: 4px 6px;
             border-radius: 6px;
-            font-size: 10px;
+            /* 放大排班卡片字體為原基準的 1.2 倍 */
+            font-size: 11px;
             margin: 1px 0;
             cursor: move;
             transition: all 0.3s ease;
@@ -2612,7 +2613,8 @@
 
 #scheduleManagement .shift-item .shift-name {
             font-weight: 600;
-            font-size: 10px;
+            /* 排班卡片內的姓名字體放大 1.2 倍 */
+            font-size: 11px;
         }
 
 #scheduleManagement .shift-item .shift-actions {
@@ -2630,11 +2632,12 @@
             background: rgba(255,255,255,0.2);
             border: none;
             color: white;
-            width: 16px;
-            height: 16px;
+            /* 將按鈕尺寸及字體放大 1.2 倍 */
+            width: 19px;
+            height: 19px;
             border-radius: 3px;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 11px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -2645,7 +2648,8 @@
         }
 
 #scheduleManagement .shift-details {
-            font-size: 8px;
+            /* 放大排班詳情字體為原基準的 1.2 倍 */
+            font-size: 9px;
             opacity: 0.9;
             line-height: 1.1;
         }
@@ -2653,7 +2657,8 @@
         /* 顯示職位名稱的樣式 */
         #scheduleManagement .shift-item .staff-position {
             margin-left: 2px;
-            font-size: 9px;
+            /* 放大職位標籤字體為原基準的 1.2 倍 */
+            font-size: 10px;
             font-weight: 500;
             opacity: 0.85;
         }
@@ -2977,7 +2982,8 @@
             }
 
 #scheduleManagement .shift-item {
-                font-size: 10px;
+                /* 調整窄螢幕下的排班卡片字體大小為原基準 1.2 倍 */
+                font-size: 11px;
                 padding: 2px 4px;
             }
 
@@ -3000,37 +3006,36 @@
             font-size: 10px !important;
         }
         #scheduleManagement .shift-item {
-            font-size: 9px !important;
+            /* 將排班卡片整體字體放大為原設定的 1.2 倍 */
+            font-size: 11px !important;
         }
         #scheduleManagement .shift-item .shift-name {
-            font-size: 9px !important;
+            /* 排班卡片內的姓名字體同步放大 1.2 倍 */
+            font-size: 11px !important;
         }
         #scheduleManagement .shift-action-btn {
-            font-size: 9px !important;
-            width: 14px !important;
-            height: 14px !important;
+            /* 操作按鈕字體及尺寸放大 1.2 倍 */
+            font-size: 11px !important;
+            /* 調整寬高與基準一併放大 1.2 倍 */
+            width: 19px !important;
+            height: 19px !important;
         }
         #scheduleManagement .shift-details {
-            font-size: 7px !important;
-        }
-        #scheduleManagement .shift-item .staff-position {
-            font-size: 8px !important;
-        }
-        #scheduleManagement .staff-name {
-            /* 將醫護人員管理區的使用者名稱縮小至原字級的 0.75 倍（由放大 1.5 倍後減 0.25 倍） */
-            font-size: 12px !important;
-        }
-        #scheduleManagement .staff-name .staff-position {
-            /* 職位標籤同樣按比例縮小 */
-            font-size: 12px !important;
-        }
-        #scheduleManagement .staff-status {
-            /* 將狀態字體減 0.25 倍，使其較先前略小 */
+            /* 排班詳情字體放大約 1.2 倍 */
             font-size: 9px !important;
         }
-        #scheduleManagement .drag-hint {
-            /* 調整拖曳提示字體為較小尺寸 */
+        #scheduleManagement .shift-item .staff-position {
+            /* 職位標籤字體依比例調整 */
             font-size: 10px !important;
+        }
+        #scheduleManagement .staff-name {
+            font-size: 11px !important;
+        }
+        #scheduleManagement .staff-status {
+            font-size: 8px !important;
+        }
+        #scheduleManagement .drag-hint {
+            font-size: 9px !important;
         }
         #scheduleManagement .staff-filter-btn {
             font-size: 10px !important;
