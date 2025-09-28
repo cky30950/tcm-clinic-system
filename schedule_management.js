@@ -7,6 +7,22 @@
         // 公眾假期顯示控制：'' 表示不顯示，'hk' 表示顯示香港公眾假期，'us' 表示顯示美國公眾假期
         let selectedHolidayRegion = '';
 
+        /*
+         * ------------------------------------------------------------------
+         * 防止重複動作旗標
+         *
+         * 有使用者回報在點擊日曆格或提交排班表單時會看到兩次相同的操作被觸發，
+         * 這通常是由於瀏覽器在不同元素上綁定了多個事件處理程序，導致同一事件被
+         * 短時間內重複處理。以下旗標用於暫時鎖定模態框開啟與表單送出的行為，確
+         * 保每次使用者操作只會觸發一次對應的函式。鎖定會在下一個事件循環解除，
+         * 不會影響正常的後續操作。
+         */
+
+        // 當 shiftModalOpening 為 true 時，表示排班模態框正在開啟過程中，避免重複呼叫 openShiftModal
+        let shiftModalOpening = false;
+        // 當 shiftSubmitInProgress 為 true 時，表示正在處理新增/編輯排班，避免重複呼叫 addShift
+        let shiftSubmitInProgress = false;
+
         // 定義 2025 年香港與美國公眾假期列表。若擴充其他年份，可新增相應物件。
         const hkHolidays2025 = [
             { date: '2025-01-01', name: '元旦' },
@@ -932,6 +948,15 @@
             if (!ensureAdmin('新增或編輯排班')) {
                 return;
             }
+            // 若模態框正在開啟，避免重複觸發導致重複執行
+            if (shiftModalOpening) {
+                return;
+            }
+            shiftModalOpening = true;
+            // 在下一個事件循環解除鎖定，防止瞬間重複觸發
+            setTimeout(() => {
+                shiftModalOpening = false;
+            }, 0);
             const modal = document.getElementById('shiftModal');
             const form = document.getElementById('shiftForm');
             
@@ -976,6 +1001,12 @@
             if (!ensureAdmin('新增或編輯排班')) {
                 return;
             }
+            // 如果已有排班提交正在進行，直接返回以避免重複動作
+            if (shiftSubmitInProgress) {
+                return;
+            }
+            // 設置旗標，表示正在處理新增/編輯排班
+            shiftSubmitInProgress = true;
             const form = document.getElementById('shiftForm');
             const modal = document.getElementById('shiftModal');
             const editId = modal.dataset.editId;
@@ -990,6 +1021,8 @@
 
             if (!staffId || !date || !startTime || !endTime || !type) {
                 alert('請填寫所有必填欄位！');
+                // 釋放提交鎖定，讓使用者可以再次嘗試
+                shiftSubmitInProgress = false;
                 return;
             }
 
@@ -1004,6 +1037,8 @@
             if (conflict) {
                 const staffMember = findStaffById(staffId);
                 showNotification(`${staffMember.name} 在 ${date} ${startTime} 已有排班，無法重複安排！`);
+                // 釋放提交鎖定，以便使用者修正後可重新提交
+                shiftSubmitInProgress = false;
                 return;
             }
             
@@ -1051,6 +1086,10 @@
             // 更新顯示
             renderCalendar();
             updateStats();
+            // 排班提交處理完成，延遲釋放鎖定避免緊接著的事件連續觸發
+            setTimeout(() => {
+                shiftSubmitInProgress = false;
+            }, 0);
         }
 
         // 同步到 Google Calendar
@@ -1351,13 +1390,13 @@
                 </html>
             `);
             printWindow.document.close();
-            printWindow.focus();
-            setTimeout(() => {
-                // 觸發列印
+            // 使用 onload 事件等待內容完成載入後再列印，避免在某些瀏覽器中出現空白頁的情況。
+            printWindow.onload = () => {
+                printWindow.focus();
                 printWindow.print();
-                // 列印後關閉視窗
+                // 列印完成後關閉新開的視窗，避免留下空白標籤
                 printWindow.close();
-            }, 100);
+            };
         }
 
         // 生成列印內容
@@ -1726,6 +1765,38 @@
   window.scheduleShowShiftDetails = showShiftDetails;
   window.scheduleShowShiftDetailsById = showShiftDetailsById;
   window.scheduleUpdateStats = updateStats;
+
+  // ----------------------------------------------------------------------
+  // Inline event handler wrappers
+  //
+  // schedule_management.js 為行事曆排班系統暴露了一組以 schedule* 為前綴的 API，
+  // 其中包含編輯與刪除排班的函式。排班項目的 HTML 標記使用了 onclick="handleEditShift(...)"
+  // 與 onclick="handleDeleteShift(...)" 等 inline 事件。在某些佈署環境中，
+  // 這些包裝函式是由 system.html 內嵌腳本提供的。但當我們停用舊有腳本時，
+  // handleEditShift / handleDeleteShift 可能不存在。
+  // 為了保證排班項目按鈕可以正常工作，我們在此為 window 物件提供後備實作。
+
+  if (typeof window.handleEditShift !== 'function') {
+    window.handleEditShift = function (e, shiftId) {
+      // 停止事件向上冒泡，以免點擊事件被父元素捕獲
+      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+      // 調用 scheduleEditShift 以開啟編輯介面
+      if (typeof window.scheduleEditShift === 'function') {
+        window.scheduleEditShift(shiftId);
+      }
+    };
+  }
+  if (typeof window.handleDeleteShift !== 'function') {
+    window.handleDeleteShift = function (e, shiftId) {
+      // 停止事件冒泡並阻止預設行為（例如點擊後跳轉）
+      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+      // 調用 scheduleDeleteShift 以刪除排班
+      if (typeof window.scheduleDeleteShift === 'function') {
+        window.scheduleDeleteShift(shiftId);
+      }
+    };
+  }
 
   // 公眾假期選擇函式暴露至全域，供 HTML 選單呼叫
   window.scheduleChangeHolidayRegion = changeHolidayRegion;
