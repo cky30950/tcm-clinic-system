@@ -1359,106 +1359,7 @@
             }
         }
 
-        /**
-         * 列印當月排班表。
-         * 舊的列印功能已移除並改為僅列印當前月份的排班資料。
-         * 此函式會開啟一個新視窗顯示排班表並觸發瀏覽器的列印對話框。
-         */
-        function printMonthlySchedule() {
-            // 產生排班表內容（僅包含當月資料）
-            const printContent = generatePrintContent();
-            // 建立列印視窗
-            const printWindow = window.open('', '_blank', 'noopener,noreferrer');
-            printWindow.document.write(`
-                <html>
-                <head>
-                    <title>醫療排班表</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; margin: 20px; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                        th { background-color: #f2f2f2; }
-                        .header { text-align: center; margin-bottom: 20px; }
-                        .shift-doctor { background-color: #e8f5e8; }
-                        .shift-nurse { background-color: #fff3e0; }
-                        @media print { body { margin: 0; } }
-                    </style>
-                </head>
-                <body>
-                    ${printContent}
-                </body>
-                </html>
-            `);
-            printWindow.document.close();
-            // 使用 onload 事件等待內容完成載入後再列印，避免在某些瀏覽器中出現空白頁的情況。
-            printWindow.onload = () => {
-                printWindow.focus();
-                printWindow.print();
-                // 列印完成後關閉新開的視窗，避免留下空白標籤
-                printWindow.close();
-            };
-        }
-
-        // 生成列印內容
-        function generatePrintContent() {
-            const currentMonth = currentDate.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' });
-            let content = `
-                <div class="header">
-                    <h1>醫療排班表</h1>
-                    <h2>${currentMonth}</h2>
-                    <p>列印時間：${new Date().toLocaleString('zh-TW')}</p>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>日期</th>
-                            <th>姓名</th>
-                            <th>職位</th>
-                            <th>部門</th>
-                            <th>班別</th>
-                            <th>時間</th>
-                            <th>狀態</th>
-                            <th>備註</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            const sortedShifts = shifts
-                .filter(passesFilter)
-                // 僅列印當前月份的排班
-                .filter(shift => {
-                    const d = new Date(shift.date);
-                    return d.getFullYear() === currentDate.getFullYear() && d.getMonth() === currentDate.getMonth();
-                })
-                .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-            sortedShifts.forEach(shift => {
-                const staffMember = findStaffById(shift.staffId);
-                const statusText = shift.status === 'confirmed' ? '已確認' : shift.status === 'pending' ? '待確認' : '已取消';
-                const rowClass = staffMember.role === 'doctor' ? 'shift-doctor' : 'shift-nurse';
-                
-                content += `
-                    <tr class="${rowClass}">
-                        <td>${shift.date}</td>
-                        <td>${staffMember.name}</td>
-                        <td>${staffMember.level}</td>
-                        <td>${staffMember.department}</td>
-                        <td>${getShiftTypeName(shift.type)}</td>
-                        <td>${shift.startTime} - ${shift.endTime}</td>
-                        <td>${statusText}</td>
-                        <td>${shift.notes || ''}</td>
-                    </tr>
-                `;
-            });
-
-            content += `
-                    </tbody>
-                </table>
-            `;
-
-            return content;
-        }
+        // 列印功能已移除，故不再提供 printMonthlySchedule 與 generatePrintContent 函式
 
         // 獲取班別名稱
         function getShiftTypeName(type) {
@@ -1745,8 +1646,7 @@
   window.scheduleSyncToGoogle = syncToGoogle;
   window.scheduleExportToICal = exportToICal;
   // 將列印功能指向新的當月列印函式，並保留舊名稱供向後相容
-  window.schedulePrintMonthlySchedule = printMonthlySchedule;
-  window.schedulePrintSchedule = printMonthlySchedule;
+  // 列印功能已移除，不再暴露 schedulePrintMonthlySchedule 與 schedulePrintSchedule
   window.scheduleApplyFilters = applyFilters;
   window.scheduleOpenFixedScheduleModal = openFixedScheduleModal;
   window.scheduleCloseFixedScheduleModal = closeFixedScheduleModal;
@@ -1765,6 +1665,10 @@
   window.scheduleShowShiftDetails = showShiftDetails;
   window.scheduleShowShiftDetailsById = showShiftDetailsById;
   window.scheduleUpdateStats = updateStats;
+
+  // 將列印當月排班表函式暴露至全域。使用者可透過 schedulePrintShiftTable()
+  // 觸發列印當前月份的排班表。函式名稱帶有 ShiftTable，避免與舊版列印 API 衝突。
+  window.schedulePrintShiftTable = printCurrentMonthSchedule;
 
   // ----------------------------------------------------------------------
   // Inline event handler wrappers
