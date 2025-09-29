@@ -22670,16 +22670,27 @@ function hideGlobalCopyright() {
               };
             }
             // 遞歸補強 root 及 child 回傳值的兼容方法
-            if (ref.child && typeof ref.child === 'function') {
-              const origChild = ref.child.bind(ref);
+            {
+              const hasOriginalChild = ref.child && typeof ref.child === 'function';
+              const origChild = hasOriginalChild ? ref.child.bind(ref) : null;
               ref.child = function (childPath) {
-                const childRef = origChild(childPath);
+                let childRef;
+                if (origChild) {
+                  // 使用原始的 child 方法取得子節點
+                  childRef = origChild(childPath);
+                } else {
+                  // 模組化 ref 沒有 child 方法，手動拼接路徑產生新的引用
+                  const basePath = ref.__firechatPath || '';
+                  const normalizedBase = basePath ? basePath.replace(/^\/+|\/+$/g, '') : '';
+                  const childNewPath = normalizedBase ? `${normalizedBase}/${childPath}` : childPath;
+                  childRef = window.firebase.ref(window.firebase.rtdb, childNewPath);
+                }
                 let compat = attachCompat(childRef);
                 // 更新路徑
-                const normalize = (p) => (p ? p.replace(/^\/+|\/+$/g, '') : '');
-                const basePath = ref.__firechatPath || '';
-                const newPath = basePath ? `${basePath}/${childPath}` : childPath;
-                compat.__firechatPath = normalize(newPath);
+                const normalizePath = (p) => (p ? p.replace(/^\/+|\/+$/g, '') : '');
+                const base = ref.__firechatPath || '';
+                const combinedPath = base ? `${base}/${childPath}` : childPath;
+                compat.__firechatPath = normalizePath(combinedPath);
                 augmentRef(compat);
                 return compat;
               };
