@@ -4312,38 +4312,65 @@
     <!-- Firechat 相關資源：jQuery、Firebase compat 以及 Firechat 樣式與腳本 -->
     <!-- 引入 jQuery（Firechat UI 依賴） -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <!-- 移除 Firebase compat 引用，改用模組化版本，避免與自定義 window.firebase 衝突 -->
-    <!-- Firechat CSS 與 JS -->
-    <link rel="stylesheet" href="https://cdn.firebase.com/libs/firechat/3.0.1/firechat.min.css" />
-    <script src="https://cdn.firebase.com/libs/firechat/3.0.1/firechat.min.js"></script>
-
-    <!-- 聊天室容器及切換按鈕 -->
-    <div id="firechatContainer" class="fixed bottom-20 right-4 bg-white shadow-lg rounded-lg overflow-hidden z-50" style="width: 320px; height: 400px; display: none;"></div>
+    <!-- Firebase compat：提供舊版 Firebase API 給 Firechat 使用 -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <!-- 內部聊天彈窗容器 -->
+    <div id="chatPopup" class="fixed bottom-20 right-4 bg-white shadow-lg rounded-lg overflow-hidden z-50 hidden" style="width: 320px; height: 420px;">
+      <!-- 聊天標題區 -->
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div id="chatConnectionDot" class="w-3 h-3 bg-gray-400 rounded-full"></div>
+          <span class="font-bold text-sm">內部聊天</span>
+          <span id="chatOnlineCount" class="text-xs text-blue-200"></span>
+        </div>
+        <button id="closeChatBtn" class="text-white hover:bg-white hover:bg-opacity-20 rounded-md px-2 py-1 text-lg leading-none">×</button>
+      </div>
+      <!-- 聊天內容區 -->
+      <div class="flex h-[372px]">
+        <!-- 用戶列表 -->
+        <div id="chatUserList" class="w-1/3 bg-gray-50 border-r border-gray-200 overflow-y-auto text-sm"></div>
+        <!-- 訊息與輸入區 -->
+        <div class="flex-1 flex flex-col">
+          <!-- 訊息顯示區 -->
+          <div id="chatMessages" class="flex-1 p-3 overflow-y-auto bg-white space-y-3"></div>
+          <!-- 輸入區 -->
+          <div class="border-t border-gray-200 p-2 bg-gray-50">
+            <form id="chatMessageForm" class="flex items-end space-x-2">
+              <div class="flex-1">
+                <textarea
+                  id="chatMessageInput"
+                  placeholder="輸入訊息..."
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm"
+                  rows="1"
+                  maxlength="500"
+                ></textarea>
+                <div class="flex justify-end items-center mt-1">
+                  <span id="chatCharCount" class="text-xs text-gray-400">0/500</span>
+                </div>
+              </div>
+              <button
+                type="submit"
+                id="chatSendBtn"
+                class="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                </svg>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 內部聊天開關按鈕 -->
     <button id="chatToggleButton" class="fixed bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg z-50" style="width:48px;height:48px;line-height:1;">💬</button>
 
-    <!-- 聊天室開關控制 -->
-    <script>
-      // 控制聊天室面板顯示/隱藏
-      (function() {
-        const toggleBtn = document.getElementById('chatToggleButton');
-        const chatContainer = document.getElementById('firechatContainer');
-        if (toggleBtn) {
-          toggleBtn.addEventListener('click', () => {
-            if (chatContainer.style.display === 'none' || chatContainer.style.display === '') {
-              chatContainer.style.display = 'block';
-              // 如果 Firechat 尚未初始化，在首次展開時初始化
-              if (typeof window.initFirechatUI === 'function' && !window.firechatInstance) {
-                window.initFirechatUI();
-              }
-            } else {
-              chatContainer.style.display = 'none';
-            }
-          });
-        }
-      })();
-    </script>
-
     <script src="schedule_management.js"></script>    <script src="system.js"></script>
+    <!-- 內部聊天系統腳本 -->
+    <script src="chatSystem.js"></script>
     <!-- 語言國際化腳本，必須在系統腳本之後載入 -->
     <script src="i18n.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>

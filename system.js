@@ -2687,13 +2687,13 @@ async function syncUserDataFromFirebase() {
                 const msg = lang === 'en' ? enMsg : zhMsg;
                 showToast(msg, 'success');
             }
-            // 初始化 Firechat 聊天室（若已載入函式）
+            // 初始化內部聊天系統（若已載入函式）
             try {
-                if (typeof window.initFirechatUI === 'function') {
-                    window.initFirechatUI();
+                if (typeof window.initChatSystem === 'function') {
+                    window.initChatSystem();
                 }
             } catch (_e) {
-                console.error('初始化聊天室失敗:', _e);
+                console.error('初始化內部聊天系統失敗:', _e);
             }
         }
 
@@ -22342,12 +22342,14 @@ function hideGlobalCopyright() {
         console.error('FirechatUI 尚未載入，無法初始化即時聊天室。');
         return;
       }
-      // 若尚未初始化 compat Firebase，嘗試使用模組化配置初始化（可忽略錯誤）
+      // 透過 compat API 初始化 Firebase（如果尚未初始化）
       if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length === 0) {
         try {
+          // 使用現有模組化應用的設定
           const config = (window.firebase && window.firebase.app && window.firebase.app.options) || {};
           firebase.initializeApp(config);
         } catch (e) {
+          // 如果已經初始化會丟出錯誤，可安全忽略
           console.warn('初始化 compat Firebase 失敗或已存在應用：', e);
         }
       }
@@ -22374,420 +22376,17 @@ function hideGlobalCopyright() {
         }
       } catch (_e) {}
       if (!displayName) {
-        displayName =
-          (authUser && (authUser.displayName || authUser.email)) ||
-          (typeof currentUser !== 'undefined' && currentUser) ||
-          'User';
+        displayName = (authUser && (authUser.displayName || authUser.email)) || (typeof currentUser !== 'undefined' && currentUser) || 'User';
       }
-      // 確保 firebase.database.ServerValue 存在 (模組化版中沒有)
-      if (window.firebase && window.firebase.database && !window.firebase.database.ServerValue) {
-        window.firebase.database.ServerValue = { TIMESTAMP: { '.sv': 'timestamp' } };
-      }
-      // 如果 window.firebase.database 尚未定義，建立一個兼容 Firechat 的 stub
-      if (window.firebase && !window.firebase.database) {
-        window.firebase.database = function () {
-          // 內部輔助：為引用附加 compat 屬性與擴充方法
-          function attachCompat(ref) {
-            if (!ref) return ref;
-            // 若尚未設置 database.app，進行設定
-            if (!ref.database) {
-              const appRef = (window.firebase && window.firebase.app) || { name: 'default', options: {} };
-              if (appRef && typeof appRef.auth !== 'function') {
-                appRef.auth = () => {
-                  return (window.firebase && window.firebase.auth) || {};
-                };
-              }
-              ref.database = { app: appRef };
-            }
-            // 增加 setWithPriority 方法：忽略優先級並直接調用 set
-            if (typeof ref.setWithPriority !== 'function' && typeof ref.set === 'function') {
-              ref.setWithPriority = (value, priority, onComplete) => {
-                const promise =
-                  window.firebase && typeof window.firebase.set === 'function'
-                    ? window.firebase.set(ref, value)
-                    : Promise.resolve();
-                if (typeof onComplete === 'function') {
-                  promise
-                    .then(() => onComplete(null))
-                    .catch((err) => onComplete(err));
-                }
-                return promise;
-              };
-            }
-            // 增加 onDisconnect 方法：若無對應 API，直接使用 set() 實現
-            if (typeof ref.onDisconnect !== 'function') {
-              ref.onDisconnect = () => {
-                const od =
-                  window.firebase && typeof window.firebase.onDisconnect === 'function'
-                    ? window.firebase.onDisconnect(ref)
-                    : null;
-                return {
-                  set: (value) => {
-                    if (od && typeof od.set === 'function') {
-                      return od.set(value);
-                    }
-                    return window.firebase && typeof window.firebase.set === 'function'
-                      ? window.firebase.set(ref, value)
-                      : Promise.resolve();
-                  },
-                  cancel: () => {
-                    if (od && typeof od.cancel === 'function') {
-                      return od.cancel();
-                    }
-                    return Promise.resolve();
-                  },
-                };
-              };
-            }
-            // 將原有 child 方法封裝為遞迴 attachCompat；若不存在則稍後由 ref() 生成
-            if (typeof ref.child === 'function' && !ref.__firechatPatched) {
-              const originalChild = ref.child.bind(ref);
-              ref.child = (childPath) => {
-                const childRef = originalChild(childPath);
-                return attachCompat(childRef);
-              };
-              ref.__firechatPatched = true;
-            }
-            // 對 root 做相同處理
-            if (ref.root && !ref.root.database) {
-              attachCompat(ref.root);
-            }
-            return ref;
-          }
-
-          /**
-           * 為提供給 Firechat 的引用擴充舊版 Firebase API 方法，以便 Firechat 可以正常調用。
-           * 這些方法透過模組化 Firebase 函式實作，如 push、set、on、once 等。
-           * @param {Object} ref - 從模組化 ref() 或 query() 取得的引用對象
-           */
-          function augmentRef(ref) {
-            if (!ref) return ref;
-            // 若已經擴充過，直接返回以避免重複和遞迴
-            if (ref.__firechatExtended) return ref;
-            // 標記為已擴充，防止在遞迴過程中重覆處理同一個參考
-            ref.__firechatExtended = true;
-            // 推入新的資料節點並回傳帶有 key 的引用
-            if (typeof ref.push !== 'function') {
-              ref.push = function (value, onComplete) {
-                let newRef;
-                // 優先使用模組化 push 函式
-                if (typeof window.firebase.push === 'function') {
-                  newRef = window.firebase.push(ref, value);
-                } else {
-                  // 若無模組化 push，則產生隨機鍵並手動建立新路徑
-                  const basePath = ref.__firechatPath || '';
-                  const normalizedBase = basePath ? basePath.replace(/^\/+|\/+$/g, '') : '';
-                  // 生成類似 Firebase push key 的隨機字串
-                  const generateKey = () => {
-                    const now = Date.now().toString(36);
-                    const rand = Math.random().toString(36).substring(2, 10);
-                    return now + rand;
-                  };
-                  const newKey = generateKey();
-                  const newPath = normalizedBase ? `${normalizedBase}/${newKey}` : newKey;
-                  newRef = window.firebase.ref(window.firebase.rtdb, newPath);
-                }
-                let compat = attachCompat(newRef);
-                // 更新路徑
-                if (ref.__firechatPath) {
-                  const normalize = (p) => (p ? p.replace(/^\/+|\/+$/g, '') : '');
-                  const childKey = compat.key || '';
-                  const newPath = ref.__firechatPath ? `${ref.__firechatPath}/${childKey}` : childKey;
-                  compat.__firechatPath = normalize(newPath);
-                }
-                augmentRef(compat);
-                // 若有 value 且 value 非 undefined，並未透過 push(value) 直接寫入，則手動 set
-                if (typeof value !== 'undefined' && value !== null && typeof onComplete === 'function') {
-                  compat.set(value, onComplete);
-                } else if (typeof value !== 'undefined' && value !== null) {
-                  compat.set(value);
-                }
-                return compat;
-              };
-            }
-            // set 寫入
-            if (typeof ref.set !== 'function' && typeof window.firebase.set === 'function') {
-              ref.set = function (value, onComplete) {
-                const prom = window.firebase.set(ref, value);
-                if (typeof onComplete === 'function') {
-                  prom.then(() => onComplete(null)).catch((err) => onComplete(err));
-                }
-                return prom;
-              };
-            }
-            // update 更新
-            if (typeof ref.update !== 'function' && typeof window.firebase.update === 'function') {
-              ref.update = function (value, onComplete) {
-                const prom = window.firebase.update(ref, value);
-                if (typeof onComplete === 'function') {
-                  prom.then(() => onComplete(null)).catch((err) => onComplete(err));
-                }
-                return prom;
-              };
-            }
-            // remove 刪除
-            if (typeof ref.remove !== 'function' && typeof window.firebase.remove === 'function') {
-              ref.remove = function (onComplete) {
-                const prom = window.firebase.remove(ref);
-                if (typeof onComplete === 'function') {
-                  prom.then(() => onComplete(null)).catch((err) => onComplete(err));
-                }
-                return prom;
-              };
-            }
-            // transaction 更新
-            if (typeof ref.transaction !== 'function' && typeof window.firebase.runTransaction === 'function') {
-              ref.transaction = function (updateFn, onComplete, applyLocally) {
-                return window.firebase
-                  .runTransaction(ref, (currentData) => {
-                    try {
-                      const result = updateFn(currentData);
-                      return result;
-                    } catch (e) {
-                      console.error('transaction updateFn 錯誤', e);
-                      return currentData;
-                    }
-                  }, { applyLocally: !!applyLocally })
-                  .then((res) => {
-                    if (typeof onComplete === 'function') onComplete(null, res.committed, res.snapshot);
-                    return res;
-                  })
-                  .catch((err) => {
-                    if (typeof onComplete === 'function') onComplete(err, false, null);
-                    throw err;
-                  });
-              };
-            }
-            // once 讀取一次
-            if (typeof ref.once !== 'function' && typeof window.firebase.get === 'function') {
-              ref.once = function (eventType, successCallback, failureCallback) {
-                // 只支援 value 事件，其他事件退化為取得整個列表
-                const handleSnapshots = (snapshot) => {
-                  if (eventType === 'value') {
-                    if (typeof successCallback === 'function') successCallback(snapshot);
-                  } else if (eventType === 'child_added' || eventType === 'child_removed' || eventType === 'child_changed' || eventType === 'child_moved') {
-                    snapshot.forEach((childSnap) => {
-                      if (typeof successCallback === 'function') successCallback(childSnap);
-                    });
-                  } else {
-                    if (typeof successCallback === 'function') successCallback(snapshot);
-                  }
-                  return snapshot;
-                };
-                return window.firebase
-                  .get(ref)
-                  .then((snapshot) => handleSnapshots(snapshot))
-                  .catch((err) => {
-                    if (typeof failureCallback === 'function') failureCallback(err);
-                    throw err;
-                  });
-              };
-            }
-            // 事件監聽 on
-            if (typeof ref.on !== 'function') {
-              ref.__listeners = [];
-              ref.on = function (eventType, callback, cancelCallback) {
-                let unsub;
-                try {
-                  if (eventType === 'value' && typeof window.firebase.onValue === 'function') {
-                    unsub = window.firebase.onValue(ref, callback, cancelCallback || undefined);
-                  } else if (eventType === 'child_added' && typeof window.firebase.onChildAdded === 'function') {
-                    unsub = window.firebase.onChildAdded(ref, callback, cancelCallback || undefined);
-                  } else if (eventType === 'child_removed' && typeof window.firebase.onChildRemoved === 'function') {
-                    unsub = window.firebase.onChildRemoved(ref, callback, cancelCallback || undefined);
-                  } else if (eventType === 'child_changed' && typeof window.firebase.onChildChanged === 'function') {
-                    unsub = window.firebase.onChildChanged(ref, callback, cancelCallback || undefined);
-                  } else {
-                    // 預設使用 onValue
-                    if (typeof window.firebase.onValue === 'function') {
-                      unsub = window.firebase.onValue(ref, callback, cancelCallback || undefined);
-                    }
-                  }
-                } catch (err) {
-                  console.warn('安裝監聽器時發生錯誤：', err);
-                }
-                // 儲存取消函式
-                ref.__listeners.push({ eventType, callback, unsub });
-                return callback;
-              };
-              // off 移除監聽
-              ref.off = function (eventType, callback) {
-                // 使用模組化 off 若可用
-                if (typeof window.firebase.off === 'function') {
-                  try {
-                    window.firebase.off(ref, eventType, callback);
-                  } catch (e) {
-                    // 忽略錯誤
-                  }
-                }
-                if (ref.__listeners && ref.__listeners.length) {
-                  ref.__listeners = ref.__listeners.filter((l) => {
-                    const match = (!eventType || l.eventType === eventType) && (!callback || l.callback === callback);
-                    if (match && l.unsub) {
-                      try {
-                        l.unsub();
-                      } catch (e) {
-                        // 忽略取消監聽錯誤
-                      }
-                    }
-                    return !match;
-                  });
-                }
-              };
-            }
-            // 限制結果: limitToLast
-            if (typeof ref.limitToLast !== 'function') {
-              ref.limitToLast = function (limit) {
-                if (typeof window.firebase.limitToLast === 'function') {
-                  const newQuery = window.firebase.limitToLast(ref, limit);
-                  let compat = attachCompat(newQuery);
-                  compat.__firechatPath = ref.__firechatPath;
-                  augmentRef(compat);
-                  return compat;
-                }
-                // 若無 limitToLast 函式，退化為返回自身
-                return ref;
-              };
-            }
-            // limitToFirst
-            if (typeof ref.limitToFirst !== 'function') {
-              ref.limitToFirst = function (limit) {
-                if (typeof window.firebase.limitToFirst === 'function') {
-                  const newQuery = window.firebase.limitToFirst(ref, limit);
-                  let compat = attachCompat(newQuery);
-                  compat.__firechatPath = ref.__firechatPath;
-                  augmentRef(compat);
-                  return compat;
-                }
-                return ref;
-              };
-            }
-            // orderByChild
-            if (typeof ref.orderByChild !== 'function') {
-              ref.orderByChild = function (childKey) {
-                if (typeof window.firebase.orderByChild === 'function') {
-                  const newQuery = window.firebase.orderByChild(ref, childKey);
-                  let compat = attachCompat(newQuery);
-                  compat.__firechatPath = ref.__firechatPath;
-                  augmentRef(compat);
-                  return compat;
-                }
-                return ref;
-              };
-            }
-            // startAt
-            if (typeof ref.startAt !== 'function') {
-              ref.startAt = function (value) {
-                if (typeof window.firebase.startAt === 'function') {
-                  const newQuery = window.firebase.startAt(ref, value);
-                  let compat = attachCompat(newQuery);
-                  compat.__firechatPath = ref.__firechatPath;
-                  augmentRef(compat);
-                  return compat;
-                }
-                return ref;
-              };
-            }
-            // endAt
-            if (typeof ref.endAt !== 'function') {
-              ref.endAt = function (value) {
-                if (typeof window.firebase.endAt === 'function') {
-                  const newQuery = window.firebase.endAt(ref, value);
-                  let compat = attachCompat(newQuery);
-                  compat.__firechatPath = ref.__firechatPath;
-                  augmentRef(compat);
-                  return compat;
-                }
-                return ref;
-              };
-            }
-            // 遞歸補強 root 及 child 回傳值的兼容方法
-            {
-              const hasOriginalChild = ref.child && typeof ref.child === 'function';
-              const origChild = hasOriginalChild ? ref.child.bind(ref) : null;
-              ref.child = function (childPath) {
-                let childRef;
-                if (origChild) {
-                  // 使用原始的 child 方法取得子節點
-                  childRef = origChild(childPath);
-                } else {
-                  // 模組化 ref 沒有 child 方法，手動拼接路徑產生新的引用
-                  const basePath = ref.__firechatPath || '';
-                  const normalizedBase = basePath ? basePath.replace(/^\/+|\/+$/g, '') : '';
-                  const childNewPath = normalizedBase ? `${normalizedBase}/${childPath}` : childPath;
-                  childRef = window.firebase.ref(window.firebase.rtdb, childNewPath);
-                }
-                let compat = attachCompat(childRef);
-                // 更新路徑
-                const normalizePath = (p) => (p ? p.replace(/^\/+|\/+$/g, '') : '');
-                const base = ref.__firechatPath || '';
-                const combinedPath = base ? `${base}/${childPath}` : childPath;
-                compat.__firechatPath = normalizePath(combinedPath);
-                augmentRef(compat);
-                return compat;
-              };
-            }
-            return ref;
-          }
-          return {
-            ref: (path) => {
-              if (window.firebase && typeof window.firebase.ref === 'function' && window.firebase.rtdb) {
-                // 使用模組化 API 建立引用
-                const baseRef = window.firebase.ref(window.firebase.rtdb, path);
-                let compatRef = attachCompat(baseRef);
-                // 儲存路徑供後續子節點與查詢建立時使用
-                const normalize = (p) => (p ? p.replace(/^\/+|\/+$/g, '') : '');
-                compatRef.__firechatPath = normalize(path);
-                // 以 augmentRef 擴充 compatRef 功能
-                augmentRef(compatRef);
-                // 如果沒有 root 屬性，建立根參考並擴充其方法
-                if (!compatRef.root) {
-                  const rootRef = window.firebase.ref(window.firebase.rtdb);
-                  let rootCompat = attachCompat(rootRef);
-                  rootCompat.__firechatPath = '';
-                  augmentRef(rootCompat);
-                  compatRef.root = rootCompat;
-                }
-                return compatRef;
-              }
-              throw new Error('Firebase RTDB 尚未初始化');
-            },
-            ServerValue: {
-              TIMESTAMP: { '.sv': 'timestamp' },
-            },
-          };
-        };
-        // 亦在函式上掛上 ServerValue 屬性，方便直接調用 firebase.database.ServerValue
-        window.firebase.database.ServerValue = { TIMESTAMP: { '.sv': 'timestamp' } };
-      }
-      // 建立 chatRef：優先使用 database().ref 產生帶兼容的引用
-      let chatRef = null;
-      if (window.firebase && window.firebase.database) {
-        if (
-          typeof window.firebase.database === 'function' &&
-          typeof window.firebase.database().ref === 'function'
-        ) {
-          chatRef = window.firebase.database().ref('chat');
-        } else if (
-          window.firebase.database &&
-          typeof window.firebase.database.ref === 'function'
-        ) {
-          chatRef = window.firebase.database.ref('chat');
-        }
-      }
-      if (!chatRef && typeof firebase !== 'undefined' && firebase.database) {
-        chatRef = firebase.database().ref('chat');
-      }
-      if (!chatRef) {
-        console.error('無法取得聊天參考路徑：Firebase 未初始化');
-        return;
-      }
-      // 取得聊天容器並初始化 FirechatUI
+      // 建立 Realtime Database 參考路徑，聊天室資料將儲存於 'chat' 節點
+      const chatRef = firebase.database().ref('chat');
+      // 建立 FirechatUI 實例，掛載至聊天室容器
       const container = document.getElementById('firechatContainer');
       if (!container) {
         console.error('找不到 Firechat 容器，無法初始化。');
         return;
       }
+      // 如果已有聊天實例則重新設定使用者即可
       if (window.firechatInstance && typeof window.firechatInstance.setUser === 'function') {
         window.firechatInstance.setUser(userId, displayName);
       } else {
