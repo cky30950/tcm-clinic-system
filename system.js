@@ -2549,7 +2549,47 @@ async function syncUserDataFromFirebase() {
             localStorage.setItem('users', JSON.stringify(users));
             console.log('已同步 Firebase 用戶數據到本地:', users.length, '筆 (使用快取)');
         } else {
-            console.log('從 Firebase 取得的用戶資料為空或讀取失敗，使用本地數據');
+            // 如果讀取失敗或沒有資料，嘗試使用當前登入使用者的 UID 取得個人資料
+            try {
+                const auth = window.firebase.auth;
+                const currentUserAuth = auth && auth.currentUser;
+                if (currentUserAuth && currentUserAuth.uid && window.firebaseDataManager && typeof window.firebaseDataManager.getUserByUid === 'function') {
+                    const res = await window.firebaseDataManager.getUserByUid(currentUserAuth.uid);
+                    if (res && res.success && res.data) {
+                        const u = res.data;
+                        const { personalSettings, ...rest } = u || {};
+                        users = [
+                            {
+                                ...rest,
+                                createdAt: u.createdAt
+                                  ? (u.createdAt.seconds
+                                    ? new Date(u.createdAt.seconds * 1000).toISOString()
+                                    : u.createdAt)
+                                  : new Date().toISOString(),
+                                updatedAt: u.updatedAt
+                                  ? (u.updatedAt.seconds
+                                    ? new Date(u.updatedAt.seconds * 1000).toISOString()
+                                    : u.updatedAt)
+                                  : new Date().toISOString(),
+                                lastLogin: u.lastLogin
+                                  ? (u.lastLogin.seconds
+                                    ? new Date(u.lastLogin.seconds * 1000).toISOString()
+                                    : u.lastLogin)
+                                  : null
+                            }
+                        ];
+                        localStorage.setItem('users', JSON.stringify(users));
+                        console.log('已同步當前使用者資料到本地 (權限限制下)', users);
+                    } else {
+                        console.log('從 Firebase 取得的用戶資料為空或讀取失敗，使用本地數據');
+                    }
+                } else {
+                    console.log('從 Firebase 取得的用戶資料為空或讀取失敗，使用本地數據');
+                }
+            } catch (subErr) {
+                console.error('嘗試載入當前使用者資料時發生錯誤:', subErr);
+                console.log('從 Firebase 取得的用戶資料為空或讀取失敗，使用本地數據');
+            }
         }
     } catch (error) {
         console.error('同步 Firebase 用戶數據失敗:', error);
@@ -16468,7 +16508,91 @@ class FirebaseDataManager {
             return { success: true, data: users, hasMore: this.usersHasMore };
         } catch (error) {
             console.error('讀取用戶數據失敗:', error);
+            /*
+             * 如果出現權限相關錯誤（例如 Firestore 回傳 Missing or insufficient permissions），
+             * 代表當前使用者無法讀取整個 users 集合。此時我們嘗試回退：
+             * 透過當前登入使用者的 UID 取得其個人用戶文件，以便至少能載入
+             * 自己的帳號資料並避免阻礙登入流程。
+             */
+            try {
+                const msg = (error && error.message) ? error.message.toString().toLowerCase() : '';
+                const code = (error && error.code) ? error.code : '';
+                if (code === 'permission-denied' || msg.includes('missing or insufficient permissions')) {
+                    const auth = window.firebase.auth;
+                    const currentUserAuth = auth && auth.currentUser;
+                    if (currentUserAuth && currentUserAuth.uid && typeof this.getUserByUid === 'function') {
+                        const res = await this.getUserByUid(currentUserAuth.uid);
+                        if (res && res.success && res.data) {
+                            this.usersCache = [res.data];
+                            this.usersLastVisible = null;
+                            this.usersHasMore = false;
+                            // 存入 localStorage
+                            try {
+                                localStorage.setItem('users', JSON.stringify(this.usersCache));
+                            } catch (_lsErr) {
+                                // 忽略 localStorage 錯誤
+                            }
+                            return { success: true, data: this.usersCache, hasMore: false };
+                        }
+                    }
+                }
+            } catch (fallbackErr) {
+                console.error('嘗試回退讀取當前用戶資料失敗:', fallbackErr);
+            }
             return { success: false, data: [] };
+        }
+    }
+
+    /**
+     * 透過使用者的 UID 取得對應的用戶資料。
+     * 此方法會先嘗試使用 where('uid','==', uid) 查詢，若沒有結果則回退
+     * 直接讀取文件 ID 為 uid 的文件。若皆失敗或未找到，返回 null。
+     *
+     * @param {string} uid Firebase Authentication 使用者 UID
+     * @returns {Promise<{ success: boolean, data: Object|null }>} 結果物件
+     */
+    async getUserByUid(uid) {
+        if (!this.isReady || !uid) {
+            return { success: false, data: null };
+        }
+        try {
+            // 先透過 uid 欄位查詢
+            const usersRef = window.firebase.collection(window.firebase.db, 'users');
+            let snapshot;
+            try {
+                const q = window.firebase.firestoreQuery(
+                    usersRef,
+                    window.firebase.where('uid', '==', uid),
+                    window.firebase.limit(1)
+                );
+                snapshot = await window.firebase.getDocs(q);
+            } catch (_e) {
+                snapshot = null;
+            }
+            let found = null;
+            if (snapshot && snapshot.docs && snapshot.docs.length > 0) {
+                const docSnap = snapshot.docs[0];
+                found = { id: docSnap.id, ...docSnap.data() };
+            }
+            // 若未找到，再嘗試直接讀取 uid 為文件 ID 的文件
+            if (!found) {
+                try {
+                    const docRef = window.firebase.doc(window.firebase.db, 'users', uid);
+                    const docSnap = await window.firebase.getDoc(docRef);
+                    if (docSnap && docSnap.exists()) {
+                        found = { id: docSnap.id, ...docSnap.data() };
+                    }
+                } catch (_e2) {
+                    // ignore
+                }
+            }
+            if (found) {
+                return { success: true, data: found };
+            }
+            return { success: false, data: null };
+        } catch (error) {
+            console.error('讀取用戶 (UID) 失敗:', error);
+            return { success: false, data: null };
         }
     }
 
