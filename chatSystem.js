@@ -250,6 +250,18 @@
       messagesUnsub = onValue(messagesRef, (snapshot) => {
         const data = snapshot.val() || {};
         const msgArray = Object.values(data);
+        // 更新該用戶的最後訊息時間並重新排序
+        if (msgArray && msgArray.length > 0) {
+          const last = msgArray[msgArray.length - 1];
+          const lastTs = last && last.timestamp;
+          if (lastTs && typeof lastTs === 'number') {
+            const target = usersList.find((u) => u && u.uid === uid);
+            if (target) {
+              target.lastChat = lastTs;
+              reorderList();
+            }
+          }
+        }
         renderMessages(msgArray);
       });
     }
@@ -335,27 +347,26 @@
       updateCharCount();
       toggleSendButton();
       autoResize();
+
+      // 更新選中對象的最後聊天時間並重新排序用戶列表
+      try {
+        const target = usersList.find((u) => u && u.uid === selectedUid);
+        if (target) {
+          target.lastChat = ts;
+          reorderList();
+        }
+      } catch (_err) {
+        // 忽略更新列表的錯誤
+      }
     }
 
     /**
      * 讀取所有用戶並渲染於列表。僅包含啟用用戶且排除自己。
      */
-    function loadUsers() {
-      const allUsers = Array.isArray(window.users) ? window.users : [];
-      usersList = allUsers.filter((u) => {
-        return u && u.uid && u.uid !== currentUid && (u.active !== false);
-      });
-      // 為用戶指定顏色
-      usersList.forEach((u, idx) => {
-        userColorMap[u.uid] = getColorByIndex(idx);
-      });
-      // 依照顯示名稱排序
-      usersList.sort((a, b) => {
-        const nameA = getDisplayName(a);
-        const nameB = getDisplayName(b);
-        return nameA.localeCompare(nameB, 'zh-Hant-u-ca-roc-tw');
-      });
-      // 清空列表
+    /**
+     * 重新渲染用戶列表，根據 usersList 的順序生成 DOM。這個函式會保留選取狀態。
+     */
+    function renderUserList() {
       userListEl.innerHTML = '';
       usersList.forEach((u) => {
         const displayName = getDisplayName(u);
@@ -363,7 +374,9 @@
         const colorCls = userColorMap[u.uid] || 'bg-gray-500';
         const item = document.createElement('div');
         item.dataset.uid = u.uid;
-        item.className = 'flex items-center space-x-2 p-2 bg-white hover:bg-gray-100 cursor-pointer text-sm';
+        // 選中目標需套用背景色
+        const isSelected = selectedUid && selectedUid === u.uid;
+        item.className = 'flex items-center space-x-2 p-2 bg-white hover:bg-gray-100 cursor-pointer text-sm' + (isSelected ? ' bg-blue-100' : '');
         item.innerHTML = `
           <div class="w-8 h-8 ${colorCls} rounded-full flex items-center justify-center text-white text-sm font-bold">${escapeHtml(initials)}</div>
           <span class="truncate">${escapeHtml(displayName)}</span>
@@ -374,6 +387,77 @@
         });
         userListEl.appendChild(item);
       });
+    }
+
+    /**
+     * 根據 lastChat 屬性重新排序 usersList，並重新渲染列表。
+     */
+    function reorderList() {
+      usersList.sort((a, b) => {
+        const tA = typeof a.lastChat === 'number' ? a.lastChat : 0;
+        const tB = typeof b.lastChat === 'number' ? b.lastChat : 0;
+        if (tA === tB) {
+          // 若時間相同，依照顯示名稱排序
+          const nameA = getDisplayName(a);
+          const nameB = getDisplayName(b);
+          return nameA.localeCompare(nameB, 'zh-Hant-u-ca-roc-tw');
+        }
+        return tB - tA;
+      });
+      renderUserList();
+    }
+
+    /**
+     * 從 Firebase 中載入用戶列表並取得每個對話的最後訊息時間，最後渲染列表。
+     * 這個函式會將 usersList 更新為包含 lastChat 屬性。
+     */
+    async function loadUsers() {
+      const allUsers = Array.isArray(window.users) ? window.users : [];
+      usersList = allUsers.filter((u) => {
+        return u && u.uid && u.uid !== currentUid && (u.active !== false);
+      });
+      // 為用戶指定顏色
+      usersList.forEach((u, idx) => {
+        userColorMap[u.uid] = getColorByIndex(idx);
+      });
+      // 計算每個用戶與當前用戶之間最後的對話時間
+      const fetchPromises = usersList.map(async (u) => {
+        const chatId = currentUid < u.uid ? `${currentUid}_${u.uid}` : `${u.uid}_${currentUid}`;
+        try {
+          const snap = await firebase.get(ref(rtdb, `messages/${chatId}`));
+          let last = 0;
+          if (snap && snap.exists()) {
+            const data = snap.val() || {};
+            for (const key in data) {
+              const msg = data[key];
+              const ts = msg && msg.timestamp;
+              if (ts && typeof ts === 'number' && ts > last) {
+                last = ts;
+              }
+            }
+          }
+          u.lastChat = last;
+        } catch (_err) {
+          u.lastChat = 0;
+        }
+      });
+      try {
+        await Promise.all(fetchPromises);
+      } catch (_e) {
+        // 忽略任何錯誤
+      }
+      // 依照最後對話時間排序
+      usersList.sort((a, b) => {
+        const tA = typeof a.lastChat === 'number' ? a.lastChat : 0;
+        const tB = typeof b.lastChat === 'number' ? b.lastChat : 0;
+        if (tA === tB) {
+          const nameA = getDisplayName(a);
+          const nameB = getDisplayName(b);
+          return nameA.localeCompare(nameB, 'zh-Hant-u-ca-roc-tw');
+        }
+        return tB - tA;
+      });
+      renderUserList();
     }
 
     /**
@@ -431,8 +515,8 @@
       updatePresenceUI(presenceData);
     });
 
-    // 載入用戶列表
-    loadUsers();
+    // 載入用戶列表（含最後聊天時間）
+    loadUsers().catch(() => {});
     // 初始字數統計與送出按鈕狀態
     updateCharCount();
     toggleSendButton();
