@@ -2719,6 +2719,14 @@ async function logout() {
         if (window.firebase && window.firebase.auth) {
             await window.firebase.signOut(window.firebase.auth);
         }
+        // 在登出後立即銷毀聊天模組，關閉視窗與按鈕並停止監聽
+        try {
+            if (window.ChatModule && typeof window.ChatModule.destroyChat === 'function') {
+                window.ChatModule.destroyChat();
+            }
+        } catch (chatErr) {
+            console.error('銷毀聊天模組失敗:', chatErr);
+        }
 
         // --- 取消中藥庫存監聽器 ---
         // 在登出時移除 Realtime Database 的中藥庫存監聽，

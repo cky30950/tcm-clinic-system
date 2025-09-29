@@ -483,13 +483,15 @@
       }
       this.messagesRef = window.firebase.ref(window.firebase.rtdb, path);
       // Listen to full value to fetch entire message list. Since group sizes are small, this is acceptable.
-      window.firebase.onValue(this.messagesRef, (snapshot) => {
+        window.firebase.onValue(this.messagesRef, (snapshot) => {
         const data = snapshot.val() || {};
         const messages = Object.values(data);
+        // Sort messages so that newest come first (descending by timestamp)
         messages.sort((a, b) => {
           const ta = a.timestamp || 0;
           const tb = b.timestamp || 0;
-          return ta - tb;
+          // If timestamps are equal or invalid, maintain order
+          return tb - ta;
         });
         this.renderMessages(messages);
       });
@@ -565,8 +567,8 @@
         fragment.appendChild(wrapper);
       });
       this.messageContainer.appendChild(fragment);
-      // Auto-scroll to bottom
-      this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
+      // Auto-scroll to top so that the newest messages are visible immediately
+      this.messageContainer.scrollTop = 0;
     }
 
     /**
