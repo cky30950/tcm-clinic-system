@@ -2722,7 +2722,7 @@ async function logout() {
                 // 新增：穴位庫管理
                 acupointLibrary: { title: '穴位庫', icon: '📌', description: '查看穴位資料' },
                 // 新增：醫療排班管理功能
-                scheduleManagement: { title: '醫療排班管理', icon: '📅', description: '排班與行事曆管理' },
+                scheduleManagement: { title: '醫療排班', icon: '📅', description: '排班與行事曆查看' },
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
                 // 將診所用戶管理的圖示更新為單人符號，以符合交換後的配置
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
