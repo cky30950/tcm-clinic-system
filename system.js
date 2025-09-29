@@ -22454,47 +22454,257 @@ function hideGlobalCopyright() {
             }
             return ref;
           }
+
+          /**
+           * 為提供給 Firechat 的引用擴充舊版 Firebase API 方法，以便 Firechat 可以正常調用。
+           * 這些方法透過模組化 Firebase 函式實作，如 push、set、on、once 等。
+           * @param {Object} ref - 從模組化 ref() 或 query() 取得的引用對象
+           */
+          function augmentRef(ref) {
+            if (!ref) return ref;
+            // 推入新的資料節點並回傳帶有 key 的引用
+            if (typeof ref.push !== 'function' && typeof window.firebase.push === 'function') {
+              ref.push = function (value, onComplete) {
+                // 若有傳入初始值，則 push 後立即 set
+                const newRef = window.firebase.push(ref, value);
+                let compat = attachCompat(newRef);
+                // 繼承路徑
+                if (ref.__firechatPath) {
+                  const normalize = (p) => (p ? p.replace(/^\/+|\/+$/g, '') : '');
+                  const childKey = compat.key || '';
+                  const newPath = ref.__firechatPath ? `${ref.__firechatPath}/${childKey}` : childKey;
+                  compat.__firechatPath = normalize(newPath);
+                }
+                augmentRef(compat);
+                // 若有 value 且 value 非 undefined，並未透過 push(value) 直接寫入，則手動 set
+                if (typeof value !== 'undefined' && value !== null && typeof onComplete === 'function') {
+                  compat.set(value, onComplete);
+                } else if (typeof value !== 'undefined' && value !== null) {
+                  compat.set(value);
+                }
+                return compat;
+              };
+            }
+            // set 寫入
+            if (typeof ref.set !== 'function' && typeof window.firebase.set === 'function') {
+              ref.set = function (value, onComplete) {
+                const prom = window.firebase.set(ref, value);
+                if (typeof onComplete === 'function') {
+                  prom.then(() => onComplete(null)).catch((err) => onComplete(err));
+                }
+                return prom;
+              };
+            }
+            // update 更新
+            if (typeof ref.update !== 'function' && typeof window.firebase.update === 'function') {
+              ref.update = function (value, onComplete) {
+                const prom = window.firebase.update(ref, value);
+                if (typeof onComplete === 'function') {
+                  prom.then(() => onComplete(null)).catch((err) => onComplete(err));
+                }
+                return prom;
+              };
+            }
+            // remove 刪除
+            if (typeof ref.remove !== 'function' && typeof window.firebase.remove === 'function') {
+              ref.remove = function (onComplete) {
+                const prom = window.firebase.remove(ref);
+                if (typeof onComplete === 'function') {
+                  prom.then(() => onComplete(null)).catch((err) => onComplete(err));
+                }
+                return prom;
+              };
+            }
+            // transaction 更新
+            if (typeof ref.transaction !== 'function' && typeof window.firebase.runTransaction === 'function') {
+              ref.transaction = function (updateFn, onComplete, applyLocally) {
+                return window.firebase
+                  .runTransaction(ref, (currentData) => {
+                    try {
+                      const result = updateFn(currentData);
+                      return result;
+                    } catch (e) {
+                      console.error('transaction updateFn 錯誤', e);
+                      return currentData;
+                    }
+                  }, { applyLocally: !!applyLocally })
+                  .then((res) => {
+                    if (typeof onComplete === 'function') onComplete(null, res.committed, res.snapshot);
+                    return res;
+                  })
+                  .catch((err) => {
+                    if (typeof onComplete === 'function') onComplete(err, false, null);
+                    throw err;
+                  });
+              };
+            }
+            // once 讀取一次
+            if (typeof ref.once !== 'function' && typeof window.firebase.get === 'function') {
+              ref.once = function (eventType, successCallback, failureCallback) {
+                // 只支援 value 事件，其他事件退化為取得整個列表
+                const handleSnapshots = (snapshot) => {
+                  if (eventType === 'value') {
+                    if (typeof successCallback === 'function') successCallback(snapshot);
+                  } else if (eventType === 'child_added' || eventType === 'child_removed' || eventType === 'child_changed' || eventType === 'child_moved') {
+                    snapshot.forEach((childSnap) => {
+                      if (typeof successCallback === 'function') successCallback(childSnap);
+                    });
+                  } else {
+                    if (typeof successCallback === 'function') successCallback(snapshot);
+                  }
+                  return snapshot;
+                };
+                return window.firebase
+                  .get(ref)
+                  .then((snapshot) => handleSnapshots(snapshot))
+                  .catch((err) => {
+                    if (typeof failureCallback === 'function') failureCallback(err);
+                    throw err;
+                  });
+              };
+            }
+            // 事件監聽 on
+            if (typeof ref.on !== 'function') {
+              ref.__listeners = [];
+              ref.on = function (eventType, callback, cancelCallback) {
+                let unsub;
+                try {
+                  if (eventType === 'value' && typeof window.firebase.onValue === 'function') {
+                    unsub = window.firebase.onValue(ref, callback, cancelCallback || undefined);
+                  } else if (eventType === 'child_added' && typeof window.firebase.onChildAdded === 'function') {
+                    unsub = window.firebase.onChildAdded(ref, callback, cancelCallback || undefined);
+                  } else if (eventType === 'child_removed' && typeof window.firebase.onChildRemoved === 'function') {
+                    unsub = window.firebase.onChildRemoved(ref, callback, cancelCallback || undefined);
+                  } else if (eventType === 'child_changed' && typeof window.firebase.onChildChanged === 'function') {
+                    unsub = window.firebase.onChildChanged(ref, callback, cancelCallback || undefined);
+                  } else {
+                    // 預設使用 onValue
+                    if (typeof window.firebase.onValue === 'function') {
+                      unsub = window.firebase.onValue(ref, callback, cancelCallback || undefined);
+                    }
+                  }
+                } catch (err) {
+                  console.warn('安裝監聽器時發生錯誤：', err);
+                }
+                // 儲存取消函式
+                ref.__listeners.push({ eventType, callback, unsub });
+                return callback;
+              };
+              // off 移除監聽
+              ref.off = function (eventType, callback) {
+                // 使用模組化 off 若可用
+                if (typeof window.firebase.off === 'function') {
+                  try {
+                    window.firebase.off(ref, eventType, callback);
+                  } catch (e) {
+                    // 忽略錯誤
+                  }
+                }
+                if (ref.__listeners && ref.__listeners.length) {
+                  ref.__listeners = ref.__listeners.filter((l) => {
+                    const match = (!eventType || l.eventType === eventType) && (!callback || l.callback === callback);
+                    if (match && l.unsub) {
+                      try {
+                        l.unsub();
+                      } catch (e) {
+                        // 忽略取消監聽錯誤
+                      }
+                    }
+                    return !match;
+                  });
+                }
+              };
+            }
+            // 限制結果: limitToLast
+            if (typeof ref.limitToLast !== 'function' && typeof window.firebase.limitToLast === 'function') {
+              ref.limitToLast = function (limit) {
+                const newQuery = window.firebase.limitToLast(ref, limit);
+                let compat = attachCompat(newQuery);
+                compat.__firechatPath = ref.__firechatPath;
+                augmentRef(compat);
+                return compat;
+              };
+            }
+            // limitToFirst
+            if (typeof ref.limitToFirst !== 'function' && typeof window.firebase.limitToFirst === 'function') {
+              ref.limitToFirst = function (limit) {
+                const newQuery = window.firebase.limitToFirst(ref, limit);
+                let compat = attachCompat(newQuery);
+                compat.__firechatPath = ref.__firechatPath;
+                augmentRef(compat);
+                return compat;
+              };
+            }
+            // orderByChild
+            if (typeof ref.orderByChild !== 'function' && typeof window.firebase.orderByChild === 'function') {
+              ref.orderByChild = function (childKey) {
+                const newQuery = window.firebase.orderByChild(ref, childKey);
+                let compat = attachCompat(newQuery);
+                compat.__firechatPath = ref.__firechatPath;
+                augmentRef(compat);
+                return compat;
+              };
+            }
+            // startAt
+            if (typeof ref.startAt !== 'function' && typeof window.firebase.startAt === 'function') {
+              ref.startAt = function (value) {
+                const newQuery = window.firebase.startAt(ref, value);
+                let compat = attachCompat(newQuery);
+                compat.__firechatPath = ref.__firechatPath;
+                augmentRef(compat);
+                return compat;
+              };
+            }
+            // endAt
+            if (typeof ref.endAt !== 'function' && typeof window.firebase.endAt === 'function') {
+              ref.endAt = function (value) {
+                const newQuery = window.firebase.endAt(ref, value);
+                let compat = attachCompat(newQuery);
+                compat.__firechatPath = ref.__firechatPath;
+                augmentRef(compat);
+                return compat;
+              };
+            }
+            // 遞歸補強 root 及 child 回傳值的兼容方法
+            if (ref.child && typeof ref.child === 'function' && !ref.__firechatAugmented) {
+              const origChild = ref.child.bind(ref);
+              ref.child = function (childPath) {
+                const childRef = origChild(childPath);
+                let compat = attachCompat(childRef);
+                // 更新路徑
+                const normalize = (p) => (p ? p.replace(/^\/+|\/+$/g, '') : '');
+                const basePath = ref.__firechatPath || '';
+                const newPath = basePath ? `${basePath}/${childPath}` : childPath;
+                compat.__firechatPath = normalize(newPath);
+                augmentRef(compat);
+                return compat;
+              };
+              ref.__firechatAugmented = true;
+            }
+            // 為 root 附加同樣的方法
+            if (ref.root && typeof ref.root === 'object' && !ref.root.__firechatAugmented) {
+              augmentRef(ref.root);
+              ref.root.__firechatAugmented = true;
+            }
+            return ref;
+          }
           return {
             ref: (path) => {
               if (window.firebase && typeof window.firebase.ref === 'function' && window.firebase.rtdb) {
                 // 使用模組化 API 建立引用
                 const baseRef = window.firebase.ref(window.firebase.rtdb, path);
                 let compatRef = attachCompat(baseRef);
-                // 儲存路徑供 child() 生成使用
+                // 儲存路徑供後續子節點與查詢建立時使用
                 const normalize = (p) => (p ? p.replace(/^\/+|\/+$/g, '') : '');
                 compatRef.__firechatPath = normalize(path);
-                // 若原始引用沒有 child 方法，為其建立 child()：基於儲存的路徑拼接子路徑
-                if (typeof compatRef.child !== 'function') {
-                  compatRef.child = function (childPath) {
-                    const basePath = compatRef.__firechatPath;
-                    const newPath = basePath ? `${basePath}/${childPath}` : childPath;
-                    const newRef = window.firebase.ref(window.firebase.rtdb, newPath);
-                    let newCompat = attachCompat(newRef);
-                    newCompat.__firechatPath = normalize(newPath);
-                    // 同樣確保 child() 在不存在時建立
-                    if (typeof newCompat.child !== 'function') {
-                      newCompat.child = compatRef.child.bind({ __firechatPath: newCompat.__firechatPath });
-                    }
-                    return newCompat;
-                  };
-                }
-                // root 屬性：根路徑空字串
+                // 以 augmentRef 擴充 compatRef 功能
+                augmentRef(compatRef);
+                // 如果沒有 root 屬性，建立根參考並擴充其方法
                 if (!compatRef.root) {
                   const rootRef = window.firebase.ref(window.firebase.rtdb);
                   let rootCompat = attachCompat(rootRef);
                   rootCompat.__firechatPath = '';
-                  if (typeof rootCompat.child !== 'function') {
-                    rootCompat.child = function (childPath) {
-                      const newPath = normalize(childPath);
-                      const newRef = window.firebase.ref(window.firebase.rtdb, newPath);
-                      let newCompat = attachCompat(newRef);
-                      newCompat.__firechatPath = normalize(newPath);
-                      if (typeof newCompat.child !== 'function') {
-                        newCompat.child = compatRef.child.bind({ __firechatPath: newCompat.__firechatPath });
-                      }
-                      return newCompat;
-                    };
-                  }
+                  augmentRef(rootCompat);
                   compatRef.root = rootCompat;
                 }
                 return compatRef;
