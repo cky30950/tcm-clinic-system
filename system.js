@@ -22467,12 +22467,28 @@ function hideGlobalCopyright() {
             // 標記為已擴充，防止在遞迴過程中重覆處理同一個參考
             ref.__firechatExtended = true;
             // 推入新的資料節點並回傳帶有 key 的引用
-            if (typeof ref.push !== 'function' && typeof window.firebase.push === 'function') {
+            if (typeof ref.push !== 'function') {
               ref.push = function (value, onComplete) {
-                // 若有傳入初始值，則 push 後立即 set
-                const newRef = window.firebase.push(ref, value);
+                let newRef;
+                // 優先使用模組化 push 函式
+                if (typeof window.firebase.push === 'function') {
+                  newRef = window.firebase.push(ref, value);
+                } else {
+                  // 若無模組化 push，則產生隨機鍵並手動建立新路徑
+                  const basePath = ref.__firechatPath || '';
+                  const normalizedBase = basePath ? basePath.replace(/^\/+|\/+$/g, '') : '';
+                  // 生成類似 Firebase push key 的隨機字串
+                  const generateKey = () => {
+                    const now = Date.now().toString(36);
+                    const rand = Math.random().toString(36).substring(2, 10);
+                    return now + rand;
+                  };
+                  const newKey = generateKey();
+                  const newPath = normalizedBase ? `${normalizedBase}/${newKey}` : newKey;
+                  newRef = window.firebase.ref(window.firebase.rtdb, newPath);
+                }
                 let compat = attachCompat(newRef);
-                // 繼承路徑
+                // 更新路徑
                 if (ref.__firechatPath) {
                   const normalize = (p) => (p ? p.replace(/^\/+|\/+$/g, '') : '');
                   const childKey = compat.key || '';
@@ -22620,53 +22636,69 @@ function hideGlobalCopyright() {
               };
             }
             // 限制結果: limitToLast
-            if (typeof ref.limitToLast !== 'function' && typeof window.firebase.limitToLast === 'function') {
+            if (typeof ref.limitToLast !== 'function') {
               ref.limitToLast = function (limit) {
-                const newQuery = window.firebase.limitToLast(ref, limit);
-                let compat = attachCompat(newQuery);
-                compat.__firechatPath = ref.__firechatPath;
-                augmentRef(compat);
-                return compat;
+                if (typeof window.firebase.limitToLast === 'function') {
+                  const newQuery = window.firebase.limitToLast(ref, limit);
+                  let compat = attachCompat(newQuery);
+                  compat.__firechatPath = ref.__firechatPath;
+                  augmentRef(compat);
+                  return compat;
+                }
+                // 若無 limitToLast 函式，退化為返回自身
+                return ref;
               };
             }
             // limitToFirst
-            if (typeof ref.limitToFirst !== 'function' && typeof window.firebase.limitToFirst === 'function') {
+            if (typeof ref.limitToFirst !== 'function') {
               ref.limitToFirst = function (limit) {
-                const newQuery = window.firebase.limitToFirst(ref, limit);
-                let compat = attachCompat(newQuery);
-                compat.__firechatPath = ref.__firechatPath;
-                augmentRef(compat);
-                return compat;
+                if (typeof window.firebase.limitToFirst === 'function') {
+                  const newQuery = window.firebase.limitToFirst(ref, limit);
+                  let compat = attachCompat(newQuery);
+                  compat.__firechatPath = ref.__firechatPath;
+                  augmentRef(compat);
+                  return compat;
+                }
+                return ref;
               };
             }
             // orderByChild
-            if (typeof ref.orderByChild !== 'function' && typeof window.firebase.orderByChild === 'function') {
+            if (typeof ref.orderByChild !== 'function') {
               ref.orderByChild = function (childKey) {
-                const newQuery = window.firebase.orderByChild(ref, childKey);
-                let compat = attachCompat(newQuery);
-                compat.__firechatPath = ref.__firechatPath;
-                augmentRef(compat);
-                return compat;
+                if (typeof window.firebase.orderByChild === 'function') {
+                  const newQuery = window.firebase.orderByChild(ref, childKey);
+                  let compat = attachCompat(newQuery);
+                  compat.__firechatPath = ref.__firechatPath;
+                  augmentRef(compat);
+                  return compat;
+                }
+                return ref;
               };
             }
             // startAt
-            if (typeof ref.startAt !== 'function' && typeof window.firebase.startAt === 'function') {
+            if (typeof ref.startAt !== 'function') {
               ref.startAt = function (value) {
-                const newQuery = window.firebase.startAt(ref, value);
-                let compat = attachCompat(newQuery);
-                compat.__firechatPath = ref.__firechatPath;
-                augmentRef(compat);
-                return compat;
+                if (typeof window.firebase.startAt === 'function') {
+                  const newQuery = window.firebase.startAt(ref, value);
+                  let compat = attachCompat(newQuery);
+                  compat.__firechatPath = ref.__firechatPath;
+                  augmentRef(compat);
+                  return compat;
+                }
+                return ref;
               };
             }
             // endAt
-            if (typeof ref.endAt !== 'function' && typeof window.firebase.endAt === 'function') {
+            if (typeof ref.endAt !== 'function') {
               ref.endAt = function (value) {
-                const newQuery = window.firebase.endAt(ref, value);
-                let compat = attachCompat(newQuery);
-                compat.__firechatPath = ref.__firechatPath;
-                augmentRef(compat);
-                return compat;
+                if (typeof window.firebase.endAt === 'function') {
+                  const newQuery = window.firebase.endAt(ref, value);
+                  let compat = attachCompat(newQuery);
+                  compat.__firechatPath = ref.__firechatPath;
+                  augmentRef(compat);
+                  return compat;
+                }
+                return ref;
               };
             }
             // 遞歸補強 root 及 child 回傳值的兼容方法
