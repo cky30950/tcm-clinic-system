@@ -4429,44 +4429,62 @@
       // 使用現有的 Firebase 設定初始化舊版 Firebase 並建立 Firechat。
       (function() {
         function initFirechat() {
-          // 確認舊版 Firebase (v3) 及 modular Firebase 皆已載入。舊版 firebase 透過全域變數 firebase 提供，
-          // modular Firebase 透過 firebase_init.js 暴露於 window.firebaseModular。若其中任何一個尚未就緒，則稍後再嘗試。
+          // 等待 compat Firebase (全域 firebase) 和 modular Firebase (window.firebaseModular) 都可用後才初始化 Firechat。
           if (typeof firebase === 'undefined' || !window.firebaseModular) {
             setTimeout(initFirechat, 100);
             return;
           }
           try {
-            // 確保 compat 版本的 firebase 已可用並儲存至 window.firebaseCompat 供後續使用。
+            // 儲存 compat 版本的 firebase 供後續使用（避免被其他腳本覆寫）。
             if (!window.firebaseCompat && typeof firebase !== 'undefined' && typeof firebase.initializeApp === 'function') {
               window.firebaseCompat = firebase;
             }
-            // 使用在 firebase_init.js 中暴露的 firebaseConfig 來初始化 compat Firebase。
-            // compat 版本提供 firebase.initializeApp()、firebase.database() 等命名空間式 API。
+            // 取得設定，優先使用 firebase_init.js 中暴露的 firebaseConfig。
             var config = window.firebaseConfig || (window.firebaseModular && window.firebaseModular.app && window.firebaseModular.app.options);
+            // 初始化 compat Firebase（若未初始化會成功，已初始化會丟出錯誤後被捕捉）。
             if (window.firebaseCompat) {
-              window.firebaseCompat.initializeApp(config);
+              try {
+                window.firebaseCompat.initializeApp(config);
+              } catch (_err) {
+                // 忽略已經初始化的錯誤
+              }
             }
           } catch (e) {
-            // 若初始化失敗或已初始化則忽略。
+            // 若初始化失敗則稍後重試
+            setTimeout(initFirechat, 100);
+            return;
           }
-          // 使用新版 Firebase Auth (從 firebase_init.js 暴露的 firebaseModular) 監聽登入狀態並初始化 Firechat。
-          window.firebaseModular.auth.onAuthStateChanged(function(user) {
-            // 未登入時不顯示聊天室
-            if (!user) {
-              return;
-            }
-            var wrapper = document.getElementById('firechat-wrapper');
-            if (!wrapper) return;
-            // 顯示聊天容器
-            wrapper.style.display = 'block';
-            // 使用 compat 版本的 firebase 取得 Realtime Database 參考。
-            var chatRef = window.firebaseCompat.database().ref('chat');
-            var chat = new FirechatUI(chatRef, wrapper);
-            var name = user.displayName || user.email || '匿名';
-            chat.setUser(user.uid, name, function() {
-              // 使用者設定完成，可進行其他初始化，例如自動加入房間
+          // 只註冊一次 onAuthStateChanged 監聽，避免重複建立聊天室。
+          if (!window._firechatAuthListenerAdded) {
+            window._firechatAuthListenerAdded = true;
+            window.firebaseModular.auth.onAuthStateChanged(function(user) {
+              // 未登入時不顯示聊天室
+              if (!user) {
+                return;
+              }
+              // 確保 compat Firebase 已可用
+              if (!window.firebaseCompat || typeof window.firebaseCompat.database !== 'function') {
+                return;
+              }
+              var wrapper = document.getElementById('firechat-wrapper');
+              if (!wrapper) return;
+              // 若已初始化聊天室則不重複處理
+              if (wrapper.dataset.initialized === 'true') {
+                wrapper.style.display = 'block';
+                return;
+              }
+              // 顯示聊天容器
+              wrapper.style.display = 'block';
+              // 建立 Realtime Database 參考並初始化 Firechat
+              var chatRef = window.firebaseCompat.database().ref('chat');
+              var chat = new FirechatUI(chatRef, wrapper);
+              var name = user.displayName || user.email || '匿名';
+              chat.setUser(user.uid, name, function() {
+                // 標記已初始化
+                wrapper.dataset.initialized = 'true';
+              });
             });
-          });
+          }
         }
         // 等待 DOM 準備完成後初始化。
         document.addEventListener('DOMContentLoaded', initFirechat);
