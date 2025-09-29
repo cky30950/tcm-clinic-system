@@ -4309,68 +4309,7 @@
     <!-- 載入 Chart.js 用於繪製個人統計分析圖表 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- 將 jQuery 保留下來，供其他模組使用 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-
-    <!-- 內部聊天彈窗容器與切換按鈕 -->
-    <!-- 
-      新增自訂聊天界面取代舊有 Firechat。該視窗預設隱藏，點擊右下角按鈕可開啟/關閉。
-      視窗設置可調整大小（resize: both）與拖曳 (透過 header)。
-      chatSystem.js 會負責初始化聊天邏輯並處理拖曳事件。
-    -->
-    <div id="chatPopup" class="fixed bottom-20 right-4 bg-white shadow-lg rounded-lg flex flex-col z-50 hidden"
-         style="width: 360px; height: 450px; resize: both; overflow: hidden; min-width: 300px; min-height: 300px; max-width: 100vw; max-height: 100vh;">
-      <!-- 彈窗標題與拖曳區 -->
-      <div id="chatPopupHeader" class="cursor-move flex items-center justify-between px-4 py-2 text-white"
-           style="background: linear-gradient(to right, #2563EB, #4F46E5);">
-        <div class="flex items-center space-x-2">
-          <div id="chatConnectionDot" class="w-3 h-3 bg-gray-400 rounded-full"></div>
-          <span class="font-medium">內部聊天室</span>
-          <span id="chatOnlineCount" class="text-xs text-blue-200"></span>
-        </div>
-        <button id="closeChatBtn" class="text-white focus:outline-none">&times;</button>
-      </div>
-      <!-- 主內容：用戶列表與聊天區 -->
-      <div class="flex flex-1 h-full overflow-hidden">
-        <!-- 用戶列表 -->
-        <div id="chatUserList" class="w-1/3 md:w-1/4 border-r border-gray-200 overflow-y-auto bg-gray-50"></div>
-        <!-- 聊天訊息與輸入區 -->
-        <div class="flex-1 flex flex-col">
-          <!-- 訊息顯示區 -->
-          <div id="chatMessages" class="flex-1 p-4 overflow-y-auto space-y-3 bg-white"></div>
-          <!-- 輸入區 -->
-          <div class="border-t border-gray-200 p-3 bg-gray-50">
-            <form id="chatMessageForm" class="flex items-end space-x-2">
-              <div class="flex-1">
-                <textarea id="chatMessageInput" rows="1" maxlength="500"
-                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                          placeholder="輸入訊息..."></textarea>
-                <div class="flex justify-end items-center mt-1">
-                  <span id="chatCharCount" class="text-xs text-gray-400">0/500</span>
-                </div>
-              </div>
-              <button id="chatSendBtn" type="submit" disabled
-                      class="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                </svg>
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-    <!-- 聊天開關按鈕 -->
-    <button id="chatToggleButton"
-            class="fixed bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg z-50"
-            style="width:48px;height:48px;line-height:1;">💬</button>
-
-    <script src="schedule_management.js"></script>
-    <!-- 系統主腳本：放置在聊天腳本之前，以便聊天系統在登入後正確初始化 -->
-    <script src="system.js"></script>
-    <!-- 內部聊天腳本：負責即時訊息顯示、用戶列表以及拖曳與調整大小 -->
-    <script src="chatSystem.js"></script>
+    <script src="schedule_management.js"></script>    <script src="system.js"></script>
     <!-- 語言國際化腳本，必須在系統腳本之後載入 -->
     <script src="i18n.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
@@ -4476,7 +4415,49 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"b2074e7888b746fe9fbbc15492b4c3d4","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+    
+    <!-- ******** 新增：即時聊天功能元件 ******** -->
+    <!-- 聊天功能入口按鈕。僅在使用者登入且主系統顯示時可見。
+         按鈕採用固定定位於頁面右下角，顯示聊天泡泡圖標。 -->
+    <button id="chatToggleButton" class="hidden fixed bottom-4 right-4 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg p-4 focus:outline-none">
+        <!-- 使用簡易文字表現按鈕圖標，避免外部依賴 -->
+        💬
+    </button>
+
+    <!-- 聊天彈窗。預設隱藏，點擊聊天按鈕後顯示。可拖曳移動並調整大小。
+         包含線上用戶列表、訊息顯示區與輸入區。 -->
+    <div id="chatPopup" class="hidden fixed bottom-20 right-4 z-50 w-80 sm:w-96 bg-white rounded-lg shadow-xl flex flex-col" style="resize: both; overflow: hidden;">
+        <!-- 彈窗標題列，可作為拖曳的手把 -->
+        <div id="chatHeader" class="cursor-move select-none flex items-center justify-between px-4 py-2 rounded-t-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+            <div class="flex items-center space-x-2">
+                <span class="font-semibold">聊天室</span>
+                <span id="chatOnlineCount" class="text-xs text-blue-200"></span>
+            </div>
+            <button id="chatCloseButton" class="text-xl leading-none focus:outline-none">×</button>
+        </div>
+        <!-- 內容區域：左側為用戶列表，右側為訊息顯示與輸入 -->
+        <div class="flex h-80">
+            <!-- 用戶列表 -->
+            <div id="chatUserList" class="w-1/3 border-r border-gray-200 overflow-y-auto p-2 space-y-1">
+                <!-- 用戶列表由 JavaScript 動態渲染 -->
+            </div>
+            <!-- 訊息與輸入區 -->
+            <div class="flex-1 flex flex-col">
+                <!-- 訊息顯示區 -->
+                <div id="chatMessages" class="flex-1 overflow-y-auto p-2 space-y-2 bg-white">
+                    <!-- 訊息由 JavaScript 動態渲染 -->
+                </div>
+                <!-- 輸入區 -->
+                <div class="border-t border-gray-200 p-2 bg-gray-50">
+                    <textarea id="chatMessageInput" rows="2" class="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" placeholder="輸入訊息..."></textarea>
+                    <div class="flex justify-end mt-2">
+                        <button id="chatSendButton" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>發送</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
