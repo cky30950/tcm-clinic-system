@@ -22342,19 +22342,12 @@ function hideGlobalCopyright() {
         console.error('FirechatUI 尚未載入，無法初始化即時聊天室。');
         return;
       }
-
-      // 確保 firebase.database.ServerValue 存在。模組化版中可能沒有此屬性，需手動建立以供 Firechat 使用。
-      if (window.firebase && window.firebase.database && !window.firebase.database.ServerValue) {
-        window.firebase.database.ServerValue = { TIMESTAMP: { '.sv': 'timestamp' } };
-      }
-      // 透過 compat API 初始化 Firebase（如果尚未初始化）
+      // 若尚未初始化 compat Firebase，嘗試使用模組化配置初始化（可忽略錯誤）
       if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length === 0) {
         try {
-          // 使用現有模組化應用的設定
           const config = (window.firebase && window.firebase.app && window.firebase.app.options) || {};
           firebase.initializeApp(config);
         } catch (e) {
-          // 如果已經初始化會丟出錯誤，可安全忽略
           console.warn('初始化 compat Firebase 失敗或已存在應用：', e);
         }
       }
@@ -22381,68 +22374,59 @@ function hideGlobalCopyright() {
         }
       } catch (_e) {}
       if (!displayName) {
-        displayName = (authUser && (authUser.displayName || authUser.email)) || (typeof currentUser !== 'undefined' && currentUser) || 'User';
+        displayName =
+          (authUser && (authUser.displayName || authUser.email)) ||
+          (typeof currentUser !== 'undefined' && currentUser) ||
+          'User';
       }
-      // 提供 Firechat 所需的 database 介面，如果尚不存在
-      // Firechat 期望使用 firebase.database() 取得資料庫參考與 ServerValue.TIMESTAMP。
-      // 在模組化 Firebase 環境中，compat 版的 database API 不存在，因此動態建立兼容的函式。
+      // 確保 firebase.database.ServerValue 存在 (模組化版中沒有)
+      if (window.firebase && window.firebase.database && !window.firebase.database.ServerValue) {
+        window.firebase.database.ServerValue = { TIMESTAMP: { '.sv': 'timestamp' } };
+      }
+      // 如果 window.firebase.database 尚未定義，建立一個兼容 Firechat 的 stub
       if (window.firebase && !window.firebase.database) {
-        window.firebase.database = function() {
-          /**
-           * 將 reference 物件附加上 compat 屬性，確保 ref.database.app 存在。
-           * 這對 Firechat 來說十分重要，因為它會讀取 firechatRef.database.app。
-           * 此函式會遞迴地為 child 與 root 屬性建立 database.app。
-           * @param {object} ref 模組化 Reference 物件
-           * @returns {object} 具備 compat 屬性的 Reference 物件
-           */
+        window.firebase.database = function () {
+          // 內部輔助：為引用附加 compat 屬性與擴充方法
           function attachCompat(ref) {
-            if (ref && !ref.database) {
-              // 建立 database.app 屬性，引用現有的 Firebase app 或提供預設對象
+            if (!ref) return ref;
+            // 若尚未設置 database.app，進行設定
+            if (!ref.database) {
               const appRef = (window.firebase && window.firebase.app) || { name: 'default', options: {} };
-              // 確保 app 物件具備 auth() 方法，回傳模組化版本的 auth 以供 Firechat 調用
               if (appRef && typeof appRef.auth !== 'function') {
                 appRef.auth = () => {
-                  // 若模組化 auth 可直接使用，回傳之；否則回傳空物件避免錯誤
                   return (window.firebase && window.firebase.auth) || {};
                 };
               }
               ref.database = { app: appRef };
             }
-            // 補強 child() 使其傳回的 reference 也具有 database.app
-            if (ref && typeof ref.child === 'function' && !ref.__firechatPatched) {
-              const originalChild = ref.child.bind(ref);
-              ref.child = (childPath) => {
-                const childRef = originalChild(childPath);
-                return attachCompat(childRef);
-              };
-              ref.__firechatPatched = true;
-            }
-            // 補強 setWithPriority() 方法：模組化 API 不支援此方法，直接調用 set() 並忽略優先級
-            if (ref && typeof ref.setWithPriority !== 'function' && typeof ref.set === 'function') {
+            // 增加 setWithPriority 方法：忽略優先級並直接調用 set
+            if (typeof ref.setWithPriority !== 'function' && typeof ref.set === 'function') {
               ref.setWithPriority = (value, priority, onComplete) => {
-                // 使用模組化 set() 寫入資料，並忽略 priority
-                const promise = window.firebase && typeof window.firebase.set === 'function'
-                  ? window.firebase.set(ref, value)
-                  : Promise.resolve();
+                const promise =
+                  window.firebase && typeof window.firebase.set === 'function'
+                    ? window.firebase.set(ref, value)
+                    : Promise.resolve();
                 if (typeof onComplete === 'function') {
-                  promise.then(() => onComplete(null)).catch((err) => onComplete(err));
+                  promise
+                    .then(() => onComplete(null))
+                    .catch((err) => onComplete(err));
                 }
                 return promise;
               };
             }
-            // 補強 onDisconnect() 方法：模組化 API 的 onDisconnect 需要額外函式，這裡提供簡易封裝
-            if (ref && typeof ref.onDisconnect !== 'function') {
+            // 增加 onDisconnect 方法：若無對應 API，直接使用 set() 實現
+            if (typeof ref.onDisconnect !== 'function') {
               ref.onDisconnect = () => {
-                const od = (window.firebase && typeof window.firebase.onDisconnect === 'function')
-                  ? window.firebase.onDisconnect(ref)
-                  : null;
+                const od =
+                  window.firebase && typeof window.firebase.onDisconnect === 'function'
+                    ? window.firebase.onDisconnect(ref)
+                    : null;
                 return {
                   set: (value) => {
-                    // 若有 onDisconnect API 則調用；否則直接寫入資料
                     if (od && typeof od.set === 'function') {
                       return od.set(value);
                     }
-                    return (window.firebase && typeof window.firebase.set === 'function')
+                    return window.firebase && typeof window.firebase.set === 'function'
                       ? window.firebase.set(ref, value)
                       : Promise.resolve();
                   },
@@ -22451,55 +22435,95 @@ function hideGlobalCopyright() {
                       return od.cancel();
                     }
                     return Promise.resolve();
-                  }
+                  },
                 };
               };
             }
-            // 確保 root 參考亦有 database.app
-            if (ref && ref.root && !ref.root.database) {
+            // 將原有 child 方法封裝為遞迴 attachCompat；若不存在則稍後由 ref() 生成
+            if (typeof ref.child === 'function' && !ref.__firechatPatched) {
+              const originalChild = ref.child.bind(ref);
+              ref.child = (childPath) => {
+                const childRef = originalChild(childPath);
+                return attachCompat(childRef);
+              };
+              ref.__firechatPatched = true;
+            }
+            // 對 root 做相同處理
+            if (ref.root && !ref.root.database) {
               attachCompat(ref.root);
             }
             return ref;
           }
           return {
-            /**
-             * 取得指定路徑的資料庫參考。利用模組化 RTDB API window.firebase.ref 建立參考。
-             * 若 RTDB 未正確初始化，會拋出錯誤。
-             * @param {string} path 路徑字串，例如 'chat'
-             * @returns {object} 具備 compat 屬性的 Realtime Database 參考
-             */
             ref: (path) => {
               if (window.firebase && typeof window.firebase.ref === 'function' && window.firebase.rtdb) {
+                // 使用模組化 API 建立引用
                 const baseRef = window.firebase.ref(window.firebase.rtdb, path);
-                return attachCompat(baseRef);
+                let compatRef = attachCompat(baseRef);
+                // 儲存路徑供 child() 生成使用
+                const normalize = (p) => (p ? p.replace(/^\/+|\/+$/g, '') : '');
+                compatRef.__firechatPath = normalize(path);
+                // 若原始引用沒有 child 方法，為其建立 child()：基於儲存的路徑拼接子路徑
+                if (typeof compatRef.child !== 'function') {
+                  compatRef.child = function (childPath) {
+                    const basePath = compatRef.__firechatPath;
+                    const newPath = basePath ? `${basePath}/${childPath}` : childPath;
+                    const newRef = window.firebase.ref(window.firebase.rtdb, newPath);
+                    let newCompat = attachCompat(newRef);
+                    newCompat.__firechatPath = normalize(newPath);
+                    // 同樣確保 child() 在不存在時建立
+                    if (typeof newCompat.child !== 'function') {
+                      newCompat.child = compatRef.child.bind({ __firechatPath: newCompat.__firechatPath });
+                    }
+                    return newCompat;
+                  };
+                }
+                // root 屬性：根路徑空字串
+                if (!compatRef.root) {
+                  const rootRef = window.firebase.ref(window.firebase.rtdb);
+                  let rootCompat = attachCompat(rootRef);
+                  rootCompat.__firechatPath = '';
+                  if (typeof rootCompat.child !== 'function') {
+                    rootCompat.child = function (childPath) {
+                      const newPath = normalize(childPath);
+                      const newRef = window.firebase.ref(window.firebase.rtdb, newPath);
+                      let newCompat = attachCompat(newRef);
+                      newCompat.__firechatPath = normalize(newPath);
+                      if (typeof newCompat.child !== 'function') {
+                        newCompat.child = compatRef.child.bind({ __firechatPath: newCompat.__firechatPath });
+                      }
+                      return newCompat;
+                    };
+                  }
+                  compatRef.root = rootCompat;
+                }
+                return compatRef;
               }
               throw new Error('Firebase RTDB 尚未初始化');
             },
-            /**
-             * 提供 ServerValue.TIMESTAMP，以相容 Firechat 對時間戳的需求。
-             * 這裡直接回傳 RTDB 特殊值物件 { '.sv': 'timestamp' }。
-             */
             ServerValue: {
-              TIMESTAMP: { '.sv': 'timestamp' }
-            }
+              TIMESTAMP: { '.sv': 'timestamp' },
+            },
           };
         };
-        // 在 compat 函式本體外設置 ServerValue 屬性，使得 firebase.database.ServerValue.TIMESTAMP 可用於 Firechat
-        if (window.firebase.database && !window.firebase.database.ServerValue) {
-          window.firebase.database.ServerValue = { TIMESTAMP: { '.sv': 'timestamp' } };
-        }
+        // 亦在函式上掛上 ServerValue 屬性，方便直接調用 firebase.database.ServerValue
+        window.firebase.database.ServerValue = { TIMESTAMP: { '.sv': 'timestamp' } };
       }
-      // 建立 Realtime Database 參考路徑，聊天室資料將儲存於 'chat' 節點
-      let chatRef;
-      // 優先使用 database().ref() 以取得附帶 compat 資訊的參考；若 database 為物件則直接調用其 ref 方法
+      // 建立 chatRef：優先使用 database().ref 產生帶兼容的引用
+      let chatRef = null;
       if (window.firebase && window.firebase.database) {
-        if (typeof window.firebase.database === 'function' && typeof window.firebase.database().ref === 'function') {
+        if (
+          typeof window.firebase.database === 'function' &&
+          typeof window.firebase.database().ref === 'function'
+        ) {
           chatRef = window.firebase.database().ref('chat');
-        } else if (typeof window.firebase.database.ref === 'function') {
+        } else if (
+          window.firebase.database &&
+          typeof window.firebase.database.ref === 'function'
+        ) {
           chatRef = window.firebase.database.ref('chat');
         }
       }
-      // 次選：若 compat API 存在則使用
       if (!chatRef && typeof firebase !== 'undefined' && firebase.database) {
         chatRef = firebase.database().ref('chat');
       }
@@ -22507,13 +22531,12 @@ function hideGlobalCopyright() {
         console.error('無法取得聊天參考路徑：Firebase 未初始化');
         return;
       }
-      // 建立 FirechatUI 實例，掛載至聊天室容器
+      // 取得聊天容器並初始化 FirechatUI
       const container = document.getElementById('firechatContainer');
       if (!container) {
         console.error('找不到 Firechat 容器，無法初始化。');
         return;
       }
-      // 如果已有聊天實例則重新設定使用者即可
       if (window.firechatInstance && typeof window.firechatInstance.setUser === 'function') {
         window.firechatInstance.setUser(userId, displayName);
       } else {

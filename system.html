@@ -4312,10 +4312,7 @@
     <!-- Firechat 相關資源：jQuery、Firebase compat 以及 Firechat 樣式與腳本 -->
     <!-- 引入 jQuery（Firechat UI 依賴） -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <!-- Firebase compat：提供舊版 Firebase API 給 Firechat 使用 -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <!-- 移除 Firebase compat 引用，改用模組化版本，避免與自定義 window.firebase 衝突 -->
     <!-- Firechat CSS 與 JS -->
     <link rel="stylesheet" href="https://cdn.firebase.com/libs/firechat/3.0.1/firechat.min.css" />
     <script src="https://cdn.firebase.com/libs/firechat/3.0.1/firechat.min.js"></script>
