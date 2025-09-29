@@ -2514,10 +2514,10 @@ async function attemptMainLogin() {
             console.error('登入後清理問診資料失敗:', err);
         }
 
-        // 初始化聊天模組：在登入及系統初始化後啟用內部聊天
+        // 初始化聊天模組：在載入系統資料後啟用內部聊天。傳入當前用戶資料與所有用戶清單
         try {
             if (window.ChatModule && typeof window.ChatModule.initChat === 'function') {
-                window.ChatModule.initChat(currentUserData);
+                window.ChatModule.initChat(currentUserData, users);
             }
         } catch (chatErr) {
             console.error('初始化聊天模組失敗:', chatErr);
@@ -2718,14 +2718,6 @@ async function logout() {
         // Firebase 登出
         if (window.firebase && window.firebase.auth) {
             await window.firebase.signOut(window.firebase.auth);
-        }
-        // 在清理系統狀態之前銷毀聊天模組
-        try {
-            if (window.ChatModule && typeof window.ChatModule.destroyChat === 'function') {
-                window.ChatModule.destroyChat();
-            }
-        } catch (chatErr) {
-            console.error('銷毀聊天模組失敗:', chatErr);
         }
 
         // --- 取消中藥庫存監聽器 ---

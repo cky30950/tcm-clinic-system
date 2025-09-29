@@ -24,6 +24,9 @@
       this.messagesRef = null;
       this.dragOffset = { x: 0, y: 0 };
       this.isDragging = false;
+      // Store all clinic users passed from the main system. This list will be used
+      // to populate the user list on the left. Defaults to an empty array.
+      this.usersList = [];
     }
 
     /**
@@ -33,7 +36,7 @@
      *
      * @param {Object} userData - The current user's data object.
      */
-    init(userData) {
+    init(userData, usersList) {
       if (this.initialized) return;
       if (!userData) return;
       // Determine UID: prefer userData.uid, fallback to Firebase auth currentUser
@@ -46,6 +49,12 @@
       }
       this.currentUser = userData;
       this.initialized = true;
+      // Store users list if provided; fallback to global if available
+      if (usersList && Array.isArray(usersList)) {
+        this.usersList = usersList;
+      } else if (Array.isArray(window.users)) {
+        this.usersList = window.users;
+      }
       this.createUI();
       this.setupPresence();
       this.populateUserList();
@@ -116,6 +125,7 @@
       this.currentUserUid = null;
       this.currentChannel = 'public';
       this.privateChatId = null;
+      this.usersList = [];
     }
 
     /**
@@ -374,17 +384,16 @@
       groupItem.classList.add('bg-blue-100'); // default selected
       this.userListContainer.appendChild(groupItem);
       // Other users
-      if (Array.isArray(window.users)) {
-        window.users.forEach(u => {
-          if (!u) return;
-          // Exclude current user (by id or uid)
-          const uid = u.uid || u.id || null;
-          if (!uid) return;
-          if (uid === this.currentUserUid || String(uid) === String(this.currentUser.id)) return;
-          const userItem = createItem(u, false);
-          this.userListContainer.appendChild(userItem);
-        });
-      }
+      const list = Array.isArray(this.usersList) ? this.usersList : [];
+      list.forEach(u => {
+        if (!u) return;
+        // Exclude current user (by uid or id)
+        const uid = u.uid || u.id || null;
+        if (!uid) return;
+        if (uid === this.currentUserUid || String(uid) === String(this.currentUser.id)) return;
+        const userItem = createItem(u, false);
+        this.userListContainer.appendChild(userItem);
+      });
     }
 
     /**
@@ -620,9 +629,9 @@
   // Create a single instance of InternalChat and expose init/destroy methods
   const chatInstance = new InternalChat();
   window.ChatModule = {
-    initChat: (userData) => {
+    initChat: (userData, usersList) => {
       try {
-        chatInstance.init(userData);
+        chatInstance.init(userData, usersList);
       } catch (err) {
         console.error('ChatModule: initChat failed', err);
       }
