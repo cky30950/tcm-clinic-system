@@ -22378,33 +22378,45 @@ function hideGlobalCopyright() {
       if (!displayName) {
         displayName = (authUser && (authUser.displayName || authUser.email)) || (typeof currentUser !== 'undefined' && currentUser) || 'User';
       }
-      // 建立 Realtime Database 參考路徑，聊天室資料將儲存於 'chat' 節點
-      // 在不同的 Firebase SDK 版本或初始化方式下，取得資料庫實例的方式可能不同。
-      // - 當使用 compat SDK 時，`firebase.database()` 是可用的。
-      // - 在某些情況下，`firebase.database` 可能不存在，這通常是因為引入的是模組化 SDK，
-      //   或因為全域變數被覆寫。另一方面，透過 compat `app()` 物件仍可取得 `database()` 方法。
-      // - 若以上方式均不可用，則嘗試透過 window.firebase（可能是另一個全域命名空間）取得。
-      //   無法取得即時資料庫時，將顯示錯誤並終止初始化。
-      let chatRef;
-      try {
-        if (typeof firebase !== 'undefined' && typeof firebase.database === 'function') {
-          // 標準 compat 寫法
-          chatRef = firebase.database().ref('chat');
-        } else if (typeof window !== 'undefined' && window.firebase && typeof window.firebase.database === 'function') {
-          // 有些情況下全域 firebase 被覆寫，window.firebase 才有 database
-          chatRef = window.firebase.database().ref('chat');
-        } else if (typeof firebase !== 'undefined' && typeof firebase.app === 'function') {
-          // 試著透過 app() 取得 database()，此方式適用於 compat SDK
-          const app = firebase.app();
-          if (app && typeof app.database === 'function') {
-            chatRef = app.database().ref('chat');
-          }
-        }
-      } catch (e) {
-        // 忽略例外，在後續判斷 chatRef 是否存在
+      // 提供 Firechat 所需的 database 接口，如果尚不存在
+      // Firechat 期望使用 firebase.database() 來獲得資料庫參考與 ServerValue.TIMESTAMP。
+      // 當使用模組化 Firebase 時，compat 版的 database API 不存在，因此我們動態建立一個兼容函式。
+      if (window.firebase && !window.firebase.database) {
+        window.firebase.database = function() {
+          return {
+            /**
+             * 取得指定路徑的資料庫參考。利用模組化 RTDB API window.firebase.ref 建立參考。
+             * 若 RTDB 未正確初始化，會拋出錯誤。
+             * @param {string} path 路徑字串，例如 'chat'
+             * @returns {object} Realtime Database 參考
+             */
+            ref: (path) => {
+              if (window.firebase && typeof window.firebase.ref === 'function' && window.firebase.rtdb) {
+                return window.firebase.ref(window.firebase.rtdb, path);
+              }
+              throw new Error('Firebase RTDB 尚未初始化');
+            },
+            /**
+             * 提供 ServerValue.TIMESTAMP，以相容 Firechat 對時間戳的需求。
+             * 這裡直接回傳 RTDB 特殊值物件 { '.sv': 'timestamp' }。
+             */
+            ServerValue: {
+              TIMESTAMP: { '.sv': 'timestamp' }
+            }
+          };
+        };
       }
-      if (!chatRef) {
-        console.error('找不到 Realtime Database 服務，無法初始化聊天室。');
+
+      // 建立 Realtime Database 參考路徑，聊天室資料將儲存於 'chat' 節點
+      let chatRef;
+      if (window.firebase && typeof window.firebase.ref === 'function' && window.firebase.rtdb) {
+        // 使用現有 API 產生聊天引用（模組化版本）
+        chatRef = window.firebase.ref(window.firebase.rtdb, 'chat');
+      } else if (typeof firebase !== 'undefined' && firebase.database) {
+        // 如果 compat API 已存在則退回使用
+        chatRef = firebase.database().ref('chat');
+      } else {
+        console.error('無法取得聊天參考路徑：Firebase 未初始化');
         return;
       }
       // 建立 FirechatUI 實例，掛載至聊天室容器
