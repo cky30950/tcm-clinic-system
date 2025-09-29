@@ -2892,6 +2892,11 @@ async function logout() {
                 loadHerbLibrary();
             } else if (sectionId === 'acupointLibrary') {
                 loadAcupointLibrary();
+            } else if (sectionId === 'scheduleManagement') {
+                // 僅在使用者進入醫療排班區域時才初始化排班系統。
+                if (typeof window.initializeScheduleManagement === 'function') {
+                    window.initializeScheduleManagement();
+                }
             } else if (sectionId === 'billingManagement') {
                 loadBillingManagement();
             } else if (sectionId === 'financialReports') {

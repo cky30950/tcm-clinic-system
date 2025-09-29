@@ -226,38 +226,32 @@
          */
         async function loadClinicStaff() {
             try {
-                // 在嘗試讀取 Firebase 用戶資料前，等待 FirebaseDataManager 準備完成。
-                // 系統在 window.load 事件時才初始化 firebaseDataManager，
-                // 而排班管理腳本於 DOMContentLoaded 即會執行，可能導致 fetchUsers 尚未可用。
-                if (typeof waitForFirebaseDataManager === 'function') {
-                    // 使用系統提供的等待函式確保 firebaseDataManager.isReady
-                    try {
-                        await waitForFirebaseDataManager();
-                    } catch (e) {
-                        // 若等待過程出錯，僅記錄警告而不終止流程
-                        console.warn('等待 FirebaseDataManager 就緒時發生錯誤:', e);
-                    }
-                } else {
-                    // 若沒有 waitForFirebaseDataManager，則自行輪詢等待一段時間
-                    for (let i = 0; i < 50 && (!window.firebaseDataManager || !window.firebaseDataManager.isReady); i++) {
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-                }
-
                 let usersList = [];
-                // 優先使用 fetchUsers 函式從 Firebase 讀取診所用戶
-                if (typeof fetchUsers === 'function') {
-                    try {
-                        usersList = await fetchUsers();
-                    } catch (e) {
-                        console.warn('呼叫 fetchUsers 失敗:', e);
+                /*
+                 * 讀取診所人員資料，優先使用本地快取。由於使用者要求僅在登入後
+                 * 才讀取排班資料，且希望依賴本地的用戶數據，因此不再呼叫
+                 * fetchUsers() 或等待 Firebase 服務。改為從 localStorage
+                 * 與全域緩存變數讀取用戶資料。這樣可避免在未登入或離線狀態下
+                 * 發出遠端請求。
+                 */
+                try {
+                    const stored = localStorage.getItem('users');
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            usersList = parsed;
+                        }
                     }
+                } catch (e) {
+                    console.warn('讀取本地用戶數據失敗:', e);
                 }
-                // 若尚未取得資料，嘗試從全域緩存或本地資料取得
-                if ((!usersList || usersList.length === 0) && window.usersFromFirebase && Array.isArray(window.usersFromFirebase)) {
-                    usersList = window.usersFromFirebase;
-                } else if ((!usersList || usersList.length === 0) && window.users && Array.isArray(window.users)) {
-                    usersList = window.users;
+                // 若 localStorage 中沒有資料，嘗試從全域快取讀取
+                if (usersList.length === 0) {
+                    if (window.usersFromFirebase && Array.isArray(window.usersFromFirebase) && window.usersFromFirebase.length > 0) {
+                        usersList = window.usersFromFirebase;
+                    } else if (window.users && Array.isArray(window.users) && window.users.length > 0) {
+                        usersList = window.users;
+                    }
                 }
                 // 將用戶資料轉換為排班人員格式
                 // 清空原陣列以維持同一個引用，避免其他腳本無法取得最新資料
@@ -282,7 +276,7 @@
                 });
                 // 更新全域 staff 指向最新的資料陣列，確保其他腳本能取得最新人員
                 // 由於我們使用 splice 清空陣列並重新填充，不會改變引用，
-                // 這裡仍然將 window.staff 指向同一個陣列以防止遺漏。
+                // 因此仍將 window.staff 指向同一個陣列。
                 window.staff = staff;
             } catch (err) {
                 console.error('載入診所用戶時發生錯誤：', err);
@@ -443,29 +437,9 @@
             window.handleDeleteShift = handleDeleteShift;
         }
 
-        // 初始化
-        document.addEventListener('DOMContentLoaded', async function() {
-            // 更新當前日期
-            updateCurrentDate();
-            // 設定事件監聽器
-            setupEventListeners();
-            // 載入診所實際人員資料
-            await loadClinicStaff();
-            // 讀取已存在的排班資料，不使用即時監聽
-            await loadShiftsFromDb();
-            // 渲染行事曆與人員面板
-            renderCalendar();
-            renderStaffPanel();
-            updateStaffSelects();
-            // 更新統計資訊
-            updateStats();
-            // 標記排班系統已初始化，避免重複初始化
-            try {
-                window.scheduleInitialized = true;
-            } catch (_e) {
-                // 忽略
-            }
-        });
+        // 延遲初始化
+        // 不在 DOMContentLoaded 時自動載入排班資料和人員資料。
+        // 初始化將在使用者登入並進入醫療排班區塊時觸發。
 
         // 設定事件監聽器
         function setupEventListeners() {
@@ -1839,36 +1813,35 @@
   // 公眾假期選擇函式暴露至全域，供 HTML 選單呼叫
   window.scheduleChangeHolidayRegion = changeHolidayRegion;
 
-// Initialize on DOMContentLoaded
-if (typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', async function() {
-    // 僅在排班管理元素存在時執行初始化
-    if (document.getElementById('scheduleManagement')) {
-      if (window.scheduleInitialized) return;
-      window.scheduleInitialized = true;
-      try {
-        // 更新當前日期顯示
-        if (typeof updateCurrentDate === 'function') updateCurrentDate();
-        // 設定事件監聽器
-        if (typeof setupEventListeners === 'function') setupEventListeners();
-        // 載入診所人員
-        if (typeof loadClinicStaff === 'function') {
-          await loadClinicStaff();
-        }
-        // 從 Realtime Database 載入排班資料
-        if (typeof loadShiftsFromDb === 'function') {
-          await loadShiftsFromDb();
-        }
-        // 渲染行事曆與人員面板
-        if (typeof renderCalendar === 'function') renderCalendar();
-        if (typeof renderStaffPanel === 'function') renderStaffPanel();
-        if (typeof updateStaffSelects === 'function') updateStaffSelects();
-        // 更新統計資訊
-        if (typeof updateStats === 'function') updateStats();
-      } catch (e) {
-        console.error('Schedule init error', e);
+// 延遲初始化排班系統：
+// 將初始化邏輯封裝為函式，僅當用戶登入並進入排班管理區塊時才呼叫。
+if (typeof window.initializeScheduleManagement !== 'function') {
+  window.initializeScheduleManagement = async function() {
+    // 若已經初始化過，避免重複執行
+    if (window.scheduleInitialized) return;
+    window.scheduleInitialized = true;
+    try {
+      // 更新當前日期顯示
+      if (typeof updateCurrentDate === 'function') updateCurrentDate();
+      // 設定事件監聽器
+      if (typeof setupEventListeners === 'function') setupEventListeners();
+      // 載入診所人員（使用本地用戶資料）
+      if (typeof loadClinicStaff === 'function') {
+        await loadClinicStaff();
       }
+      // 從資料庫讀取排班資料
+      if (typeof loadShiftsFromDb === 'function') {
+        await loadShiftsFromDb();
+      }
+      // 渲染行事曆與人員面板
+      if (typeof renderCalendar === 'function') renderCalendar();
+      if (typeof renderStaffPanel === 'function') renderStaffPanel();
+      if (typeof updateStaffSelects === 'function') updateStaffSelects();
+      // 更新統計資訊
+      if (typeof updateStats === 'function') updateStats();
+    } catch (e) {
+      console.error('Schedule init error', e);
     }
-  });
+  };
 }
 })();
