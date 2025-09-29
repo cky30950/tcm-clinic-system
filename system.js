@@ -2687,14 +2687,6 @@ async function syncUserDataFromFirebase() {
                 const msg = lang === 'en' ? enMsg : zhMsg;
                 showToast(msg, 'success');
             }
-            // 初始化 Firechat 聊天室（若已載入函式）
-            try {
-                if (typeof window.initFirechatUI === 'function') {
-                    window.initFirechatUI();
-                }
-            } catch (_e) {
-                console.error('初始化聊天室失敗:', _e);
-            }
         }
 
         // 側邊選單控制
@@ -22326,32 +22318,28 @@ function hideGlobalCopyright() {
 
   /**
    * 初始化 Firechat UI。這個函式會在登入後由聊天室開關按鈕或登入程序呼叫。
-   * 它會透過 compat 版的 Firebase 初始化 Realtime Database，建立 FirechatUI 實例，
+   * 它會透過現有的 Firebase Realtime Database 引用建立 FirechatUI 實例，
    * 並將當前使用者設為聊天室用戶。初始化完成後，將實例保存在 window.firechatInstance。
    */
   window.initFirechatUI = async function initFirechatUI() {
     try {
-      // 等待 Firebase 模組化初始化完成
-      if (typeof waitForFirebaseDb === 'function') {
-        await waitForFirebaseDb();
-      } else if (typeof waitForFirebase === 'function') {
-        await waitForFirebase();
-      }
       // 確認 FirechatUI 已載入
       if (typeof FirechatUI === 'undefined') {
         console.error('FirechatUI 尚未載入，無法初始化即時聊天室。');
         return;
       }
-      // 透過 compat API 初始化 Firebase（如果尚未初始化）
-      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length === 0) {
-        try {
-          // 使用現有模組化應用的設定
-          const config = (window.firebase && window.firebase.app && window.firebase.app.options) || {};
-          firebase.initializeApp(config);
-        } catch (e) {
-          // 如果已經初始化會丟出錯誤，可安全忽略
-          console.warn('初始化 compat Firebase 失敗或已存在應用：', e);
-        }
+      // 如果 global firebase.database 不存在，為 Firechat 提供必要介面
+      if (typeof window.firebase !== 'undefined' && typeof window.firebase.database === 'undefined') {
+        // 建立一個仿 firebase.database 的函式，回傳具有 ref 方法的物件
+        window.firebase.database = function() {
+          return {
+            ref: function(path) {
+              return window.firebase.ref(window.firebase.rtdb, path);
+            }
+          };
+        };
+        // 加入 ServerValue 屬性以支援伺服器時間戳
+        window.firebase.database.ServerValue = { TIMESTAMP: { '.sv': 'timestamp' } };
       }
       // 取得當前登入使用者資訊
       const authUser = window.firebase && window.firebase.auth ? window.firebase.auth.currentUser : null;
@@ -22379,8 +22367,8 @@ function hideGlobalCopyright() {
         displayName = (authUser && (authUser.displayName || authUser.email)) || (typeof currentUser !== 'undefined' && currentUser) || 'User';
       }
       // 建立 Realtime Database 參考路徑，聊天室資料將儲存於 'chat' 節點
-      const chatRef = firebase.database().ref('chat');
-      // 建立 FirechatUI 實例，掛載至聊天室容器
+      const chatRef = window.firebase.ref(window.firebase.rtdb, 'chat');
+      // 取得 Firechat 容器
       const container = document.getElementById('firechatContainer');
       if (!container) {
         console.error('找不到 Firechat 容器，無法初始化。');
