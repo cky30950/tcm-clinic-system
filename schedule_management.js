@@ -335,6 +335,20 @@
                 }
             } catch (err) {
                 console.error('載入排班資料失敗:', err);
+                try {
+                    const msg = (err && err.message) ? err.message.toString().toLowerCase() : '';
+                    const code = err && err.code ? err.code : '';
+                    // 如果是權限不足導致的錯誤，通知使用者
+                    if (code === 'permission-denied' || msg.includes('permission denied')) {
+                        if (typeof showNotification === 'function') {
+                            showNotification('您沒有權限讀取排班資料，如需存取請聯繫管理員');
+                        }
+                        // 不重新拋出錯誤，避免中斷後續流程
+                        return;
+                    }
+                } catch (_e) {
+                    // 忽略回退處理錯誤
+                }
             }
         }
 
