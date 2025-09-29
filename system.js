@@ -12828,6 +12828,8 @@ const consultationDate = (() => {
     const d = parseConsultationDate(consultation.date);
     return d ? d.toLocaleDateString('zh-TW') : '未知日期';
 })();
+
+// Firechat 已整合於 HTML 中，移除先前的簡易聊天功能。
             
             // 直接載入病歷，不彈出確認提示視窗
             // 注意：此操作會覆蓋當前已填寫的診症內容（主訴、舌象、脈象、診斷、處方、收費項目、醫囑等），且無法復原。
