@@ -953,9 +953,14 @@ async function fetchDataWithCache(cache, fetchFunc, forceRefresh = false) {
             if (result && result.success) {
                 cache = result.data;
             } else {
-                cache = null;
+                // 若取得失敗（例如權限不足），保留現有快取而不是覆寫為 null
+                // 只有當先前沒有快取時，才將快取設為 null
+                if (!cache) {
+                    cache = null;
+                }
             }
         }
+        // 回傳快取，如果仍為 null 則返回空陣列
         return cache || [];
     } catch (error) {
         console.error('資料載入失敗:', error);
@@ -2522,7 +2527,7 @@ async function syncUserDataFromFirebase() {
 
         // 改為透過 fetchUsers(true) 讀取用戶列表，並利用快取避免重複讀取
         const data = await fetchUsers(true);
-        if (data && data.length > 0) {
+        if (Array.isArray(data) && data.length > 0) {
             // 更新本地 users 變數，僅同步必要欄位（排除 personalSettings）
             users = data.map(user => {
                 const { personalSettings, ...rest } = user || {};
@@ -2546,10 +2551,63 @@ async function syncUserDataFromFirebase() {
                 };
             });
             // 保存到本地存儲作為備用
-            localStorage.setItem('users', JSON.stringify(users));
+            try {
+                localStorage.setItem('users', JSON.stringify(users));
+            } catch (lsErr) {
+                console.warn('保存用戶資料到本地失敗:', lsErr);
+            }
             console.log('已同步 Firebase 用戶數據到本地:', users.length, '筆 (使用快取)');
         } else {
-            console.log('從 Firebase 取得的用戶資料為空或讀取失敗，使用本地數據');
+            // 當無法從 Firebase 取得完整用戶列表時，回退為僅同步當前登入者
+            console.log('無法從 Firebase 取得完整用戶列表，嘗試僅同步當前使用者');
+            try {
+                const authCurrent = window.firebase && window.firebase.auth && window.firebase.auth.currentUser;
+                if (authCurrent && window.firebaseDataManager && typeof window.firebaseDataManager.getUserByUid === 'function') {
+                    const uid = authCurrent.uid;
+                    const res = await window.firebaseDataManager.getUserByUid(uid);
+                    if (res && res.success && res.data) {
+                        // 從 res.data 組裝用戶資料並排除 personalSettings
+                        const { personalSettings, ...rest } = res.data || {};
+                        const userObj = {
+                            ...rest,
+                            createdAt: res.data.createdAt
+                              ? (res.data.createdAt.seconds
+                                ? new Date(res.data.createdAt.seconds * 1000).toISOString()
+                                : res.data.createdAt)
+                              : new Date().toISOString(),
+                            updatedAt: res.data.updatedAt
+                              ? (res.data.updatedAt.seconds
+                                ? new Date(res.data.updatedAt.seconds * 1000).toISOString()
+                                : res.data.updatedAt)
+                              : new Date().toISOString(),
+                            lastLogin: res.data.lastLogin
+                              ? (res.data.lastLogin.seconds
+                                ? new Date(res.data.lastLogin.seconds * 1000).toISOString()
+                                : res.data.lastLogin)
+                              : null
+                        };
+                        // 使用現有 users 陣列（若存在），並合併或新增當前用戶
+                        let mergedList = Array.isArray(users) ? [...users] : [];
+                        // 如果 mergedList 中已有此使用者，則更新其資料，否則加入
+                        const existingIndex = mergedList.findIndex(u => String(u.id) === String(userObj.id));
+                        if (existingIndex >= 0) {
+                            mergedList[existingIndex] = { ...mergedList[existingIndex], ...userObj };
+                        } else {
+                            mergedList.push(userObj);
+                        }
+                        users = mergedList;
+                        // 更新本地存儲
+                        try {
+                            localStorage.setItem('users', JSON.stringify(users));
+                        } catch (lsErr) {
+                            console.warn('保存當前用戶資料到本地失敗:', lsErr);
+                        }
+                        console.log('已回退同步單一使用者資料');
+                    }
+                }
+            } catch (fallbackErr) {
+                console.warn('同步當前使用者資料發生錯誤:', fallbackErr);
+            }
         }
     } catch (error) {
         console.error('同步 Firebase 用戶數據失敗:', error);
@@ -16418,40 +16476,34 @@ class FirebaseDataManager {
      */
     async getUsers(forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
-        // 如果尚未登入 (auth.currentUser 為 null)，則避免向 Firestore 讀取整個 users 集合，
-        // 直接嘗試從快取或 localStorage 取得資料。這在登入前的排班管理等情境中非常重要，
-        // 可避免出現「Missing or insufficient permissions」的錯誤。
         try {
-            const authObj = window.firebase && window.firebase.auth;
-            const curUser = authObj && authObj.currentUser;
-            if (!curUser) {
-                // 若已有快取且不需強制刷新，直接回傳
+            // 如果尚未登入（無 auth.currentUser），不要嘗試從 Firestore 讀取，以避免觸發權限錯誤。
+            const authCurrent = window.firebase && window.firebase.auth && window.firebase.auth.currentUser;
+            if (!authCurrent) {
+                // 未登入時，優先返回快取或本地資料；不嘗試遠端讀取
                 if (!forceRefresh && this.usersCache !== null) {
                     return { success: true, data: this.usersCache, hasMore: !!this.usersHasMore };
                 }
-                // 從 localStorage 載入
-                try {
-                    const stored = localStorage.getItem('users');
-                    if (stored) {
-                        const localData = JSON.parse(stored);
-                        if (Array.isArray(localData)) {
-                            this.usersCache = localData;
-                            this.usersLastVisible = null;
-                            this.usersHasMore = false;
-                            return { success: true, data: this.usersCache, hasMore: false };
+                if (!forceRefresh) {
+                    try {
+                        const stored = localStorage.getItem('users');
+                        if (stored) {
+                            const localData = JSON.parse(stored);
+                            if (Array.isArray(localData)) {
+                                this.usersCache = localData;
+                                this.usersLastVisible = null;
+                                this.usersHasMore = false;
+                                return { success: true, data: this.usersCache, hasMore: false };
+                            }
                         }
+                    } catch (lsErr) {
+                        console.warn('載入本地用戶資料失敗:', lsErr);
                     }
-                } catch (_lsErr) {
-                    /* ignore */
                 }
-                // 沒有本地資料，直接返回空陣列
+                // 未登入且無可用資料，返回空陣列
                 return { success: true, data: [], hasMore: false };
             }
-        } catch (_authCheckErr) {
-            // 若檢查過程出錯，略過，繼續後續邏輯
-        }
-        try {
-            // 有快取且不需強制刷新時直接回傳現有快取
+            // 已登入：若有快取且不需強制刷新，直接回傳現有快取
             if (!forceRefresh && this.usersCache !== null) {
                 return { success: true, data: this.usersCache, hasMore: !!this.usersHasMore };
             }
@@ -16463,7 +16515,6 @@ class FirebaseDataManager {
                         const localData = JSON.parse(stored);
                         if (Array.isArray(localData)) {
                             this.usersCache = localData;
-                            // localStorage 不保存游標與 hasMore，因為無分頁概念
                             this.usersLastVisible = null;
                             this.usersHasMore = false;
                             return { success: true, data: this.usersCache, hasMore: false };
@@ -16500,7 +16551,9 @@ class FirebaseDataManager {
             return { success: true, data: users, hasMore: this.usersHasMore };
         } catch (error) {
             console.error('讀取用戶數據失敗:', error);
-            return { success: false, data: [] };
+            // 發生錯誤時不要覆寫現有快取，仍返回當前快取資料以避免覆蓋
+            const fallbackData = Array.isArray(this.usersCache) ? this.usersCache : [];
+            return { success: true, data: fallbackData, hasMore: !!this.usersHasMore };
         }
     }
 

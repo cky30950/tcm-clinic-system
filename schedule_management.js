@@ -334,21 +334,17 @@
                     });
                 }
             } catch (err) {
-                console.error('載入排班資料失敗:', err);
+                // 如果因權限不足導致讀取失敗，向使用者顯示通知
                 try {
-                    const msg = (err && err.message) ? err.message.toString().toLowerCase() : '';
-                    const code = err && err.code ? err.code : '';
-                    // 如果是權限不足導致的錯誤，通知使用者
-                    if (code === 'permission-denied' || msg.includes('permission denied')) {
+                    if (err && err.message && String(err.message).toLowerCase().includes('permission')) {
                         if (typeof showNotification === 'function') {
-                            showNotification('您沒有權限讀取排班資料，如需存取請聯繫管理員');
+                            showNotification('您沒有權限讀取排班資料，如需存取請聯繫管理員', 'error');
                         }
-                        // 不重新拋出錯誤，避免中斷後續流程
-                        return;
                     }
-                } catch (_e) {
-                    // 忽略回退處理錯誤
+                } catch (_notifyErr) {
+                    // 忽略顯示通知時的錯誤
                 }
+                console.error('載入排班資料失敗:', err);
             }
         }
 
