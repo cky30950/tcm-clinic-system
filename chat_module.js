@@ -317,7 +317,7 @@
       // Clear existing entries
       this.userListContainer.innerHTML = '';
       // Helper to create an item
-      const createItem = (userObj, isGroup = false) => {
+        const createItem = (userObj, isGroup = false) => {
         const item = document.createElement('div');
         item.className = 'flex items-center px-3 py-2 cursor-pointer hover:bg-gray-100';
         item.dataset.uid = userObj.uid || '';
@@ -328,15 +328,17 @@
           avatar.textContent = '#';
           avatar.style.backgroundColor = '#6B7280'; // gray
         } else {
-          // If user has specific color stored, else use a default
-          const firstChar = (userObj.username || '?').charAt(0);
+          // Avatar shows first character of name or username
+          const nameSource = userObj.name || userObj.username || '?';
+          const firstChar = nameSource.charAt(0);
           avatar.textContent = firstChar;
-          // Simple hash to choose a color
+          // Choose a color based on uid
           const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
           let index = 0;
-          if (userObj.uid) {
-            for (let i = 0; i < userObj.uid.length; i++) {
-              index = (index + userObj.uid.charCodeAt(i)) % colors.length;
+          const uidStr = String(userObj.uid || userObj.id || '');
+          if (uidStr) {
+            for (let i = 0; i < uidStr.length; i++) {
+              index = (index + uidStr.charCodeAt(i)) % colors.length;
             }
           }
           avatar.style.backgroundColor = colors[index];
@@ -344,7 +346,7 @@
         // Name
         const nameSpan = document.createElement('span');
         nameSpan.className = 'flex-1 text-sm truncate';
-        nameSpan.textContent = isGroup ? '主頻道' : (userObj.username || '未知用戶');
+        nameSpan.textContent = isGroup ? '主頻道' : (userObj.name || userObj.username || '未知用戶');
         // Status dot
         const statusDot = document.createElement('span');
         statusDot.className = 'w-2 h-2 rounded-full ml-2 flex-shrink-0';
@@ -444,7 +446,7 @@
       this.privateChatId = chatId;
       this.currentChannel = 'private';
       // Update channel label to user name
-      this.channelLabel.textContent = userObj.username || '私人聊天';
+      this.channelLabel.textContent = userObj.name || userObj.username || '私人聊天';
       this.listenToMessages(chatId);
     }
 
@@ -540,7 +542,8 @@
           // For self messages, show avatar on the right
           const avatar = document.createElement('div');
           avatar.className = 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ml-2';
-          const firstChar = (this.currentUser.username || '?').charAt(0);
+          const nameSourceSelf = (this.currentUser && (this.currentUser.name || this.currentUser.username)) || '?';
+          const firstChar = nameSourceSelf.charAt(0);
           avatar.textContent = firstChar;
           const colors = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6'];
           let index = 0;
@@ -586,7 +589,8 @@
       const timestamp = Date.now();
       const messageData = {
         senderId: this.currentUserUid,
-        senderName: this.currentUser.username || '',
+        // Use the clinic user's managed name if available
+        senderName: (this.currentUser && (this.currentUser.name || this.currentUser.username)) || '',
         text: text,
         timestamp: timestamp
       };
