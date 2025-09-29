@@ -79,10 +79,62 @@
     const charCountEl = document.getElementById('chatCharCount');
     const connectionDot = document.getElementById('chatConnectionDot');
     const onlineCountEl = document.getElementById('chatOnlineCount');
+    // 拖曳區域（標題）
+    const chatPopupHeader = document.getElementById('chatPopupHeader');
 
     if (!chatToggleButton || !chatPopup || !userListEl || !chatMessagesEl || !messageInput || !messageForm || !sendBtn) {
       console.warn('聊天系統初始化失敗：找不到必要的 DOM 元件');
       return;
+    }
+
+    /**
+     * 設定聊天視窗可拖曳
+     * 透過點擊標題區（chatPopupHeader）觸發拖曳行為，
+     * 在拖曳開始時將原本的 bottom/right 定位改為 top/left，
+     * 接著在滑鼠移動過程中更新 left/top 以實現自由移動。
+     */
+    if (chatPopup && chatPopupHeader) {
+      let isDraggingWindow = false;
+      let dragOffsetX = 0;
+      let dragOffsetY = 0;
+
+      const onMouseMove = (e) => {
+        if (!isDraggingWindow) return;
+        let newLeft = e.clientX - dragOffsetX;
+        let newTop = e.clientY - dragOffsetY;
+        // 限制拖曳範圍不得超出視窗
+        const maxLeft = window.innerWidth - chatPopup.offsetWidth;
+        const maxTop = window.innerHeight - chatPopup.offsetHeight;
+        if (newLeft < 0) newLeft = 0;
+        if (newTop < 0) newTop = 0;
+        if (newLeft > maxLeft) newLeft = maxLeft;
+        if (newTop > maxTop) newTop = maxTop;
+        chatPopup.style.left = `${newLeft}px`;
+        chatPopup.style.top = `${newTop}px`;
+      };
+
+      const onMouseUp = () => {
+        if (!isDraggingWindow) return;
+        isDraggingWindow = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+
+      chatPopupHeader.addEventListener('mousedown', (e) => {
+        // 僅限左鍵拖曳
+        if (e.button !== 0) return;
+        isDraggingWindow = true;
+        const rect = chatPopup.getBoundingClientRect();
+        dragOffsetX = e.clientX - rect.left;
+        dragOffsetY = e.clientY - rect.top;
+        // 將初始定位從 bottom/right 轉為 top/left，保留當前位置
+        chatPopup.style.right = 'auto';
+        chatPopup.style.bottom = 'auto';
+        chatPopup.style.left = `${rect.left}px`;
+        chatPopup.style.top = `${rect.top}px`;
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
     }
 
     // 從 Firebase 取得必要函式

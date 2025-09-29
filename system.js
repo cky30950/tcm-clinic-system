@@ -2687,13 +2687,14 @@ async function syncUserDataFromFirebase() {
                 const msg = lang === 'en' ? enMsg : zhMsg;
                 showToast(msg, 'success');
             }
-            // 初始化內部聊天系統（若已載入函式）
+            // 初始化自訂聊天系統（若已載入函式）
             try {
                 if (typeof window.initChatSystem === 'function') {
                     window.initChatSystem();
                 }
             } catch (_e) {
-                console.error('初始化內部聊天系統失敗:', _e);
+                // 若聊天系統初始化失敗，僅輸出警告並繼續流程
+                console.warn('初始化聊天系統失敗:', _e);
             }
         }
 
