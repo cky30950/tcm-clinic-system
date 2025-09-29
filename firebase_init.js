@@ -39,11 +39,6 @@ import { getAuth, signInWithEmailAndPassword, signOut, setPersistence, browserSe
 // 匯入外部配置檔案。請將您的 Firebase 設定值放在 firebaseConfig.js 中，並避免將其提交到版本控制。
 import firebaseConfig from './firebaseConfig.js';
 
-// 將設定值暴露於全域，以便 Firechat 等需要舊版 Firebase 的模組可重新初始化。
-// 這不會洩漏您的金鑰，因為 firebaseConfig 內容僅包含專案識別與 API 金鑰等公開資訊。
-// Firechat 將使用此物件呼叫 firebase.initializeApp()。
-window.firebaseConfig = firebaseConfig;
-
     // Initialize Firebase 使用外部配置
     const app = initializeApp(firebaseConfig);
     // 使用 initializeFirestore 搭配 persistentLocalCache 啟用離線快取。
@@ -72,10 +67,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
     // 讓其他腳本可以使用 Firebase
     // 注意：不要覆蓋 Firestore 的 query 方法。為了使用 Realtime Database 的查詢功能，
     // 將其以 rtdbQuery 名稱暴露，避免與 Firestore 的 query 衝突。
-    // Store the modular Firebase object in a separate property before assigning it to window.firebase.  
-    // We assign it to window.firebase below, but in some pages (e.g. Firechat integration) we need to
-    // retain access to this modular instance after other scripts (like Firebase v3) override window.firebase.
-    const firebaseModular = {
+    window.firebase = {
         // 基本實例
         app,
         db,
@@ -130,16 +122,6 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         setPersistence,
         browserSessionPersistence
     };
-
-    // Make the modular Firebase object globally accessible. It will be duplicated onto
-    // window.firebase after this assignment. If another script later overwrites window.firebase
-    // (for example, loading Firebase v3 for Firechat), you can still access the modular APIs via
-    // window.firebaseModular.
-    window.firebaseModular = firebaseModular;
-
-    // 將 modular API 複製到全域 firebase，供系統其他部分使用。Firechat 將使用 firebaseCompat，因此後續載入 compat
-    // SDK 不會覆蓋此 modular 版本，只要我們在其他地方使用 window.firebaseModular 即可避免衝突。
-    window.firebase = firebaseModular;
 
     // 連接狀態監控
     window.firebaseConnected = false;
