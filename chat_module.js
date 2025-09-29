@@ -36,6 +36,12 @@
       // Bindings for last message handling
       this.updateUserListOrder = this.updateUserListOrder.bind(this);
       this.attachLastMessageListeners = this.attachLastMessageListeners.bind(this);
+
+      // Track when each channel (public or private) was last read by the current
+      // user. This helps determine whether a channel has unread messages.
+      // Keys correspond to channel IDs ("public" or sorted UID pair). Values
+      // are timestamps of the last message the user has viewed in that channel.
+      this.lastSeenTime = {};
     }
 
     /**
@@ -413,6 +419,17 @@
         item.appendChild(avatar);
         item.appendChild(nameSpan);
         item.appendChild(statusDot);
+
+        // A small red dot to indicate unread messages. By default hidden. The
+        // indicator will be toggled on or off based on whether there are
+        // unseen messages for this channel. It uses a data attribute so it can
+        // be queried later without storing separate references.
+        const newIndicator = document.createElement('span');
+        newIndicator.dataset.newIndicator = 'true';
+        // Use Tailwind utility-like classes for size and shape. Hidden by
+        // default; will be shown when there are unread messages.
+        newIndicator.className = 'ml-auto w-2 h-2 rounded-full bg-red-500 hidden';
+        item.appendChild(newIndicator);
         // Click handler
         item.addEventListener('click', () => {
           // Remove highlight from previous selection
@@ -486,6 +503,15 @@
       this.privateChatId = null;
       this.channelLabel.textContent = '主頻道';
       this.listenToMessages('public');
+
+      // Mark messages in the public channel as read by setting the last seen
+      // timestamp to the latest message time or now. This prevents the new
+      // message indicator from showing while the user is in the channel.
+      const ts = this.lastMessageTime['public'] || Date.now();
+      this.lastSeenTime['public'] = ts;
+      if (typeof this.updateNewMessageIndicators === 'function') {
+        this.updateNewMessageIndicators();
+      }
     }
 
     /**
@@ -505,6 +531,15 @@
       // Update channel label to user name
       this.channelLabel.textContent = userObj.name || userObj.username || '私人聊天';
       this.listenToMessages(chatId);
+
+      // Mark messages in this private channel as read. Use the last known
+      // message timestamp or current time as the last seen timestamp. This
+      // ensures the unread indicator resets when switching into the chat.
+      const last = this.lastMessageTime[chatId] || Date.now();
+      this.lastSeenTime[chatId] = last;
+      if (typeof this.updateNewMessageIndicators === 'function') {
+        this.updateNewMessageIndicators();
+      }
     }
 
     /**
@@ -685,6 +720,17 @@
         this.sendButton.disabled = true;
         // Reset textarea height
         this.messageInput.style.height = 'auto';
+
+        // Since the user has just sent a message, mark this channel as read by
+        // recording the timestamp. Use the timestamp of the sent message so
+        // that new messages from other channels can still produce indicators.
+        const channelId = (this.currentChannel === 'public') ? 'public' : this.privateChatId;
+        if (channelId) {
+          this.lastSeenTime[channelId] = timestamp;
+          if (typeof this.updateNewMessageIndicators === 'function') {
+            this.updateNewMessageIndicators();
+          }
+        }
       }).catch((err) => {
         console.error('ChatModule: failed to send message', err);
       });
@@ -760,6 +806,12 @@
       } catch (err) {
         console.error('ChatModule: Failed to attach last message listeners for private chats', err);
       }
+
+      // Initial update of unread message indicators. Without this call, the
+      // indicators may not be shown on first render before messages are loaded.
+      if (typeof this.updateNewMessageIndicators === 'function') {
+        this.updateNewMessageIndicators();
+      }
     }
 
     /**
@@ -810,6 +862,55 @@
           item.classList.add('bg-blue-100');
         } else {
           item.classList.remove('bg-blue-100');
+        }
+      });
+
+      // After reordering, update unread message indicators to reflect the
+      // latest message times and read statuses. Without this call, the
+      // indicator elements may not accurately represent unread counts when
+      // items move positions.
+      if (typeof this.updateNewMessageIndicators === 'function') {
+        this.updateNewMessageIndicators();
+      }
+    }
+
+    /**
+     * Update the unread message indicators on the user list. For each user (or
+     * the public channel), determine whether the last message timestamp is
+     * greater than the timestamp the current user last viewed messages in
+     * that channel. If so, show a small red dot; otherwise hide it. The
+     * indicator is always hidden for the currently selected channel since the
+     * user is already viewing it. This method should be invoked whenever
+     * lastMessageTime or lastSeenTime changes or the user switches channels.
+     */
+    updateNewMessageIndicators() {
+      if (!this.userListContainer) return;
+      const items = this.userListContainer.querySelectorAll('div[data-uid]');
+      items.forEach((item) => {
+        const uid = item.dataset.uid;
+        let channelId;
+        if (uid === 'public') {
+          channelId = 'public';
+        } else {
+          channelId = [String(this.currentUserUid), String(uid)].sort().join('_');
+        }
+        const indicator = item.querySelector('span[data-new-indicator="true"]');
+        if (!indicator) return;
+        // Hide indicator on the currently selected channel
+        if (this.currentChannel === 'public' && channelId === 'public') {
+          indicator.classList.add('hidden');
+          return;
+        }
+        if (this.currentChannel === 'private' && this.privateChatId === channelId) {
+          indicator.classList.add('hidden');
+          return;
+        }
+        const lastMsg = this.lastMessageTime[channelId] || 0;
+        const lastSeen = this.lastSeenTime[channelId] || 0;
+        if (lastMsg > lastSeen) {
+          indicator.classList.remove('hidden');
+        } else {
+          indicator.classList.add('hidden');
         }
       });
     }
