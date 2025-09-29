@@ -22462,6 +22462,10 @@ function hideGlobalCopyright() {
            */
           function augmentRef(ref) {
             if (!ref) return ref;
+            // 若已經擴充過，直接返回以避免重複和遞迴
+            if (ref.__firechatExtended) return ref;
+            // 標記為已擴充，防止在遞迴過程中重覆處理同一個參考
+            ref.__firechatExtended = true;
             // 推入新的資料節點並回傳帶有 key 的引用
             if (typeof ref.push !== 'function' && typeof window.firebase.push === 'function') {
               ref.push = function (value, onComplete) {
@@ -22666,7 +22670,7 @@ function hideGlobalCopyright() {
               };
             }
             // 遞歸補強 root 及 child 回傳值的兼容方法
-            if (ref.child && typeof ref.child === 'function' && !ref.__firechatAugmented) {
+            if (ref.child && typeof ref.child === 'function') {
               const origChild = ref.child.bind(ref);
               ref.child = function (childPath) {
                 const childRef = origChild(childPath);
@@ -22679,12 +22683,6 @@ function hideGlobalCopyright() {
                 augmentRef(compat);
                 return compat;
               };
-              ref.__firechatAugmented = true;
-            }
-            // 為 root 附加同樣的方法
-            if (ref.root && typeof ref.root === 'object' && !ref.root.__firechatAugmented) {
-              augmentRef(ref.root);
-              ref.root.__firechatAugmented = true;
             }
             return ref;
           }
