@@ -3068,7 +3068,7 @@
                     <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
                     <div class="current-date" id="currentDate"></div>
                     <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個 ▶</button>
-                    <button class="nav-btn" onclick="scheduleGoToToday()">📅 今天</button>
+                    <button class="nav-btn" onclick="scheduleGoToToday()"><span class="text-3xl mr-3">📅 </span> 今天</button>
                 </div>
                 <div class="view-controls">
                     <!-- 假期選擇下拉式選單 -->
@@ -3081,17 +3081,16 @@
                     </select>
                 </div>
                 <div class="sync-controls">
-                    <button class="sync-btn" onclick="scheduleSyncToGoogle()">📅 同步 Google</button>
-                    <button class="sync-btn" onclick="scheduleExportToICal()">📋 匯出 iCal</button>
+                    <button class="sync-btn" onclick="scheduleSyncToGoogle()"><span class="text-3xl mr-3">📅</span> 同步 Google</button>
+                    <button class="sync-btn" onclick="scheduleExportToICal()"><span class="text-3xl mr-3">📋</span> 匯出 iCal</button>
                     <!-- 新增列印更表按鈕：列印當前月份的排班表 -->
-                    <button class="sync-btn" onclick="schedulePrintShiftTable()">🖨️ 列印更表</button>
+                    <button class="sync-btn" onclick="schedulePrintShiftTable()"><span class="text-3xl mr-3">🖨️</span> 列印更表</button>
                 </div>
             </div>
 
             <!-- 篩選面板 -->
             <div class="filter-panel">
             <div class="filter-grid">
-                <!-- 部門篩選已移除。若要重新啟用，請在此加入對應的下拉選單。 -->
                 <div class="filter-group">
                     <label class="filter-label">職位篩選</label>
                     <select class="filter-select" id="roleFilter" onchange="scheduleApplyFilters()">
@@ -3115,8 +3114,8 @@
                     <input type="text" class="filter-input" id="staffSearch" placeholder="輸入姓名..." oninput="scheduleApplyFilters()">
                 </div>
                 <div class="quick-actions">
-                    <button class="quick-btn" onclick="scheduleOpenFixedScheduleModal()">📅 固定上班</button>
-                    <button class="quick-btn danger" onclick="scheduleClearAllShifts()">🗑️ 清空排班</button>
+                    <button class="quick-btn" onclick="scheduleOpenFixedScheduleModal()"><span class="text-3xl mr-3">📅</span> 固定上班</button>
+                    <button class="quick-btn danger" onclick="scheduleClearAllShifts()"><span class="text-3xl mr-3">🗑️</span> 清空排班</button>
                 </div>
             </div>
             </div>
@@ -3127,7 +3126,7 @@
         </div>
 
         <div class="staff-panel">
-            <h3>👨‍⚕️👩‍⚕️ 醫護人員管理 <span style="font-size: 12px; color: #718096; font-weight: normal;">拖拽人員到行事曆新增排班</span></h3>
+            <h3><span class="text-3xl mr-3">👨‍⚕️👩‍⚕️</span> 醫護人員管理 <span style="font-size: 12px; color: #718096; font-weight: normal;">拖拽人員到行事曆新增排班</span></h3>
             <div class="staff-filter">
                 <button class="staff-filter-btn active" onclick="scheduleFilterStaff('all')">全部</button>
                 <button class="staff-filter-btn" onclick="scheduleFilterStaff('doctor')">醫師</button>
