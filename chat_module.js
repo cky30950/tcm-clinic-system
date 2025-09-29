@@ -27,6 +27,15 @@
       // Store all clinic users passed from the main system. This list will be used
       // to populate the user list on the left. Defaults to an empty array.
       this.usersList = [];
+      // Track the last message timestamp for each channel (public or private chat).
+      this.lastMessageTime = {};
+      // Store references to last message listeners keyed by channelId for cleanup.
+      this.channelListeners = {};
+      // Handler for beforeunload event to remove presence on window unload.
+      this.beforeUnloadHandler = null;
+      // Bindings for last message handling
+      this.updateUserListOrder = this.updateUserListOrder.bind(this);
+      this.attachLastMessageListeners = this.attachLastMessageListeners.bind(this);
     }
 
     /**
@@ -59,6 +68,8 @@
       this.setupPresence();
       this.populateUserList();
       this.listenToPresence();
+      // Set up listeners for last message times and start listening to public channel by default
+      this.attachLastMessageListeners();
       this.listenToMessages('public');
     }
 
@@ -97,6 +108,25 @@
         console.error('ChatModule: error removing presence entry', err);
       }
       this.presenceRef = null;
+      // Detach last message listeners
+      try {
+        if (this.channelListeners) {
+          Object.values(this.channelListeners).forEach(({ ref, callback }) => {
+            if (ref && callback) {
+              window.firebase.off(ref, 'value', callback);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('ChatModule: error detaching channel listeners', err);
+      }
+      this.channelListeners = {};
+      this.lastMessageTime = {};
+      // Remove beforeunload handler
+      if (this.beforeUnloadHandler) {
+        window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+        this.beforeUnloadHandler = null;
+      }
       // Remove UI elements and event listeners
       if (this.chatButton) {
         this.chatButton.removeEventListener('click', this.togglePopupHandler);
@@ -126,6 +156,7 @@
       this.currentChannel = 'public';
       this.privateChatId = null;
       this.usersList = [];
+      this.lastMessageTime = {};
     }
 
     /**
@@ -307,13 +338,30 @@
       try {
         // Each user has its own presence entry under presence/<uid>
         this.presenceRef = window.firebase.ref(window.firebase.rtdb, `presence/${this.currentUserUid}`);
-        // Remove presence when disconnected
-        if (this.presenceRef && typeof this.presenceRef.onDisconnect === 'function') {
-          this.presenceRef.onDisconnect().remove();
+        // Remove presence when disconnected using onDisconnect if available
+        try {
+          if (this.presenceRef && window.firebase.onDisconnect) {
+            // Register a handler to remove the presence entry when the connection is lost unexpectedly
+            window.firebase.onDisconnect(this.presenceRef).remove();
+          }
+        } catch (err) {
+          console.warn('ChatModule: Failed to set onDisconnect for presence', err);
         }
+        // Mark the user as present now
         window.firebase.set(this.presenceRef, true).catch((err) => {
           console.error('ChatModule: Failed to set presence', err);
         });
+        // Ensure presence is removed when the page unloads or the user closes the tab
+        this.beforeUnloadHandler = () => {
+          try {
+            if (this.presenceRef) {
+              window.firebase.remove(this.presenceRef);
+            }
+          } catch (_e) {
+            // Ignore errors during unload
+          }
+        };
+        window.addEventListener('beforeunload', this.beforeUnloadHandler);
       } catch (err) {
         console.error('ChatModule: Error in setupPresence', err);
       }
@@ -483,17 +531,28 @@
       }
       this.messagesRef = window.firebase.ref(window.firebase.rtdb, path);
       // Listen to full value to fetch entire message list. Since group sizes are small, this is acceptable.
-        window.firebase.onValue(this.messagesRef, (snapshot) => {
+      window.firebase.onValue(this.messagesRef, (snapshot) => {
         const data = snapshot.val() || {};
         const messages = Object.values(data);
-        // Sort messages so that newest come first (descending by timestamp)
+        // Sort messages so that oldest come first (ascending by timestamp). Newer messages will appear at the bottom.
         messages.sort((a, b) => {
           const ta = a.timestamp || 0;
           const tb = b.timestamp || 0;
-          // If timestamps are equal or invalid, maintain order
-          return tb - ta;
+          return ta - tb;
         });
+        // Render sorted messages
         this.renderMessages(messages);
+        // Track latest timestamp for this channel to update ordering of user list
+        let latestTs = 0;
+        messages.forEach((msg) => {
+          const ts = msg.timestamp || 0;
+          if (ts > latestTs) latestTs = ts;
+        });
+        this.lastMessageTime[channelId] = latestTs;
+        // Reorder user list if available
+        if (typeof this.updateUserListOrder === 'function') {
+          this.updateUserListOrder();
+        }
       });
     }
 
@@ -567,8 +626,12 @@
         fragment.appendChild(wrapper);
       });
       this.messageContainer.appendChild(fragment);
-      // Auto-scroll to top so that the newest messages are visible immediately
-      this.messageContainer.scrollTop = 0;
+      // Auto-scroll to bottom so that the newest messages (last in array) are visible
+      try {
+        this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
+      } catch (_e) {
+        // silently ignore scroll errors
+      }
     }
 
     /**
@@ -624,6 +687,130 @@
         this.messageInput.style.height = 'auto';
       }).catch((err) => {
         console.error('ChatModule: failed to send message', err);
+      });
+    }
+
+    /**
+     * Attach listeners to the last message of each channel (public and each private chat).
+     * This allows the user list to be sorted by the most recently active conversations.
+     * The listeners will update this.lastMessageTime and trigger updateUserListOrder().
+     */
+    attachLastMessageListeners() {
+      // Detach any existing listeners first
+      try {
+        if (this.channelListeners) {
+          Object.values(this.channelListeners).forEach(({ ref, callback }) => {
+            if (ref && callback) {
+              // Remove 'value' listener on this ref for the stored callback
+              window.firebase.off(ref, 'value', callback);
+            }
+          });
+        }
+      } catch (_err) {
+        console.error('ChatModule: error detaching channel listeners', _err);
+      }
+      this.channelListeners = {};
+      // Always watch the public chat
+      try {
+        const publicRef = window.firebase.ref(window.firebase.rtdb, 'chat/messages/public');
+        const publicCallback = (snapshot) => {
+          const data = snapshot.val() || {};
+          let latest = 0;
+          Object.values(data).forEach((msg) => {
+            const ts = msg.timestamp || 0;
+            if (ts > latest) latest = ts;
+          });
+          this.lastMessageTime['public'] = latest;
+          if (typeof this.updateUserListOrder === 'function') {
+            this.updateUserListOrder();
+          }
+        };
+        window.firebase.onValue(publicRef, publicCallback);
+        this.channelListeners['public'] = { ref: publicRef, callback: publicCallback };
+      } catch (err) {
+        console.error('ChatModule: Failed to attach last message listener for public', err);
+      }
+      // Watch each private chat corresponding to other users
+      try {
+        const list = Array.isArray(this.usersList) ? this.usersList : [];
+        list.forEach((u) => {
+          if (!u) return;
+          const uid = u.uid || u.id;
+          if (!uid) return;
+          // Skip current user
+          if (String(uid) === String(this.currentUserUid) || String(uid) === String(this.currentUser && this.currentUser.id)) return;
+          const chatId = [String(this.currentUserUid), String(uid)].sort().join('_');
+          const path = `chat/private/${chatId}`;
+          const ref = window.firebase.ref(window.firebase.rtdb, path);
+          const cb = (snapshot) => {
+            const data = snapshot.val() || {};
+            let latest = 0;
+            Object.values(data).forEach((msg) => {
+              const ts = msg.timestamp || 0;
+              if (ts > latest) latest = ts;
+            });
+            this.lastMessageTime[chatId] = latest;
+            if (typeof this.updateUserListOrder === 'function') {
+              this.updateUserListOrder();
+            }
+          };
+          window.firebase.onValue(ref, cb);
+          this.channelListeners[chatId] = { ref: ref, callback: cb };
+        });
+      } catch (err) {
+        console.error('ChatModule: Failed to attach last message listeners for private chats', err);
+      }
+    }
+
+    /**
+     * Sort the user list based on the most recent message timestamp for each channel.  
+     * Channels with newer messages will appear first. The currently selected channel
+     * maintains its highlight after reordering.
+     */
+    updateUserListOrder() {
+      if (!this.userListContainer) return;
+      const items = Array.from(this.userListContainer.children);
+      if (!items || items.length === 0) return;
+      // Identify the currently selected item (highlight class)
+      let selectedUid = null;
+      items.forEach((item) => {
+        if (item.classList.contains('bg-blue-100')) {
+          selectedUid = item.dataset.uid;
+        }
+      });
+      // Sort items by last message time descending (most recent first)
+      items.sort((a, b) => {
+        const uidA = a.dataset.uid;
+        const uidB = b.dataset.uid;
+        // Determine channel IDs for A and B
+        let chA = null;
+        let chB = null;
+        if (uidA === 'public') {
+          chA = 'public';
+        } else {
+          chA = [String(this.currentUserUid), String(uidA)].sort().join('_');
+        }
+        if (uidB === 'public') {
+          chB = 'public';
+        } else {
+          chB = [String(this.currentUserUid), String(uidB)].sort().join('_');
+        }
+        const timeA = this.lastMessageTime[chA] || 0;
+        const timeB = this.lastMessageTime[chB] || 0;
+        if (timeA === timeB) return 0;
+        return timeB - timeA;
+      });
+      // Append sorted items back to container
+      items.forEach((item) => {
+        this.userListContainer.appendChild(item);
+      });
+      // Restore the selected highlight class
+      items.forEach((item) => {
+        if (selectedUid && item.dataset.uid === selectedUid) {
+          item.classList.add('bg-blue-100');
+        } else {
+          item.classList.remove('bg-blue-100');
+        }
       });
     }
   }

@@ -27,13 +27,13 @@ import {
   writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getDatabase, ref, set, get, update, remove, onValue, off,
+        // 新增 onDisconnect 用於在連線中斷時自動移除 presence
+        onDisconnect,
         // 新增查詢相關方法，用於在 Realtime Database 上進行條件篩選
         query as rtdbQuery,
         orderByChild,
         startAt,
-        endAt,
-        // 引入 onDisconnect 以在使用者登出或視窗關閉時能夠更新線上狀態
-        onDisconnect } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+        endAt } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, signOut, setPersistence, browserSessionPersistence, createUserWithEmailAndPassword, updateProfile,
         // 新增更改密碼、刪除帳號、重新驗證等方法
         updatePassword, deleteUser as firebaseDeleteUser, EmailAuthProvider, reauthenticateWithCredential } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
@@ -101,7 +101,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         remove,
         onValue,
         off,
-        // 處理使用者離線狀態更新
+        // onDisconnect 用於設定斷線時的處理，例如自動移除 presence
         onDisconnect,
         // Realtime Database 查詢函式，同時將其作為預設的 query 屬性供 RTDB 使用
         rtdbQuery,
