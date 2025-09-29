@@ -247,9 +247,28 @@ function hasAccessToSection(sectionId) {
   // 取得用戶職位並移除前後空白
   const pos = currentUserData.position.trim ? currentUserData.position.trim() : currentUserData.position;
 
-  // 特別處理：用戶管理僅限診所管理者使用
+  // 特別處理：用戶管理僅限管理員使用。
+  // 使用 window.isAdminUser（若存在）來判斷是否為管理員，
+  // 以支援例如「系統管理」或包含「管理」的其他職稱，同時保留
+  // 對特定電子郵件 (admin@clinic.com) 的判斷。
   if (sectionId === 'userManagement') {
-    return pos === '診所管理';
+    try {
+      if (typeof window.isAdminUser === 'function') {
+        // 若提供了 isAdminUser 函式，直接以其結果為準。
+        return window.isAdminUser();
+      }
+    } catch (_e) {
+      // 忽略函式執行中的錯誤
+    }
+    // 如果沒有 isAdminUser 或執行失敗，則根據職稱及電子郵件進行判斷。
+    const email = (currentUserData && currentUserData.email
+      ? String(currentUserData.email).toLowerCase().trim()
+      : '');
+    return (
+      pos === '診所管理' ||
+      (pos && pos.includes('管理')) ||
+      email === 'admin@clinic.com'
+    );
   }
 
   // 收費項目管理僅限診所管理者或醫師使用
@@ -13028,8 +13047,20 @@ async function loadUserManagement() {
 
 // 從 Firebase 載入用戶數據
 async function loadUsersFromFirebase() {
+    // 在載入用戶資料前先確保 Firebase DataManager 已就緒，避免尚未初始化造成讀取失敗
+    if (typeof waitForFirebaseDataManager === 'function') {
+        try {
+            await waitForFirebaseDataManager();
+        } catch (e) {
+            console.warn('等待 FirebaseDataManager 就緒時發生錯誤:', e);
+        }
+    }
     const tbody = document.getElementById('userList');
-    
+    // 若找不到 userList 元素，則提前結束
+    if (!tbody) {
+        console.warn('找不到 userList 元素，無法載入用戶列表');
+        return;
+    }
     // 顯示載入中
     tbody.innerHTML = `
         <tr>
@@ -13071,14 +13102,26 @@ function filterUsers(status) {
     document.querySelectorAll('[id^="user-filter-"]').forEach(btn => {
         btn.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition duration-200';
     });
-    document.getElementById(`user-filter-${status}`).className = 'px-4 py-2 rounded-lg text-sm font-medium bg-blue-100 text-blue-800 transition duration-200';
-    
+    // 設定當前篩選按鈕樣式，若元素不存在則忽略
+    const activeBtn = document.getElementById(`user-filter-${status}`);
+    if (activeBtn) {
+        activeBtn.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-blue-100 text-blue-800 transition duration-200';
+    }
     displayUsers();
 }
 
 function displayUsers() {
-    const searchTerm = document.getElementById('searchUser').value.toLowerCase();
+    // 取得搜尋關鍵字，若搜尋欄位不存在則使用空字串
+    const searchInput = document.getElementById('searchUser');
+    const searchTerm = searchInput && searchInput.value
+        ? String(searchInput.value).toLowerCase()
+        : '';
     const tbody = document.getElementById('userList');
+    // 若找不到 userList 元素則不進行渲染
+    if (!tbody) {
+        console.warn('找不到 userList 元素，無法渲染用戶列表');
+        return;
+    }
     
     // 使用 Firebase 數據或本地數據
     const currentUsers = usersFromFirebase.length > 0 ? usersFromFirebase : users;
