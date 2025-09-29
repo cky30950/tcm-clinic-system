@@ -72,7 +72,10 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
     // 讓其他腳本可以使用 Firebase
     // 注意：不要覆蓋 Firestore 的 query 方法。為了使用 Realtime Database 的查詢功能，
     // 將其以 rtdbQuery 名稱暴露，避免與 Firestore 的 query 衝突。
-    window.firebase = {
+    // Store the modular Firebase object in a separate property before assigning it to window.firebase.  
+    // We assign it to window.firebase below, but in some pages (e.g. Firechat integration) we need to
+    // retain access to this modular instance after other scripts (like Firebase v3) override window.firebase.
+    const firebaseModular = {
         // 基本實例
         app,
         db,
@@ -127,6 +130,16 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         setPersistence,
         browserSessionPersistence
     };
+
+    // Make the modular Firebase object globally accessible. It will be duplicated onto
+    // window.firebase after this assignment. If another script later overwrites window.firebase
+    // (for example, loading Firebase v3 for Firechat), you can still access the modular APIs via
+    // window.firebaseModular.
+    window.firebaseModular = firebaseModular;
+
+    // 將 modular API 複製到全域 firebase，供系統其他部分使用。Firechat 將使用 firebaseCompat，因此後續載入 compat
+    // SDK 不會覆蓋此 modular 版本，只要我們在其他地方使用 window.firebaseModular 即可避免衝突。
+    window.firebase = firebaseModular;
 
     // 連接狀態監控
     window.firebaseConnected = false;
