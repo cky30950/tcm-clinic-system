@@ -2687,6 +2687,14 @@ async function syncUserDataFromFirebase() {
                 const msg = lang === 'en' ? enMsg : zhMsg;
                 showToast(msg, 'success');
             }
+            // 初始化 Firechat 聊天室（若已載入函式）
+            try {
+                if (typeof window.initFirechatUI === 'function') {
+                    window.initFirechatUI();
+                }
+            } catch (_e) {
+                console.error('初始化聊天室失敗:', _e);
+            }
         }
 
         // 側邊選單控制
@@ -22318,28 +22326,32 @@ function hideGlobalCopyright() {
 
   /**
    * 初始化 Firechat UI。這個函式會在登入後由聊天室開關按鈕或登入程序呼叫。
-   * 它會透過現有的 Firebase Realtime Database 引用建立 FirechatUI 實例，
+   * 它會透過 compat 版的 Firebase 初始化 Realtime Database，建立 FirechatUI 實例，
    * 並將當前使用者設為聊天室用戶。初始化完成後，將實例保存在 window.firechatInstance。
    */
   window.initFirechatUI = async function initFirechatUI() {
     try {
+      // 等待 Firebase 模組化初始化完成
+      if (typeof waitForFirebaseDb === 'function') {
+        await waitForFirebaseDb();
+      } else if (typeof waitForFirebase === 'function') {
+        await waitForFirebase();
+      }
       // 確認 FirechatUI 已載入
       if (typeof FirechatUI === 'undefined') {
         console.error('FirechatUI 尚未載入，無法初始化即時聊天室。');
         return;
       }
-      // 如果 global firebase.database 不存在，為 Firechat 提供必要介面
-      if (typeof window.firebase !== 'undefined' && typeof window.firebase.database === 'undefined') {
-        // 建立一個仿 firebase.database 的函式，回傳具有 ref 方法的物件
-        window.firebase.database = function() {
-          return {
-            ref: function(path) {
-              return window.firebase.ref(window.firebase.rtdb, path);
-            }
-          };
-        };
-        // 加入 ServerValue 屬性以支援伺服器時間戳
-        window.firebase.database.ServerValue = { TIMESTAMP: { '.sv': 'timestamp' } };
+      // 透過 compat API 初始化 Firebase（如果尚未初始化）
+      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length === 0) {
+        try {
+          // 使用現有模組化應用的設定
+          const config = (window.firebase && window.firebase.app && window.firebase.app.options) || {};
+          firebase.initializeApp(config);
+        } catch (e) {
+          // 如果已經初始化會丟出錯誤，可安全忽略
+          console.warn('初始化 compat Firebase 失敗或已存在應用：', e);
+        }
       }
       // 取得當前登入使用者資訊
       const authUser = window.firebase && window.firebase.auth ? window.firebase.auth.currentUser : null;
@@ -22367,8 +22379,35 @@ function hideGlobalCopyright() {
         displayName = (authUser && (authUser.displayName || authUser.email)) || (typeof currentUser !== 'undefined' && currentUser) || 'User';
       }
       // 建立 Realtime Database 參考路徑，聊天室資料將儲存於 'chat' 節點
-      const chatRef = window.firebase.ref(window.firebase.rtdb, 'chat');
-      // 取得 Firechat 容器
+      // 在不同的 Firebase SDK 版本或初始化方式下，取得資料庫實例的方式可能不同。
+      // - 當使用 compat SDK 時，`firebase.database()` 是可用的。
+      // - 在某些情況下，`firebase.database` 可能不存在，這通常是因為引入的是模組化 SDK，
+      //   或因為全域變數被覆寫。另一方面，透過 compat `app()` 物件仍可取得 `database()` 方法。
+      // - 若以上方式均不可用，則嘗試透過 window.firebase（可能是另一個全域命名空間）取得。
+      //   無法取得即時資料庫時，將顯示錯誤並終止初始化。
+      let chatRef;
+      try {
+        if (typeof firebase !== 'undefined' && typeof firebase.database === 'function') {
+          // 標準 compat 寫法
+          chatRef = firebase.database().ref('chat');
+        } else if (typeof window !== 'undefined' && window.firebase && typeof window.firebase.database === 'function') {
+          // 有些情況下全域 firebase 被覆寫，window.firebase 才有 database
+          chatRef = window.firebase.database().ref('chat');
+        } else if (typeof firebase !== 'undefined' && typeof firebase.app === 'function') {
+          // 試著透過 app() 取得 database()，此方式適用於 compat SDK
+          const app = firebase.app();
+          if (app && typeof app.database === 'function') {
+            chatRef = app.database().ref('chat');
+          }
+        }
+      } catch (e) {
+        // 忽略例外，在後續判斷 chatRef 是否存在
+      }
+      if (!chatRef) {
+        console.error('找不到 Realtime Database 服務，無法初始化聊天室。');
+        return;
+      }
+      // 建立 FirechatUI 實例，掛載至聊天室容器
       const container = document.getElementById('firechatContainer');
       if (!container) {
         console.error('找不到 Firechat 容器，無法初始化。');
