@@ -4415,7 +4415,7 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
     <!-- Firechat 聊天面板 -->
-    <div id="firechat-wrapper" style="position: fixed; bottom: 20px; right: 20px; width: 320px; height: 440px; z-index: 1000;"></div>
+    <div id="firechat-wrapper" style="position: fixed; bottom: 20px; right: 20px; width: 320px; height: 440px; z-index: 1000; display: none;"></div>
 
     <!-- jQuery (Firechat 需要) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
@@ -4434,21 +4434,31 @@
             return;
           }
           try {
-            var config = window.firebase.app.options;
-            if (firebase.apps && !firebase.apps.length) {
-              firebase.initializeApp(config);
-            }
+            // 使用在 firebase_init.js 中暴露的 firebaseConfig 來初始化舊版 Firebase。
+            // Firechat 使用的舊版 Firebase (v3) 不會有 firebase.apps 屬性，
+            // 因此無法透過 firebase.apps.length 檢查是否已初始化。
+            // 為避免 "Firebase: No Firebase App '[DEFAULT]' has been created" 錯誤，
+            // 直接嘗試初始化舊版 Firebase，若已初始化則會拋出錯誤並被捕捉忽略。
+            var config = window.firebaseConfig || (window.firebase.app && window.firebase.app.options);
+            firebase.initializeApp(config);
           } catch (e) {
             // 若初始化失敗或已初始化則忽略。
           }
           // 使用新版 Firebase Auth 監聽登入狀態並初始化 Firechat。
           window.firebase.auth.onAuthStateChanged(function(user) {
-            if (!user) return;
+            // 未登入時不顯示聊天室
+            if (!user) {
+              return;
+            }
+            var wrapper = document.getElementById('firechat-wrapper');
+            if (!wrapper) return;
+            // 顯示聊天容器
+            wrapper.style.display = 'block';
             var chatRef = firebase.database().ref('chat');
-            var chat = new FirechatUI(chatRef, document.getElementById('firechat-wrapper'));
+            var chat = new FirechatUI(chatRef, wrapper);
             var name = user.displayName || user.email || '匿名';
             chat.setUser(user.uid, name, function() {
-              // 這裡可加入額外設定，例如自動加入預設聊天室。
+              // 使用者設定完成，可進行其他初始化，例如自動加入房間
             });
           });
         }

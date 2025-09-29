@@ -39,6 +39,11 @@ import { getAuth, signInWithEmailAndPassword, signOut, setPersistence, browserSe
 // 匯入外部配置檔案。請將您的 Firebase 設定值放在 firebaseConfig.js 中，並避免將其提交到版本控制。
 import firebaseConfig from './firebaseConfig.js';
 
+// 將設定值暴露於全域，以便 Firechat 等需要舊版 Firebase 的模組可重新初始化。
+// 這不會洩漏您的金鑰，因為 firebaseConfig 內容僅包含專案識別與 API 金鑰等公開資訊。
+// Firechat 將使用此物件呼叫 firebase.initializeApp()。
+window.firebaseConfig = firebaseConfig;
+
     // Initialize Firebase 使用外部配置
     const app = initializeApp(firebaseConfig);
     // 使用 initializeFirestore 搭配 persistentLocalCache 啟用離線快取。
