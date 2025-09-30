@@ -744,6 +744,11 @@ window.translations = {
         "夜班 (00:00-08:00)": "Night (00:00-08:00)",
         "急診班": "Emergency",
         "自訂時間": "Custom",
+        // Shift type label used when a custom schedule is chosen.  Without
+        // this entry the label "自訂" would remain untranslated on the
+        // calendar and in notifications.  It is distinct from
+        // "自訂時間" which refers specifically to the custom time option.
+        "自訂": "Custom",
         "備註": "Notes",
         "輸入備註資訊...": "Enter notes...",
         "取消": "Cancel",
@@ -844,6 +849,13 @@ window.translations = {
         "替換": "replaced",
         "工作日：": "Working days:",
         // Additional labels used in the scheduling UI
+        // When confirming deletion or showing details, colon versions of labels
+        // need their own translation keys. Without these entries, the
+        // translate helper will fall back to the Chinese original.  Add
+        // translations for "日期：", "無" and "班別：".
+        "日期：": "Date:",
+        "無": "None",
+        "班別：": "Shift type:",
         "班別:": "Shift type:",
         "一般排班": "General shift",
         "無排班": "No shifts",
@@ -866,6 +878,9 @@ window.translations = {
         // Labels for the scheduling menu item and its description
         "醫療排班": "Medical scheduling",
         "排班與行事曆查看": "View schedules and calendar",
+
+        // Generic phrase used when referring to an unspecified operation (e.g., in admin checks)
+        "此操作": "this action",
         "，替換": ", replaced",
         "。": ".",
         "請輸入中藥材名稱！": "Please enter the herb name!",

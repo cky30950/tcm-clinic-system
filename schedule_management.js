@@ -182,10 +182,12 @@
          * @param {string} operationName - 顯示於提示中的操作名稱
          * @returns {boolean} 若為管理員則回傳 true，否則 false
          */
-        function ensureAdmin(operationName = '此操作') {
+        function ensureAdmin(operationName = null) {
             // 若 isAdminUser 未定義或回傳 false，則拒絕操作
             if (!window.isAdminUser || !window.isAdminUser()) {
-                const opText = operationName || '此操作';
+                // Use the provided operation name if any, otherwise default to a generic phrase. Translate the operation name if possible.
+                const opName = operationName || '此操作';
+                const opText = translate(opName);
                 // Build translated admin-only message
                 showNotification(translate('只有管理員才能執行') + opText + translate('！'));
                 return false;
@@ -831,7 +833,12 @@
             renderStaffPanel(); // 更新人員狀態
             updateStats();
             
-            const shiftTypeName = getShiftTypeName(shiftType);
+            // Translate the shift type name before composing the message.  This
+            // ensures that the notification appears in the currently
+            // selected language.  Without this call, shift type names like
+            // "早班" or "夜班" would remain in Chinese even when the UI
+            // language is English.
+            const shiftTypeName = translate(getShiftTypeName(shiftType));
             // Compose notification message for newly added shift using translations
             showNotification(`${translate('已為')} ${staffMember.name} ${translate('新增')} ${shiftTypeName} (${startTime}-${endTime})${translate('！')}`);
         }
@@ -1027,13 +1034,15 @@
             delete modal.dataset.editId;
             const titleEl = modal.querySelector('h3');
             if (titleEl) {
-                titleEl.textContent = '新增排班';
+                    // Set modal title using translation for "新增排班"
+                    titleEl.textContent = translate('新增排班');
             }
             // 根據目前模式調整提交按鈕文字為「新增排班」
             try {
                 const submitBtn = form.querySelector('button[type="submit"]');
                 if (submitBtn) {
-                    submitBtn.textContent = '新增排班';
+                    // Use translated label for add shift button
+                    submitBtn.textContent = translate('新增排班');
                 }
             } catch (_e) {
                 /* 若表單不存在按鈕則忽略 */
@@ -1113,7 +1122,8 @@
                     showNotification(translate('排班更新成功！'));
                 }
                 delete modal.dataset.editId;
-                modal.querySelector('h3').textContent = '新增排班';
+                // Translate modal title for adding shift
+                modal.querySelector('h3').textContent = translate('新增排班');
             } else {
                 // 新增模式
                 const newShift = {
@@ -1371,13 +1381,15 @@
             // 標記為編輯模式
             const modal = document.getElementById('shiftModal');
             modal.dataset.editId = shiftId;
-            modal.querySelector('h3').textContent = '編輯排班';
+            // Set modal header to translated 'Edit shift'
+            modal.querySelector('h3').textContent = translate('編輯排班');
             // 根據目前模式調整提交按鈕文字為「編輯排班」
             try {
                 const form = document.getElementById('shiftForm');
                 const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
                 if (submitBtn) {
-                    submitBtn.textContent = '編輯排班';
+                    // Set submit button label to translated 'Edit shift'
+                    submitBtn.textContent = translate('編輯排班');
                 }
             } catch (_e) {
                 /* 忽略錯誤 */
@@ -1711,13 +1723,22 @@ ${translate('電子郵件：')}${staffMember.email}`);
             }
             
             let scheduleText = `${staffMember.name} ${translate('的排班記錄：')}\n\n`;
+            // Determine the current language to format dates properly.  When the
+            // language is English we use 'en-US', otherwise fall back to
+            // traditional Chinese locale.
+            const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
             staffShifts.forEach(shift => {
-                const date = new Date(shift.date).toLocaleDateString('zh-TW');
+                const dateObj = new Date(shift.date);
+                const formattedDate = dateObj.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW');
                 const duration = calculateShiftDuration(shift.startTime, shift.endTime);
-                scheduleText += `📅 ${date} ${shift.startTime}-${shift.endTime} (${duration}h) - ${getShiftTypeName(shift.type)}\n`;
+                // Translate the shift type name before inserting it into the
+                // schedule text.  This ensures names like "早班" or "夜班"
+                // are shown as "Morning" and "Night" in English.
+                const shiftTypeName = translate(getShiftTypeName(shift.type));
+                scheduleText += `📅 ${formattedDate} ${shift.startTime}-${shift.endTime} (${duration}h) - ${shiftTypeName}\n`;
                 if (shift.notes) scheduleText += `   ${translate('備註:')} ${shift.notes}\n`;
             });
-            
+            // Display the assembled schedule text
             alert(scheduleText);
         }
 
@@ -1744,8 +1765,12 @@ ${translate('電子郵件：')}${staffMember.email}`);
                 const year = currentDate.getFullYear();
                 const month = currentDate.getMonth();
                 const lastDay = new Date(year, month + 1, 0).getDate();
+                // Chinese weekday symbols; use translate() for English names
                 const weekdays = ['日','一','二','三','四','五','六'];
-                let html = '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>排班表</title>';
+                // Determine current language for localisation
+                const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+                // Start HTML document.  The lang attribute reflects the current language.
+                let html = '<!DOCTYPE html><html lang="' + (lang === 'zh' ? 'zh-TW' : 'en') + '"><head><meta charset="UTF-8"><title>' + translate('排班表') + '</title>';
                 html += '<style>';
                 html += 'body{font-family:\'Noto Sans TC\',sans-serif;padding:20px;}';
                 html += 'h2{text-align:center;margin:0 0 20px;font-size:20px;}';
@@ -1756,25 +1781,39 @@ ${translate('電子郵件：')}${staffMember.email}`);
                 html += 'li{margin-bottom:4px;line-height:1.4;}';
                 html += 'em{color:#6b7280;}';
                 html += '</style></head><body>';
-                const title = year + ' 年 ' + (month + 1) + ' 月排班表';
+                // Generate the title differently based on language.  In English we
+                // use a hyphenated format (e.g. "Shift schedule - 2025/05"),
+                // whereas in Chinese we retain the original format.
+                let title;
+                if (lang === 'en') {
+                    // Use zero‑padded month for consistency
+                    const mm = String(month + 1).padStart(2, '0');
+                    title = translate('排班表') + ' - ' + year + '/' + mm;
+                } else {
+                    title = year + ' 年 ' + (month + 1) + ' 月' + translate('排班表');
+                }
                 html += '<h2>' + title + '</h2>';
-                html += '<table><thead><tr><th style="width:120px;">日期</th><th>排班</th></tr></thead><tbody>';
+                // Table header: translate the headings
+                html += '<table><thead><tr><th style="width:120px;">' + translate('日期') + '</th><th>' + translate('排班') + '</th></tr></thead><tbody>';
+                // Generate each day's row
                 for (let day = 1; day <= lastDay; day++) {
                     const dateObj = new Date(year, month, day);
                     const dateStr = formatDate(dateObj);
                     const dayShifts = shifts.filter(s => s.date === dateStr && passesFilter(s));
                     let cellContent;
                     if (dayShifts.length === 0) {
-                            // Use translation for "No shifts" when printing the schedule.  The
-                            // translate helper is available within this scope.
-                            cellContent = `<em>${translate('無排班')}</em>`;
+                        // Use translation for "No shifts" when printing the schedule
+                        cellContent = `<em>${translate('無排班')}</em>`;
                     } else {
-                        dayShifts.sort((a,b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
+                        dayShifts.sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
                         cellContent = '<ul>';
                         dayShifts.forEach(shift => {
                             const staffMember = findStaffById(shift.staffId);
                             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
-                            const typeName = getShiftTypeName(shift.type);
+                            // Translate the shift type name for the printed schedule.  Without
+                            // translation the names would remain in Chinese even when
+                            // printing in English.
+                            const typeName = translate(getShiftTypeName(shift.type));
                             let info = staffMember.name;
                             if (staffMember.level) info += ' ' + staffMember.level;
                             info += ' ' + shift.startTime + '-' + shift.endTime + ' (' + duration + 'h)';
@@ -1784,8 +1823,18 @@ ${translate('電子郵件：')}${staffMember.email}`);
                         });
                         cellContent += '</ul>';
                     }
-                    const weekday = weekdays[dateObj.getDay()];
-                    const displayDate = (month + 1) + '月' + day + '日 (' + weekday + ')';
+                    // Determine the weekday name based on current language
+                    const weekdayCh = weekdays[dateObj.getDay()];
+                    const weekdayName = translate(weekdayCh);
+                    let displayDate;
+                    if (lang === 'en') {
+                        // Format as mm/dd (Weekday)
+                        const mm = String(month + 1).padStart(2, '0');
+                        const dd = String(day).padStart(2, '0');
+                        displayDate = mm + '/' + dd + ' (' + weekdayName + ')';
+                    } else {
+                        displayDate = (month + 1) + '月' + day + '日 (' + weekdayCh + ')';
+                    }
                     html += '<tr><td>' + displayDate + '</td><td>' + cellContent + '</td></tr>';
                 }
                 html += '</tbody></table></body></html>';
@@ -1796,7 +1845,7 @@ ${translate('電子郵件：')}${staffMember.email}`);
                     printWin.document.close();
                     printWin.focus();
                     setTimeout(() => {
-                        try { printWin.print(); } catch(_) {} finally { printWin.close(); }
+                        try { printWin.print(); } catch (_) {} finally { printWin.close(); }
                     }, 300);
                 } else {
                     alert(translate('無法開啟列印視窗，請檢查瀏覽器設定。'));
@@ -1903,12 +1952,29 @@ if (typeof window.initializeScheduleManagement !== 'function') {
         const isAdmin = window.isAdminUser && window.isAdminUser();
         const qaEl = document.getElementById('quickActions');
         const dragEl = document.getElementById('dragInstruction');
-        // 如果元素存在，根據 isAdmin 動態設置 display 屬性。
+        // 如果元素存在，根據 isAdmin 動態設置 display 屬性。使用明確的
+        // display 值來確保在不同瀏覽器和樣式設定下正確顯示。
         if (qaEl) {
-          qaEl.style.display = isAdmin ? '' : 'none';
+          if (isAdmin) {
+            // 使用 flex 顯示快速操作區塊，並移除隱藏類別
+            qaEl.style.display = 'flex';
+            if (qaEl.classList) qaEl.classList.remove('hidden');
+          } else {
+            // 隱藏快速操作區塊並加入 hidden 類別，以便覆蓋其他樣式
+            qaEl.style.display = 'none';
+            if (qaEl.classList) qaEl.classList.add('hidden');
+          }
         }
         if (dragEl) {
-          dragEl.style.display = isAdmin ? '' : 'none';
+          if (isAdmin) {
+            // 使用 inline 顯示拖拽提示，並移除 hidden 類別
+            dragEl.style.display = 'inline';
+            if (dragEl.classList) dragEl.classList.remove('hidden');
+          } else {
+            // 隱藏拖拽提示並加入 hidden 類別
+            dragEl.style.display = 'none';
+            if (dragEl.classList) dragEl.classList.add('hidden');
+          }
         }
       } catch (_err) {
         // 若遇到錯誤，僅在控制台記錄，不影響其他功能
