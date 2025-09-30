@@ -1897,25 +1897,22 @@ if (typeof window.initializeScheduleManagement !== 'function') {
       // 更新統計資訊
       if (typeof updateStats === 'function') updateStats();
 
-      // 根據使用者權限隱藏部分介面元素
-      // 如果不是管理員，則隱藏固定上班與清空排班按鈕，以及拖拽提示文字
+      // 根據使用者權限調整部分介面元素的顯示與隱藏
+      // 管理員可以看到固定上班、清空排班按鈕及拖拽提示；非管理員則隱藏這些元素。
       try {
         const isAdmin = window.isAdminUser && window.isAdminUser();
-        if (!isAdmin) {
-          // 隱藏快速操作區塊
-          const qaEl = document.getElementById('quickActions');
-          if (qaEl) {
-            qaEl.style.display = 'none';
-          }
-          // 隱藏拖拽提示文字
-          const dragEl = document.getElementById('dragInstruction');
-          if (dragEl) {
-            dragEl.style.display = 'none';
-          }
+        const qaEl = document.getElementById('quickActions');
+        const dragEl = document.getElementById('dragInstruction');
+        // 如果元素存在，根據 isAdmin 動態設置 display 屬性。
+        if (qaEl) {
+          qaEl.style.display = isAdmin ? '' : 'none';
+        }
+        if (dragEl) {
+          dragEl.style.display = isAdmin ? '' : 'none';
         }
       } catch (_err) {
         // 若遇到錯誤，僅在控制台記錄，不影響其他功能
-        console.warn('Failed to apply admin-only UI hiding', _err);
+        console.warn('Failed to apply admin-only UI visibility toggling', _err);
       }
     } catch (e) {
       console.error('Schedule init error', e);

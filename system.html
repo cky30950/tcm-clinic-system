@@ -3084,9 +3084,11 @@
         <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
             <div class="controls">
                 <div class="nav-controls">
-                    <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">◀ 上一個</button>
+                    <!-- 更新按鈕文字為「上一個月」，無箭頭符號 -->
+                    <button class="nav-btn" onclick="scheduleNavigateCalendar(-1)">上一個月</button>
                     <div class="current-date" id="currentDate"></div>
-                    <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個 ▶</button>
+                    <!-- 更新按鈕文字為「下一個月」，無箭頭符號 -->
+                    <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個月</button>
                     <button class="nav-btn" onclick="scheduleGoToToday()"><span class="text-1xl mr-1">📅 </span> 今天</button>
                 </div>
                 <div class="view-controls">

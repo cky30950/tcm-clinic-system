@@ -859,6 +859,13 @@ window.translations = {
         // shown when a staff entry lacks a name; do not confuse it with the
         // chat system's "未知用戶" (Unknown user) which is translated separately.
         "未知人員": "Unknown staff",
+        // Navigation labels for previous/next month in the scheduling calendar
+        "上一個月": "Previous month",
+        "下一個月": "Next month",
+
+        // Labels for the scheduling menu item and its description
+        "醫療排班": "Medical scheduling",
+        "排班與行事曆查看": "View schedules and calendar",
         "，替換": ", replaced",
         "。": ".",
         "請輸入中藥材名稱！": "Please enter the herb name!",
