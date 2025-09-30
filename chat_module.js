@@ -49,6 +49,11 @@
       // Keys correspond to channel IDs ("public" or sorted UID pair). Values
       // are timestamps of the last message the user has viewed in that channel.
       this.lastSeenTime = {};
+
+      // Bind persistence helpers to this context. These helpers load and
+      // persist the last seen timestamps to localStorage keyed by user UID.
+      this.loadLastSeenTimes = this.loadLastSeenTimes.bind(this);
+      this.persistLastSeenTimes = this.persistLastSeenTimes.bind(this);
     }
 
     /**
@@ -76,6 +81,16 @@
         this.usersList = usersList;
       } else if (Array.isArray(window.users)) {
         this.usersList = window.users;
+      }
+
+      // Load last seen times from localStorage so that unread indicators
+      // respect previously viewed messages across sessions. This must be
+      // called after currentUserUid is determined and before any listeners
+      // update lastSeenTime.
+      try {
+        this.loadLastSeenTimes();
+      } catch (_e) {
+        // Ignore errors loading last seen times
       }
       this.createUI();
       this.setupPresence();
@@ -549,6 +564,10 @@
       // message indicator from showing while the user is in the channel.
       const ts = this.lastMessageTime['public'] || Date.now();
       this.lastSeenTime['public'] = ts;
+      // Persist the last seen time so red dot remains hidden across sessions
+      if (typeof this.persistLastSeenTimes === 'function') {
+        this.persistLastSeenTimes();
+      }
       if (typeof this.updateNewMessageIndicators === 'function') {
         this.updateNewMessageIndicators();
       }
@@ -577,6 +596,10 @@
       // ensures the unread indicator resets when switching into the chat.
       const last = this.lastMessageTime[chatId] || Date.now();
       this.lastSeenTime[chatId] = last;
+      // Persist the last seen time for this private chat
+      if (typeof this.persistLastSeenTimes === 'function') {
+        this.persistLastSeenTimes();
+      }
       if (typeof this.updateNewMessageIndicators === 'function') {
         this.updateNewMessageIndicators();
       }
@@ -640,6 +663,10 @@
           }
           if (isCurrent) {
             this.lastSeenTime[channelId] = latestTs;
+            // Persist last seen time when actively viewing this channel
+            if (typeof this.persistLastSeenTimes === 'function') {
+              this.persistLastSeenTimes();
+            }
           }
         } catch (_e) {
           // ignore errors during lastSeen update
@@ -791,6 +818,11 @@
           this.lastSeenTime[channelId] = timestamp;
           if (typeof this.updateNewMessageIndicators === 'function') {
             this.updateNewMessageIndicators();
+          }
+
+          // Persist updated lastSeenTime so that read status remains after reload
+          if (typeof this.persistLastSeenTimes === 'function') {
+            this.persistLastSeenTimes();
           }
         }
       }).catch((err) => {
@@ -975,6 +1007,44 @@
           indicator.classList.add('hidden');
         }
       });
+    }
+
+    /**
+     * Persist the lastSeenTime map to localStorage so that unread indicators
+     * remain accurate across page reloads and logins. The data is stored
+     * under a key unique to the current user's UID. Failures to write are
+     * silently ignored (e.g. when localStorage is unavailable).
+     */
+    persistLastSeenTimes() {
+      try {
+        if (!this.currentUserUid) return;
+        const key = `chat_lastSeen_${this.currentUserUid}`;
+        // Only persist plain objects; avoid persisting other types.
+        const data = JSON.stringify(this.lastSeenTime || {});
+        localStorage.setItem(key, data);
+      } catch (_e) {
+        // Ignore persistence errors (e.g., quota exceeded, unavailable)
+      }
+    }
+
+    /**
+     * Load previously persisted lastSeenTime values from localStorage. If no
+     * data exists for the current user, the map remains empty. Invalid
+     * JSON or other errors are silently ignored.
+     */
+    loadLastSeenTimes() {
+      try {
+        if (!this.currentUserUid) return;
+        const key = `chat_lastSeen_${this.currentUserUid}`;
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          this.lastSeenTime = parsed;
+        }
+      } catch (_e) {
+        // Ignore errors reading/parsing localStorage
+      }
     }
   }
 
