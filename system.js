@@ -2715,8 +2715,10 @@ async function syncUserDataFromFirebase() {
         // 登出功能
 async function logout() {
     try {
-        // 在真正登出前，先銷毀聊天模組並更新線上狀態。
-        // 必須在 signOut 之前呼叫，否則身份驗證被移除後將無權寫入 presence 造成狀態無法更新。
+        // 在撤銷 Firebase 登入之前，先關閉聊天模組。這樣可以確保我們仍具備
+        // 足夠的權限去更新 Realtime Database 中的 presence 狀態。若先
+        // 執行 signOut，再呼叫 destroyChat，可能因為使用者的權限已失效
+        // 而導致 presence 狀態無法正確寫入，從而出現登出後依然顯示在線的問題。
         try {
             if (window.ChatModule && typeof window.ChatModule.destroyChat === 'function') {
                 window.ChatModule.destroyChat();
