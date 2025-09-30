@@ -1839,9 +1839,47 @@ if (typeof window.initializeScheduleManagement !== 'function') {
       if (typeof updateStaffSelects === 'function') updateStaffSelects();
       // 更新統計資訊
       if (typeof updateStats === 'function') updateStats();
+      // 依據目前使用者身分更新管理員限定的 UI 元件
+      if (typeof toggleAdminUI === 'function') toggleAdminUI();
     } catch (e) {
       console.error('Schedule init error', e);
     }
   };
 }
+
+  /**
+   * 切換管理員專用功能的顯示狀態。若使用者為管理員，顯示固定上班與清空排班按鈕以及拖拽提示；
+   * 否則隱藏這些元素。該函式會試著從 DOM 中取得 quickActions 與 dragHint 元素，
+   * 並根據當前權限設定其 display 屬性。
+   */
+  function toggleAdminUI() {
+    try {
+      const isAdmin = window.isAdminUser && window.isAdminUser();
+      const qa = document.getElementById('quickActions');
+      const dragHintEl = document.getElementById('dragHint');
+      if (qa) {
+        // quickActions 預設使用 flex 佈局
+        qa.style.display = isAdmin ? 'flex' : 'none';
+      }
+      if (dragHintEl) {
+        // span 預設顯示內聯，如果非管理員則隱藏
+        dragHintEl.style.display = isAdmin ? 'inline' : 'none';
+      }
+    } catch (_e) {
+      // 忽略錯誤
+    }
+  }
+
+  /**
+   * 根據使用者是否具備管理員身分，控制某些 UI 元件的顯示。
+   * 對於非管理員，隱藏「固定上班」與「清空排班」按鈕，以及拖拽提示文字。
+   * 這些元素在 system.html 中使用了 id：quickActions 和 dragHint。
+   * 此事件監聽會在 DOMContentLoaded 之後執行，以確保元素已存在。
+   */
+  document.addEventListener('DOMContentLoaded', function () {
+    // 於 DOM 渲染完成後根據管理員身分更新 UI
+    if (typeof toggleAdminUI === 'function') {
+      toggleAdminUI();
+    }
+  });
 })();
