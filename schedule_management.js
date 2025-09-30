@@ -7,6 +7,27 @@
         // 公眾假期顯示控制：'' 表示不顯示，'hk' 表示顯示香港公眾假期，'us' 表示顯示美國公眾假期
         let selectedHolidayRegion = '';
 
+        // ------------------------------------------------------------------
+        // Translation helper
+        //
+        // The schedule management module makes use of various alert and
+        // notification messages. To support multiple languages, define a
+        // helper function that retrieves the translated string based on the
+        // current language (stored in localStorage under 'lang'). If the
+        // translation is missing, fall back to the original Chinese text.
+        function translate(key) {
+            try {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const dict = window.translations && window.translations[lang];
+                if (dict && Object.prototype.hasOwnProperty.call(dict, key)) {
+                    return dict[key];
+                }
+                return key;
+            } catch (_e) {
+                return key;
+            }
+        }
+
         /*
          * ------------------------------------------------------------------
          * 防止重複動作旗標
@@ -165,7 +186,8 @@
             // 若 isAdminUser 未定義或回傳 false，則拒絕操作
             if (!window.isAdminUser || !window.isAdminUser()) {
                 const opText = operationName || '此操作';
-                showNotification('只有管理員才能執行' + opText + '！');
+                // Build translated admin-only message
+                showNotification(translate('只有管理員才能執行') + opText + translate('！'));
                 return false;
             }
             return true;
@@ -332,7 +354,8 @@
                 try {
                     if (err && err.message && String(err.message).toLowerCase().includes('permission')) {
                         if (typeof showNotification === 'function') {
-                            showNotification('您沒有權限讀取排班資料，如需存取請聯繫管理員', 'error');
+                            // Use translated message when lacking permission to read schedule data
+                            showNotification(translate('您沒有權限讀取排班資料，如需存取請聯繫管理員'), 'error');
                         }
                     }
                 } catch (_notifyErr) {
@@ -635,20 +658,26 @@
             // 因此改為調用包裝函式 handleEditShift / handleDeleteShift，由包裝函式自行處理
             // 停止事件冒泡和觸發實際的編輯或刪除邏輯。
             // 根據職位顯示中文名稱，如果 level 為空則從 role 推斷
-            const positionLabel = staffMember.level || (staffMember.role === 'doctor' ? '醫師' : staffMember.role === 'nurse' ? '護理師' : '');
+            // Determine the display label for the staff member's position.  If a
+            // specific level is provided (which may already be localised), use it.
+            // Otherwise map the role ('doctor' or 'nurse') to the default
+            // Chinese title and translate it using the translate helper. This
+            // ensures doctor/nurse labels inside shift elements reflect the
+            // current language setting.
+            const positionLabel = staffMember.level || translate(staffMember.role === 'doctor' ? '醫師' : staffMember.role === 'nurse' ? '護理師' : '');
             element.innerHTML = `
                 <div class="shift-header">
                     <div class="shift-name">
                         ${staffMember.name}<span class="staff-position"> ${positionLabel}</span>
                     </div>
                     <div class="shift-actions">
-                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
-                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="刪除">🗑️</button>
+                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="${translate('編輯')}">✏️</button>
+                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="${translate('刪除')}">🗑️</button>
                     </div>
                 </div>
                 <div class="shift-details">
                     ${shift.startTime}-${shift.endTime} (${duration}h)<br>
-                    ${shift.notes || '一般排班'}
+                    ${shift.notes || translate('一般排班')}
                 </div>
             `;
 
@@ -740,7 +769,7 @@
                     // 重新渲染日曆並更新統計
                     renderCalendar();
                     updateStats();
-                    showNotification('排班已成功移動！');
+                    showNotification(translate('排班已成功移動！'));
                 }
             });
 
@@ -772,7 +801,8 @@
             );
             
             if (existingShift) {
-                showNotification(`${staffMember.name} 在該時段已有排班！`);
+                // Preserve the staff name and translate the static suffix
+                showNotification(`${staffMember.name} ${translate('在該時段已有排班！')}`);
                 return;
             }
             
@@ -802,7 +832,8 @@
             updateStats();
             
             const shiftTypeName = getShiftTypeName(shiftType);
-            showNotification(`已為 ${staffMember.name} 新增 ${shiftTypeName} (${startTime}-${endTime})！`);
+            // Compose notification message for newly added shift using translations
+            showNotification(`${translate('已為')} ${staffMember.name} ${translate('新增')} ${shiftTypeName} (${startTime}-${endTime})${translate('！')}`);
         }
 
         // 輔助函數
@@ -844,8 +875,9 @@
                 
 
                 
-                // 顯示人員姓名與職位（level 為中文職稱）。若無 level 則根據 role 推斷
-                const positionLabel = member.level || (member.role === 'doctor' ? '醫師' : member.role === 'nurse' ? '護理師' : '');
+                // 顯示人員姓名與職位（level 為職稱）。若無 level 則根據 role 推斷，並使用翻譯
+                // 將預設中文職稱轉換為當前語言。例如 doctor -> 醫師 -> Doctor（在英文下）。
+                const positionLabel = member.level || translate(member.role === 'doctor' ? '醫師' : member.role === 'nurse' ? '護理師' : '');
                 card.innerHTML = `
                     <div class="staff-name">${member.name}<span class="staff-position"> ${positionLabel}</span></div>
                     <div class="drag-hint">🖱️</div>
@@ -915,11 +947,11 @@
         // 獲取人員狀態
         function getStaffStatus(staffId, todayShifts) {
             if (todayShifts.length === 0) {
-                return { class: '', icon: '✅', text: '可排班' };
+                return { class: '', icon: '✅', text: translate('可排班') };
             } else if (todayShifts.length === 1) {
-                return { class: 'partial', icon: '⏰', text: '已排班' };
+                return { class: 'partial', icon: '⏰', text: translate('已排班') };
             } else {
-                return { class: 'busy', icon: '🔴', text: '滿班' };
+                return { class: 'busy', icon: '🔴', text: translate('滿班') };
             }
         }
 
@@ -930,7 +962,9 @@
             staff.forEach(member => {
                 const option = document.createElement('option');
                 option.value = member.id;
-                option.textContent = `${member.name} (${member.role === 'doctor' ? '醫師' : '護理師'})`;
+                // Localise the doctor/nurse label for the staff select dropdown
+                const roleLabel = member.role === 'doctor' ? translate('醫師') : translate('護理師');
+                option.textContent = `${member.name} (${roleLabel})`;
                 select.appendChild(option);
             });
 
@@ -941,7 +975,9 @@
                 staff.forEach(member => {
                     const option = document.createElement('option');
                     option.value = member.id;
-                    option.textContent = `${member.name} (${member.role === 'doctor' ? '醫師' : '護理師'}) - ${member.department}`;
+                    // Localise the doctor/nurse label for the fixed schedule staff select
+                    const roleLabelFixed = member.role === 'doctor' ? translate('醫師') : translate('護理師');
+                    option.textContent = `${member.name} (${roleLabelFixed}) - ${member.department}`;
                     fixedSelect.appendChild(option);
                 });
             }
@@ -1034,14 +1070,15 @@
             const type = document.getElementById('shiftType').value;
 
             if (!staffId || !date || !startTime || !endTime || !type) {
-                alert('請填寫所有必填欄位！');
+                // Show translated message when required fields are missing
+                alert(translate('請填寫所有必填欄位！'));
                 // 釋放提交鎖定，讓使用者可以再次嘗試
                 shiftSubmitInProgress = false;
                 return;
             }
 
             // 檢查是否已有相同人員在相同日期與開始時間的排班，避免重複建立
-            const conflict = shifts.find(s =>
+                const conflict = shifts.find(s =>
                 // 排除正在編輯的排班
                 (editId ? String(s.id) !== String(editId) : true) &&
                 String(s.staffId) === String(staffId) &&
@@ -1050,7 +1087,8 @@
             );
             if (conflict) {
                 const staffMember = findStaffById(staffId);
-                showNotification(`${staffMember.name} 在 ${date} ${startTime} 已有排班，無法重複安排！`);
+                // Compose a notification preserving the user's name and translating the suffix
+                showNotification(`${staffMember.name} ${date} ${startTime} ${translate('已有排班，無法重複安排！')}`);
                 // 釋放提交鎖定，以便使用者修正後可重新提交
                 shiftSubmitInProgress = false;
                 return;
@@ -1072,7 +1110,7 @@
                 const shiftIndex = shifts.findIndex(s => s.id == editId);
                 if (shiftIndex !== -1) {
                     shifts[shiftIndex] = { ...shifts[shiftIndex], ...shiftData };
-                    showNotification('排班更新成功！');
+                    showNotification(translate('排班更新成功！'));
                 }
                 delete modal.dataset.editId;
                 modal.querySelector('h3').textContent = '新增排班';
@@ -1083,7 +1121,7 @@
                     ...shiftData
                 };
                 shifts.push(newShift);
-                showNotification('排班新增成功！');
+                showNotification(translate('排班新增成功！'));
             }
 
             // 儲存排班至 Realtime Database
@@ -1126,12 +1164,15 @@
                 }
                 const startDateTime = `${shift.date}T${shift.startTime}:00`;
                 const endDateTime = `${endDateStr}T${endTimeStr}:00`;
+                // Localised role label and shift type for the title and description
+                const roleLabel = staffMember.role === 'doctor' ? translate('醫師') : staffMember.role === 'nurse' ? translate('護理師') : '';
+                const shiftTypeName = translate(getShiftTypeName(shift.type));
                 return {
-                    title: `${staffMember.name} - ${staffMember.role === 'doctor' ? '醫師' : '護理師'}排班`,
+                    title: `${staffMember.name} - ${roleLabel}${translate('排班')}`,
                     start: startDateTime,
                     end: endDateTime,
                     // 移除部門資訊，以避免顯示不必要的欄位
-                    description: `班別: ${shift.type}${shift.notes ? '\n備註: ' + shift.notes : ''}`
+                    description: `${translate('班別:')} ${shiftTypeName}${shift.notes ? '\n' + translate('備註:') + ' ' + shift.notes : ''}`
                 };
             });
 
@@ -1154,9 +1195,9 @@
                     /* 如果解析失敗，忽略地點設定 */
                 }
                 window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
-                showNotification('正在開啟 Google Calendar...');
+                showNotification(translate('正在開啟 Google Calendar...'));
             } else {
-                showNotification('沒有排班資料可同步');
+            showNotification(translate('沒有排班資料可同步'));
             }
         }
 
@@ -1187,16 +1228,19 @@
                 const startDateTime = `${shift.date.replace(/-/g, '')}T${shift.startTime.replace(':', '')}00`;
                 const endDateTime = `${endDateStr.replace(/-/g, '')}T${endTimeStr.replace(':', '')}00`;
                 
-                // 組合描述，僅包含班別與備註
+                // Compose a description containing the shift type and notes.  Use the
+                // translate helper to localise both the label and the shift type name.
                 let descriptionLines = [];
-                descriptionLines.push(`班別: ${shift.type}`);
+                const shiftTypeName = translate(getShiftTypeName(shift.type));
+                descriptionLines.push(`${translate('班別:')} ${shiftTypeName}`);
                 if (shift.notes) {
-                    descriptionLines.push(`備註: ${shift.notes}`);
+                    descriptionLines.push(`${translate('備註:')} ${shift.notes}`);
                 }
                 const descriptionString = descriptionLines.join('\\n');
-                
-                // 從本地取得診所設定，如果有地址則作為地點
-                let location = '醫院';
+
+                // Retrieve the clinic address from local storage if available; otherwise
+                // use a translated default ("醫院" -> "Hospital" in English).
+                let location = translate('醫院');
                 try {
                     const clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
                     if (clinicSettings && clinicSettings.address) {
@@ -1205,12 +1249,13 @@
                 } catch (_e) {
                     /* 如果解析失敗，保持預設地點 */
                 }
+                const roleLabel = staffMember.role === 'doctor' ? translate('醫師') : staffMember.role === 'nurse' ? translate('護理師') : '';
                 icalContent.push(
                     'BEGIN:VEVENT',
                     `UID:${shift.id}@medical-schedule.com`,
                     `DTSTART:${startDateTime}`,
                     `DTEND:${endDateTime}`,
-                    `SUMMARY:${staffMember.name} - ${staffMember.role === 'doctor' ? '醫師' : '護理師'}排班`,
+                    `SUMMARY:${staffMember.name} - ${roleLabel}${translate('排班')}`,
                     `DESCRIPTION:${descriptionString}`,
                     `LOCATION:${location}`,
                     'END:VEVENT'
@@ -1224,13 +1269,18 @@
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = '醫療排班行事曆.ics';
+            // Set the filename using translated base name for iCal file. The translation
+            // dictionary includes an entry for '醫療排班行事曆'.  We append the .ics
+            // extension after translating so that the file name is localized when
+            // downloading the calendar file.
+            const baseName = translate('醫療排班行事曆');
+            link.download = `${baseName}.ics`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
 
-            showNotification('iCal 檔案已下載！');
+            showNotification(translate('iCal 檔案已下載！'));
         }
 
         // 新增功能函數
@@ -1288,7 +1338,7 @@
             if (!ensureAdmin('清空所有排班')) {
                 return;
             }
-            if (confirm('確定要清空所有排班嗎？此操作無法復原。')) {
+            if (confirm(translate('確定要清空所有排班嗎？此操作無法復原。'))) {
                 shifts = [];
                 // 儲存變更
                 try {
@@ -1298,7 +1348,7 @@
                 }
                 renderCalendar();
                 updateStats();
-                showNotification('所有排班已清空！');
+                showNotification(translate('所有排班已清空！'));
             }
         }
 
@@ -1346,17 +1396,17 @@
             // 獲取排班資訊用於確認對話框
             const shift = shifts.find(s => s.id == shiftId);
             if (!shift) {
-                showNotification('找不到要刪除的排班！');
+                    showNotification(translate('找不到要刪除的排班！'));
                 return;
             }
             
             const staffMember = findStaffById(shift.staffId);
-            const confirmMessage = `確定要刪除以下排班嗎？\n\n` +
-                                 `人員：${staffMember.name}\n` +
-                                 `日期：${shift.date}\n` +
-                                 `時間：${shift.startTime} - ${shift.endTime}\n` +
-                                 `備註：${shift.notes || '無'}\n\n` +
-                                 `此操作無法復原！`;
+            const confirmMessage = translate('確定要刪除以下排班嗎？') + '\n\n' +
+                                 translate('人員：') + `${staffMember.name}\n` +
+                                 translate('日期：') + `${shift.date}\n` +
+                                 translate('時間：') + `${shift.startTime} - ${shift.endTime}\n` +
+                                 translate('備註：') + `${shift.notes || translate('無')}\n\n` +
+                                 translate('此操作無法復原！');
             
             if (confirm(confirmMessage)) {
                 const shiftIndex = shifts.findIndex(s => s.id == shiftId);
@@ -1370,9 +1420,9 @@
                     }
                     renderCalendar();
                     updateStats();
-                    showNotification('排班已刪除！');
+                    showNotification(translate('排班已刪除！'));
                 } else {
-                    showNotification('刪除失敗：找不到排班資料！');
+                    showNotification(translate('刪除失敗：找不到排班資料！'));
                 }
             }
         }
@@ -1383,14 +1433,15 @@
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
             
             // 顯示排班詳情，移除部門與狀態資訊以簡化顯示
-            alert(`排班詳情：
-姓名：${staffMember.name}
-職位：${staffMember.level}
-日期：${shift.date}
-時間：${shift.startTime} - ${shift.endTime} (${duration} 小時)
-備註：${shift.notes || '無'}
-聯絡電話：${staffMember.phone}
-電子郵件：${staffMember.email}`);
+            // Display shift details with translated labels while preserving dynamic data.
+            alert(`${translate('排班詳情：')}
+${translate('姓名：')}${staffMember.name}
+${translate('職位：')}${staffMember.level}
+${translate('日期：')}${shift.date}
+${translate('時間：')}${shift.startTime} - ${shift.endTime} (${duration} ${translate('小時')})
+${translate('備註：')}${shift.notes || translate('無')}
+${translate('聯絡電話：')}${staffMember.phone}
+${translate('電子郵件：')}${staffMember.email}`);
         }
 
         // 根據ID顯示排班詳情
@@ -1491,7 +1542,7 @@
             }
             
             if (selectedDays.length === 0) {
-                alert('請至少選擇一個工作日！');
+                alert(translate('請至少選擇一個工作日！'));
                 return;
             }
             
@@ -1501,7 +1552,7 @@
                 startTime = document.getElementById('fixedStartTime').value;
                 endTime = document.getElementById('fixedEndTime').value;
                 if (!startTime || !endTime) {
-                    alert('請設定自訂時間！');
+                    alert(translate('請設定自訂時間！'));
                     return;
                 }
             } else {
@@ -1536,8 +1587,8 @@
                     const startDateStr = document.getElementById('rangeStartDate').value;
                     const endDateStr = document.getElementById('rangeEndDate').value;
                     if (!startDateStr || !endDateStr) {
-                        alert('請設定自訂日期範圍！');
-                        return;
+                    alert(translate('請設定自訂日期範圍！'));
+                    return;
                     }
                     startDate = new Date(startDateStr);
                     endDate = new Date(endDateStr);
@@ -1605,16 +1656,19 @@
             
             // 顯示結果
             const staffMember = findStaffById(staffId);
-            let message = `固定排班建立完成！\n\n`;
-            message += `人員：${staffMember.name}\n`;
-            message += `新增排班：${addedCount} 天\n`;
+            // Compose a detailed fixed schedule message (unused currently)
+            let message = `${translate('固定排班建立完成！')}\n\n`;
+            message += `${translate('人員：')}${staffMember.name}\n`;
+            message += `${translate('新增排班：')}${addedCount} ${translate('天')}\n`;
             if (replacedCount > 0) {
-                message += `替換排班：${replacedCount} 天\n`;
+                message += `${translate('替換排班：')}${replacedCount} ${translate('天')}\n`;
             }
-            message += `時間：${startTime} - ${endTime}\n`;
-            message += `工作日：${selectedDays.map(d => ['日','一','二','三','四','五','六'][d]).join('、')}`;
-            
-            showNotification(`已為 ${staffMember.name} 建立固定排班！新增 ${addedCount} 天${replacedCount > 0 ? `，替換 ${replacedCount} 天` : ''}。`);
+            message += `${translate('時間：')}${startTime} - ${endTime}\n`;
+            // Convert day indices to translated labels
+            message += `${translate('工作日：')}${selectedDays.map(d => translate(['日','一','二','三','四','五','六'][d])).join('、')}`;
+
+            // Show a notification summarizing the fixed schedule creation
+            showNotification(`${translate('已為')} ${staffMember.name} ${translate('建立固定排班')}！${translate('新增')} ${addedCount} ${translate('天')}${replacedCount > 0 ? `${translate('，替換')} ${replacedCount} ${translate('天')}` : ''}${translate('。')}`);
         }
 
         // 點擊模態框外部關閉
@@ -1652,16 +1706,16 @@
                 .sort((a, b) => new Date(a.date) - new Date(b.date));
             
             if (staffShifts.length === 0) {
-                alert(`${staffMember.name} 目前沒有排班記錄。`);
+                alert(`${staffMember.name} ${translate('目前沒有排班記錄。')}`);
                 return;
             }
             
-            let scheduleText = `${staffMember.name} 的排班記錄：\n\n`;
+            let scheduleText = `${staffMember.name} ${translate('的排班記錄：')}\n\n`;
             staffShifts.forEach(shift => {
                 const date = new Date(shift.date).toLocaleDateString('zh-TW');
                 const duration = calculateShiftDuration(shift.startTime, shift.endTime);
                 scheduleText += `📅 ${date} ${shift.startTime}-${shift.endTime} (${duration}h) - ${getShiftTypeName(shift.type)}\n`;
-                if (shift.notes) scheduleText += `   備註: ${shift.notes}\n`;
+                if (shift.notes) scheduleText += `   ${translate('備註:')} ${shift.notes}\n`;
             });
             
             alert(scheduleText);
@@ -1670,13 +1724,14 @@
         // 聯絡人員
         function contactStaff(staffId) {
             const staffMember = findStaffById(staffId);
-            const contactInfo = `聯絡 ${staffMember.name}：\n\n` +
-                              `📞 電話: ${staffMember.phone}\n` +
-                              `📧 信箱: ${staffMember.email}\n` +
-                              `🏥 部門: ${staffMember.department}\n` +
-                              `👔 職位: ${staffMember.level}`;
+            // Build contact information using translated labels while preserving icons and data.
+            const contactInfo = `${translate('聯絡')} ${staffMember.name}:\n\n` +
+                              `📞 ${translate('電話:')} ${staffMember.phone}\n` +
+                              `📧 ${translate('信箱:')} ${staffMember.email}\n` +
+                              `🏥 ${translate('部門:')} ${staffMember.department}\n` +
+                              `👔 ${translate('職位:')} ${staffMember.level}`;
             
-            if (confirm(contactInfo + '\n\n要撥打電話嗎？')) {
+            if (confirm(contactInfo + '\n\n' + translate('要撥打電話嗎？'))) {
                 // 在實際應用中，這裡可以整合電話系統
                 window.open(`tel:${staffMember.phone}`, '_blank', 'noopener,noreferrer');
             }
@@ -1710,7 +1765,9 @@
                     const dayShifts = shifts.filter(s => s.date === dateStr && passesFilter(s));
                     let cellContent;
                     if (dayShifts.length === 0) {
-                        cellContent = '<em>無排班</em>';
+                            // Use translation for "No shifts" when printing the schedule.  The
+                            // translate helper is available within this scope.
+                            cellContent = `<em>${translate('無排班')}</em>`;
                     } else {
                         dayShifts.sort((a,b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
                         cellContent = '<ul>';
@@ -1742,11 +1799,11 @@
                         try { printWin.print(); } catch(_) {} finally { printWin.close(); }
                     }, 300);
                 } else {
-                    alert('無法開啟列印視窗，請檢查瀏覽器設定。');
+                    alert(translate('無法開啟列印視窗，請檢查瀏覽器設定。'));
                 }
             } catch (err) {
                 console.error('printCurrentMonthSchedule error', err);
-                alert('列印排班表時發生錯誤！');
+                alert(translate('列印排班表時發生錯誤！'));
             }
         }
 
