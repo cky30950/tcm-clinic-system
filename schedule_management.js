@@ -1956,22 +1956,23 @@ if (typeof window.initializeScheduleManagement !== 'function') {
         // display 值來確保在不同瀏覽器和樣式設定下正確顯示。
         if (qaEl) {
           if (isAdmin) {
-            // 使用 flex 顯示快速操作區塊，並移除隱藏類別
-            qaEl.style.display = 'flex';
+            // 將 display 設為空字串，移除任何內嵌樣式，以便回復至 CSS 定義的 flex
+            qaEl.style.display = '';
+            // 移除 hidden 類別使其可見
             if (qaEl.classList) qaEl.classList.remove('hidden');
           } else {
-            // 隱藏快速操作區塊並加入 hidden 類別，以便覆蓋其他樣式
+            // 非管理員：隱藏快速操作區塊並套用 hidden 類別
             qaEl.style.display = 'none';
             if (qaEl.classList) qaEl.classList.add('hidden');
           }
         }
         if (dragEl) {
           if (isAdmin) {
-            // 使用 inline 顯示拖拽提示，並移除 hidden 類別
-            dragEl.style.display = 'inline';
+            // 將 display 設為空字串，移除內嵌樣式，讓元素以預設 inline 顯示
+            dragEl.style.display = '';
             if (dragEl.classList) dragEl.classList.remove('hidden');
           } else {
-            // 隱藏拖拽提示並加入 hidden 類別
+            // 非管理員：隱藏拖拽提示並套用 hidden 類別
             dragEl.style.display = 'none';
             if (dragEl.classList) dragEl.classList.add('hidden');
           }
