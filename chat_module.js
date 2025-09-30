@@ -671,7 +671,10 @@
       } else {
         path = `chat/private/${channelId}`;
       }
-      this.messagesRef = window.firebase.ref(window.firebase.rtdb, path);
+      // 取出最後 100 筆訊息，以降低讀取量。若訊息較少則會全部返回
+      const baseRef = window.firebase.ref(window.firebase.rtdb, path);
+      const q = window.firebase.query(baseRef, window.firebase.orderByChild('timestamp'), window.firebase.limitToLast(50));
+      this.messagesRef = q;
       // Define the callback outside of onValue so we can detach it later.
       this.currentMessageCallback = (snapshot) => {
         const data = snapshot.val() || {};
@@ -714,7 +717,7 @@
           this.updateUserListOrder();
         }
       };
-      // Listen to the full message list. Since group sizes are small, this is acceptable.
+      // Listen to the limited message list
       window.firebase.onValue(this.messagesRef, this.currentMessageCallback);
     }
 
@@ -891,10 +894,13 @@
       // Always watch the public chat
       try {
         const publicRef = window.firebase.ref(window.firebase.rtdb, 'chat/messages/public');
+        // 使用 limitToLast(1) 查詢只監聽最後一則訊息，減少讀取量
+        const publicQuery = window.firebase.query(publicRef, window.firebase.orderByChild('timestamp'), window.firebase.limitToLast(1));
         const publicCallback = (snapshot) => {
-          const data = snapshot.val() || {};
+          // 由於查詢只回傳最後一筆資料，直接取其中的 timestamp 即可
           let latest = 0;
-          Object.values(data).forEach((msg) => {
+          snapshot.forEach((child) => {
+            const msg = child.val() || {};
             const ts = msg.timestamp || 0;
             if (ts > latest) latest = ts;
           });
@@ -903,8 +909,8 @@
             this.updateUserListOrder();
           }
         };
-        window.firebase.onValue(publicRef, publicCallback);
-        this.channelListeners['public'] = { ref: publicRef, callback: publicCallback };
+        window.firebase.onValue(publicQuery, publicCallback);
+        this.channelListeners['public'] = { ref: publicQuery, callback: publicCallback };
       } catch (err) {
         console.error('ChatModule: Failed to attach last message listener for public', err);
       }
@@ -919,11 +925,13 @@
           if (String(uid) === String(this.currentUserUid) || String(uid) === String(this.currentUser && this.currentUser.id)) return;
           const chatId = [String(this.currentUserUid), String(uid)].sort().join('_');
           const path = `chat/private/${chatId}`;
-          const ref = window.firebase.ref(window.firebase.rtdb, path);
+          const baseRef = window.firebase.ref(window.firebase.rtdb, path);
+          // 查詢最後一則訊息
+          const q = window.firebase.query(baseRef, window.firebase.orderByChild('timestamp'), window.firebase.limitToLast(1));
           const cb = (snapshot) => {
-            const data = snapshot.val() || {};
             let latest = 0;
-            Object.values(data).forEach((msg) => {
+            snapshot.forEach((child) => {
+              const msg = child.val() || {};
               const ts = msg.timestamp || 0;
               if (ts > latest) latest = ts;
             });
@@ -932,8 +940,8 @@
               this.updateUserListOrder();
             }
           };
-          window.firebase.onValue(ref, cb);
-          this.channelListeners[chatId] = { ref: ref, callback: cb };
+          window.firebase.onValue(q, cb);
+          this.channelListeners[chatId] = { ref: q, callback: cb };
         });
       } catch (err) {
         console.error('ChatModule: Failed to attach last message listeners for private chats', err);

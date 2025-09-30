@@ -33,7 +33,9 @@ import { getDatabase, ref, set, get, update, remove, onValue, off,
         query as rtdbQuery,
         orderByChild,
         startAt,
-        endAt } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+        endAt,
+        // 引入 limitToLast 用於限制回傳的記錄數量，以減少讀取量
+        limitToLast } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, signOut, setPersistence, browserSessionPersistence, createUserWithEmailAndPassword, updateProfile,
         // 新增更改密碼、刪除帳號、重新驗證等方法
         updatePassword, deleteUser as firebaseDeleteUser, EmailAuthProvider, reauthenticateWithCredential } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
@@ -110,6 +112,8 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         orderByChild,
         startAt,
         endAt,
+        // 暴露 limitToLast 供其他模組使用，用於限制查詢結果的項目數量
+        limitToLast,
         // 驗證函式
         signInWithEmailAndPassword,
         signOut,
