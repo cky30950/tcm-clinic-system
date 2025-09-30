@@ -55,6 +55,14 @@
       this.loadLastSeenTimes = this.loadLastSeenTimes.bind(this);
       this.persistLastSeenTimes = this.persistLastSeenTimes.bind(this);
 
+      // References and listeners for monitoring Firebase connection status. When
+      // the connection state changes (e.g. goes offline or comes back
+      // online), we re-apply presence onDisconnect handlers and update our
+      // presence entry accordingly. These will be assigned in setupPresence()
+      // and detached in destroy().
+      this.connectionRef = null;
+      this.connectionListener = null;
+
       // Indicator element on the chat toggle button to show new unread
       // messages across all channels. This small red dot is appended to the
       // chat button in createUI() and toggled visible/hidden in
@@ -158,6 +166,16 @@
       } catch (err) {
         console.error('ChatModule: error setting offline presence during destroy', err);
       }
+      // Detach connection status listener
+      try {
+        if (this.connectionRef && this.connectionListener) {
+          window.firebase.off(this.connectionRef, 'value', this.connectionListener);
+        }
+      } catch (err) {
+        console.error('ChatModule: error detaching connection listener', err);
+      }
+      this.connectionRef = null;
+      this.connectionListener = null;
       this.presenceRef = null;
       // Detach last message listeners
       try {
@@ -407,25 +425,38 @@
       try {
         // Each user has its own presence entry under presence/<uid>
         this.presenceRef = window.firebase.ref(window.firebase.rtdb, `presence/${this.currentUserUid}`);
-        // When the connection is lost unexpectedly (e.g. tab is closed or network drops),
-        // mark the user as offline with a lastSeen timestamp instead of removing the entry.
-        try {
-          if (this.presenceRef && window.firebase.onDisconnect) {
-            window.firebase.onDisconnect(this.presenceRef).set({
-              online: false,
+        // Monitor connection status via the special .info/connected path. When the client
+        // transitions from offline to online, re-apply the onDisconnect handler and
+        // set presence to online. Without this, the presence may remain offline
+        // after a reconnect. See Firebase presence docs for details.
+        this.connectionRef = window.firebase.ref(window.firebase.rtdb, '.info/connected');
+        this.connectionListener = (snapshot) => {
+          const isConnected = !!snapshot.val();
+          if (isConnected) {
+            try {
+              // Setup onDisconnect handler to mark the user offline on unexpected disconnect.
+              if (this.presenceRef && window.firebase.onDisconnect) {
+                // Call onDisconnect before setting presence to avoid race conditions【90900164263754†L107-L111】.
+                window.firebase.onDisconnect(this.presenceRef).set({
+                  online: false,
+                  lastSeen: Date.now()
+                });
+              }
+            } catch (err) {
+              console.warn('ChatModule: Failed to set onDisconnect for presence', err);
+            }
+            // Immediately mark the user as online with a lastSeen timestamp. This will
+            // run each time the connection comes online. Any error here is logged.
+            window.firebase.set(this.presenceRef, {
+              online: true,
               lastSeen: Date.now()
+            }).catch((err) => {
+              console.error('ChatModule: Failed to set presence', err);
             });
           }
-        } catch (err) {
-          console.warn('ChatModule: Failed to set onDisconnect for presence', err);
-        }
-        // Mark the user as online now with a lastSeen timestamp.
-        window.firebase.set(this.presenceRef, {
-          online: true,
-          lastSeen: Date.now()
-        }).catch((err) => {
-          console.error('ChatModule: Failed to set presence', err);
-        });
+        };
+        window.firebase.onValue(this.connectionRef, this.connectionListener);
+
         // When the page unloads or the user leaves explicitly, set presence to offline
         this.beforeUnloadHandler = () => {
           try {
@@ -673,7 +704,7 @@
       }
       // 取出最後 100 筆訊息，以降低讀取量。若訊息較少則會全部返回
       const baseRef = window.firebase.ref(window.firebase.rtdb, path);
-      const q = window.firebase.query(baseRef, window.firebase.orderByChild('timestamp'), window.firebase.limitToLast(50));
+      const q = window.firebase.query(baseRef, window.firebase.orderByChild('timestamp'), window.firebase.limitToLast(100));
       this.messagesRef = q;
       // Define the callback outside of onValue so we can detach it later.
       this.currentMessageCallback = (snapshot) => {
