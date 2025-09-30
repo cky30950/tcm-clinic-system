@@ -22114,8 +22114,20 @@ function hideGlobalCopyright() {
     if (!mainSystem || mainSystem.classList.contains('hidden')) {
       return;
     }
-    // 收集所有固定定位且 id 包含 modal 的彈窗，且未被隱藏的
-    const modals = Array.from(document.querySelectorAll('.fixed')).filter(el => {
+    // 收集可視彈窗
+    // 預設只選取固定定位 (position: fixed) 的彈窗，並且 ID 包含 "modal"，且未被 Tailwind 的 hidden 類別隱藏。
+    // 另外納入排班管理的彈窗（#scheduleManagement .modal.show）以支援 ESC/Enter 快捷操作。
+    const modalNodes = [];
+    // 選取 .fixed 的彈窗
+    document.querySelectorAll('.fixed').forEach(el => modalNodes.push(el));
+    // 納入排班管理中的 .modal.show 視窗
+    document.querySelectorAll('#scheduleManagement .modal.show').forEach(el => modalNodes.push(el));
+    const modals = modalNodes.filter(el => {
+      // 排班管理的視窗以 .show 為顯示標記，無需判斷 hidden
+      if (el.matches('#scheduleManagement .modal.show')) {
+        return true;
+      }
+      // 其他彈窗需符合條件：未隱藏且 id 名稱含 modal
       const id = (el.id || '').toLowerCase();
       return !el.classList.contains('hidden') && id.includes('modal');
     });
@@ -22176,6 +22188,24 @@ function hideGlobalCopyright() {
       }
       if (modals.length > 0) {
         const modal = modals[modals.length - 1];
+        const modalId = modal.id || '';
+        // 若為排班管理的排班或固定班視窗，直接調用其關閉函式
+        try {
+          if (modalId === 'shiftModal' && typeof scheduleCloseModal === 'function') {
+            scheduleCloseModal();
+            ev.preventDefault();
+            ev.stopPropagation();
+            return;
+          }
+          if (modalId === 'fixedScheduleModal' && typeof scheduleCloseFixedScheduleModal === 'function') {
+            scheduleCloseFixedScheduleModal();
+            ev.preventDefault();
+            ev.stopPropagation();
+            return;
+          }
+        } catch (_e) {
+          // ignore errors and continue fallback
+        }
         // 嘗試尋找取消/關閉按鈕，避免選中導覽按鈕（如上一頁/下一頁）
         let cancelBtn =
           modal.querySelector('button[id*="cancel" i]') ||
@@ -22188,16 +22218,16 @@ function hideGlobalCopyright() {
         } else {
           // 若找不到可點擊的關閉按鈕，依彈窗 id 呼叫指定的關閉函式或直接隱藏
           try {
-            const id = modal.id || '';
-            if (id === 'patientDetailModal' && typeof closePatientDetail === 'function') {
+            if (modalId === 'patientDetailModal' && typeof closePatientDetail === 'function') {
               closePatientDetail();
-            } else if (id === 'patientMedicalHistoryModal' && typeof closePatientMedicalHistoryModal === 'function') {
+            } else if (modalId === 'patientMedicalHistoryModal' && typeof closePatientMedicalHistoryModal === 'function') {
               closePatientMedicalHistoryModal();
-            } else if (id === 'medicalHistoryModal' && typeof closeMedicalHistoryModal === 'function') {
+            } else if (modalId === 'medicalHistoryModal' && typeof closeMedicalHistoryModal === 'function') {
               closeMedicalHistoryModal();
-            } else if (id === 'registrationModal' && typeof closeRegistrationModal === 'function') {
+            } else if (modalId === 'registrationModal' && typeof closeRegistrationModal === 'function') {
               closeRegistrationModal();
             } else {
+              // 對於排班管理模態框以外的固定定位彈窗，可嘗試用 Tailwind 的 hidden 類關閉
               modal.classList.add('hidden');
             }
           } catch (_e) {
@@ -22241,6 +22271,24 @@ function hideGlobalCopyright() {
         ev.preventDefault();
         ev.stopPropagation();
         return;
+      }
+      // 排班管理彈窗：shiftModal 與 fixedScheduleModal
+      // 按 Enter 時直接執行新增或建立，無論焦點是否在下拉選單中。
+      try {
+        if (modalId === 'shiftModal' && typeof scheduleAddShift === 'function') {
+          scheduleAddShift();
+          ev.preventDefault();
+          ev.stopPropagation();
+          return;
+        }
+        if (modalId === 'fixedScheduleModal' && typeof scheduleCreateFixedSchedule === 'function') {
+          scheduleCreateFixedSchedule();
+          ev.preventDefault();
+          ev.stopPropagation();
+          return;
+        }
+      } catch (_e) {
+        // 忽略調用錯誤，繼續以下邏輯
       }
       // 在其他可編輯輸入（如 INPUT/TEXTAREA/contentEditable）中，不攔截 Enter
       if (isEditableInput) {
