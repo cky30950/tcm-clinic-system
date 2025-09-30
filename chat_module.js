@@ -67,6 +67,13 @@
       // while the chat popup is hidden, the notification sound will play
       // again and this value will update.
       this.lastNotificationTimestamp = 0;
+
+      // Track the timestamp (in milliseconds) of the last notification sound
+      // played. This is used to throttle the sound so that it plays at
+      // most once every 10 seconds when new messages arrive. When the
+      // difference between the current time and this value exceeds the
+      // defined interval, a new sound can be played.
+      this.lastSoundTime = 0;
     }
 
     /**
@@ -1079,15 +1086,23 @@
         if (hasUnread && this.chatPopup && this.chatPopup.classList.contains('hidden')) {
           // Show dot
           this.chatNotificationIndicator.classList.remove('hidden');
-          // Play sound if this is a newly arrived unread message (timestamp greater than last played)
+          // If a newer unread message is detected (timestamp greater than last recorded)
           if (latestUnreadTs > (this.lastNotificationTimestamp || 0)) {
+            // Always update the last notification timestamp to the latest unread message time
             this.lastNotificationTimestamp = latestUnreadTs;
-            if (typeof this.playNotificationSound === 'function') {
-              this.playNotificationSound();
+            // Determine if enough time has passed since the last sound (10 seconds)
+            const now = Date.now();
+            const intervalMs = 10000;
+            if ((now - (this.lastSoundTime || 0)) >= intervalMs) {
+              // Play notification sound and update last sound time
+              if (typeof this.playNotificationSound === 'function') {
+                this.playNotificationSound();
+              }
+              this.lastSoundTime = now;
             }
           }
         } else {
-          // Hide dot and reset last notification timestamp (so that future unread will play sound again)
+          // Hide dot when there are no unread messages or the popup is visible.
           if (indicatorVisible) {
             this.chatNotificationIndicator.classList.add('hidden');
           }
