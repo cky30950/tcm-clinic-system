@@ -405,8 +405,21 @@
      * Show or hide the chat popup when the toggle button is clicked.
      */
     togglePopup() {
-      if (this.chatPopup.classList.contains('hidden')) {
+      // Toggle the chat popup visibility. When opening the popup, scroll
+      // the message container to the bottom so that the newest messages are
+      // visible immediately. This ensures that each time the user opens a
+      // conversation, the latest messages are in view.
+      const wasHidden = this.chatPopup.classList.contains('hidden');
+      if (wasHidden) {
         this.chatPopup.classList.remove('hidden');
+        // Scroll to bottom after opening
+        if (this.messageContainer) {
+          try {
+            this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
+          } catch (_e) {
+            // Ignore scroll errors
+          }
+        }
       } else {
         this.chatPopup.classList.add('hidden');
       }
@@ -725,7 +738,11 @@
           if (ts > latestTs) latestTs = ts;
         });
         this.lastMessageTime[channelId] = latestTs;
-        // If the user is currently viewing this channel, update lastSeenTime so that unread indicators reset.
+        // If the user is currently viewing this channel and the chat popup is visible,
+        // update lastSeenTime so that unread indicators reset. When the chat
+        // popup is hidden, do not mark messages as read in the selected channel
+        // so that notifications will be shown when new messages arrive while
+        // the popup is closed.
         try {
           let isCurrent = false;
           if (this.currentChannel === 'public' && channelId === 'public') {
@@ -733,7 +750,9 @@
           } else if (this.currentChannel === 'private' && this.privateChatId && channelId === this.privateChatId) {
             isCurrent = true;
           }
-          if (isCurrent) {
+          // Determine if the chat popup is hidden
+          const popupHidden = (this.chatPopup && this.chatPopup.classList.contains('hidden'));
+          if (isCurrent && !popupHidden) {
             this.lastSeenTime[channelId] = latestTs;
             // Persist last seen time when actively viewing this channel
             if (typeof this.persistLastSeenTimes === 'function') {
@@ -1056,6 +1075,12 @@
      */
     updateNewMessageIndicators() {
       if (!this.userListContainer) return;
+      // Determine whether the chat popup is currently hidden. When the chat
+      // is hidden, messages in the currently selected channel should still
+      // be considered unread for the purpose of showing indicators. When
+      // the chat is visible, messages in the current channel are treated
+      // as read and thus indicators are hidden.
+      const popupHidden = (this.chatPopup && this.chatPopup.classList.contains('hidden'));
       const items = this.userListContainer.querySelectorAll('div[data-uid]');
       items.forEach((item) => {
         const uid = item.dataset.uid;
@@ -1067,14 +1092,16 @@
         }
         const indicator = item.querySelector('span[data-new-indicator="true"]');
         if (!indicator) return;
-        // Hide indicator on the currently selected channel
-        if (this.currentChannel === 'public' && channelId === 'public') {
-          indicator.classList.add('hidden');
-          return;
-        }
-        if (this.currentChannel === 'private' && this.privateChatId === channelId) {
-          indicator.classList.add('hidden');
-          return;
+        // Hide indicator on the currently selected channel only when the chat popup is visible.
+        if (!popupHidden) {
+          if (this.currentChannel === 'public' && channelId === 'public') {
+            indicator.classList.add('hidden');
+            return;
+          }
+          if (this.currentChannel === 'private' && this.privateChatId === channelId) {
+            indicator.classList.add('hidden');
+            return;
+          }
         }
         const lastMsg = this.lastMessageTime[channelId] || 0;
         const lastSeen = this.lastSeenTime[channelId] || 0;
@@ -1105,12 +1132,17 @@
           }
           const lastMsg = this.lastMessageTime[channelId] || 0;
           const lastSeen = this.lastSeenTime[channelId] || 0;
-          // Skip currently selected channel because unread indicators are hidden while viewing it
-          if (this.currentChannel === 'public' && channelId === 'public') {
-            return;
-          }
-          if (this.currentChannel === 'private' && this.privateChatId === channelId) {
-            return;
+          // Skip currently selected channel only if chat popup is visible. When
+          // the chat is hidden, include the current channel in unread checks so
+          // that notifications can be shown even if the user had selected that
+          // chat before closing the popup.
+          if (!popupHidden) {
+            if (this.currentChannel === 'public' && channelId === 'public') {
+              return;
+            }
+            if (this.currentChannel === 'private' && this.privateChatId === channelId) {
+              return;
+            }
           }
           if (lastMsg > lastSeen) {
             hasUnread = true;
