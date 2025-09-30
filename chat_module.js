@@ -54,6 +54,19 @@
       // persist the last seen timestamps to localStorage keyed by user UID.
       this.loadLastSeenTimes = this.loadLastSeenTimes.bind(this);
       this.persistLastSeenTimes = this.persistLastSeenTimes.bind(this);
+
+      // Indicator element on the chat toggle button to show new unread
+      // messages across all channels. This small red dot is appended to the
+      // chat button in createUI() and toggled visible/hidden in
+      // updateNewMessageIndicators().
+      this.chatNotificationIndicator = null;
+
+      // Track the timestamp of the latest unread message that has already
+      // triggered a notification sound. This prevents multiple sounds
+      // playing for the same unread messages. When a newer message arrives
+      // while the chat popup is hidden, the notification sound will play
+      // again and this value will update.
+      this.lastNotificationTimestamp = 0;
     }
 
     /**
@@ -207,6 +220,18 @@
       button.className = 'bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg focus:outline-none';
       button.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16h10"></path></svg>`;
       document.body.appendChild(button);
+
+      // Add a small red dot indicator to the chat toggle button. This
+      // notification dot will be shown when there are unread messages and
+      // the chat popup is hidden. Use absolute positioning relative to
+      // the button. The dot is hidden by default.
+      button.classList.add('relative');
+      const notifDot = document.createElement('span');
+      this.chatNotificationIndicator = notifDot;
+      notifDot.className = 'absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500 hidden';
+      // Offset the dot so it sits slightly outside the button's boundary.
+      notifDot.style.transform = 'translate(50%,-50%)';
+      button.appendChild(notifDot);
       // Handler bound to this for removal later
       this.togglePopupHandler = () => this.togglePopup();
       button.addEventListener('click', this.togglePopupHandler);
@@ -359,6 +384,12 @@
         this.chatPopup.classList.remove('hidden');
       } else {
         this.chatPopup.classList.add('hidden');
+      }
+      // Update the new message indicators whenever the popup visibility
+      // changes so that the notification dot on the chat button hides when
+      // the chat is open and shows only when closed and unread messages exist.
+      if (typeof this.updateNewMessageIndicators === 'function') {
+        this.updateNewMessageIndicators();
       }
     }
 
@@ -1007,6 +1038,61 @@
           indicator.classList.add('hidden');
         }
       });
+
+      // Also update the indicator on the chat toggle button itself. This dot
+      // should be visible if there are any unread messages across all
+      // channels and the chat popup is currently hidden. The chat popup
+      // being hidden ensures that the user sees the red dot when not
+      // actively viewing the chat. When the chat is open, the dot should
+      // always be hidden.
+      if (this.chatNotificationIndicator) {
+        let hasUnread = false;
+        // Track the latest timestamp of unread messages across all channels.
+        let latestUnreadTs = 0;
+        items.forEach((item) => {
+          const uid = item.dataset.uid;
+          let channelId;
+          if (uid === 'public') {
+            channelId = 'public';
+          } else {
+            channelId = [String(this.currentUserUid), String(uid)].sort().join('_');
+          }
+          const lastMsg = this.lastMessageTime[channelId] || 0;
+          const lastSeen = this.lastSeenTime[channelId] || 0;
+          // Skip currently selected channel because unread indicators are hidden while viewing it
+          if (this.currentChannel === 'public' && channelId === 'public') {
+            return;
+          }
+          if (this.currentChannel === 'private' && this.privateChatId === channelId) {
+            return;
+          }
+          if (lastMsg > lastSeen) {
+            hasUnread = true;
+            if (lastMsg > latestUnreadTs) {
+              latestUnreadTs = lastMsg;
+            }
+          }
+        });
+        // Determine whether the notification dot is currently visible
+        const indicatorVisible = !this.chatNotificationIndicator.classList.contains('hidden');
+        // Only show the dot and play sound if there are unread messages and the popup is hidden
+        if (hasUnread && this.chatPopup && this.chatPopup.classList.contains('hidden')) {
+          // Show dot
+          this.chatNotificationIndicator.classList.remove('hidden');
+          // Play sound if this is a newly arrived unread message (timestamp greater than last played)
+          if (latestUnreadTs > (this.lastNotificationTimestamp || 0)) {
+            this.lastNotificationTimestamp = latestUnreadTs;
+            if (typeof this.playNotificationSound === 'function') {
+              this.playNotificationSound();
+            }
+          }
+        } else {
+          // Hide dot and reset last notification timestamp (so that future unread will play sound again)
+          if (indicatorVisible) {
+            this.chatNotificationIndicator.classList.add('hidden');
+          }
+        }
+      }
     }
 
     /**
@@ -1044,6 +1130,34 @@
         }
       } catch (_e) {
         // Ignore errors reading/parsing localStorage
+      }
+    }
+
+    /**
+     * Play a brief notification sound to alert the user of a new chat message.
+     * This uses the Web Audio API to generate a short sine wave tone. The
+     * implementation mirrors the playNotificationSound() function used in
+     * system.js for other notifications. Surround in try/catch to avoid
+     * crashing on browsers that do not support AudioContext.
+     */
+    playNotificationSound() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(440, ctx.currentTime);
+        gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.start();
+        // Fade out over 0.8 seconds
+        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+        oscillator.stop(ctx.currentTime + 0.8);
+      } catch (_e) {
+        // Silently ignore errors playing sound
       }
     }
   }
