@@ -22155,10 +22155,24 @@ function hideGlobalCopyright() {
       return;
     }
 
-    // 處理 Esc 鍵：僅在 keydown 階段關閉彈窗或切換側邊欄
+    // 處理 Esc 鍵：僅在 keydown 階段關閉聊天視窗、彈窗或切換側邊欄
     if (key === 'Escape') {
+      // 僅處理 keydown，忽略 keypress
       if (eventType !== 'keydown') {
         return;
+      }
+      // 首先處理聊天彈窗。如果聊天彈窗存在且未隱藏，則優先關閉
+      try {
+        const chatPopup = document.getElementById('chatPopup');
+        if (chatPopup && !chatPopup.classList.contains('hidden')) {
+          // 隱藏聊天視窗
+          chatPopup.classList.add('hidden');
+          ev.preventDefault();
+          ev.stopPropagation();
+          return;
+        }
+      } catch (_e) {
+        // 忽略查找或關閉聊天彈窗時的錯誤
       }
       if (modals.length > 0) {
         const modal = modals[modals.length - 1];
