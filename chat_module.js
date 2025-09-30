@@ -112,13 +112,16 @@
         console.error('ChatModule: error detaching messages listener', err);
       }
       this.messagesRef = null;
-      // Remove presence entry
+      // Mark presence as offline instead of removing the entry completely
       try {
         if (this.presenceRef) {
-          window.firebase.remove(this.presenceRef);
+          window.firebase.set(this.presenceRef, {
+            online: false,
+            lastSeen: Date.now()
+          });
         }
       } catch (err) {
-        console.error('ChatModule: error removing presence entry', err);
+        console.error('ChatModule: error setting offline presence during destroy', err);
       }
       this.presenceRef = null;
       // Detach last message listeners
@@ -351,24 +354,33 @@
       try {
         // Each user has its own presence entry under presence/<uid>
         this.presenceRef = window.firebase.ref(window.firebase.rtdb, `presence/${this.currentUserUid}`);
-        // Remove presence when disconnected using onDisconnect if available
+        // When the connection is lost unexpectedly (e.g. tab is closed or network drops),
+        // mark the user as offline with a lastSeen timestamp instead of removing the entry.
         try {
           if (this.presenceRef && window.firebase.onDisconnect) {
-            // Register a handler to remove the presence entry when the connection is lost unexpectedly
-            window.firebase.onDisconnect(this.presenceRef).remove();
+            window.firebase.onDisconnect(this.presenceRef).set({
+              online: false,
+              lastSeen: Date.now()
+            });
           }
         } catch (err) {
           console.warn('ChatModule: Failed to set onDisconnect for presence', err);
         }
-        // Mark the user as present now
-        window.firebase.set(this.presenceRef, true).catch((err) => {
+        // Mark the user as online now with a lastSeen timestamp.
+        window.firebase.set(this.presenceRef, {
+          online: true,
+          lastSeen: Date.now()
+        }).catch((err) => {
           console.error('ChatModule: Failed to set presence', err);
         });
-        // Ensure presence is removed when the page unloads or the user closes the tab
+        // When the page unloads or the user leaves explicitly, set presence to offline
         this.beforeUnloadHandler = () => {
           try {
             if (this.presenceRef) {
-              window.firebase.remove(this.presenceRef);
+              window.firebase.set(this.presenceRef, {
+                online: false,
+                lastSeen: Date.now()
+              });
             }
           } catch (_e) {
             // Ignore errors during unload
@@ -479,8 +491,16 @@
           // Count online users excluding current (for potential use)
           let onlineCount = 0;
           Object.keys(presenceData).forEach(uid => {
-            if (presenceData[uid]) {
-              if (uid !== this.currentUserUid) onlineCount++;
+            const entry = presenceData[uid];
+            // Determine online status based on the structure of the entry.
+            let isOnline = false;
+            if (entry && typeof entry === 'object') {
+              isOnline = !!entry.online;
+            } else {
+              isOnline = !!entry;
+            }
+            if (isOnline && uid !== this.currentUserUid) {
+              onlineCount++;
             }
           });
           // Update status dots
@@ -495,7 +515,14 @@
               dot.style.backgroundColor = 'transparent';
               return;
             }
-            if (uid && presenceData[uid]) {
+            const entry = presenceData[uid];
+            let isOnline = false;
+            if (entry && typeof entry === 'object') {
+              isOnline = !!entry.online;
+            } else {
+              isOnline = !!entry;
+            }
+            if (isOnline) {
               dot.style.backgroundColor = '#10B981'; // green
             } else {
               dot.style.backgroundColor = '#9CA3AF'; // gray
@@ -603,6 +630,20 @@
           if (ts > latestTs) latestTs = ts;
         });
         this.lastMessageTime[channelId] = latestTs;
+        // If the user is currently viewing this channel, update lastSeenTime so that unread indicators reset.
+        try {
+          let isCurrent = false;
+          if (this.currentChannel === 'public' && channelId === 'public') {
+            isCurrent = true;
+          } else if (this.currentChannel === 'private' && this.privateChatId && channelId === this.privateChatId) {
+            isCurrent = true;
+          }
+          if (isCurrent) {
+            this.lastSeenTime[channelId] = latestTs;
+          }
+        } catch (_e) {
+          // ignore errors during lastSeen update
+        }
         // Reorder user list if available
         if (typeof this.updateUserListOrder === 'function') {
           this.updateUserListOrder();
