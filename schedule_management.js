@@ -160,13 +160,29 @@
                     } else {
                         user = {};
                     }
-                    const pos = (user.position || user.role || '').toString().trim();
-                    const email = (user.email || '').toString().toLowerCase().trim();
-                    // 只要職稱包含「管理」即可視為管理員，例如「診所管理」「系統管理」等
+                    // 先檢查 Firebase 自訂 claims 中的角色權限（透過 window.currentUserClaims 傳入）。
+                    // 若 role 為 'admin'，則視為管理員。
+                    try {
+                        const claims = window.currentUserClaims || {};
+                        const claimRole = (claims.role || claims.Role || '').toString().toLowerCase();
+                        if (claimRole === 'admin') {
+                            return true;
+                        }
+                    } catch (_claimErr) {
+                        // 忽略 claims 解析錯誤
+                    }
+                    // 若使用者資料中有 role 屬性，亦可作為權限判斷依據（大小寫不敏感）
+                    const userRole = (user.role || '').toString().toLowerCase();
+                    if (userRole === 'admin') {
+                        return true;
+                    }
+                    // 原有判斷：職稱包含「管理」即視為管理員，例如「診所管理」「系統管理」等
+                    const pos = (user.position || '').toString().trim();
                     if (pos && (pos === '診所管理' || pos.includes('管理'))) {
                         return true;
                     }
                     // 或者使用特定電子郵件身分
+                    const email = (user.email || '').toString().toLowerCase().trim();
                     if (email === 'admin@clinic.com') {
                         return true;
                     }

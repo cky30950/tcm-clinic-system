@@ -3,6 +3,11 @@
 let currentUser = null;
 let currentUserData = null;
 
+// 全域自訂權限（Custom Claims）儲存區
+// 於 Firebase 登入後載入使用者的 ID Token 並解析其中的自訂權限，再存入此對象
+// 以便其他模組（例如 schedule_management.js）可直接存取
+window.currentUserClaims = {};
+
 /**
  * A simple debounce utility to delay the execution of a function until after a specified
  * delay has passed since its last invocation. This helps to avoid triggering expensive
@@ -2375,6 +2380,24 @@ async function attemptMainLogin() {
         // 取得 Firebase 使用者資訊
         const firebaseUser = userCredential.user;
         const uid = firebaseUser.uid;
+
+        // 取得並存儲 Firebase 自訂權限（Custom Claims）
+        // 當管理員需進行更細緻的權限管理時，可在後端設定自訂 claims（例如 role: 'admin'）。
+        // 使用者登入時透過 getIdTokenResult() 取得 claims，並存入全域變數以供其他模組使用。
+        try {
+            if (firebaseUser && typeof firebaseUser.getIdTokenResult === 'function') {
+                const idTokenResult = await firebaseUser.getIdTokenResult();
+                if (idTokenResult && idTokenResult.claims) {
+                    // 將取得的 claims 儲存在全域 currentUserClaims
+                    window.currentUserClaims = idTokenResult.claims;
+                } else {
+                    window.currentUserClaims = {};
+                }
+            }
+        } catch (claimsErr) {
+            console.warn('取得使用者自訂權限失敗:', claimsErr);
+            window.currentUserClaims = {};
+        }
 
         // 同步載入 Firebase 用戶數據
         await syncUserDataFromFirebase();
