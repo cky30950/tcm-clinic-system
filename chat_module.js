@@ -22,6 +22,13 @@
       this.presenceRootRef = null;
       this.presenceListener = null;
       this.messagesRef = null;
+      // Store the callback for the currently active message listener. This is
+      // needed so that we can detach only the specific callback when
+      // switching channels instead of removing all listeners on the same
+      // reference (which would inadvertently remove other listeners such as
+      // those used for last message tracking). See listenToMessages() for
+      // details.
+      this.currentMessageCallback = null;
       this.dragOffset = { x: 0, y: 0 };
       this.isDragging = false;
       // Store all clinic users passed from the main system. This list will be used
@@ -482,6 +489,12 @@
             const uid = item.dataset.uid;
             const dot = item.querySelector('span[data-status-dot="true"]');
             if (!dot) return;
+            // Skip the public (group) channel. Its status dot should remain
+            // transparent rather than being forced to gray or green.
+            if (uid === 'public') {
+              dot.style.backgroundColor = 'transparent';
+              return;
+            }
             if (uid && presenceData[uid]) {
               dot.style.backgroundColor = '#10B981'; // green
             } else {
@@ -549,15 +562,21 @@
      * @param {string} channelId - 'public' for group chat or chat ID for private.
      */
     listenToMessages(channelId) {
-      // Detach previous listener
-      try {
-        if (this.messagesRef) {
-          window.firebase.off(this.messagesRef, 'value');
+      // Detach the previous message listener. It's important to only remove
+      // the specific callback that was registered for the previous channel.
+      // Calling off(ref, 'value') without a callback removes *all* value
+      // listeners on that reference, which would break other listeners such
+      // as those used for tracking the last message of each chat. By
+      // storing the callback in `this.currentMessageCallback` we can detach
+      // precisely the old listener without affecting others.
+      if (this.messagesRef && this.currentMessageCallback) {
+        try {
+          window.firebase.off(this.messagesRef, 'value', this.currentMessageCallback);
+        } catch (err) {
+          console.error('ChatModule: error detaching old message listener', err);
         }
-      } catch (err) {
-        console.error('ChatModule: error detaching old message listener', err);
       }
-      // Determine path
+      // Determine path for the new channel
       let path;
       if (channelId === 'public') {
         path = 'chat/messages/public';
@@ -565,8 +584,8 @@
         path = `chat/private/${channelId}`;
       }
       this.messagesRef = window.firebase.ref(window.firebase.rtdb, path);
-      // Listen to full value to fetch entire message list. Since group sizes are small, this is acceptable.
-      window.firebase.onValue(this.messagesRef, (snapshot) => {
+      // Define the callback outside of onValue so we can detach it later.
+      this.currentMessageCallback = (snapshot) => {
         const data = snapshot.val() || {};
         const messages = Object.values(data);
         // Sort messages so that oldest come first (ascending by timestamp). Newer messages will appear at the bottom.
@@ -588,7 +607,9 @@
         if (typeof this.updateUserListOrder === 'function') {
           this.updateUserListOrder();
         }
-      });
+      };
+      // Listen to the full message list. Since group sizes are small, this is acceptable.
+      window.firebase.onValue(this.messagesRef, this.currentMessageCallback);
     }
 
     /**
