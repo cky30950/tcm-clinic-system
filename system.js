@@ -1852,6 +1852,50 @@ async function openInventoryModal(itemId) {
         const modal = document.getElementById('inventoryModal');
         const qtyInput = document.getElementById('inventoryQuantity');
         const thrInput = document.getElementById('inventoryThreshold');
+        /**
+         * 在庫存編輯彈窗中，當使用者於「剩餘數量」欄位按下 Enter 鍵時，直接觸發儲存動作。
+         * 這裡會為輸入框動態掛載鍵盤事件處理器，並於重複開啟彈窗時先移除舊的處理器，避免重複綁定。
+         * 儲存邏輯優先透過點擊彈窗內的儲存按鈕，以保持與其他操作一致；若找不到按鈕則直接呼叫
+         * saveInventoryChanges()。
+         */
+        try {
+            if (qtyInput) {
+                // 移除先前的事件處理器，避免重複觸發
+                if (qtyInput._enterSaveHandler) {
+                    qtyInput.removeEventListener('keypress', qtyInput._enterSaveHandler);
+                }
+                // 定義新的事件處理器
+                qtyInput._enterSaveHandler = function (ev) {
+                    if (ev && ev.key === 'Enter') {
+                        ev.preventDefault();
+                        try {
+                            // 尋找庫存彈窗內負責儲存的按鈕。使用包含 saveInventoryChanges 的 onclick 來匹配
+                            const saveBtn = modal ? modal.querySelector('button[onclick*="saveInventoryChanges"]') : null;
+                            if (saveBtn && typeof saveBtn.click === 'function') {
+                                saveBtn.click();
+                                return;
+                            }
+                        } catch (_e) {
+                            // 找不到按鈕時忽略，改以直接呼叫儲存函式
+                        }
+                        // Fallback：直接呼叫 saveInventoryChanges
+                        try {
+                            if (typeof saveInventoryChanges === 'function') {
+                                saveInventoryChanges();
+                            }
+                        } catch (_e) {
+                            // 如果調用失敗，僅記錄錯誤
+                            console.error('Enter 鍵觸發庫存儲存失敗:', _e);
+                        }
+                    }
+                };
+                // 綁定新的處理器
+                qtyInput.addEventListener('keypress', qtyInput._enterSaveHandler);
+            }
+        } catch (_e) {
+            // 若綁定事件時發生錯誤，僅記錄但不會阻斷彈窗開啟
+            console.error('綁定庫存數量輸入 Enter 鍵事件失敗:', _e);
+        }
         const titleEl = document.getElementById('inventoryModalTitle');
         // 設定彈窗標題包含藥材名稱
         let nameStr = '';
