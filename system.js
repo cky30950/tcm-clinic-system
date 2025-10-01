@@ -1743,6 +1743,16 @@ async function setHerbInventory(itemId, quantity, threshold, unit) {
 async function revertInventoryForConsultation(consultationId) {
     if (!consultationId) return;
     await waitForFirebaseDb();
+    // 確保中藥庫存資料已載入。若尚未初始化，或因頁面重載等原因導致本地 herbInventory 為空，
+    // 則呼叫 initHerbInventory() 以載入最新庫存資料。
+    try {
+        if (typeof initHerbInventory === 'function') {
+            // 使用非強制刷新。若尚未初始化則會載入資料，若已初始化則不會造成多餘讀取。
+            await initHerbInventory(false);
+        }
+    } catch (_initErr) {
+        // 忽略初始化錯誤，後續仍嘗試還原庫存
+    }
     const logRef = window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationId));
     try {
         const logSnap = await window.firebase.get(logRef);
@@ -1750,10 +1760,26 @@ async function revertInventoryForConsultation(consultationId) {
             const log = logSnap.val() || {};
             for (const key in log) {
                 const consumption = Number(log[key]) || 0;
+                // 讀取當前庫存資料。若尚未存在該項目，提供預設值。
                 const inv = getHerbInventory(key);
+                // 將消耗量加回庫存
                 const newQty = (inv.quantity || 0) + consumption;
-                // 使用原單位更新庫存
-                await setHerbInventory(key, newQty, inv.threshold, inv.unit);
+                // 使用原單位更新庫存。當 inv.unit 不存在時，預設為 'g'
+                const unitToUse = inv.unit || 'g';
+                const thresholdToUse = typeof inv.threshold === 'number' ? inv.threshold : 0;
+                await setHerbInventory(key, newQty, thresholdToUse, unitToUse);
+                // 同步更新本地快取，避免 UI 延遲或未初始化時跳過更新
+                try {
+                    if (typeof herbInventory !== 'undefined') {
+                        herbInventory[String(key)] = {
+                            quantity: newQty,
+                            threshold: thresholdToUse,
+                            unit: unitToUse
+                        };
+                    }
+                } catch (_e) {
+                    /* 忽略本地更新錯誤 */
+                }
             }
             // 移除消耗記錄
             await window.firebase.remove(logRef);
@@ -1776,6 +1802,16 @@ async function revertInventoryForConsultation(consultationId) {
 async function updateInventoryAfterConsultation(consultationId, items, days, freq, isEditing = false, previousLog = null) {
     if (!consultationId || !Array.isArray(items)) return;
     await waitForFirebaseDb();
+    // 確保在進行庫存計算之前載入最新的中藥庫存資料。
+    // 若 herbInventory 尚未初始化（例如使用者直接進入診症頁面尚未查看中藥庫存），
+    // 則 initHerbInventory() 會讀取 Realtime Database 並填充 herbInventory，避免取得預設 0 值而導致計算錯誤。
+    try {
+        if (typeof initHerbInventory === 'function') {
+            await initHerbInventory(false);
+        }
+    } catch (_initErr) {
+        // 若初始化失敗，仍繼續執行，僅使用當前本地 herbInventory 資料
+    }
     // 還原舊的消耗量
     if (isEditing && previousLog) {
         for (const key in previousLog) {
