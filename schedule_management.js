@@ -1900,6 +1900,47 @@ ${translate('電子郵件：')}${staffMember.email}`);
   // 列印當月排班表函式
   window.schedulePrintShiftTable = printCurrentMonthSchedule;
 
+  /**
+   * 根據當前登入使用者的權限動態調整排班管理介面的顯示項目。
+   * 管理員會看到固定上班與清空排班按鈕，以及拖拽提示文字；
+   * 非管理員則隱藏這些元素。此函式可安全重複調用，每次調用都會
+   * 重新檢查使用者身份並更新對應的 UI。
+   */
+  if (typeof window.scheduleUpdateAdminUI !== 'function') {
+    window.scheduleUpdateAdminUI = function () {
+      try {
+        const isAdmin = window.isAdminUser && window.isAdminUser();
+        const qaEl = document.getElementById('quickActions');
+        const dragEl = document.getElementById('dragInstruction');
+        // 如果元素存在，根據 isAdmin 動態設置 display 屬性。使用明確的
+        // display 值來確保在不同瀏覽器和樣式設定下正確顯示。
+        if (qaEl) {
+          if (isAdmin) {
+            // 管理員：恢復預設顯示，確保按鈕可見
+            qaEl.style.display = '';
+            if (qaEl.classList) qaEl.classList.remove('hidden');
+          } else {
+            // 非管理員：隱藏快速操作區塊
+            qaEl.style.display = 'none';
+            if (qaEl.classList) qaEl.classList.add('hidden');
+          }
+        }
+        if (dragEl) {
+          if (isAdmin) {
+            dragEl.style.display = '';
+            if (dragEl.classList) dragEl.classList.remove('hidden');
+          } else {
+            dragEl.style.display = 'none';
+            if (dragEl.classList) dragEl.classList.add('hidden');
+          }
+        }
+      } catch (err) {
+        // 若遇到錯誤，僅在控制台記錄，不影響其他功能
+        console.warn('scheduleUpdateAdminUI error', err);
+      }
+    };
+  }
+
   // ----------------------------------------------------------------------
   // Inline event handler wrappers
   //
@@ -1937,65 +1978,43 @@ ${translate('電子郵件：')}${staffMember.email}`);
 
 // 延遲初始化排班系統：
 // 將初始化邏輯封裝為函式，僅當用戶登入並進入排班管理區塊時才呼叫。
+// 調整邏輯：即使已初始化過，仍會執行 UI 權限調整，使管理員按鈕可在登入後正確顯示。
 if (typeof window.initializeScheduleManagement !== 'function') {
   window.initializeScheduleManagement = async function() {
-    // 若已經初始化過，避免重複執行
-    if (window.scheduleInitialized) return;
-    window.scheduleInitialized = true;
+    // 判斷是否第一次初始化，用於執行一次性的重度操作
+    const isFirstInit = !window.scheduleInitialized;
+    if (isFirstInit) {
+      window.scheduleInitialized = true;
+    }
     try {
-      // 更新當前日期顯示
-      if (typeof updateCurrentDate === 'function') updateCurrentDate();
-      // 設定事件監聽器
-      if (typeof setupEventListeners === 'function') setupEventListeners();
-      // 載入診所人員（使用本地用戶資料）
-      if (typeof loadClinicStaff === 'function') {
-        await loadClinicStaff();
-      }
-      // 從資料庫讀取排班資料
-      if (typeof loadShiftsFromDb === 'function') {
-        await loadShiftsFromDb();
-      }
-      // 渲染行事曆與人員面板
-      if (typeof renderCalendar === 'function') renderCalendar();
-      if (typeof renderStaffPanel === 'function') renderStaffPanel();
-      if (typeof updateStaffSelects === 'function') updateStaffSelects();
-      // 更新統計資訊
-      if (typeof updateStats === 'function') updateStats();
-
-      // 根據使用者權限調整部分介面元素的顯示與隱藏
-      // 管理員可以看到固定上班、清空排班按鈕及拖拽提示；非管理員則隱藏這些元素。
-      try {
-        const isAdmin = window.isAdminUser && window.isAdminUser();
-        const qaEl = document.getElementById('quickActions');
-        const dragEl = document.getElementById('dragInstruction');
-        // 如果元素存在，根據 isAdmin 動態設置 display 屬性。使用明確的
-        // display 值來確保在不同瀏覽器和樣式設定下正確顯示。
-        if (qaEl) {
-          if (isAdmin) {
-            // 將 display 設為空字串，移除任何內嵌樣式，以便回復至 CSS 定義的 flex
-            qaEl.style.display = '';
-            // 移除 hidden 類別使其可見
-            if (qaEl.classList) qaEl.classList.remove('hidden');
-          } else {
-            // 非管理員：隱藏快速操作區塊並套用 hidden 類別
-            qaEl.style.display = 'none';
-            if (qaEl.classList) qaEl.classList.add('hidden');
-          }
+      // 僅在第一次初始化時載入資料及渲染畫面
+      if (isFirstInit) {
+        // 更新當前日期顯示
+        if (typeof updateCurrentDate === 'function') updateCurrentDate();
+        // 設定事件監聽器
+        if (typeof setupEventListeners === 'function') setupEventListeners();
+        // 載入診所人員（使用本地用戶資料）
+        if (typeof loadClinicStaff === 'function') {
+          await loadClinicStaff();
         }
-        if (dragEl) {
-          if (isAdmin) {
-            // 將 display 設為空字串，移除內嵌樣式，讓元素以預設 inline 顯示
-            dragEl.style.display = '';
-            if (dragEl.classList) dragEl.classList.remove('hidden');
-          } else {
-            // 非管理員：隱藏拖拽提示並套用 hidden 類別
-            dragEl.style.display = 'none';
-            if (dragEl.classList) dragEl.classList.add('hidden');
-          }
+        // 從資料庫讀取排班資料
+        if (typeof loadShiftsFromDb === 'function') {
+          await loadShiftsFromDb();
         }
-      } catch (_err) {
-        // 若遇到錯誤，僅在控制台記錄，不影響其他功能
-        console.warn('Failed to apply admin-only UI visibility toggling', _err);
+        // 渲染行事曆與人員面板
+        if (typeof renderCalendar === 'function') renderCalendar();
+        if (typeof renderStaffPanel === 'function') renderStaffPanel();
+        if (typeof updateStaffSelects === 'function') updateStaffSelects();
+        // 更新統計資訊
+        if (typeof updateStats === 'function') updateStats();
+      }
+      // 每次進入排班頁面時都更新按鈕的顯示狀態，以反映當前使用者權限
+      if (typeof window.scheduleUpdateAdminUI === 'function') {
+        try {
+          window.scheduleUpdateAdminUI();
+        } catch (uiErr) {
+          console.warn('Failed to update admin UI on initialize', uiErr);
+        }
       }
     } catch (e) {
       console.error('Schedule init error', e);

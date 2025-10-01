@@ -2994,6 +2994,14 @@ async function logout() {
                 if (typeof window.initializeScheduleManagement === 'function') {
                     window.initializeScheduleManagement();
                 }
+                // 即使系統已初始化，也在每次進入排班管理時更新管理員 UI
+                if (typeof window.scheduleUpdateAdminUI === 'function') {
+                    try {
+                        window.scheduleUpdateAdminUI();
+                    } catch (uiErr) {
+                        console.warn('Failed to update admin UI in navigateTo', uiErr);
+                    }
+                }
             } else if (sectionId === 'billingManagement') {
                 loadBillingManagement();
             } else if (sectionId === 'financialReports') {
