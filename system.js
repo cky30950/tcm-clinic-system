@@ -14097,55 +14097,81 @@ async function deleteUser(id) {
 
         // 快速日期選擇
         function setQuickDate() {
+            /**
+             * 根據目前日期計算本週或上週的起始日期。
+             * 以週一作為每週的第一天，週日為最後一天。
+             * 例如，若今天是週三（getDay() 回傳 3），則本週開始為週一。
+             * 若今天是週日（getDay() 回傳 0），則本週開始仍為本週週一。
+             * @param {Date} date 當前日期
+             * @returns {Date} 當週週一的日期
+             */
+            function getStartOfWeek(date) {
+                const result = new Date(date);
+                const day = result.getDay();
+                // 將 Sunday (0) 視為一週的最後一天，需回溯 6 天至週一
+                // 其餘情況回溯 day-1 天至週一
+                const diff = day === 0 ? -6 : 1 - day;
+                result.setDate(result.getDate() + diff);
+                return result;
+            }
+
             const quickDate = document.getElementById('quickDate').value;
             const today = new Date();
             let startDate, endDate;
-            // 新增：嘗試取得舊的 reportType 元素供回寫；如元素不存在則忽略
+            // 嘗試取得舊的 reportType 元素供回寫；如元素不存在則忽略
             const rptElem = document.getElementById('reportType');
 
             switch (quickDate) {
                 case 'today':
-                    startDate = endDate = today;
+                    // 今日：開始與結束皆為今天
+                    startDate = new Date(today);
+                    endDate = new Date(today);
                     if (rptElem) rptElem.value = 'daily';
                     break;
                 case 'yesterday':
-                    startDate = endDate = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+                    // 昨天：開始與結束皆為昨天
+                    startDate = new Date(today);
+                    startDate.setDate(today.getDate() - 1);
+                    endDate = new Date(startDate);
                     if (rptElem) rptElem.value = 'daily';
                     break;
                 case 'thisWeek': {
-                    const thisWeekStart = new Date(today);
-                    thisWeekStart.setDate(today.getDate() - today.getDay());
-                    startDate = thisWeekStart;
-                    endDate = today;
+                    // 本週：以週一為起點，結束日期為今天
+                    startDate = getStartOfWeek(today);
+                    endDate = new Date(today);
                     if (rptElem) rptElem.value = 'weekly';
                     break;
                 }
                 case 'lastWeek': {
-                    const lastWeekStart = new Date(today);
-                    lastWeekStart.setDate(today.getDate() - today.getDay() - 7);
-                    const lastWeekEnd = new Date(lastWeekStart);
-                    lastWeekEnd.setDate(lastWeekStart.getDate() + 6);
-                    startDate = lastWeekStart;
-                    endDate = lastWeekEnd;
+                    // 上週：取得本週週一後，再往前推七天得到上週週一；結束日期為上週週日
+                    const startOfThisWeek = getStartOfWeek(today);
+                    startDate = new Date(startOfThisWeek);
+                    startDate.setDate(startOfThisWeek.getDate() - 7);
+                    endDate = new Date(startDate);
+                    endDate.setDate(startDate.getDate() + 6);
                     if (rptElem) rptElem.value = 'weekly';
                     break;
                 }
                 case 'thisMonth':
+                    // 本月：起始為月初 (1 日)，結束為月末
                     startDate = new Date(today.getFullYear(), today.getMonth(), 1);
                     endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
                     if (rptElem) rptElem.value = 'monthly';
                     break;
                 case 'lastMonth':
+                    // 上月：起始為上個月 1 日，結束為上個月的最後一天
                     startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
                     endDate = new Date(today.getFullYear(), today.getMonth(), 0);
                     if (rptElem) rptElem.value = 'monthly';
                     break;
                 case 'thisYear':
+                    // 今年：起始為 1 月 1 日，結束為 12 月 31 日
                     startDate = new Date(today.getFullYear(), 0, 1);
                     endDate = new Date(today.getFullYear(), 11, 31);
                     if (rptElem) rptElem.value = 'yearly';
                     break;
                 case 'lastYear':
+                    // 去年：起始為去年 1 月 1 日，結束為去年 12 月 31 日
                     startDate = new Date(today.getFullYear() - 1, 0, 1);
                     endDate = new Date(today.getFullYear() - 1, 11, 31);
                     if (rptElem) rptElem.value = 'yearly';
@@ -14155,8 +14181,10 @@ async function deleteUser(id) {
             }
 
             if (startDate && endDate) {
+                // 將日期格式化為 YYYY-MM-DD 並更新 UI
                 document.getElementById('startDate').value = formatFinancialDate(startDate);
                 document.getElementById('endDate').value = formatFinancialDate(endDate);
+                // 重新生成報表
                 generateFinancialReport();
             }
         }
