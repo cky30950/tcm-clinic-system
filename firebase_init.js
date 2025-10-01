@@ -44,6 +44,15 @@ import { getAuth, signInWithEmailAndPassword, signOut, setPersistence,
         // 引入 onAuthStateChanged 以監聽認證狀態變化
         onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
+// -----------------------------------------------------------------------------
+// Aliases and helper constants
+//
+// To cleanly export the deletion helper, define a local alias referencing
+// the imported deleteUser function.  This avoids trying to export a symbol
+// that doesn't exist in the module scope and matches the naming used on
+// window.firebase (deleteAuthUser).
+const deleteAuthUser = firebaseDeleteUser;
+
 // 匯入外部配置檔案。請將您的 Firebase 設定值放在 firebaseConfig.js 中，並避免將其提交到版本控制。
 import firebaseConfig from './firebaseConfig.js';
 
