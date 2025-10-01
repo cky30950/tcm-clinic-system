@@ -12,7 +12,7 @@
       "indications": "脾胃氣虛，面色萎白，語聲低微，氣短乏力，食少便溏，舌淡苔白，脈虛弱",
       "usage": "水煎服，每日一劑，分二次溫服",
       "updatedAt": "2025-08-12T10:25:21.657Z",
-      "name_pinyin": "sìjūnzi湯"
+      "englishName": "SiJunZiTang"
     },
     {
       "id": 1754994356663,
@@ -26,7 +26,7 @@
       "type": "formula",
       "effects": "益氣健脾，燥濕化痰",
       "indications": "脾胃氣虛兼有痰濕，食少便溏，胸脘痞悶，嘔逆等症",
-      "name_pinyin": "liùjūnzi湯"
+      "englishName": "LiuJunZiTang"
     },
     {
       "id": 1755100000001,
@@ -40,7 +40,7 @@
       "indications": "太陽中風，頭痛發熱，汗出惡風，鼻鳴乾嘔，脈浮緩",
       "usage": "水煎服，溫覆取微汗",
       "updatedAt": "2025-08-13T12:00:00.001Z",
-      "name_pinyin": "guìzhī湯"
+      "englishName": "GuiZhiTang"
     },
     {
       "id": 1755100000002,
@@ -54,7 +54,7 @@
       "indications": "太陽傷寒，頭痛發熱，身疼腰痛，骨節疼痛，惡風無汗而喘，脈浮緊",
       "usage": "水煎服，溫服取汗",
       "updatedAt": "2025-08-13T12:00:00.002Z",
-      "name_pinyin": "máhuáng湯"
+      "englishName": "MaHuangTang"
     },
     {
       "id": 1755100000003,
@@ -68,7 +68,7 @@
       "indications": "外寒內飲，惡寒發熱，無汗，喘咳，痰多稀白，胸痞，脈浮緊",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.003Z",
-      "name_pinyin": "xiǎoqīnglóng湯"
+      "englishName": "XiaoQingLongTang"
     },
     {
       "id": 1755100000004,
@@ -82,7 +82,7 @@
       "indications": "外感風寒，兼有裏熱，發熱惡寒，身疼痛，不汗出而煩躁，脈浮緊",
       "usage": "水煎服，取微汗",
       "updatedAt": "2025-08-13T12:00:00.004Z",
-      "name_pinyin": "dàqīnglóng湯"
+      "englishName": "DaQingLongTang"
     },
     {
       "id": 1755100000005,
@@ -96,7 +96,7 @@
       "indications": "外有表證，內停水濕，頭痛發熱，煩渴欲飲，水入即吐，小便不利，脈浮",
       "usage": "散劑，開水調服",
       "updatedAt": "2025-08-13T12:00:00.005Z",
-      "name_pinyin": "wǔlíngsàn"
+      "englishName": "WuLingSan"
     },
     {
       "id": 1755100000006,
@@ -110,7 +110,7 @@
       "indications": "太陽病，項背強幾幾，無汗惡風，或太陽與陽明合病，自下利者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.006Z",
-      "name_pinyin": "gégēn湯"
+      "englishName": "GeGenTang"
     },
     {
       "id": 1755100000007,
@@ -124,7 +124,7 @@
       "indications": "陽明氣分熱盛，壯熱面赤，煩渴引飲，汗出惡熱，脈洪大有力",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.007Z",
-      "name_pinyin": "báihǔ湯"
+      "englishName": "BaiHuTang"
     },
     {
       "id": 1755100000008,
@@ -138,7 +138,7 @@
       "indications": "少陽病，往來寒熱，胸脅苦滿，默默不欲飲食，心煩喜嘔，口苦，咽乾，目眩，脈弦",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.008Z",
-      "name_pinyin": "xiǎocháihú湯"
+      "englishName": "XiaoChaiHuTang"
     },
     {
       "id": 1755100000009,
@@ -152,7 +152,7 @@
       "indications": "少陽陽明合病，往來寒熱，胸脅苦滿，嘔不止，鬱鬱微煩，心下痞硬，或心下滿痛，大便不解或協熱下利，舌苔黃，脈弦數有力",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.009Z",
-      "name_pinyin": "dàcháihú湯"
+      "englishName": "DaChaiHuTang"
     },
     {
       "id": 1755100000010,
@@ -166,7 +166,7 @@
       "indications": "寒熱錯雜之痞證，心下痞，但滿而不痛，或嘔吐，腸鳴下利，舌苔膩而微黃",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.010Z",
-      "name_pinyin": "bànxià瀉xīn湯"
+      "englishName": "BanXiaXieXinTang"
     },
     {
       "id": 1755100000011,
@@ -180,7 +180,7 @@
       "indications": "陽虛水泛，小便不利，四肢沈重疼痛，腹痛下利，或肢體浮腫，苔白不渴，脈沈",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.011Z",
-      "name_pinyin": "zhēnwǔ湯"
+      "englishName": "ZhenWuTang"
     },
     {
       "id": 1755100000012,
@@ -194,7 +194,7 @@
       "indications": "脾胃虛寒，腹痛洩瀉，嘔吐食少，口不渴，舌淡苔白，脈沈細或遲緩",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-13T12:00:00.012Z",
-      "name_pinyin": "lǐzhōngwán"
+      "englishName": "LiZhongWan"
     },
     {
       "id": 1755100000013,
@@ -208,7 +208,7 @@
       "indications": "少陰病，四肢厥逆，惡寒踡臥，嘔吐不渴，腹痛下利，神衰欲寐，脈沈微細",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.013Z",
-      "name_pinyin": "sìnì湯"
+      "englishName": "SiNiTang"
     },
     {
       "id": 1755100000014,
@@ -222,7 +222,7 @@
       "indications": "血虛寒厥，手足厥寒，脈細欲絕，或寒入經絡，腰、股、腿、足疼痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.014Z",
-      "name_pinyin": "當歸sìnì湯"
+      "englishName": "DangGuiSiNiTang"
     },
     {
       "id": 1755100000015,
@@ -236,7 +236,7 @@
       "indications": "蛔厥，煩悶嘔吐，時發時止，得食即吐，常自吐蛔，手足厥逆，腹痛時作。又主久痢",
       "usage": "丸劑，空腹溫開水送服",
       "updatedAt": "2025-08-13T12:00:00.015Z",
-      "name_pinyin": "烏méiwán"
+      "englishName": "WuMeiWan"
     },
     {
       "id": 1755100000016,
@@ -250,7 +250,7 @@
       "indications": "外感風邪，邪熱壅肺，身熱不解，咳逆氣急鼻煽，口渴，有汗或無汗，舌苔薄白或黃，脈滑而數者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.016Z",
-      "name_pinyin": "máhuángxìngréngāncǎoshígāo湯"
+      "englishName": "MaHuangXingRenGanCaoShiGaoTang"
     },
     {
       "id": 1755100000017,
@@ -264,7 +264,7 @@
       "indications": "發汗吐下後，虛煩不得眠，心中懊憹，胸中窒，或心中結痛，舌紅苔微黃",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.017Z",
-      "name_pinyin": "梔zishì湯"
+      "englishName": "ZhiZiShiTang"
     },
     {
       "id": 1755100000018,
@@ -278,7 +278,7 @@
       "indications": "陰血不足，筋脈失濡，腿腳攣急，或腹中疼痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.018Z",
-      "name_pinyin": "sháoyàogāncǎo湯"
+      "englishName": "ShaoYaoGanCaoTang"
     },
     {
       "id": 1755100000019,
@@ -292,7 +292,7 @@
       "indications": "太陽與少陽合病，自下利者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.019Z",
-      "name_pinyin": "huángqín湯"
+      "englishName": "HuangQinTang"
     },
     {
       "id": 1755100000020,
@@ -306,7 +306,7 @@
       "indications": "少陰病，得之二三日以上，心中煩，不得臥",
       "usage": "水煎服，阿膠烊化，雞子黃攪勻兌服",
       "updatedAt": "2025-08-13T12:00:00.020Z",
-      "name_pinyin": "huángliánājiāo湯"
+      "englishName": "HuangLianAJiaoTang"
     },
     {
       "id": 1755100000021,
@@ -320,7 +320,7 @@
       "indications": "少陰病，身體痛，手足寒，骨節痛，脈沈者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.021Z",
-      "name_pinyin": "fùzi湯"
+      "englishName": "FuZiTang"
     },
     {
       "id": 1755100000022,
@@ -334,7 +334,7 @@
       "indications": "胃氣虛弱，氣結成痞，心下痞硬而滿，乾嘔心煩，腹中雷鳴，下利穀不化",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.022Z",
-      "name_pinyin": "gāncǎo瀉xīn湯"
+      "englishName": "GanCaoXieXinTang"
     },
     {
       "id": 1755100000023,
@@ -348,7 +348,7 @@
       "indications": "水熱互結痞證，心下痞硬，乾噫食臭，脅下有水氣，腹中雷鳴，下利",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.023Z",
-      "name_pinyin": "shēngjiāng瀉xīn湯"
+      "englishName": "ShengJiangXieXinTang"
     },
     {
       "id": 1755100000024,
@@ -362,7 +362,7 @@
       "indications": "胃氣虛弱，痰濁內阻，心下痞硬，噫氣不除，或反胃嘔噦，吐涎沫",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.024Z",
-      "name_pinyin": "xuánfùdàizhě湯"
+      "englishName": "XuanFuDaiZheTang"
     },
     {
       "id": 1755100000025,
@@ -376,7 +376,7 @@
       "indications": "水熱互結，陰虛內熱，小便不利，發熱，口渴欲飲，或心煩不寐，或兼有咳嗽、嘔惡、下利",
       "usage": "水煎服，阿膠烊化",
       "updatedAt": "2025-08-13T12:00:00.025Z",
-      "name_pinyin": "zhūlíng湯"
+      "englishName": "ZhuLingTang"
     },
     {
       "id": 1755100000026,
@@ -390,7 +390,7 @@
       "indications": "濕熱黃疸，一身面目俱黃，黃色鮮明，發熱，無汗或但頭汗出，口渴欲飲，惡心嘔吐，腹微滿，小便短赤，舌苔黃膩，脈沈實或滑數",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.026Z",
-      "name_pinyin": "yīnchénhāo湯"
+      "englishName": "YinChenHaoTang"
     },
     {
       "id": 1755100000027,
@@ -404,7 +404,7 @@
       "indications": "濕熱黃疸兼表證，身黃，發熱，無汗，身癢",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.027Z",
-      "name_pinyin": "máhuánglián軺chìxiǎodòu湯"
+      "englishName": "MaHuangLianYaoChiXiaoDouTang"
     },
     {
       "id": 1755100000028,
@@ -418,7 +418,7 @@
       "indications": "太陽病誤下，腹滿時痛者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.028Z",
-      "name_pinyin": "guìzhījiāsháoyào湯"
+      "englishName": "GuiZhiJiaShaoYaoTang"
     },
     {
       "id": 1755100000029,
@@ -432,7 +432,7 @@
       "indications": "太陽病誤下，腹滿大實痛者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.029Z",
-      "name_pinyin": "guìzhījiādàhuáng湯"
+      "englishName": "GuiZhiJiaDaHuangTang"
     },
     {
       "id": 1755100000030,
@@ -446,7 +446,7 @@
       "indications": "汗下後，病仍不解，煩躁者；亦治陽衰陰盛之煩躁，肢厥，脈微細",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.030Z",
-      "name_pinyin": "fúlíngsìnì湯"
+      "englishName": "FuLingSiNiTang"
     },
     {
       "id": 1755100000031,
@@ -460,7 +460,7 @@
       "indications": "下之後，復發汗，晝日煩躁不得眠，夜而安靜，不嘔不渴，無表證，脈沈微，身無大熱者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.031Z",
-      "name_pinyin": "gānjiāngfùzi湯"
+      "englishName": "GanJiangFuZiTang"
     },
     {
       "id": 1755100000032,
@@ -474,7 +474,7 @@
       "indications": "發汗過多，其人叉手自冒心，心下悸，欲得按者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.032Z",
-      "name_pinyin": "guìzhīgāncǎo湯"
+      "englishName": "GuiZhiGanCaoTang"
     },
     {
       "id": 1755100000033,
@@ -488,7 +488,7 @@
       "indications": "中陽不足，痰飲內停，胸脅支滿，目眩心悸，或短氣而咳，舌苔白滑，脈弦滑",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.033Z",
-      "name_pinyin": "fúlíngguìzhībái朮gāncǎo湯"
+      "englishName": "FuLingGuiZhiBaiShuGanCaoTang"
     },
     {
       "id": 1755100000034,
@@ -502,7 +502,7 @@
       "indications": "太陽病，外證未除，而數下之，遂協熱而利，利下不止，心下痞硬，表裏不解者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.034Z",
-      "name_pinyin": "guìzhīrén參湯"
+      "englishName": "GuiZhiRenShenTang"
     },
     {
       "id": 1755100000035,
@@ -516,7 +516,7 @@
       "indications": "發汗後，腹脹滿者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.035Z",
-      "name_pinyin": "hòupǔshēngjiāngbànxiàgāncǎorén參湯"
+      "englishName": "HouPuShengJiangBanXiaGanCaoRenShenTang"
     },
     {
       "id": 1755100000036,
@@ -530,7 +530,7 @@
       "indications": "傷寒下後，心煩腹滿，臥起不安者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.036Z",
-      "name_pinyin": "梔zihòupǔ湯"
+      "englishName": "ZhiZiHouPuTang"
     },
     {
       "id": 1755100000037,
@@ -544,7 +544,7 @@
       "indications": "傷寒，醫以丸藥大下之，身熱不去，微煩者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.037Z",
-      "name_pinyin": "梔zigānjiāng湯"
+      "englishName": "ZhiZiGanJiangTang"
     },
     {
       "id": 1755100000038,
@@ -558,7 +558,7 @@
       "indications": "傷寒脈浮，自汗出，小便數，心煩，微惡寒，腳攣急，反與桂枝欲攻其表，此誤也。得之便厥，咽中乾，煩躁吐逆者，作此湯與之，以復其陽",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.038Z",
-      "name_pinyin": "gāncǎogānjiāng湯"
+      "englishName": "GanCaoGanJiangTang"
     },
     {
       "id": 1755100000039,
@@ -572,7 +572,7 @@
       "indications": "發汗病不解，反惡寒者，虛故也",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.039Z",
-      "name_pinyin": "sháoyàogāncǎofùzi湯"
+      "englishName": "ShaoYaoGanCaoFuZiTang"
     },
     {
       "id": 1755100000040,
@@ -586,7 +586,7 @@
       "indications": "太陽病發汗太過，遂漏不止，其人惡風，小便難，四肢微急，難以屈伸者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.040Z",
-      "name_pinyin": "guìzhījiāfùzi湯"
+      "englishName": "GuiZhiJiaFuZiTang"
     },
     {
       "id": 1755100000041,
@@ -600,7 +600,7 @@
       "indications": "太陽病，下之後，脈促胸滿者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.041Z",
-      "name_pinyin": "guìzhīqùsháoyào湯"
+      "englishName": "GuiZhiQuShaoYaoTang"
     },
     {
       "id": 1755100000042,
@@ -614,7 +614,7 @@
       "indications": "太陽病，下之後，脈促胸滿，微惡寒者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.042Z",
-      "name_pinyin": "guìzhīqùsháoyàojiāfùzi湯"
+      "englishName": "GuiZhiQuShaoYaoJiaFuZiTang"
     },
     {
       "id": 1755100000043,
@@ -628,7 +628,7 @@
       "indications": "太陽病，得之八九日，如瘧狀，發熱惡寒，熱多寒少，其人不嘔，清便欲自可，一日二三度發。脈微緩者，為欲愈也；脈微而惡寒者，此陰陽俱虛，不可更發汗、更下、更吐也；面色反有熱色者，未欲解也，以其不能得小汗出，身必癢",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.043Z",
-      "name_pinyin": "guìzhīmáhuánggèbàn湯"
+      "englishName": "GuiZhiMaHuangGeBanTang"
     },
     {
       "id": 1755100000044,
@@ -642,7 +642,7 @@
       "indications": "服桂枝湯，大汗出，脈洪大者，與桂枝湯，如前法。若形似瘧，一日再發者，汗出必解",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.044Z",
-      "name_pinyin": "guìzhīèrmáhuángyī湯"
+      "englishName": "GuiZhiErMaHuangYiTang"
     },
     {
       "id": 1755100000045,
@@ -656,7 +656,7 @@
       "indications": "太陽病，發熱惡寒，熱多寒少，脈微弱者，此無陽也，不可發汗",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.045Z",
-      "name_pinyin": "guìzhīèryuèbìyī湯"
+      "englishName": "GuiZhiErYueBiYiTang"
     },
     {
       "id": 1755100000046,
@@ -670,7 +670,7 @@
       "indications": "傷寒六七日，發熱微惡寒，支節煩疼，微嘔，心下支結，外證未去者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.046Z",
-      "name_pinyin": "cháihúguìzhī湯"
+      "englishName": "ChaiHuGuiZhiTang"
     },
     {
       "id": 1755100000047,
@@ -684,7 +684,7 @@
       "indications": "傷寒八九日，下之，胸滿煩驚，小便不利，譫語，一身盡重，不可轉側者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.047Z",
-      "name_pinyin": "cháihújiālónggǔmǔlì湯"
+      "englishName": "ChaiHuJiaLongGuMuLiTang"
     },
     {
       "id": 1755100000048,
@@ -698,7 +698,7 @@
       "indications": "傷寒五六日，已發汗而復下之，胸脅滿微結，小便不利，渴而不嘔，但頭汗出，往來寒熱，心煩者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.048Z",
-      "name_pinyin": "cháihúguìzhīgānjiāng湯"
+      "englishName": "ChaiHuGuiZhiGanJiangTang"
     },
     {
       "id": 1755100000049,
@@ -712,7 +712,7 @@
       "indications": "梅核氣，咽中如有物阻，咯吐不出，吞咽不下，胸膈滿悶，或咳或嘔",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.049Z",
-      "name_pinyin": "bànxiàhòupǔ湯"
+      "englishName": "BanXiaHouPuTang"
     },
     {
       "id": 1755100000050,
@@ -726,7 +726,7 @@
       "indications": "胸痹，心中痞氣，氣結在胸，胸滿，脅下逆搶心",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.050Z",
-      "name_pinyin": "zhǐ實xièbáiguìzhī湯"
+      "englishName": "ZhiShiXieBaiGuiZhiTang"
     },
     {
       "id": 1755100000051,
@@ -740,7 +740,7 @@
       "indications": "傷寒六七日，大下後，寸脈沈而遲，手足厥逆，下部脈不至，喉咽不利，唾膿血，洩利不止者，為難治",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.051Z",
-      "name_pinyin": "máhuángshēngmá湯"
+      "englishName": "MaHuangShengMaTang"
     },
     {
       "id": 1755100000052,
@@ -754,7 +754,7 @@
       "indications": "血虛寒凝，手足厥寒，脈細欲絕，內有久寒，腹痛，嘔吐",
       "usage": "水煎服，清酒和水各半煎煮",
       "updatedAt": "2025-08-13T12:00:00.052Z",
-      "name_pinyin": "當歸sìnìjiā吳zhūyúshēngjiāng湯"
+      "englishName": "DangGuiSiNiJiaWuZhuYuShengJiangTang"
     },
     {
       "id": 1755100000053,
@@ -768,7 +768,7 @@
       "indications": "熱痢下重，腹痛，便膿血，渴欲飲水，肛門灼熱",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.053Z",
-      "name_pinyin": "báitóuwēng湯"
+      "englishName": "BaiTouWengTang"
     },
     {
       "id": 1755100000054,
@@ -782,7 +782,7 @@
       "indications": "下痢不止，便膿血，色暗不鮮，腹痛喜溫喜按，舌淡苔白，脈遲弱",
       "usage": "水煎服，赤石脂一半煎煮，一半研末沖服",
       "updatedAt": "2025-08-13T12:00:00.054Z",
-      "name_pinyin": "táohuā湯"
+      "englishName": "TaoHuaTang"
     },
     {
       "id": 1755100000055,
@@ -796,7 +796,7 @@
       "indications": "食穀欲嘔，屬陽明也；少陰病，吐利，手足逆冷，煩躁欲死；厥陰病，乾嘔，吐涎沫，頭痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.055Z",
-      "name_pinyin": "吳zhūyú湯"
+      "englishName": "WuZhuYuTang"
     },
     {
       "id": 1755100000056,
@@ -810,7 +810,7 @@
       "indications": "下血，先便後血，此遠血也，亦主吐血、衄血",
       "usage": "水煎服，竈心土先煎取澄清液，再煎他藥，阿膠烊化",
       "updatedAt": "2025-08-13T12:00:00.056Z",
-      "name_pinyin": "huángtǔ湯"
+      "englishName": "HuangTuTang"
     },
     {
       "id": 1755100000057,
@@ -824,7 +824,7 @@
       "indications": "吐血不止，面色萎黃，脈虛無力",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.057Z",
-      "name_pinyin": "bǎiyè湯"
+      "englishName": "BaiYeTang"
     },
     {
       "id": 1755100000058,
@@ -838,7 +838,7 @@
       "indications": "心氣不足，吐血、衄血，心下痞，按之濡，其脈關上浮者",
       "usage": "水煎服，或沸水浸泡絞汁服",
       "updatedAt": "2025-08-13T12:00:00.058Z",
-      "name_pinyin": "瀉xīn湯"
+      "englishName": "XieXinTang"
     },
     {
       "id": 1755100000059,
@@ -852,7 +852,7 @@
       "indications": "少陰病，二三日，咽痛者，可與甘草湯；不瘥者，與桔梗湯。亦治肺癰，咳而胸滿，振寒脈數，咽乾不渴，時出濁唾腥臭，久久吐膿如米粥者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.059Z",
-      "name_pinyin": "júgěng湯"
+      "englishName": "JuGengTang"
     },
     {
       "id": 1755100000060,
@@ -866,7 +866,7 @@
       "indications": "少陰病，咽中傷，生瘡，不能語言，聲不出者",
       "usage": "半夏與雞子清、苦酒（醋）同煮，含咽",
       "updatedAt": "2025-08-13T12:00:00.060Z",
-      "name_pinyin": "kǔjiǔ湯"
+      "englishName": "KuJiuTang"
     },
     {
       "id": 1755100000061,
@@ -880,7 +880,7 @@
       "indications": "少陰病，咽中痛",
       "usage": "散劑，白飲和服，或水煎服",
       "updatedAt": "2025-08-13T12:00:00.061Z",
-      "name_pinyin": "bànxiàsànjí湯"
+      "englishName": "BanXiaSanJiTang"
     },
     {
       "id": 1755100000062,
@@ -894,7 +894,7 @@
       "indications": "少陰病，咽痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.062Z",
-      "name_pinyin": "gāncǎo湯"
+      "englishName": "GanCaoTang"
     },
     {
       "id": 1755100000063,
@@ -908,7 +908,7 @@
       "indications": "少陰病，下利，咽痛，胸滿，心煩",
       "usage": "豬膚加水及白蜜、白粉熬香，和令相得，溫分六服",
       "updatedAt": "2025-08-13T12:00:00.063Z",
-      "name_pinyin": "zhūfū湯"
+      "englishName": "ZhuFuTang"
     },
     {
       "id": 1755100000064,
@@ -922,7 +922,7 @@
       "indications": "少陰病，下利，脈微者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.064Z",
-      "name_pinyin": "báitōng湯"
+      "englishName": "BaiTongTang"
     },
     {
       "id": 1755100000065,
@@ -936,7 +936,7 @@
       "indications": "少陰病，下利，脈微，與白通湯。利不止，厥逆無脈，乾嘔煩者",
       "usage": "水煎服，加入人尿、豬膽汁",
       "updatedAt": "2025-08-13T12:00:00.065Z",
-      "name_pinyin": "báitōngjiāzhūdǎnzhī湯"
+      "englishName": "BaiTongJiaZhuDanZhiTang"
     },
     {
       "id": 1755100000066,
@@ -950,7 +950,7 @@
       "indications": "少陰病，下利清穀，裏寒外熱，手足厥逆，脈微欲絕，身反不惡寒，其人面色赤，或腹痛，或乾嘔，或咽痛，或利止脈不出者",
       "usage": "水煎服，乾薑用量加倍",
       "updatedAt": "2025-08-13T12:00:00.066Z",
-      "name_pinyin": "tōngmàisìnì湯"
+      "englishName": "TongMaiSiNiTang"
     },
     {
       "id": 1755100000067,
@@ -964,7 +964,7 @@
       "indications": "吐已下斷，汗出而厥，四肢拘急不解，脈微欲絕者",
       "usage": "水煎服，加入豬膽汁",
       "updatedAt": "2025-08-13T12:00:00.067Z",
-      "name_pinyin": "tōngmàisìnìjiāzhūdǎnzhī湯"
+      "englishName": "TongMaiSiNiJiaZhuDanZhiTang"
     },
     {
       "id": 1755100000068,
@@ -978,7 +978,7 @@
       "indications": "惡寒脈微而復利，利止亡血也",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.068Z",
-      "name_pinyin": "sìnìjiārén參湯"
+      "englishName": "SiNiJiaRenShenTang"
     },
     {
       "id": 1755100000069,
@@ -992,7 +992,7 @@
       "indications": "傷寒汗出而渴者，五苓散主之；不渴者，茯苓甘草湯主之。心下悸，厥而心下悸者，宜先治水",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.069Z",
-      "name_pinyin": "fúlínggāncǎo湯"
+      "englishName": "FuLingGanCaoTang"
     },
     {
       "id": 1755100000070,
@@ -1006,7 +1006,7 @@
       "indications": "病在陽，應以汗解之，反以冷水潠之，若灌之，其熱被劫不得去，彌更益煩，肉上粟起，意欲飲水，反不渴者，服文蛤散",
       "usage": "散劑，以沸湯和服",
       "updatedAt": "2025-08-13T12:00:00.070Z",
-      "name_pinyin": "wénhásàn"
+      "englishName": "WenHaSan"
     },
     {
       "id": 1755100000071,
@@ -1020,7 +1020,7 @@
       "indications": "太陽中暍，身熱疼重，而脈微弱，此以夏月傷冷水，水行皮中所致也",
       "usage": "散劑，以香豉煎湯送服",
       "updatedAt": "2025-08-13T12:00:00.071Z",
-      "name_pinyin": "yīwùguādìsàn"
+      "englishName": "YiWuGuaDiSan"
     },
     {
       "id": 1755100000072,
@@ -1034,7 +1034,7 @@
       "indications": "傷寒陰陽易之為病，其人身體重、少氣、少腹裏急，或引陰中拘攣，熱上衝胸，頭重不欲舉，眼中生花，膝脛拘急者",
       "usage": "水沖服",
       "updatedAt": "2025-08-13T12:00:00.072Z",
-      "name_pinyin": "燒kūnsàn"
+      "englishName": "ShaoKunSan"
     },
     {
       "id": 1755100000073,
@@ -1048,7 +1048,7 @@
       "indications": "大病瘥後，從腰以下有水氣者",
       "usage": "散劑，白飲和服",
       "updatedAt": "2025-08-13T12:00:00.073Z",
-      "name_pinyin": "mǔlì澤瀉sàn"
+      "englishName": "MuLiZeXieSan"
     },
     {
       "id": 1755100000074,
@@ -1062,7 +1062,7 @@
       "indications": "大病瘥後勞復者",
       "usage": "水煎服，若有宿食，加大黃",
       "updatedAt": "2025-08-13T12:00:00.074Z",
-      "name_pinyin": "zhǐ實梔zishì湯"
+      "englishName": "ZhiShiZhiZiShiTang"
     },
     {
       "id": 1755100000075,
@@ -1076,7 +1076,7 @@
       "indications": "傷寒解後，虛羸少氣，氣逆欲吐",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.075Z",
-      "name_pinyin": "zhúyèshígāo湯"
+      "englishName": "ZhuYeShiGaoTang"
     },
     {
       "id": 1755100000076,
@@ -1090,7 +1090,7 @@
       "indications": "傷寒服湯藥，下利不止，心下痞硬。服瀉心湯已，復以他藥下之，利不止。醫以理中與之，利益甚。理中者，理中焦，此利在下焦",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.076Z",
-      "name_pinyin": "chìshízhīyǔyúliáng湯"
+      "englishName": "ChiShiZhiYuYuLiangTang"
     },
     {
       "id": 1755100000077,
@@ -1104,7 +1104,7 @@
       "indications": "腹中寒氣，雷鳴切痛，胸脅逆滿，嘔吐",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.077Z",
-      "name_pinyin": "fùzijīngmǐ湯"
+      "englishName": "FuZiJingMiTang"
     },
     {
       "id": 1755100000078,
@@ -1118,7 +1118,7 @@
       "indications": "心胸中大寒痛，嘔不能飲食，腹中寒，上衝皮起，出見有頭足，上下痛而不可觸近",
       "usage": "水煎服，飴糖烊化",
       "updatedAt": "2025-08-13T12:00:00.078Z",
-      "name_pinyin": "dàjiànzhōng湯"
+      "englishName": "DaJianZhongTang"
     },
     {
       "id": 1755100000079,
@@ -1132,7 +1132,7 @@
       "indications": "脅下偏痛，發熱，其脈緊弦，此寒也，以溫藥下之",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.079Z",
-      "name_pinyin": "dàhuángfùzi湯"
+      "englishName": "DaHuangFuZiTang"
     },
     {
       "id": 1755100000080,
@@ -1146,7 +1146,7 @@
       "indications": "寒疝腹中痛，及脅痛裏急者；產後腹中㽲痛，當歸生薑羊肉湯主之；並治虛勞不足",
       "usage": "水煮，溫服",
       "updatedAt": "2025-08-13T12:00:00.080Z",
-      "name_pinyin": "當歸shēngjiāngyángròu湯"
+      "englishName": "DangGuiShengJiangYangRouTang"
     },
     {
       "id": 1755100000081,
@@ -1160,7 +1160,7 @@
       "indications": "太陽病，其證備，身體強，幾幾然，脈反沈遲，此為痙",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.081Z",
-      "name_pinyin": "guālóuguìzhī湯"
+      "englishName": "GuaLouGuiZhiTang"
     },
     {
       "id": 1755100000082,
@@ -1174,7 +1174,7 @@
       "indications": "太陽與陽明合病，不下利，但嘔者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.082Z",
-      "name_pinyin": "gégēnjiābànxià湯"
+      "englishName": "GeGenJiaBanXiaTang"
     },
     {
       "id": 1755100000083,
@@ -1188,7 +1188,7 @@
       "indications": "太陽與少陽合病，自下利而嘔者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.083Z",
-      "name_pinyin": "huángqínjiābànxiàshēngjiāng湯"
+      "englishName": "HuangQinJiaBanXiaShengJiangTang"
     },
     {
       "id": 1755100000084,
@@ -1202,7 +1202,7 @@
       "indications": "燒針令其汗，針處被寒，核起而赤者，必發奔豚，氣從少腹上衝心者",
       "usage": "水煎服，桂枝加重用量",
       "updatedAt": "2025-08-13T12:00:00.084Z",
-      "name_pinyin": "guìzhījiāguì湯"
+      "englishName": "GuiZhiJiaGuiTang"
     },
     {
       "id": 1755100000085,
@@ -1216,7 +1216,7 @@
       "indications": "太陽病，下之微喘者，表未解故也；喘家作桂枝湯，加厚朴、杏子佳",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.085Z",
-      "name_pinyin": "guìzhījiāhòupǔxìngzi湯"
+      "englishName": "GuiZhiJiaHouPuXingZiTang"
     },
     {
       "id": 1755100000086,
@@ -1230,7 +1230,7 @@
       "indications": "太陽病，項背強幾幾，反汗出惡風者",
       "usage": "水煎服，先煮葛根",
       "updatedAt": "2025-08-13T12:00:00.086Z",
-      "name_pinyin": "guìzhījiāgégēn湯"
+      "englishName": "GuiZhiJiaGeGenTang"
     },
     {
       "id": 1755100000087,
@@ -1244,7 +1244,7 @@
       "indications": "服桂枝湯，或下之，仍頭項強痛，翕翕發熱，無汗，心下滿微痛，小便不利者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.087Z",
-      "name_pinyin": "guìzhīqùguìjiāfúlíngbái朮湯"
+      "englishName": "GuiZhiQuGuiJiaFuLingBaiShuTang"
     },
     {
       "id": 1755100000088,
@@ -1258,7 +1258,7 @@
       "indications": "發汗後，身疼痛，脈沈遲者",
       "usage": "水煎服，芍藥、生薑加重用量，加入人參",
       "updatedAt": "2025-08-13T12:00:00.088Z",
-      "name_pinyin": "guìzhīxīnjiā湯"
+      "englishName": "GuiZhiXinJiaTang"
     },
     {
       "id": 1755100000089,
@@ -1272,7 +1272,7 @@
       "indications": "傷寒十三日不解，胸脅滿而嘔，日晡所發潮熱，已而微利。此本柴胡證，下之以不得利，今反利者，知醫以丸藥下之，此非其治也。潮熱者，實也。先宜服小柴胡湯以解外，後以柴胡加芒硝湯主之",
       "usage": "水煎服，芒硝溶服",
       "updatedAt": "2025-08-13T12:00:00.089Z",
-      "name_pinyin": "cháihújiāmángxiāo湯"
+      "englishName": "ChaiHuJiaMangXiaoTang"
     },
     {
       "id": 1755100000090,
@@ -1286,7 +1286,7 @@
       "indications": "傷寒服湯藥，下利不止，心下痞硬。服瀉心湯已，復以他藥下之，利不止。醫以理中與之，利益甚。理中者，理中焦，此利在下焦，赤石脂禹餘糧湯主之。復不止者，當利其小便。（方證闕如，後世補遺）",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-13T12:00:00.090Z",
-      "name_pinyin": "yǔyúliángwán"
+      "englishName": "YuYuLiangWan"
     },
     {
       "id": 1755100000091,
@@ -1300,7 +1300,7 @@
       "indications": "除熱癱癇",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.091Z",
-      "name_pinyin": "fēngyǐn湯"
+      "englishName": "FengYinTang"
     },
     {
       "id": 1755100000092,
@@ -1314,7 +1314,7 @@
       "indications": "頭風",
       "usage": "外用法，為散，沐了，以方寸匕，已摩疾上，令藥力行",
       "updatedAt": "2025-08-13T12:00:00.092Z",
-      "name_pinyin": "tóufēngmósàn"
+      "englishName": "TouFengMoSan"
     },
     {
       "id": 1755100000093,
@@ -1328,7 +1328,7 @@
       "indications": "諸肢節疼痛，身體尪羸，腳腫如脫，頭眩短氣，溫溫欲吐",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.093Z",
-      "name_pinyin": "guìzhīsháoyàozhīmǔ湯"
+      "englishName": "GuiZhiShaoYaoZhiMuTang"
     },
     {
       "id": 1755100000094,
@@ -1342,7 +1342,7 @@
       "indications": "腳氣疼痛，不可屈伸；歷節不可屈伸疼痛",
       "usage": "水煎服，川烏先煎",
       "updatedAt": "2025-08-13T12:00:00.094Z",
-      "name_pinyin": "烏tóu湯"
+      "englishName": "WuTouTang"
     },
     {
       "id": 1755100000095,
@@ -1356,7 +1356,7 @@
       "indications": "血痹，陰陽俱微，寸口關上微，尺中小緊，外證身體不仁，如風痹狀",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.095Z",
-      "name_pinyin": "huángqíguìzhīwǔwù湯"
+      "englishName": "HuangQiGuiZhiWuWuTang"
     },
     {
       "id": 1755100000096,
@@ -1370,7 +1370,7 @@
       "indications": "少陰病始得之，反發熱，脈沈者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.096Z",
-      "name_pinyin": "máhuángxìxīnfùzi湯"
+      "englishName": "MaHuangXiXinFuZiTang"
     },
     {
       "id": 1755100000097,
@@ -1384,7 +1384,7 @@
       "indications": "少陰病，得之二三日，麻黃附子甘草湯微發汗，以二三日無證，故微發汗也",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.097Z",
-      "name_pinyin": "máhuángfùzigāncǎo湯"
+      "englishName": "MaHuangFuZiGanCaoTang"
     },
     {
       "id": 1755100000098,
@@ -1398,7 +1398,7 @@
       "indications": "發汗後，身疼痛，脈沈遲者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.098Z",
-      "name_pinyin": "guìzhījiāsháoyàoshēngjiāngrén參xīnjiā湯"
+      "englishName": "GuiZhiJiaShaoYaoShengJiangRenShenXinJiaTang"
     },
     {
       "id": 1755100000099,
@@ -1412,7 +1412,7 @@
       "indications": "氣分，心下堅，大如盤，邊如旋杯，水飲所作",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.099Z",
-      "name_pinyin": "guìzhīqùsháoyàojiāmáhuángfùzixìxīn湯"
+      "englishName": "GuiZhiQuShaoYaoJiaMaHuangFuZiXiXinTang"
     },
     {
       "id": 1755100000100,
@@ -1426,7 +1426,7 @@
       "indications": "傷寒脈浮，醫以火迫劫之，亡陽，必驚狂，臥起不安者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.100Z",
-      "name_pinyin": "guìzhīqùsháoyàojiāshǔqīmǔlìlónggǔjiùnì湯"
+      "englishName": "GuiZhiQuShaoYaoJiaShuQiMuLiLongGuJiuNiTang"
     },
     {
       "id": 1755100000101,
@@ -1440,7 +1440,7 @@
       "indications": "火逆下之，因燒針煩躁者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.101Z",
-      "name_pinyin": "guìzhīgāncǎolónggǔmǔlì湯"
+      "englishName": "GuiZhiGanCaoLongGuMuLiTang"
     },
     {
       "id": 1755100000102,
@@ -1454,7 +1454,7 @@
       "indications": "小結胸病，正在心下，按之則痛，脈浮滑者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.102Z",
-      "name_pinyin": "xiǎoxiànxiōng湯"
+      "englishName": "XiaoXianXiongTang"
     },
     {
       "id": 1755100000103,
@@ -1468,7 +1468,7 @@
       "indications": "結胸熱實，脈沈而緊，心下痛，按之石硬者",
       "usage": "水煎服，甘遂研末沖服",
       "updatedAt": "2025-08-13T12:00:00.103Z",
-      "name_pinyin": "dàxiànxiōng湯"
+      "englishName": "DaXianXiongTang"
     },
     {
       "id": 1755100000104,
@@ -1482,7 +1482,7 @@
       "indications": "結胸者，項亦強，如柔痙狀，下之則和",
       "usage": "丸劑，煮服",
       "updatedAt": "2025-08-13T12:00:00.104Z",
-      "name_pinyin": "dàxiànxiōngwán"
+      "englishName": "DaXianXiongWan"
     },
     {
       "id": 1755100000105,
@@ -1496,7 +1496,7 @@
       "indications": "懸飲，咳唾胸脅引痛，心下痞硬，乾嘔短氣，頭痛目眩，胸背掣痛不得息",
       "usage": "三藥為末，棗湯送服",
       "updatedAt": "2025-08-13T12:00:00.105Z",
-      "name_pinyin": "shí棗湯"
+      "englishName": "ShiZaoTang"
     },
     {
       "id": 1755100000106,
@@ -1510,7 +1510,7 @@
       "indications": "寒實結胸，無熱證者",
       "usage": "散劑，白飲和服",
       "updatedAt": "2025-08-13T12:00:00.106Z",
-      "name_pinyin": "sānwùxiǎobáisàn"
+      "englishName": "SanWuXiaoBaiSan"
     },
     {
       "id": 1755100000107,
@@ -1524,7 +1524,7 @@
       "indications": "太陽病，身黃，脈沈結，少腹硬，小便不利，為無血也；小便自利，其人如狂者，血證諦也",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.107Z",
-      "name_pinyin": "dǐ當湯"
+      "englishName": "DiDangTang"
     },
     {
       "id": 1755100000108,
@@ -1538,7 +1538,7 @@
       "indications": "傷寒有熱，少腹滿，應小便不利，今反利者，為有血也，當下之，不可餘藥，宜抵當丸",
       "usage": "丸劑，煮服",
       "updatedAt": "2025-08-13T12:00:00.108Z",
-      "name_pinyin": "dǐ當wán"
+      "englishName": "DiDangWan"
     },
     {
       "id": 1755100000109,
@@ -1552,7 +1552,7 @@
       "indications": "太陽病不解，熱結膀胱，其人如狂，血自下，下者愈。其外不解者，尚未可攻，當先解其外；外解已，但少腹急結者，乃可攻之，宜桃核承氣湯",
       "usage": "水煎服，芒硝溶服",
       "updatedAt": "2025-08-13T12:00:00.109Z",
-      "name_pinyin": "táohéchéng氣湯"
+      "englishName": "TaoHeChengQiTang"
     },
     {
       "id": 1755100000110,
@@ -1566,7 +1566,7 @@
       "indications": "腎著之病，其人身體重，腰中冷，如坐水中，形如水狀，反不渴，小便自利，飲食如故，病屬下焦，身勞汗出，衣裏冷濕，久久得之，腰以下冷痛，腹重如帶五千錢",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.110Z",
-      "name_pinyin": "gāncǎogānjiāngfúlíngbái朮湯"
+      "englishName": "GanCaoGanJiangFuLingBaiShuTang"
     },
     {
       "id": 1755100000111,
@@ -1580,7 +1580,7 @@
       "indications": "心下堅，大如盤，邊如旋盤，水飲所作",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.111Z",
-      "name_pinyin": "zhǐ朮湯"
+      "englishName": "ZhiShuTang"
     },
     {
       "id": 1755100000112,
@@ -1594,7 +1594,7 @@
       "indications": "風濕脈浮身重，汗出惡風者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.112Z",
-      "name_pinyin": "fángjǐhuángqí湯"
+      "englishName": "FangJiHuangQiTang"
     },
     {
       "id": 1755100000113,
@@ -1608,7 +1608,7 @@
       "indications": "皮水為病，四肢腫，水氣在皮膚中，四肢聶聶動者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.113Z",
-      "name_pinyin": "fángjǐfúlíng湯"
+      "englishName": "FangJiFuLingTang"
     },
     {
       "id": 1755100000114,
@@ -1622,7 +1622,7 @@
       "indications": "風水惡風，一身悉腫，脈浮不渴，續自汗出，無大熱",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.114Z",
-      "name_pinyin": "yuèbì湯"
+      "englishName": "YueBiTang"
     },
     {
       "id": 1755100000115,
@@ -1636,7 +1636,7 @@
       "indications": "裏水，一身面目黃腫，其脈沈，小便不利",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.115Z",
-      "name_pinyin": "yuèbìjiā朮湯"
+      "englishName": "YueBiJiaShuTang"
     },
     {
       "id": 1755100000116,
@@ -1650,7 +1650,7 @@
       "indications": "咳而上氣，此為肺脹，其人喘，目如脫狀，脈浮大者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.116Z",
-      "name_pinyin": "yuèbìjiābànxià湯"
+      "englishName": "YueBiJiaBanXiaTang"
     },
     {
       "id": 1755100000117,
@@ -1664,7 +1664,7 @@
       "indications": "肺脹，咳而上氣，煩躁而喘，脈浮者，心下有水氣",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.117Z",
-      "name_pinyin": "xiǎoqīnglóngjiāshígāo湯"
+      "englishName": "XiaoQingLongJiaShiGaoTang"
     },
     {
       "id": 1755100000118,
@@ -1678,7 +1678,7 @@
       "indications": "咳而上氣，喉中水雞聲",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.118Z",
-      "name_pinyin": "shègānmáhuáng湯"
+      "englishName": "SheGanMaHuangTang"
     },
     {
       "id": 1755100000119,
@@ -1692,7 +1692,7 @@
       "indications": "咳而脈浮者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.119Z",
-      "name_pinyin": "hòupǔmáhuáng湯"
+      "englishName": "HouPuMaHuangTang"
     },
     {
       "id": 1755100000120,
@@ -1706,7 +1706,7 @@
       "indications": "咳而脈沈者",
       "usage": "水煎服，澤漆先煎",
       "updatedAt": "2025-08-13T12:00:00.120Z",
-      "name_pinyin": "澤qī湯"
+      "englishName": "ZeQiTang"
     },
     {
       "id": 1755100000121,
@@ -1720,7 +1720,7 @@
       "indications": "大逆上氣，咽喉不利，止逆下氣者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.121Z",
-      "name_pinyin": "màiméndōng湯"
+      "englishName": "MaiMenDongTang"
     },
     {
       "id": 1755100000122,
@@ -1734,7 +1734,7 @@
       "indications": "肺癰，喘不得臥；支飲不得息",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.122Z",
-      "name_pinyin": "tínglìdà棗瀉fèi湯"
+      "englishName": "TingLiDaZaoXieFeiTang"
     },
     {
       "id": 1755100000123,
@@ -1748,7 +1748,7 @@
       "indications": "咳而胸滿，振寒脈數，咽乾不渴，時出濁唾腥臭，久久吐膿如米粥者，為肺癰",
       "usage": "散劑，強人飲服半錢匕",
       "updatedAt": "2025-08-13T12:00:00.123Z",
-      "name_pinyin": "júgěngbáisàn"
+      "englishName": "JuGengBaiSan"
     },
     {
       "id": 1755100000124,
@@ -1762,7 +1762,7 @@
       "indications": "肺痿吐涎沫",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.124Z",
-      "name_pinyin": "guìzhīqùsháoyàojiāzàojiá湯"
+      "englishName": "GuiZhiQuShaoYaoJiaZaoJiaTang"
     },
     {
       "id": 1755100000125,
@@ -1776,7 +1776,7 @@
       "indications": "衝氣即低，而反更咳胸滿者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.125Z",
-      "name_pinyin": "línggānwǔwèijiāngxīn湯"
+      "englishName": "LingGanWuWeiJiangXinTang"
     },
     {
       "id": 1755100000126,
@@ -1790,7 +1790,7 @@
       "indications": "水去嘔止，其人形腫者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.126Z",
-      "name_pinyin": "línggānwǔwèijiājiāngxīnbànxiàxìngrén湯"
+      "englishName": "LingGanWuWeiJiaJiangXinBanXiaXingRenTang"
     },
     {
       "id": 1755100000127,
@@ -1804,7 +1804,7 @@
       "indications": "面熱如醉，此為胃熱上衝熏其面",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.127Z",
-      "name_pinyin": "línggānwǔwèijiājiāngxīnbànxìngdàhuáng湯"
+      "englishName": "LingGanWuWeiJiaJiangXinBanXingDaHuangTang"
     },
     {
       "id": 1755100000128,
@@ -1818,7 +1818,7 @@
       "indications": "奔豚氣上衝胸，腹痛，往來寒熱",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.128Z",
-      "name_pinyin": "bēntún湯"
+      "englishName": "BenTunTang"
     },
     {
       "id": 1755100000129,
@@ -1832,7 +1832,7 @@
       "indications": "小便不利者，有水氣，其人苦渴",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-13T12:00:00.129Z",
-      "name_pinyin": "guālóuqúmàiwán"
+      "englishName": "GuaLouQuMaiWan"
     },
     {
       "id": 1755100000130,
@@ -1846,7 +1846,7 @@
       "indications": "小便不利",
       "usage": "散劑，飲服方寸匕",
       "updatedAt": "2025-08-13T12:00:00.130Z",
-      "name_pinyin": "púhuīsàn"
+      "englishName": "PuHuiSan"
     },
     {
       "id": 1755100000131,
@@ -1860,7 +1860,7 @@
       "indications": "小便不利",
       "usage": "散劑，飲服方寸匕",
       "updatedAt": "2025-08-13T12:00:00.131Z",
-      "name_pinyin": "huáshíbáiyúsàn"
+      "englishName": "HuaShiBaiYuSan"
     },
     {
       "id": 1755100000132,
@@ -1874,7 +1874,7 @@
       "indications": "小便不利",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.132Z",
-      "name_pinyin": "fúlíngróngyán湯"
+      "englishName": "FuLingRongYanTang"
     },
     {
       "id": 1755100000133,
@@ -1888,7 +1888,7 @@
       "indications": "服桂枝湯，大汗出後，大煩渴不解，脈洪大者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.133Z",
-      "name_pinyin": "báihǔjiārù參湯"
+      "englishName": "BaiHuJiaRuShenTang"
     },
     {
       "id": 1755100000134,
@@ -1902,7 +1902,7 @@
       "indications": "百合病發汗後者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.134Z",
-      "name_pinyin": "bǎihézhīmǔ湯"
+      "englishName": "BaiHeZhiMuTang"
     },
     {
       "id": 1755100000135,
@@ -1916,7 +1916,7 @@
       "indications": "百合病下之後者",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.135Z",
-      "name_pinyin": "huáshídàizhě湯"
+      "englishName": "HuaShiDaiZheTang"
     },
     {
       "id": 1755100000136,
@@ -1930,7 +1930,7 @@
       "indications": "百合病吐之後者",
       "usage": "水煎服，雞子黃攪勻兌服",
       "updatedAt": "2025-08-13T12:00:00.136Z",
-      "name_pinyin": "bǎihéjīzi湯"
+      "englishName": "BaiHeJiZiTang"
     },
     {
       "id": 1755100000137,
@@ -1944,7 +1944,7 @@
       "indications": "百合病不經吐、下、發汗，病形如初者",
       "usage": "水煎服，地黃汁兌服",
       "updatedAt": "2025-08-13T12:00:00.137Z",
-      "name_pinyin": "bǎihédehuáng湯"
+      "englishName": "BaiHeDeHuangTang"
     },
     {
       "id": 1755100000138,
@@ -1958,7 +1958,7 @@
       "indications": "百合病一月不解，變成渴者",
       "usage": "以百合一升，以水一斗，漬之一宿，以洗身。洗已，食煮餅，勿以鹽豉也",
       "updatedAt": "2025-08-13T12:00:00.138Z",
-      "name_pinyin": "bǎihéxǐfāng"
+      "englishName": "BaiHeXiFang"
     },
     {
       "id": 1755100000139,
@@ -1972,7 +1972,7 @@
       "indications": "百合病渴不差者",
       "usage": "散劑，飲服方寸匕",
       "updatedAt": "2025-08-13T12:00:00.139Z",
-      "name_pinyin": "guālóumǔlìsàn"
+      "englishName": "GuaLouMuLiSan"
     },
     {
       "id": 1755100000140,
@@ -1986,7 +1986,7 @@
       "indications": "百合病變發熱者",
       "usage": "散劑，飲服方寸匕",
       "updatedAt": "2025-08-13T12:00:00.140Z",
-      "name_pinyin": "bǎihéhuáshísàn"
+      "englishName": "BaiHeHuaShiSan"
     },
     {
       "id": 1755100000141,
@@ -2000,7 +2000,7 @@
       "indications": "婦人臟躁，喜悲傷欲哭，象如神靈所作，數欠伸",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.141Z",
-      "name_pinyin": "gāncǎoxiǎomàidà棗湯"
+      "englishName": "GanCaoXiaoMaiDaZaoTang"
     },
     {
       "id": 1755100000142,
@@ -2014,7 +2014,7 @@
       "indications": "虛勞虛煩不得眠",
       "usage": "水煎服",
       "updatedAt": "2025-08-13T12:00:00.142Z",
-      "name_pinyin": "suān棗rén湯"
+      "englishName": "SuanZaoRenTang"
     },
     {
       "id": 1755100000143,
@@ -2028,7 +2028,7 @@
       "indications": "五勞虛極羸瘦，腹滿不能飲食，食傷、憂傷、飲傷、房室傷、飢傷、勞傷、經絡營衛氣傷，內有乾血，肌膚甲錯，兩目黯黑",
       "usage": "丸劑，酒飲服",
       "updatedAt": "2025-08-13T12:00:00.143Z",
-      "name_pinyin": "dàhuáng䗪chóngwán"
+      "englishName": "DaHuangZheChongWan"
     },
     {
       "id": 1755200000001,
@@ -2042,7 +2042,7 @@
       "indications": "傷寒脈浮，醫以火迫劫之，亡陽，驚狂，臥起不安者",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.001Z",
-      "name_pinyin": "guìzhīqùsháoyàojiāshǔqīlónggǔmǔlìjiùnì湯"
+      "englishName": "GuiZhiQuShaoYaoJiaShuQiLongGuMuLiJiuNiTang"
     },
     {
       "id": 1755200000002,
@@ -2056,7 +2056,7 @@
       "indications": "發汗後，臍下悸者，欲作奔豚",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.002Z",
-      "name_pinyin": "fúlíngguìzhīgāncǎodà棗湯"
+      "englishName": "FuLingGuiZhiGanCaoDaZaoTang"
     },
     {
       "id": 1755200000004,
@@ -2070,7 +2070,7 @@
       "indications": "傷寒八九日，風濕相搏，身體疼煩，不能自轉側，不嘔不渴，脈浮虛而澀者",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.004Z",
-      "name_pinyin": "guìzhīfùzi湯"
+      "englishName": "GuiZhiFuZiTang"
     },
     {
       "id": 1755200000005,
@@ -2084,7 +2084,7 @@
       "indications": "風濕相搏，骨節疼煩，掣痛不得屈伸，近之則痛劇，汗出短氣，小便不利，惡風不欲去衣，或身微腫者",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.005Z",
-      "name_pinyin": "gāncǎofùzi湯"
+      "englishName": "GanCaoFuZiTang"
     },
     {
       "id": 1755200000006,
@@ -2098,7 +2098,7 @@
       "indications": "溫瘧，其脈如平，身無寒但熱，骨節疼煩，時嘔",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.006Z",
-      "name_pinyin": "báihǔjiāguìzhī湯"
+      "englishName": "BaiHuJiaGuiZhiTang"
     },
     {
       "id": 1755200000007,
@@ -2112,7 +2112,7 @@
       "indications": "心下痞，而復惡寒汗出者",
       "usage": "水煎服，附子另煎兌入",
       "updatedAt": "2025-08-14T12:00:00.007Z",
-      "name_pinyin": "fùzi瀉xīn湯"
+      "englishName": "FuZiXieXinTang"
     },
     {
       "id": 1755200000010,
@@ -2126,7 +2126,7 @@
       "indications": "傷寒胸中有熱，胃中有邪氣，腹中痛，欲嘔吐者",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.010Z",
-      "name_pinyin": "huánglián湯"
+      "englishName": "HuangLianTang"
     },
     {
       "id": 1755200000013,
@@ -2140,7 +2140,7 @@
       "indications": "病者一身盡疼，發熱，日晡所劇者，名風濕",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.013Z",
-      "name_pinyin": "máhuángxìngrényìyǐgāncǎo湯"
+      "englishName": "MaHuangXingRenYiYiGanCaoTang"
     },
     {
       "id": 1755200000014,
@@ -2154,7 +2154,7 @@
       "indications": "風濕歷節，驚狂不安，言行妄為者",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.014Z",
-      "name_pinyin": "fángjǐdehuáng湯"
+      "englishName": "FangJiDeHuangTang"
     },
     {
       "id": 1755200000015,
@@ -2168,7 +2168,7 @@
       "indications": "黃汗，身體腫，發熱汗出而渴，狀如風水，汗霑衣，色正黃如柏汁，脈沈",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.015Z",
-      "name_pinyin": "guìzhījiāhuángqí湯"
+      "englishName": "GuiZhiJiaHuangQiTang"
     },
     {
       "id": 1755200000016,
@@ -2182,7 +2182,7 @@
       "indications": "黃汗病，身體腫，發熱汗出而渴，狀如風水，汗霑衣，色正黃如柏汁，脈自沈",
       "usage": "水煎服，用苦酒（醋）和水煎煮",
       "updatedAt": "2025-08-14T12:00:00.016Z",
-      "name_pinyin": "huángqísháoyàoguìzhīkǔjiǔ湯"
+      "englishName": "HuangQiShaoYaoGuiZhiKuJiuTang"
     },
     {
       "id": 1755200000017,
@@ -2196,7 +2196,7 @@
       "indications": "夫失精家，少腹弦急，陰頭寒，目眩發落，脈極虛芤遲，為清穀亡血失精，脈得諸芤動微緊，男子失精，女子夢交",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.017Z",
-      "name_pinyin": "guìzhījiālónggǔmǔlì湯"
+      "englishName": "GuiZhiJiaLongGuMuLiTang"
     },
     {
       "id": 1755200000018,
@@ -2210,7 +2210,7 @@
       "indications": "男子失精，腰膝冷痛",
       "usage": "散劑，酒服",
       "updatedAt": "2025-08-14T12:00:00.018Z",
-      "name_pinyin": "tiānxióngsàn"
+      "englishName": "TianXiongSan"
     },
     {
       "id": 1755200000019,
@@ -2224,7 +2224,7 @@
       "indications": "虛勞諸不足，風氣百疾",
       "usage": "丸劑，酒服",
       "updatedAt": "2025-08-14T12:00:00.019Z",
-      "name_pinyin": "shǔyùwán"
+      "englishName": "ShuYuWan"
     },
     {
       "id": 1755200000046,
@@ -2238,7 +2238,7 @@
       "indications": "冷勞，又主鬼疰一門相染",
       "usage": "散劑，飲服方寸匕",
       "updatedAt": "2025-08-14T12:00:00.046Z",
-      "name_pinyin": "獺gānsàn"
+      "englishName": "TaGanSan"
     },
     {
       "id": 1755200001001,
@@ -2252,7 +2252,7 @@
       "indications": "溫病初起，發熱無汗，或有汗不暢，微惡風寒，頭痛口渴，咳嗽咽痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.101Z",
-      "name_pinyin": "yínqiàosàn"
+      "englishName": "YinQiaoSan"
     },
     {
       "id": 1755200001002,
@@ -2266,7 +2266,7 @@
       "indications": "風溫初起，咳嗽，身熱不甚，口微渴",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.102Z",
-      "name_pinyin": "sāngjúyǐn"
+      "englishName": "SangJuYin"
     },
     {
       "id": 1755200001003,
@@ -2280,7 +2280,7 @@
       "indications": "外感風寒，內傷濕滯，頭痛昏重，胸膈痞悶，脘腹脹痛，嘔吐洩瀉",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.103Z",
-      "name_pinyin": "huòxiāngzhèng氣sàn"
+      "englishName": "HuoXiangZhengQiSan"
     },
     {
       "id": 1755200001004,
@@ -2294,7 +2294,7 @@
       "indications": "濕滯脾胃，脘腹脹滿，不思飲食，口淡無味，嘔噦惡心，噯氣吞酸，肢體沈重",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.104Z",
-      "name_pinyin": "píngwèisàn"
+      "englishName": "PingWeiSan"
     },
     {
       "id": 1755200001005,
@@ -2308,7 +2308,7 @@
       "indications": "濕痰咳嗽，痰多色白，胸膈痞悶，惡心嘔吐，肢體困倦",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.105Z",
-      "name_pinyin": "èrchén湯"
+      "englishName": "ErChenTang"
     },
     {
       "id": 1755200001006,
@@ -2322,7 +2322,7 @@
       "indications": "食積停滯，脘腹脹滿，噯腐吞酸，厭食嘔吐，大便洩瀉",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-14T12:00:00.106Z",
-      "name_pinyin": "bǎohéwán"
+      "englishName": "BaoHeWan"
     },
     {
       "id": 1755200001007,
@@ -2336,7 +2336,7 @@
       "indications": "營血虛滯，心悸失眠，頭暈目眩，面色無華，婦人月經不調，臍腹作痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.107Z",
-      "name_pinyin": "sìwù湯"
+      "englishName": "SiWuTang"
     },
     {
       "id": 1755200001008,
@@ -2350,7 +2350,7 @@
       "indications": "心脾兩虛，心悸怔忡，健忘失眠，盜汗虛熱，食少體倦，面色萎黃",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.108Z",
-      "name_pinyin": "歸pí湯"
+      "englishName": "GuiPiTang"
     },
     {
       "id": 1755200001009,
@@ -2364,7 +2364,7 @@
       "indications": "腎陰虧虛，腰膝酸軟，頭暈目眩，耳鳴耳聾，盜汗遺精，骨蒸潮熱",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-14T12:00:00.109Z",
-      "name_pinyin": "liùwèidehuángwán"
+      "englishName": "LiuWeiDeHuangWan"
     },
     {
       "id": 1755200001010,
@@ -2378,7 +2378,7 @@
       "indications": "肝腎陰虛，肝氣不舒，胸脘脅痛，吞酸吐苦，咽乾口燥",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.110Z",
-      "name_pinyin": "yīguànjiān"
+      "englishName": "YiGuanJian"
     },
     {
       "id": 1755200001011,
@@ -2392,7 +2392,7 @@
       "indications": "胸中血瘀，頭痛胸痛，心悸失眠，急躁易怒，入暮潮熱",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.111Z",
-      "name_pinyin": "xuèfǔzhúyū湯"
+      "englishName": "XueFuZhuYuTang"
     },
     {
       "id": 1755200001012,
@@ -2406,7 +2406,7 @@
       "indications": "中風後遺症，半身不遂，口眼喎斜，語言謇澀，口角流涎",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.112Z",
-      "name_pinyin": "bǔyángháiwǔ湯"
+      "englishName": "BuYangHaiWuTang"
     },
     {
       "id": 1755200001013,
@@ -2420,7 +2420,7 @@
       "indications": "氣陰兩虛，汗多神疲，體倦乏力，氣短懶言，咽乾口渴",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.113Z",
-      "name_pinyin": "shēngmàisàn"
+      "englishName": "ShengMaiSan"
     },
     {
       "id": 1755200001014,
@@ -2434,7 +2434,7 @@
       "indications": "表虛自汗，易感風邪，面色㿠白",
       "usage": "散劑，溫開水送服",
       "updatedAt": "2025-08-14T12:00:00.114Z",
-      "name_pinyin": "yùpíngfēngsàn"
+      "englishName": "YuPingFengSan"
     },
     {
       "id": 1755200001015,
@@ -2448,7 +2448,7 @@
       "indications": "外感風邪頭痛，偏正頭痛，或巔頂作痛，惡寒發熱，目眩鼻塞",
       "usage": "散劑，清茶調服",
       "updatedAt": "2025-08-14T12:00:00.115Z",
-      "name_pinyin": "chuānqiōngchádiàosàn"
+      "englishName": "ChuanQiongChaDiaoSan"
     },
     {
       "id": 1755200001016,
@@ -2462,7 +2462,7 @@
       "indications": "風疹濕疹，皮膚瘙癢，疹出色紅，抓破後滲出水液",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.116Z",
-      "name_pinyin": "xiāofēngsàn"
+      "englishName": "XiaoFengSan"
     },
     {
       "id": 1755200001017,
@@ -2476,7 +2476,7 @@
       "indications": "肝膽實火上炎，頭痛目赤，脅痛口苦，耳聾耳腫；肝經濕熱下注，陰腫陰癢，小便淋濁，婦女帶下",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.117Z",
-      "name_pinyin": "lóngdǎn瀉gān湯"
+      "englishName": "LongDanXieGanTang"
     },
     {
       "id": 1755200001018,
@@ -2490,7 +2490,7 @@
       "indications": "肺熱喘咳，皮膚蒸熱，日晡尤甚",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.118Z",
-      "name_pinyin": "瀉báisàn"
+      "englishName": "XieBaiSan"
     },
     {
       "id": 1755200001019,
@@ -2504,7 +2504,7 @@
       "indications": "胃火牙痛，牙齦紅腫潰爛，口氣熱臭，口乾舌燥",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.119Z",
-      "name_pinyin": "qīngwèisàn"
+      "englishName": "QingWeiSan"
     },
     {
       "id": 1755200001020,
@@ -2518,7 +2518,7 @@
       "indications": "濕熱痢疾，腹痛便膿血，赤白相兼，裏急後重",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.120Z",
-      "name_pinyin": "sháoyào湯"
+      "englishName": "ShaoYaoTang"
     },
     {
       "id": 1755200001021,
@@ -2532,7 +2532,7 @@
       "indications": "濕熱淋證，尿頻尿急，溺時澀痛，淋瀝不暢，小便渾赤，甚則癃閉不通",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.121Z",
-      "name_pinyin": "bāzhèngsàn"
+      "englishName": "BaZhengSan"
     },
     {
       "id": 1755200001022,
@@ -2546,7 +2546,7 @@
       "indications": "脾虛濕盛，皮水，一身悉腫，肢體沈重，心腹脹滿，上氣喘急",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.122Z",
-      "name_pinyin": "wǔpísàn"
+      "englishName": "WuPiSan"
     },
     {
       "id": 1755200001023,
@@ -2560,7 +2560,7 @@
       "indications": "脾腎陽虛，水氣內停，身半以下腫甚，胸腹脹滿，手足不溫，口中不渴，大便溏薄",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.123Z",
-      "name_pinyin": "實písàn"
+      "englishName": "ShiPiSan"
     },
     {
       "id": 1755200001024,
@@ -2574,7 +2574,7 @@
       "indications": "下焦虛寒，小便白濁，頻數無度，白如米泔，凝如膏糊",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.124Z",
-      "name_pinyin": "bìxièfēnqīngyǐn"
+      "englishName": "BiXieFenQingYin"
     },
     {
       "id": 1755200001025,
@@ -2588,7 +2588,7 @@
       "indications": "風濕在表，肩背痛不可回顧，頭痛身重，或腰脊疼痛，難以轉側",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.125Z",
-      "name_pinyin": "qiānghuó勝濕湯"
+      "englishName": "QiangHuoShengShiTang"
     },
     {
       "id": 1755200001026,
@@ -2602,7 +2602,7 @@
       "indications": "痹證日久，肝腎兩虧，氣血不足，腰膝疼痛，肢節屈伸不利，麻木不仁",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.126Z",
-      "name_pinyin": "獨huójìshēng湯"
+      "englishName": "DuHuoJiShengTang"
     },
     {
       "id": 1755200001027,
@@ -2616,7 +2616,7 @@
       "indications": "風痰上擾，眩暈頭痛，胸膈痞悶，惡心嘔吐",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.127Z",
-      "name_pinyin": "bànxiàbái朮tiānmá湯"
+      "englishName": "BanXiaBaiShuTianMaTang"
     },
     {
       "id": 1755200001028,
@@ -2630,7 +2630,7 @@
       "indications": "類中風，頭目眩暈，目脹耳鳴，腦部熱痛，心中煩熱，面色如醉",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.128Z",
-      "name_pinyin": "zhèngānxīfēng湯"
+      "englishName": "ZhenGanXiFengTang"
     },
     {
       "id": 1755200001029,
@@ -2644,7 +2644,7 @@
       "indications": "肝陽偏亢，肝風上擾，頭痛眩暈，失眠多夢",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.129Z",
-      "name_pinyin": "tiānmágōuténgyǐn"
+      "englishName": "TianMaGouTengYin"
     },
     {
       "id": 1755200001030,
@@ -2658,7 +2658,7 @@
       "indications": "溫病熱邪久羈，熱灼真陰，虛風內動，手足瘛瘲，脈氣虛弱",
       "usage": "水煎服，雞子黃攪勻兌服",
       "updatedAt": "2025-08-14T12:00:00.130Z",
-      "name_pinyin": "dàdìngfēngzhū"
+      "englishName": "DaDingFengZhu"
     },
     {
       "id": 1755200001031,
@@ -2672,7 +2672,7 @@
       "indications": "外感涼燥，頭微痛，惡寒無汗，咳嗽痰稀，鼻塞咽乾",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.131Z",
-      "name_pinyin": "xìngsūsàn"
+      "englishName": "XingSuSan"
     },
     {
       "id": 1755200001032,
@@ -2686,7 +2686,7 @@
       "indications": "溫燥傷肺，頭痛身熱，乾咳無痰，氣逆而喘，咽喉乾燥，心煩口渴",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.132Z",
-      "name_pinyin": "qīngzàojiùfèi湯"
+      "englishName": "QingZaoJiuFeiTang"
     },
     {
       "id": 1755200001033,
@@ -2700,7 +2700,7 @@
       "indications": "白喉，喉間起白如腐，不易撥去，咽喉腫痛，鼻乾唇燥",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.133Z",
-      "name_pinyin": "yǎngyīnqīngfèi湯"
+      "englishName": "YangYinQingFeiTang"
     },
     {
       "id": 1755200001034,
@@ -2714,7 +2714,7 @@
       "indications": "肺腎陰虧，虛火上炎，咽喉燥痛，咳嗽氣喘，痰中帶血",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.134Z",
-      "name_pinyin": "bǎihégùjīn湯"
+      "englishName": "BaiHeGuJinTang"
     },
     {
       "id": 1755200001035,
@@ -2728,7 +2728,7 @@
       "indications": "肺腎陰虛，咳嗽喘逆，潮熱盜汗",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-14T12:00:00.135Z",
-      "name_pinyin": "màiwèidehuángwán"
+      "englishName": "MaiWeiDeHuangWan"
     },
     {
       "id": 1755200001036,
@@ -2742,7 +2742,7 @@
       "indications": "腎陽不足，命門火衰，年老或久病氣衰神疲，畏寒肢冷，陽痿遺精，大便不實",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-14T12:00:00.136Z",
-      "name_pinyin": "yòu歸wán"
+      "englishName": "YouGuiWan"
     },
     {
       "id": 1755200001037,
@@ -2756,7 +2756,7 @@
       "indications": "喑痱證，舌強不能言，足廢不能用，口乾不欲飲",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.137Z",
-      "name_pinyin": "dehuángyǐnzi"
+      "englishName": "DeHuangYinZi"
     },
     {
       "id": 1755200001038,
@@ -2770,7 +2770,7 @@
       "indications": "腎虛精關不固，遺精滑洩，神疲乏力，四肢酸軟，腰痛耳鳴",
       "usage": "丸劑，鹽湯送下",
       "updatedAt": "2025-08-14T12:00:00.138Z",
-      "name_pinyin": "jīnsuǒgùjīngwán"
+      "englishName": "JinSuoGuJingWan"
     },
     {
       "id": 1755200001039,
@@ -2784,7 +2784,7 @@
       "indications": "下元虛冷，小便頻數，小兒遺尿",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-14T12:00:00.139Z",
-      "name_pinyin": "suōquánwán"
+      "englishName": "SuoQuanWan"
     },
     {
       "id": 1755200001040,
@@ -2798,7 +2798,7 @@
       "indications": "脾氣虛弱，衝脈不固，血崩或月經過多，色淡質稀，心悸氣短",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.140Z",
-      "name_pinyin": "gùchōng湯"
+      "englishName": "GuChongTang"
     },
     {
       "id": 1755200001041,
@@ -2812,7 +2812,7 @@
       "indications": "腎虛濕熱帶下，帶下黏稠量多，色黃如濃茶汁，其氣腥穢",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.141Z",
-      "name_pinyin": "yìhuáng湯"
+      "englishName": "YiHuangTang"
     },
     {
       "id": 1755200001042,
@@ -2826,7 +2826,7 @@
       "indications": "脾虛肝鬱，濕濁帶下，帶下色白或淡黃，清稀無臭，倦怠便溏",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.142Z",
-      "name_pinyin": "wán帶湯"
+      "englishName": "WanDaiTang"
     },
     {
       "id": 1755200001043,
@@ -2840,7 +2840,7 @@
       "indications": "氣血虛弱，胎元不固，胎動不安，屢有墮胎宿疾，面色淡白，倦怠乏力",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.143Z",
-      "name_pinyin": "tàishānpánshísàn"
+      "englishName": "TaiShanPanShiSan"
     },
     {
       "id": 1755200001044,
@@ -2854,7 +2854,7 @@
       "indications": "產後血虛受寒，惡露不行，小腹冷痛",
       "usage": "水煎服，或酌加黃酒同煎",
       "updatedAt": "2025-08-14T12:00:00.144Z",
-      "name_pinyin": "shēnghuà湯"
+      "englishName": "ShengHuaTang"
     },
     {
       "id": 1755200001045,
@@ -2868,7 +2868,7 @@
       "indications": "瘀血留結胞宮，妊娠胎動不安，漏下不止，血色紫黑晦暗，腹痛拒按",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-14T12:00:00.145Z",
-      "name_pinyin": "guìzhīfúlíngwán"
+      "englishName": "GuiZhiFuLingWan"
     },
     {
       "id": 1755200001046,
@@ -2882,7 +2882,7 @@
       "indications": "腸癰初起，右少腹疼痛拒按，右足屈而不伸，伸則痛甚，時時發熱，自汗惡寒",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.146Z",
-      "name_pinyin": "dàhuángmǔdān湯"
+      "englishName": "DaHuangMuDanTang"
     },
     {
       "id": 1755200001047,
@@ -2896,7 +2896,7 @@
       "indications": "肺癰，身有微熱，咳嗽痰多，甚則咳吐腥臭膿血，胸中隱隱作痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-14T12:00:00.147Z",
-      "name_pinyin": "wěijīng湯"
+      "englishName": "WeiJingTang"
     },
     {
       "id": 1755200001050,
@@ -2910,7 +2910,7 @@
       "indications": "脾虛氣滯，寒熱互結，心下痞滿，不欲飲食，倦怠乏力，大便不調",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-14T12:00:00.150Z",
-      "name_pinyin": "zhǐ實xiāopǐwán"
+      "englishName": "ZhiShiXiaoPiWan"
     },
     {
       "id": 1755300000001,
@@ -2924,7 +2924,7 @@
       "indications": "衝任虛寒，瘀血阻滯，月經不調，逾期不止，傍晚發熱，手心煩熱，唇口乾燥",
       "usage": "水煎服，阿膠烊化",
       "updatedAt": "2025-08-15T10:00:00.001Z",
-      "name_pinyin": "溫jīng湯"
+      "englishName": "WenJingTang"
     },
     {
       "id": 1755300000002,
@@ -2938,7 +2938,7 @@
       "indications": "氣血虛弱，心動悸，脈結代，虛羸少氣，舌光少苔",
       "usage": "水煎服，阿膠烊化，入酒煎",
       "updatedAt": "2025-08-15T10:00:00.002Z",
-      "name_pinyin": "zhìgāncǎo湯"
+      "englishName": "ZhiGanCaoTang"
     },
     {
       "id": 1755300000003,
@@ -2952,7 +2952,7 @@
       "indications": "濕溫時疫，發熱倦怠，胸悶腹脹，肢酸咽腫，身黃頤腫，口渴尿赤",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.003Z",
-      "name_pinyin": "gānlùxiāodúdān"
+      "englishName": "GanLuXiaoDuDan"
     },
     {
       "id": 1755300000004,
@@ -2966,7 +2966,7 @@
       "indications": "熱入血分，身熱譫語，斑色紫黑，吐血衄血，尿血便血",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.004Z",
-      "name_pinyin": "xījiǎodehuáng湯"
+      "englishName": "XiJiaoDeHuangTang"
     },
     {
       "id": 1755300000005,
@@ -2980,7 +2980,7 @@
       "indications": "溫病後期，夜熱早涼，熱退無汗，舌紅苔少，脈細數",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.005Z",
-      "name_pinyin": "qīnghāobiējiǎ湯"
+      "englishName": "QingHaoBieJiaTang"
     },
     {
       "id": 1755300000006,
@@ -2994,7 +2994,7 @@
       "indications": "大頭瘟，惡寒發熱，頭面紅腫焮痛，目不能開，咽喉不利",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.006Z",
-      "name_pinyin": "pǔ濟xiāodúyǐn"
+      "englishName": "PuJiXiaoDuYin"
     },
     {
       "id": 1755300000007,
@@ -3008,7 +3008,7 @@
       "indications": "上中二焦邪鬱生熱，煩躁口渴，面赤唇焦，胸膈煩熱，口舌生瘡，便秘尿赤",
       "usage": "水煎服，芒硝溶服",
       "updatedAt": "2025-08-15T10:00:00.007Z",
-      "name_pinyin": "涼gésàn"
+      "englishName": "LiangGeSan"
     },
     {
       "id": 1755300000008,
@@ -3022,7 +3022,7 @@
       "indications": "三焦火毒熱盛，大熱煩躁，錯語不眠，吐血發斑，癰腫疔毒",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.008Z",
-      "name_pinyin": "huángliánjiědú湯"
+      "englishName": "HuangLianJieDuTang"
     },
     {
       "id": 1755300000009,
@@ -3036,7 +3036,7 @@
       "indications": "火毒結聚，癰瘡疔腫，紅腫熱痛，發熱惡寒",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.009Z",
-      "name_pinyin": "wǔwèixiāodúyǐn"
+      "englishName": "WuWeiXiaoDuYin"
     },
     {
       "id": 1755300000010,
@@ -3050,7 +3050,7 @@
       "indications": "熱毒熾盛，脫疽，患肢暗紅腫痛，潰爛腐臭",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.010Z",
-      "name_pinyin": "sìmiàoyǒngān湯"
+      "englishName": "SiMiaoYongAnTang"
     },
     {
       "id": 1755300000011,
@@ -3064,7 +3064,7 @@
       "indications": "熱入心包，神昏譫語，中風昏迷，小兒驚厥",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.011Z",
-      "name_pinyin": "niúhuángqīngxīnwán"
+      "englishName": "NiuHuangQingXinWan"
     },
     {
       "id": 1755300000012,
@@ -3078,7 +3078,7 @@
       "indications": "熱病邪入心包，高熱驚厥，神昏譫語，中風昏迷",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.012Z",
-      "name_pinyin": "ān宮niúhuángwán"
+      "englishName": "AnGongNiuHuangWan"
     },
     {
       "id": 1755300000013,
@@ -3092,7 +3092,7 @@
       "indications": "寒閉證，突然昏倒，牙關緊閉，不省人事，心腹疼痛",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.013Z",
-      "name_pinyin": "sūhéxiāngwán"
+      "englishName": "SuHeXiangWan"
     },
     {
       "id": 1755300000014,
@@ -3106,7 +3106,7 @@
       "indications": "熱病神昏，高熱煩躁，譫語驚厥，斑疹吐衄",
       "usage": "散劑，冷開水調服",
       "updatedAt": "2025-08-15T10:00:00.014Z",
-      "name_pinyin": "zǐxuědān"
+      "englishName": "ZiXueDan"
     },
     {
       "id": 1755300000015,
@@ -3120,7 +3120,7 @@
       "indications": "中暑中惡，中風溫病，神昏內閉，痰盛氣粗，身熱煩躁",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.015Z",
-      "name_pinyin": "zhì寶dān"
+      "englishName": "ZhiBaoDan"
     },
     {
       "id": 1755300000016,
@@ -3134,7 +3134,7 @@
       "indications": "濕熱食積，脘腹脹痛，下痢洩瀉，大便秘結，小便短赤",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.016Z",
-      "name_pinyin": "zhǐ實導滯wán"
+      "englishName": "ZhiShiDaoZhiWan"
     },
     {
       "id": 1755300000017,
@@ -3148,7 +3148,7 @@
       "indications": "赤白痢疾，裏急後重，胃腸積滯，脘腹脹滿",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.017Z",
-      "name_pinyin": "mùxiāng檳lángwán"
+      "englishName": "MuXiangBinLangWan"
     },
     {
       "id": 1755300000018,
@@ -3162,7 +3162,7 @@
       "indications": "脾虛食積，食少難消，脘腹痞悶，大便溏薄",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.018Z",
-      "name_pinyin": "jiànpíwán"
+      "englishName": "JianPiWan"
     },
     {
       "id": 1755300000019,
@@ -3176,7 +3176,7 @@
       "indications": "脾胃氣虛，食少便溏，肢倦乏力，面色萎黃",
       "usage": "散劑，大棗湯調服",
       "updatedAt": "2025-08-15T10:00:00.019Z",
-      "name_pinyin": "參língbái朮sàn"
+      "englishName": "ShenLingBaiShuSan"
     },
     {
       "id": 1755300000020,
@@ -3190,7 +3190,7 @@
       "indications": "脾胃氣虛，痰阻氣滯，嘔吐痞悶，不思飲食，脘腹脹痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.020Z",
-      "name_pinyin": "xiāngshāliùjūnzi湯"
+      "englishName": "XiangShaLiuJunZiTang"
     },
     {
       "id": 1755300000021,
@@ -3204,7 +3204,7 @@
       "indications": "胃氣虛弱，痰濁內阻，心下痞硬，噫氣不除",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.021Z",
-      "name_pinyin": "xuánfùhuādàizhěshí湯"
+      "englishName": "XuanFuHuaDaiZheShiTang"
     },
     {
       "id": 1755300000022,
@@ -3218,7 +3218,7 @@
       "indications": "胃虛有熱，氣逆不降，呃逆或乾嘔",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.022Z",
-      "name_pinyin": "júpízhúrú湯"
+      "englishName": "JuPiZhuRuTang"
     },
     {
       "id": 1755300000023,
@@ -3232,7 +3232,7 @@
       "indications": "胃氣虛寒，呃逆不已，胸痞脈遲",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.023Z",
-      "name_pinyin": "dīngxiāngshìdì湯"
+      "englishName": "DingXiangShiDiTang"
     },
     {
       "id": 1755300000024,
@@ -3246,7 +3246,7 @@
       "indications": "腎洩，五更洩瀉，不思飲食，食不消化，腹痛腰酸",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.024Z",
-      "name_pinyin": "sìshénwán"
+      "englishName": "SiShenWan"
     },
     {
       "id": 1755300000025,
@@ -3260,7 +3260,7 @@
       "indications": "腎陽不足，腰痛腳軟，下半身冷感，小便不利或反多",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.025Z",
-      "name_pinyin": "jīn匱shèn氣wán"
+      "englishName": "JinKuiShenQiWan"
     },
     {
       "id": 1755300000026,
@@ -3274,7 +3274,7 @@
       "indications": "真陰不足，頭暈目眩，腰酸腿軟，遺精滑洩，自汗盜汗",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.026Z",
-      "name_pinyin": "zuǒ歸wán"
+      "englishName": "ZuoGuiWan"
     },
     {
       "id": 1755300000027,
@@ -3288,7 +3288,7 @@
       "indications": "腎陽不足，氣怯神疲，腹痛腰酸，肢冷脈細",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.027Z",
-      "name_pinyin": "yòu歸yǐn"
+      "englishName": "YouGuiYin"
     },
     {
       "id": 1755300000028,
@@ -3302,7 +3302,7 @@
       "indications": "肝腎不足，鬚髮早白，齒牙動搖，夢遺滑精，腰膝酸軟",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.028Z",
-      "name_pinyin": "qī寶měirándān"
+      "englishName": "QiBaoMeiRanDan"
     },
     {
       "id": 1755300000029,
@@ -3316,7 +3316,7 @@
       "indications": "真元虧損，精血不足，瘦削少氣，夢遺洩精，目視不明",
       "usage": "膠劑，酒化服",
       "updatedAt": "2025-08-15T10:00:00.029Z",
-      "name_pinyin": "guīlùèrxiānjiāo"
+      "englishName": "GuiLuErXianJiao"
     },
     {
       "id": 1755300000030,
@@ -3330,7 +3330,7 @@
       "indications": "腎虛水腫，腰重腳腫，小便不利",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.030Z",
-      "name_pinyin": "濟shēngshèn氣wán"
+      "englishName": "JiShengShenQiWan"
     },
     {
       "id": 1755300000031,
@@ -3344,7 +3344,7 @@
       "indications": "陰虛火旺，潮熱盜汗，口乾咽痛，耳鳴遺精",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.031Z",
-      "name_pinyin": "zhībǎidehuángwán"
+      "englishName": "ZhiBaiDeHuangWan"
     },
     {
       "id": 1755300000032,
@@ -3358,7 +3358,7 @@
       "indications": "肝腎陰虧，眩暈耳鳴，羞明畏光，迎風流淚，視物昏花",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.032Z",
-      "name_pinyin": "qǐjúdehuángwán"
+      "englishName": "QiJuDeHuangWan"
     },
     {
       "id": 1755300000033,
@@ -3372,7 +3372,7 @@
       "indications": "肝腎兩虧，陰虛火旺，內障目暗，視物昏花",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.033Z",
-      "name_pinyin": "shíhúyèguāngwán"
+      "englishName": "ShiHuYeGuangWan"
     },
     {
       "id": 1755300000034,
@@ -3386,7 +3386,7 @@
       "indications": "氣血兩虛，面色蒼白或萎黃，頭暈目眩，四肢倦怠，氣短懶言",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.034Z",
-      "name_pinyin": "bāzhēn湯"
+      "englishName": "BaZhenTang"
     },
     {
       "id": 1755300000035,
@@ -3400,7 +3400,7 @@
       "indications": "氣血兩虛，面色萎黃，倦怠乏力，食少心悸，頭暈自汗",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.035Z",
-      "name_pinyin": "shíquándàbǔ湯"
+      "englishName": "ShiQuanDaBuTang"
     },
     {
       "id": 1755300000036,
@@ -3414,7 +3414,7 @@
       "indications": "積勞虛損，呼吸少氣，行動喘息，心虛驚悸，咽乾唇燥",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.036Z",
-      "name_pinyin": "rén參yǎng榮湯"
+      "englishName": "RenShenYangRongTang"
     },
     {
       "id": 1755300000037,
@@ -3428,7 +3428,7 @@
       "indications": "氣血虛弱，胎元不固，胎動不安，屢有墮胎宿疾",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.037Z",
-      "name_pinyin": "tàishānpánshíyǐn"
+      "englishName": "TaiShanPanShiYin"
     },
     {
       "id": 1755300000038,
@@ -3442,7 +3442,7 @@
       "indications": "婦人衝任虛損，崩漏下血，月經過多，產後下血不絕，妊娠下血",
       "usage": "水煎服，阿膠烊化",
       "updatedAt": "2025-08-15T10:00:00.038Z",
-      "name_pinyin": "jiāoài湯"
+      "englishName": "JiaoAiTang"
     },
     {
       "id": 1755300000039,
@@ -3456,7 +3456,7 @@
       "indications": "陰虛血熱，月經過多，崩中漏下，血色深紅",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.039Z",
-      "name_pinyin": "gùjīngwán"
+      "englishName": "GuJingWan"
     },
     {
       "id": 1755300000040,
@@ -3470,7 +3470,7 @@
       "indications": "衝任虛寒，瘀阻胞宮，崩漏下血，血色紫黑",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.040Z",
-      "name_pinyin": "zhènlíngdān"
+      "englishName": "ZhenLingDan"
     },
     {
       "id": 1755300000041,
@@ -3484,7 +3484,7 @@
       "indications": "脾胃寒濕，脘腹脹滿，時作疼痛，不思飲食，四肢倦怠",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.041Z",
-      "name_pinyin": "hòupǔ溫zhōng湯"
+      "englishName": "HouPuWenZhongTang"
     },
     {
       "id": 1755300000042,
@@ -3498,7 +3498,7 @@
       "indications": "痰飲嘔吐，心下痞悶，不渴",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.042Z",
-      "name_pinyin": "xiǎobànxià湯"
+      "englishName": "XiaoBanXiaTang"
     },
     {
       "id": 1755300000043,
@@ -3512,7 +3512,7 @@
       "indications": "中陽不足，痰飲內停，胸脅支滿，目眩心悸",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.043Z",
-      "name_pinyin": "língguì朮gān湯"
+      "englishName": "LingGuiShuGanTang"
     },
     {
       "id": 1755300000044,
@@ -3526,7 +3526,7 @@
       "indications": "婦人臟躁，喜悲傷欲哭，象如神靈所作，數欠伸",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.044Z",
-      "name_pinyin": "gānmàidà棗湯"
+      "englishName": "GanMaiDaZaoTang"
     },
     {
       "id": 1755300000046,
@@ -3540,7 +3540,7 @@
       "indications": "陰虧血少，虛煩心悸，失眠夢遺，口舌生瘡，大便乾燥",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.046Z",
-      "name_pinyin": "tiānwángbǔxīndān"
+      "englishName": "TianWangBuXinDan"
     },
     {
       "id": 1755300000047,
@@ -3554,7 +3554,7 @@
       "indications": "心火亢盛，陰血不足，失眠多夢，驚悸怔忡，心煩神亂",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.047Z",
-      "name_pinyin": "zhūshāānshénwán"
+      "englishName": "ZhuShaAnShenWan"
     },
     {
       "id": 1755300000048,
@@ -3568,7 +3568,7 @@
       "indications": "體虛自汗，夜臥尤甚，心悸驚惕，短氣煩倦",
       "usage": "散劑，溫開水調服",
       "updatedAt": "2025-08-15T10:00:00.048Z",
-      "name_pinyin": "mǔlìsàn"
+      "englishName": "MuLiSan"
     },
     {
       "id": 1755300000049,
@@ -3582,7 +3582,7 @@
       "indications": "久瀉久痢，脾腎虛寒，滑脫不禁，腹痛喜溫喜按，倦怠食少",
       "usage": "水煎服",
       "updatedAt": "2025-08-15T10:00:00.049Z",
-      "name_pinyin": "zhēnrényǎngzàng湯"
+      "englishName": "ZhenRenYangZangTang"
     },
     {
       "id": 1755300000050,
@@ -3596,7 +3596,7 @@
       "indications": "陽鬱厥逆，手足不溫，脘腹疼痛，洩利下重",
       "usage": "散劑，米湯或溫開水送服",
       "updatedAt": "2025-08-15T10:00:00.050Z",
-      "name_pinyin": "sìnìsàn"
+      "englishName": "SiNiSan"
     },
     {
       "id": 1755400000001,
@@ -3610,7 +3610,7 @@
       "indications": "平素氣虛，感受暑濕，身熱頭痛，口渴自汗，四肢困倦，不思飲食",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.001Z",
-      "name_pinyin": "qīngshǔyì氣湯"
+      "englishName": "QingShuYiQiTang"
     },
     {
       "id": 1755400000002,
@@ -3624,7 +3624,7 @@
       "indications": "濕溫初起，頭痛惡寒，身重疼痛，面色淡黃，胸悶不飢，午後身熱",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.002Z",
-      "name_pinyin": "sānrén湯"
+      "englishName": "SanRenTang"
     },
     {
       "id": 1755400000003,
@@ -3638,7 +3638,7 @@
       "indications": "濕熱霍亂，上吐下瀉，胸脘痞悶，心煩躁擾，小便短赤",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.003Z",
-      "name_pinyin": "lián樸yǐn"
+      "englishName": "LianPuYin"
     },
     {
       "id": 1755400000004,
@@ -3652,7 +3652,7 @@
       "indications": "肝鬱血虛，化火生熱，煩躁易怒，頭痛目澀，頰赤口乾，月經不調",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.004Z",
-      "name_pinyin": "bāwèixiāoyáosàn"
+      "englishName": "BaWeiXiaoYaoSan"
     },
     {
       "id": 1755400000005,
@@ -3666,7 +3666,7 @@
       "indications": "肝旺脾虛，腸鳴腹痛，大便洩瀉，瀉必腹痛，脈弦而緩",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.005Z",
-      "name_pinyin": "tòng瀉yàofāng"
+      "englishName": "TongXieYaoFang"
     },
     {
       "id": 1755400000008,
@@ -3680,7 +3680,7 @@
       "indications": "胎動不安，腰酸腹痛，勢欲小產，臨產艱難",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.008Z",
-      "name_pinyin": "bǎo產無憂sàn"
+      "englishName": "BaoChanWuYouSan"
     },
     {
       "id": 1755400000009,
@@ -3694,7 +3694,7 @@
       "indications": "血虛風燥，皮膚瘙癢，癮疹色淡，面色無華",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.009Z",
-      "name_pinyin": "當歸yǐnzi"
+      "englishName": "DangGuiYinZi"
     },
     {
       "id": 1755400000010,
@@ -3708,7 +3708,7 @@
       "indications": "少陰病，心中煩，不得臥",
       "usage": "水煎服，阿膠烊化，雞子黃攪勻兌服",
       "updatedAt": "2025-08-16T10:00:00.010Z",
-      "name_pinyin": "huángliánājiāojīzihuáng湯"
+      "englishName": "HuangLianAJiaoJiZiHuangTang"
     },
     {
       "id": 1755400000012,
@@ -3722,7 +3722,7 @@
       "indications": "脾胃伏火，口瘡口臭，煩渴易飢，口燥唇乾",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.012Z",
-      "name_pinyin": "瀉huángsàn"
+      "englishName": "XieHuangSan"
     },
     {
       "id": 1755400000013,
@@ -3736,7 +3736,7 @@
       "indications": "心經熱盛，心胸煩熱，口渴面赤，口舌生瘡，小便赤澀",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.013Z",
-      "name_pinyin": "導chìsàn"
+      "englishName": "DaoChiSan"
     },
     {
       "id": 1755400000014,
@@ -3750,7 +3750,7 @@
       "indications": "肝膽實火，頭暈目眩，神志不寧，譫語發狂，大便秘結",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-16T10:00:00.014Z",
-      "name_pinyin": "當歸lóng薈wán"
+      "englishName": "DangGuiLongHuiWan"
     },
     {
       "id": 1755400000015,
@@ -3764,7 +3764,7 @@
       "indications": "肝火犯胃，脅肋疼痛，嘈雜吞酸，嘔吐口苦",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-16T10:00:00.015Z",
-      "name_pinyin": "zuǒjīnwán"
+      "englishName": "ZuoJinWan"
     },
     {
       "id": 1755400000018,
@@ -3778,7 +3778,7 @@
       "indications": "痰壅氣逆，咳嗽喘逆，痰多胸痞，食少難消",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.018Z",
-      "name_pinyin": "sānziyǎngqīn湯"
+      "englishName": "SanZiYangQinTang"
     },
     {
       "id": 1755400000020,
@@ -3792,7 +3792,7 @@
       "indications": "陰血不足，肝陽偏亢，神志不寧，入夜少寐，時而驚悸",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-16T10:00:00.020Z",
-      "name_pinyin": "zhēnzhūmǔwán"
+      "englishName": "ZhenZhuMuWan"
     },
     {
       "id": 1755400000021,
@@ -3806,7 +3806,7 @@
       "indications": "心腎不交，心悸怔忡，夜寐不安",
       "usage": "丸劑，臨臥用溫開水送服",
       "updatedAt": "2025-08-16T10:00:00.021Z",
-      "name_pinyin": "jiāotàiwán"
+      "englishName": "JiaoTaiWan"
     },
     {
       "id": 1755400000022,
@@ -3820,7 +3820,7 @@
       "indications": "肝鬱化火，心腹脅肋諸痛，時發時止，口苦",
       "usage": "散劑，溫酒或溫開水送服",
       "updatedAt": "2025-08-16T10:00:00.022Z",
-      "name_pinyin": "jīnlíngzisàn"
+      "englishName": "JinLingZiSan"
     },
     {
       "id": 1755400000023,
@@ -3834,7 +3834,7 @@
       "indications": "瘀血停滯，心腹劇痛，產後惡露不行，月經不調",
       "usage": "散劑，醋或黃酒調服",
       "updatedAt": "2025-08-16T10:00:00.023Z",
-      "name_pinyin": "shīxiàosàn"
+      "englishName": "ShiXiaoSan"
     },
     {
       "id": 1755400000025,
@@ -3848,7 +3848,7 @@
       "indications": "氣血凝滯，心腹疼痛，腿臂疼痛，跌打瘀腫，內外瘡瘍",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.025Z",
-      "name_pinyin": "huóluòxiàolíngdān"
+      "englishName": "HuoLuoXiaoLingDan"
     },
     {
       "id": 1755400000026,
@@ -3862,7 +3862,7 @@
       "indications": "跌打損傷，筋斷骨折，瘀血腫痛，刀傷出血",
       "usage": "散劑，溫酒或溫開水送服，外用以酒調敷",
       "updatedAt": "2025-08-16T10:00:00.026Z",
-      "name_pinyin": "qīlísàn"
+      "englishName": "QiLiSan"
     },
     {
       "id": 1755400000027,
@@ -3876,7 +3876,7 @@
       "indications": "跌打損傷，瘀血留於脅下，痛不可忍",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.027Z",
-      "name_pinyin": "復yuánhuóxuè湯"
+      "englishName": "FuYuanHuoXueTang"
     },
     {
       "id": 1755400000028,
@@ -3890,7 +3890,7 @@
       "indications": "血熱妄行，嘔血吐血咯血嗽血",
       "usage": "散劑，藕汁或蘿蔔汁磨京墨調服",
       "updatedAt": "2025-08-16T10:00:00.028Z",
-      "name_pinyin": "shíhuīsàn"
+      "englishName": "ShiHuiSan"
     },
     {
       "id": 1755400000029,
@@ -3904,7 +3904,7 @@
       "indications": "肝火犯肺，咳嗽痰中帶血，痰質濃稠，心煩口渴",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-16T10:00:00.029Z",
-      "name_pinyin": "hāixuèfāng"
+      "englishName": "HaiXueFang"
     },
     {
       "id": 1755400000030,
@@ -3918,7 +3918,7 @@
       "indications": "下焦瘀熱，血淋尿血，小便頻數，赤澀熱痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.030Z",
-      "name_pinyin": "xiǎo薊yǐnzi"
+      "englishName": "XiaoJiYinZi"
     },
     {
       "id": 1755400000031,
@@ -3932,7 +3932,7 @@
       "indications": "腸風臟毒，便前出血，或便後出血，或糞中帶血",
       "usage": "散劑，清米飲調下",
       "updatedAt": "2025-08-16T10:00:00.031Z",
-      "name_pinyin": "huáihuāsàn"
+      "englishName": "HuaiHuaSan"
     },
     {
       "id": 1755400000034,
@@ -3946,7 +3946,7 @@
       "indications": "鼻淵，鼻流濁涕不止，前額疼痛",
       "usage": "散劑，蔥茶湯調服",
       "updatedAt": "2025-08-16T10:00:00.034Z",
-      "name_pinyin": "cāngěrzisàn"
+      "englishName": "CangErZiSan"
     },
     {
       "id": 1755400000035,
@@ -3960,7 +3960,7 @@
       "indications": "中風口眼喎斜，面部肌肉抽動",
       "usage": "散劑，熱酒調下",
       "updatedAt": "2025-08-16T10:00:00.035Z",
-      "name_pinyin": "牽zhèngsàn"
+      "englishName": "QianZhengSan"
     },
     {
       "id": 1755400000036,
@@ -3974,7 +3974,7 @@
       "indications": "破傷風，牙關緊急，口撮唇緊，身體強直，角弓反張",
       "usage": "散劑，熱酒或童便調服，亦可外敷",
       "updatedAt": "2025-08-16T10:00:00.036Z",
-      "name_pinyin": "yùzhēnsàn"
+      "englishName": "YuZhenSan"
     },
     {
       "id": 1755400000038,
@@ -3988,7 +3988,7 @@
       "indications": "濕熱相搏，遍身肢節煩痛，肩背沈重，胸膈不利",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.038Z",
-      "name_pinyin": "當歸niāntòng湯"
+      "englishName": "DangGuiNianTongTang"
     },
     {
       "id": 1755400000039,
@@ -4002,7 +4002,7 @@
       "indications": "濕熱下注，筋骨疼痛，腳膝紅腫熱痛，帶下淋濁",
       "usage": "散劑，薑湯或溫開水送服",
       "updatedAt": "2025-08-16T10:00:00.039Z",
-      "name_pinyin": "èrmiàosàn"
+      "englishName": "ErMiaoSan"
     },
     {
       "id": 1755500000029,
@@ -4016,7 +4016,7 @@
       "indications": "濕熱下注，兩腳麻木，或如火烙之熱",
       "usage": "丸劑，溫開水或薑鹽湯送服",
       "updatedAt": "2025-08-17T10:00:00.029Z",
-      "name_pinyin": "sānmiàowán"
+      "englishName": "SanMiaoWan"
     },
     {
       "id": 1755400000041,
@@ -4030,7 +4030,7 @@
       "indications": "濕熱痿證，兩足麻木，痿軟無力",
       "usage": "丸劑，溫開水送服",
       "updatedAt": "2025-08-16T10:00:00.041Z",
-      "name_pinyin": "sìmiàowán"
+      "englishName": "SiMiaoWan"
     },
     {
       "id": 1755400000042,
@@ -4044,7 +4044,7 @@
       "indications": "濕腳氣，足脛腫重無力，麻木冷痛，惡寒發熱",
       "usage": "水煎服，凌晨冷服",
       "updatedAt": "2025-08-16T10:00:00.042Z",
-      "name_pinyin": "jīmíngsàn"
+      "englishName": "JiMingSan"
     },
     {
       "id": 1755400000045,
@@ -4058,7 +4058,7 @@
       "indications": "風濕痹痛，肩項臂痛，舉動艱難",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.045Z",
-      "name_pinyin": "juānbì湯"
+      "englishName": "JuanBiTang"
     },
     {
       "id": 1755400000048,
@@ -4072,7 +4072,7 @@
       "indications": "行痹，肢體關節疼痛，遊走不定",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.048Z",
-      "name_pinyin": "fángfēng湯"
+      "englishName": "FangFengTang"
     },
     {
       "id": 1755400000049,
@@ -4086,7 +4086,7 @@
       "indications": "濕熱痹證，骨節煩疼，局部灼熱紅腫",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.049Z",
-      "name_pinyin": "xuānbì湯"
+      "englishName": "XuanBiTang"
     },
     {
       "id": 1755400000050,
@@ -4100,7 +4100,7 @@
       "indications": "外感溫燥，頭痛身熱，口渴，乾咳無痰，或痰少而黏",
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.050Z",
-      "name_pinyin": "sāngxìng湯"
+      "englishName": "SangXingTang"
     },
     {
       "id": 1755500000001,
@@ -4114,7 +4114,7 @@
       "indications": "心火偏旺，氣陰兩虛，口乾咽燥，煩熱盜汗，小便赤澀",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.001Z",
-      "name_pinyin": "qīngxīnliánziyǐn"
+      "englishName": "QingXinLianZiYin"
     },
     {
       "id": 1755500000002,
@@ -4128,7 +4128,7 @@
       "indications": "膽胃不和，痰熱內擾，虛煩不眠，嘔吐呃逆，驚悸不寧",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.002Z",
-      "name_pinyin": "溫dǎn湯"
+      "englishName": "WenDanTang"
     },
     {
       "id": 1755500000003,
@@ -4142,7 +4142,7 @@
       "indications": "胃中濕熱，口臭喉瘡，牙齦腫痛，吐血衄血",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.003Z",
-      "name_pinyin": "gānlùyǐn"
+      "englishName": "GanLuYin"
     },
     {
       "id": 1755500000004,
@@ -4156,7 +4156,7 @@
       "indications": "肺熱鼻淵，鼻塞不通，濁涕不止",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.004Z",
-      "name_pinyin": "xīnyíqīngfèiyǐn"
+      "englishName": "XinYiQingFeiYin"
     },
     {
       "id": 1755500000005,
@@ -4170,7 +4170,7 @@
       "indications": "面上瘡癤，風熱痤瘡，紅腫疼痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.005Z",
-      "name_pinyin": "qīngshàngfángfēng湯"
+      "englishName": "QingShangFangFengTang"
     },
     {
       "id": 1755500000006,
@@ -4184,7 +4184,7 @@
       "indications": "風濕血瘀，遍身疼痛，經絡不利",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.006Z",
-      "name_pinyin": "shūjīnghuóxuè湯"
+      "englishName": "ShuJingHuoXueTang"
     },
     {
       "id": 1755500000007,
@@ -4198,7 +4198,7 @@
       "indications": "肝鬱血虛，化火生熱，煩躁易怒，月經不調",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.007Z",
-      "name_pinyin": "jiāwèixiāoyáosàn"
+      "englishName": "JiaWeiXiaoYaoSan"
     },
     {
       "id": 1755500000008,
@@ -4212,7 +4212,7 @@
       "indications": "肺熱咳嗽，痰多氣促，咽喉乾痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.008Z",
-      "name_pinyin": "qīngfèi湯"
+      "englishName": "QingFeiTang"
     },
     {
       "id": 1755500000009,
@@ -4226,7 +4226,7 @@
       "indications": "陰虛火旺，潮熱盜汗，咳嗽咯血",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.009Z",
-      "name_pinyin": "zīyīnjiànghuǒ湯"
+      "englishName": "ZiYinJiangHuoTang"
     },
     {
       "id": 1755500000012,
@@ -4240,7 +4240,7 @@
       "indications": "虛勞腹痛，營氣內虛，腹中拘急，痛引腰背",
       "usage": "水煎服，飴糖烊化",
       "updatedAt": "2025-08-17T10:00:00.012Z",
-      "name_pinyin": "當歸jiànzhōng湯"
+      "englishName": "DangGuiJianZhongTang"
     },
     {
       "id": 1755500000013,
@@ -4254,7 +4254,7 @@
       "indications": "氣虛外感，惡寒發熱，頭項強痛，肢體酸痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.013Z",
-      "name_pinyin": "rén參敗dúsàn"
+      "englishName": "RenShenBaiDuSan"
     },
     {
       "id": 1755500000014,
@@ -4268,7 +4268,7 @@
       "indications": "氣虛外感風寒，內有痰飲，惡寒發熱，頭痛鼻塞，咳嗽痰多",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.014Z",
-      "name_pinyin": "參sūyǐn"
+      "englishName": "ShenSuYin"
     },
     {
       "id": 1755500000015,
@@ -4282,7 +4282,7 @@
       "indications": "陽氣虛弱，外感風寒，惡寒發熱，熱輕寒重，無汗肢冷",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.015Z",
-      "name_pinyin": "zàizàosàn"
+      "englishName": "ZaiZaoSan"
     },
     {
       "id": 1755500000017,
@@ -4296,7 +4296,7 @@
       "indications": "素體陰虛，外感風熱，頭痛身熱，微惡風寒，咽乾咳嗽",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.017Z",
-      "name_pinyin": "jiā減wēiruí湯"
+      "englishName": "JiaJianWeiRuiTang"
     },
     {
       "id": 1755500000018,
@@ -4310,7 +4310,7 @@
       "indications": "麻疹初起，疹發不透，身熱頭痛",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.018Z",
-      "name_pinyin": "shēngmágégēn湯"
+      "englishName": "ShengMaGeGenTang"
     },
     {
       "id": 1755500000019,
@@ -4324,7 +4324,7 @@
       "indications": "感冒風寒，鬱而化熱，惡寒漸輕，身熱增盛，頭痛肢楚",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.019Z",
-      "name_pinyin": "cháigéjiějī湯"
+      "englishName": "ChaiGeJieJiTang"
     },
     {
       "id": 1755500000020,
@@ -4338,7 +4338,7 @@
       "indications": "外感風寒初起，惡寒發熱，頭痛鼻塞",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.020Z",
-      "name_pinyin": "cōngshì湯"
+      "englishName": "CongShiTang"
     },
     {
       "id": 1755500000022,
@@ -4352,7 +4352,7 @@
       "indications": "風熱上攻，偏正頭痛，頭暈目眩",
       "usage": "散劑，清茶調服",
       "updatedAt": "2025-08-17T10:00:00.022Z",
-      "name_pinyin": "júhuāchádiàosàn"
+      "englishName": "JuHuaChaDiaoSan"
     },
     {
       "id": 1755500000046,
@@ -4366,7 +4366,7 @@
       "indications": "喑痱證，舌強不能言，足廢不能用",
       "usage": "水煎服",
       "updatedAt": "2025-08-17T10:00:00.046Z",
-      "name_pinyin": "dehuángyǐnzi"
+      "englishName": "DeHuangYinZi"
     }
   ]
 }

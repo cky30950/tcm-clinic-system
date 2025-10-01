@@ -10461,6 +10461,27 @@ async function initializeSystemAfterLogin() {
             // 為避免 XSS，對文字內容進行轉義
             const safeName = window.escapeHtml(herb.name);
             const safeAlias = herb.alias ? window.escapeHtml(herb.alias) : null;
+            // Retrieve englishName if available and escape it. englishName contains the romanised
+            // name generated from the herb name. It may be undefined for legacy data. When
+            // displaying the card we choose between the Chinese name or the English name based
+            // on the current language stored in localStorage (default is zh). This mirrors
+            // the behaviour used for acupoint cards: in English mode we hide the Chinese
+            // name and show only the pinyin/English name, while in Chinese mode we show
+            // only the Chinese name.
+            const safeEnglishName = herb.englishName ? window.escapeHtml(herb.englishName) : null;
+            // Determine which name to display
+            let displayName = safeName;
+            try {
+                const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                if (langSel && langSel.toLowerCase().startsWith('en')) {
+                    // In English mode prefer the englishName. If englishName is not
+                    // available fall back to the Chinese name.
+                    displayName = safeEnglishName || safeName;
+                }
+            } catch (_e) {
+                // If accessing localStorage fails just use the Chinese name
+                displayName = safeName;
+            }
             // 新增性味、歸經與主治欄位的轉義處理
             const safeNature = herb.nature ? window.escapeHtml(herb.nature) : null;
             const safeMeridian = herb.meridian ? window.escapeHtml(herb.meridian) : null;
@@ -10513,7 +10534,7 @@ async function initializeSystemAfterLogin() {
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
                         <div>
-                            <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
+                            <h4 class="text-lg font-semibold text-gray-900">${displayName}</h4>
                             ${safeAlias ? `<p class="text-sm text-gray-600">${safeAlias}</p>` : ''}
                         </div>
                     </div>
@@ -10534,6 +10555,22 @@ async function initializeSystemAfterLogin() {
         function createFormulaCard(formula) {
             // 為避免 XSS，對文字內容進行轉義
             const safeName = window.escapeHtml(formula.name);
+            // Retrieve englishName if available and escape it. englishName contains
+            // the romanised name derived from the formula name. It may be undefined
+            // for legacy data. Similar to herbs and acupoints, we decide between
+            // the Chinese name and the English name based on the current language
+            // setting stored in localStorage. In English mode only the englishName
+            // is displayed; in Chinese mode only the Chinese name is shown.
+            const safeEnglishName = formula.englishName ? window.escapeHtml(formula.englishName) : null;
+            let displayName = safeName;
+            try {
+                const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                if (langSel && langSel.toLowerCase().startsWith('en')) {
+                    displayName = safeEnglishName || safeName;
+                }
+            } catch (_e) {
+                displayName = safeName;
+            }
             const safeSource = formula.source ? window.escapeHtml(formula.source) : null;
             const safeEffects = formula.effects ? window.escapeHtml(formula.effects) : null;
             // 新增主治與用法欄位的轉義處理
@@ -10585,7 +10622,7 @@ async function initializeSystemAfterLogin() {
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
                         <div>
-                            <h4 class="text-lg font-semibold text-gray-900">${safeName}</h4>
+                            <h4 class="text-lg font-semibold text-gray-900">${displayName}</h4>
                             ${safeSource ? `<p class="text-sm text-gray-600">出處：${safeSource}</p>` : ''}
                         </div>
                     </div>
