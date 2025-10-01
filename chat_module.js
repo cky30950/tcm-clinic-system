@@ -120,6 +120,18 @@
       } catch (_e) {
         // Ignore errors loading last seen times
       }
+      // Also fetch last seen times from the Realtime Database. This call is
+      // asynchronous and will merge any remote data with the locally loaded
+      // timestamps. We intentionally do not await the promise here so that
+      // chat initialization can continue without delay. When the data is
+      // retrieved, unread indicators will update automatically.
+      try {
+        if (typeof this.loadLastSeenTimesRemote === 'function') {
+          this.loadLastSeenTimesRemote();
+        }
+      } catch (_e) {
+        // Ignore remote loading errors; offline usage will still work
+      }
       this.createUI();
       this.setupPresence();
       this.populateUserList();
@@ -1190,12 +1202,38 @@
     persistLastSeenTimes() {
       try {
         if (!this.currentUserUid) return;
-        const key = `chat_lastSeen_${this.currentUserUid}`;
-        // Only persist plain objects; avoid persisting other types.
-        const data = JSON.stringify(this.lastSeenTime || {});
-        localStorage.setItem(key, data);
-      } catch (_e) {
-        // Ignore persistence errors (e.g., quota exceeded, unavailable)
+        // Persist to localStorage as a fallback for offline access.
+        try {
+          const key = `chat_lastSeen_${this.currentUserUid}`;
+          const data = JSON.stringify(this.lastSeenTime || {});
+          localStorage.setItem(key, data);
+        } catch (_e) {
+          // Ignore localStorage errors
+        }
+        // Also persist to Firebase Realtime Database so that unread status
+        // remains accurate across sessions and devices. Prefer using set()
+        // so that obsolete channel keys are removed. Fallback to update()
+        // if set() is unavailable.
+        const rtdb = window.firebase && window.firebase.rtdb;
+        const ref = window.firebase && window.firebase.ref;
+        const set = window.firebase && window.firebase.set;
+        const update = window.firebase && window.firebase.update;
+        if (rtdb && ref && (set || update)) {
+          const path = `chat/lastSeen/${this.currentUserUid}`;
+          const lastSeenRef = ref(rtdb, path);
+          const payload = this.lastSeenTime || {};
+          if (set) {
+            set(lastSeenRef, payload).catch((err) => {
+              console.error('ChatModule: error persisting lastSeenTime to database', err);
+            });
+          } else {
+            update(lastSeenRef, payload).catch((err) => {
+              console.error('ChatModule: error persisting lastSeenTime to database', err);
+            });
+          }
+        }
+      } catch (err) {
+        console.error('ChatModule: error in persistLastSeenTimes', err);
       }
     }
 
@@ -1216,6 +1254,60 @@
         }
       } catch (_e) {
         // Ignore errors reading/parsing localStorage
+      }
+    }
+
+    /**
+     * Fetch lastSeenTime from Firebase Realtime Database and merge with local data.
+     * See persistLastSeenTimes() for format. This method returns a Promise.
+     */
+    loadLastSeenTimesRemote() {
+      try {
+        if (!this.currentUserUid) {
+          return Promise.resolve();
+        }
+        const rtdb = window.firebase && window.firebase.rtdb;
+        const ref = window.firebase && window.firebase.ref;
+        const get = window.firebase && window.firebase.get;
+        if (!rtdb || !ref || !get) {
+          return Promise.resolve();
+        }
+        const path = `chat/lastSeen/${this.currentUserUid}`;
+        const lastSeenRef = ref(rtdb, path);
+        return get(lastSeenRef).then((snapshot) => {
+          const remoteData = snapshot && snapshot.exists() ? snapshot.val() : {};
+          if (remoteData && typeof remoteData === 'object') {
+            // Merge remote data with current lastSeenTime. Keep the max timestamp for each channel.
+            const merged = {};
+            Object.keys(remoteData).forEach((key) => {
+              const val = remoteData[key];
+              if (typeof val === 'number') {
+                merged[key] = val;
+              }
+            });
+            Object.keys(this.lastSeenTime || {}).forEach((key) => {
+              const localVal = this.lastSeenTime[key];
+              if (typeof localVal !== 'number') return;
+              if (!merged[key] || localVal > merged[key]) {
+                merged[key] = localVal;
+              }
+            });
+            this.lastSeenTime = merged;
+            // Persist merged result back to database and localStorage
+            if (typeof this.persistLastSeenTimes === 'function') {
+              this.persistLastSeenTimes();
+            }
+            // Update unread indicators after remote load
+            if (typeof this.updateNewMessageIndicators === 'function') {
+              this.updateNewMessageIndicators();
+            }
+          }
+        }).catch((err) => {
+          console.error('ChatModule: error loading lastSeenTime from database', err);
+        });
+      } catch (err) {
+        console.error('ChatModule: exception in loadLastSeenTimesRemote', err);
+        return Promise.resolve();
       }
     }
 
