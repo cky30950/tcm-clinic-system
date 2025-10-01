@@ -743,14 +743,23 @@
             // ensures doctor/nurse labels inside shift elements reflect the
             // current language setting.
             const positionLabel = staffMember.level || translate(staffMember.role === 'doctor' ? '醫師' : staffMember.role === 'nurse' ? '護理師' : '');
+            // 判斷當前使用者是否為管理員。非管理員時不顯示編輯與刪除按鈕。
+            const isAdmin = typeof window.isAdminUser === 'function' && window.isAdminUser();
+            // 根據權限組織操作按鈕的 HTML；僅管理員可見。
+            let actionsHtml = '';
+            if (isAdmin) {
+                actionsHtml = `
+                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="${translate('編輯')}">✏️</button>
+                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="${translate('刪除')}">🗑️</button>
+                `;
+            }
             element.innerHTML = `
                 <div class="shift-header">
                     <div class="shift-name">
                         ${staffMember.name}<span class="staff-position"> ${positionLabel}</span>
                     </div>
                     <div class="shift-actions">
-                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="${translate('編輯')}">✏️</button>
-                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="${translate('刪除')}">🗑️</button>
+                        ${actionsHtml.trim()}
                     </div>
                 </div>
                 <div class="shift-details">
