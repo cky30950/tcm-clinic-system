@@ -2,7 +2,14 @@
 // This module dynamically creates a chat UI within the application once a user logs in.
 // It manages online presence, group chat, and one‑to‑one private chat using Firebase Realtime Database.
 
-(function() {
+// Convert this file into an ES6 module.  Remove the IIFE wrapper so
+// that top–level declarations live in the module scope.  This allows
+// export statements to be used.  The IIFE wrapper previously
+// encapsulated the implementation details and exposed a ChatModule
+// object on the `window` global.  We retain the global export at the
+// bottom of the file for backwards compatibility while also
+// explicitly exporting the class and convenience functions.
+
   class InternalChat {
     constructor() {
       this.initialized = false;
@@ -1248,22 +1255,51 @@
     }
   }
 
-  // Create a single instance of InternalChat and expose init/destroy methods
-  const chatInstance = new InternalChat();
+// Create a single instance of InternalChat.  Expose helper functions
+// that call the underlying instance.  These helpers are exported
+// individually so that module consumers can import and invoke them
+// directly.  We also attach a ChatModule object to `window` so that
+// existing non‑module code continues to work without change.
+const chatInstance = new InternalChat();
+
+/**
+ * Initialise the chat module for the current user.  Wraps the
+ * underlying chat instance and catches any errors.
+ * @param {Object} userData The current user's data
+ * @param {Array} usersList Array of user records for populating the user list
+ */
+export function initChat(userData, usersList) {
+  try {
+    chatInstance.init(userData, usersList);
+  } catch (err) {
+    console.error('ChatModule: initChat failed', err);
+  }
+}
+
+/**
+ * Tear down the chat module, cleaning up listeners and UI.  Wraps the
+ * underlying chat instance and catches any errors.
+ */
+export function destroyChat() {
+  try {
+    chatInstance.destroy();
+  } catch (err) {
+    console.error('ChatModule: destroyChat failed', err);
+  }
+}
+
+// Export the InternalChat class itself for advanced use (e.g. testing
+// or custom instantiation).  Consumers may import this class and
+// construct their own instances if needed.
+export { InternalChat };
+
+// Backwards compatibility: continue to expose a ChatModule object
+// globally so that existing code written against window.ChatModule
+// still functions.  This object simply delegates to the exported
+// helpers defined above.
+if (typeof window !== 'undefined') {
   window.ChatModule = {
-    initChat: (userData, usersList) => {
-      try {
-        chatInstance.init(userData, usersList);
-      } catch (err) {
-        console.error('ChatModule: initChat failed', err);
-      }
-    },
-    destroyChat: () => {
-      try {
-        chatInstance.destroy();
-      } catch (err) {
-        console.error('ChatModule: destroyChat failed', err);
-      }
-    }
+    initChat,
+    destroyChat
   };
-})();
+}
