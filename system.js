@@ -6764,6 +6764,13 @@ if (!patient) {
                                     <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || '無記錄'}</div>
                                 </div>
                                 
+                                ${consultation.currentHistory ? `
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-700 block mb-2">現病史</span>
+                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.currentHistory}</div>
+                                </div>
+                                ` : ''}
+                                
                                 ${consultation.tongue ? `
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">舌象</span>
@@ -6775,13 +6782,6 @@ if (!patient) {
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">脈象</span>
                                     <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.pulse}</div>
-                                </div>
-                                ` : ''}
-                                
-                                ${consultation.currentHistory ? `
-                                <div>
-                                    <span class="text-sm font-semibold text-gray-700 block mb-2">現病史</span>
-                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.currentHistory}</div>
                                 </div>
                                 ` : ''}
                                 
@@ -7140,6 +7140,13 @@ function displayConsultationMedicalHistoryPage() {
                             <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || '無記錄'}</div>
                         </div>
                         
+                        ${consultation.currentHistory ? `
+                        <div>
+                            <span class="text-sm font-semibold text-gray-700 block mb-2">現病史</span>
+                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.currentHistory}</div>
+                        </div>
+                        ` : ''}
+                        
                         ${consultation.tongue ? `
                         <div>
                             <span class="text-sm font-semibold text-gray-700 block mb-2">舌象</span>
@@ -7151,13 +7158,6 @@ function displayConsultationMedicalHistoryPage() {
                         <div>
                             <span class="text-sm font-semibold text-gray-700 block mb-2">脈象</span>
                             <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.pulse}</div>
-                        </div>
-                        ` : ''}
-                        
-                        ${consultation.currentHistory ? `
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700 block mb-2">現病史</span>
-                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.currentHistory}</div>
                         </div>
                         ` : ''}
                         
