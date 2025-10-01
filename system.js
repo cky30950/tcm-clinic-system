@@ -11503,26 +11503,41 @@ async function initializeSystemAfterLogin() {
             }
             
             // 搜索匹配的中藥材和方劑，並根據匹配程度排序
-            let matchedItems = (Array.isArray(herbLibrary) ? herbLibrary : []).filter(item => {
-                const lowerName = item.name ? item.name.toLowerCase() : '';
-                const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
-                const lowerEffects = item.effects ? item.effects.toLowerCase() : '';
-                return lowerName.includes(searchTerm) || lowerAlias.includes(searchTerm) || lowerEffects.includes(searchTerm);
-            }).map(item => {
-                // 計算匹配分數：名稱匹配優先、別名次之、功效再次
-                const lowerName = item.name ? item.name.toLowerCase() : '';
-                const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
-                const lowerEffects = item.effects ? item.effects.toLowerCase() : '';
-                let score = Infinity;
-                if (lowerName.includes(searchTerm)) {
-                    score = lowerName.indexOf(searchTerm);
-                } else if (lowerAlias.includes(searchTerm)) {
-                    score = 100 + lowerAlias.indexOf(searchTerm);
-                } else if (lowerEffects.includes(searchTerm)) {
-                    score = 200 + lowerEffects.indexOf(searchTerm);
-                }
-                return { item, score };
-            }).sort((a, b) => a.score - b.score).map(obj => obj.item);
+            let matchedItems = (Array.isArray(herbLibrary) ? herbLibrary : [])
+                .filter(item => {
+                    // 將各屬性轉為小寫以便比對
+                    const lowerName = item.name ? item.name.toLowerCase() : '';
+                    const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
+                    const lowerEnglish = item.englishName ? item.englishName.toLowerCase() : '';
+                    const lowerEffects = item.effects ? item.effects.toLowerCase() : '';
+                    // 包含名稱、別名、英文名或功效即可視為匹配
+                    return (
+                        lowerName.includes(searchTerm) ||
+                        lowerAlias.includes(searchTerm) ||
+                        lowerEnglish.includes(searchTerm) ||
+                        lowerEffects.includes(searchTerm)
+                    );
+                })
+                .map(item => {
+                    // 計算匹配分數：名稱匹配優先，其次為別名、英文名，再次為功效
+                    const lowerName = item.name ? item.name.toLowerCase() : '';
+                    const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
+                    const lowerEnglish = item.englishName ? item.englishName.toLowerCase() : '';
+                    const lowerEffects = item.effects ? item.effects.toLowerCase() : '';
+                    let score = Infinity;
+                    if (lowerName.includes(searchTerm)) {
+                        score = lowerName.indexOf(searchTerm);
+                    } else if (lowerAlias.includes(searchTerm)) {
+                        score = 100 + lowerAlias.indexOf(searchTerm);
+                    } else if (lowerEnglish.includes(searchTerm)) {
+                        score = 200 + lowerEnglish.indexOf(searchTerm);
+                    } else if (lowerEffects.includes(searchTerm)) {
+                        score = 300 + lowerEffects.indexOf(searchTerm);
+                    }
+                    return { item, score };
+                })
+                .sort((a, b) => a.score - b.score)
+                .map(obj => obj.item);
             // 只取前 10 個結果
             matchedItems = matchedItems.slice(0, 10);
             
@@ -21175,24 +21190,28 @@ ${item.points.map(pt => {
               }
               return;
             }
-            // 搜索並根據匹配程度排序 herbLibrary 中的中藥材與方劑（名稱、別名或功效）
+            // 搜索並根據匹配程度排序 herbLibrary 中的中藥材與方劑（名稱、別名、英文名或功效）
             let matched = (Array.isArray(herbLibrary) ? herbLibrary : [])
               .filter(item => item && (item.type === 'herb' || item.type === 'formula') && (
                 (item.name && item.name.toLowerCase().includes(searchTerm)) ||
                 (item.alias && item.alias.toLowerCase().includes(searchTerm)) ||
+                (item.englishName && item.englishName.toLowerCase().includes(searchTerm)) ||
                 (item.effects && item.effects.toLowerCase().includes(searchTerm))
               ))
               .map(item => {
                 const ln = item.name ? item.name.toLowerCase() : '';
                 const la = item.alias ? item.alias.toLowerCase() : '';
+                const en = item.englishName ? item.englishName.toLowerCase() : '';
                 const le = item.effects ? item.effects.toLowerCase() : '';
                 let score = Infinity;
                 if (ln.includes(searchTerm)) {
                   score = ln.indexOf(searchTerm);
                 } else if (la.includes(searchTerm)) {
                   score = 100 + la.indexOf(searchTerm);
+                } else if (en.includes(searchTerm)) {
+                  score = 200 + en.indexOf(searchTerm);
                 } else if (le.includes(searchTerm)) {
-                  score = 200 + le.indexOf(searchTerm);
+                  score = 300 + le.indexOf(searchTerm);
                 }
                 return { item, score };
               })
@@ -21342,14 +21361,15 @@ ${item.points.map(pt => {
               }
               return;
             }
-            // 過濾並根據匹配程度排序 acupointLibrary 中的穴位（名稱、經絡、定位、功效或主治）
+            // 過濾並根據匹配程度排序 acupointLibrary 中的穴位（名稱、經絡、定位、功效、主治或英文名）
             let matched = (Array.isArray(acupointLibrary) ? acupointLibrary : [])
               .filter(item => item && (
                 (item.name && item.name.toLowerCase().includes(searchTerm)) ||
                 (item.meridian && item.meridian.toLowerCase().includes(searchTerm)) ||
                 (item.location && item.location.toLowerCase().includes(searchTerm)) ||
                 (item.functions && (Array.isArray(item.functions) ? item.functions.join(' ').toLowerCase().includes(searchTerm) : String(item.functions).toLowerCase().includes(searchTerm))) ||
-                (item.indications && (Array.isArray(item.indications) ? item.indications.join(' ').toLowerCase().includes(searchTerm) : String(item.indications).toLowerCase().includes(searchTerm)))
+                (item.indications && (Array.isArray(item.indications) ? item.indications.join(' ').toLowerCase().includes(searchTerm) : String(item.indications).toLowerCase().includes(searchTerm))) ||
+                (item.englishName && item.englishName.toLowerCase().includes(searchTerm))
               ))
               .map(item => {
                 const n = item.name ? item.name.toLowerCase() : '';
@@ -21357,6 +21377,7 @@ ${item.points.map(pt => {
                 const l = item.location ? item.location.toLowerCase() : '';
                 const f = item.functions ? (Array.isArray(item.functions) ? item.functions.join(' ').toLowerCase() : String(item.functions).toLowerCase()) : '';
                 const i = item.indications ? (Array.isArray(item.indications) ? item.indications.join(' ').toLowerCase() : String(item.indications).toLowerCase()) : '';
+                const e = item.englishName ? item.englishName.toLowerCase() : '';
                 let score = Infinity;
                 if (n.includes(searchTerm)) {
                   score = n.indexOf(searchTerm);
@@ -21368,6 +21389,8 @@ ${item.points.map(pt => {
                   score = 300 + f.indexOf(searchTerm);
                 } else if (i.includes(searchTerm)) {
                   score = 400 + i.indexOf(searchTerm);
+                } else if (e.includes(searchTerm)) {
+                  score = 500 + e.indexOf(searchTerm);
                 }
                 return { item, score };
               })
@@ -21661,7 +21684,8 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
           (item.meridian && item.meridian.toLowerCase().includes(searchTerm)) ||
           (item.location && item.location.toLowerCase().includes(searchTerm)) ||
           (item.functions && (Array.isArray(item.functions) ? item.functions.join(' ').toLowerCase().includes(searchTerm) : String(item.functions).toLowerCase().includes(searchTerm))) ||
-          (item.indications && (Array.isArray(item.indications) ? item.indications.join(' ').toLowerCase().includes(searchTerm) : String(item.indications).toLowerCase().includes(searchTerm)))
+          (item.indications && (Array.isArray(item.indications) ? item.indications.join(' ').toLowerCase().includes(searchTerm) : String(item.indications).toLowerCase().includes(searchTerm))) ||
+          (item.englishName && item.englishName.toLowerCase().includes(searchTerm))
         ))
         .map(item => {
           const nameStr = item.name ? item.name.toLowerCase() : '';
@@ -21669,6 +21693,7 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
           const locStr = item.location ? item.location.toLowerCase() : '';
           const funcStr = item.functions ? (Array.isArray(item.functions) ? item.functions.join(' ').toLowerCase() : String(item.functions).toLowerCase()) : '';
           const indStr = item.indications ? (Array.isArray(item.indications) ? item.indications.join(' ').toLowerCase() : String(item.indications).toLowerCase()) : '';
+          const engStr = item.englishName ? item.englishName.toLowerCase() : '';
           let score = Infinity;
           if (nameStr.includes(searchTerm)) {
             score = nameStr.indexOf(searchTerm);
@@ -21680,6 +21705,8 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
             score = 300 + funcStr.indexOf(searchTerm);
           } else if (indStr.includes(searchTerm)) {
             score = 400 + indStr.indexOf(searchTerm);
+          } else if (engStr.includes(searchTerm)) {
+            score = 500 + engStr.indexOf(searchTerm);
           }
           return { item, score };
         })
