@@ -4467,26 +4467,32 @@ async function selectPatientForRegistration(patientId) {
         // 載入醫師選項
         function loadDoctorOptions() {
             const doctorSelect = document.getElementById('appointmentDoctor');
-            
+
             // 獲取所有啟用的醫師用戶
-            const doctors = users.filter(user => 
+            const doctors = users.filter(user =>
                 user.active && user.position === '醫師'
             );
-            
-            // 清空現有選項（保留預設選項）
-            doctorSelect.innerHTML = '<option value="">請選擇醫師</option>';
-            
-            // 添加醫師選項
+
+            // 清空現有選項並設置預設選項文字（使用 i18n 翻譯）
+            // 使用 window.t 如果可用，否則退回原文
+            const defaultLabel = window.t ? window.t('請選擇醫師') : '請選擇醫師';
+            doctorSelect.innerHTML = `<option value="">${defaultLabel}</option>`;
+
+            // 添加醫師選項，根據當前語言翻譯「醫師」後綴
             doctors.forEach(doctor => {
                 const option = document.createElement('option');
                 option.value = doctor.username;
-                option.textContent = `${doctor.name}醫師`;
+                // 翻譯「醫師」後綴；若翻譯後非原文則在姓名與後綴之間加入空格
+                const suffix = window.t ? window.t('醫師') : '醫師';
+                const needsSpace = suffix && suffix !== '醫師';
+                let displayName = needsSpace ? `${doctor.name} ${suffix}` : `${doctor.name}${suffix}`;
                 if (doctor.registrationNumber) {
-                    option.textContent += ` (${doctor.registrationNumber})`;
+                    displayName += ` (${doctor.registrationNumber})`;
                 }
+                option.textContent = displayName;
                 doctorSelect.appendChild(option);
             });
-            
+
             // 如果當前用戶是醫師，預設選擇自己
             if (currentUserData && currentUserData.position === '醫師') {
                 doctorSelect.value = currentUserData.username;
