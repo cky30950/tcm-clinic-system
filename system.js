@@ -14164,23 +14164,20 @@ async function deleteUser(id) {
                     endDate = new Date(today.getFullYear(), today.getMonth(), 0);
                     if (rptElem) rptElem.value = 'monthly';
                     break;
-                case 'thisYear': {
+                case 'thisYear':
                     // 今年：起始為當年度 1 月 1 日，結束為當年度最後一天
-                    const currentYear = today.getFullYear();
-                    startDate = new Date(currentYear, 0, 1);
-                    // 取隔年 1 月 0 日，可得到當年最後一天（例如：new Date(2026, 0, 0) 為 2025-12-31）
-                    endDate = new Date(currentYear + 1, 0, 0);
+                    startDate = new Date(today.getFullYear(), 0, 1);
+                    // 使用 new Date(year + 1, 0, 0) 取得當年度最後一天（例如：2025+1,0,0 得到 2025-12-31）
+                    endDate = new Date(today.getFullYear() + 1, 0, 0);
                     if (rptElem) rptElem.value = 'yearly';
                     break;
-                }
-                case 'lastYear': {
+                case 'lastYear':
                     // 去年：起始為去年 1 月 1 日，結束為去年最後一天
-                    const lastYear = today.getFullYear() - 1;
-                    startDate = new Date(lastYear, 0, 1);
-                    endDate = new Date(lastYear + 1, 0, 0);
+                    startDate = new Date(today.getFullYear() - 1, 0, 1);
+                    // 使用 new Date(currentYear, 0, 0) 取得前一年度最後一天（即本年度 1 月 0 日）
+                    endDate = new Date(today.getFullYear(), 0, 0);
                     if (rptElem) rptElem.value = 'yearly';
                     break;
-                }
                 default:
                     return;
             }
