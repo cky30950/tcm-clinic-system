@@ -35,7 +35,21 @@ import './schedule_management.js';
 // top‑level declarations scoped to the module.  The file itself
 // attaches necessary functions and variables to the global `window`
 // object where required.
-import './system.js';
+// Import the core system logic (everything from the original system.js except
+// the network status and keyboard/inactivity monitoring).  This module
+// attaches many functions to the `window` object just like the legacy
+// system.js did.  We renamed it to core_system.js and removed the
+// standalone network and keyboard IIFEs.
+import './core_system.js';
+
+// Import the separated network status module.  This registers online/offline
+// listeners and exposes updateNetworkStatus on the global window.
+import './network_status.js';
+
+// Import the separated keyboard and inactivity monitoring module.  This
+// registers global keyboard shortcuts and exposes start/stop inactivity
+// monitoring on the global window.
+import './keyboard_inactivity.js';
 
 // No additional code is needed here.  All initialization and event
 // binding is performed within the imported modules.  Keeping this file

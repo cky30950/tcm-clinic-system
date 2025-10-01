@@ -44,15 +44,6 @@ import { getAuth, signInWithEmailAndPassword, signOut, setPersistence,
         // 引入 onAuthStateChanged 以監聽認證狀態變化
         onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
-// -----------------------------------------------------------------------------
-// Aliases and helper constants
-//
-// To cleanly export the deletion helper, define a local alias referencing
-// the imported deleteUser function.  This avoids trying to export a symbol
-// that doesn't exist in the module scope and matches the naming used on
-// window.firebase (deleteAuthUser).
-const deleteAuthUser = firebaseDeleteUser;
-
 // 匯入外部配置檔案。請將您的 Firebase 設定值放在 firebaseConfig.js 中，並避免將其提交到版本控制。
 import firebaseConfig from './firebaseConfig.js';
 
@@ -182,67 +173,3 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
     console.log('Firebase 初始化完成');
 
     // 不在初始化時發送 Firebase 連線狀態事件，以避免初始值誤判為離線。
-
-// ----------------------------------------------------------------------
-// Module exports
-//
-// In addition to attaching the Firebase API wrapper to `window.firebase`,
-// export the underlying app instances and helper functions so that
-// consumers using ES6 modules can import them directly.  This allows
-// tree‑shaking tools to include only the functions in use and avoids
-// reliance on global variables.  The names mirror those attached to
-// `window.firebase` above.
-export {
-    // Core Firebase app instances
-    app,
-    db,
-    rtdb,
-    auth,
-    // Firestore helpers
-    collection,
-    addDoc,
-    getDocs,
-    doc,
-    updateDoc,
-    deleteDoc,
-    setDoc,
-    writeBatch,
-    // Expose Firestore query helper under the same name used on window.firebase
-    // Note: the default Firestore query is named `query` in the SDK; we
-    // rename it here for clarity and to align with the global alias
-    query as firestoreQuery,
-    where,
-    orderBy,
-    limit,
-    startAfter,
-    getDoc,
-    getCountFromServer,
-    // Realtime Database helpers
-    ref,
-    set,
-    get,
-    update,
-    remove,
-    onValue,
-    off,
-    onDisconnect,
-    // The rtdbQuery alias mirrors the assignment on window.firebase
-    rtdbQuery,
-    orderByChild,
-    startAt,
-    endAt,
-    limitToLast,
-    // Auth helpers
-    signInWithEmailAndPassword,
-    signOut,
-    createUserWithEmailAndPassword,
-    updateProfile,
-    updatePassword,
-    deleteAuthUser,
-    EmailAuthProvider,
-    reauthenticateWithCredential,
-    setPersistence,
-    browserSessionPersistence,
-    browserLocalPersistence,
-    onAuthStateChanged
-};

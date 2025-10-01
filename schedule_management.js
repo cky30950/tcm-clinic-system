@@ -1,9 +1,4 @@
-// Convert this script into an ES6 module.  Remove the immediately‑invoked
-// function expression (IIFE) wrapper so that top‑level declarations live
-// in module scope.  This change allows us to export functions for
-// consumers while still attaching them to the `window` object for
-// backwards compatibility.  The rest of the file remains largely
-// unchanged.
+(function() {
 // 全域變數
         let currentDate = new Date();
         let currentView = 'month';
@@ -2007,39 +2002,4 @@ if (typeof window.initializeScheduleManagement !== 'function') {
     }
   };
 }
-
-// ----------------------------------------------------------------------
-// Module exports
-//
-// Export the primary schedule management functions so that they can be
-// imported by other modules.  These functions are still attached to
-// `window.schedule*` above for backwards compatibility, but by
-// exporting them here we enable ES module consumers to import them
-// directly without relying on globals.
-export {
-  navigateCalendar,
-  goToToday,
-  syncToGoogle,
-  exportToICal,
-  applyFilters,
-  openFixedScheduleModal,
-  closeFixedScheduleModal,
-  createFixedSchedule,
-  clearAllShifts,
-  openShiftModal,
-  closeModal,
-  addShift,
-  filterStaff,
-  editShift,
-  deleteShift,
-  quickAddShiftFromDrag,
-  contactStaff,
-  viewStaffSchedule,
-  showShiftDetails,
-  showShiftDetailsById,
-  updateStats,
-  // Export printCurrentMonthSchedule under a more descriptive name for module users
-  printCurrentMonthSchedule as printShiftTable,
-  // Export holiday region helper for direct import
-  changeHolidayRegion
-};
+})();
