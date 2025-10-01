@@ -153,6 +153,8 @@ window.translations = {
         "年報表": "年報表",
         "年齡": "年齡",
         "年齡：": "年齡：",
+        // Generic number label colon variant used in registration search
+        "編號：": "編號：",
         "序號": "序號",
         "建議休息期間": "建議休息期間",
         "建議病人下次回診的時間": "建議病人下次回診的時間",
@@ -171,6 +173,8 @@ window.translations = {
         "掛號診症系統": "掛號診症系統",
         "掛號醫師": "掛號醫師",
         "掛號醫師 *": "掛號醫師 *",
+        // Colon variant for registration doctor to ensure proper translation lookup
+        "掛號醫師：": "掛號醫師：",
         "搜索病人掛號": "搜索病人掛號",
         "操作": "操作",
         "收入佔比": "收入佔比",
@@ -1166,6 +1170,8 @@ window.translations = {
         "掛號診症系統": "Registration and Consultation System",
         "掛號醫師": "Doctor",
         "掛號醫師 *": "Doctor *",
+        // Colon variant for registration doctor to ensure proper translation lookup
+        "掛號醫師：": "Doctor:",
         "搜索病人掛號": "Search patient registrations",
         "操作": "Actions",
         "收入佔比": "Revenue Share",
@@ -1243,6 +1249,8 @@ window.translations = {
         "統計期間收入": "Income for the period",
         "統計資料、備份匯出": "Statistics & Backup Export",
         "編號": "ID",
+        // Generic number label colon variant used in registration search
+        "編號：": "ID:",
         "編輯組合": "Edit Combo",
         "總收入": "Total Revenue",
         "總計：": "Total:",
