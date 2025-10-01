@@ -48,6 +48,38 @@ const paginationSettings = {
     patientList: { currentPage: 1, itemsPerPage: 10 }
 };
 
+/**
+ * 取得多語欄位值。根據當前語言返回對應欄位內容。
+ * 如果語言為英文，優先尋找帶有 `_en` 後綴的欄位；若不存在，則尋找 `_pinyin` 後綴欄位。
+ * 若均無符合欄位或語言非英文，則返回原始欄位值。
+ *
+ * @param {Object} obj - 含有多語欄位的資料物件，例如穴位或中藥。
+ * @param {string} key - 欄位名稱，如 'name'、'category' 等。
+ * @returns {string} 對應的欄位內容，若無則為空字串。
+ */
+function getLocalizedValue(obj, key) {
+    if (!obj || typeof obj !== 'object') return '';
+    let val = obj[key] || '';
+    try {
+        const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+        if (langSel && langSel.toLowerCase().startsWith('en')) {
+            // 若有英文欄位，優先使用
+            const enField = key + '_en';
+            if (typeof obj[enField] === 'string' && obj[enField]) {
+                return obj[enField];
+            }
+            // 若沒有英文欄位，則使用拼音欄位
+            const pinyinField = key + '_pinyin';
+            if (typeof obj[pinyinField] === 'string' && obj[pinyinField]) {
+                return obj[pinyinField];
+            }
+        }
+    } catch (_e) {
+        // 忽略 localStorage 讀取錯誤
+    }
+    return val;
+}
+
 // 為穴位庫新增分頁設定，每頁顯示 6 筆資料
 paginationSettings.acupointLibrary = { currentPage: 1, itemsPerPage: 6 };
 
@@ -10458,8 +10490,9 @@ async function initializeSystemAfterLogin() {
         }
         
         function createHerbCard(herb) {
-            // 為避免 XSS，對文字內容進行轉義
-            const safeName = window.escapeHtml(herb.name);
+            // 為避免 XSS，對文字內容進行轉義，並根據語言顯示中文、英文或拼音
+            const displayName = getLocalizedValue(herb, 'name') || '';
+            const safeName = window.escapeHtml(displayName);
             const safeAlias = herb.alias ? window.escapeHtml(herb.alias) : null;
             // 新增性味、歸經與主治欄位的轉義處理
             const safeNature = herb.nature ? window.escapeHtml(herb.nature) : null;
@@ -10532,8 +10565,9 @@ async function initializeSystemAfterLogin() {
         }
         
         function createFormulaCard(formula) {
-            // 為避免 XSS，對文字內容進行轉義
-            const safeName = window.escapeHtml(formula.name);
+            // 為避免 XSS，對文字內容進行轉義，並根據語言顯示中文、英文或拼音
+            const displayName = getLocalizedValue(formula, 'name') || '';
+            const safeName = window.escapeHtml(displayName);
             const safeSource = formula.source ? window.escapeHtml(formula.source) : null;
             const safeEffects = formula.effects ? window.escapeHtml(formula.effects) : null;
             // 新增主治與用法欄位的轉義處理
@@ -10984,7 +11018,9 @@ async function initializeSystemAfterLogin() {
          * @returns {string}
          */
         function createAcupointCard(ac) {
-            const safeName = window.escapeHtml(ac.name || '');
+            // 根據語言取得顯示名稱（中文、英文或拼音）
+            const displayName = getLocalizedValue(ac, 'name') || '';
+            const safeName = window.escapeHtml(displayName);
             const safeMeridian = ac.meridian ? window.escapeHtml(ac.meridian) : '';
             const safeLocation = ac.location ? window.escapeHtml(ac.location) : '';
             const funcs = Array.isArray(ac.functions) ? ac.functions : (ac.functions ? [ac.functions] : []);
@@ -20024,14 +20060,29 @@ function deleteAcupointCombination(id) {
             pageItems.forEach(item => {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-purple-200';
+              // 根據語言取得模板各欄位的顯示值
+              const nameVal = getLocalizedValue(item, 'name') || '';
+              const categoryVal = getLocalizedValue(item, 'category') || '';
+              const durationVal = getLocalizedValue(item, 'duration') || '';
+              const followVal = getLocalizedValue(item, 'followUp') || '';
+              const contentVal = getLocalizedValue(item, 'content') || item.content || '';
+              const safeNameVal = window.escapeHtml(nameVal);
+              const safeCategoryVal = window.escapeHtml(categoryVal);
+              const safeDurationVal = window.escapeHtml(durationVal);
+              const safeFollowVal = window.escapeHtml(followVal);
+              // 為內容逐行轉義並包裹段落標籤
+              const contentHtml = contentVal.split('\n').map(p => '<p class="mb-2">' + window.escapeHtml(p) + '</p>').join('');
+              // 標籤翻譯：療程與複診
+              const treatmentLabel = (typeof window.t === 'function') ? window.t('療程:') : '療程:';
+              const followLabel = (typeof window.t === 'function') ? window.t('複診:') : '複診:';
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
                   <div>
-                    <h3 class="text-lg font-semibold text-purple-800">${item.name}</h3>
+                    <h3 class="text-lg font-semibold text-purple-800">${safeNameVal}</h3>
                     <div class="flex gap-2 mt-1">
-                      <span class="text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded">${item.category}</span>
-                      <span class="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">療程: ${item.duration}</span>
-                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">複診: ${item.followUp}</span>
+                      <span class="text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded">${safeCategoryVal}</span>
+                      <span class="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">${treatmentLabel} ${safeDurationVal}</span>
+                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">${followLabel} ${safeFollowVal}</span>
                     </div>
                   </div>
                   <div class="flex gap-2">
@@ -20039,7 +20090,7 @@ function deleteAcupointCombination(id) {
                   </div>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
-                  ${item.content.split('\n').map(p => '<p class="mb-2">' + p + '</p>').join('')}
+                  ${contentHtml}
                 </div>
               `;
               container.appendChild(card);
@@ -21116,6 +21167,8 @@ ${item.points.map(pt => {
             // 顯示搜尋結果：移除劑量顯示並使用 tooltip 顯示詳細資料
             resultsList.innerHTML = matched.map(item => {
               const safeName = (item.name || '').replace(/'/g, "\\'");
+              // 顯示名稱根據語言選擇中文、英文或拼音
+              const displayName = window.escapeHtml(getLocalizedValue(item, 'name'));
               // 構建詳細資訊內容
               const details = [];
               details.push('名稱：' + (item.name || ''));
@@ -21134,7 +21187,7 @@ ${item.points.map(pt => {
               const encoded = encodeURIComponent(details.join('\n'));
               // 使用模板字串來組合 HTML，避免字串串接時的引號轉義錯誤
               // 這裡使用單引號包裹 safeName 參數，並確保任何單引號都已在上方以 \\ 替換
-              return `<div class="p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addHerbToCombo('${safeName}', '')">${window.escapeHtml(item.name)}</div>`;
+              return `<div class="p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addHerbToCombo('${safeName}', '')">${displayName}</div>`;
             }).join('');
             resultsContainer.classList.remove('hidden');
           }
@@ -21170,10 +21223,21 @@ ${item.points.map(pt => {
                 hideTooltip();
               });
             }
-            // 名稱以 span 顯示（不可編輯）
+            // 名稱以 span 顯示（不可編輯），根據語言選擇中文、英文或拼音
             const nameSpan = document.createElement('span');
             nameSpan.className = 'flex-1 text-green-800';
-            nameSpan.textContent = name || '';
+            let displayNameHerb = name || '';
+            try {
+              const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+              if (langSel && langSel.toLowerCase().startsWith('en') && Array.isArray(herbLibrary)) {
+                const found = herbLibrary.find(item => item && item.name === name);
+                if (found) {
+                  const localized = getLocalizedValue(found, 'name');
+                  if (localized) displayNameHerb = localized;
+                }
+              }
+            } catch (_e) {}
+            nameSpan.textContent = displayNameHerb;
             div.appendChild(nameSpan);
             // 劑量輸入欄
             const dosageInput = document.createElement('input');
@@ -21291,6 +21355,8 @@ ${item.points.map(pt => {
             // 顯示搜尋結果，每個結果可點擊加入穴位清單，並顯示 tooltip 詳細資料
             resultsList.innerHTML = matched.map(item => {
               const safeName = (item.name || '').replace(/'/g, "\\'");
+              // 顯示名稱根據語言選擇中文、英文或拼音
+              const displayName = window.escapeHtml(getLocalizedValue(item, 'name'));
               const details = [];
               details.push('名稱：' + (item.name || ''));
               if (item.meridian) details.push('經絡：' + item.meridian);
@@ -21308,7 +21374,7 @@ ${item.points.map(pt => {
               const encoded = encodeURIComponent(details.join('\n'));
               // 使用模板字串來組合 HTML，避免字串串接時的引號轉義錯誤
               // 注意 safeName 中的單引號已使用 \ 替換，因此可以安全地放入單引號包裹的 onclick 引數
-              return `<div class="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addAcupointToCombo('${safeName}')">${window.escapeHtml(item.name)}</div>`;
+              return `<div class="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addAcupointToCombo('${safeName}')">${displayName}</div>`;
             }).join('');
             resultsContainer.classList.remove('hidden');
           }
@@ -21343,10 +21409,21 @@ ${item.points.map(pt => {
                 hideTooltip();
               });
             }
-            // 名稱以 span 顯示
+            // 名稱以 span 顯示，根據當前語言決定顯示中文、英文或拼音
             const nameSpan = document.createElement('span');
             nameSpan.className = 'flex-1 text-blue-800';
-            nameSpan.textContent = name || '';
+            let displayNameAcup = name || '';
+            try {
+              const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+              if (langSel && langSel.toLowerCase().startsWith('en') && Array.isArray(acupointLibrary)) {
+                const found = acupointLibrary.find(item => item && item.name === name);
+                if (found) {
+                  const localized = getLocalizedValue(found, 'name');
+                  if (localized) displayNameAcup = localized;
+                }
+              }
+            } catch (_e) {}
+            nameSpan.textContent = displayNameAcup;
             div.appendChild(nameSpan);
     // 不再顯示主穴/配穴選擇，僅顯示名稱與刪除按鈕
             // 刪除按鈕
