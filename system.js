@@ -1572,38 +1572,48 @@ function generateMedicalRecordNumber() {
         // 格式化年齡顯示
         function formatAge(birthDate) {
             if (!birthDate) return '未知';
-            
+
             const birth = new Date(birthDate);
             const today = new Date();
-            
+
             let years = today.getFullYear() - birth.getFullYear();
             const monthDiff = today.getMonth() - birth.getMonth();
-            
+
             if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
                 years--;
             }
-            
+
+            // 取得翻譯函式，用於取得不同語言下的單位
+            const translate = typeof window.t === 'function' ? window.t : (s) => s;
+
             if (years > 0) {
-                return `${years}歲`;
+                // 翻譯「歲」單位；若翻譯後與原文不同，則在數字與單位之間加空格
+                const unit = translate('歲');
+                const joiner = unit !== '歲' ? ' ' : '';
+                return `${years}${joiner}${unit}`;
             } else {
-                // 未滿一歲的嬰幼兒顯示月數
+                // 未滿一歲的嬰幼兒顯示月數或天數
                 let months = today.getMonth() - birth.getMonth();
                 let days = today.getDate() - birth.getDate();
-                
+
                 if (days < 0) {
                     months--;
                     const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
                     days += lastMonth.getDate();
                 }
-                
+
                 if (months < 0) {
                     months += 12;
                 }
-                
+
                 if (months > 0) {
-                    return `${months}個月`;
+                    const unit = translate('個月');
+                    const joiner = unit !== '個月' ? ' ' : '';
+                    return `${months}${joiner}${unit}`;
                 } else {
-                    return `${days}天`;
+                    const unit = translate('天');
+                    const joiner = unit !== '天' ? ' ' : '';
+                    return `${days}${joiner}${unit}`;
                 }
             }
         }
@@ -4482,22 +4492,29 @@ async function selectPatientForRegistration(patientId) {
             
             // 清空現有選項（保留預設選項）
             doctorSelect.innerHTML = '<option value="">請選擇醫師</option>';
-            
-            // 添加醫師選項
-            doctors.forEach(doctor => {
-                const option = document.createElement('option');
-                option.value = doctor.username;
-                option.textContent = `${doctor.name}醫師`;
-                if (doctor.registrationNumber) {
-                    option.textContent += ` (${doctor.registrationNumber})`;
-                }
-                doctorSelect.appendChild(option);
-            });
-            
-            // 如果當前用戶是醫師，預設選擇自己
-            if (currentUserData && currentUserData.position === '醫師') {
-                doctorSelect.value = currentUserData.username;
-            }
+    // 取得翻譯函式
+    const translate = typeof window.t === 'function' ? window.t : (s) => s;
+
+    // 添加醫師選項，動態翻譯職位名稱。
+    doctors.forEach(doctor => {
+        const option = document.createElement('option');
+        option.value = doctor.username;
+        // 取得翻譯後的職位名稱
+        const translatedRole = translate('醫師');
+        // 根據翻譯結果決定是否在姓名與職位之間插入空格。
+        const joiner = translatedRole !== '醫師' ? ' ' : '';
+        option.textContent = `${doctor.name}${joiner}${translatedRole}`;
+        // 若有註冊編號則加入括號顯示
+        if (doctor.registrationNumber) {
+            option.textContent += ` (${doctor.registrationNumber})`;
+        }
+        doctorSelect.appendChild(option);
+    });
+
+    // 如果當前用戶是醫師，預設選擇自己
+    if (currentUserData && currentUserData.position === '醫師') {
+        doctorSelect.value = currentUserData.username;
+    }
         }
         
         // 關閉掛號彈窗
@@ -13105,11 +13122,16 @@ const consultationDate = (() => {
         // 獲取用戶顯示名稱（姓名全名 + 職位）
         function getUserDisplayName(user) {
             if (!user || !user.name) return '未知用戶';
-            
+
             const fullName = user.name;
             const position = user.position || '用戶';
-            
-            return `${fullName}${position}`;
+
+            // 使用國際化函式翻譯職位名稱，如果當前語言為中文，翻譯結果會與原文一致。
+            const translate = typeof window.t === 'function' ? window.t : (s) => s;
+            const translatedPosition = translate(position);
+            // 若翻譯後的職位與原職位不同（例如英文界面），則在姓名與職位之間插入空格。
+            const joiner = translatedPosition !== position ? ' ' : '';
+            return `${fullName}${joiner}${translatedPosition}`;
         }
         
         // 獲取醫師顯示名稱
