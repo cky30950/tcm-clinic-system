@@ -10989,15 +10989,22 @@ async function initializeSystemAfterLogin() {
             // 新增英譯名稱與國際編碼的處理。從資料中讀取英譯名稱 (englishName) 與國際編碼 (internationalCode)，若不存在則使用空字串。
             const safeEnglishName = ac.englishName ? window.escapeHtml(ac.englishName) : '';
             const safeCode = ac.internationalCode ? window.escapeHtml(ac.internationalCode) : '';
-            // 組合顯示名稱：中文名 / 英文名 (國際編碼)
-            let displayName = safeName;
-            if (safeEnglishName) {
-                displayName += ' / ' + safeEnglishName;
+            // 組合顯示名稱：根據介面語言決定是否顯示中文
+            // 取得目前語言設定，預設為中文（zh）。localStorage.getItem('lang') 在英文版會是 'en'
+            const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+            let displayName;
+            if (lang === 'en' && safeEnglishName) {
+                // 英文介面：僅顯示英文名稱，不含中文
+                displayName = safeEnglishName;
+            } else {
+                // 中文介面或沒有英文名稱：僅顯示中文名稱
+                displayName = safeName;
             }
+            // 如有國際編碼，一律加上 (國際編碼)
             if (safeCode) {
                 displayName += ' (' + safeCode + ')';
             }
-            // 將合併後的名稱覆蓋回 safeName，讓卡片標題使用中英名稱與國際編碼
+            // 將組合後的名稱覆蓋回 safeName，讓卡片標題使用
             safeName = displayName;
             const safeMeridian = ac.meridian ? window.escapeHtml(ac.meridian) : '';
             const safeLocation = ac.location ? window.escapeHtml(ac.location) : '';
