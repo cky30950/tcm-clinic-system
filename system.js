@@ -11553,7 +11553,19 @@ async function initializeSystemAfterLogin() {
             
             // 顯示搜索結果，移除劑量欄，並使用自訂 tooltip
             resultsList.innerHTML = matchedItems.map(item => {
-                const typeName = item.type === 'herb' ? '中藥材' : '方劑';
+                // 根據當前介面語言決定名稱顯示。若為英文介面且存在英譯名稱，優先使用英譯名稱；否則使用中文名稱。
+                let displayName = item.name;
+                try {
+                    const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                    if (langSel && langSel.toLowerCase().startsWith('en') && item.englishName) {
+                        displayName = item.englishName;
+                    }
+                } catch (_e) {
+                    displayName = item.name;
+                }
+                // 翻譯類型名稱：使用 window.t 函式進行翻譯，預設為中文
+                const typeLabelZh = item.type === 'herb' ? '中藥材' : '方劑';
+                const typeLabel = (typeof window.t === 'function') ? window.t(typeLabelZh) : typeLabelZh;
                 const bgColor = 'bg-yellow-50 hover:bg-yellow-100 border-yellow-200';
                 // 組合完整資訊作為 tooltip 內容，並進行編碼
                 const details = [];
@@ -11598,8 +11610,8 @@ async function initializeSystemAfterLogin() {
                          onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"
                          onclick="addToPrescription('${item.type}', ${item.id})">
                         <div class="text-center">
-                            <div class="font-semibold text-gray-900 text-sm mb-1">${window.escapeHtml(item.name)}</div>
-                            <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${typeName}</div>
+                            <div class="font-semibold text-gray-900 text-sm mb-1">${window.escapeHtml(displayName)}</div>
+                            <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${typeLabel}</div>
                             ${item.effects ? `<div class="text-xs text-gray-600 mt-1">${window.escapeHtml(item.effects.substring(0, 30))}${item.effects.length > 30 ? '...' : ''}</div>` : ''}
                             <div class="text-xs mt-1 ${stockClass}">${remainLabel} ${qtyDisplay}${unitTranslated}</div>
                         </div>
@@ -11717,6 +11729,28 @@ async function initializeSystemAfterLogin() {
                             if (fullItem.cautions) details.push('注意：' + fullItem.cautions);
                         }
                         const encoded = encodeURIComponent(details.join('\n'));
+                        // 決定名稱顯示。英語介面且有英譯名稱時，顯示英譯名稱；否則顯示中文名稱
+                        let displayName = item.name;
+                        try {
+                            const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                            if (langSel && langSel.toLowerCase().startsWith('en') && fullItem && fullItem.englishName) {
+                                displayName = fullItem.englishName;
+                            }
+                        } catch (_e) {
+                            displayName = item.name;
+                        }
+                        // 決定類型標籤：依語言選擇英文或中文
+                        let typeLabel;
+                        try {
+                            const langSel2 = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                            if (langSel2 && langSel2.toLowerCase().startsWith('en')) {
+                                typeLabel = item.type === 'formula' ? 'Formula' : 'Herb';
+                            } else {
+                                typeLabel = item.type === 'formula' ? '方劑' : '中藥材';
+                            }
+                        } catch (_err) {
+                            typeLabel = item.type === 'formula' ? '方劑' : '中藥材';
+                        }
                         // 建立 HTML，並綁定 tooltip 事件於整個項目容器
                         return `
                             <div class="${bgColor} border rounded-lg p-3 cursor-pointer"
@@ -11726,8 +11760,8 @@ async function initializeSystemAfterLogin() {
                                  onmouseleave="hideTooltip()">
                                 <div class="flex items-center">
                                     <div class="flex-1">
-                                        <div class="font-semibold text-gray-900">${window.escapeHtml(item.name)}</div>
-                                        ${item.type === 'formula' ? `<div class="text-xs text-gray-600">方劑</div>` : ''}
+                                        <div class="font-semibold text-gray-900">${window.escapeHtml(displayName)}</div>
+                                        ${item.type === 'formula' ? `<div class="text-xs text-gray-600">${typeLabel}</div>` : ''}
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         ${(() => {
@@ -21726,6 +21760,16 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
       // 建立結果列表，每個結果可以點擊加入針灸備註
       resultsList.innerHTML = matched.map(item => {
         const safeName = (item.name || '').replace(/'/g, "\\'");
+        // 決定顯示名稱：英語介面且有英譯名稱時顯示英譯名稱，否則顯示中文名稱
+        let displayName = item.name || '';
+        try {
+          const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+          if (langSel && langSel.toLowerCase().startsWith('en') && item.englishName) {
+            displayName = item.englishName;
+          }
+        } catch (_e) {
+          displayName = item.name || '';
+        }
         const details = [];
         details.push('名稱：' + (item.name || ''));
         if (item.meridian) details.push('經絡：' + item.meridian);
@@ -21742,7 +21786,7 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
         if (item.category) details.push('分類：' + item.category);
         const encoded = encodeURIComponent(details.join('\n'));
         // 使用藍色背景與邊框呈現搜尋結果，每個結果可點擊加入備註
-        return `<div class="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addAcupointToNotes('${safeName}')">${window.escapeHtml(item.name)}</div>`;
+        return `<div class="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addAcupointToNotes('${safeName}')">${window.escapeHtml(displayName)}</div>`;
       }).join('');
       resultsContainer.classList.remove('hidden');
     } catch (e) {
