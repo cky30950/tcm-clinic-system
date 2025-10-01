@@ -2,6 +2,9 @@
 // 用戶登入後的資料
 let currentUser = null;
 let currentUserData = null;
+// 初始化全域登入狀態，使其他模組在系統載入前即可讀取
+window.currentUser = currentUser;
+window.currentUserData = currentUserData;
 
 // 全域自訂權限（Custom Claims）儲存區
 // 於 Firebase 登入後載入使用者的 ID Token 並解析其中的自訂權限，再存入此對象
@@ -2453,7 +2456,10 @@ async function attemptMainLogin() {
             
             // 使用用戶資料進行登入
             currentUserData = matchingUser;
+            // 同步更新全域變數以供其他模組（如 schedule_management.js）使用
+            window.currentUserData = currentUserData;
             currentUser = matchingUser.username;
+            window.currentUser = currentUser;
         } else {
             // 若找不到對應用戶，表示尚未授權，不允許以臨時帳號登入
             showToast('此帳號尚未被授權，請聯繫系統管理員', 'error');
@@ -2686,7 +2692,10 @@ async function syncUserDataFromFirebase() {
             }
             
             currentUser = user.username;
+            // 將登入資訊同步到 window 以便其他模組讀取
+            window.currentUser = currentUser;
             currentUserData = user;
+            window.currentUserData = currentUserData;
             
             // 切換到主系統
             document.getElementById('loginPage').classList.add('hidden');
@@ -2785,6 +2794,9 @@ async function logout() {
         // 清理本地數據
         currentUser = null;
         currentUserData = null;
+        // 同步清除全域變數
+        window.currentUser = null;
+        window.currentUserData = null;
         
         // 切換頁面
         document.getElementById('loginPage').classList.remove('hidden');
@@ -13662,7 +13674,10 @@ async function saveUser() {
                 // 如果更新的是當前登入用戶，同步更新 currentUserData
                 if (editingUserId === currentUserData.id) {
                     currentUserData = { ...currentUserData, ...userData };
+                    // 同步更新全域登入資訊
+                    window.currentUserData = currentUserData;
                     currentUser = users[userIndex].username;
+                    window.currentUser = currentUser;
                     
                     // 更新顯示的用戶資訊
                     document.getElementById('userRole').textContent = `當前用戶：${getUserDisplayName(currentUserData)}`;

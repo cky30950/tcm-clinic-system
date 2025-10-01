@@ -4332,15 +4332,13 @@
     <!-- 載入 Chart.js 用於繪製個人統計分析圖表 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- Load schedule management as an ES6 module.  Modules are deferred
-         automatically, so they execute after HTML parsing but before
-         subsequent scripts.  The system.js script remains a classic
-         script so that legacy code continues to run with globals. -->
-    <script type="module" src="schedule_management.js"></script>
-    <script src="system.js"></script>
-    <!-- 新增聊天模組腳本，改為 ES6 模組並保持在 system.js 之後載入 -->
-    <script type="module" src="chat_module.js"></script>
-    <!-- 語言國際化腳本，必須在系統腳本之後載入 -->
+    <!-- Load the ES module entry point which in turn imports all
+         feature modules (Firebase initialization, chat, schedule
+         management, and the core system logic).  Using a single
+         module entry consolidates script loading and ensures proper
+         execution order. -->
+    <script type="module" src="main.js"></script>
+    <!-- 語言國際化腳本，必須在所有其他腳本載入之後 -->
     <script src="i18n.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
