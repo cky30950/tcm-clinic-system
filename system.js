@@ -14006,8 +14006,12 @@ async function deleteUser(id) {
         }
 
         // 格式化日期為 YYYY-MM-DD
+        // 使用本地時區組合字串，避免使用 toISOString() 導致跨日誤差
         function formatFinancialDate(date) {
-            return date.toISOString().split('T')[0];
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
 
         // 載入醫師選項
@@ -14165,16 +14169,16 @@ async function deleteUser(id) {
                     if (rptElem) rptElem.value = 'monthly';
                     break;
                 case 'thisYear':
-                    // 今年：起始為當年度 1 月 1 日，結束為當年度最後一天
+                    // 今年：起始為本年度 1 月 1 日，結束為本年度的最後一天（12 月 31 日）。
+                    // 為確保跨時區日期正確，使用 new Date(下一年, 0, 0) 取得本年度的最後一天。
                     startDate = new Date(today.getFullYear(), 0, 1);
-                    // 使用 new Date(year + 1, 0, 0) 取得當年度最後一天（例如：2025+1,0,0 得到 2025-12-31）
                     endDate = new Date(today.getFullYear() + 1, 0, 0);
                     if (rptElem) rptElem.value = 'yearly';
                     break;
                 case 'lastYear':
-                    // 去年：起始為去年 1 月 1 日，結束為去年最後一天
+                    // 去年：起始為去年 1 月 1 日，結束為去年的最後一天。
+                    // 使用 new Date(今年, 0, 0) 取得去年的 12 月 31 日。
                     startDate = new Date(today.getFullYear() - 1, 0, 1);
-                    // 使用 new Date(currentYear, 0, 0) 取得前一年度最後一天（即本年度 1 月 0 日）
                     endDate = new Date(today.getFullYear(), 0, 0);
                     if (rptElem) rptElem.value = 'yearly';
                     break;
