@@ -18,9 +18,8 @@
     ],
     "method": "斜刺或平刺0.5-0.8寸",
     "category": "肺之募穴",
-    "englishName": "Central Authority",
-    "internationalCode": "LU-1",
-    "primaryEnglishName": "Zhongfu (Central Authority)"
+    "englishName": "Zhongfu (Central Authority)",
+    "internationalCode": "LU-1"
   },
   {
     "id": 2,
@@ -40,9 +39,8 @@
     ],
     "method": "直刺0.5-0.8寸，不可深刺",
     "category": "肺經穴",
-    "englishName": "Cloud Gate",
-    "internationalCode": "LU-2",
-    "primaryEnglishName": "Yunmen (Cloud Gate)"
+    "englishName": "Yunmen (Cloud Gate)",
+    "internationalCode": "LU-2"
   },
   {
     "id": 3,
@@ -62,9 +60,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "肺經穴",
-    "englishName": "Heaven's Authority",
-    "internationalCode": "LU-3",
-    "primaryEnglishName": "Tianfu (Heaven's Authority)"
+    "englishName": "Tianfu (Heaven's Authority)",
+    "internationalCode": "LU-3"
   },
   {
     "id": 4,
@@ -84,9 +81,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "肺經穴",
-    "englishName": "Purely Doing as One Likes",
-    "internationalCode": "LU-4",
-    "primaryEnglishName": "Xiabai (Purely Doing as One Likes)"
+    "englishName": "Xiabai (Purely Doing as One Likes)",
+    "internationalCode": "LU-4"
   },
   {
     "id": 5,
@@ -107,9 +103,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "合穴(水穴)",
-    "englishName": "Cubit Marsh",
-    "internationalCode": "LU-5",
-    "primaryEnglishName": "Chize (Cubit Marsh)"
+    "englishName": "Chize (Cubit Marsh)",
+    "internationalCode": "LU-5"
   },
   {
     "id": 6,
@@ -130,9 +125,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "郄穴",
-    "englishName": "Greatest Hole",
-    "internationalCode": "LU-6",
-    "primaryEnglishName": "Kongzui (Greatest Hole)"
+    "englishName": "Kongzui (Greatest Hole)",
+    "internationalCode": "LU-6"
   },
   {
     "id": 7,
@@ -153,9 +147,8 @@
     ],
     "method": "斜刺0.3-0.5寸",
     "category": "絡穴、八脈交會穴（通任脈）",
-    "englishName": "Wedge Gap",
-    "internationalCode": "LU-7",
-    "primaryEnglishName": "Lieque (Wedge Gap)"
+    "englishName": "Lieque (Wedge Gap)",
+    "internationalCode": "LU-7"
   },
   {
     "id": 8,
@@ -176,9 +169,8 @@
     ],
     "method": "避開動脈，直刺0.2-0.3寸",
     "category": "經穴(金穴)",
-    "englishName": "Lengthwise Gutter",
-    "internationalCode": "LU-8",
-    "primaryEnglishName": "Jingqu (Lengthwise Gutter)"
+    "englishName": "Jingqu (Lengthwise Gutter)",
+    "internationalCode": "LU-8"
   },
   {
     "id": 9,
@@ -199,9 +191,8 @@
     ],
     "method": "避開動脈，直刺0.2-0.3寸",
     "category": "輸穴(土穴)、原穴、八會穴之脈會",
-    "englishName": "Largest Depth",
-    "internationalCode": "LU-9",
-    "primaryEnglishName": "Taiyuan (Largest Depth)"
+    "englishName": "Taiyuan (Largest Depth)",
+    "internationalCode": "LU-9"
   },
   {
     "id": 10,
@@ -222,9 +213,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "滎穴(火穴)",
-    "englishName": "Fishing Side",
-    "internationalCode": "LU-10",
-    "primaryEnglishName": "Yuji (Fishing Side)"
+    "englishName": "Yuji (Fishing Side)",
+    "internationalCode": "LU-10"
   },
   {
     "id": 11,
@@ -245,9 +235,8 @@
     ],
     "method": "點刺出血",
     "category": "井穴(木穴)",
-    "englishName": "Littlest Exchange",
-    "internationalCode": "LU-11",
-    "primaryEnglishName": "Shaoshang (Littlest Exchange)"
+    "englishName": "Shaoshang (Littlest Exchange)",
+    "internationalCode": "LU-11"
   },
   {
     "id": 12,
@@ -268,9 +257,8 @@
     ],
     "method": "點刺出血",
     "category": "井穴(金穴)",
-    "englishName": "Yang Exchanges",
-    "internationalCode": "LI-1",
-    "primaryEnglishName": "Shangyang (Yang Exchanges)"
+    "englishName": "Shangyang (Yang Exchanges)",
+    "internationalCode": "LI-1"
   },
   {
     "id": 13,
@@ -291,9 +279,8 @@
     ],
     "method": "直刺0.2-0.3寸",
     "category": "滎穴(水穴)",
-    "englishName": "Second Space",
-    "internationalCode": "LI-2",
-    "primaryEnglishName": "Erjian (Second Space)"
+    "englishName": "Erjian (Second Space)",
+    "internationalCode": "LI-2"
   },
   {
     "id": 14,
@@ -314,9 +301,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "輸穴(木穴)",
-    "englishName": "Third Space",
-    "internationalCode": "LI-3",
-    "primaryEnglishName": "Sanjian (Third Space)"
+    "englishName": "Sanjian (Third Space)",
+    "internationalCode": "LI-3"
   },
   {
     "id": 15,
@@ -337,9 +323,8 @@
     ],
     "method": "直刺0.5-1寸，孕婦禁針",
     "category": "原穴",
-    "englishName": "Closed Valley",
-    "internationalCode": "LI-4",
-    "primaryEnglishName": "Hegu (Closed Valley)"
+    "englishName": "Hegu (Closed Valley)",
+    "internationalCode": "LI-4"
   },
   {
     "id": 16,
@@ -360,9 +345,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "經穴(火穴)",
-    "englishName": "Yang Valley Stream",
-    "internationalCode": "LI-5",
-    "primaryEnglishName": "Yangxi (Yang Valley Stream)"
+    "englishName": "Yangxi (Yang Valley Stream)",
+    "internationalCode": "LI-5"
   },
   {
     "id": 17,
@@ -383,9 +367,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "絡穴",
-    "englishName": "Veering Passage",
-    "internationalCode": "LI-6",
-    "primaryEnglishName": "Pianli (Veering Passage)"
+    "englishName": "Pianli (Veering Passage)",
+    "internationalCode": "LI-6"
   },
   {
     "id": 18,
@@ -406,9 +389,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "郄穴",
-    "englishName": "Warm Drops",
-    "internationalCode": "LI-7",
-    "primaryEnglishName": "Wenliu (Warm Drops)"
+    "englishName": "Wenliu (Warm Drops)",
+    "internationalCode": "LI-7"
   },
   {
     "id": 19,
@@ -429,9 +411,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "大腸經穴",
-    "englishName": "Lower One at the Angle",
-    "internationalCode": "LI-8",
-    "primaryEnglishName": "Xialian (Lower One at the Angle)"
+    "englishName": "Xialian (Lower One at the Angle)",
+    "internationalCode": "LI-8"
   },
   {
     "id": 20,
@@ -452,9 +433,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "大腸經穴",
-    "englishName": "Upper One at the Angle",
-    "internationalCode": "LI-9",
-    "primaryEnglishName": "Shanglian (Upper One at the Angle)"
+    "englishName": "Shanglian (Upper One at the Angle)",
+    "internationalCode": "LI-9"
   },
   {
     "id": 21,
@@ -475,9 +455,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "大腸經穴",
-    "englishName": "Hand's Three Quarter Miles",
-    "internationalCode": "LI-10",
-    "primaryEnglishName": "Shousanli (Hand's Three Quarter Miles)"
+    "englishName": "Shousanli (Hand's Three Quarter Miles)",
+    "internationalCode": "LI-10"
   },
   {
     "id": 22,
@@ -498,9 +477,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "合穴(土穴)",
-    "englishName": "Pond at the Bend",
-    "internationalCode": "LI-11",
-    "primaryEnglishName": "Quchi (Pond at the Bend)"
+    "englishName": "Quchi (Pond at the Bend)",
+    "internationalCode": "LI-11"
   },
   {
     "id": 23,
@@ -520,9 +498,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "大腸經穴",
-    "englishName": "Elbow Bone Notch",
-    "internationalCode": "LI-12",
-    "primaryEnglishName": "Zhouliao (Elbow Bone Notch)"
+    "englishName": "Zhouliao (Elbow Bone Notch)",
+    "internationalCode": "LI-12"
   },
   {
     "id": 24,
@@ -542,9 +519,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "大腸經穴",
-    "englishName": "Hand's Five Quarter Miles",
-    "internationalCode": "LI-13",
-    "primaryEnglishName": "Shouwuli (Hand's Five Quarter Miles)"
+    "englishName": "Shouwuli (Hand's Five Quarter Miles)",
+    "internationalCode": "LI-13"
   },
   {
     "id": 25,
@@ -564,9 +540,8 @@
     ],
     "method": "直刺0.8-1.5寸",
     "category": "大腸經穴",
-    "englishName": "Upper Arm",
-    "internationalCode": "LI-14",
-    "primaryEnglishName": "Binao (Upper Arm)"
+    "englishName": "Binao (Upper Arm)",
+    "internationalCode": "LI-14"
   },
   {
     "id": 26,
@@ -586,9 +561,8 @@
     ],
     "method": "直刺0.8-1.5寸",
     "category": "大腸經穴",
-    "englishName": "Shoulder Bone",
-    "internationalCode": "LI-15",
-    "primaryEnglishName": "Jianyu (Shoulder Bone)"
+    "englishName": "Jianyu (Shoulder Bone)",
+    "internationalCode": "LI-15"
   },
   {
     "id": 27,
@@ -608,9 +582,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "大腸經穴",
-    "englishName": "Big Bones",
-    "internationalCode": "LI-16",
-    "primaryEnglishName": "Jugu (Big Bones)"
+    "englishName": "Jugu (Big Bones)",
+    "internationalCode": "LI-16"
   },
   {
     "id": 28,
@@ -630,9 +603,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "大腸經穴",
-    "englishName": "Heaven's Tripod",
-    "internationalCode": "LI-17",
-    "primaryEnglishName": "Tianding (Heaven's Tripod)"
+    "englishName": "Tianding (Heaven's Tripod)",
+    "internationalCode": "LI-17"
   },
   {
     "id": 29,
@@ -652,9 +624,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "大腸經穴",
-    "englishName": "Aiding the Chimney",
-    "internationalCode": "LI-18",
-    "primaryEnglishName": "Futu (Aiding the Chimney)"
+    "englishName": "Futu (Aiding the Chimney)",
+    "internationalCode": "LI-18"
   },
   {
     "id": 30,
@@ -674,9 +645,8 @@
     ],
     "method": "斜刺0.3-0.5寸",
     "category": "大腸經穴",
-    "englishName": "Taste's Grain-like Bone Notch",
-    "internationalCode": "LI-19",
-    "primaryEnglishName": "Kouheliao (Taste's Grain-like Bone Notch)"
+    "englishName": "Kouheliao (Taste's Grain-like Bone Notch)",
+    "internationalCode": "LI-19"
   },
   {
     "id": 31,
@@ -696,9 +666,8 @@
     ],
     "method": "斜刺0.3-0.5寸",
     "category": "大腸經穴",
-    "englishName": "Welcoming Fragrance",
-    "internationalCode": "LI-20",
-    "primaryEnglishName": "Yingxiang (Welcoming Fragrance)"
+    "englishName": "Yingxiang (Welcoming Fragrance)",
+    "internationalCode": "LI-20"
   },
   {
     "id": 32,
@@ -719,9 +688,8 @@
     ],
     "method": "沿眶緣緩慢直刺0.5-1寸",
     "category": "胃經穴",
-    "englishName": "Accept the Tears",
-    "internationalCode": "ST-1",
-    "primaryEnglishName": "Chengqi (Accept the Tears)"
+    "englishName": "Chengqi (Accept the Tears)",
+    "internationalCode": "ST-1"
   },
   {
     "id": 33,
@@ -742,9 +710,8 @@
     ],
     "method": "直刺0.3-0.7寸",
     "category": "胃經穴",
-    "englishName": "Four Whites",
-    "internationalCode": "ST-2",
-    "primaryEnglishName": "Sibai (Four Whites)"
+    "englishName": "Sibai (Four Whites)",
+    "internationalCode": "ST-2"
   },
   {
     "id": 34,
@@ -765,9 +732,8 @@
     ],
     "method": "直刺0.3-0.8寸",
     "category": "胃經穴",
-    "englishName": "Large Bone Notch",
-    "internationalCode": "ST-3",
-    "primaryEnglishName": "Juliao (Large Bone Notch)"
+    "englishName": "Juliao (Large Bone Notch)",
+    "internationalCode": "ST-3"
   },
   {
     "id": 35,
@@ -787,9 +753,8 @@
     ],
     "method": "斜刺0.5-1寸",
     "category": "胃經穴",
-    "englishName": "Land's Granary",
-    "internationalCode": "ST-4",
-    "primaryEnglishName": "Dicang (Land's Granary)"
+    "englishName": "Dicang (Land's Granary)",
+    "internationalCode": "ST-4"
   },
   {
     "id": 36,
@@ -810,9 +775,8 @@
     ],
     "method": "斜刺0.3-0.5寸",
     "category": "胃經穴",
-    "englishName": "Big Welcome",
-    "internationalCode": "ST-5",
-    "primaryEnglishName": "Daying (Big Welcome)"
+    "englishName": "Daying (Big Welcome)",
+    "internationalCode": "ST-5"
   },
   {
     "id": 37,
@@ -833,9 +797,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "胃經穴",
-    "englishName": "Jaw Wheel",
-    "internationalCode": "ST-6",
-    "primaryEnglishName": "Jiache (Jaw Wheel)"
+    "englishName": "Jiache (Jaw Wheel)",
+    "internationalCode": "ST-6"
   },
   {
     "id": 38,
@@ -856,9 +819,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "胃經穴",
-    "englishName": "Underneath the Joint",
-    "internationalCode": "ST-7",
-    "primaryEnglishName": "Xiaguan (Underneath the Joint)"
+    "englishName": "Xiaguan (Underneath the Joint)",
+    "internationalCode": "ST-7"
   },
   {
     "id": 39,
@@ -879,9 +841,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "胃經穴",
-    "englishName": "Corner of the Hair",
-    "internationalCode": "ST-8",
-    "primaryEnglishName": "Touwei (Corner of the Hair)"
+    "englishName": "Touwei (Corner of the Hair)",
+    "internationalCode": "ST-8"
   },
   {
     "id": 40,
@@ -901,9 +862,8 @@
     ],
     "method": "避開動脈，直刺0.3-0.8寸",
     "category": "胃經穴",
-    "englishName": "Welcoming Others",
-    "internationalCode": "ST-9",
-    "primaryEnglishName": "Renying (Welcoming Others)"
+    "englishName": "Renying (Welcoming Others)",
+    "internationalCode": "ST-9"
   },
   {
     "id": 41,
@@ -923,9 +883,8 @@
     ],
     "method": "直刺0.3-0.8寸",
     "category": "胃經穴",
-    "englishName": "Fluids Chimney",
-    "internationalCode": "ST-10",
-    "primaryEnglishName": "Shuitu (Fluids Chimney)"
+    "englishName": "Shuitu (Fluids Chimney)",
+    "internationalCode": "ST-10"
   },
   {
     "id": 42,
@@ -945,9 +904,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "胃經穴",
-    "englishName": "Qi Lodge",
-    "internationalCode": "ST-11",
-    "primaryEnglishName": "Qishe (Qi Lodge)"
+    "englishName": "Qishe (Qi Lodge)",
+    "internationalCode": "ST-11"
   },
   {
     "id": 43,
@@ -967,9 +925,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "胃經穴",
-    "englishName": "Empty Basin",
-    "internationalCode": "ST-12",
-    "primaryEnglishName": "Quepen (Empty Basin)"
+    "englishName": "Quepen (Empty Basin)",
+    "internationalCode": "ST-12"
   },
   {
     "id": 44,
@@ -989,9 +946,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "胃經穴",
-    "englishName": "Qi Door",
-    "internationalCode": "ST-13",
-    "primaryEnglishName": "Qihu (Qi Door)"
+    "englishName": "Qihu (Qi Door)",
+    "internationalCode": "ST-13"
   },
   {
     "id": 45,
@@ -1011,9 +967,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "胃經穴",
-    "englishName": "Store Room",
-    "internationalCode": "ST-14",
-    "primaryEnglishName": "Kufang (Store Room)"
+    "englishName": "Kufang (Store Room)",
+    "internationalCode": "ST-14"
   },
   {
     "id": 46,
@@ -1033,9 +988,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "胃經穴",
-    "englishName": "Room Screen",
-    "internationalCode": "ST-15",
-    "primaryEnglishName": "Wuyi (Room Screen)"
+    "englishName": "Wuyi (Room Screen)",
+    "internationalCode": "ST-15"
   },
   {
     "id": 47,
@@ -1055,9 +1009,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "胃經穴",
-    "englishName": "Chest Window",
-    "internationalCode": "ST-16",
-    "primaryEnglishName": "Yingchuang (Chest Window)"
+    "englishName": "Yingchuang (Chest Window)",
+    "internationalCode": "ST-16"
   },
   {
     "id": 48,
@@ -1075,9 +1028,8 @@
     ],
     "method": "禁針，可灸",
     "category": "胃經穴",
-    "englishName": "Center of the Nipple",
-    "internationalCode": "ST-17",
-    "primaryEnglishName": "Ruzhong (Center of the Nipple)"
+    "englishName": "Ruzhong (Center of the Nipple)",
+    "internationalCode": "ST-17"
   },
   {
     "id": 49,
@@ -1098,9 +1050,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "胃經穴",
-    "englishName": "Base of the Breasts",
-    "internationalCode": "ST-18",
-    "primaryEnglishName": "Rugen (Base of the Breasts)"
+    "englishName": "Rugen (Base of the Breasts)",
+    "internationalCode": "ST-18"
   },
   {
     "id": 50,
@@ -1120,9 +1071,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "胃經穴",
-    "englishName": "Not Accepted",
-    "internationalCode": "ST-19",
-    "primaryEnglishName": "Burong (Not Accepted)"
+    "englishName": "Burong (Not Accepted)",
+    "internationalCode": "ST-19"
   },
   {
     "id": 51,
@@ -1142,9 +1092,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "胃經穴",
-    "englishName": "Receiving Enough",
-    "internationalCode": "ST-20",
-    "primaryEnglishName": "Chengman (Receiving Enough)"
+    "englishName": "Chengman (Receiving Enough)",
+    "internationalCode": "ST-20"
   },
   {
     "id": 52,
@@ -1164,9 +1113,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "胃經穴",
-    "englishName": "Gate Beam",
-    "internationalCode": "ST-21",
-    "primaryEnglishName": "Liangmen (Gate Beam)"
+    "englishName": "Liangmen (Gate Beam)",
+    "internationalCode": "ST-21"
   },
   {
     "id": 53,
@@ -1187,9 +1135,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "胃經穴",
-    "englishName": "Barrier Gate",
-    "internationalCode": "ST-22",
-    "primaryEnglishName": "Guanmen (Barrier Gate)"
+    "englishName": "Guanmen (Barrier Gate)",
+    "internationalCode": "ST-22"
   },
   {
     "id": 54,
@@ -1209,9 +1156,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "胃經穴",
-    "englishName": "Greatest Oneness",
-    "internationalCode": "ST-23",
-    "primaryEnglishName": "Taiyi (Greatest Oneness)"
+    "englishName": "Taiyi (Greatest Oneness)",
+    "internationalCode": "ST-23"
   },
   {
     "id": 55,
@@ -1231,9 +1177,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "胃經穴",
-    "englishName": "Supple Flesh Gate",
-    "internationalCode": "ST-24",
-    "primaryEnglishName": "Huaroumen (Supple Flesh Gate)"
+    "englishName": "Huaroumen (Supple Flesh Gate)",
+    "internationalCode": "ST-24"
   },
   {
     "id": 56,
@@ -1254,9 +1199,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "大腸募穴",
-    "englishName": "Heaven's Pivot",
-    "internationalCode": "ST-25",
-    "primaryEnglishName": "Tianshu (Heaven's Pivot)"
+    "englishName": "Tianshu (Heaven's Pivot)",
+    "internationalCode": "ST-25"
   },
   {
     "id": 57,
@@ -1276,9 +1220,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "胃經穴",
-    "englishName": "Outside the High Mound",
-    "internationalCode": "ST-26",
-    "primaryEnglishName": "Wailing (Outside the High Mound)"
+    "englishName": "Wailing (Outside the High Mound)",
+    "internationalCode": "ST-26"
   },
   {
     "id": 58,
@@ -1298,9 +1241,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "胃經穴",
-    "englishName": "Very Rough",
-    "internationalCode": "ST-27",
-    "primaryEnglishName": "Daju (Very Rough)"
+    "englishName": "Daju (Very Rough)",
+    "internationalCode": "ST-27"
   },
   {
     "id": 59,
@@ -1320,9 +1262,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "胃經穴",
-    "englishName": "Fluid Passage",
-    "internationalCode": "ST-28",
-    "primaryEnglishName": "Shuidao (Fluid Passage)"
+    "englishName": "Shuidao (Fluid Passage)",
+    "internationalCode": "ST-28"
   },
   {
     "id": 60,
@@ -1342,9 +1283,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "胃經穴",
-    "englishName": "Arriving Home",
-    "internationalCode": "ST-29",
-    "primaryEnglishName": "Guilai (Arriving Home)"
+    "englishName": "Guilai (Arriving Home)",
+    "internationalCode": "ST-29"
   },
   {
     "id": 61,
@@ -1364,9 +1304,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "胃經穴",
-    "englishName": "Qi Infusion",
-    "internationalCode": "ST-30",
-    "primaryEnglishName": "Qichong (Qi Infusion)"
+    "englishName": "Qichong (Qi Infusion)",
+    "internationalCode": "ST-30"
   },
   {
     "id": 62,
@@ -1385,9 +1324,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "胃經穴",
-    "englishName": "Thigh Joint",
-    "internationalCode": "ST-31",
-    "primaryEnglishName": "Biguan (Thigh Joint)"
+    "englishName": "Biguan (Thigh Joint)",
+    "internationalCode": "ST-31"
   },
   {
     "id": 63,
@@ -1406,9 +1344,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "胃經穴",
-    "englishName": "Prostrating Hare",
-    "internationalCode": "ST-32",
-    "primaryEnglishName": "Futu (Prostrating Hare)"
+    "englishName": "Futu (Prostrating Hare)",
+    "internationalCode": "ST-32"
   },
   {
     "id": 64,
@@ -1428,9 +1365,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "胃經穴",
-    "englishName": "Yin at the Market",
-    "internationalCode": "ST-33",
-    "primaryEnglishName": "Yinshi (Yin at the Market)"
+    "englishName": "Yinshi (Yin at the Market)",
+    "internationalCode": "ST-33"
   },
   {
     "id": 65,
@@ -1450,9 +1386,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "郄穴",
-    "englishName": "Beam to the Mound",
-    "internationalCode": "ST-34",
-    "primaryEnglishName": "Liangqiu (Beam to the Mound)"
+    "englishName": "Liangqiu (Beam to the Mound)",
+    "internationalCode": "ST-34"
   },
   {
     "id": 66,
@@ -1471,9 +1406,8 @@
     ],
     "method": "向後內斜刺0.5-1寸",
     "category": "胃經穴",
-    "englishName": "Calf's Nose",
-    "internationalCode": "ST-35",
-    "primaryEnglishName": "Dubi (Calf's Nose)"
+    "englishName": "Dubi (Calf's Nose)",
+    "internationalCode": "ST-35"
   },
   {
     "id": 67,
@@ -1495,9 +1429,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "合穴(土穴)、下合穴",
-    "englishName": "Leg's Three Quarter Miles",
-    "internationalCode": "ST-36",
-    "primaryEnglishName": "Zusanli (Leg's Three Quarter Miles)"
+    "englishName": "Zusanli (Leg's Three Quarter Miles)",
+    "internationalCode": "ST-36"
   },
   {
     "id": 68,
@@ -1517,9 +1450,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "大腸下合穴",
-    "englishName": "At the Top of the Big Hollow",
-    "internationalCode": "ST-37",
-    "primaryEnglishName": "Shangjuxu (At the Top of the Big Hollow)"
+    "englishName": "Shangjuxu (At the Top of the Big Hollow)",
+    "internationalCode": "ST-37"
   },
   {
     "id": 69,
@@ -1538,9 +1470,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "胃經穴",
-    "englishName": "Long Narrow Opening",
-    "internationalCode": "ST-38",
-    "primaryEnglishName": "Tiaokou (Long Narrow Opening)"
+    "englishName": "Tiaokou (Long Narrow Opening)",
+    "internationalCode": "ST-38"
   },
   {
     "id": 70,
@@ -1560,9 +1491,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "小腸下合穴",
-    "englishName": "At the Bottom of the Big Hollow",
-    "internationalCode": "ST-39",
-    "primaryEnglishName": "Xiajuxu (At the Bottom of the Big Hollow)"
+    "englishName": "Xiajuxu (At the Bottom of the Big Hollow)",
+    "internationalCode": "ST-39"
   },
   {
     "id": 71,
@@ -1582,9 +1512,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "絡穴",
-    "englishName": "Ample Enrichment",
-    "internationalCode": "ST-40",
-    "primaryEnglishName": "Fenglong (Ample Enrichment)"
+    "englishName": "Fenglong (Ample Enrichment)",
+    "internationalCode": "ST-40"
   },
   {
     "id": 72,
@@ -1604,9 +1533,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "經穴(火穴)",
-    "englishName": "Melting Valley Stream",
-    "internationalCode": "ST-41",
-    "primaryEnglishName": "Jiexi (Melting Valley Stream)"
+    "englishName": "Jiexi (Melting Valley Stream)",
+    "internationalCode": "ST-41"
   },
   {
     "id": 73,
@@ -1626,9 +1554,8 @@
     ],
     "method": "避開動脈，直刺0.3-0.5寸",
     "category": "原穴",
-    "englishName": "Infusing Yang",
-    "internationalCode": "ST-42",
-    "primaryEnglishName": "Chongyang (Infusing Yang)"
+    "englishName": "Chongyang (Infusing Yang)",
+    "internationalCode": "ST-42"
   },
   {
     "id": 74,
@@ -1647,9 +1574,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "輸穴(木穴)",
-    "englishName": "Trapped in the Valley",
-    "internationalCode": "ST-43",
-    "primaryEnglishName": "Xiangu (Trapped in the Valley)"
+    "englishName": "Xiangu (Trapped in the Valley)",
+    "internationalCode": "ST-43"
   },
   {
     "id": 75,
@@ -1669,9 +1595,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "滎穴(水穴)",
-    "englishName": "Inner Courtyard",
-    "internationalCode": "ST-44",
-    "primaryEnglishName": "Neiting (Inner Courtyard)"
+    "englishName": "Neiting (Inner Courtyard)",
+    "internationalCode": "ST-44"
   },
   {
     "id": 76,
@@ -1692,9 +1617,8 @@
     ],
     "method": "點刺出血",
     "category": "井穴(金穴)",
-    "englishName": "Dangerous Exchange",
-    "internationalCode": "ST-45",
-    "primaryEnglishName": "Lidui (Dangerous Exchange)"
+    "englishName": "Lidui (Dangerous Exchange)",
+    "internationalCode": "ST-45"
   },
   {
     "id": 77,
@@ -1716,9 +1640,8 @@
     ],
     "method": "點刺出血",
     "category": "井穴(木穴)",
-    "englishName": "Hidden Purity",
-    "internationalCode": "SP-1",
-    "primaryEnglishName": "Yinbai (Hidden Purity)"
+    "englishName": "Yinbai (Hidden Purity)",
+    "internationalCode": "SP-1"
   },
   {
     "id": 78,
@@ -1738,9 +1661,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "滎穴(火穴)",
-    "englishName": "Big City",
-    "internationalCode": "SP-2",
-    "primaryEnglishName": "Dadu (Big City)"
+    "englishName": "Dadu (Big City)",
+    "internationalCode": "SP-2"
   },
   {
     "id": 79,
@@ -1761,9 +1683,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "輸穴(土穴)、原穴",
-    "englishName": "Greatest Purity",
-    "internationalCode": "SP-3",
-    "primaryEnglishName": "Taibai (Greatest Purity)"
+    "englishName": "Taibai (Greatest Purity)",
+    "internationalCode": "SP-3"
   },
   {
     "id": 80,
@@ -1784,9 +1705,8 @@
     ],
     "method": "直刺0.6-1.2寸",
     "category": "絡穴、八脈交會穴（通衝脈）",
-    "englishName": "Going Along Fairly",
-    "internationalCode": "SP-4",
-    "primaryEnglishName": "Gongsun (Going Along Fairly)"
+    "englishName": "Gongsun (Going Along Fairly)",
+    "internationalCode": "SP-4"
   },
   {
     "id": 81,
@@ -1806,9 +1726,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "經穴(金穴)",
-    "englishName": "Deliberation Mound",
-    "internationalCode": "SP-5",
-    "primaryEnglishName": "Shangqiu (Deliberation Mound)"
+    "englishName": "Shangqiu (Deliberation Mound)",
+    "internationalCode": "SP-5"
   },
   {
     "id": 82,
@@ -1833,9 +1752,8 @@
     ],
     "method": "直刺1-1.5寸，孕婦禁針",
     "category": "脾經穴",
-    "englishName": "Three Yin in Interaction",
-    "internationalCode": "SP-6",
-    "primaryEnglishName": "Sanyinjiao (Three Yin in Interaction)"
+    "englishName": "Sanyinjiao (Three Yin in Interaction)",
+    "internationalCode": "SP-6"
   },
   {
     "id": 83,
@@ -1856,9 +1774,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "脾經穴",
-    "englishName": "Leaking Valley",
-    "internationalCode": "SP-7",
-    "primaryEnglishName": "Lougu (Leaking Valley)"
+    "englishName": "Lougu (Leaking Valley)",
+    "internationalCode": "SP-7"
   },
   {
     "id": 84,
@@ -1879,9 +1796,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "郄穴",
-    "englishName": "Ground Pivot",
-    "internationalCode": "SP-8",
-    "primaryEnglishName": "Diji (Ground Pivot)"
+    "englishName": "Diji (Ground Pivot)",
+    "internationalCode": "SP-8"
   },
   {
     "id": 85,
@@ -1904,9 +1820,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "合穴(水穴)",
-    "englishName": "Yin Mound Spring",
-    "internationalCode": "SP-9",
-    "primaryEnglishName": "Yinlingquan (Yin Mound Spring)"
+    "englishName": "Yinlingquan (Yin Mound Spring)",
+    "internationalCode": "SP-9"
   },
   {
     "id": 86,
@@ -1929,9 +1844,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "脾經穴",
-    "englishName": "Sea of Blood",
-    "internationalCode": "SP-10",
-    "primaryEnglishName": "Xuehai (Sea of Blood)"
+    "englishName": "Xuehai (Sea of Blood)",
+    "internationalCode": "SP-10"
   },
   {
     "id": 87,
@@ -1951,9 +1865,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "脾經穴",
-    "englishName": "Winnowing Gate",
-    "internationalCode": "SP-11",
-    "primaryEnglishName": "Jimen (Winnowing Gate)"
+    "englishName": "Jimen (Winnowing Gate)",
+    "internationalCode": "SP-11"
   },
   {
     "id": 88,
@@ -1973,9 +1886,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "脾經穴",
-    "englishName": "Rinsing the Gate",
-    "internationalCode": "SP-12",
-    "primaryEnglishName": "Chongmen (Rinsing the Gate)"
+    "englishName": "Chongmen (Rinsing the Gate)",
+    "internationalCode": "SP-12"
   },
   {
     "id": 89,
@@ -1994,9 +1906,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "脾經穴",
-    "englishName": "Official Building's Lodge",
-    "internationalCode": "SP-13",
-    "primaryEnglishName": "Fushe (Official Building's Lodge)"
+    "englishName": "Fushe (Official Building's Lodge)",
+    "internationalCode": "SP-13"
   },
   {
     "id": 90,
@@ -2015,9 +1926,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "脾經穴",
-    "englishName": "Belly Knot",
-    "internationalCode": "SP-14",
-    "primaryEnglishName": "Fujie (Belly Knot)"
+    "englishName": "Fujie (Belly Knot)",
+    "internationalCode": "SP-14"
   },
   {
     "id": 91,
@@ -2036,9 +1946,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "脾經穴",
-    "englishName": "Wide Horizontally",
-    "internationalCode": "SP-15",
-    "primaryEnglishName": "Daheng (Wide Horizontally)"
+    "englishName": "Daheng (Wide Horizontally)",
+    "internationalCode": "SP-15"
   },
   {
     "id": 92,
@@ -2057,9 +1966,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "脾經穴",
-    "englishName": "Belly Lament",
-    "internationalCode": "SP-16",
-    "primaryEnglishName": "Fuai (Belly Lament)"
+    "englishName": "Fuai (Belly Lament)",
+    "internationalCode": "SP-16"
   },
   {
     "id": 93,
@@ -2078,9 +1986,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "脾經穴",
-    "englishName": "Feeding Opening",
-    "internationalCode": "SP-17",
-    "primaryEnglishName": "Shidou (Feeding Opening)"
+    "englishName": "Shidou (Feeding Opening)",
+    "internationalCode": "SP-17"
   },
   {
     "id": 94,
@@ -2100,9 +2007,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "脾經穴",
-    "englishName": "Heavenly Valley Stream",
-    "internationalCode": "SP-18",
-    "primaryEnglishName": "Tianxi (Heavenly Valley Stream)"
+    "englishName": "Tianxi (Heavenly Valley Stream)",
+    "internationalCode": "SP-18"
   },
   {
     "id": 95,
@@ -2121,9 +2027,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "脾經穴",
-    "englishName": "Countryside of the Chest",
-    "internationalCode": "SP-19",
-    "primaryEnglishName": "Xiongxiang (Countryside of the Chest)"
+    "englishName": "Xiongxiang (Countryside of the Chest)",
+    "internationalCode": "SP-19"
   },
   {
     "id": 96,
@@ -2142,9 +2047,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "脾經穜",
-    "englishName": "Flourishing All-Around",
-    "internationalCode": "SP-20",
-    "primaryEnglishName": "Zhourong (Flourishing All-Around)"
+    "englishName": "Zhourong (Flourishing All-Around)",
+    "internationalCode": "SP-20"
   },
   {
     "id": 97,
@@ -2164,9 +2068,8 @@
     ],
     "method": "斜刺0.3-0.5寸",
     "category": "脾之大絡",
-    "englishName": "Big Embrace",
-    "internationalCode": "SP-21",
-    "primaryEnglishName": "Dabao (Big Embrace)"
+    "englishName": "Dabao (Big Embrace)",
+    "internationalCode": "SP-21"
   },
   {
     "id": 98,
@@ -2187,9 +2090,8 @@
     ],
     "method": "避開動脈，直刺0.3-0.6寸",
     "category": "心經穴",
-    "englishName": "Highest Source",
-    "internationalCode": "HT-1",
-    "primaryEnglishName": "Jiquan (Highest Source)"
+    "englishName": "Jiquan (Highest Source)",
+    "internationalCode": "HT-1"
   },
   {
     "id": 99,
@@ -2209,9 +2111,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "心經穴",
-    "englishName": "Blue-Green Spirit",
-    "internationalCode": "HT-2",
-    "primaryEnglishName": "Qingling (Blue-Green Spirit)"
+    "englishName": "Qingling (Blue-Green Spirit)",
+    "internationalCode": "HT-2"
   },
   {
     "id": 100,
@@ -2232,9 +2133,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "合穴(水穴)",
-    "englishName": "Smallest Sea",
-    "internationalCode": "HT-3",
-    "primaryEnglishName": "Shaohai (Smallest Sea)"
+    "englishName": "Shaohai (Smallest Sea)",
+    "internationalCode": "HT-3"
   },
   {
     "id": 101,
@@ -2254,9 +2154,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "經穴(金穴)",
-    "englishName": "Spirit's Path",
-    "internationalCode": "HT-4",
-    "primaryEnglishName": "Lingdao (Spirit's Path)"
+    "englishName": "Lingdao (Spirit's Path)",
+    "internationalCode": "HT-4"
   },
   {
     "id": 102,
@@ -2277,9 +2176,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "絡穴",
-    "englishName": "Passing Through the Village",
-    "internationalCode": "HT-5",
-    "primaryEnglishName": "Tongli (Passing Through the Village)"
+    "englishName": "Tongli (Passing Through the Village)",
+    "internationalCode": "HT-5"
   },
   {
     "id": 103,
@@ -2300,9 +2198,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "郄穴",
-    "englishName": "Yin Cleft",
-    "internationalCode": "HT-6",
-    "primaryEnglishName": "Yinxi (Yin Cleft)"
+    "englishName": "Yinxi (Yin Cleft)",
+    "internationalCode": "HT-6"
   },
   {
     "id": 104,
@@ -2324,9 +2221,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "輸穴(土穴)、原穴",
-    "englishName": "Gate to the Heart",
-    "internationalCode": "HT-7",
-    "primaryEnglishName": "Shenmen (Gate to the Heart)"
+    "englishName": "Shenmen (Gate to the Heart)",
+    "internationalCode": "HT-7"
   },
   {
     "id": 105,
@@ -2347,9 +2243,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "滎穴(火穴)",
-    "englishName": "Smallest Authority",
-    "internationalCode": "HT-8",
-    "primaryEnglishName": "Shaofu (Smallest Authority)"
+    "englishName": "Shaofu (Smallest Authority)",
+    "internationalCode": "HT-8"
   },
   {
     "id": 106,
@@ -2370,9 +2265,8 @@
     ],
     "method": "點刺出血",
     "category": "井穴(木穴)",
-    "englishName": "Smallest Infusion",
-    "internationalCode": "HT-9",
-    "primaryEnglishName": "Shaochong (Smallest Infusion)"
+    "englishName": "Shaochong (Smallest Infusion)",
+    "internationalCode": "HT-9"
   },
   {
     "id": 107,
@@ -2394,9 +2288,8 @@
     ],
     "method": "點刺出血",
     "category": "井穴(金穴)",
-    "englishName": "Smallest Marsh",
-    "internationalCode": "SI-1",
-    "primaryEnglishName": "Shaoze (Smallest Marsh)"
+    "englishName": "Shaoze (Smallest Marsh)",
+    "internationalCode": "SI-1"
   },
   {
     "id": 108,
@@ -2417,9 +2310,8 @@
     ],
     "method": "直刺0.2-0.3寸",
     "category": "滎穴(水穴)",
-    "englishName": "In Front of the Valley",
-    "internationalCode": "SI-2",
-    "primaryEnglishName": "Qiangu (In Front of the Valley)"
+    "englishName": "Qiangu (In Front of the Valley)",
+    "internationalCode": "SI-2"
   },
   {
     "id": 109,
@@ -2440,9 +2332,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "輸穴(木穴)、八脈交會穴（通督脈）",
-    "englishName": "Behind the Valley Stream",
-    "internationalCode": "SI-3",
-    "primaryEnglishName": "Houxi (Behind the Valley Stream)"
+    "englishName": "Houxi (Behind the Valley Stream)",
+    "internationalCode": "SI-3"
   },
   {
     "id": 110,
@@ -2463,9 +2354,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "原穴",
-    "englishName": "Wrist Bones",
-    "internationalCode": "SI-4",
-    "primaryEnglishName": "Wangu (Wrist Bones)"
+    "englishName": "Wangu (Wrist Bones)",
+    "internationalCode": "SI-4"
   },
   {
     "id": 111,
@@ -2487,9 +2377,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "經穴(火穴)",
-    "englishName": "Yang Valley",
-    "internationalCode": "SI-5",
-    "primaryEnglishName": "Yanggu (Yang Valley)"
+    "englishName": "Yanggu (Yang Valley)",
+    "internationalCode": "SI-5"
   },
   {
     "id": 112,
@@ -2509,9 +2398,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "郄穴",
-    "englishName": "Nurture the Old",
-    "internationalCode": "SI-6",
-    "primaryEnglishName": "Yanglao (Nurture the Old)"
+    "englishName": "Yanglao (Nurture the Old)",
+    "internationalCode": "SI-6"
   },
   {
     "id": 113,
@@ -2532,9 +2420,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "絡穴",
-    "englishName": "Support the Upright",
-    "internationalCode": "SI-7",
-    "primaryEnglishName": "Zhizheng (Support the Upright)"
+    "englishName": "Zhizheng (Support the Upright)",
+    "internationalCode": "SI-7"
   },
   {
     "id": 114,
@@ -2554,9 +2441,8 @@
     ],
     "method": "直刺0.3-0.8寸",
     "category": "合穴(土穴)",
-    "englishName": "Little Sea",
-    "internationalCode": "SI-8",
-    "primaryEnglishName": "Xiaohai (Little Sea)"
+    "englishName": "Xiaohai (Little Sea)",
+    "internationalCode": "SI-8"
   },
   {
     "id": 115,
@@ -2576,9 +2462,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "小腸經穴",
-    "englishName": "Persistent Shouldering",
-    "internationalCode": "SI-9",
-    "primaryEnglishName": "Jianzhen (Persistent Shouldering)"
+    "englishName": "Jianzhen (Persistent Shouldering)",
+    "internationalCode": "SI-9"
   },
   {
     "id": 116,
@@ -2597,9 +2482,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "小腸經穴",
-    "englishName": "Upper Arm Increase",
-    "internationalCode": "SI-10",
-    "primaryEnglishName": "Naoyu (Upper Arm Increase)"
+    "englishName": "Naoyu (Upper Arm Increase)",
+    "internationalCode": "SI-10"
   },
   {
     "id": 117,
@@ -2619,9 +2503,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "小腸經穴",
-    "englishName": "Heavenly Ancestor",
-    "internationalCode": "SI-11",
-    "primaryEnglishName": "Tianzong (Heavenly Ancestor)"
+    "englishName": "Tianzong (Heavenly Ancestor)",
+    "internationalCode": "SI-11"
   },
   {
     "id": 118,
@@ -2640,9 +2523,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "小腸經穴",
-    "englishName": "Handling Wind",
-    "internationalCode": "SI-12",
-    "primaryEnglishName": "Bingfeng (Handling Wind)"
+    "englishName": "Bingfeng (Handling Wind)",
+    "internationalCode": "SI-12"
   },
   {
     "id": 119,
@@ -2661,9 +2543,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "小腸經穴",
-    "englishName": "Fence at the Curve",
-    "internationalCode": "SI-13",
-    "primaryEnglishName": "Quyuan (Fence at the Curve)"
+    "englishName": "Quyuan (Fence at the Curve)",
+    "internationalCode": "SI-13"
   },
   {
     "id": 120,
@@ -2683,9 +2564,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "小腸經穴",
-    "englishName": "Side of the Shoulder Increase",
-    "internationalCode": "SI-14",
-    "primaryEnglishName": "Jianwaiyu (Side of the Shoulder Increase)"
+    "englishName": "Jianwaiyu (Side of the Shoulder Increase)",
+    "internationalCode": "SI-14"
   },
   {
     "id": 121,
@@ -2705,9 +2585,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "小腸經穴",
-    "englishName": "Between the Shoulders Increase",
-    "internationalCode": "SI-15",
-    "primaryEnglishName": "Jianzhongyu (Between the Shoulders Increase)"
+    "englishName": "Jianzhongyu (Between the Shoulders Increase)",
+    "internationalCode": "SI-15"
   },
   {
     "id": 122,
@@ -2727,9 +2606,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "小腸經穴",
-    "englishName": "Window to Heaven",
-    "internationalCode": "SI-16",
-    "primaryEnglishName": "Tianchuang (Window to Heaven)"
+    "englishName": "Tianchuang (Window to Heaven)",
+    "internationalCode": "SI-16"
   },
   {
     "id": 123,
@@ -2750,9 +2628,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "小腸經穴",
-    "englishName": "Heaven's Container",
-    "internationalCode": "SI-17",
-    "primaryEnglishName": "Tianrong (Heaven's Container)"
+    "englishName": "Tianrong (Heaven's Container)",
+    "internationalCode": "SI-17"
   },
   {
     "id": 124,
@@ -2772,9 +2649,8 @@
     ],
     "method": "斜刺0.3-0.5寸",
     "category": "小腸經穴",
-    "englishName": "Cheekbone Notch",
-    "internationalCode": "SI-18",
-    "primaryEnglishName": "Quanliao (Cheekbone Notch)"
+    "englishName": "Quanliao (Cheekbone Notch)",
+    "internationalCode": "SI-18"
   },
   {
     "id": 125,
@@ -2795,9 +2671,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "小腸經穴",
-    "englishName": "Hearing Palace",
-    "internationalCode": "SI-19",
-    "primaryEnglishName": "Tinggong (Hearing Palace)"
+    "englishName": "Tinggong (Hearing Palace)",
+    "internationalCode": "SI-19"
   },
   {
     "id": 126,
@@ -2819,9 +2694,8 @@
     ],
     "method": "直刺0.5-1寸，不宜提插捻轉",
     "category": "膀胱經穴",
-    "englishName": "Brightening the Eyes",
-    "internationalCode": "BL-1",
-    "primaryEnglishName": "Jingming (Brightening the Eyes)"
+    "englishName": "Jingming (Brightening the Eyes)",
+    "internationalCode": "BL-1"
   },
   {
     "id": 127,
@@ -2842,9 +2716,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Gathered Bamboo",
-    "internationalCode": "BL-2",
-    "primaryEnglishName": "Zanzhu (Gathered Bamboo)"
+    "englishName": "Zanzhu (Gathered Bamboo)",
+    "internationalCode": "BL-2"
   },
   {
     "id": 128,
@@ -2864,9 +2737,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "膀胱經穴",
-    "englishName": "Eyebrow Thoroughfare",
-    "internationalCode": "BL-3",
-    "primaryEnglishName": "Meichong (Eyebrow Thoroughfare)"
+    "englishName": "Meichong (Eyebrow Thoroughfare)",
+    "internationalCode": "BL-3"
   },
   {
     "id": 129,
@@ -2886,9 +2758,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "膀胱經穴",
-    "englishName": "Uneven Curve",
-    "internationalCode": "BL-4",
-    "primaryEnglishName": "Qucha (Uneven Curve)"
+    "englishName": "Qucha (Uneven Curve)",
+    "internationalCode": "BL-4"
   },
   {
     "id": 130,
@@ -2908,9 +2779,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "膀胱經穴",
-    "englishName": "Fifth Position",
-    "internationalCode": "BL-5",
-    "primaryEnglishName": "Wuchu (Fifth Position)"
+    "englishName": "Wuchu (Fifth Position)",
+    "internationalCode": "BL-5"
   },
   {
     "id": 131,
@@ -2930,9 +2800,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "膀胱經穴",
-    "englishName": "Receiving Light",
-    "internationalCode": "BL-6",
-    "primaryEnglishName": "Chengguang (Receiving Light)"
+    "englishName": "Chengguang (Receiving Light)",
+    "internationalCode": "BL-6"
   },
   {
     "id": 132,
@@ -2953,9 +2822,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "膀胱經穴",
-    "englishName": "Unhindered Heaven",
-    "internationalCode": "BL-7",
-    "primaryEnglishName": "Tongtian (Unhindered Heaven)"
+    "englishName": "Tongtian (Unhindered Heaven)",
+    "internationalCode": "BL-7"
   },
   {
     "id": 133,
@@ -2975,9 +2843,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "膀胱經穴",
-    "englishName": "Receding Yoke",
-    "internationalCode": "BL-8",
-    "primaryEnglishName": "Luoque (Receding Yoke)"
+    "englishName": "Luoque (Receding Yoke)",
+    "internationalCode": "BL-8"
   },
   {
     "id": 134,
@@ -2997,9 +2864,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "膀胱經穴",
-    "englishName": "Jade Pillow",
-    "internationalCode": "BL-9",
-    "primaryEnglishName": "Yuzhen (Jade Pillow)"
+    "englishName": "Yuzhen (Jade Pillow)",
+    "internationalCode": "BL-9"
   },
   {
     "id": 135,
@@ -3020,9 +2886,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Heaven's Pillar",
-    "internationalCode": "BL-10",
-    "primaryEnglishName": "Tianzhu (Heaven's Pillar)"
+    "englishName": "Tianzhu (Heaven's Pillar)",
+    "internationalCode": "BL-10"
   },
   {
     "id": 136,
@@ -3043,9 +2908,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "八會穴之骨會",
-    "englishName": "Many Shuttles",
-    "internationalCode": "BL-11",
-    "primaryEnglishName": "Dazhu (Many Shuttles)"
+    "englishName": "Dazhu (Many Shuttles)",
+    "internationalCode": "BL-11"
   },
   {
     "id": 137,
@@ -3067,9 +2931,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Wind Gate",
-    "internationalCode": "BL-12",
-    "primaryEnglishName": "Fengmen (Wind Gate)"
+    "englishName": "Fengmen (Wind Gate)",
+    "internationalCode": "BL-12"
   },
   {
     "id": 138,
@@ -3091,9 +2954,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "肺之背俞穴",
-    "englishName": "Lung Increase",
-    "internationalCode": "BL-13",
-    "primaryEnglishName": "Feiyu (Lung Increase)"
+    "englishName": "Feiyu (Lung Increase)",
+    "internationalCode": "BL-13"
   },
   {
     "id": 139,
@@ -3114,9 +2976,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "心包之背俞穴",
-    "englishName": "Body Yin Increase",
-    "internationalCode": "BL-14",
-    "primaryEnglishName": "Jueyinyu (Body Yin Increase)"
+    "englishName": "Jueyinyu (Body Yin Increase)",
+    "internationalCode": "BL-14"
   },
   {
     "id": 140,
@@ -3138,9 +2999,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "心之背俞穴",
-    "englishName": "Heart Increase",
-    "internationalCode": "BL-15",
-    "primaryEnglishName": "Xinyu (Heart Increase)"
+    "englishName": "Xinyu (Heart Increase)",
+    "internationalCode": "BL-15"
   },
   {
     "id": 141,
@@ -3161,9 +3021,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Supervision Increase",
-    "internationalCode": "BL-16",
-    "primaryEnglishName": "Duyu (Supervision Increase)"
+    "englishName": "Duyu (Supervision Increase)",
+    "internationalCode": "BL-16"
   },
   {
     "id": 142,
@@ -3185,9 +3044,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "八會穴之血會",
-    "englishName": "Diaphragm Increase",
-    "internationalCode": "BL-17",
-    "primaryEnglishName": "Geyu (Diaphragm Increase)"
+    "englishName": "Geyu (Diaphragm Increase)",
+    "internationalCode": "BL-17"
   },
   {
     "id": 143,
@@ -3209,9 +3067,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "肝之背俞穴",
-    "englishName": "Liver Increase",
-    "internationalCode": "BL-18",
-    "primaryEnglishName": "Ganyu (Liver Increase)"
+    "englishName": "Ganyu (Liver Increase)",
+    "internationalCode": "BL-18"
   },
   {
     "id": 144,
@@ -3232,9 +3089,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膽之背俞穴",
-    "englishName": "Gallbladder Increase",
-    "internationalCode": "BL-19",
-    "primaryEnglishName": "Danyu (Gallbladder Increase)"
+    "englishName": "Danyu (Gallbladder Increase)",
+    "internationalCode": "BL-19"
   },
   {
     "id": 145,
@@ -3256,9 +3112,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "脾之背俞穴",
-    "englishName": "Spleen Increase",
-    "internationalCode": "BL-20",
-    "primaryEnglishName": "Piyu (Spleen Increase)"
+    "englishName": "Piyu (Spleen Increase)",
+    "internationalCode": "BL-20"
   },
   {
     "id": 146,
@@ -3279,9 +3134,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "胃之背俞穴",
-    "englishName": "Stomach Increase",
-    "internationalCode": "BL-21",
-    "primaryEnglishName": "Weiyu (Stomach Increase)"
+    "englishName": "Weiyu (Stomach Increase)",
+    "internationalCode": "BL-21"
   },
   {
     "id": 147,
@@ -3303,9 +3157,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "三焦之背俞穴",
-    "englishName": "Triple Burner Increase",
-    "internationalCode": "BL-22",
-    "primaryEnglishName": "Sanjiaoyu (Triple Burner Increase)"
+    "englishName": "Sanjiaoyu (Triple Burner Increase)",
+    "internationalCode": "BL-22"
   },
   {
     "id": 148,
@@ -3328,9 +3181,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "腎之背俞穴",
-    "englishName": "Kidney Increase",
-    "internationalCode": "BL-23",
-    "primaryEnglishName": "Shenyu (Kidney Increase)"
+    "englishName": "Shenyu (Kidney Increase)",
+    "internationalCode": "BL-23"
   },
   {
     "id": 149,
@@ -3350,9 +3202,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "膀胱經穴",
-    "englishName": "Sea of Qi Increase",
-    "internationalCode": "BL-24",
-    "primaryEnglishName": "Qihaiyu (Sea of Qi Increase)"
+    "englishName": "Qihaiyu (Sea of Qi Increase)",
+    "internationalCode": "BL-24"
   },
   {
     "id": 150,
@@ -3374,9 +3225,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "大腸之背俞穴",
-    "englishName": "Large Intestine Increase",
-    "internationalCode": "BL-25",
-    "primaryEnglishName": "Dachangyu (Large Intestine Increase)"
+    "englishName": "Dachangyu (Large Intestine Increase)",
+    "internationalCode": "BL-25"
   },
   {
     "id": 151,
@@ -3397,9 +3247,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "膀胱經穴",
-    "englishName": "Bar's Beginning Increase",
-    "internationalCode": "BL-26",
-    "primaryEnglishName": "Guanyuanyu (Bar's Beginning Increase)"
+    "englishName": "Guanyuanyu (Bar's Beginning Increase)",
+    "internationalCode": "BL-26"
   },
   {
     "id": 152,
@@ -3420,9 +3269,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "小腸之背俞穴",
-    "englishName": "Small Intestine Increase",
-    "internationalCode": "BL-27",
-    "primaryEnglishName": "Xiaochangyu (Small Intestine Increase)"
+    "englishName": "Xiaochangyu (Small Intestine Increase)",
+    "internationalCode": "BL-27"
   },
   {
     "id": 153,
@@ -3444,9 +3292,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "膀胱之背俞穴",
-    "englishName": "Bladder Increase",
-    "internationalCode": "BL-28",
-    "primaryEnglishName": "Pangguangyu (Bladder Increase)"
+    "englishName": "Pangguangyu (Bladder Increase)",
+    "internationalCode": "BL-28"
   },
   {
     "id": 154,
@@ -3466,9 +3313,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "膀胱經穴",
-    "englishName": "Middle Spine Muscles Increase",
-    "internationalCode": "BL-29",
-    "primaryEnglishName": "Zhonglvyu (Middle Spine Muscles Increase)"
+    "englishName": "Zhonglvyu (Middle Spine Muscles Increase)",
+    "internationalCode": "BL-29"
   },
   {
     "id": 155,
@@ -3489,9 +3335,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "膀胱經穴",
-    "englishName": "White Ring Increase",
-    "internationalCode": "BL-30",
-    "primaryEnglishName": "Baihuanyu (White Ring Increase)"
+    "englishName": "Baihuanyu (White Ring Increase)",
+    "internationalCode": "BL-30"
   },
   {
     "id": 156,
@@ -3513,9 +3358,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "膀胱經穴",
-    "englishName": "Upper Bone Notch",
-    "internationalCode": "BL-31",
-    "primaryEnglishName": "Shangliao (Upper Bone Notch)"
+    "englishName": "Shangliao (Upper Bone Notch)",
+    "internationalCode": "BL-31"
   },
   {
     "id": 157,
@@ -3537,9 +3381,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "膀胱經穴",
-    "englishName": "Second Bone Notch",
-    "internationalCode": "BL-32",
-    "primaryEnglishName": "Ciliao (Second Bone Notch)"
+    "englishName": "Ciliao (Second Bone Notch)",
+    "internationalCode": "BL-32"
   },
   {
     "id": 158,
@@ -3560,9 +3403,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "膀胱經穴",
-    "englishName": "Middle Bone Notch",
-    "internationalCode": "BL-33",
-    "primaryEnglishName": "Zhongliao (Middle Bone Notch)"
+    "englishName": "Zhongliao (Middle Bone Notch)",
+    "internationalCode": "BL-33"
   },
   {
     "id": 159,
@@ -3584,9 +3426,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "膀胱經穴",
-    "englishName": "Lower Bone Notch",
-    "internationalCode": "BL-34",
-    "primaryEnglishName": "Xialiao (Lower Bone Notch)"
+    "englishName": "Xialiao (Lower Bone Notch)",
+    "internationalCode": "BL-34"
   },
   {
     "id": 160,
@@ -3607,9 +3448,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "膀胱經穴",
-    "englishName": "Meeting of Yangs",
-    "internationalCode": "BL-35",
-    "primaryEnglishName": "Huiyang (Meeting of Yangs)"
+    "englishName": "Huiyang (Meeting of Yangs)",
+    "internationalCode": "BL-35"
   },
   {
     "id": 161,
@@ -3629,9 +3469,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "膀胱經穴",
-    "englishName": "Receiving Help",
-    "internationalCode": "BL-36",
-    "primaryEnglishName": "Chengfu (Receiving Help)"
+    "englishName": "Chengfu (Receiving Help)",
+    "internationalCode": "BL-36"
   },
   {
     "id": 162,
@@ -3650,9 +3489,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "膀胱經穴",
-    "englishName": "Prosperity Gate",
-    "internationalCode": "BL-37",
-    "primaryEnglishName": "Yinmen (Prosperity Gate)"
+    "englishName": "Yinmen (Prosperity Gate)",
+    "internationalCode": "BL-37"
   },
   {
     "id": 163,
@@ -3672,9 +3510,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "膀胱經穴",
-    "englishName": "Floating Gap",
-    "internationalCode": "BL-38",
-    "primaryEnglishName": "Fuxi (Floating Gap)"
+    "englishName": "Fuxi (Floating Gap)",
+    "internationalCode": "BL-38"
   },
   {
     "id": 164,
@@ -3694,9 +3531,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "三焦下合穴",
-    "englishName": "Yield to Yang",
-    "internationalCode": "BL-39",
-    "primaryEnglishName": "Weiyang (Yield to Yang)"
+    "englishName": "Weiyang (Yield to Yang)",
+    "internationalCode": "BL-39"
   },
   {
     "id": 165,
@@ -3718,9 +3554,8 @@
     ],
     "method": "直刺1-1.5寸，或點刺出血",
     "category": "合穴(土穴)、下合穴",
-    "englishName": "Yield to Within",
-    "internationalCode": "BL-40",
-    "primaryEnglishName": "Weizhong (Yield to Within)"
+    "englishName": "Weizhong (Yield to Within)",
+    "internationalCode": "BL-40"
   },
   {
     "id": 166,
@@ -3739,9 +3574,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Connecting the Segments",
-    "internationalCode": "BL-41",
-    "primaryEnglishName": "Fufen (Connecting the Segments)"
+    "englishName": "Fufen (Connecting the Segments)",
+    "internationalCode": "BL-41"
   },
   {
     "id": 167,
@@ -3762,9 +3596,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Door to the Corporeal",
-    "internationalCode": "BL-42",
-    "primaryEnglishName": "Pohu (Door to the Corporeal)"
+    "englishName": "Pohu (Door to the Corporeal)",
+    "internationalCode": "BL-42"
   },
   {
     "id": 168,
@@ -3786,9 +3619,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Heavy Breathing",
-    "internationalCode": "BL-43",
-    "primaryEnglishName": "Gaohuang (Heavy Breathing)"
+    "englishName": "Gaohuang (Heavy Breathing)",
+    "internationalCode": "BL-43"
   },
   {
     "id": 169,
@@ -3809,9 +3641,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Hall of Consciousness",
-    "internationalCode": "BL-44",
-    "primaryEnglishName": "Shentang (Hall of Consciousness)"
+    "englishName": "Shentang (Hall of Consciousness)",
+    "internationalCode": "BL-44"
   },
   {
     "id": 170,
@@ -3831,9 +3662,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Cry",
-    "internationalCode": "BL-45",
-    "primaryEnglishName": "Yixi (Cry)"
+    "englishName": "Yixi (Cry)",
+    "internationalCode": "BL-45"
   },
   {
     "id": 171,
@@ -3853,9 +3683,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Diaphragm Barrier",
-    "internationalCode": "BL-46",
-    "primaryEnglishName": "Geguan (Diaphragm Barrier)"
+    "englishName": "Geguan (Diaphragm Barrier)",
+    "internationalCode": "BL-46"
   },
   {
     "id": 172,
@@ -3875,9 +3704,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Hun Gate",
-    "internationalCode": "BL-47",
-    "primaryEnglishName": "Hunmen (Hun Gate)"
+    "englishName": "Hunmen (Hun Gate)",
+    "internationalCode": "BL-47"
   },
   {
     "id": 173,
@@ -3897,9 +3725,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Yang Headrope",
-    "internationalCode": "BL-48",
-    "primaryEnglishName": "Yanggang (Yang Headrope)"
+    "englishName": "Yanggang (Yang Headrope)",
+    "internationalCode": "BL-48"
   },
   {
     "id": 174,
@@ -3919,9 +3746,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Dwelling of Thought",
-    "internationalCode": "BL-49",
-    "primaryEnglishName": "Yishe (Dwelling of Thought)"
+    "englishName": "Yishe (Dwelling of Thought)",
+    "internationalCode": "BL-49"
   },
   {
     "id": 175,
@@ -3941,9 +3767,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膀胱經穴",
-    "englishName": "Stomach Granary",
-    "internationalCode": "BL-50",
-    "primaryEnglishName": "Weicang (Stomach Granary)"
+    "englishName": "Weicang (Stomach Granary)",
+    "internationalCode": "BL-50"
   },
   {
     "id": 176,
@@ -3963,9 +3788,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "膀胱經穴",
-    "englishName": "Breathing Gate",
-    "internationalCode": "BL-51",
-    "primaryEnglishName": "Huangmen (Breathing Gate)"
+    "englishName": "Huangmen (Breathing Gate)",
+    "internationalCode": "BL-51"
   },
   {
     "id": 177,
@@ -3986,9 +3810,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "膀胱經穴",
-    "englishName": "Chamber of Will",
-    "internationalCode": "BL-52",
-    "primaryEnglishName": "Zhishi (Chamber of Will)"
+    "englishName": "Zhishi (Chamber of Will)",
+    "internationalCode": "BL-52"
   },
   {
     "id": 178,
@@ -4008,9 +3831,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "膀胱經穴",
-    "englishName": "Womb Breathing",
-    "internationalCode": "BL-53",
-    "primaryEnglishName": "Baohuang (Womb Breathing)"
+    "englishName": "Baohuang (Womb Breathing)",
+    "internationalCode": "BL-53"
   },
   {
     "id": 179,
@@ -4031,9 +3853,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "膀胱經穴",
-    "englishName": "Edge of the Sides",
-    "internationalCode": "BL-54",
-    "primaryEnglishName": "Zhibian (Edge of the Sides)"
+    "englishName": "Zhibian (Edge of the Sides)",
+    "internationalCode": "BL-54"
   },
   {
     "id": 180,
@@ -4053,9 +3874,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "膀胱經穴",
-    "englishName": "Junction of Yang",
-    "internationalCode": "BL-55",
-    "primaryEnglishName": "Heyang (Junction of Yang)"
+    "englishName": "Heyang (Junction of Yang)",
+    "internationalCode": "BL-55"
   },
   {
     "id": 181,
@@ -4075,9 +3895,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "膀胱經穴",
-    "englishName": "Supporting Muscles",
-    "internationalCode": "BL-56",
-    "primaryEnglishName": "Chengjin (Supporting Muscles)"
+    "englishName": "Chengjin (Supporting Muscles)",
+    "internationalCode": "BL-56"
   },
   {
     "id": 182,
@@ -4097,9 +3916,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "膀胱經穴",
-    "englishName": "Supporting the Mountain",
-    "internationalCode": "BL-57",
-    "primaryEnglishName": "Chengshan (Supporting the Mountain)"
+    "englishName": "Chengshan (Supporting the Mountain)",
+    "internationalCode": "BL-57"
   },
   {
     "id": 183,
@@ -4120,9 +3938,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "絡穴",
-    "englishName": "Scattered Yang",
-    "internationalCode": "BL-58",
-    "primaryEnglishName": "Feiyang (Scattered Yang)"
+    "englishName": "Feiyang (Scattered Yang)",
+    "internationalCode": "BL-58"
   },
   {
     "id": 184,
@@ -4142,9 +3959,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "陽蹻脈郄穴",
-    "englishName": "Calyx Yang",
-    "internationalCode": "BL-59",
-    "primaryEnglishName": "Fuyang (Calyx Yang)"
+    "englishName": "Fuyang (Calyx Yang)",
+    "internationalCode": "BL-59"
   },
   {
     "id": 185,
@@ -4165,9 +3981,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "經穴",
-    "englishName": "Kunlun Mountains",
-    "internationalCode": "BL-60",
-    "primaryEnglishName": "Kunlun (Kunlun Mountains)"
+    "englishName": "Kunlun (Kunlun Mountains)",
+    "internationalCode": "BL-60"
   },
   {
     "id": 186,
@@ -4187,9 +4002,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "膀胱經穴",
-    "englishName": "Group Participation",
-    "internationalCode": "BL-61",
-    "primaryEnglishName": "Pucan (Group Participation)"
+    "englishName": "Pucan (Group Participation)",
+    "internationalCode": "BL-61"
   },
   {
     "id": 187,
@@ -4210,9 +4024,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "八脈交會穴（通陽蹻脈）",
-    "englishName": "Extended Vessel",
-    "internationalCode": "BL-62",
-    "primaryEnglishName": "Shenmai (Extended Vessel)"
+    "englishName": "Shenmai (Extended Vessel)",
+    "internationalCode": "BL-62"
   },
   {
     "id": 188,
@@ -4233,9 +4046,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "郄穴",
-    "englishName": "Golden Gate",
-    "internationalCode": "BL-63",
-    "primaryEnglishName": "Jinmen (Golden Gate)"
+    "englishName": "Jinmen (Golden Gate)",
+    "internationalCode": "BL-63"
   },
   {
     "id": 189,
@@ -4256,9 +4068,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "原穴",
-    "englishName": "Fear Bone",
-    "internationalCode": "BL-64",
-    "primaryEnglishName": "Jinggu (Fear Bone)"
+    "englishName": "Jinggu (Fear Bone)",
+    "internationalCode": "BL-64"
   },
   {
     "id": 190,
@@ -4279,9 +4090,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "輸穴",
-    "englishName": "Bundle of Bones",
-    "internationalCode": "BL-65",
-    "primaryEnglishName": "Shugu (Bundle of Bones)"
+    "englishName": "Shugu (Bundle of Bones)",
+    "internationalCode": "BL-65"
   },
   {
     "id": 191,
@@ -4302,9 +4112,8 @@
     ],
     "method": "直刺0.2-0.3寸",
     "category": "滎穴",
-    "englishName": "Walking Through the Valley",
-    "internationalCode": "BL-66",
-    "primaryEnglishName": "Zutonggu (Walking Through the Valley)"
+    "englishName": "Zutonggu (Walking Through the Valley)",
+    "internationalCode": "BL-66"
   },
   {
     "id": 192,
@@ -4325,9 +4134,8 @@
     ],
     "method": "點刺出血，或艾灸",
     "category": "井穴",
-    "englishName": "Most Yin",
-    "internationalCode": "BL-67",
-    "primaryEnglishName": "Zhiyin (Most Yin)"
+    "englishName": "Zhiyin (Most Yin)",
+    "internationalCode": "BL-67"
   },
   {
     "id": 193,
@@ -4350,9 +4158,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "井穴(木穴)",
-    "englishName": "Bubbling Spring",
-    "internationalCode": "KI-1",
-    "primaryEnglishName": "Yongquan (Bubbling Spring)"
+    "englishName": "Yongquan (Bubbling Spring)",
+    "internationalCode": "KI-1"
   },
   {
     "id": 194,
@@ -4374,9 +4181,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "滎穴(火穴)",
-    "englishName": "Burning Valley",
-    "internationalCode": "KI-2",
-    "primaryEnglishName": "Rangu (Burning Valley)"
+    "englishName": "Rangu (Burning Valley)",
+    "internationalCode": "KI-2"
   },
   {
     "id": 195,
@@ -4399,9 +4205,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "輸穴(土穴)、原穴",
-    "englishName": "Largest Valley Stream",
-    "internationalCode": "KI-3",
-    "primaryEnglishName": "Taixi (Largest Valley Stream)"
+    "englishName": "Taixi (Largest Valley Stream)",
+    "internationalCode": "KI-3"
   },
   {
     "id": 196,
@@ -4423,9 +4228,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "絡穴",
-    "englishName": "Big Bell",
-    "internationalCode": "KI-4",
-    "primaryEnglishName": "Dazhong (Big Bell)"
+    "englishName": "Dazhong (Big Bell)",
+    "internationalCode": "KI-4"
   },
   {
     "id": 197,
@@ -4445,9 +4249,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "郄穴",
-    "englishName": "Water Spring",
-    "internationalCode": "KI-5",
-    "primaryEnglishName": "Shuiquan (Water Spring)"
+    "englishName": "Shuiquan (Water Spring)",
+    "internationalCode": "KI-5"
   },
   {
     "id": 198,
@@ -4469,9 +4272,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "八脈交會穴（通陰蹻脈）",
-    "englishName": "Shining Sea",
-    "internationalCode": "KI-6",
-    "primaryEnglishName": "Zhaohai (Shining Sea)"
+    "englishName": "Zhaohai (Shining Sea)",
+    "internationalCode": "KI-6"
   },
   {
     "id": 199,
@@ -4492,9 +4294,8 @@
     ],
     "method": "直刺0.8-1寸",
     "category": "經穴(金穴)",
-    "englishName": "Restoring the Trickle",
-    "internationalCode": "KI-7",
-    "primaryEnglishName": "Fuliu (Restoring the Trickle)"
+    "englishName": "Fuliu (Restoring the Trickle)",
+    "internationalCode": "KI-7"
   },
   {
     "id": 200,
@@ -4515,9 +4316,8 @@
     ],
     "method": "直刺0.8-1寸",
     "category": "陰蹻脈郄穴",
-    "englishName": "Mutual Trust",
-    "internationalCode": "KI-8",
-    "primaryEnglishName": "Jiaoxin (Mutual Trust)"
+    "englishName": "Jiaoxin (Mutual Trust)",
+    "internationalCode": "KI-8"
   },
   {
     "id": 201,
@@ -4537,9 +4337,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "陰維脈郄穴",
-    "englishName": "Construction Guide",
-    "internationalCode": "KI-9",
-    "primaryEnglishName": "Zhubin (Construction Guide)"
+    "englishName": "Zhubin (Construction Guide)",
+    "internationalCode": "KI-9"
   },
   {
     "id": 202,
@@ -4561,9 +4360,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "合穴(水穴)",
-    "englishName": "Yin Valley",
-    "internationalCode": "KI-10",
-    "primaryEnglishName": "Yingu (Yin Valley)"
+    "englishName": "Yingu (Yin Valley)",
+    "internationalCode": "KI-10"
   },
   {
     "id": 203,
@@ -4584,9 +4382,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "腎經穴",
-    "englishName": "Pubic Bone",
-    "internationalCode": "KI-11",
-    "primaryEnglishName": "Henggu (Pubic Bone)"
+    "englishName": "Henggu (Pubic Bone)",
+    "internationalCode": "KI-11"
   },
   {
     "id": 204,
@@ -4607,9 +4404,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "腎經穴",
-    "englishName": "Great Vitality",
-    "internationalCode": "KI-12",
-    "primaryEnglishName": "Dahe (Great Vitality)"
+    "englishName": "Dahe (Great Vitality)",
+    "internationalCode": "KI-12"
   },
   {
     "id": 205,
@@ -4629,9 +4425,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "腎經穴",
-    "englishName": "Qi Point",
-    "internationalCode": "KI-13",
-    "primaryEnglishName": "Qixue (Qi Point)"
+    "englishName": "Qixue (Qi Point)",
+    "internationalCode": "KI-13"
   },
   {
     "id": 206,
@@ -4652,9 +4447,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "腎經穴",
-    "englishName": "Four Fullnesses",
-    "internationalCode": "KI-14",
-    "primaryEnglishName": "Siman (Four Fullnesses)"
+    "englishName": "Siman (Four Fullnesses)",
+    "internationalCode": "KI-14"
   },
   {
     "id": 207,
@@ -4674,9 +4468,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "腎經穴",
-    "englishName": "Pour into the Center",
-    "internationalCode": "KI-15",
-    "primaryEnglishName": "Zhongzhu (Pour into the Center)"
+    "englishName": "Zhongzhu (Pour into the Center)",
+    "internationalCode": "KI-15"
   },
   {
     "id": 208,
@@ -4697,9 +4490,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "腎經穴",
-    "englishName": "Breathing Increase",
-    "internationalCode": "KI-16",
-    "primaryEnglishName": "Huangyu (Breathing Increase)"
+    "englishName": "Huangyu (Breathing Increase)",
+    "internationalCode": "KI-16"
   },
   {
     "id": 209,
@@ -4719,9 +4511,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "腎經穴",
-    "englishName": "Crooked Exchanges",
-    "internationalCode": "KI-17",
-    "primaryEnglishName": "Shangqu (Crooked Exchanges)"
+    "englishName": "Shangqu (Crooked Exchanges)",
+    "internationalCode": "KI-17"
   },
   {
     "id": 210,
@@ -4741,9 +4532,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "腎經穴",
-    "englishName": "Stone Barrier",
-    "internationalCode": "KI-18",
-    "primaryEnglishName": "Shiguan (Stone Barrier)"
+    "englishName": "Shiguan (Stone Barrier)",
+    "internationalCode": "KI-18"
   },
   {
     "id": 211,
@@ -4763,9 +4553,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "腎經穴",
-    "englishName": "Yin City",
-    "internationalCode": "KI-19",
-    "primaryEnglishName": "Yindu (Yin City)"
+    "englishName": "Yindu (Yin City)",
+    "internationalCode": "KI-19"
   },
   {
     "id": 212,
@@ -4785,9 +4574,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "腎經穴",
-    "englishName": "On the Belly Through the Valley",
-    "internationalCode": "KI-20",
-    "primaryEnglishName": "Futonggu (On the Belly Through the Valley)"
+    "englishName": "Futonggu (On the Belly Through the Valley)",
+    "internationalCode": "KI-20"
   },
   {
     "id": 213,
@@ -4807,9 +4595,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "腎經穴",
-    "englishName": "Gate to Darkness",
-    "internationalCode": "KI-21",
-    "primaryEnglishName": "Youmen (Gate to Darkness)"
+    "englishName": "Youmen (Gate to Darkness)",
+    "internationalCode": "KI-21"
   },
   {
     "id": 214,
@@ -4829,9 +4616,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "腎經穴",
-    "englishName": "Walking Corridor",
-    "internationalCode": "KI-22",
-    "primaryEnglishName": "Bulang (Walking Corridor)"
+    "englishName": "Bulang (Walking Corridor)",
+    "internationalCode": "KI-22"
   },
   {
     "id": 215,
@@ -4852,9 +4638,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "腎經穴",
-    "englishName": "Blocked Heart",
-    "internationalCode": "KI-23",
-    "primaryEnglishName": "Shenfeng (Blocked Heart)"
+    "englishName": "Shenfeng (Blocked Heart)",
+    "internationalCode": "KI-23"
   },
   {
     "id": 216,
@@ -4874,9 +4659,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "腎經穴",
-    "englishName": "Spiritual Wasteland",
-    "internationalCode": "KI-24",
-    "primaryEnglishName": "Lingxu (Spiritual Wasteland)"
+    "englishName": "Lingxu (Spiritual Wasteland)",
+    "internationalCode": "KI-24"
   },
   {
     "id": 217,
@@ -4897,9 +4681,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "腎經穴",
-    "englishName": "Container of the Mind",
-    "internationalCode": "KI-25",
-    "primaryEnglishName": "Shenzang (Container of the Mind)"
+    "englishName": "Shenzang (Container of the Mind)",
+    "internationalCode": "KI-25"
   },
   {
     "id": 218,
@@ -4919,9 +4702,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "腎經穴",
-    "englishName": "Inner Refinement",
-    "internationalCode": "KI-26",
-    "primaryEnglishName": "Yuzhong (Inner Refinement)"
+    "englishName": "Yuzhong (Inner Refinement)",
+    "internationalCode": "KI-26"
   },
   {
     "id": 219,
@@ -4941,9 +4723,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "腎經穴",
-    "englishName": "Increase of Authority",
-    "internationalCode": "KI-27",
-    "primaryEnglishName": "Yufu (Increase of Authority)"
+    "englishName": "Yufu (Increase of Authority)",
+    "internationalCode": "KI-27"
   },
   {
     "id": 220,
@@ -4964,9 +4745,8 @@
     ],
     "method": "斜刺0.3-0.5寸",
     "category": "心包經穴",
-    "englishName": "Heavenly Pond",
-    "internationalCode": "P-1",
-    "primaryEnglishName": "Tianchi (Heavenly Pond)"
+    "englishName": "Tianchi (Heavenly Pond)",
+    "internationalCode": "P-1"
   },
   {
     "id": 221,
@@ -4986,9 +4766,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "心包經穴",
-    "englishName": "Heavenly Spring",
-    "internationalCode": "P-2",
-    "primaryEnglishName": "Tianquan (Heavenly Spring)"
+    "englishName": "Tianquan (Heavenly Spring)",
+    "internationalCode": "P-2"
   },
   {
     "id": 222,
@@ -5010,9 +4789,8 @@
     ],
     "method": "直刺0.8-1寸",
     "category": "合穴(水穴)",
-    "englishName": "Marsh at the Bend",
-    "internationalCode": "P-3",
-    "primaryEnglishName": "Quze (Marsh at the Bend)"
+    "englishName": "Quze (Marsh at the Bend)",
+    "internationalCode": "P-3"
   },
   {
     "id": 223,
@@ -5033,9 +4811,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "郄穴",
-    "englishName": "Gate Ajar",
-    "internationalCode": "P-4",
-    "primaryEnglishName": "Ximen (Gate Ajar)"
+    "englishName": "Ximen (Gate Ajar)",
+    "internationalCode": "P-4"
   },
   {
     "id": 224,
@@ -5057,9 +4834,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "經穴(金穴)",
-    "englishName": "Using the Space",
-    "internationalCode": "P-5",
-    "primaryEnglishName": "Jianshi (Using the Space)"
+    "englishName": "Jianshi (Using the Space)",
+    "internationalCode": "P-5"
   },
   {
     "id": 225,
@@ -5082,9 +4858,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "絡穴、八脈交會穴（通陰維脈）",
-    "englishName": "Barrier Gate to the Inside",
-    "internationalCode": "P-6",
-    "primaryEnglishName": "Neiguan (Barrier Gate to the Inside)"
+    "englishName": "Neiguan (Barrier Gate to the Inside)",
+    "internationalCode": "P-6"
   },
   {
     "id": 226,
@@ -5106,9 +4881,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "輸穴(土穴)、原穴",
-    "englishName": "Much Abuse",
-    "internationalCode": "P-7",
-    "primaryEnglishName": "Daling (Much Abuse)"
+    "englishName": "Daling (Much Abuse)",
+    "internationalCode": "P-7"
   },
   {
     "id": 227,
@@ -5129,9 +4903,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "滎穴(火穴)",
-    "englishName": "Working in the Palace",
-    "internationalCode": "P-8",
-    "primaryEnglishName": "Laogong (Working in the Palace)"
+    "englishName": "Laogong (Working in the Palace)",
+    "internationalCode": "P-8"
   },
   {
     "id": 228,
@@ -5152,9 +4925,8 @@
     ],
     "method": "點刺出血",
     "category": "井穴(木穴)",
-    "englishName": "Thoroughfare in the Middle",
-    "internationalCode": "P-9",
-    "primaryEnglishName": "Zhongchong (Thoroughfare in the Middle)"
+    "englishName": "Zhongchong (Thoroughfare in the Middle)",
+    "internationalCode": "P-9"
   },
   {
     "id": 229,
@@ -5176,9 +4948,8 @@
     ],
     "method": "點刺出血",
     "category": "井穴(金穴)",
-    "englishName": "Through the Barrier Gate",
-    "internationalCode": "TB-1",
-    "primaryEnglishName": "Guanchong (Through the Barrier Gate)"
+    "englishName": "Guanchong (Through the Barrier Gate)",
+    "internationalCode": "TB-1"
   },
   {
     "id": 230,
@@ -5199,9 +4970,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "滎穴(水穴)",
-    "englishName": "Juices Gate",
-    "internationalCode": "TB-2",
-    "primaryEnglishName": "Yemen (Juices Gate)"
+    "englishName": "Yemen (Juices Gate)",
+    "internationalCode": "TB-2"
   },
   {
     "id": 231,
@@ -5223,9 +4993,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "輸穴(木穴)",
-    "englishName": "Between the Sandbars",
-    "internationalCode": "TB-3",
-    "primaryEnglishName": "Zhongzhu (Between the Sandbars)"
+    "englishName": "Zhongzhu (Between the Sandbars)",
+    "internationalCode": "TB-3"
   },
   {
     "id": 232,
@@ -5246,9 +5015,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "原穴",
-    "englishName": "Yang Pond",
-    "internationalCode": "TB-4",
-    "primaryEnglishName": "Yangchi (Yang Pond)"
+    "englishName": "Yangchi (Yang Pond)",
+    "internationalCode": "TB-4"
   },
   {
     "id": 233,
@@ -5270,9 +5038,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "絡穴、八脈交會穴（通陽維脈）",
-    "englishName": "Barrier Gate to the Outside",
-    "internationalCode": "TB-5",
-    "primaryEnglishName": "Waiguan (Barrier Gate to the Outside)"
+    "englishName": "Waiguan (Barrier Gate to the Outside)",
+    "internationalCode": "TB-5"
   },
   {
     "id": 234,
@@ -5294,9 +5061,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "經穴(火穴)",
-    "englishName": "Limb's Ditch",
-    "internationalCode": "TB-6",
-    "primaryEnglishName": "Zhigou (Limb's Ditch)"
+    "englishName": "Zhigou (Limb's Ditch)",
+    "internationalCode": "TB-6"
   },
   {
     "id": 235,
@@ -5315,9 +5081,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "郄穴",
-    "englishName": "Clan Meeting",
-    "internationalCode": "TB-7",
-    "primaryEnglishName": "Huizong (Clan Meeting)"
+    "englishName": "Huizong (Clan Meeting)",
+    "internationalCode": "TB-7"
   },
   {
     "id": 236,
@@ -5337,9 +5102,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "三焦經穴",
-    "englishName": "Triple Yang Twist",
-    "internationalCode": "TB-8",
-    "primaryEnglishName": "Sanyangluo (Triple Yang Twist)"
+    "englishName": "Sanyangluo (Triple Yang Twist)",
+    "internationalCode": "TB-8"
   },
   {
     "id": 237,
@@ -5359,9 +5123,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "三焦經穴",
-    "englishName": "Fourth Ditch",
-    "internationalCode": "TB-9",
-    "primaryEnglishName": "Sidu (Fourth Ditch)"
+    "englishName": "Sidu (Fourth Ditch)",
+    "internationalCode": "TB-9"
   },
   {
     "id": 238,
@@ -5382,9 +5145,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "合穴(土穴)",
-    "englishName": "Heavenly Well",
-    "internationalCode": "TB-10",
-    "primaryEnglishName": "Tianjing (Heavenly Well)"
+    "englishName": "Tianjing (Heavenly Well)",
+    "internationalCode": "TB-10"
   },
   {
     "id": 239,
@@ -5403,9 +5165,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "三焦經穴",
-    "englishName": "Clear Cold Depths",
-    "internationalCode": "TB-11",
-    "primaryEnglishName": "Qinglengyuan (Clear Cold Depths)"
+    "englishName": "Qinglengyuan (Clear Cold Depths)",
+    "internationalCode": "TB-11"
   },
   {
     "id": 240,
@@ -5425,9 +5186,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "三焦經穴",
-    "englishName": "Thawing Lake",
-    "internationalCode": "TB-12",
-    "primaryEnglishName": "Xiaoluo (Thawing Lake)"
+    "englishName": "Xiaoluo (Thawing Lake)",
+    "internationalCode": "TB-12"
   },
   {
     "id": 241,
@@ -5446,9 +5206,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "三焦經穴",
-    "englishName": "Upper Arm Junction",
-    "internationalCode": "TB-13",
-    "primaryEnglishName": "Naohui (Upper Arm Junction)"
+    "englishName": "Naohui (Upper Arm Junction)",
+    "internationalCode": "TB-13"
   },
   {
     "id": 242,
@@ -5467,9 +5226,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "三焦經穴",
-    "englishName": "Shoulder Bones Notch",
-    "internationalCode": "TB-14",
-    "primaryEnglishName": "Jianliao (Shoulder Bones Notch)"
+    "englishName": "Jianliao (Shoulder Bones Notch)",
+    "internationalCode": "TB-14"
   },
   {
     "id": 243,
@@ -5488,9 +5246,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "三焦經穴",
-    "englishName": "Heavenly Bone Notch",
-    "internationalCode": "TB-15",
-    "primaryEnglishName": "Tianliao (Heavenly Bone Notch)"
+    "englishName": "Tianliao (Heavenly Bone Notch)",
+    "internationalCode": "TB-15"
   },
   {
     "id": 244,
@@ -5511,9 +5268,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "三焦經穴",
-    "englishName": "Lattice Window to Heaven",
-    "internationalCode": "TB-16",
-    "primaryEnglishName": "Tianyou (Lattice Window to Heaven)"
+    "englishName": "Tianyou (Lattice Window to Heaven)",
+    "internationalCode": "TB-16"
   },
   {
     "id": 245,
@@ -5535,9 +5291,8 @@
     ],
     "method": "直刺0.8-1.2寸",
     "category": "三焦經穴",
-    "englishName": "Wind Screen",
-    "internationalCode": "TB-17",
-    "primaryEnglishName": "Yifeng (Wind Screen)"
+    "englishName": "Yifeng (Wind Screen)",
+    "internationalCode": "TB-17"
   },
   {
     "id": 246,
@@ -5557,9 +5312,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "三焦經穴",
-    "englishName": "Spasm Bloodvessel",
-    "internationalCode": "TB-18",
-    "primaryEnglishName": "Chimai (Spasm Bloodvessel)"
+    "englishName": "Chimai (Spasm Bloodvessel)",
+    "internationalCode": "TB-18"
   },
   {
     "id": 247,
@@ -5579,9 +5333,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "三焦經穴",
-    "englishName": "Quieting the Head",
-    "internationalCode": "TB-19",
-    "primaryEnglishName": "Luxi (Quieting the Head)"
+    "englishName": "Luxi (Quieting the Head)",
+    "internationalCode": "TB-19"
   },
   {
     "id": 248,
@@ -5601,9 +5354,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "三焦經穴",
-    "englishName": "Following the Angle",
-    "internationalCode": "TB-20",
-    "primaryEnglishName": "Jiaosun (Following the Angle)"
+    "englishName": "Jiaosun (Following the Angle)",
+    "internationalCode": "TB-20"
   },
   {
     "id": 249,
@@ -5623,9 +5375,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "三焦經穴",
-    "englishName": "Ear Opening",
-    "internationalCode": "TB-21",
-    "primaryEnglishName": "Ermen (Ear Opening)"
+    "englishName": "Ermen (Ear Opening)",
+    "internationalCode": "TB-21"
   },
   {
     "id": 250,
@@ -5645,9 +5396,8 @@
     ],
     "method": "斜刺0.3-0.5寸",
     "category": "三焦經穴",
-    "englishName": "Attuned Listening Bone Notch",
-    "internationalCode": "TB-22",
-    "primaryEnglishName": "Erheliao (Attuned Listening Bone Notch)"
+    "englishName": "Erheliao (Attuned Listening Bone Notch)",
+    "internationalCode": "TB-22"
   },
   {
     "id": 251,
@@ -5668,9 +5418,8 @@
     ],
     "method": "平刺0.5-1寸",
     "category": "三焦經穴",
-    "englishName": "Bamboo Hairs Cavity",
-    "internationalCode": "TB-23",
-    "primaryEnglishName": "Sizhukong (Bamboo Hairs Cavity)"
+    "englishName": "Sizhukong (Bamboo Hairs Cavity)",
+    "internationalCode": "TB-23"
   },
   {
     "id": 252,
@@ -5690,9 +5439,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "膽經穴",
-    "englishName": "Pupil Bone Notch",
-    "internationalCode": "GB-1",
-    "primaryEnglishName": "Tongziliao (Pupil Bone Notch)"
+    "englishName": "Tongziliao (Pupil Bone Notch)",
+    "internationalCode": "GB-1"
   },
   {
     "id": 253,
@@ -5713,9 +5461,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Listening to the Group",
-    "internationalCode": "GB-2",
-    "primaryEnglishName": "Tinghui (Listening to the Group)"
+    "englishName": "Tinghui (Listening to the Group)",
+    "internationalCode": "GB-2"
   },
   {
     "id": 254,
@@ -5736,9 +5483,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Above the Joint",
-    "internationalCode": "GB-3",
-    "primaryEnglishName": "Shangguan (Above the Joint)"
+    "englishName": "Shangguan (Above the Joint)",
+    "internationalCode": "GB-3"
   },
   {
     "id": 255,
@@ -5759,9 +5505,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Clenched Jaws",
-    "internationalCode": "GB-4",
-    "primaryEnglishName": "Hanyan (Clenched Jaws)"
+    "englishName": "Hanyan (Clenched Jaws)",
+    "internationalCode": "GB-4"
   },
   {
     "id": 256,
@@ -5780,9 +5525,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Hanging from the Forehead",
-    "internationalCode": "GB-5",
-    "primaryEnglishName": "Xuanlu (Hanging from the Forehead)"
+    "englishName": "Xuanlu (Hanging from the Forehead)",
+    "internationalCode": "GB-5"
   },
   {
     "id": 257,
@@ -5801,9 +5545,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Hanging Little Bit",
-    "internationalCode": "GB-6",
-    "primaryEnglishName": "Xuanli (Hanging Little Bit)"
+    "englishName": "Xuanli (Hanging Little Bit)",
+    "internationalCode": "GB-6"
   },
   {
     "id": 258,
@@ -5823,9 +5566,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Curve of the Hair on the Temples",
-    "internationalCode": "GB-7",
-    "primaryEnglishName": "Qubin (Curve of the Hair on the Temples)"
+    "englishName": "Qubin (Curve of the Hair on the Temples)",
+    "internationalCode": "GB-7"
   },
   {
     "id": 259,
@@ -5844,9 +5586,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Follow the Valley",
-    "internationalCode": "GB-8",
-    "primaryEnglishName": "Shuaigu (Follow the Valley)"
+    "englishName": "Shuaigu (Follow the Valley)",
+    "internationalCode": "GB-8"
   },
   {
     "id": 260,
@@ -5865,9 +5606,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Heavenly Infusion",
-    "internationalCode": "GB-9",
-    "primaryEnglishName": "Tianchong (Heavenly Infusion)"
+    "englishName": "Tianchong (Heavenly Infusion)",
+    "internationalCode": "GB-9"
   },
   {
     "id": 261,
@@ -5888,9 +5628,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Purity Rising to the Surface",
-    "internationalCode": "GB-10",
-    "primaryEnglishName": "Fubai (Purity Rising to the Surface)"
+    "englishName": "Fubai (Purity Rising to the Surface)",
+    "internationalCode": "GB-10"
   },
   {
     "id": 262,
@@ -5910,9 +5649,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Yin Openings Head Point",
-    "internationalCode": "GB-11",
-    "primaryEnglishName": "Touqiaoyin (Yin Openings Head Point)"
+    "englishName": "Touqiaoyin (Yin Openings Head Point)",
+    "internationalCode": "GB-11"
   },
   {
     "id": 263,
@@ -5933,9 +5671,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Entire Bone",
-    "internationalCode": "GB-12",
-    "primaryEnglishName": "Wangu (Entire Bone)"
+    "englishName": "Wangu (Entire Bone)",
+    "internationalCode": "GB-12"
   },
   {
     "id": 264,
@@ -5955,9 +5692,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Mind's Root",
-    "internationalCode": "GB-13",
-    "primaryEnglishName": "Benshen (Mind's Root)"
+    "englishName": "Benshen (Mind's Root)",
+    "internationalCode": "GB-13"
   },
   {
     "id": 265,
@@ -5978,9 +5714,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Yang Purity",
-    "internationalCode": "GB-14",
-    "primaryEnglishName": "Yangbai (Yang Purity)"
+    "englishName": "Yangbai (Yang Purity)",
+    "internationalCode": "GB-14"
   },
   {
     "id": 266,
@@ -6002,9 +5737,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Near to Tears in the Hair",
-    "internationalCode": "GB-15",
-    "primaryEnglishName": "Toulinqi (Near to Tears in the Hair)"
+    "englishName": "Toulinqi (Near to Tears in the Hair)",
+    "internationalCode": "GB-15"
   },
   {
     "id": 267,
@@ -6026,9 +5760,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "See through the Window",
-    "internationalCode": "GB-16",
-    "primaryEnglishName": "Muchuang (See through the Window)"
+    "englishName": "Muchuang (See through the Window)",
+    "internationalCode": "GB-16"
   },
   {
     "id": 268,
@@ -6048,9 +5781,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Upright Conduct",
-    "internationalCode": "GB-17",
-    "primaryEnglishName": "Zhengying (Upright Conduct)"
+    "englishName": "Zhengying (Upright Conduct)",
+    "internationalCode": "GB-17"
   },
   {
     "id": 269,
@@ -6071,9 +5803,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Informed by the Spirit",
-    "internationalCode": "GB-18",
-    "primaryEnglishName": "Chengling (Informed by the Spirit)"
+    "englishName": "Chengling (Informed by the Spirit)",
+    "internationalCode": "GB-18"
   },
   {
     "id": 270,
@@ -6094,9 +5825,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Brain Hollow",
-    "internationalCode": "GB-19",
-    "primaryEnglishName": "Naokong (Brain Hollow)"
+    "englishName": "Naokong (Brain Hollow)",
+    "internationalCode": "GB-19"
   },
   {
     "id": 271,
@@ -6120,9 +5850,8 @@
     ],
     "method": "針尖微下，向鼻尖斜刺0.8-1.2寸",
     "category": "膽經穴",
-    "englishName": "Windy Pond",
-    "internationalCode": "GB-20",
-    "primaryEnglishName": "Fengchi (Windy Pond)"
+    "englishName": "Fengchi (Windy Pond)",
+    "internationalCode": "GB-20"
   },
   {
     "id": 272,
@@ -6144,9 +5873,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Shoulder Well",
-    "internationalCode": "GB-21",
-    "primaryEnglishName": "Jianjing (Shoulder Well)"
+    "englishName": "Jianjing (Shoulder Well)",
+    "internationalCode": "GB-21"
   },
   {
     "id": 273,
@@ -6165,9 +5893,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Abyss Under the Armpit",
-    "internationalCode": "GB-22",
-    "primaryEnglishName": "Yuanye (Abyss Under the Armpit)"
+    "englishName": "Yuanye (Abyss Under the Armpit)",
+    "internationalCode": "GB-22"
   },
   {
     "id": 274,
@@ -6187,9 +5914,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膽經穴",
-    "englishName": "Flank Muscles",
-    "internationalCode": "GB-23",
-    "primaryEnglishName": "Zhejin (Flank Muscles)"
+    "englishName": "Zhejin (Flank Muscles)",
+    "internationalCode": "GB-23"
   },
   {
     "id": 275,
@@ -6209,9 +5935,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "膽募穴",
-    "englishName": "Daytime Moon",
-    "internationalCode": "GB-24",
-    "primaryEnglishName": "Riyue (Daytime Moon)"
+    "englishName": "Riyue (Daytime Moon)",
+    "internationalCode": "GB-24"
   },
   {
     "id": 276,
@@ -6233,9 +5958,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "腎募穴",
-    "englishName": "Gate of Fear",
-    "internationalCode": "GB-25",
-    "primaryEnglishName": "Jingmen (Gate of Fear)"
+    "englishName": "Jingmen (Gate of Fear)",
+    "internationalCode": "GB-25"
   },
   {
     "id": 277,
@@ -6255,9 +5979,8 @@
     ],
     "method": "直刺0.8-1寸",
     "category": "帶脈穴",
-    "englishName": "Girdle Vessel",
-    "internationalCode": "GB-26",
-    "primaryEnglishName": "Daimai (Girdle Vessel)"
+    "englishName": "Daimai (Girdle Vessel)",
+    "internationalCode": "GB-26"
   },
   {
     "id": 278,
@@ -6278,9 +6001,8 @@
     ],
     "method": "直刺0.8-1.5寸",
     "category": "膽經穴",
-    "englishName": "Five Pivots",
-    "internationalCode": "GB-27",
-    "primaryEnglishName": "Wushu (Five Pivots)"
+    "englishName": "Wushu (Five Pivots)",
+    "internationalCode": "GB-27"
   },
   {
     "id": 279,
@@ -6301,9 +6023,8 @@
     ],
     "method": "直刺0.8-1.5寸",
     "category": "膽經穴",
-    "englishName": "Holding the Path",
-    "internationalCode": "GB-28",
-    "primaryEnglishName": "Weidao (Holding the Path)"
+    "englishName": "Weidao (Holding the Path)",
+    "internationalCode": "GB-28"
   },
   {
     "id": 280,
@@ -6322,9 +6043,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "膽經穴",
-    "englishName": "Squatting Bone Notch",
-    "internationalCode": "GB-29",
-    "primaryEnglishName": "Juliao (Squatting Bone Notch)"
+    "englishName": "Juliao (Squatting Bone Notch)",
+    "internationalCode": "GB-29"
   },
   {
     "id": 281,
@@ -6343,9 +6063,8 @@
     ],
     "method": "直刺2-3寸",
     "category": "膽經穴",
-    "englishName": "Jumping Around",
-    "internationalCode": "GB-30",
-    "primaryEnglishName": "Huantiao (Jumping Around)"
+    "englishName": "Huantiao (Jumping Around)",
+    "internationalCode": "GB-30"
   },
   {
     "id": 282,
@@ -6364,9 +6083,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "膽經穴",
-    "englishName": "Windy Market",
-    "internationalCode": "GB-31",
-    "primaryEnglishName": "Fengshi (Windy Market)"
+    "englishName": "Fengshi (Windy Market)",
+    "internationalCode": "GB-31"
   },
   {
     "id": 283,
@@ -6385,9 +6103,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "膽經穴",
-    "englishName": "Middle of the Ditch",
-    "internationalCode": "GB-32",
-    "primaryEnglishName": "Zhongdu (Middle of the Ditch)"
+    "englishName": "Zhongdu (Middle of the Ditch)",
+    "internationalCode": "GB-32"
   },
   {
     "id": 284,
@@ -6406,9 +6123,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "膽經穴",
-    "englishName": "Knee Yang Joint",
-    "internationalCode": "GB-33",
-    "primaryEnglishName": "Xiyangguan (Knee Yang Joint)"
+    "englishName": "Xiyangguan (Knee Yang Joint)",
+    "internationalCode": "GB-33"
   },
   {
     "id": 285,
@@ -6431,9 +6147,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "合穴(土穴)、八會穴之筋會",
-    "englishName": "Yang Mound Spring",
-    "internationalCode": "GB-34",
-    "primaryEnglishName": "Yanglingquan (Yang Mound Spring)"
+    "englishName": "Yanglingquan (Yang Mound Spring)",
+    "internationalCode": "GB-34"
   },
   {
     "id": 286,
@@ -6452,9 +6167,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "陽維脈郄穴",
-    "englishName": "Yang in Interaction",
-    "internationalCode": "GB-35",
-    "primaryEnglishName": "Yangjiao (Yang in Interaction)"
+    "englishName": "Yangjiao (Yang in Interaction)",
+    "internationalCode": "GB-35"
   },
   {
     "id": 287,
@@ -6473,9 +6187,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "郄穴",
-    "englishName": "Outside of the Mound",
-    "internationalCode": "GB-36",
-    "primaryEnglishName": "Waiqiu (Outside of the Mound)"
+    "englishName": "Waiqiu (Outside of the Mound)",
+    "internationalCode": "GB-36"
   },
   {
     "id": 288,
@@ -6495,9 +6208,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "絡穴",
-    "englishName": "Bright Sunlight",
-    "internationalCode": "GB-37",
-    "primaryEnglishName": "Guangming (Bright Sunlight)"
+    "englishName": "Guangming (Bright Sunlight)",
+    "internationalCode": "GB-37"
   },
   {
     "id": 289,
@@ -6518,9 +6230,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "經穴(火穴)",
-    "englishName": "Yang Bars",
-    "internationalCode": "GB-38",
-    "primaryEnglishName": "Yangfu (Yang Bars)"
+    "englishName": "Yangfu (Yang Bars)",
+    "internationalCode": "GB-38"
   },
   {
     "id": 290,
@@ -6540,9 +6251,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "八會穴之髓會",
-    "englishName": "Hanging Bell",
-    "internationalCode": "GB-39",
-    "primaryEnglishName": "Xuanzhong (Hanging Bell)"
+    "englishName": "Xuanzhong (Hanging Bell)",
+    "internationalCode": "GB-39"
   },
   {
     "id": 291,
@@ -6561,9 +6271,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "原穴",
-    "englishName": "Mound in the Wilderness",
-    "internationalCode": "GB-40",
-    "primaryEnglishName": "Qiuxu (Mound in the Wilderness)"
+    "englishName": "Qiuxu (Mound in the Wilderness)",
+    "internationalCode": "GB-40"
   },
   {
     "id": 292,
@@ -6585,9 +6294,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "輸穴(木穴)、八脈交會穴（通帶脈）",
-    "englishName": "Near to Tears on the Foot",
-    "internationalCode": "GB-41",
-    "primaryEnglishName": "Zulinqi (Near to Tears on the Foot)"
+    "englishName": "Zulinqi (Near to Tears on the Foot)",
+    "internationalCode": "GB-41"
   },
   {
     "id": 293,
@@ -6608,9 +6316,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "膽經穴",
-    "englishName": "Five Meeting on the Ground",
-    "internationalCode": "GB-42",
-    "primaryEnglishName": "Diwuhui (Five Meeting on the Ground)"
+    "englishName": "Diwuhui (Five Meeting on the Ground)",
+    "internationalCode": "GB-42"
   },
   {
     "id": 294,
@@ -6632,9 +6339,8 @@
     ],
     "method": "直刺0.3-0.5寸",
     "category": "滎穴(水穴)",
-    "englishName": "Valley Creek Going as it Likes",
-    "internationalCode": "GB-43",
-    "primaryEnglishName": "Xiaxi (Valley Creek Going as it Likes)"
+    "englishName": "Xiaxi (Valley Creek Going as it Likes)",
+    "internationalCode": "GB-43"
   },
   {
     "id": 295,
@@ -6656,9 +6362,8 @@
     ],
     "method": "點刺出血",
     "category": "井穴(金穴)",
-    "englishName": "Yin Openings Foot Point",
-    "internationalCode": "GB-44",
-    "primaryEnglishName": "Zuqiaoyin (Yin Openings Foot Point)"
+    "englishName": "Zuqiaoyin (Yin Openings Foot Point)",
+    "internationalCode": "GB-44"
   },
   {
     "id": 296,
@@ -6680,9 +6385,8 @@
     ],
     "method": "點刺出血",
     "category": "井穴(木穴)",
-    "englishName": "Big Vessel",
-    "internationalCode": "LIV-1",
-    "primaryEnglishName": "Dadun (Big Vessel)"
+    "englishName": "Dadun (Big Vessel)",
+    "internationalCode": "LIV-1"
   },
   {
     "id": 297,
@@ -6705,9 +6409,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "滎穴(火穴)",
-    "englishName": "Walking Pause",
-    "internationalCode": "LIV-2",
-    "primaryEnglishName": "Xingjian (Walking Pause)"
+    "englishName": "Xingjian (Walking Pause)",
+    "internationalCode": "LIV-2"
   },
   {
     "id": 298,
@@ -6731,9 +6434,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "輸穴(土穴)、原穴",
-    "englishName": "Largest Infusion",
-    "internationalCode": "LIV-3",
-    "primaryEnglishName": "Taichong (Largest Infusion)"
+    "englishName": "Taichong (Largest Infusion)",
+    "internationalCode": "LIV-3"
   },
   {
     "id": 299,
@@ -6753,9 +6455,8 @@
     ],
     "method": "直刺0.5-0.8寸",
     "category": "經穴(金穴)",
-    "englishName": "Between the Dikes",
-    "internationalCode": "LIV-4",
-    "primaryEnglishName": "Zhongfeng (Between the Dikes)"
+    "englishName": "Zhongfeng (Between the Dikes)",
+    "internationalCode": "LIV-4"
   },
   {
     "id": 300,
@@ -6776,9 +6477,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "絡穴",
-    "englishName": "Woodworm Canal",
-    "internationalCode": "LIV-5",
-    "primaryEnglishName": "Ligou (Woodworm Canal)"
+    "englishName": "Ligou (Woodworm Canal)",
+    "internationalCode": "LIV-5"
   },
   {
     "id": 301,
@@ -6799,9 +6499,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "郄穴",
-    "englishName": "Between the Cities",
-    "internationalCode": "LIV-6",
-    "primaryEnglishName": "Zhongdu (Between the Cities)"
+    "englishName": "Zhongdu (Between the Cities)",
+    "internationalCode": "LIV-6"
   },
   {
     "id": 302,
@@ -6819,9 +6518,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "肝經穴",
-    "englishName": "Knee Joint",
-    "internationalCode": "LIV-7",
-    "primaryEnglishName": "Xiguan (Knee Joint)"
+    "englishName": "Xiguan (Knee Joint)",
+    "internationalCode": "LIV-7"
   },
   {
     "id": 303,
@@ -6843,9 +6541,8 @@
     ],
     "method": "直刺1-1.5寸",
     "category": "合穴(水穴)",
-    "englishName": "Spring at the Bend",
-    "internationalCode": "LIV-8",
-    "primaryEnglishName": "Ququan (Spring at the Bend)"
+    "englishName": "Ququan (Spring at the Bend)",
+    "internationalCode": "LIV-8"
   },
   {
     "id": 304,
@@ -6865,9 +6562,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "肝經穴",
-    "englishName": "Yin Wrapping",
-    "internationalCode": "LIV-9",
-    "primaryEnglishName": "Yinbao (Yin Wrapping)"
+    "englishName": "Yinbao (Yin Wrapping)",
+    "internationalCode": "LIV-9"
   },
   {
     "id": 305,
@@ -6887,9 +6583,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "肝經穴",
-    "englishName": "Leg's Five Quarter Miles",
-    "internationalCode": "LIV-10",
-    "primaryEnglishName": "Zuwuli (Leg's Five Quarter Miles)"
+    "englishName": "Zuwuli (Leg's Five Quarter Miles)",
+    "internationalCode": "LIV-10"
   },
   {
     "id": 306,
@@ -6908,9 +6603,8 @@
     ],
     "method": "直刺1-2寸",
     "category": "肝經穴",
-    "englishName": "Yin Corner",
-    "internationalCode": "LIV-11",
-    "primaryEnglishName": "Yinlian (Yin Corner)"
+    "englishName": "Yinlian (Yin Corner)",
+    "internationalCode": "LIV-11"
   },
   {
     "id": 307,
@@ -6929,9 +6623,8 @@
     ],
     "method": "避開動脈，直刺0.5-1寸",
     "category": "肝經穴",
-    "englishName": "Hasty Pulse",
-    "internationalCode": "LIV-12",
-    "primaryEnglishName": "Jimai (Hasty Pulse)"
+    "englishName": "Jimai (Hasty Pulse)",
+    "internationalCode": "LIV-12"
   },
   {
     "id": 308,
@@ -6951,9 +6644,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "脾募穴、八會穴之髒會",
-    "englishName": "Chapter Gate",
-    "internationalCode": "LIV-13",
-    "primaryEnglishName": "Zhangmen (Chapter Gate)"
+    "englishName": "Zhangmen (Chapter Gate)",
+    "internationalCode": "LIV-13"
   },
   {
     "id": 309,
@@ -6973,9 +6665,8 @@
     ],
     "method": "斜刺0.5-0.8寸",
     "category": "肝募穴",
-    "englishName": "Gate of Hope",
-    "internationalCode": "LIV-14",
-    "primaryEnglishName": "Qimen (Gate of Hope)"
+    "englishName": "Qimen (Gate of Hope)",
+    "internationalCode": "LIV-14"
   },
   {
     "id": 310,
@@ -6995,9 +6686,8 @@
     ],
     "method": "斜刺，針尖向上與骶骨平行刺入0.5-1寸",
     "category": "絡穴",
-    "englishName": "Continuously Strong",
-    "internationalCode": "DU-1",
-    "primaryEnglishName": "Changqiang (Continuously Strong)"
+    "englishName": "Changqiang (Continuously Strong)",
+    "internationalCode": "DU-1"
   },
   {
     "id": 311,
@@ -7016,9 +6706,8 @@
     ],
     "method": "向上斜刺0.5-1寸",
     "category": "督脈穴",
-    "englishName": "Loins Increase",
-    "internationalCode": "DU-2",
-    "primaryEnglishName": "Yaoyu (Loins Increase)"
+    "englishName": "Yaoyu (Loins Increase)",
+    "internationalCode": "DU-2"
   },
   {
     "id": 312,
@@ -7038,9 +6727,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "督脈穴",
-    "englishName": "Waist's Yang Bar",
-    "internationalCode": "DU-3",
-    "primaryEnglishName": "Yaoyangguan (Waist's Yang Bar)"
+    "englishName": "Yaoyangguan (Waist's Yang Bar)",
+    "internationalCode": "DU-3"
   },
   {
     "id": 313,
@@ -7061,9 +6749,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "督脈穴",
-    "englishName": "Gate of Destiny",
-    "internationalCode": "DU-4",
-    "primaryEnglishName": "Mingmen (Gate of Destiny)"
+    "englishName": "Mingmen (Gate of Destiny)",
+    "internationalCode": "DU-4"
   },
   {
     "id": 314,
@@ -7083,9 +6770,8 @@
     ],
     "method": "向上斜刺0.5-1寸",
     "category": "督脈穴",
-    "englishName": "Most Yang",
-    "internationalCode": "DU-9",
-    "primaryEnglishName": "Zhiyang (Most Yang)"
+    "englishName": "Zhiyang (Most Yang)",
+    "internationalCode": "DU-9"
   },
   {
     "id": 315,
@@ -7107,9 +6793,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "督脈穴",
-    "englishName": "Big Vertebra",
-    "internationalCode": "DU-14",
-    "primaryEnglishName": "Dazhui (Big Vertebra)"
+    "englishName": "Dazhui (Big Vertebra)",
+    "internationalCode": "DU-14"
   },
   {
     "id": 316,
@@ -7130,9 +6815,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "督脈穴",
-    "englishName": "Hundreds of Realizations",
-    "internationalCode": "DU-20",
-    "primaryEnglishName": "Baihui (Hundreds of Realizations)"
+    "englishName": "Baihui (Hundreds of Realizations)",
+    "internationalCode": "DU-20"
   },
   {
     "id": 317,
@@ -7152,9 +6836,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "督脈穴",
-    "englishName": "Stars Above",
-    "internationalCode": "DU-23",
-    "primaryEnglishName": "Shangxing (Stars Above)"
+    "englishName": "Shangxing (Stars Above)",
+    "internationalCode": "DU-23"
   },
   {
     "id": 318,
@@ -7175,9 +6858,8 @@
     ],
     "method": "平刺0.5-0.8寸",
     "category": "督脈穴",
-    "englishName": "Courtyard of the Mind",
-    "internationalCode": "DU-24",
-    "primaryEnglishName": "Shenting (Courtyard of the Mind)"
+    "englishName": "Shenting (Courtyard of the Mind)",
+    "internationalCode": "DU-24"
   },
   {
     "id": 319,
@@ -7198,9 +6880,8 @@
     ],
     "method": "向上斜刺0.3-0.5寸",
     "category": "督脈穴",
-    "englishName": "Water Trough",
-    "internationalCode": "DU-26",
-    "primaryEnglishName": "Shuigou (Water Trough)"
+    "englishName": "Shuigou (Water Trough)",
+    "internationalCode": "DU-26"
   },
   {
     "id": 320,
@@ -7221,9 +6902,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "任脈穴",
-    "englishName": "Meeting of Yin",
-    "internationalCode": "REN-1",
-    "primaryEnglishName": "Huiyin (Meeting of Yin)"
+    "englishName": "Huiyin (Meeting of Yin)",
+    "internationalCode": "REN-1"
   },
   {
     "id": 321,
@@ -7244,9 +6924,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "任脈穴",
-    "englishName": "Curved Bone",
-    "internationalCode": "REN-2",
-    "primaryEnglishName": "Qugu (Curved Bone)"
+    "englishName": "Qugu (Curved Bone)",
+    "internationalCode": "REN-2"
   },
   {
     "id": 322,
@@ -7268,9 +6947,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "膀胱募穴",
-    "englishName": "Balanced Fully",
-    "internationalCode": "REN-3",
-    "primaryEnglishName": "Zhongji (Balanced Fully)"
+    "englishName": "Zhongji (Balanced Fully)",
+    "internationalCode": "REN-3"
   },
   {
     "id": 323,
@@ -7293,9 +6971,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "小腸募穴",
-    "englishName": "Primary Barrier Gate",
-    "internationalCode": "REN-4",
-    "primaryEnglishName": "Guanyuan (Primary Barrier Gate)"
+    "englishName": "Guanyuan (Primary Barrier Gate)",
+    "internationalCode": "REN-4"
   },
   {
     "id": 324,
@@ -7316,9 +6993,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "任脈穴",
-    "englishName": "Sea of Qi",
-    "internationalCode": "REN-6",
-    "primaryEnglishName": "Qihai (Sea of Qi)"
+    "englishName": "Qihai (Sea of Qi)",
+    "internationalCode": "REN-6"
   },
   {
     "id": 325,
@@ -7340,9 +7016,8 @@
     ],
     "method": "禁刺，宜灸",
     "category": "任脈穴",
-    "englishName": "Loss of Consciousness",
-    "internationalCode": "REN-8",
-    "primaryEnglishName": "Shenque (Loss of Consciousness)"
+    "englishName": "Shenque (Loss of Consciousness)",
+    "internationalCode": "REN-8"
   },
   {
     "id": 326,
@@ -7365,9 +7040,8 @@
     ],
     "method": "直刺0.5-1寸",
     "category": "胃募穴、八會穴之腑會",
-    "englishName": "Middle Inside of the Stomach",
-    "internationalCode": "REN-12",
-    "primaryEnglishName": "Zhongwan (Middle Inside of the Stomach)"
+    "englishName": "Zhongwan (Middle Inside of the Stomach)",
+    "internationalCode": "REN-12"
   },
   {
     "id": 327,
@@ -7389,9 +7063,8 @@
     ],
     "method": "平刺0.3-0.5寸",
     "category": "心包募穴、八會穴之氣會",
-    "englishName": "Center of the Chest",
-    "internationalCode": "REN-17",
-    "primaryEnglishName": "Shanzhong (Center of the Chest)"
+    "englishName": "Shanzhong (Center of the Chest)",
+    "internationalCode": "REN-17"
   },
   {
     "id": 328,
@@ -7413,9 +7086,8 @@
     ],
     "method": "先直刺0.2-0.3寸，然後將針尖轉向下，緊靠胸骨後方刺入1-1.5寸",
     "category": "任脈穴",
-    "englishName": "Heaven's Chimney",
-    "internationalCode": "REN-22",
-    "primaryEnglishName": "Tiantu (Heaven's Chimney)"
+    "englishName": "Tiantu (Heaven's Chimney)",
+    "internationalCode": "REN-22"
   },
   {
     "id": 329,
@@ -7436,9 +7108,8 @@
     ],
     "method": "向舌根斜刺0.5-0.8寸",
     "category": "任脈穴",
-    "englishName": "Corner Spring",
-    "internationalCode": "REN-23",
-    "primaryEnglishName": "Lianquan (Corner Spring)"
+    "englishName": "Lianquan (Corner Spring)",
+    "internationalCode": "REN-23"
   },
   {
     "id": 330,
@@ -7458,8 +7129,7 @@
     ],
     "method": "斜刺0.3-0.5寸",
     "category": "任脈穴",
-    "englishName": "Fluid Receptacle",
-    "internationalCode": "REN-24",
-    "primaryEnglishName": "Chengjiang (Fluid Receptacle)"
+    "englishName": "Chengjiang (Fluid Receptacle)",
+    "internationalCode": "REN-24"
   }
 ]
