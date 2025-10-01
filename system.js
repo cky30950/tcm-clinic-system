@@ -11280,6 +11280,21 @@ async function initializeSystemAfterLogin() {
             const safeName = window.escapeHtml(item.name);
             const safeUnit = item.unit ? window.escapeHtml(item.unit) : null;
             const safeDescription = item.description ? window.escapeHtml(item.description) : null;
+            // 讀取英譯名稱並轉義。某些收費項目可能包含英文名稱（englishName）
+            // 以便在英文介面顯示時使用。如果沒有提供 englishName，則預設為 null。
+            const safeEnglishName = item.englishName ? window.escapeHtml(item.englishName) : null;
+            // 根據當前語言選擇顯示名稱。預設為中文名稱，若介面語言為英文且
+            // 有提供英文名稱，則優先使用英文名稱。
+            let displayName = safeName;
+            try {
+                const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                if (langSel && langSel.toLowerCase().startsWith('en')) {
+                    displayName = safeEnglishName || safeName;
+                }
+            } catch (_e) {
+                // 若讀取 localStorage 失敗或其他錯誤，退回顯示中文名稱
+                displayName = safeName;
+            }
             return `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 ${!item.active ? 'opacity-75' : ''}">
                     <div class="flex justify-between items-start mb-3">
