@@ -328,7 +328,65 @@
         }
 
         // 排班資料 - 使用當前月份的日期
+        // 將排班依年月分割儲存在 Realtime Database，例如 scheduleShifts/2025-10/{shiftId}
+        // 本地僅保存正在檢視月份的排班列表以減少下載量。
         let shifts = [];
+
+        /**
+         * 依據日期字串 (YYYY-MM-DD) 取得年月鍵，用於在 RTDB 中的節點。
+         * 若未提供日期，則使用 currentDate。輸出格式為 YYYY-MM。
+         * @param {string} dateStr 日期字串，例如 2025-10-01
+         * @returns {string} 年月鍵，例如 '2025-10'
+         */
+        function getMonthKey(dateStr) {
+            try {
+                if (dateStr && typeof dateStr === 'string' && dateStr.length >= 7) {
+                    return dateStr.slice(0, 7);
+                }
+                const d = currentDate instanceof Date ? currentDate : new Date();
+                const y = d.getFullYear();
+                const m = (d.getMonth() + 1).toString().padStart(2, '0');
+                return `${y}-${m}`;
+            } catch (_e) {
+                const d = new Date();
+                return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+            }
+        }
+
+        /**
+         * 將單筆排班資料寫入至 Firebase Realtime Database。
+         * 僅寫入該排班，而不覆蓋整個排班集合。
+         * @param {Object} shift 排班物件，必須包含 id、date 等欄位
+         */
+        async function saveShiftToDb(shift) {
+            try {
+                if (!window.firebase || !window.firebase.rtdb || !shift) return;
+                const monthKey = getMonthKey(shift.date);
+                // 從 shift 物件中移除 id 以避免 id 存入資料庫值
+                const { id, ...data } = shift || {};
+                const path = `scheduleShifts/${monthKey}/${id}`;
+                const refPath = window.firebase.ref(window.firebase.rtdb, path);
+                await window.firebase.set(refPath, data);
+            } catch (e) {
+                console.error('保存單筆排班資料失敗:', e);
+            }
+        }
+
+        /**
+         * 從 Firebase Realtime Database 中刪除單筆排班資料。
+         * @param {Object} shift 排班物件，需要 id 與 date
+         */
+        async function deleteShiftFromDb(shift) {
+            try {
+                if (!window.firebase || !window.firebase.rtdb || !shift) return;
+                const monthKey = getMonthKey(shift.date);
+                const path = `scheduleShifts/${monthKey}/${shift.id}`;
+                const refPath = window.firebase.ref(window.firebase.rtdb, path);
+                await window.firebase.remove(refPath);
+            } catch (e) {
+                console.error('刪除排班資料失敗:', e);
+            }
+        }
 
         /**
          * 從 Firebase Realtime Database 載入排班資料。
@@ -354,17 +412,18 @@
                     console.warn('Firebase Realtime Database 尚未準備就緒，無法載入排班資料');
                     return;
                 }
-                // 從預設路徑載入排班資料
-                const shiftsRef = window.firebase.ref(window.firebase.rtdb, 'scheduleShifts');
-                const snapshot = await window.firebase.get(shiftsRef);
+                // 只載入目前月份的排班資料，以減少下載量
+                const monthKey = getMonthKey();
+                const monthRef = window.firebase.ref(window.firebase.rtdb, `scheduleShifts/${monthKey}`);
+                const snapshot = await window.firebase.get(monthRef);
                 const data = snapshot && snapshot.exists() ? snapshot.val() : null;
                 // 清空現有資料，保持陣列引用不變
                 shifts.splice(0, shifts.length);
                 if (data) {
-                    Object.keys(data).forEach(key => {
-                        const shiftObj = data[key] || {};
-                        // 將鍵轉為數字 ID，並合併資料
-                        shifts.push({ id: isNaN(Number(key)) ? key : Number(key), ...shiftObj });
+                    Object.keys(data).forEach(idKey => {
+                        const shiftObj = data[idKey] || {};
+                        // 將鍵轉為數字 ID（若為數字字串）並合併資料
+                        shifts.push({ id: isNaN(Number(idKey)) ? idKey : Number(idKey), ...shiftObj });
                     });
                 }
             } catch (err) {
@@ -404,16 +463,10 @@
                     console.warn('Firebase Realtime Database 尚未準備就緒，無法保存排班資料');
                     return;
                 }
-                // 將 shifts 陣列轉換為物件，以便儲存至 Realtime Database
-                const dataObj = {};
-                shifts.forEach(shift => {
-                    // 使用 shift.id 作為鍵，避免覆蓋不同 ID 的資料
-                    const { id, ...rest } = shift;
-                    // 將所有屬性（除了 id）寫入資料庫
-                    dataObj[id] = rest;
-                });
-                const shiftsRef = window.firebase.ref(window.firebase.rtdb, 'scheduleShifts');
-                await window.firebase.set(shiftsRef, dataObj);
+                // 逐筆寫入排班資料，以避免覆蓋整個排班集合。
+                for (const shift of shifts) {
+                    await saveShiftToDb(shift);
+                }
             } catch (err) {
                 console.error('保存排班資料失敗:', err);
             }
@@ -566,9 +619,16 @@
         }
 
         // 導航行事曆
-        function navigateCalendar(direction) {
+        async function navigateCalendar(direction) {
+            // 調整月份
             currentDate.setMonth(currentDate.getMonth() + direction);
             updateCurrentDate();
+            // 載入新的月份排班資料，以便顯示對應月份的排班
+            try {
+                await loadShiftsFromDb();
+            } catch (_e) {
+                // 錯誤已在 loadShiftsFromDb 中處理
+            }
             renderCalendar();
         }
 
@@ -776,13 +836,21 @@
                 } else if (draggedShift) {
                     // 排班拖拽 - 移動排班
                     const newDate = this.dataset.date;
+                    // 紀錄原本日期，以便跨月份時刪除舊路徑
+                    const oldDate = draggedShift.date;
                     // 更新排班日期
                     draggedShift.date = newDate;
-                    // 儲存更新後的排班資料
+                    // 將更新後的排班寫入資料庫
                     try {
-                        await saveShiftsToDb();
+                        await saveShiftToDb(draggedShift);
+                        // 如果跨月份則刪除原路徑的資料
+                        const oldKey = getMonthKey(oldDate);
+                        const newKey = getMonthKey(newDate);
+                        if (oldKey !== newKey) {
+                            await deleteShiftFromDb({ id: draggedShift.id, date: oldDate });
+                        }
                     } catch (_err) {
-                        /* 保存錯誤已在函式中記錄 */
+                        /* 保存錯誤已在函式中處理 */
                     }
                     // 重新渲染日曆並更新統計
                     renderCalendar();
@@ -839,11 +907,11 @@
             };
             
             shifts.push(newShift);
-            // 儲存排班至資料庫（非阻塞，如出錯則在 console 顯示）
+            // 儲存單筆排班至資料庫（非阻塞，如出錯則在 console 顯示）
             try {
-                await saveShiftsToDb();
+                await saveShiftToDb(newShift);
             } catch (_err) {
-                /* 忽略保存錯誤，已在 saveShiftsToDb 中記錄 */
+                /* 忽略保存錯誤，已在 saveShiftToDb 中處理 */
             }
             renderCalendar();
             renderStaffPanel(); // 更新人員狀態
@@ -1134,11 +1202,26 @@
                 // 編輯模式
                 const shiftIndex = shifts.findIndex(s => s.id == editId);
                 if (shiftIndex !== -1) {
+                    // 儲存編輯前的日期以便跨月份時刪除原資料
+                    const originalShift = { ...shifts[shiftIndex] };
+                    // 更新本地排班陣列
                     shifts[shiftIndex] = { ...shifts[shiftIndex], ...shiftData };
                     showNotification(translate('排班更新成功！'));
+                    // 將更新後的排班寫入資料庫
+                    await saveShiftToDb(shifts[shiftIndex]);
+                    // 若日期跨月份則刪除原路徑的排班資料
+                    try {
+                        const oldKey = getMonthKey(originalShift.date);
+                        const newKey = getMonthKey(shifts[shiftIndex].date);
+                        if (oldKey !== newKey) {
+                            await deleteShiftFromDb(originalShift);
+                        }
+                    } catch (_delErr) {
+                        // 忽略刪除錯誤
+                    }
                 }
                 delete modal.dataset.editId;
-                // Translate modal title for adding shift
+                // 恢復新增排班的標題
                 modal.querySelector('h3').textContent = translate('新增排班');
             } else {
                 // 新增模式
@@ -1148,13 +1231,8 @@
                 };
                 shifts.push(newShift);
                 showNotification(translate('排班新增成功！'));
-            }
-
-            // 儲存排班至 Realtime Database
-            try {
-                await saveShiftsToDb();
-            } catch (_err) {
-                /* 錯誤已在 saveShiftsToDb 中處理 */
+                // 寫入單筆排班資料
+                await saveShiftToDb(newShift);
             }
             
             // 重置表單並關閉視窗
@@ -1312,9 +1390,15 @@
         // 新增功能函數
         
         // 回到今天
-        function goToToday() {
+        async function goToToday() {
             currentDate = new Date();
             updateCurrentDate();
+            // 載入當月份的排班資料
+            try {
+                await loadShiftsFromDb();
+            } catch (_e) {
+                // 錯誤已在 loadShiftsFromDb 中處理
+            }
             renderCalendar();
             updateStats();
         }
@@ -1365,12 +1449,15 @@
                 return;
             }
             if (confirm(translate('確定要清空所有排班嗎？此操作無法復原。'))) {
+                // 清除目前月份的所有排班
                 shifts = [];
-                // 儲存變更
+                // 從資料庫移除當月節點
                 try {
-                    await saveShiftsToDb();
+                    const monthKey = getMonthKey();
+                    const monthRef = window.firebase.ref(window.firebase.rtdb, `scheduleShifts/${monthKey}`);
+                    await window.firebase.remove(monthRef);
                 } catch (_err) {
-                    /* 錯誤已在函式中處理 */
+                    // 錯誤已在 firebase.remove 中記錄
                 }
                 renderCalendar();
                 updateStats();
@@ -1439,12 +1526,15 @@
             if (confirm(confirmMessage)) {
                 const shiftIndex = shifts.findIndex(s => s.id == shiftId);
                 if (shiftIndex !== -1) {
+                    // 儲存將要刪除的排班資訊，以便刪除資料庫
+                    const delShift = { ...shifts[shiftIndex] };
+                    // 從本地陣列移除
                     shifts.splice(shiftIndex, 1);
-                    // 儲存刪除後的排班
+                    // 刪除資料庫中的排班
                     try {
-                        await saveShiftsToDb();
+                        await deleteShiftFromDb(delShift);
                     } catch (_err) {
-                        /* 保存錯誤已在函式中處理 */
+                        // 錯誤已在 deleteShiftFromDb 中記錄
                     }
                     renderCalendar();
                     updateStats();
@@ -1623,17 +1713,15 @@ ${translate('電子郵件：')}${staffMember.email}`);
                     break;
             }
             
-            // 生成排班
-            const newShifts = [];
+            // 生成排班並立即同步至資料庫
             // 使用當前時間戳作為起始 ID，後續自增；不將 ID 轉為數字
             let shiftIdCounter = Date.now();
             let addedCount = 0;
             let replacedCount = 0;
-            
+
             for (let dt = new Date(startDate); dt <= endDate; dt.setDate(dt.getDate() + 1)) {
                 const dayOfWeek = dt.getDay();
                 if (selectedDays.includes(dayOfWeek)) {
-                    // 使用本地時區格式化日期，避免 toISOString() 造成日期提早或延後
                     const dateStr = formatDate(dt);
                     // 檢查是否已有排班（使用字串比對人員 ID）
                     const existingShiftIndex = shifts.findIndex(s =>
@@ -1641,7 +1729,7 @@ ${translate('電子郵件：')}${staffMember.email}`);
                     );
                     if (existingShiftIndex !== -1) {
                         if (replaceExisting) {
-                            // 替換現有排班
+                            // 替換現有排班：更新本地資料並寫入資料庫
                             shifts[existingShiftIndex] = {
                                 ...shifts[existingShiftIndex],
                                 startTime: startTime,
@@ -1650,13 +1738,17 @@ ${translate('電子郵件：')}${staffMember.email}`);
                                 notes: notes
                             };
                             replacedCount++;
+                            try {
+                                await saveShiftToDb(shifts[existingShiftIndex]);
+                            } catch (_err) {
+                                // 保存單筆排班錯誤在 saveShiftToDb 中已處理
+                            }
                         }
                         // 如果不替換，跳過這一天
                     } else {
-                        // 新增排班
+                        // 新增排班：推到本地陣列並寫入資料庫
                         const newShift = {
                             id: shiftIdCounter++,
-                            // 以字串存放 staffId
                             staffId: staffId,
                             date: dateStr,
                             startTime: startTime,
@@ -1667,21 +1759,20 @@ ${translate('電子郵件：')}${staffMember.email}`);
                         };
                         shifts.push(newShift);
                         addedCount++;
+                        try {
+                            await saveShiftToDb(newShift);
+                        } catch (_err) {
+                            // 保存單筆排班錯誤在 saveShiftToDb 中已處理
+                        }
                     }
                 }
             }
-            
-            // 儲存排班變更
-            try {
-                await saveShiftsToDb();
-            } catch (_err) {
-                /* 錯誤已在函式中處理 */
-            }
-            // 更新顯示
+
+            // 資料寫入完成後，重新渲染當前月份行事曆並更新統計
             renderCalendar();
             updateStats();
             closeFixedScheduleModal();
-            
+
             // 顯示結果
             const staffMember = findStaffById(staffId);
             // Compose a detailed fixed schedule message (unused currently)
