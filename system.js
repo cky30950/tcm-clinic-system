@@ -3440,14 +3440,19 @@ function renderPatientListTable(pageChange = false) {
         const safeAge = window.escapeHtml(formatAge(patient.birthDate));
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
+        // Use small colored buttons for actions and wrap the original async calls with
+        // handlers that show a loading spinner during the operation. These handlers
+        // ensure consistent UX by disabling the button and centering a spinner until the
+        // underlying action completes. Each button passes the click event so the
+        // handler can determine which element to operate on.
         let actions = `
-                <button onclick="viewPatient('${patient.id}')" class="text-blue-600 hover:text-blue-800">查看</button>
-                <button onclick="showPatientMedicalHistory('${patient.id}')" class="text-purple-600 hover:text-purple-800">病歷</button>
-                <button onclick="editPatient('${patient.id}')" class="text-green-600 hover:text-green-800">編輯</button>
+                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition duration-200">查看</button>
+                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs transition duration-200">病歷</button>
+                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs transition duration-200">編輯</button>
         `;
         if (showDelete) {
             actions += `
-                <button onclick="deletePatient('${patient.id}')" class="text-red-600 hover:text-red-800">刪除</button>
+                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition duration-200">刪除</button>
             `;
         }
         row.innerHTML = `
@@ -3508,14 +3513,19 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
         const safeAge = window.escapeHtml(formatAge(patient.birthDate));
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
+        // Use small colored buttons for actions and wrap the original async calls with
+        // handlers that show a loading spinner during the operation. These handlers
+        // ensure consistent UX by disabling the button and centering a spinner until the
+        // underlying action completes. Each button passes the click event so the
+        // handler can determine which element to operate on.
         let actions = `
-                <button onclick="viewPatient('${patient.id}')" class="text-blue-600 hover:text-blue-800">查看</button>
-                <button onclick="showPatientMedicalHistory('${patient.id}')" class="text-purple-600 hover:text-purple-800">病歷</button>
-                <button onclick="editPatient('${patient.id}')" class="text-green-600 hover:text-green-800">編輯</button>
+                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition duration-200">查看</button>
+                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs transition duration-200">病歷</button>
+                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs transition duration-200">編輯</button>
         `;
         if (showDelete) {
             actions += `
-                <button onclick="deletePatient('${patient.id}')" class="text-red-600 hover:text-red-800">刪除</button>
+                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition duration-200">刪除</button>
             `;
         }
         row.innerHTML = `
@@ -13115,6 +13125,92 @@ const consultationDate = (() => {
     const d = parseConsultationDate(consultation.date);
     return d ? d.toLocaleDateString('zh-TW') : '未知日期';
 })();
+
+// -----------------------------------------------------------------------------
+// Patient management action wrappers
+//
+// The patient list view provides inline buttons for viewing details, showing
+// medical history, editing information and deleting a patient. To improve
+// usability, each button triggers an asynchronous operation and should display
+// a loading spinner to indicate progress. The following wrapper functions
+// encapsulate this logic. They receive the click event and patient ID,
+// activate a spinner on the clicked button via `setButtonLoading`, call the
+// original action (viewPatient, showPatientMedicalHistory, editPatient or
+// deletePatient) and then clear the spinner via `clearButtonLoading` once
+// complete. These functions are defined in the global scope so that they can
+// be referenced from HTML `onclick` attributes without attaching them
+// explicitly to `window` (top-level functions in non‑module scripts are
+// automatically properties of `window`).
+
+/**
+ * Wrapper for viewing patient details with a loading spinner.
+ * @param {Event} ev Click event from the button
+ * @param {string} id ID of the patient to view
+ */
+async function handleViewPatient(ev, id) {
+  const btn = ev && ev.currentTarget ? ev.currentTarget : null;
+  if (btn) setButtonLoading(btn);
+  try {
+    await viewPatient(id);
+  } catch (err) {
+    console.error('Error viewing patient:', err);
+  } finally {
+    if (btn) clearButtonLoading(btn);
+  }
+}
+
+/**
+ * Wrapper for showing a patient's medical history with a loading spinner.
+ * @param {Event} ev Click event from the button
+ * @param {string} id ID of the patient whose history to show
+ */
+async function handleShowMedicalHistory(ev, id) {
+  const btn = ev && ev.currentTarget ? ev.currentTarget : null;
+  if (btn) setButtonLoading(btn);
+  try {
+    await showPatientMedicalHistory(id);
+  } catch (err) {
+    console.error('Error showing patient medical history:', err);
+  } finally {
+    if (btn) clearButtonLoading(btn);
+  }
+}
+
+/**
+ * Wrapper for editing patient information with a loading spinner.
+ * @param {Event} ev Click event from the button
+ * @param {string} id ID of the patient to edit
+ */
+async function handleEditPatient(ev, id) {
+  const btn = ev && ev.currentTarget ? ev.currentTarget : null;
+  if (btn) setButtonLoading(btn);
+  try {
+    await editPatient(id);
+  } catch (err) {
+    console.error('Error editing patient:', err);
+  } finally {
+    if (btn) clearButtonLoading(btn);
+  }
+}
+
+/**
+ * Wrapper for deleting a patient with a loading spinner. If the user cancels
+ * deletion via the confirmation dialog in `deletePatient`, the spinner will
+ * still be removed immediately when the function returns.
+ * @param {Event} ev Click event from the button
+ * @param {string} id ID of the patient to delete
+ */
+async function handleDeletePatient(ev, id) {
+  const btn = ev && ev.currentTarget ? ev.currentTarget : null;
+  if (btn) setButtonLoading(btn);
+  try {
+    await deletePatient(id);
+  } catch (err) {
+    console.error('Error deleting patient:', err);
+  } finally {
+    if (btn) clearButtonLoading(btn);
+  }
+}
             
             // 直接載入病歷，不彈出確認提示視窗
             // 注意：此操作會覆蓋當前已填寫的診症內容（主訴、舌象、脈象、診斷、處方、收費項目、醫囑等），且無法復原。
