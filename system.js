@@ -1486,7 +1486,10 @@ function generateMedicalRecordNumber() {
             // spinning border will still remain visible thanks to the missing top segment.
             // 恢復原先的讀取圈樣式：使用較小的圓形並透過 border-t-transparent 產生缺口。
             // border-current 讓外框顏色與按鈕文字顏色一致，適用於深色背景。
-            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>`;
+            // Reduce spinner size to avoid causing layout shifts, especially for compact buttons.
+            // Use a smaller spinner to minimize layout shift. The spinner remains an inline-block with 
+            // border-current so it inherits the button's text color and is visible on contrasting backgrounds.
+            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-2 w-2 border-2 border-current border-t-transparent"></div>`;
         }
 
         // 清除按鈕讀取狀態，還原原始內容
@@ -3441,13 +3444,13 @@ function renderPatientListTable(pageChange = false) {
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
         let actions = `
-                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">查看</button>
-                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
-                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
+                <button onclick="handleViewPatient(event, '${patient.id}')" class="inline-flex items-center justify-center w-14 px-2 py-1 text-xs font-medium text-white bg-blue-500 hover:bg-blue-600 rounded">查看</button>
+                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="inline-flex items-center justify-center w-14 px-2 py-1 text-xs font-medium text-white bg-purple-500 hover:bg-purple-600 rounded">病歷</button>
+                <button onclick="handleEditPatient(event, '${patient.id}')" class="inline-flex items-center justify-center w-14 px-2 py-1 text-xs font-medium text-white bg-green-500 hover:bg-green-600 rounded">編輯</button>
         `;
         if (showDelete) {
             actions += `
-                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
+                <button onclick="handleDeletePatient(event, '${patient.id}')" class="inline-flex items-center justify-center w-14 px-2 py-1 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded">刪除</button>
             `;
         }
         row.innerHTML = `
@@ -3509,13 +3512,13 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
         let actions = `
-                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">查看</button>
-                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
-                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
+                <button onclick="handleViewPatient(event, '${patient.id}')" class="inline-flex items-center justify-center w-14 px-2 py-1 text-xs font-medium text-white bg-blue-500 hover:bg-blue-600 rounded">查看</button>
+                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="inline-flex items-center justify-center w-14 px-2 py-1 text-xs font-medium text-white bg-purple-500 hover:bg-purple-600 rounded">病歷</button>
+                <button onclick="handleEditPatient(event, '${patient.id}')" class="inline-flex items-center justify-center w-14 px-2 py-1 text-xs font-medium text-white bg-green-500 hover:bg-green-600 rounded">編輯</button>
         `;
         if (showDelete) {
             actions += `
-                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
+                <button onclick="handleDeletePatient(event, '${patient.id}')" class="inline-flex items-center justify-center w-14 px-2 py-1 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded">刪除</button>
             `;
         }
         row.innerHTML = `
@@ -18248,61 +18251,6 @@ document.addEventListener('DOMContentLoaded', function() {
   window.changeCurrentUserPassword = changeCurrentUserPassword;
   window.deleteCurrentUserAccount = deleteCurrentUserAccount;
 
-  // 病人管理按鈕的封裝函式：為查看、病歷、編輯和刪除操作添加讀取圈，並在操作完成後清除。
-  async function handleViewPatient(ev, id) {
-    let btn = ev && ev.currentTarget ? ev.currentTarget : null;
-    if (btn) setButtonLoading(btn);
-    try {
-      await viewPatient(id);
-    } catch (error) {
-      console.error('Error viewing patient:', error);
-    } finally {
-      if (btn) clearButtonLoading(btn);
-    }
-  }
-
-  async function handleShowMedicalHistory(ev, id) {
-    let btn = ev && ev.currentTarget ? ev.currentTarget : null;
-    if (btn) setButtonLoading(btn);
-    try {
-      await showPatientMedicalHistory(id);
-    } catch (error) {
-      console.error('Error showing medical history:', error);
-    } finally {
-      if (btn) clearButtonLoading(btn);
-    }
-  }
-
-  async function handleEditPatient(ev, id) {
-    let btn = ev && ev.currentTarget ? ev.currentTarget : null;
-    if (btn) setButtonLoading(btn);
-    try {
-      await editPatient(id);
-    } catch (error) {
-      console.error('Error editing patient:', error);
-    } finally {
-      if (btn) clearButtonLoading(btn);
-    }
-  }
-
-  async function handleDeletePatient(ev, id) {
-    let btn = ev && ev.currentTarget ? ev.currentTarget : null;
-    if (btn) setButtonLoading(btn);
-    try {
-      await deletePatient(id);
-    } catch (error) {
-      console.error('Error deleting patient:', error);
-    } finally {
-      if (btn) clearButtonLoading(btn);
-    }
-  }
-
-  // 將這些封裝函式掛載到 window，供 HTML 的 onclick 直接調用
-  window.handleViewPatient = handleViewPatient;
-  window.handleShowMedicalHistory = handleShowMedicalHistory;
-  window.handleEditPatient = handleEditPatient;
-  window.handleDeletePatient = handleDeletePatient;
-
   // 模板庫：診斷模板與醫囑模板彈窗
   // 顯示診斷模板選擇彈窗，並動態生成模板列表
   function showDiagnosisTemplateModal() {
@@ -22790,4 +22738,85 @@ function hideGlobalCopyright() {
   // 將控制函式掛到 window，使其可被外部調用
   window.startInactivityMonitoring = startInactivityMonitoring;
   window.stopInactivityMonitoring = stopInactivityMonitoring;
+
+  /**
+   * 包裝原有病人操作函式以提供讀取指示。
+   * 每個函式會於點擊時顯示讀取圈，完成後恢復原狀。
+   * 傳入的 event 物件用來取得當前按鈕。
+   */
+  async function handleViewPatient(event, id) {
+    let btn = null;
+    try {
+      // 嘗試從事件物件取得按鈕
+      btn = event && event.currentTarget ? event.currentTarget : null;
+      if (btn) {
+        setButtonLoading(btn);
+      }
+      // 呼叫原本的 viewPatient 函式
+      await viewPatient(id);
+    } catch (e) {
+      console.error('查看病人資料時出錯:', e);
+    } finally {
+      if (btn) {
+        clearButtonLoading(btn);
+      }
+    }
+  }
+
+  async function handleShowMedicalHistory(event, id) {
+    let btn = null;
+    try {
+      btn = event && event.currentTarget ? event.currentTarget : null;
+      if (btn) {
+        setButtonLoading(btn);
+      }
+      await showPatientMedicalHistory(id);
+    } catch (e) {
+      console.error('載入病歷時出錯:', e);
+    } finally {
+      if (btn) {
+        clearButtonLoading(btn);
+      }
+    }
+  }
+
+  async function handleEditPatient(event, id) {
+    let btn = null;
+    try {
+      btn = event && event.currentTarget ? event.currentTarget : null;
+      if (btn) {
+        setButtonLoading(btn);
+      }
+      await editPatient(id);
+    } catch (e) {
+      console.error('編輯病人資料時出錯:', e);
+    } finally {
+      if (btn) {
+        clearButtonLoading(btn);
+      }
+    }
+  }
+
+  async function handleDeletePatient(event, id) {
+    let btn = null;
+    try {
+      btn = event && event.currentTarget ? event.currentTarget : null;
+      if (btn) {
+        setButtonLoading(btn);
+      }
+      await deletePatient(id);
+    } catch (e) {
+      console.error('刪除病人資料時出錯:', e);
+    } finally {
+      if (btn) {
+        clearButtonLoading(btn);
+      }
+    }
+  }
+
+  // 將包裝函式掛到 window，使其可由 HTML onclick 屬性調用
+  window.handleViewPatient = handleViewPatient;
+  window.handleShowMedicalHistory = handleShowMedicalHistory;
+  window.handleEditPatient = handleEditPatient;
+  window.handleDeletePatient = handleDeletePatient;
 })();
