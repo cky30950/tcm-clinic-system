@@ -3441,13 +3441,13 @@ function renderPatientListTable(pageChange = false) {
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
         let actions = `
-                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition duration-200">查看</button>
-                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs transition duration-200">病歷</button>
-                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs transition duration-200">編輯</button>
+                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">查看</button>
+                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
+                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
         `;
         if (showDelete) {
             actions += `
-                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition duration-200">刪除</button>
+                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
             `;
         }
         row.innerHTML = `
@@ -3509,13 +3509,13 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
         let actions = `
-                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition duration-200">查看</button>
-                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs transition duration-200">病歷</button>
-                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs transition duration-200">編輯</button>
+                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">查看</button>
+                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
+                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
         `;
         if (showDelete) {
             actions += `
-                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition duration-200">刪除</button>
+                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
             `;
         }
         row.innerHTML = `
@@ -22736,82 +22736,3 @@ function hideGlobalCopyright() {
   window.startInactivityMonitoring = startInactivityMonitoring;
   window.stopInactivityMonitoring = stopInactivityMonitoring;
 })();
-
-// -----------------------------------------------------------------------------
-// Patient management action wrappers
-//
-// These wrapper functions add a loading spinner to the clicked button while
-// performing asynchronous operations on patient data. They call the original
-// functions (`viewPatient`, `showPatientMedicalHistory`, `editPatient`,
-// and `deletePatient`) and ensure the spinner is cleared when the promise
-// resolves or rejects. Because this script is loaded as a normal (non‑module)
-// script, functions declared at the top level automatically become properties
-// of `window` and can be invoked via HTML `onclick` handlers.
-
-/**
- * View patient details with a loading spinner.
- * @param {Event} ev Click event
- * @param {string} id Patient ID
- */
-async function handleViewPatient(ev, id) {
-  const btn = ev && ev.currentTarget ? ev.currentTarget : null;
-  if (btn) setButtonLoading(btn);
-  try {
-    await viewPatient(id);
-  } catch (err) {
-    console.error('Error viewing patient:', err);
-  } finally {
-    if (btn) clearButtonLoading(btn);
-  }
-}
-
-/**
- * Show patient medical history with a loading spinner.
- * @param {Event} ev Click event
- * @param {string} id Patient ID
- */
-async function handleShowMedicalHistory(ev, id) {
-  const btn = ev && ev.currentTarget ? ev.currentTarget : null;
-  if (btn) setButtonLoading(btn);
-  try {
-    await showPatientMedicalHistory(id);
-  } catch (err) {
-    console.error('Error showing medical history:', err);
-  } finally {
-    if (btn) clearButtonLoading(btn);
-  }
-}
-
-/**
- * Edit patient information with a loading spinner.
- * @param {Event} ev Click event
- * @param {string} id Patient ID
- */
-async function handleEditPatient(ev, id) {
-  const btn = ev && ev.currentTarget ? ev.currentTarget : null;
-  if (btn) setButtonLoading(btn);
-  try {
-    await editPatient(id);
-  } catch (err) {
-    console.error('Error editing patient:', err);
-  } finally {
-    if (btn) clearButtonLoading(btn);
-  }
-}
-
-/**
- * Delete a patient with a loading spinner.
- * @param {Event} ev Click event
- * @param {string} id Patient ID
- */
-async function handleDeletePatient(ev, id) {
-  const btn = ev && ev.currentTarget ? ev.currentTarget : null;
-  if (btn) setButtonLoading(btn);
-  try {
-    await deletePatient(id);
-  } catch (err) {
-    console.error('Error deleting patient:', err);
-  } finally {
-    if (btn) clearButtonLoading(btn);
-  }
-}
