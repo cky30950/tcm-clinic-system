@@ -1134,7 +1134,8 @@ async function fetchUsers(forceRefresh = false) {
         let clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
         if (!clinicSettings.chineseName) {
             clinicSettings.chineseName = '名醫診所系統';
-            clinicSettings.englishName = 'TCM Clinic';
+            // 預設英文名稱改為 Dr.Great Clinic，而非原本的 TCM Clinic
+            clinicSettings.englishName = 'Dr.Great Clinic';
             clinicSettings.businessHours = '週一至週五 09:00-18:00';
             clinicSettings.phone = '(852) 2345-6789';
             clinicSettings.address = '香港中環皇后大道中123號';
@@ -7820,7 +7821,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     <!-- Clinic Header -->
                     <div class="clinic-header">
                         <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
-                        <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
+                        <div class="clinic-subtitle">${clinicSettings.englishName || 'Dr.Great Clinic'}</div>
                         <div class="clinic-subtitle">${isEnglish ? 'Tel:' : '電話：'}${clinicSettings.phone || '(852) 2345-6789'}　${isEnglish ? 'Address:' : '地址：'}${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                     </div>
                     
@@ -8298,7 +8299,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                         <!-- Clinic Header -->
                         <div class="clinic-header">
                             <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
-                            <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
+                            <div class="clinic-subtitle">${clinicSettings.englishName || 'Dr.Great Clinic'}</div>
                             <div class="clinic-subtitle">${isEnglish ? 'Tel:' : '電話：'}${clinicSettings.phone || '(852) 2345-6789'}　${isEnglish ? 'Address:' : '地址：'}${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                         </div>
                         
@@ -8719,7 +8720,7 @@ async function printSickLeave(consultationId, consultationData = null) {
                     <div class="content">
                         <div class="clinic-header">
                             <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
-                            <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
+                            <div class="clinic-subtitle">${clinicSettings.englishName || 'Dr.Great Clinic'}</div>
                             <div class="clinic-subtitle">${isEnglish ? 'Tel' : '電話'}${colon}${clinicSettings.phone || '(852) 2345-6789'}　${isEnglish ? 'Address' : '地址'}${colon}${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                         </div>
                         <div class="certificate-number">${SL.certificateNumber}${colon}SL${consultation.id.toString().padStart(6, '0')}</div>
@@ -9160,7 +9161,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                 <div class="advice-container">
                     <div class="clinic-header">
                         <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
-                        <div class="clinic-subtitle">${clinicSettings.englishName || 'TCM Clinic'}</div>
+                        <div class="clinic-subtitle">${clinicSettings.englishName || 'Dr.Great Clinic'}</div>
                         <div class="clinic-subtitle">${isEnglish ? 'Tel' : '電話'}${colon}${clinicSettings.phone || '(852) 2345-6789'}　${isEnglish ? 'Address' : '地址'}${colon}${clinicSettings.address || '香港中環皇后大道中123號'}</div>
                     </div>
                     <div class="advice-title">${PI.title}</div>
@@ -10324,7 +10325,7 @@ async function initializeSystemAfterLogin() {
                 chineseNameSpan.textContent = clinicSettings.chineseName || '名醫診所系統';
             }
             if (englishNameSpan) {
-                englishNameSpan.textContent = clinicSettings.englishName || 'TCM Clinic';
+                englishNameSpan.textContent = clinicSettings.englishName || 'Dr.Great Clinic';
             }
             
             // 更新登入頁面的診所名稱
@@ -10334,7 +10335,7 @@ async function initializeSystemAfterLogin() {
                 loginTitle.textContent = clinicSettings.chineseName || '名醫診所系統';
             }
             if (loginEnglishTitle) {
-                loginEnglishTitle.textContent = clinicSettings.englishName || 'TCM Clinic';
+                loginEnglishTitle.textContent = clinicSettings.englishName || 'Dr.Great Clinic';
             }
             
             // 更新主頁面的診所名稱
@@ -10344,7 +10345,7 @@ async function initializeSystemAfterLogin() {
                 systemTitle.textContent = clinicSettings.chineseName || '名醫診所系統';
             }
             if (systemEnglishTitle) {
-                systemEnglishTitle.textContent = clinicSettings.englishName || 'TCM Clinic';
+                systemEnglishTitle.textContent = clinicSettings.englishName || 'Dr.Great Clinic';
             }
             
             // 更新歡迎頁面的診所名稱
@@ -10354,7 +10355,7 @@ async function initializeSystemAfterLogin() {
                 welcomeTitle.textContent = `歡迎使用${clinicSettings.chineseName || '名醫診所系統'}`;
             }
             if (welcomeEnglishTitle) {
-                welcomeEnglishTitle.textContent = `Welcome to ${clinicSettings.englishName || 'TCM Clinic'}`;
+                welcomeEnglishTitle.textContent = `Welcome to ${clinicSettings.englishName || 'Dr.Great Clinic'}`;
             }
         }
 
@@ -14297,7 +14298,8 @@ async function deleteUser(id) {
         }
 
         // 生成財務報表
-        function generateFinancialReport() {
+        // 改為 async 以便在更新報表前重新載入最新的診症資料，確保「更新報表」按鈕真正更新內容。
+        async function generateFinancialReport() {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
             const doctorFilter = document.getElementById('doctorFilter').value;
@@ -14310,6 +14312,15 @@ async function deleteUser(id) {
             if (!startDate || !endDate) {
                 showToast('請選擇日期範圍！', 'error');
                 return;
+            }
+
+            // 在生成報表前重新載入診症資料，以取得最新收入與統計
+            if (typeof loadConsultationsForFinancial === 'function') {
+                try {
+                    await loadConsultationsForFinancial();
+                } catch (err) {
+                    console.error('重新載入財務資料失敗:', err);
+                }
             }
 
             // 過濾診症資料
