@@ -3441,13 +3441,13 @@ function renderPatientListTable(pageChange = false) {
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
         let actions = `
-                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">查看</button>
-                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
-                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
+                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">查看</button>
+                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
+                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
         `;
         if (showDelete) {
             actions += `
-                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
+                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
             `;
         }
         row.innerHTML = `
@@ -3509,13 +3509,13 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
         let actions = `
-                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">查看</button>
-                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
-                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
+                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">查看</button>
+                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
+                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-500 hover:bg-green-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
         `;
         if (showDelete) {
             actions += `
-                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white w-16 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
+                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-500 hover:bg-red-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
             `;
         }
         row.innerHTML = `
@@ -18247,6 +18247,61 @@ document.addEventListener('DOMContentLoaded', function() {
   window.loadAccountSecurity = loadAccountSecurity;
   window.changeCurrentUserPassword = changeCurrentUserPassword;
   window.deleteCurrentUserAccount = deleteCurrentUserAccount;
+
+  // 病人管理按鈕的封裝函式：為查看、病歷、編輯和刪除操作添加讀取圈，並在操作完成後清除。
+  async function handleViewPatient(ev, id) {
+    let btn = ev && ev.currentTarget ? ev.currentTarget : null;
+    if (btn) setButtonLoading(btn);
+    try {
+      await viewPatient(id);
+    } catch (error) {
+      console.error('Error viewing patient:', error);
+    } finally {
+      if (btn) clearButtonLoading(btn);
+    }
+  }
+
+  async function handleShowMedicalHistory(ev, id) {
+    let btn = ev && ev.currentTarget ? ev.currentTarget : null;
+    if (btn) setButtonLoading(btn);
+    try {
+      await showPatientMedicalHistory(id);
+    } catch (error) {
+      console.error('Error showing medical history:', error);
+    } finally {
+      if (btn) clearButtonLoading(btn);
+    }
+  }
+
+  async function handleEditPatient(ev, id) {
+    let btn = ev && ev.currentTarget ? ev.currentTarget : null;
+    if (btn) setButtonLoading(btn);
+    try {
+      await editPatient(id);
+    } catch (error) {
+      console.error('Error editing patient:', error);
+    } finally {
+      if (btn) clearButtonLoading(btn);
+    }
+  }
+
+  async function handleDeletePatient(ev, id) {
+    let btn = ev && ev.currentTarget ? ev.currentTarget : null;
+    if (btn) setButtonLoading(btn);
+    try {
+      await deletePatient(id);
+    } catch (error) {
+      console.error('Error deleting patient:', error);
+    } finally {
+      if (btn) clearButtonLoading(btn);
+    }
+  }
+
+  // 將這些封裝函式掛載到 window，供 HTML 的 onclick 直接調用
+  window.handleViewPatient = handleViewPatient;
+  window.handleShowMedicalHistory = handleShowMedicalHistory;
+  window.handleEditPatient = handleEditPatient;
+  window.handleDeletePatient = handleDeletePatient;
 
   // 模板庫：診斷模板與醫囑模板彈窗
   // 顯示診斷模板選擇彈窗，並動態生成模板列表
