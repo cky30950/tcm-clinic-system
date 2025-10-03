@@ -3565,7 +3565,8 @@ function renderPatientListTable(pageChange = false) {
     // 清空表格
     tbody.innerHTML = '';
     // 判斷當前用戶是否具有刪除病人權限
-    const showDelete = currentUserData && currentUserData.position && currentUserData.position.trim() === '診所管理';
+    // 刪除權限開放給診所管理者、護理師與醫師
+    const showDelete = currentUserData && currentUserData.position && ['診所管理', '護理師', '醫師'].includes(currentUserData.position.trim());
     // 渲染當前頁病人資料
     pageItems.forEach(patient => {
         const row = document.createElement('tr');
@@ -3643,7 +3644,8 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
     // 重新渲染表格內容
     tbody.innerHTML = '';
     // 判斷是否具有刪除權限
-    const showDelete = currentUserData && currentUserData.position && currentUserData.position.trim() === '診所管理';
+    // 刪除權限開放給診所管理者、護理師與醫師
+    const showDelete = currentUserData && currentUserData.position && ['診所管理', '護理師', '醫師'].includes(currentUserData.position.trim());
     // 先按照建立時間 (createdAt) 將頁面項目由新到舊排序，確保最新建立的病人位於最前面。
     let sortedPageItems;
     if (Array.isArray(pageItems) && pageItems.length > 1) {
@@ -3754,9 +3756,9 @@ async function editPatient(id) {
 }
 async function deletePatient(id) {
     try {
-        // 只有診所管理者可以刪除病人
-        if (!currentUserData || !currentUserData.position || currentUserData.position.trim() !== '診所管理') {
-            showToast('只有管理員可以刪除病人', 'error');
+        // 刪除病人權限開放給診所管理者、護理師與醫師
+        if (!currentUserData || !currentUserData.position || !['診所管理', '護理師', '醫師'].includes(currentUserData.position.trim())) {
+            showToast('只有管理員、護理師或醫師可以刪除病人', 'error');
             return;
         }
 
