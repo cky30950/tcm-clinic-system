@@ -5513,8 +5513,13 @@ function createAppointmentRow(appointment, patient, index) {
               為了讓表頭「操作」與診症記錄按鈕左對齊，移除 w-full 以及 justify-end，
               使按鈕自然靠左排列。
             -->
-            <td class="px-4 py-3 text-sm">
-                <div class="flex flex-wrap gap-1">
+            <td class="px-4 py-3 text-sm whitespace-nowrap">
+                <!--
+                  將操作按鈕容器改為單行顯示並禁止內容換行。
+                  使用 flex 搭配 items-center 使按鈕垂直置中，space-x-1 控制按鈕之間的間距。
+                  這可以避免在按鈕進入讀取狀態或因寬度變化時將下一個按鈕推到下一行，保持排版穩定。
+                -->
+                <div class="flex items-center space-x-1">
                     ${operationButtons}
                 </div>
             </td>
@@ -5564,7 +5569,7 @@ function getOperationButtons(appointment, patient = null) {
     const patientId = patient ? patient.id : appointment.patientId;
     
     // 所有狀態都可以查看診症記錄
-    buttons.push(`<button onclick="viewPatientMedicalHistory('${patientId}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition duration-200">診症記錄</button>`);
+    buttons.push(`<button onclick="viewPatientMedicalHistory('${patientId}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">診症記錄</button>`);
     
     // 僅當醫師正在為其他病人診症時禁用其對其他掛號的操作
     const isDisabled = isDoctorConsulting && !isCurrentConsulting;
@@ -5578,17 +5583,17 @@ function getOperationButtons(appointment, patient = null) {
         case 'registered':
             if (isDisabled) {
                 if (canConfirmArrival) {
-                    buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs cursor-not-allowed" ${disabledTooltip}>確認到達</span>`);
+                    buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs whitespace-nowrap cursor-not-allowed" ${disabledTooltip}>確認到達</span>`);
                 }
                 if (canManage) {
-                    buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs cursor-not-allowed" ${disabledTooltip}>移除掛號</span>`);
+                    buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs whitespace-nowrap cursor-not-allowed" ${disabledTooltip}>移除掛號</span>`);
                 }
             } else {
                 if (canConfirmArrival) {
-                    buttons.push(`<button onclick="confirmPatientArrival(${appointment.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs transition duration-200">確認到達</button>`);
+                    buttons.push(`<button onclick="confirmPatientArrival(${appointment.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">確認到達</button>`);
                 }
                 if (canManage) {
-                    buttons.push(`<button onclick="removeAppointment(${appointment.id})" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition duration-200">移除掛號</button>`);
+                    buttons.push(`<button onclick="removeAppointment(${appointment.id})" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">移除掛號</button>`);
                 }
             }
             break;
@@ -5596,42 +5601,42 @@ function getOperationButtons(appointment, patient = null) {
         case 'waiting':
             if (isDisabled) {
                 if (isAppointmentDoctor) {
-                    buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs cursor-not-allowed" ${disabledTooltip}>開始診症</span>`);
+                    buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs whitespace-nowrap cursor-not-allowed" ${disabledTooltip}>開始診症</span>`);
                 }
             } else {
                 if (isAppointmentDoctor) {
-                    buttons.push(`<button onclick="startConsultation(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs transition duration-200">開始診症</button>`);
+                    buttons.push(`<button onclick="startConsultation(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">開始診症</button>`);
                 }
             }
             break;
             
         case 'consulting':
             if (isAppointmentDoctor) {
-                buttons.push(`<button onclick="continueConsultation(${appointment.id})" class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs transition duration-200">繼續診症</button>`);
+                buttons.push(`<button onclick="continueConsultation(${appointment.id})" class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">繼續診症</button>`);
             }
             break;
             
         case 'completed':
             // 列印收據功能不受診症狀態限制
-            buttons.push(`<button onclick="printReceiptFromAppointment(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs transition duration-200">列印收據</button>`);
+            buttons.push(`<button onclick="printReceiptFromAppointment(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">列印收據</button>`);
             // 新增方藥醫囑列印功能，位於列印收據旁
-            buttons.push(`<button onclick="printPrescriptionInstructionsFromAppointment(${appointment.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs transition duration-200">藥單醫囑</button>`);
-            buttons.push(`<button onclick="printAttendanceCertificateFromAppointment(${appointment.id})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs transition duration-200">到診證明</button>`);
-            buttons.push(`<button onclick="printSickLeaveFromAppointment(${appointment.id})" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition duration-200">病假證明</button>`);
+            buttons.push(`<button onclick="printPrescriptionInstructionsFromAppointment(${appointment.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">藥單醫囑</button>`);
+            buttons.push(`<button onclick="printAttendanceCertificateFromAppointment(${appointment.id})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">到診證明</button>`);
+            buttons.push(`<button onclick="printSickLeaveFromAppointment(${appointment.id})" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">病假證明</button>`);
             
             if (isDisabled) {
                 if (isAppointmentDoctor) {
-                    buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs cursor-not-allowed" ${disabledTooltip}>修改病歷</span>`);
+                    buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs whitespace-nowrap cursor-not-allowed" ${disabledTooltip}>修改病歷</span>`);
                 }
                 if (canManage) {
-                    buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs cursor-not-allowed" ${disabledTooltip}>撤回診症</span>`);
+                    buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs whitespace-nowrap cursor-not-allowed" ${disabledTooltip}>撤回診症</span>`);
                 }
             } else {
                 if (isAppointmentDoctor) {
-                    buttons.push(`<button onclick="editMedicalRecord(${appointment.id})" class="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs transition duration-200">修改病歷</button>`);
+                    buttons.push(`<button onclick="editMedicalRecord(${appointment.id})" class="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">修改病歷</button>`);
                 }
                 if (canManage) {
-                    buttons.push(`<button onclick="withdrawConsultation(${appointment.id})" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition duration-200">撤回診症</button>`);
+                    buttons.push(`<button onclick="withdrawConsultation(${appointment.id})" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">撤回診症</button>`);
                 }
             }
             break;
