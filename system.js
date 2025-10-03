@@ -12038,15 +12038,13 @@ async function initializeSystemAfterLogin() {
             // 更新隱藏的文本域
             let prescriptionText = '';
             
+            // 將處方列表轉為純文字，每個項目後面加上一個換行符號。
+            // 過去版本對方劑類型使用了兩個換行符號 ("\n\n") 來額外留白，
+            // 但這會在病歷或診症記錄中呈現為項目上下出現空行。
+            // 因此統一將 herb 與 formula 項目都只添加一個換行符號，避免多餘空白。
             selectedPrescriptionItems.forEach(item => {
-                if (item.type === 'herb') {
-                    const dosage = item.customDosage || '6';
-                    prescriptionText += `${item.name} ${dosage}g\n`;
-                } else if (item.type === 'formula') {
-                    const dosage = item.customDosage || '6';
-                    // 為方劑僅記錄名稱與劑量，不包含組成
-                    prescriptionText += `${item.name} ${dosage}g\n\n`;
-                }
+                const dosage = item.customDosage || '6';
+                prescriptionText += `${item.name} ${dosage}g\n`;
             });
             
             hiddenTextarea.value = prescriptionText.trim();
