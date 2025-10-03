@@ -2573,27 +2573,81 @@ async function attemptMainLogin() {
             window.currentUserClaims = {};
         }
 
+        // 優先透過 UID 讀取單一用戶資料，以避免因為沒有權限讀取整個 users 集合而登入失敗
+        let matchingUser = null;
+        try {
+            if (window.firebaseDataManager && typeof window.firebaseDataManager.getUserByUid === 'function') {
+                const res = await window.firebaseDataManager.getUserByUid(uid);
+                if (res && res.success && res.data) {
+                    // 從 Firebase 取得的資料中排除 personalSettings，並轉換時間戳
+                    const { personalSettings, ...rest } = res.data || {};
+                    matchingUser = {
+                        ...rest,
+                        createdAt: rest.createdAt
+                          ? (rest.createdAt.seconds
+                            ? new Date(rest.createdAt.seconds * 1000).toISOString()
+                            : rest.createdAt)
+                          : new Date().toISOString(),
+                        updatedAt: rest.updatedAt
+                          ? (rest.updatedAt.seconds
+                            ? new Date(rest.updatedAt.seconds * 1000).toISOString()
+                            : rest.updatedAt)
+                          : new Date().toISOString(),
+                        lastLogin: rest.lastLogin
+                          ? (rest.lastLogin.seconds
+                            ? new Date(rest.lastLogin.seconds * 1000).toISOString()
+                            : rest.lastLogin)
+                          : null
+                    };
+                    // 將找到的用戶合併進全域 users 列表以供後續使用
+                    try {
+                        let list = Array.isArray(users) ? [...users] : [];
+                        const idx = list.findIndex(u => String(u.id) === String(matchingUser.id));
+                        if (idx >= 0) {
+                            list[idx] = { ...list[idx], ...matchingUser };
+                        } else {
+                            list.push(matchingUser);
+                        }
+                        users = list;
+                        try {
+                            localStorage.setItem('users', JSON.stringify(users));
+                        } catch (_lsErr) {
+                            // 忽略 localStorage 錯誤
+                        }
+                    } catch (_mergeErr) {
+                        // 忽略合併錯誤
+                    }
+                }
+            }
+        } catch (uidErr) {
+            console.error('透過 UID 讀取用戶資料時發生錯誤:', uidErr);
+        }
+
         // 同步載入 Firebase 用戶數據
         await syncUserDataFromFirebase();
 
-        // 在用戶資料中尋找對應的 UID 或電子郵件
-        let matchingUser = users.find(u => u.uid && u.uid === uid);
+        // 若尚未找到對應用戶，則在同步後的 users 陣列中尋找對應的 UID 或電子郵件
         if (!matchingUser) {
-            // 若未設定 uid，改用 email 比對（不區分大小寫）
-            matchingUser = users.find(u => u.email && u.email.toLowerCase() === firebaseUser.email.toLowerCase());
-            if (matchingUser) {
-                // 將 Firebase UID 設定到用戶資料中，以便下次可直接透過 UID 比對
-                matchingUser.uid = uid;
-                
-                // 更新到 Firebase
-                try {
-                    await window.firebaseDataManager.updateUser(matchingUser.id, { uid: uid });
-                } catch (error) {
-                    console.error('更新用戶 UID 失敗:', error);
+            matchingUser = users.find(u => u.uid && u.uid === uid);
+            if (!matchingUser) {
+                // 若未設定 uid，改用 email 比對（不區分大小寫）
+                matchingUser = users.find(u => u.email && u.email.toLowerCase() === firebaseUser.email.toLowerCase());
+                if (matchingUser) {
+                    // 將 Firebase UID 設定到用戶資料中，以便下次可直接透過 UID 比對
+                    matchingUser.uid = uid;
+                    // 更新到 Firebase
+                    try {
+                        await window.firebaseDataManager.updateUser(matchingUser.id, { uid: uid });
+                    } catch (error) {
+                        console.error('更新用戶 UID 失敗:', error);
+                    }
+                    // 更新本地存儲
+                    try {
+                        localStorage.setItem('users', JSON.stringify(users));
+                    } catch (_e) {
+                        // 忽略 localStorage 錯誤
+                    }
                 }
-                
-                // 更新本地存儲
-                localStorage.setItem('users', JSON.stringify(users));
             }
         }
 
@@ -17117,6 +17171,42 @@ class FirebaseDataManager {
         } catch (error) {
             console.error('刪除用戶數據失敗:', error);
             return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * 透過 Firebase UID 取得對應的用戶資料。
+     * 優先讀取單一用戶文件以避免權限不足錯誤。
+     *
+     * @param {string} uid Firebase Authentication UID
+     * @returns {Promise<{ success: boolean, data: any }>}
+     */
+    async getUserByUid(uid) {
+        // 如果數據管理器尚未就緒則直接返回
+        if (!this.isReady) {
+            return { success: false, data: null };
+        }
+        try {
+            if (!uid) {
+                return { success: false, data: null };
+            }
+            // 建立查詢條件：只讀取 uid 等於指定值的單筆紀錄
+            const colRef = window.firebase.collection(window.firebase.db, 'users');
+            const q = window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.where('uid', '==', uid),
+                window.firebase.limit(1)
+            );
+            const snapshot = await window.firebase.getDocs(q);
+            if (!snapshot.empty) {
+                const docSnap = snapshot.docs[0];
+                return { success: true, data: { id: docSnap.id, ...docSnap.data() } };
+            }
+            // 若未找到對應紀錄，回傳空資料
+            return { success: false, data: null };
+        } catch (error) {
+            console.error('透過 UID 讀取用戶資料失敗:', error);
+            return { success: false, data: null };
         }
     }
 
