@@ -1014,6 +1014,56 @@ async function fetchPatients(forceRefresh = false, pageNumber = null) {
 }
 
 /**
+ * 根據病人 ID 取得病人資料。此函式將從本地快取尋找，
+ * 若找不到則強制重新從 Firebase 讀取一次，再次尋找。
+ * 如果仍未找到，最終會直接從 FirebaseDataManager 取得所有病人
+ * 並在其中搜尋，以避免多裝置間快取不一致的問題。
+ *
+ * @param {string|number} id - 病人文件的 ID
+ * @returns {Promise<Object|null>} 找到的病人物件，若找不到則為 null
+ */
+async function getPatientByIdWithRefresh(id) {
+    // 若未提供 ID，直接回傳 null
+    if (id === undefined || id === null) return null;
+    const idStr = String(id);
+    try {
+        // 先從本地快取尋找
+        let all = await fetchPatients(false);
+        if (Array.isArray(all) && all.length > 0) {
+            const found = all.find(p => p && String(p.id) === idStr);
+            if (found) return found;
+        }
+        // 若未找到，強制重新讀取整個列表
+        all = await fetchPatients(true);
+        if (Array.isArray(all) && all.length > 0) {
+            const found2 = all.find(p => p && String(p.id) === idStr);
+            if (found2) return found2;
+        }
+        // 仍未找到時，嘗試直接向 FirebaseDataManager 取得資料
+        try {
+            // 等待 FirebaseDataManager 就緒
+            if (typeof waitForFirebaseDataManager === 'function') {
+                await waitForFirebaseDataManager();
+            }
+            if (window.firebaseDataManager && typeof window.firebaseDataManager.getPatients === 'function') {
+                const result = await window.firebaseDataManager.getPatients();
+                if (result && result.success && Array.isArray(result.data)) {
+                    const found3 = result.data.find(p => p && String(p.id) === idStr);
+                    if (found3) {
+                        return found3;
+                    }
+                }
+            }
+        } catch (innerErr) {
+            console.error('直接從 Firebase 取得病人資料時發生錯誤:', innerErr);
+        }
+    } catch (err) {
+        console.error('取得病人資料時發生錯誤:', err);
+    }
+    return null;
+}
+
+/**
  * 透過游標及 limit 方式分頁讀取病人資料。
  * 頁數從 1 開始計算。讀取後會快取該頁資料及最後一筆文件，以利下一頁查詢。
  * 當 forceRefresh 為 true 時，會清除所有分頁快取並重新讀取。
@@ -3586,14 +3636,8 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
         
 async function editPatient(id) {
     try {
-        // 從快取或 Firebase 取得病人資料
-        const allPatients = await fetchPatients();
-        if (!allPatients || allPatients.length === 0) {
-            showToast('無法讀取病人資料', 'error');
-            return;
-        }
-
-        const patient = allPatients.find(p => p.id === id);
+        // 使用新的 getPatientByIdWithRefresh 尋找病人，避免因快取未更新而讀取不到
+        const patient = await getPatientByIdWithRefresh(id);
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -3631,14 +3675,8 @@ async function deletePatient(id) {
             return;
         }
 
-        // 從快取或 Firebase 取得病人資料
-        const allPatients = await fetchPatients();
-        if (!allPatients || allPatients.length === 0) {
-            showToast('無法讀取病人資料', 'error');
-            return;
-        }
-
-        const patient = allPatients.find(p => p.id === id);
+        // 使用新的 getPatientByIdWithRefresh 取得病人資料，確保跨裝置讀取正確
+        const patient = await getPatientByIdWithRefresh(id);
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -3752,14 +3790,11 @@ async function deletePatientAssociatedData(patientId) {
 
 async function viewPatient(id) {
     try {
-        // 從快取或 Firebase 取得病人資料
-        const allPatients = await fetchPatients();
-        if (!allPatients || allPatients.length === 0) {
-            showToast('無法讀取病人資料', 'error');
-            return;
-        }
-        const patient = allPatients.find(p => p.id === id);
+        // 使用新的 getPatientByIdWithRefresh 尋找病人，
+        // 避免跨裝置快取不一致導致找不到剛新增的病人
+        const patient = await getPatientByIdWithRefresh(id);
         if (!patient) {
+            // 若無法取得病人資料，提示錯誤
             showToast('找不到病人資料', 'error');
             return;
         }
@@ -4508,43 +4543,32 @@ async function selectPatientForRegistration(patientId) {
     
     if (consultingAppointment) {
         try {
-            // 從快取或 Firebase 取得正在診症的病人資料
-            const allPatients = await fetchPatients();
-            if (allPatients && allPatients.length > 0) {
-                const consultingPatient = allPatients.find(p => p.id === consultingAppointment.patientId);
-                const consultingPatientName = consultingPatient ? consultingPatient.name : '某位病人';
-                // If the doctor is currently consulting another patient, inform the user in their chosen language
-                {
-                    const lang = localStorage.getItem('lang') || 'zh';
-                    const zhMsg = `無法進行掛號！您目前正在為 ${consultingPatientName} 診症中，請完成後再進行掛號操作。`;
-                    const enMsg = `Cannot register! You are currently consulting ${consultingPatientName}. Please finish before registering another patient.`;
-                    const msg = lang === 'en' ? enMsg : zhMsg;
-                    showToast(msg, 'warning');
-                }
-                return;
+            // 若醫師正在診症其他病人，取得該病人資料（使用新函式以防快取過期）
+            const consultingPatient = await getPatientByIdWithRefresh(consultingAppointment.patientId);
+            const consultingPatientName = consultingPatient ? consultingPatient.name : '某位病人';
+            // If the doctor is currently consulting another patient, inform the user in their chosen language
+            {
+                const lang = localStorage.getItem('lang') || 'zh';
+                const zhMsg = `無法進行掛號！您目前正在為 ${consultingPatientName} 診症中，請完成後再進行掛號操作。`;
+                const enMsg = `Cannot register! You are currently consulting ${consultingPatientName}. Please finish before registering another patient.`;
+                const msg = lang === 'en' ? enMsg : zhMsg;
+                showToast(msg, 'warning');
             }
+            return;
         } catch (error) {
             console.error('檢查診症狀態錯誤:', error);
         }
     }
     
     try {
-        // 從快取或 Firebase 取得病人資料
-        const allPatients = await fetchPatients();
-        if (!allPatients || allPatients.length === 0) {
-            showToast('讀取病人資料失敗', 'error');
-            return;
-        }
-        
-        const patient = allPatients.find(p => p.id === patientId);
+        // 使用新的函式取得選擇的病人資料
+        const patient = await getPatientByIdWithRefresh(patientId);
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
         }
-        
         selectedPatientForRegistration = patient;
         showRegistrationModal(patient);
-        
     } catch (error) {
         console.error('選擇病人資料錯誤:', error);
         showToast('讀取病人資料失敗', 'error');
@@ -4971,12 +4995,18 @@ async function loadTodayAppointments() {
         // 對於每一筆掛號資料，直接使用該次掛號的主訴，不再從病歷回填主訴。
         const rows = await Promise.all(todayAppointments.map(async (appointment, index) => {
             // 從資料集中尋找對應病人
-            const patient = patientsData.find(p => p.id === appointment.patientId);
-
-            // 若無對應病人資料，採用原本的處理邏輯
+            let patient = patientsData.find(p => p && p.id === appointment.patientId);
+            // 若無對應病人資料，嘗試刷新後取得
             if (!patient) {
-                // 如果在快取找不到，嘗試從全域陣列找（向後兼容）
-                const localPatient = patients.find(p => p.id === appointment.patientId);
+                try {
+                    patient = await getPatientByIdWithRefresh(appointment.patientId);
+                } catch (_e) {
+                    patient = null;
+                }
+            }
+            // 若仍無病人資料，嘗試從全域 patients 變數尋找（向後兼容）
+            if (!patient) {
+                const localPatient = Array.isArray(patients) ? patients.find(p => p && p.id === appointment.patientId) : null;
                 if (!localPatient) {
                     return `
                         <tr class="hover:bg-gray-50">
@@ -4989,8 +5019,7 @@ async function loadTodayAppointments() {
                 // 使用本地病人資料
                 return createAppointmentRow(appointment, localPatient, index);
             }
-
-            // 移除從病歷取得主訴的回填，僅顯示此次掛號的主訴
+            // 使用找到的病人資料建立掛號列
             return createAppointmentRow(appointment, patient, index);
         }));
 
@@ -5091,7 +5120,15 @@ function subscribeToAppointments() {
                                 }
                             }
                             if (Array.isArray(patientsList)) {
-                                const patient = patientsList.find(p => p.id === apt.patientId);
+                                let patient = patientsList.find(p => p && p.id === apt.patientId);
+                                // 若未找到，嘗試跨裝置刷新取得病人資料
+                                if (!patient) {
+                                    try {
+                                        patient = await getPatientByIdWithRefresh(apt.patientId);
+                                    } catch (_e) {
+                                        patient = null;
+                                    }
+                                }
                                 patientName = patient ? patient.name : '';
                             }
                         }
