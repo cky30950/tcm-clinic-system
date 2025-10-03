@@ -1631,6 +1631,89 @@ let herbInventory = {};
 let herbInventoryInitialized = false;
 let herbInventoryListenerAttached = false;
 
+//
+// ===============================
+// 病人列表即時更新監聽設置
+//
+// 為了在其他使用者新增或編輯病人資料時能即時刷新列表，
+// 使用 Firestore 的 onSnapshot 建立即時監聽。下面的兩個變數
+// 追蹤監聽是否已掛載以及用於解除監聽的函式。掛載監聽後，當
+// 監聽回調觸發時會清空病人相關的本地快取並重新載入病人列表。
+
+// 標記是否已附加病人列表監聽
+let patientListListenerAttached = false;
+// 儲存解除監聽的函式，由 onSnapshot 回傳
+let patientListUnsubscribe = null;
+
+/**
+ * 附加病人列表的即時監聽。在監聽回調中會清除病人快取並刷新列表。
+ * 若監聽已存在則不會重複附加。當離開病人管理頁面時應呼叫
+ * detachPatientListListener() 以移除監聽，避免不必要的流量。
+ */
+async function attachPatientListListener() {
+    try {
+        // 等待 Firebase 初始化
+        await waitForFirebaseDb();
+        // 若已附加監聽則直接返回
+        if (patientListListenerAttached) return;
+        // 建立查詢：按照建立時間由新至舊排序，以與列表排序一致
+        const colRef = window.firebase.collection(window.firebase.db, 'patients');
+        let q;
+        try {
+            // 使用 orderBy 排序；若 createdAt 不存在於某些文件，則回傳順序可能不一致。
+            q = window.firebase.firestoreQuery(colRef, window.firebase.orderBy('createdAt', 'desc'));
+        } catch (_e) {
+            // 若 orderBy 無法使用，直接監聽整個集合
+            q = colRef;
+        }
+        // 使用 onSnapshot 監聽文件變化
+        patientListUnsubscribe = window.firebase.onSnapshot(q, (snapshot) => {
+            try {
+                // 監聽回調：清除病人資料相關的快取，確保下次讀取獲得最新資料
+                patientCache = null;
+                patientPagesCache = {};
+                patientPageCursors = {};
+                patientsCountCache = null;
+                try {
+                    // 移除本地儲存的快取，以便下次重新載入
+                    localStorage.removeItem('patients');
+                } catch (_lsErr) {
+                    /* 忽略 localStorage 錯誤 */
+                }
+                // 若當前仍在病人管理頁面，立即刷新列表
+                const sectionEl = document.getElementById('patientManagement');
+                if (sectionEl && !sectionEl.classList.contains('hidden')) {
+                    loadPatientList();
+                }
+            } catch (innerErr) {
+                console.error('病人資料即時更新處理失敗:', innerErr);
+            }
+        }, (err) => {
+            console.error('監聽病人資料失敗:', err);
+        });
+        patientListListenerAttached = true;
+    } catch (outerErr) {
+        console.error('附加病人資料監聽失敗:', outerErr);
+    }
+}
+
+/**
+ * 移除病人列表的即時監聽。若尚未附加監聽則不執行任何動作。
+ */
+function detachPatientListListener() {
+    if (patientListListenerAttached) {
+        try {
+            if (typeof patientListUnsubscribe === 'function') {
+                patientListUnsubscribe();
+            }
+        } catch (err) {
+            console.error('取消病人資料監聽失敗:', err);
+        }
+        patientListListenerAttached = false;
+        patientListUnsubscribe = null;
+    }
+}
+
 /**
  * 初始化中藥庫存資料，從 Firebase Realtime Database 讀取。
  * 若已有資料且非強制刷新，直接返回。
@@ -3019,7 +3102,9 @@ async function logout() {
             if (sectionEl) sectionEl.classList.remove('hidden');
             // 根據 sectionId 載入相應功能
             if (sectionId === 'patientManagement') {
+                // 載入病人列表後設置即時監聽，確保他人新增或編輯病人資料時能即時更新畫面。
                 loadPatientList();
+                attachPatientListListener();
             } else if (sectionId === 'consultationSystem') {
                 loadConsultationSystem();
             } else if (sectionId === 'herbLibrary') {
@@ -3089,6 +3174,14 @@ async function logout() {
                         }
                     } catch (err) {
                         console.error('離開掛號系統時取消掛號監聽失敗:', err);
+                    }
+                }
+                // 離開病人資料管理時，取消病人列表的監聽，以減少 Firestore 讀取
+                if (id === 'patientManagement') {
+                    try {
+                        detachPatientListListener();
+                    } catch (err) {
+                        console.error('離開病人管理時取消病人監聽失敗:', err);
                     }
                 }
                 const el = document.getElementById(id);
