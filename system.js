@@ -8,6 +8,15 @@ let currentUserData = null;
 // 以便其他模組（例如 schedule_management.js）可直接存取
 window.currentUserClaims = {};
 
+// -----------------------------------------------------------------------
+// Helper function to compare IDs across types.
+// Some IDs (e.g. patientId) may be stored as numbers (Date.now()) or strings.
+// Comparing them directly using strict equality can lead to mismatches (e.g. 123 === "123" is false).
+// This helper normalizes both inputs to strings before comparison.
+function idsMatch(id1, id2) {
+    return String(id1) === String(id2);
+}
+
 /**
  * A simple debounce utility to delay the execution of a function until after a specified
  * delay has passed since its last invocation. This helps to avoid triggering expensive
@@ -3695,7 +3704,7 @@ async function editPatient(id) {
             return;
         }
 
-        const patient = allPatients.find(p => p.id === id);
+        const patient = allPatients.find(p => idsMatch(p.id, id));
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -3740,7 +3749,7 @@ async function deletePatient(id) {
             return;
         }
 
-        const patient = allPatients.find(p => p.id === id);
+        const patient = allPatients.find(p => idsMatch(p.id, id));
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -3860,7 +3869,7 @@ async function viewPatient(id) {
             showToast('無法讀取病人資料', 'error');
             return;
         }
-        const patient = allPatients.find(p => p.id === id);
+        const patient = allPatients.find(p => idsMatch(p.id, id));
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -4613,7 +4622,7 @@ async function selectPatientForRegistration(patientId) {
             // 從快取或 Firebase 取得正在診症的病人資料
             const allPatients = await fetchPatients();
             if (allPatients && allPatients.length > 0) {
-                const consultingPatient = allPatients.find(p => p.id === consultingAppointment.patientId);
+                const consultingPatient = allPatients.find(p => idsMatch(p.id, consultingAppointment.patientId));
                 const consultingPatientName = consultingPatient ? consultingPatient.name : '某位病人';
                 // If the doctor is currently consulting another patient, inform the user in their chosen language
                 {
@@ -4638,7 +4647,7 @@ async function selectPatientForRegistration(patientId) {
             return;
         }
         
-        const patient = allPatients.find(p => p.id === patientId);
+        const patient = allPatients.find(p => idsMatch(p.id, patientId));
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -5068,17 +5077,18 @@ async function loadTodayAppointments() {
     
     try {
         // 優先使用快取的病人資料來避免重複從 Firebase 讀取。
-        const patientsData = await fetchPatients();
+        // 強制從 Firebase 重新取得病人資料，以避免跨裝置快取不一致導致找不到新病人
+        const patientsData = await fetchPatients(true);
 
         // 對於每一筆掛號資料，直接使用該次掛號的主訴，不再從病歷回填主訴。
         const rows = await Promise.all(todayAppointments.map(async (appointment, index) => {
             // 從資料集中尋找對應病人
-            const patient = patientsData.find(p => p.id === appointment.patientId);
+            const patient = patientsData.find(p => idsMatch(p.id, appointment.patientId));
 
             // 若無對應病人資料，採用原本的處理邏輯
             if (!patient) {
                 // 如果在快取找不到，嘗試從全域陣列找（向後兼容）
-                const localPatient = patients.find(p => p.id === appointment.patientId);
+                const localPatient = patients.find(p => idsMatch(p.id, appointment.patientId));
                 if (!localPatient) {
                     return `
                         <tr class="hover:bg-gray-50">
@@ -5193,7 +5203,7 @@ function subscribeToAppointments() {
                                 }
                             }
                             if (Array.isArray(patientsList)) {
-                                const patient = patientsList.find(p => p.id === apt.patientId);
+                                const patient = patientsList.find(p => idsMatch(p.id, apt.patientId));
                                 patientName = patient ? patient.name : '';
                             }
                         }
@@ -5721,7 +5731,7 @@ async function confirmPatientArrival(appointmentId) {
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = result.data.find(p => p.id === appointment.patientId);
+        const patient = result.data.find(p => idsMatch(p.id, appointment.patientId));
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -5807,7 +5817,7 @@ async function removeAppointment(appointmentId) {
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = result.data.find(p => p.id === appointment.patientId);
+        const patient = result.data.find(p => idsMatch(p.id, appointment.patientId));
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -5924,7 +5934,7 @@ async function startConsultation(appointmentId) {
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = result.data.find(p => p.id === appointment.patientId);
+        const patient = result.data.find(p => idsMatch(p.id, appointment.patientId));
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -5979,7 +5989,7 @@ async function startConsultation(appointmentId) {
             new Date(apt.appointmentTime).toDateString() === new Date().toDateString()
         );
         if (consultingAppointment) {
-            const consultingPatient = result.data.find(p => p.id === consultingAppointment.patientId);
+            const consultingPatient = result.data.find(p => idsMatch(p.id, consultingAppointment.patientId));
             const consultingPatientName = consultingPatient ? consultingPatient.name : '未知病人';
             // 提示當前正在診症其他病人，詢問是否結束並開始新診症（支援中英文）
             const lang3 = localStorage.getItem('lang') || 'zh';
@@ -6079,7 +6089,7 @@ async function showConsultationForm(appointment) {
             return;
         }
         
-        const patient = result.data.find(p => p.id === appointment.patientId);
+        const patient = result.data.find(p => idsMatch(p.id, appointment.patientId));
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -6380,7 +6390,7 @@ async function showConsultationForm(appointment) {
                     currentConsultingAppointmentId = null;
                     return;
                 }
-                const patient = patientResult.data.find(p => p.id === appointment.patientId);
+                const patient = patientResult.data.find(p => idsMatch(p.id, appointment.patientId));
                 if (!patient) {
                     showToast('找不到病人資料！', 'error');
                     closeConsultationForm();
@@ -6727,7 +6737,7 @@ if (!patientResult.success) {
     return;
 }
 
-const patient = patientResult.data.find(p => p.id === patientId);
+const patient = patientResult.data.find(p => idsMatch(p.id, patientId));
 if (!patient) {
     showToast('找不到病人資料！', 'error');
     return;
@@ -7096,7 +7106,7 @@ async function viewPatientMedicalHistory(patientId) {
             return;
         }
         
-        const patient = patientResult.data.find(p => p.id === patientId);
+        const patient = patientResult.data.find(p => idsMatch(p.id, patientId));
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -7688,7 +7698,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             return;
         }
         
-        const patient = patientResult.data.find(p => p.id === consultation.patientId);
+        const patient = patientResult.data.find(p => idsMatch(p.id, consultation.patientId));
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -8205,7 +8215,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
             return;
         }
         
-        const patient = patientResult.data.find(p => p.id === consultation.patientId);
+        const patient = patientResult.data.find(p => idsMatch(p.id, consultation.patientId));
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -8590,7 +8600,7 @@ async function printSickLeave(consultationId, consultationData = null) {
             return;
         }
 
-        const patient = patientResult.data.find(p => p.id === consultation.patientId);
+        const patient = patientResult.data.find(p => idsMatch(p.id, consultation.patientId));
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -9029,7 +9039,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = patientResult.data.find(p => p.id === consultation.patientId);
+        const patient = patientResult.data.find(p => idsMatch(p.id, consultation.patientId));
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -9407,7 +9417,7 @@ async function withdrawConsultation(appointmentId) {
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = patientResult.data.find(p => p.id === appointment.patientId);
+        const patient = patientResult.data.find(p => idsMatch(p.id, appointment.patientId));
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -9716,7 +9726,7 @@ async function editMedicalRecord(appointmentId) {
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = patientResult.data.find(p => p.id === appointment.patientId);
+        const patient = patientResult.data.find(p => idsMatch(p.id, appointment.patientId));
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -9807,7 +9817,7 @@ async function editMedicalRecord(appointmentId) {
         }
         if (consultingAppointment) {
             // 從 Firebase 獲取正在診症的病人資料
-            const consultingPatient = patientResult.data.find(p => p.id === consultingAppointment.patientId);
+            const consultingPatient = patientResult.data.find(p => idsMatch(p.id, consultingAppointment.patientId));
             const consultingPatientName = consultingPatient ? consultingPatient.name : '未知病人';
             // 提示當前正在診症其他病人，詢問是否結束並改為修改病歷（支援中英文）
             const lang4 = localStorage.getItem('lang') || 'zh';
@@ -12889,7 +12899,7 @@ async function initializeSystemAfterLogin() {
                     return;
                 }
                 // 依據 appointment.patientId 找到病人
-                const patient = patientResult.data.find(p => p.id === appointment.patientId);
+                const patient = patientResult.data.find(p => idsMatch(p.id, appointment.patientId));
                 if (!patient) {
                     showToast('找不到病人資料！', 'error');
                     return;
@@ -13071,7 +13081,7 @@ async function initializeSystemAfterLogin() {
                     return;
                 }
                 // 使用 appointment.patientId 取得病人資料
-                const patient = patientResult.data.find(p => p.id === appointment.patientId);
+                const patient = patientResult.data.find(p => idsMatch(p.id, appointment.patientId));
                 if (!patient) {
                     showToast('找不到病人資料！', 'error');
                     return;
@@ -13269,7 +13279,7 @@ if (!patientResult.success) {
     return;
 }
 
-const patient = patientResult.data.find(p => p.id === consultation.patientId);
+const patient = patientResult.data.find(p => idsMatch(p.id, consultation.patientId));
 if (!patient) {
     showToast('找不到病人資料！', 'error');
     return;
