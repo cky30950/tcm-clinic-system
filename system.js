@@ -8,15 +8,6 @@ let currentUserData = null;
 // 以便其他模組（例如 schedule_management.js）可直接存取
 window.currentUserClaims = {};
 
-// -----------------------------------------------------------------------
-// Helper function to compare IDs across types.
-// Some IDs (e.g. patientId) may be stored as numbers (Date.now()) or strings.
-// Comparing them directly using strict equality can lead to mismatches (e.g. 123 === "123" is false).
-// This helper normalizes both inputs to strings before comparison.
-function idsMatch(id1, id2) {
-    return String(id1) === String(id2);
-}
-
 /**
  * A simple debounce utility to delay the execution of a function until after a specified
  * delay has passed since its last invocation. This helps to avoid triggering expensive
@@ -2582,81 +2573,27 @@ async function attemptMainLogin() {
             window.currentUserClaims = {};
         }
 
-        // 優先透過 UID 讀取單一用戶資料，以避免因為沒有權限讀取整個 users 集合而登入失敗
-        let matchingUser = null;
-        try {
-            if (window.firebaseDataManager && typeof window.firebaseDataManager.getUserByUid === 'function') {
-                const res = await window.firebaseDataManager.getUserByUid(uid);
-                if (res && res.success && res.data) {
-                    // 從 Firebase 取得的資料中排除 personalSettings，並轉換時間戳
-                    const { personalSettings, ...rest } = res.data || {};
-                    matchingUser = {
-                        ...rest,
-                        createdAt: rest.createdAt
-                          ? (rest.createdAt.seconds
-                            ? new Date(rest.createdAt.seconds * 1000).toISOString()
-                            : rest.createdAt)
-                          : new Date().toISOString(),
-                        updatedAt: rest.updatedAt
-                          ? (rest.updatedAt.seconds
-                            ? new Date(rest.updatedAt.seconds * 1000).toISOString()
-                            : rest.updatedAt)
-                          : new Date().toISOString(),
-                        lastLogin: rest.lastLogin
-                          ? (rest.lastLogin.seconds
-                            ? new Date(rest.lastLogin.seconds * 1000).toISOString()
-                            : rest.lastLogin)
-                          : null
-                    };
-                    // 將找到的用戶合併進全域 users 列表以供後續使用
-                    try {
-                        let list = Array.isArray(users) ? [...users] : [];
-                        const idx = list.findIndex(u => String(u.id) === String(matchingUser.id));
-                        if (idx >= 0) {
-                            list[idx] = { ...list[idx], ...matchingUser };
-                        } else {
-                            list.push(matchingUser);
-                        }
-                        users = list;
-                        try {
-                            localStorage.setItem('users', JSON.stringify(users));
-                        } catch (_lsErr) {
-                            // 忽略 localStorage 錯誤
-                        }
-                    } catch (_mergeErr) {
-                        // 忽略合併錯誤
-                    }
-                }
-            }
-        } catch (uidErr) {
-            console.error('透過 UID 讀取用戶資料時發生錯誤:', uidErr);
-        }
-
         // 同步載入 Firebase 用戶數據
         await syncUserDataFromFirebase();
 
-        // 若尚未找到對應用戶，則在同步後的 users 陣列中尋找對應的 UID 或電子郵件
+        // 在用戶資料中尋找對應的 UID 或電子郵件
+        let matchingUser = users.find(u => u.uid && u.uid === uid);
         if (!matchingUser) {
-            matchingUser = users.find(u => u.uid && u.uid === uid);
-            if (!matchingUser) {
-                // 若未設定 uid，改用 email 比對（不區分大小寫）
-                matchingUser = users.find(u => u.email && u.email.toLowerCase() === firebaseUser.email.toLowerCase());
-                if (matchingUser) {
-                    // 將 Firebase UID 設定到用戶資料中，以便下次可直接透過 UID 比對
-                    matchingUser.uid = uid;
-                    // 更新到 Firebase
-                    try {
-                        await window.firebaseDataManager.updateUser(matchingUser.id, { uid: uid });
-                    } catch (error) {
-                        console.error('更新用戶 UID 失敗:', error);
-                    }
-                    // 更新本地存儲
-                    try {
-                        localStorage.setItem('users', JSON.stringify(users));
-                    } catch (_e) {
-                        // 忽略 localStorage 錯誤
-                    }
+            // 若未設定 uid，改用 email 比對（不區分大小寫）
+            matchingUser = users.find(u => u.email && u.email.toLowerCase() === firebaseUser.email.toLowerCase());
+            if (matchingUser) {
+                // 將 Firebase UID 設定到用戶資料中，以便下次可直接透過 UID 比對
+                matchingUser.uid = uid;
+                
+                // 更新到 Firebase
+                try {
+                    await window.firebaseDataManager.updateUser(matchingUser.id, { uid: uid });
+                } catch (error) {
+                    console.error('更新用戶 UID 失敗:', error);
                 }
+                
+                // 更新本地存儲
+                localStorage.setItem('users', JSON.stringify(users));
             }
         }
 
@@ -2846,56 +2783,8 @@ async function syncUserDataFromFirebase() {
             }
             console.log('已同步 Firebase 用戶數據到本地:', users.length, '筆 (使用快取)');
         } else {
-            // 當無法從 Firebase 取得完整用戶列表時，回退為僅同步當前登入者
-            console.log('無法從 Firebase 取得完整用戶列表，嘗試僅同步當前使用者');
-            try {
-                const authCurrent = window.firebase && window.firebase.auth && window.firebase.auth.currentUser;
-                if (authCurrent && window.firebaseDataManager && typeof window.firebaseDataManager.getUserByUid === 'function') {
-                    const uid = authCurrent.uid;
-                    const res = await window.firebaseDataManager.getUserByUid(uid);
-                    if (res && res.success && res.data) {
-                        // 從 res.data 組裝用戶資料並排除 personalSettings
-                        const { personalSettings, ...rest } = res.data || {};
-                        const userObj = {
-                            ...rest,
-                            createdAt: res.data.createdAt
-                              ? (res.data.createdAt.seconds
-                                ? new Date(res.data.createdAt.seconds * 1000).toISOString()
-                                : res.data.createdAt)
-                              : new Date().toISOString(),
-                            updatedAt: res.data.updatedAt
-                              ? (res.data.updatedAt.seconds
-                                ? new Date(res.data.updatedAt.seconds * 1000).toISOString()
-                                : res.data.updatedAt)
-                              : new Date().toISOString(),
-                            lastLogin: res.data.lastLogin
-                              ? (res.data.lastLogin.seconds
-                                ? new Date(res.data.lastLogin.seconds * 1000).toISOString()
-                                : res.data.lastLogin)
-                              : null
-                        };
-                        // 使用現有 users 陣列（若存在），並合併或新增當前用戶
-                        let mergedList = Array.isArray(users) ? [...users] : [];
-                        // 如果 mergedList 中已有此使用者，則更新其資料，否則加入
-                        const existingIndex = mergedList.findIndex(u => String(u.id) === String(userObj.id));
-                        if (existingIndex >= 0) {
-                            mergedList[existingIndex] = { ...mergedList[existingIndex], ...userObj };
-                        } else {
-                            mergedList.push(userObj);
-                        }
-                        users = mergedList;
-                        // 更新本地存儲
-                        try {
-                            localStorage.setItem('users', JSON.stringify(users));
-                        } catch (lsErr) {
-                            console.warn('保存當前用戶資料到本地失敗:', lsErr);
-                        }
-                        console.log('已回退同步單一使用者資料');
-                    }
-                }
-            } catch (fallbackErr) {
-                console.warn('同步當前使用者資料發生錯誤:', fallbackErr);
-            }
+            // 無法取得完整用戶列表時，不回退單一用戶資料，以避免影響其他功能
+            console.warn('無法從 Firebase 取得完整用戶列表，未回退同步單一用戶資料');
         }
     } catch (error) {
         console.error('同步 Firebase 用戶數據失敗:', error);
@@ -3704,7 +3593,7 @@ async function editPatient(id) {
             return;
         }
 
-        const patient = allPatients.find(p => idsMatch(p.id, id));
+        const patient = allPatients.find(p => p.id === id);
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -3749,7 +3638,7 @@ async function deletePatient(id) {
             return;
         }
 
-        const patient = allPatients.find(p => idsMatch(p.id, id));
+        const patient = allPatients.find(p => p.id === id);
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -3869,7 +3758,7 @@ async function viewPatient(id) {
             showToast('無法讀取病人資料', 'error');
             return;
         }
-        const patient = allPatients.find(p => idsMatch(p.id, id));
+        const patient = allPatients.find(p => p.id === id);
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -4622,7 +4511,7 @@ async function selectPatientForRegistration(patientId) {
             // 從快取或 Firebase 取得正在診症的病人資料
             const allPatients = await fetchPatients();
             if (allPatients && allPatients.length > 0) {
-                const consultingPatient = allPatients.find(p => idsMatch(p.id, consultingAppointment.patientId));
+                const consultingPatient = allPatients.find(p => p.id === consultingAppointment.patientId);
                 const consultingPatientName = consultingPatient ? consultingPatient.name : '某位病人';
                 // If the doctor is currently consulting another patient, inform the user in their chosen language
                 {
@@ -4647,7 +4536,7 @@ async function selectPatientForRegistration(patientId) {
             return;
         }
         
-        const patient = allPatients.find(p => idsMatch(p.id, patientId));
+        const patient = allPatients.find(p => p.id === patientId);
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -5077,18 +4966,17 @@ async function loadTodayAppointments() {
     
     try {
         // 優先使用快取的病人資料來避免重複從 Firebase 讀取。
-        // 強制從 Firebase 重新取得病人資料，以避免跨裝置快取不一致導致找不到新病人
-        const patientsData = await fetchPatients(true);
+        const patientsData = await fetchPatients();
 
         // 對於每一筆掛號資料，直接使用該次掛號的主訴，不再從病歷回填主訴。
         const rows = await Promise.all(todayAppointments.map(async (appointment, index) => {
             // 從資料集中尋找對應病人
-            const patient = patientsData.find(p => idsMatch(p.id, appointment.patientId));
+            const patient = patientsData.find(p => p.id === appointment.patientId);
 
             // 若無對應病人資料，採用原本的處理邏輯
             if (!patient) {
                 // 如果在快取找不到，嘗試從全域陣列找（向後兼容）
-                const localPatient = patients.find(p => idsMatch(p.id, appointment.patientId));
+                const localPatient = patients.find(p => p.id === appointment.patientId);
                 if (!localPatient) {
                     return `
                         <tr class="hover:bg-gray-50">
@@ -5203,7 +5091,7 @@ function subscribeToAppointments() {
                                 }
                             }
                             if (Array.isArray(patientsList)) {
-                                const patient = patientsList.find(p => idsMatch(p.id, apt.patientId));
+                                const patient = patientsList.find(p => p.id === apt.patientId);
                                 patientName = patient ? patient.name : '';
                             }
                         }
@@ -5731,7 +5619,7 @@ async function confirmPatientArrival(appointmentId) {
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = result.data.find(p => idsMatch(p.id, appointment.patientId));
+        const patient = result.data.find(p => p.id === appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -5817,7 +5705,7 @@ async function removeAppointment(appointmentId) {
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = result.data.find(p => idsMatch(p.id, appointment.patientId));
+        const patient = result.data.find(p => p.id === appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -5934,7 +5822,7 @@ async function startConsultation(appointmentId) {
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = result.data.find(p => idsMatch(p.id, appointment.patientId));
+        const patient = result.data.find(p => p.id === appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -5989,7 +5877,7 @@ async function startConsultation(appointmentId) {
             new Date(apt.appointmentTime).toDateString() === new Date().toDateString()
         );
         if (consultingAppointment) {
-            const consultingPatient = result.data.find(p => idsMatch(p.id, consultingAppointment.patientId));
+            const consultingPatient = result.data.find(p => p.id === consultingAppointment.patientId);
             const consultingPatientName = consultingPatient ? consultingPatient.name : '未知病人';
             // 提示當前正在診症其他病人，詢問是否結束並開始新診症（支援中英文）
             const lang3 = localStorage.getItem('lang') || 'zh';
@@ -6089,7 +5977,7 @@ async function showConsultationForm(appointment) {
             return;
         }
         
-        const patient = result.data.find(p => idsMatch(p.id, appointment.patientId));
+        const patient = result.data.find(p => p.id === appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -6390,7 +6278,7 @@ async function showConsultationForm(appointment) {
                     currentConsultingAppointmentId = null;
                     return;
                 }
-                const patient = patientResult.data.find(p => idsMatch(p.id, appointment.patientId));
+                const patient = patientResult.data.find(p => p.id === appointment.patientId);
                 if (!patient) {
                     showToast('找不到病人資料！', 'error');
                     closeConsultationForm();
@@ -6737,7 +6625,7 @@ if (!patientResult.success) {
     return;
 }
 
-const patient = patientResult.data.find(p => idsMatch(p.id, patientId));
+const patient = patientResult.data.find(p => p.id === patientId);
 if (!patient) {
     showToast('找不到病人資料！', 'error');
     return;
@@ -7106,7 +6994,7 @@ async function viewPatientMedicalHistory(patientId) {
             return;
         }
         
-        const patient = patientResult.data.find(p => idsMatch(p.id, patientId));
+        const patient = patientResult.data.find(p => p.id === patientId);
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -7698,7 +7586,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             return;
         }
         
-        const patient = patientResult.data.find(p => idsMatch(p.id, consultation.patientId));
+        const patient = patientResult.data.find(p => p.id === consultation.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -8215,7 +8103,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
             return;
         }
         
-        const patient = patientResult.data.find(p => idsMatch(p.id, consultation.patientId));
+        const patient = patientResult.data.find(p => p.id === consultation.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -8600,7 +8488,7 @@ async function printSickLeave(consultationId, consultationData = null) {
             return;
         }
 
-        const patient = patientResult.data.find(p => idsMatch(p.id, consultation.patientId));
+        const patient = patientResult.data.find(p => p.id === consultation.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -9039,7 +8927,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = patientResult.data.find(p => idsMatch(p.id, consultation.patientId));
+        const patient = patientResult.data.find(p => p.id === consultation.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -9417,7 +9305,7 @@ async function withdrawConsultation(appointmentId) {
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = patientResult.data.find(p => idsMatch(p.id, appointment.patientId));
+        const patient = patientResult.data.find(p => p.id === appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -9726,7 +9614,7 @@ async function editMedicalRecord(appointmentId) {
             showToast('無法讀取病人資料！', 'error');
             return;
         }
-        const patient = patientResult.data.find(p => idsMatch(p.id, appointment.patientId));
+        const patient = patientResult.data.find(p => p.id === appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -9817,7 +9705,7 @@ async function editMedicalRecord(appointmentId) {
         }
         if (consultingAppointment) {
             // 從 Firebase 獲取正在診症的病人資料
-            const consultingPatient = patientResult.data.find(p => idsMatch(p.id, consultingAppointment.patientId));
+            const consultingPatient = patientResult.data.find(p => p.id === consultingAppointment.patientId);
             const consultingPatientName = consultingPatient ? consultingPatient.name : '未知病人';
             // 提示當前正在診症其他病人，詢問是否結束並改為修改病歷（支援中英文）
             const lang4 = localStorage.getItem('lang') || 'zh';
@@ -11759,15 +11647,10 @@ async function initializeSystemAfterLogin() {
             const resultsList = document.getElementById('prescriptionSearchList');
             
             if (searchTerm.length < 1) {
-                // 當搜尋字串為空時，隱藏搜尋結果容器
+                // 當搜尋字串為空時隱藏結果容器，並同步隱藏任何殘留的提示框
                 resultsContainer.classList.add('hidden');
-                // 同時隱藏任何殘留的提示框，避免上次滑鼠懸停留下的 tooltip 持續顯示
-                try {
-                    if (typeof hideTooltip === 'function') {
-                        hideTooltip();
-                    }
-                } catch (_e) {
-                    // 忽略隱藏提示框時的任何錯誤
+                if (typeof hideTooltip === 'function') {
+                    hideTooltip();
                 }
                 return;
             }
@@ -11818,6 +11701,10 @@ async function initializeSystemAfterLogin() {
                     </div>
                 `;
                 resultsContainer.classList.remove('hidden');
+                // 若沒有任何匹配結果，也應當隱藏提示框，避免殘留
+                if (typeof hideTooltip === 'function') {
+                    hideTooltip();
+                }
                 return;
             }
             
@@ -12305,13 +12192,9 @@ async function initializeSystemAfterLogin() {
         function clearPrescriptionSearch() {
             document.getElementById('prescriptionSearch').value = '';
             document.getElementById('prescriptionSearchResults').classList.add('hidden');
-            // 在清除搜尋結果時隱藏可能殘留的 tooltip，避免滑鼠懸停時提示框未消失
-            try {
-                if (typeof hideTooltip === 'function') {
-                    hideTooltip();
-                }
-            } catch (_e) {
-                // 忽略隱藏提示框時的任何錯誤
+            // 清除搜索時同步隱藏任何已顯示的 tooltip，避免游標仍停留在原位導致提示框殘留
+            if (typeof hideTooltip === 'function') {
+                hideTooltip();
             }
         }
         
@@ -12899,7 +12782,7 @@ async function initializeSystemAfterLogin() {
                     return;
                 }
                 // 依據 appointment.patientId 找到病人
-                const patient = patientResult.data.find(p => idsMatch(p.id, appointment.patientId));
+                const patient = patientResult.data.find(p => p.id === appointment.patientId);
                 if (!patient) {
                     showToast('找不到病人資料！', 'error');
                     return;
@@ -13081,7 +12964,7 @@ async function initializeSystemAfterLogin() {
                     return;
                 }
                 // 使用 appointment.patientId 取得病人資料
-                const patient = patientResult.data.find(p => idsMatch(p.id, appointment.patientId));
+                const patient = patientResult.data.find(p => p.id === appointment.patientId);
                 if (!patient) {
                     showToast('找不到病人資料！', 'error');
                     return;
@@ -13279,7 +13162,7 @@ if (!patientResult.success) {
     return;
 }
 
-const patient = patientResult.data.find(p => idsMatch(p.id, consultation.patientId));
+const patient = patientResult.data.find(p => p.id === consultation.patientId);
 if (!patient) {
     showToast('找不到病人資料！', 'error');
     return;
@@ -17198,42 +17081,6 @@ class FirebaseDataManager {
         } catch (error) {
             console.error('刪除用戶數據失敗:', error);
             return { success: false, error: error.message };
-        }
-    }
-
-    /**
-     * 透過 Firebase UID 取得對應的用戶資料。
-     * 優先讀取單一用戶文件以避免權限不足錯誤。
-     *
-     * @param {string} uid Firebase Authentication UID
-     * @returns {Promise<{ success: boolean, data: any }>}
-     */
-    async getUserByUid(uid) {
-        // 如果數據管理器尚未就緒則直接返回
-        if (!this.isReady) {
-            return { success: false, data: null };
-        }
-        try {
-            if (!uid) {
-                return { success: false, data: null };
-            }
-            // 建立查詢條件：只讀取 uid 等於指定值的單筆紀錄
-            const colRef = window.firebase.collection(window.firebase.db, 'users');
-            const q = window.firebase.firestoreQuery(
-                colRef,
-                window.firebase.where('uid', '==', uid),
-                window.firebase.limit(1)
-            );
-            const snapshot = await window.firebase.getDocs(q);
-            if (!snapshot.empty) {
-                const docSnap = snapshot.docs[0];
-                return { success: true, data: { id: docSnap.id, ...docSnap.data() } };
-            }
-            // 若未找到對應紀錄，回傳空資料
-            return { success: false, data: null };
-        } catch (error) {
-            console.error('透過 UID 讀取用戶資料失敗:', error);
-            return { success: false, data: null };
         }
     }
 
