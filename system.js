@@ -1171,10 +1171,24 @@ async function fetchConsultations(forceRefresh = false) {
  * @param {boolean} forceRefresh 是否強制重新從 Firestore 讀取資料
  * @returns {Promise<Array>} 用戶資料陣列
  */
+/**
+ * 取得用戶列表並使用本地快取。
+ *
+ * 此函式會利用 fetchDataWithCache 封裝的快取機制，
+ * 但需注意的是，它會將 forceRefresh 參數傳遞至
+ * FirebaseDataManager.getUsers(forceRefresh) 中，以便在需要
+ * 強制重新載入資料時實際清空後端快取並讀取最新數據。
+ * 若不傳遞 forceRefresh，DataManager.getUsers() 永遠
+ * 預設為 false，導致無法在登入時更新舊資料。
+ *
+ * @param {boolean} forceRefresh 是否強制重新從 Firestore 讀取
+ * @returns {Promise<Array>} 用戶資料陣列
+ */
 async function fetchUsers(forceRefresh = false) {
+    // 將 forceRefresh 參數傳遞給 getUsers()，確保可在需要時重取資料
     userCache = await fetchDataWithCache(
         userCache,
-        () => window.firebaseDataManager.getUsers(),
+        () => window.firebaseDataManager.getUsers(forceRefresh),
         forceRefresh
     );
     return userCache;
