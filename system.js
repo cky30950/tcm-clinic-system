@@ -3551,7 +3551,16 @@ function renderPatientListTable(pageChange = false) {
             <td class="px-4 py-3 text-sm text-gray-900">${safeAge}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safeGender}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safePhone}</td>
-            <td class="px-4 py-3 text-sm space-x-2">${actions}</td>
+            <!--
+              將操作按鈕容器設置為 flex 並加入 whitespace-nowrap，
+              以避免在按鈕顯示讀取圈時造成換行。space-x-2
+              用於按鈕間距，items-center 使按鈕垂直對齊。
+            -->
+            <td class="px-4 py-3 text-sm whitespace-nowrap">
+                <div class="flex items-center space-x-2">
+                    ${actions}
+                </div>
+            </td>
         `;
         tbody.appendChild(row);
     });
@@ -3619,7 +3628,15 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
             <td class="px-4 py-3 text-sm text-gray-900">${safeAge}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safeGender}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safePhone}</td>
-            <td class="px-4 py-3 text-sm space-x-2">${actions}</td>
+            <!--
+              將操作按鈕放入 flex 容器並設定 whitespace-nowrap，
+              避免按下按鈕時因為讀取圈或寬度變化而換行。
+            -->
+            <td class="px-4 py-3 text-sm whitespace-nowrap">
+                <div class="flex items-center space-x-2">
+                    ${actions}
+                </div>
+            </td>
         `;
         tbody.appendChild(row);
     });
