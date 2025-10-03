@@ -11749,7 +11749,16 @@ async function initializeSystemAfterLogin() {
             const resultsList = document.getElementById('prescriptionSearchList');
             
             if (searchTerm.length < 1) {
+                // 當搜尋字串為空時，隱藏搜尋結果容器
                 resultsContainer.classList.add('hidden');
+                // 同時隱藏任何殘留的提示框，避免上次滑鼠懸停留下的 tooltip 持續顯示
+                try {
+                    if (typeof hideTooltip === 'function') {
+                        hideTooltip();
+                    }
+                } catch (_e) {
+                    // 忽略隱藏提示框時的任何錯誤
+                }
                 return;
             }
             
@@ -12286,6 +12295,14 @@ async function initializeSystemAfterLogin() {
         function clearPrescriptionSearch() {
             document.getElementById('prescriptionSearch').value = '';
             document.getElementById('prescriptionSearchResults').classList.add('hidden');
+            // 在清除搜尋結果時隱藏可能殘留的 tooltip，避免滑鼠懸停時提示框未消失
+            try {
+                if (typeof hideTooltip === 'function') {
+                    hideTooltip();
+                }
+            } catch (_e) {
+                // 忽略隱藏提示框時的任何錯誤
+            }
         }
         
         // 收費項目搜索功能
