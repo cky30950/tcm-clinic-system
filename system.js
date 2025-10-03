@@ -3525,6 +3525,33 @@ function renderPatientListTable(pageChange = false) {
     if (!pageChange) {
         paginationSettings.patientList.currentPage = 1;
     }
+    // 在渲染表格之前，根據建立時間 (createdAt) 由新到舊排序病人資料
+    // 由於 patientListFiltered 可能已經按照其他條件排序，在這裡額外排序可以
+    // 確保「創建時間最新」的病人顯示在列表上方。當 createdAt 不存在時，將其
+    // 時間值視為 0，這樣會將沒有時間戳的資料排在最後。
+    if (Array.isArray(patientListFiltered) && patientListFiltered.length > 1) {
+        patientListFiltered.sort((a, b) => {
+            let dateA = 0;
+            let dateB = 0;
+            if (a && a.createdAt) {
+                if (a.createdAt.seconds !== undefined) {
+                    dateA = a.createdAt.seconds * 1000;
+                } else {
+                    const d = new Date(a.createdAt);
+                    dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                }
+            }
+            if (b && b.createdAt) {
+                if (b.createdAt.seconds !== undefined) {
+                    dateB = b.createdAt.seconds * 1000;
+                } else {
+                    const d = new Date(b.createdAt);
+                    dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                }
+            }
+            return dateB - dateA;
+        });
+    }
     const totalItems = patientListFiltered.length;
     const itemsPerPage = paginationSettings.patientList.itemsPerPage;
     let currentPage = paginationSettings.patientList.currentPage;
@@ -3617,7 +3644,34 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
     tbody.innerHTML = '';
     // 判斷是否具有刪除權限
     const showDelete = currentUserData && currentUserData.position && currentUserData.position.trim() === '診所管理';
-    pageItems.forEach(patient => {
+    // 先按照建立時間 (createdAt) 將頁面項目由新到舊排序，確保最新建立的病人位於最前面。
+    let sortedPageItems;
+    if (Array.isArray(pageItems) && pageItems.length > 1) {
+        sortedPageItems = pageItems.slice().sort((a, b) => {
+            let dateA = 0;
+            let dateB = 0;
+            if (a && a.createdAt) {
+                if (a.createdAt.seconds !== undefined) {
+                    dateA = a.createdAt.seconds * 1000;
+                } else {
+                    const d = new Date(a.createdAt);
+                    dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                }
+            }
+            if (b && b.createdAt) {
+                if (b.createdAt.seconds !== undefined) {
+                    dateB = b.createdAt.seconds * 1000;
+                } else {
+                    const d = new Date(b.createdAt);
+                    dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                }
+            }
+            return dateB - dateA;
+        });
+    } else {
+        sortedPageItems = pageItems;
+    }
+    sortedPageItems.forEach(patient => {
         const row = document.createElement('tr');
         row.className = 'hover:bg-gray-50';
         // 安全轉義顯示的值
