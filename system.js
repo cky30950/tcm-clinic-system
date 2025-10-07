@@ -1853,10 +1853,13 @@ function getHerbInventory(itemId) {
         return {
             quantity: inv.quantity ?? 0,
             threshold: inv.threshold ?? 0,
-            unit: inv.unit || 'g'
+            unit: inv.unit || 'g',
+            // 若 inv.disabled 為真則表示此中藥被停用
+            disabled: !!inv.disabled
         };
     }
-    return { quantity: 0, threshold: 0, unit: 'g' };
+    // 預設 disabled 為 false，表示啟用
+    return { quantity: 0, threshold: 0, unit: 'g', disabled: false };
 }
 
 /**
@@ -1866,7 +1869,7 @@ function getHerbInventory(itemId) {
  * @param {number} quantity
  * @param {number} threshold
  */
-async function setHerbInventory(itemId, quantity, threshold, unit) {
+async function setHerbInventory(itemId, quantity, threshold, unit, disabled) {
     await waitForFirebaseDb();
     const data = {};
     if (quantity !== undefined && quantity !== null) {
@@ -1878,6 +1881,11 @@ async function setHerbInventory(itemId, quantity, threshold, unit) {
     if (unit !== undefined && unit !== null) {
         // 儲存使用者選擇的單位，以便日後顯示
         data.unit = unit;
+    }
+    // 新增 disabled 屬性：若提供此參數則更新停用狀態
+    if (disabled !== undefined && disabled !== null) {
+        // 確保為布林值
+        data.disabled = !!disabled;
     }
     const refPath = window.firebase.ref(window.firebase.rtdb, 'herbInventory/' + String(itemId));
     await window.firebase.update(refPath, data);
@@ -2119,6 +2127,16 @@ async function openInventoryModal(itemId) {
                 const qtyUnitSel = document.getElementById('inventoryQuantityUnit');
                 if (qtyUnitSel) qtyUnitSel.value = unit;
             } catch (_e) {}
+            // 設定啟用/停用下拉選擇的值
+            try {
+                const disSel = document.getElementById('inventoryDisabled');
+                if (disSel) {
+                    // inv.disabled 為 true 時將下拉設為 'true' 表示停用，否則為 'false' 表示啟用
+                    disSel.value = inv && inv.disabled ? 'true' : 'false';
+                }
+            } catch (_e) {
+                /* 忽略錯誤 */
+            }
         }
         if (modal) {
             modal.classList.remove('hidden');
@@ -2161,9 +2179,19 @@ async function saveInventoryChanges() {
         const quantityBase = quantity * factor;
         const thresholdBase = threshold * factor;
         const id = currentInventoryItemId;
-        // 更新 Realtime Database，包含所選單位
+        // 讀取啟用/停用狀態
+        let disabledVal = false;
+        try {
+            const disSel = document.getElementById('inventoryDisabled');
+            if (disSel) {
+                disabledVal = (disSel.value === 'true');
+            }
+        } catch (_e) {
+            disabledVal = false;
+        }
+        // 更新 Realtime Database，包含所選單位與停用狀態
         if (typeof setHerbInventory === 'function') {
-            await setHerbInventory(id, quantityBase, thresholdBase, qtyUnit);
+            await setHerbInventory(id, quantityBase, thresholdBase, qtyUnit, disabledVal);
         }
         // 更新本地 herbLibrary 的預設庫存與單位（若存在）
         try {
@@ -10660,14 +10688,31 @@ async function initializeSystemAfterLogin() {
                 const matchesFilter = currentHerbFilter === 'all' || item.type === currentHerbFilter;
                 return matchesSearch && matchesFilter;
             }) : [];
-            // 依照排序條件重新排序 filteredItems
-            if (herbSortOrder) {
-                try {
-                    filteredItems.sort((a, b) => {
+            // 依照停用狀態與排序條件重新排序 filteredItems
+            try {
+                filteredItems.sort((a, b) => {
+                    // 取得停用狀態，停用項目應排在最末
+                    let invA = { disabled: false };
+                    let invB = { disabled: false };
+                    try {
+                        if (typeof getHerbInventory === 'function') {
+                            invA = getHerbInventory(a.id) || { disabled: false };
+                            invB = getHerbInventory(b.id) || { disabled: false };
+                        }
+                    } catch (_e) {
+                        invA = { disabled: false };
+                        invB = { disabled: false };
+                    }
+                    const disA = invA && invA.disabled ? 1 : 0;
+                    const disB = invB && invB.disabled ? 1 : 0;
+                    if (disA !== disB) {
+                        // 停用 (1) 排在啟用 (0) 之後
+                        return disA - disB;
+                    }
+                    // 如果已選擇排序方式，則在非停用條件下進行庫存或使用次數排序
+                    if (herbSortOrder) {
                         // 庫存排序
                         if (herbSortOrder === 'most' || herbSortOrder === 'least') {
-                            const invA = (typeof getHerbInventory === 'function') ? getHerbInventory(a.id) : { quantity: 0 };
-                            const invB = (typeof getHerbInventory === 'function') ? getHerbInventory(b.id) : { quantity: 0 };
                             const qtyA = invA && typeof invA.quantity === 'number' ? invA.quantity : 0;
                             const qtyB = invB && typeof invB.quantity === 'number' ? invB.quantity : 0;
                             return herbSortOrder === 'most' ? qtyB - qtyA : qtyA - qtyB;
@@ -10678,11 +10723,12 @@ async function initializeSystemAfterLogin() {
                             const countB = (typeof b.usageCount === 'number') ? b.usageCount : 0;
                             return herbSortOrder === 'useMost' ? countB - countA : countA - countB;
                         }
-                        return 0;
-                    });
-                } catch (_e) {
-                    // 若排序過程出現錯誤則忽略排序
-                }
+                    }
+                    // 若未設定排序方式，或排序比較值相同，保持原順序
+                    return 0;
+                });
+            } catch (_e) {
+                // 若排序過程出現錯誤則忽略排序
             }
             // 若無資料，顯示提示並清除分頁
             if (!filteredItems || filteredItems.length === 0) {
@@ -11789,6 +11835,17 @@ async function initializeSystemAfterLogin() {
             // 搜索匹配的中藥材和方劑，並根據匹配程度排序
             let matchedItems = (Array.isArray(herbLibrary) ? herbLibrary : [])
                 .filter(item => {
+                    // 停用的中藥不出現在處方搜尋結果中
+                    try {
+                        if (typeof getHerbInventory === 'function') {
+                            const inv = getHerbInventory(item.id);
+                            if (inv && inv.disabled) {
+                                return false;
+                            }
+                        }
+                    } catch (_e) {
+                        /* 若無法取得庫存資訊則忽略停用判斷 */
+                    }
                     // 將各屬性轉為小寫以便比對
                     const lowerName = item.name ? item.name.toLowerCase() : '';
                     const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
