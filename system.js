@@ -1853,10 +1853,13 @@ function getHerbInventory(itemId) {
         return {
             quantity: inv.quantity ?? 0,
             threshold: inv.threshold ?? 0,
-            unit: inv.unit || 'g'
+            unit: inv.unit || 'g',
+            // 若 inv.disabled 為真則表示此中藥被停用
+            disabled: !!inv.disabled
         };
     }
-    return { quantity: 0, threshold: 0, unit: 'g' };
+    // 預設 disabled 為 false，表示啟用
+    return { quantity: 0, threshold: 0, unit: 'g', disabled: false };
 }
 
 /**
@@ -1866,7 +1869,7 @@ function getHerbInventory(itemId) {
  * @param {number} quantity
  * @param {number} threshold
  */
-async function setHerbInventory(itemId, quantity, threshold, unit) {
+async function setHerbInventory(itemId, quantity, threshold, unit, disabled) {
     await waitForFirebaseDb();
     const data = {};
     if (quantity !== undefined && quantity !== null) {
@@ -1878,6 +1881,11 @@ async function setHerbInventory(itemId, quantity, threshold, unit) {
     if (unit !== undefined && unit !== null) {
         // 儲存使用者選擇的單位，以便日後顯示
         data.unit = unit;
+    }
+    // 新增 disabled 屬性：若提供此參數則更新停用狀態
+    if (disabled !== undefined && disabled !== null) {
+        // 確保為布林值
+        data.disabled = !!disabled;
     }
     const refPath = window.firebase.ref(window.firebase.rtdb, 'herbInventory/' + String(itemId));
     await window.firebase.update(refPath, data);
@@ -2119,6 +2127,16 @@ async function openInventoryModal(itemId) {
                 const qtyUnitSel = document.getElementById('inventoryQuantityUnit');
                 if (qtyUnitSel) qtyUnitSel.value = unit;
             } catch (_e) {}
+            // 設定啟用/停用下拉選擇的值
+            try {
+                const disSel = document.getElementById('inventoryDisabled');
+                if (disSel) {
+                    // inv.disabled 為 true 時將下拉設為 'true' 表示停用，否則為 'false' 表示啟用
+                    disSel.value = inv && inv.disabled ? 'true' : 'false';
+                }
+            } catch (_e) {
+                /* 忽略錯誤 */
+            }
         }
         if (modal) {
             modal.classList.remove('hidden');
@@ -2161,9 +2179,19 @@ async function saveInventoryChanges() {
         const quantityBase = quantity * factor;
         const thresholdBase = threshold * factor;
         const id = currentInventoryItemId;
-        // 更新 Realtime Database，包含所選單位
+        // 讀取啟用/停用狀態
+        let disabledVal = false;
+        try {
+            const disSel = document.getElementById('inventoryDisabled');
+            if (disSel) {
+                disabledVal = (disSel.value === 'true');
+            }
+        } catch (_e) {
+            disabledVal = false;
+        }
+        // 更新 Realtime Database，包含所選單位與停用狀態
         if (typeof setHerbInventory === 'function') {
-            await setHerbInventory(id, quantityBase, thresholdBase, qtyUnit);
+            await setHerbInventory(id, quantityBase, thresholdBase, qtyUnit, disabledVal);
         }
         // 更新本地 herbLibrary 的預設庫存與單位（若存在）
         try {
@@ -10623,23 +10651,18 @@ async function initializeSystemAfterLogin() {
                 const totalAll = searchFiltered.length;
                 const totalHerbsAll = searchFiltered.filter(item => item.type === 'herb').length;
                 const totalFormulasAll = searchFiltered.filter(item => item.type === 'formula').length;
-                // 計算停用項目數量
-                let totalDisabledAll = 0;
-                try {
-                    totalDisabledAll = searchFiltered.filter(item => {
-                        try {
-                            if (typeof getHerbInventory === 'function') {
-                                const inv = getHerbInventory(item.id);
-                                return inv && inv.disabled;
-                            }
-                        } catch (_e) {
-                            /* ignore */
+                // 新增計算已停用資料數量：根據庫存資訊中的 disabled 屬性
+                const totalDisabledAll = searchFiltered.filter(item => {
+                    try {
+                        if (typeof getHerbInventory === 'function') {
+                            const inv = getHerbInventory(item.id);
+                            return inv && inv.disabled;
                         }
-                        return false;
-                    }).length;
-                } catch (_e) {
-                    totalDisabledAll = 0;
-                }
+                    } catch (_e) {
+                        // 忽略錯誤
+                    }
+                    return false;
+                }).length;
                 // 更新各分類按鈕的顯示文字
                 const allBtn = document.getElementById('filter-all');
                 if (allBtn) {
@@ -10653,7 +10676,7 @@ async function initializeSystemAfterLogin() {
                 if (formulaBtn) {
                     formulaBtn.innerHTML = `方劑 (${totalFormulasAll})`;
                 }
-                // 更新停用分類按鈕的顯示文字
+                // 更新已停用分類按鈕的顯示文字
                 const disabledBtn = document.getElementById('filter-disabled');
                 if (disabledBtn) {
                     disabledBtn.innerHTML = `已停用 (${totalDisabledAll})`;
@@ -10679,32 +10702,52 @@ async function initializeSystemAfterLogin() {
                 } catch (_e) {
                     matchesSearch = false;
                 }
+                // 根據當前分類篩選。
                 let matchesFilter = false;
-                try {
-                    if (currentHerbFilter === 'all') {
-                        matchesFilter = true;
-                    } else if (currentHerbFilter === 'disabled') {
-                        // 僅在停用分類時，顯示庫存中標記為停用的項目
+                if (currentHerbFilter === 'all') {
+                    matchesFilter = true;
+                } else if (currentHerbFilter === 'herb') {
+                    matchesFilter = item.type === 'herb';
+                } else if (currentHerbFilter === 'formula') {
+                    matchesFilter = item.type === 'formula';
+                } else if (currentHerbFilter === 'disabled') {
+                    // 已停用：需要檢查庫存資訊的 disabled 屬性
+                    try {
                         if (typeof getHerbInventory === 'function') {
                             const inv = getHerbInventory(item.id);
                             matchesFilter = inv && inv.disabled;
                         }
-                    } else {
-                        matchesFilter = item.type === currentHerbFilter;
+                    } catch (_e) {
+                        matchesFilter = false;
                     }
-                } catch (_e) {
-                    matchesFilter = false;
                 }
                 return matchesSearch && matchesFilter;
             }) : [];
-            // 依照排序條件重新排序 filteredItems
-            if (herbSortOrder) {
-                try {
-                    filteredItems.sort((a, b) => {
+            // 依照停用狀態與排序條件重新排序 filteredItems
+            try {
+                filteredItems.sort((a, b) => {
+                    // 取得停用狀態，停用項目應排在最末
+                    let invA = { disabled: false };
+                    let invB = { disabled: false };
+                    try {
+                        if (typeof getHerbInventory === 'function') {
+                            invA = getHerbInventory(a.id) || { disabled: false };
+                            invB = getHerbInventory(b.id) || { disabled: false };
+                        }
+                    } catch (_e) {
+                        invA = { disabled: false };
+                        invB = { disabled: false };
+                    }
+                    const disA = invA && invA.disabled ? 1 : 0;
+                    const disB = invB && invB.disabled ? 1 : 0;
+                    if (disA !== disB) {
+                        // 停用 (1) 排在啟用 (0) 之後
+                        return disA - disB;
+                    }
+                    // 如果已選擇排序方式，則在非停用條件下進行庫存或使用次數排序
+                    if (herbSortOrder) {
                         // 庫存排序
                         if (herbSortOrder === 'most' || herbSortOrder === 'least') {
-                            const invA = (typeof getHerbInventory === 'function') ? getHerbInventory(a.id) : { quantity: 0 };
-                            const invB = (typeof getHerbInventory === 'function') ? getHerbInventory(b.id) : { quantity: 0 };
                             const qtyA = invA && typeof invA.quantity === 'number' ? invA.quantity : 0;
                             const qtyB = invB && typeof invB.quantity === 'number' ? invB.quantity : 0;
                             return herbSortOrder === 'most' ? qtyB - qtyA : qtyA - qtyB;
@@ -10715,11 +10758,12 @@ async function initializeSystemAfterLogin() {
                             const countB = (typeof b.usageCount === 'number') ? b.usageCount : 0;
                             return herbSortOrder === 'useMost' ? countB - countA : countA - countB;
                         }
-                        return 0;
-                    });
-                } catch (_e) {
-                    // 若排序過程出現錯誤則忽略排序
-                }
+                    }
+                    // 若未設定排序方式，或排序比較值相同，保持原順序
+                    return 0;
+                });
+            } catch (_e) {
+                // 若排序過程出現錯誤則忽略排序
             }
             // 若無資料，顯示提示並清除分頁
             if (!filteredItems || filteredItems.length === 0) {
@@ -10759,7 +10803,7 @@ async function initializeSystemAfterLogin() {
             const herbsInPage = pageItems.filter(item => item.type === 'herb');
             const formulasInPage = pageItems.filter(item => item.type === 'formula');
             let html = '';
-            if (herbsInPage.length > 0 && (currentHerbFilter === 'all' || currentHerbFilter === 'herb')) {
+            if (herbsInPage.length > 0 && (currentHerbFilter === 'all' || currentHerbFilter === 'herb' || currentHerbFilter === 'disabled')) {
                 html += `
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
@@ -10771,7 +10815,7 @@ async function initializeSystemAfterLogin() {
                     </div>
                 `;
             }
-            if (formulasInPage.length > 0 && (currentHerbFilter === 'all' || currentHerbFilter === 'formula')) {
+            if (formulasInPage.length > 0 && (currentHerbFilter === 'all' || currentHerbFilter === 'formula' || currentHerbFilter === 'disabled')) {
                 html += `
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
@@ -10825,8 +10869,13 @@ async function initializeSystemAfterLogin() {
             const safeDosage = herb.dosage ? window.escapeHtml(String(herb.dosage)) : null;
             const safeCautions = herb.cautions ? window.escapeHtml(herb.cautions) : null;
             // 中藥卡片：僅顯示資訊，不提供編輯/刪除操作
-            // 取得庫存資料
-            const inv = typeof getHerbInventory === 'function' ? getHerbInventory(herb.id) : { quantity: 0, threshold: 0, disabled: false };
+            // 取得庫存資料（含停用狀態）
+            const inv = typeof getHerbInventory === 'function' ? getHerbInventory(herb.id) : { quantity: 0, threshold: 0 };
+            // 判斷是否停用以決定狀態標籤
+            const isDisabled = inv && inv.disabled ? true : false;
+            const statusLabel = isDisabled ? '停用' : '啟用';
+            // Tailwind 樣式：停用用紅色背景，啟用用綠色背景
+            const statusClass = isDisabled ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
             const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
             const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
             const unit = (inv && inv.unit) ? inv.unit : 'g';
@@ -10865,37 +10914,14 @@ async function initializeSystemAfterLogin() {
                 }
                 return `使用 ${usageCount} 次`;
             })();
-            // 計算停用/啟用狀態與標籤
-            let isDisabled = false;
-            try {
-                isDisabled = inv && inv.disabled;
-            } catch (_e) {
-                isDisabled = false;
-            }
-            let enabledLabel = '啟用';
-            let disabledLabel = '停用';
-            try {
-                const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
-                if (langSel && langSel.toLowerCase().startsWith('en')) {
-                    enabledLabel = 'Enabled';
-                    disabledLabel = 'Disabled';
-                }
-            } catch (_e) {
-                enabledLabel = '啟用';
-                disabledLabel = '停用';
-            }
-            const statusLabel = isDisabled ? disabledLabel : enabledLabel;
-            // 根據狀態設定背景與文字顏色
-            const statusClasses = isDisabled ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-700';
-            const statusHtml = `<span class="absolute top-2 right-2 text-xs font-medium px-2 py-1 rounded ${statusClasses}">${statusLabel}</span>`;
             return `
-                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 relative">
-                    ${statusHtml}
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
                         <div>
                             <h4 class="text-lg font-semibold text-gray-900">${displayName}</h4>
                             ${safeAlias ? `<p class="text-sm text-gray-600">${safeAlias}</p>` : ''}
                         </div>
+                        <span class="ml-2 text-xs px-2 py-1 rounded ${statusClass}">${statusLabel}</span>
                     </div>
                     <div class="space-y-2 text-sm">
                         ${safeNature ? `<div><span class="font-medium text-gray-700">性味：</span>${safeNature}</div>` : ''}
@@ -10938,8 +10964,12 @@ async function initializeSystemAfterLogin() {
             const safeUsage = formula.usage ? window.escapeHtml(formula.usage) : null;
             const safeCautions = formula.cautions ? window.escapeHtml(formula.cautions) : null;
             // 方劑卡片：僅顯示資訊，不提供編輯/刪除操作
-            // 取得庫存資料
-            const inv = typeof getHerbInventory === 'function' ? getHerbInventory(formula.id) : { quantity: 0, threshold: 0, disabled: false };
+            // 取得庫存資料（含停用狀態）
+            const inv = typeof getHerbInventory === 'function' ? getHerbInventory(formula.id) : { quantity: 0, threshold: 0 };
+            // 判斷是否停用以決定狀態標籤
+            const isDisabled = inv && inv.disabled ? true : false;
+            const statusLabel = isDisabled ? '停用' : '啟用';
+            const statusClass = isDisabled ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
             const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
             const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
             const unit = (inv && inv.unit) ? inv.unit : 'g';
@@ -10977,36 +11007,14 @@ async function initializeSystemAfterLogin() {
                 }
                 return `使用 ${usageCountF} 次`;
             })();
-            // 計算停用/啟用狀態與標籤
-            let isDisabledF = false;
-            try {
-                isDisabledF = inv && inv.disabled;
-            } catch (_e) {
-                isDisabledF = false;
-            }
-            let enabledLabelF = '啟用';
-            let disabledLabelF = '停用';
-            try {
-                const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
-                if (langSel && langSel.toLowerCase().startsWith('en')) {
-                    enabledLabelF = 'Enabled';
-                    disabledLabelF = 'Disabled';
-                }
-            } catch (_e) {
-                enabledLabelF = '啟用';
-                disabledLabelF = '停用';
-            }
-            const statusLabelF = isDisabledF ? disabledLabelF : enabledLabelF;
-            const statusClassesF = isDisabledF ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-700';
-            const statusHtmlF = `<span class="absolute top-2 right-2 text-xs font-medium px-2 py-1 rounded ${statusClassesF}">${statusLabelF}</span>`;
             return `
-                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 relative">
-                    ${statusHtmlF}
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
                     <div class="flex justify-between items-start mb-3">
                         <div>
                             <h4 class="text-lg font-semibold text-gray-900">${displayName}</h4>
                             ${safeSource ? `<p class="text-sm text-gray-600">出處：${safeSource}</p>` : ''}
                         </div>
+                        <span class="ml-2 text-xs px-2 py-1 rounded ${statusClass}">${statusLabel}</span>
                     </div>
                     <div class="space-y-3 text-sm">
                         ${safeEffects ? `<div><span class="font-medium text-gray-700">功效：</span>${safeEffects}</div>` : ''}
@@ -11873,6 +11881,17 @@ async function initializeSystemAfterLogin() {
             // 搜索匹配的中藥材和方劑，並根據匹配程度排序
             let matchedItems = (Array.isArray(herbLibrary) ? herbLibrary : [])
                 .filter(item => {
+                    // 停用的中藥不出現在處方搜尋結果中
+                    try {
+                        if (typeof getHerbInventory === 'function') {
+                            const inv = getHerbInventory(item.id);
+                            if (inv && inv.disabled) {
+                                return false;
+                            }
+                        }
+                    } catch (_e) {
+                        /* 若無法取得庫存資訊則忽略停用判斷 */
+                    }
                     // 將各屬性轉為小寫以便比對
                     const lowerName = item.name ? item.name.toLowerCase() : '';
                     const lowerAlias = item.alias ? item.alias.toLowerCase() : '';
