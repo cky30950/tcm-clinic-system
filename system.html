@@ -1841,7 +1841,8 @@
         <!-- 將病歷管理區外層調整為與其他版面一致的寬度限制與內外邊距，
              將原本的白色卡片樣式移至內層，讓外層有左右留白空間 -->
         <div id="medicalRecordManagement" class="hidden max-w-7xl mx-auto px-4 py-6">
-            <div class="bg-white rounded-xl shadow-lg p-6">
+            <!-- 將整個病歷管理內文字縮小一級，採用 text-sm 作為基準字級 -->
+            <div class="bg-white rounded-xl shadow-lg p-6 text-sm">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h2 class="text-2xl font-bold text-gray-800"><span class="text-3xl mr-3">📋</span>病歷管理</h2>
                 <div class="flex flex-col md:flex-row gap-3">
@@ -1858,12 +1859,12 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <!-- 將表頭字體與大小調整為與其他版面一致，使用 text-sm、font-semibold，移除 uppercase 與 tracking-wider -->
-                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">病歷編號</th>
-                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">病人姓名</th>
-                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">主訴</th>
-                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">醫師</th>
-                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">日期</th>
-                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">操作</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700">病歷編號</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700">病人姓名</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700">主訴</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700">醫師</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700">日期</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700">操作</th>
                             </tr>
                         </thead>
                         <tbody id="medicalRecordTableBody" class="divide-y divide-gray-200">

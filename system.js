@@ -18623,10 +18623,10 @@ function displayMedicalRecords(pageChange = false) {
             if (complaint) {
                 const firstLine = complaint.split('\n').find(l => l.trim() !== '');
                 complaintDisplay = firstLine || '';
-                // 將主訴欄位的顯示長度調整為原來的約三分之二，避免列表佔用過多寬度
-                // 以前限制為 50 個字元，這裡改為 33 個字元後加省略號
-                if (complaintDisplay.length > 33) {
-                    complaintDisplay = complaintDisplay.substring(0, 33) + '...';
+                // 將主訴欄位的顯示長度縮短為 8 個字元，超出部分顯示省略號，
+                // 以免列表佔用過多寬度
+                if (complaintDisplay.length > 8) {
+                    complaintDisplay = complaintDisplay.substring(0, 8) + '...';
                 }
             }
             tbody.innerHTML += `
