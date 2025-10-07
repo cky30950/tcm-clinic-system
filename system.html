@@ -1838,7 +1838,10 @@
         <!-- 個人設置區：在外層加入與其他頁面一致的寬度與內邊距容器，卡片樣式位於內層 -->
         <!-- 個人設置區：包裝在與其他頁面相同的寬度限制與內外邊距容器中，使版面保持一致 -->
         <!-- 病歷管理 -->
-        <div id="medicalRecordManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
+        <!-- 將病歷管理區外層調整為與其他版面一致的寬度限制與內外邊距，
+             將原本的白色卡片樣式移至內層，讓外層有左右留白空間 -->
+        <div id="medicalRecordManagement" class="hidden max-w-7xl mx-auto px-4 py-6">
+            <div class="bg-white rounded-xl shadow-lg p-6">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h2 class="text-2xl font-bold text-gray-800"><span class="text-3xl mr-3">📋</span>病歷管理</h2>
                 <div class="flex flex-col md:flex-row gap-3">
@@ -1874,6 +1877,7 @@
                 </div>
             </div>
             <div id="medicalRecordPagination" class="mt-4 flex justify-center hidden"></div>
+            </div><!-- 內層卡片結束 -->
         </div>
 
         <!-- 病歷詳細資訊彈窗 -->
