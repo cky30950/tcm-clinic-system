@@ -3543,7 +3543,8 @@ function renderPatientListTable(pageChange = false) {
         const searchTerm = searchTermEl ? searchTermEl.value.toLowerCase() : '';
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                <!-- 調整 colspan 以符合增加的建檔日期欄位 -->
+                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
                     ${searchTerm ? '沒有找到符合條件的病人' : '尚無病人資料'}
                 </td>
             </tr>
@@ -3611,6 +3612,27 @@ function renderPatientListTable(pageChange = false) {
         const safeAge = window.escapeHtml(formatAge(patient.birthDate));
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
+        // 取得建檔日期，只顯示年月日，不顯示時間
+        let createdAtDateStr = '';
+        if (patient && patient.createdAt) {
+            let d;
+            if (typeof patient.createdAt.seconds !== 'undefined') {
+                d = new Date(patient.createdAt.seconds * 1000);
+            } else {
+                d = new Date(patient.createdAt);
+            }
+            if (d instanceof Date && !isNaN(d)) {
+                // 根據目前語言選擇適當的在地化格式
+                const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+                const locale = lang === 'en' ? 'en-US' : 'zh-TW';
+                createdAtDateStr = d.toLocaleDateString(locale, {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                });
+            }
+        }
+        const safeCreatedAt = window.escapeHtml(createdAtDateStr || '');
         let actions = `
                 <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">查看</button>
                 <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
@@ -3627,6 +3649,7 @@ function renderPatientListTable(pageChange = false) {
             <td class="px-4 py-3 text-sm text-gray-900">${safeAge}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safeGender}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safePhone}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${safeCreatedAt}</td>
             <!--
               將操作按鈕容器設置為 flex 並加入 whitespace-nowrap，
               以避免在按鈕顯示讀取圈時造成換行。space-x-2
@@ -3663,7 +3686,8 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
     if (!Array.isArray(pageItems) || pageItems.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                <!-- 調整 colspan 以符合增加的建檔日期欄位 -->
+                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
                     尚無病人資料
                 </td>
             </tr>
@@ -3716,6 +3740,26 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
         const safeAge = window.escapeHtml(formatAge(patient.birthDate));
         const safeGender = window.escapeHtml(patient.gender);
         const safePhone = window.escapeHtml(patient.phone);
+        // 取得建檔日期，只顯示年月日，不顯示時間
+        let createdAtDateStr = '';
+        if (patient && patient.createdAt) {
+            let d;
+            if (typeof patient.createdAt.seconds !== 'undefined') {
+                d = new Date(patient.createdAt.seconds * 1000);
+            } else {
+                d = new Date(patient.createdAt);
+            }
+            if (d instanceof Date && !isNaN(d)) {
+                const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+                const locale = lang === 'en' ? 'en-US' : 'zh-TW';
+                createdAtDateStr = d.toLocaleDateString(locale, {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                });
+            }
+        }
+        const safeCreatedAt = window.escapeHtml(createdAtDateStr || '');
         let actions = `
                 <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-500 hover:bg-blue-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">查看</button>
                 <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-500 hover:bg-purple-600 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
@@ -3732,6 +3776,7 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
             <td class="px-4 py-3 text-sm text-gray-900">${safeAge}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safeGender}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safePhone}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${safeCreatedAt}</td>
             <!--
               將操作按鈕放入 flex 容器並設定 whitespace-nowrap，
               避免按下按鈕時因為讀取圈或寬度變化而換行。

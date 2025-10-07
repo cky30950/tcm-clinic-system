@@ -1579,6 +1579,8 @@ window.translations = {
             '病史及備註：': 'Medical History & Notes:',
             '過敏史：': 'Allergies:',
             '建檔日期：': 'Created At:',
+    // 標題用於病人列表中顯示建檔日期
+    '建檔日期': 'Created At',
             '更新日期：': 'Updated At:',
             '診症記錄摘要': 'Consultation Summary',
             '載入診症記錄中...': 'Loading consultation records...',
