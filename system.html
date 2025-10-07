@@ -1070,6 +1070,10 @@
                         <button onclick="filterHerbLibrary('formula')" id="filter-formula" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition duration-200">
                             方劑
                         </button>
+                        <!-- 新增：停用分類按鈕 -->
+                        <button onclick="filterHerbLibrary('disabled')" id="filter-disabled" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition duration-200">
+                            已停用
+                        </button>
                         <select id="herbSortSelect" onchange="changeHerbSortOrder(this.value)" class="ml-auto px-4 py-2 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700">
                             <option value="">排序方式</option>
                             <option value="most">庫存最多</option>
@@ -1237,15 +1241,6 @@
                                         <!-- 讓輸入框在小螢幕時佔滿整行，避免超出右邊邊框 -->
                                         <input type="number" id="inventoryThreshold" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" min="0" step="0.5">
                                     </div>
-                                </div>
-                                <!-- 新增啟用/停用選擇 -->
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">狀態</label>
-                                    <select id="inventoryDisabled" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                        <!-- 預設為啟用 (false)，表示此藥材仍會出現在處方搜尋中 -->
-                                        <option value="false">啟用</option>
-                                        <option value="true">停用</option>
-                                    </select>
                                 </div>
                             </div>
                             <div class="mt-6 flex justify-end space-x-4">
