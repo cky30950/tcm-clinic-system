@@ -18551,10 +18551,22 @@ function displayMedicalRecords(pageChange = false) {
             const recordNum = String(rec.id || '').toLowerCase();
             const patientName = String(medicalRecordPatients[rec.patientId] || '').toLowerCase();
             let doctorName = '';
+            // 依據醫師資料設定顯示名稱，若為字串（可能為 username 或角色），
+            // 則使用 getDoctorDisplayName() 嘗試從用戶列表取得顯示名稱；
+            // 若為物件，則優先使用其 username 再以 getDoctorDisplayName() 轉換，
+            // 否則回退至其自身的 displayName/name/fullName 或 email。
             if (rec.doctor) {
-                if (typeof rec.doctor === 'string') {
-                    doctorName = rec.doctor;
-                } else {
+                try {
+                    if (typeof rec.doctor === 'string') {
+                        doctorName = typeof getDoctorDisplayName === 'function'
+                            ? getDoctorDisplayName(rec.doctor) : rec.doctor;
+                    } else if (rec.doctor.username) {
+                        doctorName = typeof getDoctorDisplayName === 'function'
+                            ? getDoctorDisplayName(rec.doctor.username) : (rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '');
+                    } else {
+                        doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
+                    }
+                } catch (_err) {
                     doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
                 }
             }
@@ -18588,6 +18600,8 @@ function displayMedicalRecords(pageChange = false) {
     } catch (_e) {}
     const translations = (typeof window !== 'undefined' && window.translations && window.translations[lang]) ? window.translations[lang] : {};
     const viewLabel = translations['檢視'] || '檢視';
+    // 新增刪除按鈕標籤，可根據語言設定
+    const deleteLabel = translations['刪除'] || (lang === 'en' ? 'Delete' : '刪除');
     const noMatchText = term ? (lang === 'en' ? 'No matching records found' : '沒有找到符合條件的病歷') : (lang === 'en' ? 'No medical records yet' : '尚無病歷資料');
     if (!pageItems || pageItems.length === 0) {
         tbody.innerHTML = `
@@ -18603,9 +18617,19 @@ function displayMedicalRecords(pageChange = false) {
             const patientName = medicalRecordPatients[rec.patientId] || '';
             let doctorName = '';
             if (rec.doctor) {
-                if (typeof rec.doctor === 'string') {
-                    doctorName = rec.doctor;
-                } else {
+                try {
+                    if (typeof rec.doctor === 'string') {
+                        doctorName = typeof getDoctorDisplayName === 'function'
+                            ? getDoctorDisplayName(rec.doctor)
+                            : rec.doctor;
+                    } else if (rec.doctor.username) {
+                        doctorName = typeof getDoctorDisplayName === 'function'
+                            ? getDoctorDisplayName(rec.doctor.username)
+                            : (rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '');
+                    } else {
+                        doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
+                    }
+                } catch (_err) {
                     doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
                 }
             }
@@ -18637,7 +18661,8 @@ function displayMedicalRecords(pageChange = false) {
                     <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(doctorName)}</td>
                     <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(dateStr)}</td>
                     <td class="px-4 py-2 whitespace-nowrap">
-                        <button class="text-blue-600 hover:underline" onclick="viewMedicalRecord('${recordNum}', '${rec.patientId}')">${window.escapeHtml(viewLabel)}</button>
+                        <button class="text-blue-600 hover:underline mr-2" onclick="viewMedicalRecord('${recordNum}', '${rec.patientId}')">${window.escapeHtml(viewLabel)}</button>
+                        <button class="text-red-600 hover:underline" onclick="confirmDeleteMedicalRecord('${recordNum}', '${patientName}')">${window.escapeHtml(deleteLabel)}</button>
                     </td>
                 </tr>
             `;
@@ -18673,12 +18698,20 @@ function viewMedicalRecord(recordId, patientId) {
         const locale = lang === 'en' ? 'en-US' : 'zh-TW';
         // 取得翻譯字典，以便後續標籤可根據語言顯示
         const dict = (window.translations && window.translations[lang]) ? window.translations[lang] : {};
-        // 取得醫師名稱
+        // 取得醫師名稱，優先透過 getDoctorDisplayName 轉換用戶名稱
         let doctorName = '';
         if (rec.doctor) {
-            if (typeof rec.doctor === 'string') {
-                doctorName = rec.doctor;
-            } else {
+            try {
+                if (typeof rec.doctor === 'string') {
+                    doctorName = typeof getDoctorDisplayName === 'function'
+                        ? getDoctorDisplayName(rec.doctor) : rec.doctor;
+                } else if (rec.doctor.username) {
+                    doctorName = typeof getDoctorDisplayName === 'function'
+                        ? getDoctorDisplayName(rec.doctor.username) : (rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '');
+                } else {
+                    doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
+                }
+            } catch (_err) {
                 doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
             }
         }
@@ -18868,6 +18901,105 @@ function closeMedicalRecordDetail() {
     }
 }
 
+/**
+ * 顯示刪除病歷確認對話框並執行刪除。
+ * 將提示訊息根據當前語言翻譯，避免使用者誤操作。
+ * @param {string} recordId - 要刪除的病歷記錄 ID
+ * @param {string} patientName - 病人名稱，用於提示中顯示
+ */
+function confirmDeleteMedicalRecord(recordId, patientName) {
+    try {
+        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+        let message;
+        if (lang === 'en') {
+            message = `Are you sure you want to delete the record for ${patientName} (ID: ${recordId})?\nThis action cannot be undone.`;
+        } else {
+            // 中文提示
+            message = `確定要刪除病歷「${patientName} - ${recordId}」嗎？\n此動作無法恢復！`;
+        }
+        if (!window.confirm(message)) {
+            return;
+        }
+        deleteMedicalRecord(recordId);
+    } catch (_err) {
+        // 若出現意外錯誤，直接呼叫刪除以確保流程不中斷
+        deleteMedicalRecord(recordId);
+    }
+}
+
+/**
+ * 刪除指定病歷，從 Firebase 的 consultations 集合中移除並更新本地列表。
+ * 如 Firebase DataManager 提供 deleteConsultation 功能，則優先使用；
+ * 若無則直接調用 firebase.deleteDoc。
+ * @param {string} recordId - 要刪除的病歷記錄 ID
+ */
+async function deleteMedicalRecord(recordId) {
+    try {
+        // 如果 firebaseDataManager 提供刪除診症紀錄的方法，優先使用
+        let deleted = false;
+        if (window.firebaseDataManager && typeof window.firebaseDataManager.deleteConsultation === 'function') {
+            const result = await window.firebaseDataManager.deleteConsultation(recordId);
+            if (result && result.success) {
+                deleted = true;
+            }
+        }
+        // 如果 deleteConsultation 沒有成功或不存在，嘗試直接調用 firebase.deleteDoc
+        if (!deleted && window.firebase && window.firebase.deleteDoc && window.firebase.doc && window.firebase.db) {
+            await window.firebase.deleteDoc(
+                window.firebase.doc(window.firebase.db, 'consultations', recordId)
+            );
+            deleted = true;
+        }
+        if (!deleted) {
+            throw new Error('Delete function not available');
+        }
+        // 從本地 medicalRecords 陣列中移除這筆記錄
+        if (Array.isArray(medicalRecords)) {
+            medicalRecords = medicalRecords.filter(rec => String(rec.id) !== String(recordId));
+        }
+        // 也在全域 consultations 陣列中移除
+        if (Array.isArray(consultations)) {
+            consultations = consultations.filter(rec => String(rec.id) !== String(recordId));
+        }
+        // 清除 patientConsultationsCache 內相關快取
+        try {
+            if (typeof patientConsultationsCache !== 'undefined' && patientConsultationsCache && typeof patientConsultationsCache === 'object') {
+                Object.keys(patientConsultationsCache).forEach(pid => {
+                    const arr = patientConsultationsCache[pid];
+                    if (Array.isArray(arr)) {
+                        patientConsultationsCache[pid] = arr.filter(rec => String(rec.id) !== String(recordId));
+                    }
+                });
+            }
+        } catch (_cacheErr) {
+            // 忽略快取更新錯誤
+        }
+        // 清除 consultationsCache 以避免下次從快取讀取已刪除的記錄
+        try {
+            if (window.firebaseDataManager && typeof window.firebaseDataManager.consultationsCache !== 'undefined') {
+                window.firebaseDataManager.consultationsCache = null;
+            }
+            // 移除 localStorage 中的 consultations 項目
+            try {
+                localStorage.removeItem('consultations');
+            } catch (_lsErr) {
+                // 忽略 localStorage 錯誤
+            }
+        } catch (_err) {
+            // 忽略錯誤
+        }
+        // 更新列表顯示
+        displayMedicalRecords(false);
+        // 顯示提示
+        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+        showToast(lang === 'en' ? 'Record deleted' : '病歷已刪除', 'success');
+    } catch (error) {
+        console.error('刪除病歷記錄失敗:', error);
+        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+        showToast(lang === 'en' ? 'Failed to delete record' : '刪除病歷失敗', 'error');
+    }
+}
+
 // 為 HTML 內使用的函式建立全域引用。
 // 這些函式會被 HTML 屬性（例如 onclick、onkeypress）呼叫，若不掛在 window 上，瀏覽器會找不到對應函式。
 (function() {
@@ -18955,6 +19087,10 @@ function closeMedicalRecordDetail() {
   window.updateRestPeriod = updateRestPeriod;
   window.useOnePackage = useOnePackage;
   window.undoPackageUse = undoPackageUse;
+
+  // 病歷刪除相關函式
+  window.confirmDeleteMedicalRecord = confirmDeleteMedicalRecord;
+  window.deleteMedicalRecord = deleteMedicalRecord;
 
   // 將個人設置與慣用組合相關函式掛載至全域，讓 HTML 按鈕可以直接調用。
   window.loadPersonalSettings = loadPersonalSettings;
