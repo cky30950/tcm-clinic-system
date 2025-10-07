@@ -45,7 +45,9 @@ const paginationSettings = {
     personalAcupointCombos: { currentPage: 1, itemsPerPage: 6 },
     prescriptionTemplates: { currentPage: 1, itemsPerPage: 6 },
     diagnosisTemplates: { currentPage: 1, itemsPerPage: 6 },
-    patientList: { currentPage: 1, itemsPerPage: 10 }
+    patientList: { currentPage: 1, itemsPerPage: 10 },
+    // 新增病歷管理列表的分頁設定
+    medicalRecordList: { currentPage: 1, itemsPerPage: 10 }
 };
 
 // 為穴位庫新增分頁設定，每頁顯示 6 筆資料
@@ -237,9 +239,9 @@ const ROLE_PERMISSIONS = {
   // 新增個人統計分析 (personalStatistics) 權限，診所管理者與醫師可使用
   // 管理員不需要個人設置與個人統計分析，故移除這兩項
   // 將模板庫移至穴位庫之後，使側邊選單順序為：患者管理 -> 診症系統 -> 中藥庫 -> 穴位庫 -> 模板庫 -> 收費管理 -> 用戶管理 -> 財務報表 -> 系統管理 -> 帳號安全
-  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
+  '診所管理': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'medicalRecordManagement', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
   // 醫師不需要系統管理權限，將模板庫移至穴位庫之後
-  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
+  '醫師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'medicalRecordManagement', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
   // 將模板庫移至穴位庫之後
   '護理師': ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'accountSecurity'],
   // 用戶無中藥庫或穴位庫權限，維持模板庫在最後
@@ -3067,6 +3069,8 @@ async function logout() {
                 acupointLibrary: { title: '穴位庫', icon: '📌', description: '查看穴位資料' },
                 // 新增：醫療排班管理功能
                 scheduleManagement: { title: '醫療排班', icon: '📅', description: '排班與行事曆查看' },
+                // 新增：病歷管理功能
+                medicalRecordManagement: { title: '病歷管理', icon: '📋', description: '查看及搜尋病歷' },
                 billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
                 // 將診所用戶管理的圖示更新為單人符號，以符合交換後的配置
                 userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
@@ -3174,6 +3178,11 @@ async function logout() {
                         console.warn('Failed to update admin UI in navigateTo', uiErr);
                     }
                 }
+            } else if (sectionId === 'medicalRecordManagement') {
+                // 載入病歷管理頁面
+                if (typeof loadMedicalRecordManagement === 'function') {
+                    loadMedicalRecordManagement();
+                }
             } else if (sectionId === 'billingManagement') {
                 loadBillingManagement();
             } else if (sectionId === 'financialReports') {
@@ -3196,7 +3205,7 @@ async function logout() {
         // 隱藏所有區域
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
+            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'medicalRecordManagement', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
                 // 在隱藏中藥庫時，取消其資料監聽以減少 Realtime Database 讀取
                 if (id === 'herbLibrary') {
                     try {
@@ -18472,6 +18481,393 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// 病歷管理相關函式與變數
+// 儲存所有病歷與對應病人名稱，以供列表與搜尋使用
+let medicalRecords = [];
+let medicalRecordPatients = {};
+/**
+ * 載入病歷管理頁面：重置搜尋欄、讀取診症記錄與病人資料，並綁定搜尋事件。
+ */
+function loadMedicalRecordManagement() {
+    try {
+        // 確保分頁設定存在並重置當前頁
+        if (!paginationSettings.medicalRecordList) {
+            paginationSettings.medicalRecordList = { currentPage: 1, itemsPerPage: 10 };
+        }
+        paginationSettings.medicalRecordList.currentPage = 1;
+        const searchInput = document.getElementById('searchMedicalRecord');
+        if (searchInput) {
+            searchInput.value = '';
+            // 移除舊的監聽器以避免重複綁定
+            if (searchInput._medicalRecordListener) {
+                searchInput.removeEventListener('input', searchInput._medicalRecordListener);
+            }
+            const listener = debounce(() => {
+                // 每當搜尋條件變更時，將頁碼重置為 1 並重新顯示列表
+                paginationSettings.medicalRecordList.currentPage = 1;
+                displayMedicalRecords(false);
+            }, 300);
+            searchInput.addEventListener('input', listener);
+            searchInput._medicalRecordListener = listener;
+        }
+        // 同時讀取診症記錄與病人列表
+        Promise.all([
+            window.firebaseDataManager && typeof window.firebaseDataManager.getConsultations === 'function' ? window.firebaseDataManager.getConsultations(true) : { success: false, data: [] },
+            window.firebaseDataManager && typeof window.firebaseDataManager.getPatients === 'function' ? window.firebaseDataManager.getPatients(true) : { success: false, data: [] }
+        ]).then(([consRes, patientsRes]) => {
+            medicalRecords = (consRes && consRes.success && Array.isArray(consRes.data)) ? consRes.data : [];
+            const patients = (patientsRes && patientsRes.success && Array.isArray(patientsRes.data)) ? patientsRes.data : [];
+            medicalRecordPatients = {};
+            patients.forEach(p => {
+                const name = p.name || p.patientName || p.fullName || p.displayName || p.chineseName || p.englishName || '';
+                medicalRecordPatients[p.id] = name;
+            });
+            displayMedicalRecords(false);
+        }).catch(err => {
+            console.error('載入病歷資料失敗:', err);
+            // 若載入失敗仍清空列表
+            medicalRecords = [];
+            medicalRecordPatients = {};
+            displayMedicalRecords(false);
+        });
+    } catch (error) {
+        console.error('初始化病歷管理時發生錯誤:', error);
+    }
+}
+
+/**
+ * 顯示病歷列表，可依搜尋條件篩選並進行分頁。
+ * @param {boolean} pageChange 若為 true 表示僅更換頁碼，不重置目前頁
+ */
+function displayMedicalRecords(pageChange = false) {
+    const tbody = document.getElementById('medicalRecordTableBody');
+    if (!tbody) return;
+    const searchInput = document.getElementById('searchMedicalRecord');
+    const term = searchInput && searchInput.value ? searchInput.value.toLowerCase().trim() : '';
+    // 依照搜尋條件過濾
+    let filtered = medicalRecords;
+    if (term) {
+        filtered = medicalRecords.filter(rec => {
+            const recordNum = String(rec.id || '').toLowerCase();
+            const patientName = String(medicalRecordPatients[rec.patientId] || '').toLowerCase();
+            let doctorName = '';
+            if (rec.doctor) {
+                if (typeof rec.doctor === 'string') {
+                    doctorName = rec.doctor;
+                } else {
+                    doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
+                }
+            }
+            doctorName = doctorName.toLowerCase();
+            return recordNum.includes(term) || patientName.includes(term) || doctorName.includes(term);
+        });
+    }
+    if (!pageChange) {
+        // 重置當前頁至第一頁
+        if (paginationSettings.medicalRecordList) {
+            paginationSettings.medicalRecordList.currentPage = 1;
+        }
+    }
+    const itemsPerPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.itemsPerPage) ? paginationSettings.medicalRecordList.itemsPerPage : 10;
+    let currentPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.currentPage) ? paginationSettings.medicalRecordList.currentPage : 1;
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+    if (currentPage > totalPages) {
+        currentPage = totalPages;
+    }
+    if (paginationSettings.medicalRecordList) {
+        paginationSettings.medicalRecordList.currentPage = currentPage;
+    }
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    const pageItems = filtered.slice(startIdx, startIdx + itemsPerPage);
+    tbody.innerHTML = '';
+    // 決定語言顯示
+    let lang = 'zh';
+    try {
+        lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+    } catch (_e) {}
+    const translations = (typeof window !== 'undefined' && window.translations && window.translations[lang]) ? window.translations[lang] : {};
+    const viewLabel = translations['檢視'] || '檢視';
+    const noMatchText = term ? (lang === 'en' ? 'No matching records found' : '沒有找到符合條件的病歷') : (lang === 'en' ? 'No medical records yet' : '尚無病歷資料');
+    if (!pageItems || pageItems.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                    ${window.escapeHtml(noMatchText)}
+                </td>
+            </tr>
+        `;
+    } else {
+        pageItems.forEach(rec => {
+            const recordNum = rec.id || '';
+            const patientName = medicalRecordPatients[rec.patientId] || '';
+            let doctorName = '';
+            if (rec.doctor) {
+                if (typeof rec.doctor === 'string') {
+                    doctorName = rec.doctor;
+                } else {
+                    doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
+                }
+            }
+            let dateStr = '';
+            try {
+                const rawDate = rec.date || rec.createdAt || rec.updatedAt || null;
+                const parsed = parseConsultationDate(rawDate);
+                if (parsed && !isNaN(parsed.getTime())) {
+                    const locale = lang === 'en' ? 'en-US' : 'zh-TW';
+                    dateStr = parsed.toLocaleDateString(locale, { year: 'numeric', month: '2-digit', day: '2-digit' });
+                }
+            } catch (_err) {}
+            let complaint = rec.symptoms || rec.inquirySummary || rec.chiefComplaint || rec.currentHistory || '';
+            let complaintDisplay = '';
+            if (complaint) {
+                const firstLine = complaint.split('\n').find(l => l.trim() !== '');
+                complaintDisplay = firstLine || '';
+                // 將主訴欄位的顯示長度調整為原來的約三分之二，避免列表佔用過多寬度
+                // 以前限制為 50 個字元，這裡改為 33 個字元後加省略號
+                if (complaintDisplay.length > 33) {
+                    complaintDisplay = complaintDisplay.substring(0, 33) + '...';
+                }
+            }
+            tbody.innerHTML += `
+                <tr>
+                    <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(recordNum)}</td>
+                    <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(patientName)}</td>
+                    <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(complaintDisplay)}</td>
+                    <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(doctorName)}</td>
+                    <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(dateStr)}</td>
+                    <td class="px-4 py-2 whitespace-nowrap">
+                        <button class="text-blue-600 hover:underline" onclick="viewMedicalRecord('${recordNum}', '${rec.patientId}')">${window.escapeHtml(viewLabel)}</button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    // 確保分頁容器存在並渲染
+    const paginEl = ensurePaginationContainer('medicalRecordList', 'medicalRecordPagination');
+    if (paginEl) {
+        renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
+            if (paginationSettings.medicalRecordList) {
+                paginationSettings.medicalRecordList.currentPage = newPage;
+            }
+            displayMedicalRecords(true);
+        }, paginEl);
+    }
+}
+
+/**
+ * 檢視單筆病歷記錄，顯示於彈窗中。
+ * @param {string} recordId 病歷檔案編號
+ * @param {string} patientId 病人編號，用於查詢病人姓名
+ */
+function viewMedicalRecord(recordId, patientId) {
+    try {
+        // 取得對應病歷紀錄
+        const rec = medicalRecords.find(r => String(r.id) === String(recordId));
+        if (!rec) {
+            showToast('找不到病歷記錄', 'error');
+            return;
+        }
+        // 取得語言與地區設定，預設為中文
+        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+        const locale = lang === 'en' ? 'en-US' : 'zh-TW';
+        // 取得翻譯字典，以便後續標籤可根據語言顯示
+        const dict = (window.translations && window.translations[lang]) ? window.translations[lang] : {};
+        // 取得醫師名稱
+        let doctorName = '';
+        if (rec.doctor) {
+            if (typeof rec.doctor === 'string') {
+                doctorName = rec.doctor;
+            } else {
+                doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
+            }
+        }
+        // 解析日期與時間，並組合為完整字串
+        const rawDate = rec.date || rec.createdAt || rec.updatedAt || null;
+        let dateTimeStr = '日期未知';
+        try {
+            const parsed = parseConsultationDate(rawDate);
+            if (parsed && !isNaN(parsed.getTime())) {
+                const datePart = parsed.toLocaleDateString(locale);
+                const timePart = parsed.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+                dateTimeStr = datePart + ' ' + timePart;
+            }
+        } catch (_e) {}
+        // 準備醫師與病歷編號標籤（含冒號），如果翻譯存在則使用翻譯
+        const doctorLabel = dict['醫師：'] || '醫師：';
+        const recordNumberLabel = dict['病歷編號：'] || '病歷編號：';
+        // 構建可選擇載入病歷按鈕的 HTML
+        let loadButtonHtml = '';
+        try {
+            if (typeof currentConsultingAppointmentId !== 'undefined' && currentConsultingAppointmentId) {
+                const currentAppointment = appointments && Array.isArray(appointments) ? appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId)) : null;
+                if (currentAppointment && String(currentAppointment.patientId) === String(rec.patientId)) {
+                    loadButtonHtml = `<button onclick="loadMedicalRecordToCurrentConsultation('${rec.id}')" class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">載入病歷</button>`;
+                }
+            }
+        } catch (_e) {}
+        // 組合詳細內容的 HTML，使用與病人病歷查看一致的卡片樣式
+        let detailHtml = '';
+        detailHtml += '<div class="border border-gray-200 rounded-lg overflow-hidden shadow-sm">';
+        // Header 區塊
+        detailHtml += '<div class="bg-gradient-to-r from-gray-50 to-blue-50 px-6 py-4 border-b border-gray-200">';
+        detailHtml += '<div class="flex justify-between items-center">';
+        // 左側日期與標籤
+        detailHtml += '<div class="flex items-center space-x-4">';
+        detailHtml += `<span class="font-semibold text-gray-900 text-lg">${window.escapeHtml(dateTimeStr)}</span>`;
+        detailHtml += `<span class="text-sm text-gray-600 bg-white px-3 py-1 rounded">${window.escapeHtml(doctorLabel)}${window.escapeHtml(doctorName)}</span>`;
+        detailHtml += `<span class="text-sm text-gray-600 bg-white px-3 py-1 rounded">${window.escapeHtml(recordNumberLabel)}${window.escapeHtml(rec.medicalRecordNumber || rec.id)}</span>`;
+        if (rec.updatedAt) {
+            detailHtml += '<span class="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">已修改</span>';
+        }
+        detailHtml += '</div>'; // 關閉左側信息
+        // 右側按鈕
+        detailHtml += '<div class="flex flex-wrap justify-end gap-1">';
+        detailHtml += `<button onclick="printConsultationRecord('${rec.id}')" class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">列印收據</button>`;
+        detailHtml += `<button onclick="printPrescriptionInstructions('${rec.id}')" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">藥單醫囑</button>`;
+        detailHtml += `<button onclick="printAttendanceCertificate('${rec.id}')" class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">到診證明</button>`;
+        detailHtml += loadButtonHtml;
+        detailHtml += '</div>'; // 按鈕區塊結束
+        detailHtml += '</div>'; // flex 容器結束
+        detailHtml += '</div>'; // header 結束
+        // 內容區塊
+        detailHtml += '<div class="p-6">';
+        detailHtml += '<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">';
+        // 左欄：症狀與診斷
+        detailHtml += '<div class="space-y-4">';
+        // 主訴
+        detailHtml += '<div>';
+        detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">主訴</span>';
+        detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${rec.symptoms ? window.escapeHtml(rec.symptoms) : '無記錄'}</div>`;
+        detailHtml += '</div>';
+        // 現病史
+        if (rec.currentHistory) {
+            detailHtml += '<div>';
+            detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">現病史</span>';
+            detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.currentHistory)}</div>`;
+            detailHtml += '</div>';
+        }
+        // 舌象
+        if (rec.tongue) {
+            detailHtml += '<div>';
+            detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">舌象</span>';
+            detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.tongue)}</div>`;
+            detailHtml += '</div>';
+        }
+        // 脈象
+        if (rec.pulse) {
+            detailHtml += '<div>';
+            detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">脈象</span>';
+            detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.pulse)}</div>`;
+            detailHtml += '</div>';
+        }
+        // 中醫診斷
+        detailHtml += '<div>';
+        detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">中醫診斷</span>';
+        detailHtml += `<div class="bg-green-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-green-400 medical-field">${rec.diagnosis ? window.escapeHtml(rec.diagnosis) : '無記錄'}</div>`;
+        detailHtml += '</div>';
+        // 證型診斷
+        detailHtml += '<div>';
+        detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">證型診斷</span>';
+        detailHtml += `<div class="bg-blue-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-blue-400 medical-field">${rec.syndrome ? window.escapeHtml(rec.syndrome) : '無記錄'}</div>`;
+        detailHtml += '</div>';
+        // 針灸備註
+        if (rec.acupunctureNotes) {
+            detailHtml += '<div>';
+            detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">針灸備註</span>';
+            detailHtml += `<div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.escapeHtml(window.stripHtmlTags(rec.acupunctureNotes))}</div>`;
+            detailHtml += '</div>';
+        }
+        detailHtml += '</div>'; // 左欄結束
+        // 右欄：處方與用法
+        detailHtml += '<div class="space-y-4">';
+        // 處方內容
+        detailHtml += '<div>';
+        detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">處方內容</span>';
+        detailHtml += `<div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 whitespace-pre-line medical-field">${rec.prescription ? window.escapeHtml(rec.prescription) : '無記錄'}</div>`;
+        detailHtml += '</div>';
+        // 服用方法
+        if (rec.usage) {
+            detailHtml += '<div>';
+            detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">服用方法</span>';
+            let usageText = '';
+            try {
+                const parts = [];
+                if (rec.medicationDays && Number(rec.medicationDays) > 0) {
+                    parts.push('服藥天數：' + rec.medicationDays + '天');
+                }
+                if (rec.medicationFrequency && Number(rec.medicationFrequency) > 0) {
+                    parts.push('每日次數：' + rec.medicationFrequency + '次');
+                }
+                const prefix = parts.length > 0 ? parts.join('　') + '　' : '';
+                usageText = prefix + rec.usage;
+            } catch (_err) {
+                usageText = rec.usage;
+            }
+            detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(usageText)}</div>`;
+            detailHtml += '</div>';
+        }
+        // 療程
+        if (rec.treatmentCourse) {
+            detailHtml += '<div>';
+            detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">療程</span>';
+            detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.treatmentCourse)}</div>`;
+            detailHtml += '</div>';
+        }
+        // 醫囑及注意事項
+        if (rec.instructions) {
+            detailHtml += '<div>';
+            detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">醫囑及注意事項</span>';
+            detailHtml += `<div class="bg-red-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-red-400 medical-field">${window.escapeHtml(rec.instructions)}</div>`;
+            detailHtml += '</div>';
+        }
+        // 複診時間
+        if (rec.followUpDate) {
+            detailHtml += '<div>';
+            detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">複診時間</span>';
+            try {
+                const followDate = new Date(rec.followUpDate);
+                detailHtml += `<div class="bg-purple-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-purple-400 medical-field">${followDate.toLocaleString(locale)}</div>`;
+            } catch (_err) {
+                detailHtml += `<div class="bg-purple-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-purple-400 medical-field">${window.escapeHtml(rec.followUpDate)}</div>`;
+            }
+            detailHtml += '</div>';
+        }
+        // 收費項目
+        if (rec.billingItems) {
+            detailHtml += '<div>';
+            detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">收費項目</span>';
+            detailHtml += `<div class="bg-green-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-green-400 whitespace-pre-line medical-field">${window.escapeHtml(rec.billingItems)}</div>`;
+            detailHtml += '</div>';
+        }
+        detailHtml += '</div>'; // 右欄結束
+        detailHtml += '</div>'; // grid 結束
+        detailHtml += '</div>'; // p-6 結束
+        detailHtml += '</div>'; // 卡片容器結束
+        // 將內容插入彈窗並顯示
+        const modal = document.getElementById('medicalRecordDetailModal');
+        const content = document.getElementById('medicalRecordDetailContent');
+        if (content) {
+            content.innerHTML = detailHtml;
+        }
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('檢視病歷記錄錯誤:', error);
+    }
+}
+
+/**
+ * 關閉病歷詳細資訊彈窗。
+ */
+function closeMedicalRecordDetail() {
+    const modal = document.getElementById('medicalRecordDetailModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
 // 為 HTML 內使用的函式建立全域引用。
 // 這些函式會被 HTML 屬性（例如 onclick、onkeypress）呼叫，若不掛在 window 上，瀏覽器會找不到對應函式。
 (function() {
@@ -18569,6 +18965,13 @@ document.addEventListener('DOMContentLoaded', function() {
   window.showAcupointComboModal = showAcupointComboModal;
   window.hideAcupointComboModal = hideAcupointComboModal;
   window.selectAcupointCombo = selectAcupointCombo;
+
+  // 病歷管理功能：將相關函式掛載至全域，供 HTML 直接調用。
+  // 這些函式負責載入病歷列表、顯示列表、檢視個別病歷以及關閉詳情彈窗。
+  window.loadMedicalRecordManagement = loadMedicalRecordManagement;
+  window.displayMedicalRecords = displayMedicalRecords;
+  window.viewMedicalRecord = viewMedicalRecord;
+  window.closeMedicalRecordDetail = closeMedicalRecordDetail;
 
   // 新增封裝函式：為常用藥方和穴位載入按鈕提供統一的讀取圈效果。
   // 與 openDiagnosisTemplate/openPrescriptionTemplate 風格一致，按下按鈕後顯示讀取圖示再開啟彈窗。
@@ -23175,25 +23578,3 @@ function hideGlobalCopyright() {
   window.startInactivityMonitoring = startInactivityMonitoring;
   window.stopInactivityMonitoring = stopInactivityMonitoring;
 })();
-
-// 覆寫病歷管理中的檢視功能，改為使用病人資料管理頁的病歷查看界面。
-// 這段程式碼在主要 IIFE 執行完成後定義，確保 showPatientMedicalHistory
-// 以及 currentPatientConsultations 等變數已存在於全域命名空間中。
-window.viewMedicalRecord = async function(recordId, patientId) {
-  try {
-    // 呼叫病人資料管理的病歷查看功能以載入病歷列表
-    await showPatientMedicalHistory(patientId);
-    // 查找指定病歷在目前病人所有病歷中的索引，並設定到對應頁面
-    if (typeof currentPatientConsultations !== 'undefined' && Array.isArray(currentPatientConsultations)) {
-      const idx = currentPatientConsultations.findIndex(c => String(c.id) === String(recordId));
-      if (idx >= 0) {
-        currentPatientHistoryPage = idx;
-        if (typeof displayPatientMedicalHistoryPage === 'function') {
-          displayPatientMedicalHistoryPage();
-        }
-      }
-    }
-  } catch (error) {
-    console.error('檢視病歷記錄錯誤:', error);
-  }
-};
