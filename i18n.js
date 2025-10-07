@@ -31,6 +31,9 @@ window.translations = {
         "有效套票": "有效套票",
         "下一頁": "下一頁",
         "上一頁": "上一頁",
+        // Pagination: first and last page labels
+        "最前一頁": "最前一頁",
+        "最後一頁": "最後一頁",
         "失效套票": "失效套票",
         "統計期間": "統計期間",
         "編輯收費項目": "編輯收費項目",
@@ -1002,6 +1005,9 @@ window.translations = {
         "有效套票": "Valid packages",
         "下一頁": "Next page",
         "上一頁": "Previous page",
+        // Pagination: first and last page labels
+        "最前一頁": "First page",
+        "最後一頁": "Last page",
         "失效套票": "Expired packages",
         "統計期間": "Statistical Period",
         "編輯收費項目": "Edit Fee Items",

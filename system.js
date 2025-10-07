@@ -207,6 +207,9 @@ function renderPagination(totalItems, itemsPerPage, currentPage, onPageChange, c
         });
         return btn;
     };
+    // 最前一頁按鈕
+    // 始終提供跳轉至第一頁的按鈕，若目前已在第一頁則禁用
+    container.appendChild(createBtn(1, '最前一頁', currentPage === 1));
     // 上一頁按鈕
     container.appendChild(createBtn(Math.max(1, currentPage - 1), '上一頁', currentPage === 1));
     // 決定要顯示的頁碼範圍，最多顯示 5 個頁碼
@@ -221,6 +224,9 @@ function renderPagination(totalItems, itemsPerPage, currentPage, onPageChange, c
     }
     // 下一頁按鈕
     container.appendChild(createBtn(Math.min(totalPages, currentPage + 1), '下一頁', currentPage === totalPages));
+    // 最後一頁按鈕
+    // 提供快速跳轉至最後一頁的按鈕，若目前已在最後一頁則禁用
+    container.appendChild(createBtn(totalPages, '最後一頁', currentPage === totalPages));
 }
 
 /**
