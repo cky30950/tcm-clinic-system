@@ -18574,6 +18574,26 @@ function displayMedicalRecords(pageChange = false) {
             return recordNum.includes(term) || patientName.includes(term) || doctorName.includes(term);
         });
     }
+    // 將過濾後的病歷依日期排序，最新日期優先。
+    // 透過 parseConsultationDate 解析 date、createdAt 或 updatedAt，若解析失敗視為 0。
+    try {
+        const getTimestamp = (rec) => {
+            try {
+                const raw = rec.date || rec.createdAt || rec.updatedAt || null;
+                const parsed = parseConsultationDate(raw);
+                return parsed && !isNaN(parsed.getTime()) ? parsed.getTime() : 0;
+            } catch (_err) {
+                return 0;
+            }
+        };
+        filtered = filtered.slice().sort((a, b) => {
+            const tA = getTimestamp(a);
+            const tB = getTimestamp(b);
+            return tB - tA;
+        });
+    } catch (_sortErr) {
+        // 忽略排序失敗
+    }
     if (!pageChange) {
         // 重置當前頁至第一頁
         if (paginationSettings.medicalRecordList) {
