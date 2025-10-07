@@ -5569,14 +5569,52 @@ function createAppointmentRow(appointment, patient, index) {
         doctorName = window.t ? window.t('未指定醫師') : '未指定醫師';
     }
     
+    // --------- 顯示病人姓名時加上性別 ---------
+    // 取得病人性別並根據語言顯示適當文字
+    let genderRaw = patient && patient.gender ? patient.gender : '';
+    let genderDisplay = genderRaw;
+    // 使用 window.t 進行翻譯；若未提供翻譯函式則回退為原始值
+    if (genderDisplay) {
+        try {
+            if (typeof window !== 'undefined' && typeof window.t === 'function') {
+                const translated = window.t(genderDisplay);
+                // window.t 可能返回與輸入不同的值
+                if (translated) {
+                    genderDisplay = translated;
+                }
+            }
+        } catch (e) {
+            // ignore translation error
+        }
+    }
+    // 若當前語言為英文，將不同表示方式統一為 Male 或 Female
+    try {
+        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+        const isEnglish = lang && lang.toLowerCase().startsWith('en');
+        if (isEnglish && genderDisplay) {
+            const gLower = genderDisplay.toLowerCase();
+            if (gLower === '男' || gLower === 'male' || gLower === 'm') {
+                genderDisplay = 'Male';
+            } else if (gLower === '女' || gLower === 'female' || gLower === 'f') {
+                genderDisplay = 'Female';
+            }
+        }
+    } catch (e) {
+        // ignore language detection errors
+    }
+    // 根據是否存在性別資訊構造姓名字串
+    const nameWithGender = genderDisplay ? `${patient.name} (${genderDisplay})` : patient.name;
+    // 為避免 XSS，使用 escapeHtml 轉義姓名及括號內容（若可用）
+    const safeNameWithGender = (typeof window !== 'undefined' && window.escapeHtml) ? window.escapeHtml(nameWithGender) : nameWithGender;
+
     const statusInfo = getStatusInfo(appointment.status);
     const operationButtons = getOperationButtons(appointment, patient); // 傳遞 patient 參數
-    
+
     return `
         <tr class="hover:bg-gray-50">
             <td class="px-4 py-3 text-sm text-gray-900 font-medium">${index + 1}</td>
             <td class="px-4 py-3 text-sm font-medium text-gray-900">
-                ${patient.name}
+                ${safeNameWithGender}
                 <div class="text-xs text-gray-500">${patient.patientNumber}</div>
             </td>
             <td class="px-4 py-3 text-sm text-gray-900">
