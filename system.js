@@ -5642,10 +5642,12 @@ function createAppointmentRow(appointment, patient, index) {
         const isEnglish = lang && lang.toLowerCase().startsWith('en');
         if (isEnglish && genderDisplay) {
             const gLower = genderDisplay.toLowerCase();
+            // In English, display abbreviated gender with single letter rather than full word.
+            // Treat various representations of male and female uniformly.
             if (gLower === '男' || gLower === 'male' || gLower === 'm') {
-                genderDisplay = 'Male';
+                genderDisplay = 'M';
             } else if (gLower === '女' || gLower === 'female' || gLower === 'f') {
-                genderDisplay = 'Female';
+                genderDisplay = 'F';
             }
         }
     } catch (e) {
