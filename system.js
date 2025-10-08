@@ -5876,13 +5876,8 @@ async function confirmPatientArrival(appointmentId) {
         setButtonLoading(loadingButton, '處理中...');
     }
     try {
-        // 從 Firebase 獲取病人資料
-        const result = await window.firebaseDataManager.getPatients();
-        if (!result.success) {
-            showToast('無法讀取病人資料！', 'error');
-            return;
-        }
-        const patient = result.data.find(p => p.id === appointment.patientId);
+        // 使用刷新方式取得病人資料
+        const patient = await getPatientByIdWithRefresh(appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -5962,13 +5957,8 @@ async function removeAppointment(appointmentId) {
         setButtonLoading(loadingButton, '處理中...');
     }
     try {
-        // 從 Firebase 獲取病人資料
-        const result = await window.firebaseDataManager.getPatients();
-        if (!result.success) {
-            showToast('無法讀取病人資料！', 'error');
-            return;
-        }
-        const patient = result.data.find(p => p.id === appointment.patientId);
+        // 使用刷新方式取得病人資料
+        const patient = await getPatientByIdWithRefresh(appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -6079,13 +6069,8 @@ async function startConsultation(appointmentId) {
         setButtonLoading(loadingButton, '處理中...');
     }
     try {
-        // 從 Firebase 獲取病人資料
-        const result = await window.firebaseDataManager.getPatients();
-        if (!result.success) {
-            showToast('無法讀取病人資料！', 'error');
-            return;
-        }
-        const patient = result.data.find(p => p.id === appointment.patientId);
+        // 使用刷新方式取得病人資料，避免病人列表尚未載入導致讀取失敗
+        const patient = await getPatientByIdWithRefresh(appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -6233,14 +6218,8 @@ async function startConsultation(appointmentId) {
 // 修復診症表單顯示函數
 async function showConsultationForm(appointment) {
     try {
-        // 從 Firebase 獲取病人資料
-        const result = await window.firebaseDataManager.getPatients();
-        if (!result.success) {
-            showToast('無法讀取病人資料！', 'error');
-            return;
-        }
-        
-        const patient = result.data.find(p => p.id === appointment.patientId);
+        // 使用刷新方式取得病人資料，避免病人列表尚未載入導致讀取失敗
+        const patient = await getPatientByIdWithRefresh(appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -6534,14 +6513,8 @@ async function showConsultationForm(appointment) {
                     currentConsultingAppointmentId = null;
                     return;
                 }
-                const patientResult = await window.firebaseDataManager.getPatients();
-                if (!patientResult.success) {
-                    showToast('無法讀取病人資料！', 'error');
-                    closeConsultationForm();
-                    currentConsultingAppointmentId = null;
-                    return;
-                }
-                const patient = patientResult.data.find(p => p.id === appointment.patientId);
+                // 使用刷新方式取得病人資料
+                const patient = await getPatientByIdWithRefresh(appointment.patientId);
                 if (!patient) {
                     showToast('找不到病人資料！', 'error');
                     closeConsultationForm();
@@ -6882,17 +6855,12 @@ async function saveConsultation() {
         
         async function showPatientMedicalHistory(patientId) {
     try {
-const patientResult = await window.firebaseDataManager.getPatients();
-if (!patientResult.success) {
-    showToast('無法讀取病人資料！', 'error');
-    return;
-}
-
-const patient = patientResult.data.find(p => p.id === patientId);
-if (!patient) {
-    showToast('找不到病人資料！', 'error');
-    return;
-}
+            // 使用刷新方式取得病人資料
+            const patient = await getPatientByIdWithRefresh(patientId);
+            if (!patient) {
+                showToast('找不到病人資料！', 'error');
+                return;
+            }
             
             // 獲取該病人的所有診症記錄（從 Firestore 取得）
             // 強制重新取得診症記錄，避免跨裝置快取不一致
@@ -7250,14 +7218,8 @@ async function viewPatientMedicalHistory(patientId) {
         setButtonLoading(loadingButton, '讀取中...');
     }
     try {
-        // 從 Firebase 獲取病人資料
-        const patientResult = await window.firebaseDataManager.getPatients();
-        if (!patientResult.success) {
-            showToast('無法讀取病人資料', 'error');
-            return;
-        }
-        
-        const patient = patientResult.data.find(p => p.id === patientId);
+        // 使用刷新方式取得單一病人資料，避免病人列表尚未載入導致讀取失敗
+        const patient = await getPatientByIdWithRefresh(patientId);
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -7842,14 +7804,8 @@ async function printConsultationRecord(consultationId, consultationData = null) 
     }
     
     try {
-        // 從 Firebase 獲取病人資料
-        const patientResult = await window.firebaseDataManager.getPatients();
-        if (!patientResult.success) {
-            showToast('無法讀取病人資料！', 'error');
-            return;
-        }
-        
-        const patient = patientResult.data.find(p => p.id === consultation.patientId);
+        // 使用刷新方式取得病人資料
+        const patient = await getPatientByIdWithRefresh(consultation.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -8359,14 +8315,8 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
     }
     
     try {
-        // 從 Firebase 獲取病人資料
-        const patientResult = await window.firebaseDataManager.getPatients();
-        if (!patientResult.success) {
-            showToast('無法讀取病人資料！', 'error');
-            return;
-        }
-        
-        const patient = patientResult.data.find(p => p.id === consultation.patientId);
+        // 使用刷新方式取得病人資料
+        const patient = await getPatientByIdWithRefresh(consultation.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -8745,13 +8695,8 @@ async function printSickLeave(consultationId, consultationData = null) {
     }
     
     try {            
-        const patientResult = await window.firebaseDataManager.getPatients();
-        if (!patientResult.success) {
-            showToast('無法讀取病人資料！', 'error');
-            return;
-        }
-
-        const patient = patientResult.data.find(p => p.id === consultation.patientId);
+        // 使用刷新方式取得病人資料
+        const patient = await getPatientByIdWithRefresh(consultation.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -9184,13 +9129,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         }
     }
     try {
-        // 讀取病人資料
-        const patientResult = await window.firebaseDataManager.getPatients();
-        if (!patientResult.success) {
-            showToast('無法讀取病人資料！', 'error');
-            return;
-        }
-        const patient = patientResult.data.find(p => p.id === consultation.patientId);
+        // 使用刷新方式取得病人資料
+        const patient = await getPatientByIdWithRefresh(consultation.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -9563,12 +9503,8 @@ async function withdrawConsultation(appointmentId) {
             showToast('找不到掛號記錄！', 'error');
             return;
         }
-        const patientResult = await window.firebaseDataManager.getPatients();
-        if (!patientResult.success) {
-            showToast('無法讀取病人資料！', 'error');
-            return;
-        }
-        const patient = patientResult.data.find(p => p.id === appointment.patientId);
+        // 使用刷新方式取得病人資料，避免病人列表尚未載入導致讀取失敗
+        const patient = await getPatientByIdWithRefresh(appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -9872,12 +9808,8 @@ async function editMedicalRecord(appointmentId) {
             showToast('找不到掛號記錄！', 'error');
             return;
         }
-        const patientResult = await window.firebaseDataManager.getPatients();
-        if (!patientResult.success) {
-            showToast('無法讀取病人資料！', 'error');
-            return;
-        }
-        const patient = patientResult.data.find(p => p.id === appointment.patientId);
+        // 使用刷新方式取得病人資料，避免病人列表尚未載入導致讀取失敗
+        const patient = await getPatientByIdWithRefresh(appointment.patientId);
         if (!patient) {
             showToast('找不到病人資料！', 'error');
             return;
@@ -13112,13 +13044,8 @@ async function initializeSystemAfterLogin() {
                 setButtonLoading(loadingButton, '讀取中...');
             }
             try {
-                const patientResult = await window.firebaseDataManager.getPatients();
-                if (!patientResult.success) {
-                    showToast('無法讀取病人資料！', 'error');
-                    return;
-                }
-                // 依據 appointment.patientId 找到病人
-                const patient = patientResult.data.find(p => p.id === appointment.patientId);
+                // 使用刷新方式取得病人資料，避免病人列表尚未載入導致讀取失敗
+                const patient = await getPatientByIdWithRefresh(appointment.patientId);
                 if (!patient) {
                     showToast('找不到病人資料！', 'error');
                     return;
@@ -13294,13 +13221,8 @@ async function initializeSystemAfterLogin() {
                 setButtonLoading(loadingButton, '讀取中...');
             }
             try {
-                const patientResult = await window.firebaseDataManager.getPatients();
-                if (!patientResult.success) {
-                    showToast('無法讀取病人資料！', 'error');
-                    return;
-                }
-                // 使用 appointment.patientId 取得病人資料
-                const patient = patientResult.data.find(p => p.id === appointment.patientId);
+                // 使用刷新方式取得病人資料，避免病人列表尚未載入導致讀取失敗
+                const patient = await getPatientByIdWithRefresh(appointment.patientId);
                 if (!patient) {
                     showToast('找不到病人資料！', 'error');
                     return;
@@ -13492,19 +13414,14 @@ function parseBillingItemsFromText(billingText) {
                 return;
             }
             
-const patientResult = await window.firebaseDataManager.getPatients();
-if (!patientResult.success) {
-    showToast('無法讀取病人資料！', 'error');
-    return;
-}
+            // 使用刷新方式取得病人資料，避免病人列表尚未載入導致讀取失敗
+            const patient = await getPatientByIdWithRefresh(consultation.patientId);
+            if (!patient) {
+                showToast('找不到病人資料！', 'error');
+                return;
+            }
 
-const patient = patientResult.data.find(p => p.id === consultation.patientId);
-if (!patient) {
-    showToast('找不到病人資料！', 'error');
-    return;
-}
-
-const consultationDate = (() => {
+            const consultationDate = (() => {
     const d = parseConsultationDate(consultation.date);
     return d ? d.toLocaleDateString('zh-TW') : '未知日期';
 })();
