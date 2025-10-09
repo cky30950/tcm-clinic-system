@@ -213,6 +213,38 @@
                 padding-left: 0.5rem !important;
                 padding-right: 0.5rem !important;
             }
+
+            /*
+             * 下拉選單樣式調整
+             *
+             * 在手機版面中，許多 <select> 元素會因為預設寬度或選項文字較長而超出容器，
+             * 導致橫向滾動或被截斷。為了改善在小螢幕上的呈現，
+             * 將所有 select（排除語言切換器 #languageSelector）設定為 100% 寬度、
+             * 同時將最小寬度設為 0，確保它們可以隨容器縮放。這能避免因內容過長而溢出框外。
+             *
+             * 另外，某些選單在桌面版使用 ml-auto 將其推到容器的右側，
+             * 在窄螢幕換行後會造成難以預料的位置偏移。透過移除 margin-left，讓
+             * 排序選單在換行時保持靠左對齊。
+             */
+            select:not(#languageSelector) {
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+            }
+            #herbSortSelect {
+                margin-left: 0 !important;
+            }
+            /* 指定部分自訂下拉選單的寬度，避免在小螢幕下造成水平滾動 */
+            #herbComboCategoryFilter,
+            #acupointComboCategoryFilter,
+            #diagnosisTemplateCategoryFilter,
+            #prescriptionTemplateCategoryFilter,
+            #holidaySelector,
+            #inventoryQuantityUnit,
+            #roleFilter,
+            #shiftTypeFilter {
+                width: 100% !important;
+            }
         }
     </style>
 </head>
