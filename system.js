@@ -1013,7 +1013,6 @@ async function fetchPatients(forceRefresh = false, pageNumber = null) {
         return await fetchPatientsPage(pageNumber, forceRefresh);
     }
     // 預設行為：從快取載入全部病人資料
-    // 透過 safeGetPatients 讀取病人列表，避免 DataManager 尚未定義時造成錯誤
     patientCache = await fetchDataWithCache(
         patientCache,
         () => safeGetPatients(),
@@ -1050,7 +1049,7 @@ async function getPatientByIdWithRefresh(id) {
         }
         // 仍未找到時，嘗試直接向 FirebaseDataManager 取得資料
         try {
-            // 確保 DataManager 就緒後再使用 safeGetPatients 取得完整病人列表
+            // 確保 DataManager 就緒後使用 safeGetPatients 取得完整病人列表
             if (typeof waitForFirebaseDataManager === 'function') {
                 await waitForFirebaseDataManager();
             }
@@ -2484,27 +2483,40 @@ async function waitForFirebaseDataManager() {
 }
 
 /**
- * 安全取得病人列表的輔助函式。
+ * 安全地取得病人列表。
  *
- * 某些情境下（例如頁面剛載入後立即操作掛號列表），
- * window.firebaseDataManager 可能尚未定義，或尚未完全初始化。
- * 如果直接存取 window.firebaseDataManager.getPatients 會產生錯誤。
- * 此函式會先等待 DataManager 初始化，再呼叫其 getPatients 方法。
+ * 本函式會先檢查 FirebaseDataManager 是否存在，僅在存在時才等待其初始化完成並呼叫 getPatients。
+ * 當 DataManager 尚未建立或無法存取時，直接回傳失敗結果，而不會造成頁面無限等待。
+ * 這可避免在登入頁或尚未初始化數據管理器的情況下呼叫相關函式時出現錯誤。
  *
- * @param {boolean} forceRefresh 是否強制重新載入資料
- * @returns {Promise<{success: boolean, data: Array}>} 病人列表查詢結果
+ * @param {boolean} forceRefresh 是否強制重新從資料庫載入
+ * @returns {Promise<{ success: boolean, data: Array }>} 病人列表資料
  */
 async function safeGetPatients(forceRefresh = false) {
   try {
-    // 確保 DataManager 已載入且就緒
-    if (typeof waitForFirebaseDataManager === 'function') {
-      await waitForFirebaseDataManager();
-    }
-    // 若 FirebaseDataManager 尚未可用，回傳失敗
+    // 如果數據管理器尚未建立，直接回傳失敗，避免等待
     if (!window.firebaseDataManager || typeof window.firebaseDataManager.getPatients !== 'function') {
       return { success: false, data: [] };
     }
-    return await window.firebaseDataManager.getPatients(forceRefresh);
+    // 等待 DataManager 就緒
+    if (typeof waitForFirebaseDataManager === 'function') {
+      try {
+        await waitForFirebaseDataManager();
+      } catch (_e) {
+        // 忽略等待中的錯誤，繼續執行
+      }
+    }
+    // 再次確認 DataManager 可用
+    if (!window.firebaseDataManager || typeof window.firebaseDataManager.getPatients !== 'function') {
+      return { success: false, data: [] };
+    }
+    // 呼叫原始 getPatients 取得資料
+    const result = await window.firebaseDataManager.getPatients(forceRefresh);
+    // 若結果為空或格式不正確仍回傳失敗狀態
+    if (result && typeof result.success === 'boolean' && Array.isArray(result.data)) {
+      return result;
+    }
+    return { success: false, data: [] };
   } catch (err) {
     console.error('safeGetPatients 發生錯誤:', err);
     return { success: false, data: [] };
@@ -5903,7 +5915,7 @@ async function confirmPatientArrival(appointmentId) {
         setButtonLoading(loadingButton, '處理中...');
     }
     try {
-        // 從 Firebase 獲取病人資料（使用 safeGetPatients 以避免 DataManager 尚未載入）
+        // 從 Firebase 獲取病人資料
         const result = await safeGetPatients();
         if (!result.success) {
             showToast('無法讀取病人資料！', 'error');
@@ -15127,7 +15139,6 @@ async function exportClinicBackup() {
         // 讀取病人與診症資料，並透過 fetchUsers() 取得用戶列表
         const [patientsRes, consultationsRes] = await Promise.all([
             safeGetPatients(),
-            // DataManager 仍需就緒才能取得診症資料，直接呼叫原函式
             (async () => {
                 await waitForFirebaseDataManager();
                 return await window.firebaseDataManager.getConsultations();
@@ -18541,7 +18552,7 @@ function loadMedicalRecordManagement() {
             searchInput.addEventListener('input', listener);
             searchInput._medicalRecordListener = listener;
         }
-        // 同時讀取診症記錄與病人列表
+        // 同時讀取診症記錄與病人列表（使用安全方法等待 DataManager 就緒）
         Promise.all([
             window.firebaseDataManager && typeof window.firebaseDataManager.getConsultations === 'function'
                 ? (async () => {
@@ -18549,7 +18560,7 @@ function loadMedicalRecordManagement() {
                       return await window.firebaseDataManager.getConsultations(true);
                   })()
                 : { success: false, data: [] },
-            // 使用安全的取值方法讀取病人資料
+            // 使用 safeGetPatients 以避免 DataManager 尚未載入
             safeGetPatients(true)
         ]).then(([consRes, patientsRes]) => {
             medicalRecords = (consRes && consRes.success && Array.isArray(consRes.data)) ? consRes.data : [];
