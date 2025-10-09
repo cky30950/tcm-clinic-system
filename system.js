@@ -3914,8 +3914,9 @@ async function deletePatient(id) {
 
         // 刪除病人確認訊息支援中英文
         const lang = localStorage.getItem('lang') || 'zh';
-        const zhConfirmMsg = `確定要刪除病人「${patient.name}」的資料嗎？\n\n注意：相關的診症記錄及套票也會一併刪除！`;
-        const enConfirmMsg = `Are you sure you want to delete the patient \"${patient.name}\"?\n\nNote: related consultation records and packages will also be deleted.`;
+        // 刪除病人時提醒同時刪除診症記錄、掛號和套票
+        const zhConfirmMsg = `確定要刪除病人「${patient.name}」的資料嗎？\n\n注意：相關的診症記錄、掛號及套票也會一併刪除！`;
+        const enConfirmMsg = `Are you sure you want to delete the patient \"${patient.name}\"?\n\nNote: related consultation records, appointments and packages will also be deleted.`;
         const confirmMessage = lang === 'en' ? enConfirmMsg : zhConfirmMsg;
         if (confirm(confirmMessage)) {
             // 顯示刪除中狀態
@@ -3944,9 +3945,16 @@ async function deletePatient(id) {
                     patientPageCursors = {};
                 }
                 patientsCountCache = null;
-                // 重新載入病人列表
-                await loadPatientListFromFirebase();
-                updateStatistics();
+            // 重新載入病人列表並更新統計後，重新載入今日掛號，以清除刪除病人對應的掛號
+            await loadPatientListFromFirebase();
+            updateStatistics();
+            try {
+                if (typeof loadTodayAppointments === 'function') {
+                    await loadTodayAppointments();
+                }
+            } catch (_e) {
+                // 忽略掛號載入失敗
+            }
             } else {
                 showToast('刪除失敗，請稍後再試', 'error');
             }
@@ -4012,6 +4020,47 @@ async function deletePatientAssociatedData(patientId) {
             }
         } catch (err) {
             console.error('查詢或刪除患者套票失敗:', err);
+        }
+
+        // 刪除掛號記錄
+        try {
+            // 等待 DataManager 就緒，以確保可取得和刪除掛號資料
+            if (typeof waitForFirebaseDataManager === 'function') {
+                try {
+                    await waitForFirebaseDataManager();
+                } catch (_e) {
+                    // 忽略等待錯誤
+                }
+            }
+            // 從 Firebase Realtime Database 取得所有掛號
+            let apptRes = null;
+            try {
+                apptRes = await window.firebaseDataManager.getAppointments();
+            } catch (getErr) {
+                console.error('讀取掛號記錄失敗:', getErr);
+            }
+            if (apptRes && apptRes.success && Array.isArray(apptRes.data)) {
+                // 找出符合病人 ID 的掛號
+                const apptsToDelete = apptRes.data.filter(ap => ap && String(ap.patientId) === String(patientId));
+                for (const ap of apptsToDelete) {
+                    try {
+                        await window.firebaseDataManager.deleteAppointment(String(ap.id));
+                    } catch (delErr) {
+                        console.error('刪除掛號記錄失敗:', delErr);
+                    }
+                }
+            }
+            // 移除本地快取及儲存的掛號
+            try {
+                if (Array.isArray(appointments)) {
+                    appointments = appointments.filter(ap => ap && String(ap.patientId) !== String(patientId));
+                }
+                localStorage.setItem('appointments', JSON.stringify(appointments));
+            } catch (_lsErr) {
+                // 忽略本地快取寫入失敗
+            }
+        } catch (err) {
+            console.error('查詢或刪除掛號記錄失敗:', err);
         }
     } catch (error) {
         console.error('刪除病人相關資料時發生錯誤:', error);
