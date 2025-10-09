@@ -2806,7 +2806,13 @@
              * Tailwind’s z-50 utility class. Setting the staff panel below
              * this value ensures the sidebar remains on top when open.
              */
-            z-index: 40;
+            /*
+             * Lower the z-index further so that the sidebar overlay (which uses
+             * Tailwind’s z-40 class) appears on top when the clinic functions
+             * sidebar is open. A lower z-index prevents the staff panel from
+             * blocking the dark overlay effect.
+             */
+            z-index: 30;
         }
 
 #scheduleManagement .staff-panel h3 {
