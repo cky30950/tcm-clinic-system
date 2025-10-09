@@ -5485,6 +5485,29 @@ async function loadConsultationForEdit(consultationId) {
             document.getElementById('formTreatmentCourse').value = consultation.treatmentCourse || '';
             document.getElementById('formInstructions').value = consultation.instructions || '';
             document.getElementById('formFollowUpDate').value = consultation.followUpDate || '';
+
+            // 載入已保存的服藥天數與每日服藥次數，以避免預設值覆蓋原始資料
+            try {
+                const daysInputEl = document.getElementById('medicationDays');
+                if (daysInputEl) {
+                    if (consultation.medicationDays !== undefined && consultation.medicationDays !== null) {
+                        daysInputEl.value = consultation.medicationDays;
+                    } else {
+                        // 若未設定，使用空字串表示未定義
+                        daysInputEl.value = '';
+                    }
+                }
+                const freqInputEl = document.getElementById('medicationFrequency');
+                if (freqInputEl) {
+                    if (consultation.medicationFrequency !== undefined && consultation.medicationFrequency !== null) {
+                        freqInputEl.value = consultation.medicationFrequency;
+                    } else {
+                        freqInputEl.value = '';
+                    }
+                }
+            } catch (_e) {
+                console.warn('載入診症記錄時設定服藥天數與每日次數失敗:', _e);
+            }
             
             // 處理到診時間 - 支援多種日期格式
             if (consultation.visitTime) {
@@ -6815,7 +6838,25 @@ async function saveConsultation() {
                 // Update local cache if present
                 const idx = consultations.findIndex(c => String(c.id) === String(appointment.consultationId));
                 if (idx >= 0) {
+                    // Merge the updated fields back into the local consultations array
                     consultations[idx] = { ...consultations[idx], ...consultationData, updatedAt: new Date(), updatedBy: currentUser };
+                }
+                // Persist updated consultations to localStorage so that subsequent reads (e.g. printing) use the latest values
+                try {
+                    localStorage.setItem('consultations', JSON.stringify(consultations));
+                } catch (_lsErr) {
+                    // ignore localStorage write errors
+                }
+                // Also update FirebaseDataManager's consultations cache if it exists to keep in-memory cache in sync
+                try {
+                    if (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.consultationsCache)) {
+                        const cacheIdx = window.firebaseDataManager.consultationsCache.findIndex(c => String(c.id) === String(appointment.consultationId));
+                        if (cacheIdx >= 0) {
+                            window.firebaseDataManager.consultationsCache[cacheIdx] = { ...window.firebaseDataManager.consultationsCache[cacheIdx], ...consultationData, updatedAt: new Date(), updatedBy: currentUser };
+                        }
+                    }
+                } catch (_cacheErr) {
+                    // ignore cache update errors
                 }
                 // 更新掛號資料中的主訴內容，確保掛號列表顯示最新的主訴
                 appointment.chiefComplaint = symptoms;
@@ -6848,6 +6889,34 @@ async function saveConsultation() {
                 showToast('診症記錄已保存！', 'success');
                 // 記錄新產生的診症 ID 供後續庫存更新
                 newConsultationIdForInventory = result.id;
+
+                // 將新增的診症記錄加入本地 consultations 陣列並更新快取
+                try {
+                    // 組合新的診症記錄物件（含 ID），並合併 consultationData
+                    const newRecord = { id: result.id, ...consultationData, createdAt: new Date(), updatedAt: new Date(), updatedBy: currentUser };
+                    // 若 consultations 為陣列則新增至結尾
+                    if (Array.isArray(consultations)) {
+                        consultations.push(newRecord);
+                    } else {
+                        consultations = [newRecord];
+                    }
+                    // 寫入 localStorage
+                    try {
+                        localStorage.setItem('consultations', JSON.stringify(consultations));
+                    } catch (_lsErr2) {
+                        // 忽略寫入失敗
+                    }
+                    // 更新 FirebaseDataManager 的 consultationsCache 以保持緩存同步
+                    try {
+                        if (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.consultationsCache)) {
+                            window.firebaseDataManager.consultationsCache.push(newRecord);
+                        }
+                    } catch (_cacheErr2) {
+                        // 忽略快取更新錯誤
+                    }
+                } catch (_e2) {
+                    // 忽略任何新增本地快取時的錯誤
+                }
             } else {
                 showToast('保存診症記錄失敗，請稍後再試', 'error');
             }
@@ -7929,19 +7998,14 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         }
 
         // 取得服藥天數與每日次數，供收據顯示使用
+        // 優先使用診症紀錄中的 medicationDays/medicationFrequency；當無對應值時，以空字串代表未定義
         let medDays = '';
         let medFreq = '';
-        try {
-            const daysEl = document.getElementById('medicationDays');
-            if (daysEl) {
-                medDays = daysEl.value;
-            }
-            const freqEl = document.getElementById('medicationFrequency');
-            if (freqEl) {
-                medFreq = freqEl.value;
-            }
-        } catch (_e) {
-            // 若無法取得元素，保持預設空值
+        if (consultation && consultation.medicationDays && Number(consultation.medicationDays) > 0) {
+            medDays = consultation.medicationDays;
+        }
+        if (consultation && consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
+            medFreq = consultation.medicationFrequency;
         }
         // 組合顯示字串：若天數或次數存在，分別加上標籤與單位；若有服用方法則附加。
         let medInfoHtml = '';
@@ -9320,20 +9384,14 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             // 無處方內容
             prescriptionHtml = '無記錄';
         }
-        // 組合服藥資訊
+        // 組合服藥資訊，優先使用診症記錄中的 medicationDays/medicationFrequency；若無則保持空值
         let medDays = '';
         let medFreq = '';
-        try {
-            const daysEl = document.getElementById('medicationDays');
-            if (daysEl) {
-                medDays = daysEl.value;
-            }
-            const freqEl = document.getElementById('medicationFrequency');
-            if (freqEl) {
-                medFreq = freqEl.value;
-            }
-        } catch (_e) {
-            // 若無法取得元素，保持預設空值
+        if (consultation && consultation.medicationDays && Number(consultation.medicationDays) > 0) {
+            medDays = consultation.medicationDays;
+        }
+        if (consultation && consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
+            medFreq = consultation.medicationFrequency;
         }
         // 根據語言動態組合服藥資訊並翻譯標籤
         const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
