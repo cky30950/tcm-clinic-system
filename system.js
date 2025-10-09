@@ -1013,9 +1013,10 @@ async function fetchPatients(forceRefresh = false, pageNumber = null) {
         return await fetchPatientsPage(pageNumber, forceRefresh);
     }
     // 預設行為：從快取載入全部病人資料
+    // 使用 safeGetPatients 時將 forceRefresh 傳入，以便在跨裝置操作時能強制從後端載入資料
     patientCache = await fetchDataWithCache(
         patientCache,
-        () => safeGetPatients(),
+        () => safeGetPatients(forceRefresh),
         forceRefresh
     );
     return patientCache;
@@ -1053,7 +1054,8 @@ async function getPatientByIdWithRefresh(id) {
             if (typeof waitForFirebaseDataManager === 'function') {
                 await waitForFirebaseDataManager();
             }
-            const result = await safeGetPatients();
+            // 在跨裝置情況下強制從後端重新讀取病人資料，以獲取最新資訊
+            const result = await safeGetPatients(true);
             if (result && result.success && Array.isArray(result.data)) {
                 const found3 = result.data.find(p => p && String(p.id) === idStr);
                 if (found3) {
@@ -2494,16 +2496,25 @@ async function waitForFirebaseDataManager() {
  */
 async function safeGetPatients(forceRefresh = false) {
   try {
-    // 如果數據管理器尚未建立，直接回傳失敗，避免等待
+    // 若數據管理器尚未建立，嘗試等待其建立，但不超過指定時間，避免在登入頁卡住
     if (!window.firebaseDataManager || typeof window.firebaseDataManager.getPatients !== 'function') {
-      return { success: false, data: [] };
+      const startTime = Date.now();
+      const maxWait = 3000; // 最多等待 3 秒
+      // 等待數據管理器初始化
+      while ((!window.firebaseDataManager || typeof window.firebaseDataManager.getPatients !== 'function') && (Date.now() - startTime < maxWait)) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      // 若仍未建立，直接回傳失敗，避免等待過久
+      if (!window.firebaseDataManager || typeof window.firebaseDataManager.getPatients !== 'function') {
+        return { success: false, data: [] };
+      }
     }
-    // 等待 DataManager 就緒
+    // 等待 DataManager 就緒（isReady），確保可以正常取得資料
     if (typeof waitForFirebaseDataManager === 'function') {
       try {
         await waitForFirebaseDataManager();
       } catch (_e) {
-        // 忽略等待中的錯誤，繼續執行
+        // 忽略等待錯誤，繼續執行
       }
     }
     // 再次確認 DataManager 可用
@@ -3477,7 +3488,8 @@ async function savePatient() {
         // 從 Firebase 生成病人編號
 async function generatePatientNumberFromFirebase() {
     try {
-        const result = await safeGetPatients();
+        // 取得病人列表時強制刷新，避免跨裝置快取導致取得舊病人數
+        const result = await safeGetPatients(true);
         if (!result.success) {
             return 'P000001'; // 如果無法讀取，使用預設編號
         }
@@ -5939,7 +5951,8 @@ async function confirmPatientArrival(appointmentId) {
     }
     try {
         // 從 Firebase 獲取病人資料
-        const result = await safeGetPatients();
+        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+        const result = await safeGetPatients(true);
         if (!result.success) {
             showToast('無法讀取病人資料！', 'error');
             return;
@@ -6025,7 +6038,8 @@ async function removeAppointment(appointmentId) {
     }
     try {
         // 從 Firebase 獲取病人資料
-        const result = await safeGetPatients();
+        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+        const result = await safeGetPatients(true);
         if (!result.success) {
             showToast('無法讀取病人資料！', 'error');
             return;
@@ -6142,7 +6156,8 @@ async function startConsultation(appointmentId) {
     }
     try {
         // 從 Firebase 獲取病人資料
-        const result = await safeGetPatients();
+        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+        const result = await safeGetPatients(true);
         if (!result.success) {
             showToast('無法讀取病人資料！', 'error');
             return;
@@ -6296,7 +6311,8 @@ async function startConsultation(appointmentId) {
 async function showConsultationForm(appointment) {
     try {
         // 從 Firebase 獲取病人資料
-        const result = await safeGetPatients();
+        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+        const result = await safeGetPatients(true);
         if (!result.success) {
             showToast('無法讀取病人資料！', 'error');
             return;
@@ -6596,7 +6612,8 @@ async function showConsultationForm(appointment) {
                     currentConsultingAppointmentId = null;
                     return;
                 }
-                const patientResult = await safeGetPatients();
+                // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+                const patientResult = await safeGetPatients(true);
                 if (!patientResult.success) {
                     showToast('無法讀取病人資料！', 'error');
                     closeConsultationForm();
@@ -6990,7 +7007,8 @@ async function saveConsultation() {
         
         async function showPatientMedicalHistory(patientId) {
     try {
-const patientResult = await safeGetPatients();
+// 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+const patientResult = await safeGetPatients(true);
 if (!patientResult.success) {
     showToast('無法讀取病人資料！', 'error');
     return;
@@ -7359,7 +7377,8 @@ async function viewPatientMedicalHistory(patientId) {
     }
     try {
         // 從 Firebase 獲取病人資料
-        const patientResult = await safeGetPatients();
+        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+        const patientResult = await safeGetPatients(true);
         if (!patientResult.success) {
             showToast('無法讀取病人資料', 'error');
             return;
@@ -7951,7 +7970,8 @@ async function printConsultationRecord(consultationId, consultationData = null) 
     
     try {
         // 從 Firebase 獲取病人資料
-        const patientResult = await safeGetPatients();
+        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+        const patientResult = await safeGetPatients(true);
         if (!patientResult.success) {
             showToast('無法讀取病人資料！', 'error');
             return;
@@ -8463,7 +8483,8 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
     
     try {
         // 從 Firebase 獲取病人資料
-        const patientResult = await safeGetPatients();
+        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+        const patientResult = await safeGetPatients(true);
         if (!patientResult.success) {
             showToast('無法讀取病人資料！', 'error');
             return;
@@ -8848,7 +8869,8 @@ async function printSickLeave(consultationId, consultationData = null) {
     }
     
     try {            
-        const patientResult = await safeGetPatients();
+        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+        const patientResult = await safeGetPatients(true);
         if (!patientResult.success) {
             showToast('無法讀取病人資料！', 'error');
             return;
@@ -9288,7 +9310,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
     }
     try {
         // 讀取病人資料
-        const patientResult = await safeGetPatients();
+        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+        const patientResult = await safeGetPatients(true);
         if (!patientResult.success) {
             showToast('無法讀取病人資料！', 'error');
             return;
@@ -9660,7 +9683,8 @@ async function withdrawConsultation(appointmentId) {
             showToast('找不到掛號記錄！', 'error');
             return;
         }
-        const patientResult = await safeGetPatients();
+        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+        const patientResult = await safeGetPatients(true);
         if (!patientResult.success) {
             showToast('無法讀取病人資料！', 'error');
             return;
@@ -9969,7 +9993,8 @@ async function editMedicalRecord(appointmentId) {
             showToast('找不到掛號記錄！', 'error');
             return;
         }
-        const patientResult = await safeGetPatients();
+        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+        const patientResult = await safeGetPatients(true);
         if (!patientResult.success) {
             showToast('無法讀取病人資料！', 'error');
             return;
@@ -13209,7 +13234,8 @@ async function initializeSystemAfterLogin() {
                 setButtonLoading(loadingButton, '讀取中...');
             }
             try {
-                const patientResult = await safeGetPatients();
+                // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+                const patientResult = await safeGetPatients(true);
                 if (!patientResult.success) {
                     showToast('無法讀取病人資料！', 'error');
                     return;
@@ -13391,7 +13417,8 @@ async function initializeSystemAfterLogin() {
                 setButtonLoading(loadingButton, '讀取中...');
             }
             try {
-                const patientResult = await safeGetPatients();
+                // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+                const patientResult = await safeGetPatients(true);
                 if (!patientResult.success) {
                     showToast('無法讀取病人資料！', 'error');
                     return;
@@ -13589,7 +13616,8 @@ function parseBillingItemsFromText(billingText) {
                 return;
             }
             
-const patientResult = await safeGetPatients();
+// 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
+const patientResult = await safeGetPatients(true);
 if (!patientResult.success) {
     showToast('無法讀取病人資料！', 'error');
     return;
@@ -15196,7 +15224,8 @@ async function exportClinicBackup() {
         // 讀取病人、診症記錄與用戶資料
         // 讀取病人與診症資料，並透過 fetchUsers() 取得用戶列表
         const [patientsRes, consultationsRes] = await Promise.all([
-            safeGetPatients(),
+            // 強制刷新以取得最新病人資料
+            safeGetPatients(true),
             (async () => {
                 await waitForFirebaseDataManager();
                 return await window.firebaseDataManager.getConsultations();
