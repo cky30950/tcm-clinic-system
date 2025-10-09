@@ -3256,7 +3256,10 @@ async function logout() {
         // 隱藏所有區域
         function hideAllSections() {
             // 隱藏所有區域，包括新增的個人設置與模板庫管理
-            ['patientManagement', 'consultationSystem', 'herbLibrary', 'acupointLibrary', 'scheduleManagement', 'medicalRecordManagement', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'templateLibrary', 'welcomePage'].forEach(id => {
+            // 按照新的側邊選單排序隱藏區域：
+            // 病歷管理應位於診症系統之後，模板庫應位於穴位庫之後。
+            // 因此調整順序為 patientManagement -> consultationSystem -> medicalRecordManagement -> herbLibrary -> acupointLibrary -> templateLibrary -> scheduleManagement -> 其他管理項
+            ['patientManagement', 'consultationSystem', 'medicalRecordManagement', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'personalSettings', 'personalStatistics', 'accountSecurity', 'welcomePage'].forEach(id => {
                 // 在隱藏中藥庫時，取消其資料監聽以減少 Realtime Database 讀取
                 if (id === 'herbLibrary') {
                     try {
