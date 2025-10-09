@@ -3693,17 +3693,16 @@ function renderPatientListTable(pageChange = false) {
             }
         }
         const safeCreatedAt = window.escapeHtml(createdAtDateStr || '');
-        // 調整操作按鈕顏色為較淡的配色，降低視覺突兀感
-        // 使用較淡的背景色，使操作按鈕視覺上更柔和
+        // 使用與掛號系統相同的淺色配色：淡色背景搭配深色文字
         let actions = `
-                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-400 hover:bg-blue-500 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">查看</button>
-                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-400 hover:bg-purple-500 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
-                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-400 hover:bg-green-500 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
+                <button onclick="handleViewPatient(event, '${patient.id}')" class="text-blue-600 hover:text-blue-800 bg-blue-50 w-14 px-2 py-1 rounded text-xs transition duration-200">查看</button>
+                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="text-purple-600 hover:text-purple-800 bg-purple-50 w-14 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
+                <button onclick="handleEditPatient(event, '${patient.id}')" class="text-green-600 hover:text-green-800 bg-green-50 w-14 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
         `;
         if (showDelete) {
-            // 刪除按鈕也採用淡色配色
+            // 刪除按鈕也採用淺色配色
             actions += `
-                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-400 hover:bg-red-500 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
+                <button onclick="handleDeletePatient(event, '${patient.id}')" class="text-red-600 hover:text-red-800 bg-red-50 w-14 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
             `;
         }
         row.innerHTML = `
@@ -3825,14 +3824,14 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
         const safeCreatedAt = window.escapeHtml(createdAtDateStr || '');
         // 使用較淡的背景色使按鈕不那麼鮮艷
         let actions = `
-                <button onclick="handleViewPatient(event, '${patient.id}')" class="bg-blue-400 hover:bg-blue-500 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">查看</button>
-                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="bg-purple-400 hover:bg-purple-500 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
-                <button onclick="handleEditPatient(event, '${patient.id}')" class="bg-green-400 hover:bg-green-500 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
+                <button onclick="handleViewPatient(event, '${patient.id}')" class="text-blue-600 hover:text-blue-800 bg-blue-50 w-14 px-2 py-1 rounded text-xs transition duration-200">查看</button>
+                <button onclick="handleShowMedicalHistory(event, '${patient.id}')" class="text-purple-600 hover:text-purple-800 bg-purple-50 w-14 px-2 py-1 rounded text-xs transition duration-200">病歷</button>
+                <button onclick="handleEditPatient(event, '${patient.id}')" class="text-green-600 hover:text-green-800 bg-green-50 w-14 px-2 py-1 rounded text-xs transition duration-200">編輯</button>
         `;
         if (showDelete) {
             // 刪除按鈕使用淡色配色，與其他操作一致
             actions += `
-                <button onclick="handleDeletePatient(event, '${patient.id}')" class="bg-red-400 hover:bg-red-500 text-white w-14 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
+                <button onclick="handleDeletePatient(event, '${patient.id}')" class="text-red-600 hover:text-red-800 bg-red-50 w-14 px-2 py-1 rounded text-xs transition duration-200">刪除</button>
             `;
         }
         row.innerHTML = `
