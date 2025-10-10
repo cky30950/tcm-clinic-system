@@ -4164,7 +4164,8 @@ async function viewPatient(id) {
             </div>
             <div id="patientConsultationSummary">
                 <div class="text-center py-4">
-                    <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                    <!-- 使用較大的讀取圈以與其他頁面一致 -->
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                     <div class="mt-2 text-sm">${lblLoadingConsultations}</div>
                 </div>
             </div>
@@ -4662,10 +4663,10 @@ async function searchPatientsForRegistration() {
         return;
     }
     
-    // 顯示載入中
+    // 顯示載入中，使用大讀取圈以統一風格
     resultsList.innerHTML = `
         <div class="p-4 text-center text-gray-500">
-            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             <div class="mt-2">搜尋中...</div>
         </div>
     `;
@@ -5224,6 +5225,23 @@ async function loadTodayAppointments() {
         } catch (error) {
             console.error('讀取掛號資料錯誤:', error);
         }
+    }
+
+    // 取得掛號列表容器並先顯示大讀取圈。
+    try {
+        const tbodyLoading = document.getElementById('todayAppointmentsList');
+        if (tbodyLoading) {
+            tbodyLoading.innerHTML = `
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                        <div class="mt-2">載入中...</div>
+                    </td>
+                </tr>
+            `;
+        }
+    } catch (_err) {
+        // 如果渲染讀取圈失敗，不影響後續流程
     }
 
     // 根據日期選擇器決定要顯示的日期；若未選擇則使用今日
@@ -10540,7 +10558,8 @@ async function loadPatientConsultationSummary(patientId) {
                     <!-- 使用動態渲染的套票區塊，初始顯示載入中動畫 -->
                     <div id="packageStatusContent">
                         <div class="text-center py-4">
-                            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                            <!-- 使用較大的讀取圈以與其他頁面一致 -->
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                             <div class="mt-2 text-sm">載入套票資料中...</div>
                         </div>
                     </div>
@@ -10597,7 +10616,8 @@ async function loadPatientConsultationSummary(patientId) {
                 <!-- 使用動態渲染的套票區塊，初始顯示載入中動畫 -->
                 <div id="packageStatusContent">
                     <div class="text-center py-4">
-                        <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                        <!-- 使用較大的讀取圈以與其他頁面一致 -->
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                         <div class="mt-2 text-sm">載入套票資料中...</div>
                     </div>
                 </div>
