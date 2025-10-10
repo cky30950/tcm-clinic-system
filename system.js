@@ -5802,7 +5802,7 @@ function createAppointmentRow(appointment, patient, index) {
             <td class="px-4 py-3 text-sm text-gray-900 font-medium">${index + 1}</td>
             <td class="px-4 py-3 text-sm font-medium text-gray-900">
                 ${safeNameWithGender}
-                <div class="text-xs text-gray-500">${patient.patientNumber}</div>
+                <!-- Removed patient number display -->
             </td>
             <td class="px-4 py-3 text-sm text-gray-900">
                 <div class="font-medium text-blue-600">${doctorName}</div>
@@ -6378,8 +6378,8 @@ async function showConsultationForm(appointment) {
         }
         
         // 設置病人資訊
-        // 顯示病人姓名與編號
-        document.getElementById('formPatientName').textContent = `${patient.name} (${patient.patientNumber})`;
+        // 僅顯示病人姓名，不顯示病人編號
+        document.getElementById('formPatientName').textContent = `${patient.name}`;
         // 顯示掛號時間
         document.getElementById('formAppointmentTime').textContent = new Date(appointment.appointmentTime).toLocaleString('zh-TW');
         // 顯示病人年齡，若沒有出生日期則顯示「未知」
@@ -7100,10 +7100,7 @@ if (!patient) {
             // 顯示病人基本資訊
             document.getElementById('patientMedicalHistoryPatientInfo').innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                    <div>
-                        <span class="font-medium text-gray-700">病人編號：</span>
-                        <span class="text-blue-600 font-semibold">${patient.patientNumber}</span>
-                    </div>
+                    <!-- 病人編號顯示已移除 -->
                     <div>
                         <span class="font-medium text-gray-700">姓名：</span>
                         <span class="font-semibold">${patient.name}</span>
@@ -7474,10 +7471,7 @@ async function viewPatientMedicalHistory(patientId) {
         // 顯示病人基本資訊
         document.getElementById('medicalHistoryPatientInfo').innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                <div>
-                    <span class="font-medium text-gray-700">病人編號：</span>
-            <span class="text-blue-600 font-semibold">${window.escapeHtml(patient.patientNumber)}</span>
-                </div>
+                <!-- 病人編號顯示已移除 -->
                 <div>
                     <span class="font-medium text-gray-700">姓名：</span>
             <span class="font-semibold">${window.escapeHtml(patient.name)}</span>
@@ -8326,10 +8320,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                             <span class="info-label">${TR.medicalRecordNo}${colon}</span>
                             <span>${consultation.medicalRecordNumber || consultation.id}</span>
                         </div>
-                        <div class="info-row">
-                            <span class="info-label">${TR.patientNumber}${colon}</span>
-                            <span>${patient.patientNumber}</span>
-                        </div>
+                        <!-- 移除病人編號行 -->
                         <div class="info-row">
                             <span class="info-label">${TR.consultationDate}${colon}</span>
                             <span>${consultationDate.toLocaleDateString(dateLocale, {
@@ -9649,7 +9640,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     <div class="patient-info">
                         <div class="info-row"><span class="info-label">${PI.patientName}${colon}</span><span>${patient.name}</span></div>
                         <div class="info-row"><span class="info-label">${PI.medicalRecordNo}${colon}</span><span>${consultation.medicalRecordNumber || consultation.id}</span></div>
-                        ${patient.patientNumber ? `<div class="info-row"><span class="info-label">${PI.patientNo}${colon}</span><span>${patient.patientNumber}</span></div>` : ''}
+                        <!-- 病人編號行已移除 -->
                         <div class="info-row"><span class="info-label">${PI.consultationDate}${colon}</span><span>${consultationDate.toLocaleDateString(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit' })}</span></div>
                         <div class="info-row"><span class="info-label">${PI.consultationTime}${colon}</span><span>${consultationDate.toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}</span></div>
                         <div class="info-row"><span class="info-label">${PI.doctor}${colon}</span><span>${getDoctorDisplayName(consultation.doctor)}</span></div>
