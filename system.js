@@ -12110,6 +12110,8 @@ async function initializeSystemAfterLogin() {
                 }
                 hideAddBillingItemForm();
                 displayBillingItems();
+                // 新增或更新收費項目後，標記已載入，避免診症搜尋時判定為未載入
+                billingItemsLoaded = true;
             } finally {
                 // 恢復按鈕狀態與內容
                 clearButtonLoading(saveBtn);
@@ -12724,25 +12726,37 @@ async function initializeSystemAfterLogin() {
         }
         
         // 收費項目搜索功能
-        function searchBillingForConsultation() {
+async function searchBillingForConsultation() {
             const searchTerm = document.getElementById('billingSearch').value.trim().toLowerCase();
             const resultsContainer = document.getElementById('billingSearchResults');
             const resultsList = document.getElementById('billingSearchList');
-            
+
             if (searchTerm.length < 1) {
                 resultsContainer.classList.add('hidden');
                 return;
             }
-            
+
+            // 確保收費項目資料已載入。若尚未載入，呼叫初始化函式載入本地或遠端資料。
+            try {
+                if (typeof initBillingItems === 'function' && !billingItemsLoaded) {
+                    await initBillingItems();
+                }
+            } catch (err) {
+                console.error('載入收費項目資料時發生錯誤:', err);
+            }
+
+            // 檢查是否仍無資料，避免搜尋出現空白
+            const itemsForSearch = Array.isArray(billingItems) ? billingItems : [];
+
             // 搜索匹配的收費項目（只顯示啟用的項目）
-            const matchedItems = billingItems.filter(item => 
-                item.active && (
-                    item.name.toLowerCase().includes(searchTerm) ||
+            const matchedItems = itemsForSearch.filter(item => 
+                item && item.active && (
+                    (item.name && item.name.toLowerCase().includes(searchTerm)) ||
                     (item.description && item.description.toLowerCase().includes(searchTerm))
                 )
             ).slice(0, 10); // 限制顯示前10個結果
-            
-            if (matchedItems.length === 0) {
+
+            if (!matchedItems || matchedItems.length === 0) {
                 resultsList.innerHTML = `
                     <div class="p-3 text-center text-gray-500 text-sm">
                         找不到符合條件的收費項目
@@ -12751,7 +12765,7 @@ async function initializeSystemAfterLogin() {
                 resultsContainer.classList.remove('hidden');
                 return;
             }
-            
+
             // 顯示搜索結果
             resultsList.innerHTML = matchedItems.map(item => {
                 const categoryNames = {
@@ -12765,7 +12779,7 @@ async function initializeSystemAfterLogin() {
                 };
                 const categoryName = categoryNames[item.category] || '未分類';
                 const bgColor = getCategoryBgColor(item.category);
-                
+
                 return `
                     <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToBilling('${item.id}')">
                         <div class="text-center">
@@ -12782,7 +12796,7 @@ async function initializeSystemAfterLogin() {
                     </div>
                 `;
             }).join('');
-            
+
             resultsContainer.classList.remove('hidden');
         }
         
