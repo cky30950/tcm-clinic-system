@@ -35,43 +35,47 @@ function debounce(func, wait, immediate = false) {
 }
 
 /**
- * 取得病人資料的時間戳記，用於排序。
- * 依序使用 createdAt、updatedAt 與病人編號（如果存在）作為
- * 排序依據。這可以確保當某些舊資料缺少 createdAt 時，
- * 仍能以 updatedAt 或病人編號作為替代值進行合理排序。
- * @param {Object} patient 病人資料物件
- * @returns {number} 代表排序權重的時間戳記或數字
+ * 取得病人資料的排序值，用於排序。
+ * 首先使用病人編號的數值部分，確保最新編號的病人排在前；
+ * 若無病人編號則使用 createdAt，再使用 updatedAt。
+ * @param {Object} patient 病人資料
+ * @returns {number} 排序值
  */
 function getPatientTimestamp(patient) {
-    let dateValue = 0;
-    if (patient && patient.createdAt) {
-        if (patient.createdAt.seconds !== undefined) {
-            dateValue = patient.createdAt.seconds * 1000;
-        } else {
-            const d = new Date(patient.createdAt);
-            dateValue = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-        }
-    } else if (patient && patient.updatedAt) {
-        if (patient.updatedAt.seconds !== undefined) {
-            dateValue = patient.updatedAt.seconds * 1000;
-        } else {
-            const d = new Date(patient.updatedAt);
-            dateValue = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-        }
-    }
-    // 如果時間戳為 0 且有病人編號，使用病人編號數值作為次要排序
-    if (!dateValue && patient && patient.patientNumber) {
-        // 從 patientNumber 中擷取連續的數字，例如 P000123 -> 123
+    // 若有病人編號，先以其數值部分排序，例如 P000123 -> 123
+    if (patient && patient.patientNumber) {
         const match = String(patient.patientNumber).match(/(\d+)/);
         if (match) {
             const num = parseInt(match[1], 10);
             if (!isNaN(num)) {
-                // 乘以 1000 以避免與毫秒級時間戳相差過大
-                dateValue = num * 1000;
+                return num;
             }
         }
     }
-    return dateValue || 0;
+    // 若無病人編號，依 createdAt 為次要排序依據
+    if (patient && patient.createdAt) {
+        if (patient.createdAt.seconds !== undefined) {
+            return patient.createdAt.seconds * 1000;
+        } else {
+            const d = new Date(patient.createdAt);
+            if (d instanceof Date && !isNaN(d)) {
+                return d.getTime();
+            }
+        }
+    }
+    // 若無 createdAt，依 updatedAt 為次次要排序依據
+    if (patient && patient.updatedAt) {
+        if (patient.updatedAt.seconds !== undefined) {
+            return patient.updatedAt.seconds * 1000;
+        } else {
+            const d = new Date(patient.updatedAt);
+            if (d instanceof Date && !isNaN(d)) {
+                return d.getTime();
+            }
+        }
+    }
+    // 若無任何資料，返回 0
+    return 0;
 }
 
 /**
@@ -3630,10 +3634,7 @@ async function savePatient() {
         patientsCountCache = null;
 
         // 重新載入病人列表
-        // 在新增或更新病人後，將分頁重置至第一頁。這可以確保最新的
-        // 病人資料會出現在第一頁，避免使用者在其他頁面看不到
-        // 剛新增的病人。未重置分頁可能導致在最後一頁
-        // 依舊停留在舊的頁碼，使得新增的病人出現在最後一頁。
+        // 在新增或更新病人後，重置病人列表分頁至第一頁，確保最新病人在第一頁顯示
         if (paginationSettings && paginationSettings.patientList) {
             paginationSettings.patientList.currentPage = 1;
         }
@@ -3703,11 +3704,9 @@ async function loadPatientListFromFirebase() {
                 console.error('搜尋病人時發生錯誤:', _searchErr);
             }
             let filteredPatients = (searchResult && searchResult.success && Array.isArray(searchResult.data)) ? searchResult.data : [];
-            // 依照 createdAt 由新至舊排序
+            // 依照 getPatientTimestamp 由新至舊排序。
+            // 使用 patientNumber 的數值部分作為主要依據，若無則依 createdAt 或 updatedAt。
             filteredPatients = filteredPatients.slice();
-            // 依據時間戳記由新到舊排序。使用 getPatientTimestamp() 可處理
-            // createdAt 缺失或格式不正確的情況，並以 updatedAt 或
-            // patientNumber 作為備援排序依據。
             filteredPatients.sort((a, b) => {
                 const tsA = getPatientTimestamp(a);
                 const tsB = getPatientTimestamp(b);
@@ -3774,12 +3773,9 @@ function renderPatientListTable(pageChange = false) {
     if (!pageChange) {
         paginationSettings.patientList.currentPage = 1;
     }
-    // 在渲染表格之前，根據建立時間 (createdAt) 由新到舊排序病人資料
-    // 由於 patientListFiltered 可能已經按照其他條件排序，在這裡額外排序可以
-    // 確保「創建時間最新」的病人顯示在列表上方。當 createdAt 不存在時，將其
-    // 時間值視為 0，這樣會將沒有時間戳的資料排在最後。
+    // 在渲染表格之前，根據 getPatientTimestamp 由新到舊排序病人資料。
+    // 使用病人編號的數值部分作為主依據，補足缺少 createdAt 或 updatedAt 的情況。
     if (Array.isArray(patientListFiltered) && patientListFiltered.length > 1) {
-        // 使用 getPatientTimestamp() 以統一處理 createdAt/updatedAt/編號。
         patientListFiltered.sort((a, b) => {
             const tsA = getPatientTimestamp(a);
             const tsB = getPatientTimestamp(b);
@@ -3905,10 +3901,9 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
     // 判斷是否具有刪除權限
     // 刪除權限開放給診所管理者、護理師與醫師
     const showDelete = currentUserData && currentUserData.position && ['診所管理', '護理師', '醫師'].includes(currentUserData.position.trim());
-    // 先按照建立時間 (createdAt) 將頁面項目由新到舊排序，確保最新建立的病人位於最前面。
+    // 先按照 getPatientTimestamp 將頁面項目由新到舊排序，確保最新建立的病人位於最前面。
     let sortedPageItems;
     if (Array.isArray(pageItems) && pageItems.length > 1) {
-        // 依照時間戳記由新到舊排序頁面項目。
         sortedPageItems = pageItems.slice().sort((a, b) => {
             const tsA = getPatientTimestamp(a);
             const tsB = getPatientTimestamp(b);
@@ -15768,8 +15763,7 @@ async function importClinicBackup(data) {
                 return cloned;
             })
             : [];
-        // 將病人資料依時間戳記由新至舊排序，以模擬 Firestore 預設排序。
-        // 使用 getPatientTimestamp() 來處理缺少 createdAt 的情況。
+        // 將病人資料依 getPatientTimestamp 由新至舊排序，以模擬 Firestore 預設排序並兼顧缺少 createdAt 的資料
         if (Array.isArray(patientCache) && patientCache.length > 1) {
             patientCache.sort((a, b) => {
                 const tsA = getPatientTimestamp(a);
@@ -15839,7 +15833,7 @@ async function importClinicBackup(data) {
             ? paginationSettings.patientList.itemsPerPage
             : 10;
         if (Array.isArray(patientCache)) {
-            // 先依時間戳記由新至舊排序，模擬 Firestore 預設排序
+            // 先依 getPatientTimestamp 由新至舊排序，模擬 Firestore 預設排序，使用病人編號數值、createdAt 或 updatedAt。
             const sortedPatients = patientCache.slice().sort((a, b) => {
                 const tsA = getPatientTimestamp(a);
                 const tsB = getPatientTimestamp(b);
