@@ -2643,7 +2643,36 @@ async function safeGetPatients(forceRefresh = false) {
     const result = await window.firebaseDataManager.getPatients(forceRefresh);
     // 若結果為空或格式不正確仍回傳失敗狀態
     if (result && typeof result.success === 'boolean' && Array.isArray(result.data)) {
-      return result;
+      // 為確保病人資料按照建檔日期由新到舊排序，對回傳資料進行排序。部分功能僅取用
+      // patientListFiltered 中的排序，然而直接從 safeGetPatients 取得的資料可能未依時間排序，
+      // 導致列表顯示順序不一致。此處將資料按 createdAt 欄位降序排列後回傳。
+      const sorted = result.data.slice();
+      if (sorted.length > 1) {
+        sorted.sort((a, b) => {
+          let dateA = 0;
+          let dateB = 0;
+          // 轉換 a.createdAt
+          if (a && a.createdAt) {
+            if (typeof a.createdAt.seconds !== 'undefined') {
+              dateA = a.createdAt.seconds * 1000;
+            } else {
+              const d = new Date(a.createdAt);
+              dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+            }
+          }
+          // 轉換 b.createdAt
+          if (b && b.createdAt) {
+            if (typeof b.createdAt.seconds !== 'undefined') {
+              dateB = b.createdAt.seconds * 1000;
+            } else {
+              const d = new Date(b.createdAt);
+              dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+            }
+          }
+          return dateB - dateA;
+        });
+      }
+      return { success: result.success, data: sorted };
     }
     return { success: false, data: [] };
   } catch (err) {
