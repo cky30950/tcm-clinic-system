@@ -3324,6 +3324,13 @@ async function logout() {
             if (sectionEl) sectionEl.classList.remove('hidden');
             // 根據 sectionId 載入相應功能
             if (sectionId === 'patientManagement') {
+                // 進入病人管理時，將分頁重設為第一頁，
+                // 確保列表預設按照建檔日期由新到舊排序並顯示最新資料在第一頁。
+                if (typeof paginationSettings !== 'undefined' &&
+                    paginationSettings.patientList &&
+                    typeof paginationSettings.patientList === 'object') {
+                    paginationSettings.patientList.currentPage = 1;
+                }
                 // 載入病人列表後設置即時監聽，確保他人新增或編輯病人資料時能即時更新畫面。
                 loadPatientList();
                 attachPatientListListener();
@@ -3590,6 +3597,14 @@ async function savePatient() {
         patientsCountCache = null;
 
         // 重新載入病人列表
+        // 新增或更新病人後，為了確保最新新增的資料顯示在列表第一頁，
+        // 將病人列表分頁重置為第一頁。這樣即使使用者原本位於其他頁面，
+        // 也能立即看到最新的病人資料顯示在最前端。
+        if (typeof paginationSettings !== 'undefined' &&
+            paginationSettings.patientList &&
+            typeof paginationSettings.patientList === 'object') {
+            paginationSettings.patientList.currentPage = 1;
+        }
         await loadPatientListFromFirebase();
         hideAddPatientForm();
         updateStatistics();
