@@ -1315,23 +1315,28 @@
 
             // 基本 Google Calendar 建立事件 URL
             const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-            // 使用逐個打開的方式，同步所有班次到 Google Calendar。
-            // 由於 Google Calendar 的模板連結無法一次建立多個事件，我們為每個班次開啟一個新分頁。
-            events.forEach((event, index) => {
-                setTimeout(() => {
-                    const params = new URLSearchParams({
-                        text: event.title,
-                        dates: `${event.start.replace(/[-:]/g, '')}/${event.end.replace(/[-:]/g, '')}`,
-                        details: event.description
-                    });
-                    if (clinicLocation) {
-                        params.set('location', clinicLocation);
-                    }
-                    window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
-                }, index * 500); // 每 0.5 秒打開一個事件，避免同時開啟太多分頁
-            });
-            // 提示使用者正在開啟 Google Calendar（每個班次會開啟一個新頁籤）
-            showNotification(translate('正在開啟 Google Calendar...'));
+            /*
+             * 使用逐個開啟新分頁的方式將排班資料轉成 Google Calendar 事件。之前使用
+             * setTimeout 於迴圈中延遲開啟頁面，但大多數瀏覽器會將延遲開啟的視窗視為
+             * 非使用者觸發的彈出視窗而被攔截，導致只能新增第一筆排班。為了確保所有排班
+             * 都能成功建立事件，改為在單一的使用者觸發事件中同步開啟所有分頁。這樣
+             * 每個 window.open 呼叫都在原始事件堆疊中執行，瀏覽器會允許連續開啟多個
+             * 分頁。由於無法同時建立多個事件，故仍需逐一開啟。
+             */
+            for (const event of events) {
+                const params = new URLSearchParams({
+                    text: event.title,
+                    dates: `${event.start.replace(/[-:]/g, '')}/${event.end.replace(/[-:]/g, '')}`,
+                    details: event.description
+                });
+                if (clinicLocation) {
+                    params.set('location', clinicLocation);
+                }
+                // 在同一次使用者互動中連續呼叫 window.open，瀏覽器會允許連續彈出
+                window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
+            }
+            // 同步完成提示
+            showNotification(translate('正在開啟 Google Calendar...')); 
         }
 
         // 匯出 iCal
