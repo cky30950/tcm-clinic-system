@@ -3640,8 +3640,7 @@ async function loadPatientListFromFirebase() {
         // 顯示載入中
         tbody.innerHTML = `
             <tr>
-                <!-- 調整 colspan 以符合增加的建檔日期欄位 -->
-                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
                     <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                     <div class="mt-2">載入中...</div>
                 </td>
@@ -3657,29 +3656,34 @@ async function loadPatientListFromFirebase() {
                 console.error('搜尋病人時發生錯誤:', _searchErr);
             }
             let filteredPatients = (searchResult && searchResult.success && Array.isArray(searchResult.data)) ? searchResult.data : [];
-            // 依照 createdAt 由新至舊排序
+            // 依照建立時間由新至舊排序；若無建立時間或相同，依病人編號由大到小排序
             filteredPatients = filteredPatients.slice();
             filteredPatients.sort((a, b) => {
-                // 取用 createdAt 或 updatedAt 作為排序依據，若無則設定為最早
-                let dateA = 0;
-                let dateB = 0;
-                if (a && a.createdAt) {
-                    if (a.createdAt.seconds) {
-                        dateA = a.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(a.createdAt);
-                        dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                const getTime = (p) => {
+                    let ts = 0;
+                    if (p && p.createdAt) {
+                        if (p.createdAt.seconds) {
+                            ts = p.createdAt.seconds * 1000;
+                        } else {
+                            const d = new Date(p.createdAt);
+                            ts = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                        }
                     }
+                    return ts;
+                };
+                const getNumber = (p) => {
+                    const numStr = p && p.patientNumber ? String(p.patientNumber).replace(/\D+/g, '') : '';
+                    const n = parseInt(numStr, 10);
+                    return isNaN(n) ? 0 : n;
+                };
+                const timeA = getTime(a);
+                const timeB = getTime(b);
+                if (timeB !== timeA) {
+                    return timeB - timeA;
                 }
-                if (b && b.createdAt) {
-                    if (b.createdAt.seconds) {
-                        dateB = b.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(b.createdAt);
-                        dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                    }
-                }
-                return dateB - dateA;
+                const numA = getNumber(a);
+                const numB = getNumber(b);
+                return numB - numA;
             });
             patientListFiltered = filteredPatients;
             renderPatientListTable(false);
@@ -3698,8 +3702,7 @@ async function loadPatientListFromFirebase() {
         console.error('載入病人列表錯誤:', error);
         const msg = `
             <tr>
-                <!-- 調整 colspan 以符合增加的建檔日期欄位 -->
-                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
                     載入失敗，請檢查網路連接
                 </td>
             </tr>
@@ -3748,26 +3751,37 @@ function renderPatientListTable(pageChange = false) {
     // 確保「創建時間最新」的病人顯示在列表上方。當 createdAt 不存在時，將其
     // 時間值視為 0，這樣會將沒有時間戳的資料排在最後。
     if (Array.isArray(patientListFiltered) && patientListFiltered.length > 1) {
+        // 依建立時間由新到舊排序，若時間相同或缺失則依病人編號由大到小排序
         patientListFiltered.sort((a, b) => {
-            let dateA = 0;
-            let dateB = 0;
-            if (a && a.createdAt) {
-                if (a.createdAt.seconds !== undefined) {
-                    dateA = a.createdAt.seconds * 1000;
-                } else {
-                    const d = new Date(a.createdAt);
-                    dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+            // 取得 createdAt 時間戳，若無則為 0
+            const getTime = (p) => {
+                let ts = 0;
+                if (p && p.createdAt) {
+                    if (p.createdAt.seconds !== undefined) {
+                        ts = p.createdAt.seconds * 1000;
+                    } else {
+                        const d = new Date(p.createdAt);
+                        ts = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                    }
                 }
+                return ts;
+            };
+            // 從病人編號中取出數值，用於排序；若無則為 0
+            const getNumber = (p) => {
+                const numStr = p && p.patientNumber ? String(p.patientNumber).replace(/\D+/g, '') : '';
+                const n = parseInt(numStr, 10);
+                return isNaN(n) ? 0 : n;
+            };
+            const timeA = getTime(a);
+            const timeB = getTime(b);
+            // 先依建立時間由新到舊排列
+            if (timeB !== timeA) {
+                return timeB - timeA;
             }
-            if (b && b.createdAt) {
-                if (b.createdAt.seconds !== undefined) {
-                    dateB = b.createdAt.seconds * 1000;
-                } else {
-                    const d = new Date(b.createdAt);
-                    dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                }
-            }
-            return dateB - dateA;
+            // 若時間相同或缺失，依病人編號由大到小排列
+            const numA = getNumber(a);
+            const numB = getNumber(b);
+            return numB - numA;
         });
     }
     const totalItems = patientListFiltered.length;
@@ -3892,26 +3906,33 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
     // 先按照建立時間 (createdAt) 將頁面項目由新到舊排序，確保最新建立的病人位於最前面。
     let sortedPageItems;
     if (Array.isArray(pageItems) && pageItems.length > 1) {
+        // 依建立時間由新到舊排序，若時間相同或缺失則依病人編號由大到小排序
         sortedPageItems = pageItems.slice().sort((a, b) => {
-            let dateA = 0;
-            let dateB = 0;
-            if (a && a.createdAt) {
-                if (a.createdAt.seconds !== undefined) {
-                    dateA = a.createdAt.seconds * 1000;
-                } else {
-                    const d = new Date(a.createdAt);
-                    dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+            const getTime = (p) => {
+                let ts = 0;
+                if (p && p.createdAt) {
+                    if (p.createdAt.seconds !== undefined) {
+                        ts = p.createdAt.seconds * 1000;
+                    } else {
+                        const d = new Date(p.createdAt);
+                        ts = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                    }
                 }
+                return ts;
+            };
+            const getNumber = (p) => {
+                const numStr = p && p.patientNumber ? String(p.patientNumber).replace(/\D+/g, '') : '';
+                const n = parseInt(numStr, 10);
+                return isNaN(n) ? 0 : n;
+            };
+            const timeA = getTime(a);
+            const timeB = getTime(b);
+            if (timeB !== timeA) {
+                return timeB - timeA;
             }
-            if (b && b.createdAt) {
-                if (b.createdAt.seconds !== undefined) {
-                    dateB = b.createdAt.seconds * 1000;
-                } else {
-                    const d = new Date(b.createdAt);
-                    dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                }
-            }
-            return dateB - dateA;
+            const numA = getNumber(a);
+            const numB = getNumber(b);
+            return numB - numA;
         });
     } else {
         sortedPageItems = pageItems;
