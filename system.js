@@ -1840,9 +1840,18 @@ async function attachPatientListListener() {
                 } catch (_lsErr) {
                     /* 忽略 localStorage 錯誤 */
                 }
-                // 若當前仍在病人管理頁面，立即刷新列表
+                // 若當前仍在病人管理頁面，將列表頁數重置為第一頁並立即刷新列表。
+                // 這樣可以確保當其他使用者新增病人時，
+                // 使用者看到最新的病人出現在第一頁。
                 const sectionEl = document.getElementById('patientManagement');
                 if (sectionEl && !sectionEl.classList.contains('hidden')) {
+                    try {
+                        if (paginationSettings && paginationSettings.patientList) {
+                            paginationSettings.patientList.currentPage = 1;
+                        }
+                    } catch (_setPageErr) {
+                        /* 忽略設定頁碼錯誤 */
+                    }
                     loadPatientList();
                 }
             } catch (innerErr) {
@@ -3324,13 +3333,6 @@ async function logout() {
             if (sectionEl) sectionEl.classList.remove('hidden');
             // 根據 sectionId 載入相應功能
             if (sectionId === 'patientManagement') {
-                // 進入病人管理時，將分頁重設為第一頁，
-                // 確保列表預設按照建檔日期由新到舊排序並顯示最新資料在第一頁。
-                if (typeof paginationSettings !== 'undefined' &&
-                    paginationSettings.patientList &&
-                    typeof paginationSettings.patientList === 'object') {
-                    paginationSettings.patientList.currentPage = 1;
-                }
                 // 載入病人列表後設置即時監聽，確保他人新增或編輯病人資料時能即時更新畫面。
                 loadPatientList();
                 attachPatientListListener();
@@ -3581,7 +3583,7 @@ async function savePatient() {
             }
         }
 
-        // 更新快取資料，下一次讀取時重新載入
+        // 更新快取資料，下一次讀取時重新載入。
         // 新增或更新病人後，除了清除病人列表快取之外，
         // 也應清除分頁游標與病人數量快取，
         // 以避免新增或更新的資料未立即反映在列表上。
@@ -3596,15 +3598,16 @@ async function savePatient() {
         // 清除病人總數快取以重新計算頁數
         patientsCountCache = null;
 
-        // 重新載入病人列表
-        // 新增或更新病人後，為了確保最新新增的資料顯示在列表第一頁，
-        // 將病人列表分頁重置為第一頁。這樣即使使用者原本位於其他頁面，
-        // 也能立即看到最新的病人資料顯示在最前端。
-        if (typeof paginationSettings !== 'undefined' &&
-            paginationSettings.patientList &&
-            typeof paginationSettings.patientList === 'object') {
-            paginationSettings.patientList.currentPage = 1;
+        // 新增病人後預設跳回第一頁，確保最新建立的病人顯示在列表頂端。
+        // 在編輯病人（editingPatientId 為真）時則維持使用者原來的頁面。
+        try {
+            if (!editingPatientId && paginationSettings && paginationSettings.patientList) {
+                paginationSettings.patientList.currentPage = 1;
+            }
+        } catch (_setPageErr) {
+            // 如果 paginationSettings 尚未初始化，忽略錯誤
         }
+        // 重新載入病人列表
         await loadPatientListFromFirebase();
         hideAddPatientForm();
         updateStatistics();
