@@ -15526,8 +15526,13 @@ async function exportClinicBackup() {
             // 強制刷新以取得最新病人資料
             safeGetPatients(true),
             (async () => {
+                // 確保 DataManager 就緒，並強制刷新診症資料快取
                 await waitForFirebaseDataManager();
-                return await window.firebaseDataManager.getConsultations();
+                /*
+                 * 使用 forceRefresh=true 讀取診症記錄，以確保匯出的備份包含當前最新的診症資料。
+                 * 先前未指定 forceRefresh 可能導致回傳快取中的舊資料，進而在還原時覆寫為舊狀態。
+                 */
+                return await window.firebaseDataManager.getConsultations(true);
             })()
         ]);
         const patientsData = patientsRes && patientsRes.success && Array.isArray(patientsRes.data) ? patientsRes.data : [];
@@ -15546,12 +15551,10 @@ async function exportClinicBackup() {
         } catch (_fetchErr) {
             console.warn('匯出備份時取得用戶列表失敗，將不包含用戶資料');
         }
-        // 只需確保收費項目已載入
-        // 如果 billingItems 已經是陣列，代表已經載入過，避免重複從 Firestore 讀取
-        if (typeof billingItems === 'undefined' || !Array.isArray(billingItems)) {
-            if (typeof initBillingItems === 'function') {
-                await initBillingItems();
-            }
+        // 讀取最新的收費項目
+        // 即使已經載入，也強制傳入 forceRefresh=true 重新從 Firestore 取得最新資料
+        if (typeof initBillingItems === 'function') {
+            await initBillingItems(true);
         }
         // 讀取所有套票資料
         let packageData = [];
