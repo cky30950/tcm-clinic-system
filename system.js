@@ -35,6 +35,46 @@ function debounce(func, wait, immediate = false) {
 }
 
 /**
+ * 取得病人資料的時間戳記，用於排序。
+ * 依序使用 createdAt、updatedAt 與病人編號（如果存在）作為
+ * 排序依據。這可以確保當某些舊資料缺少 createdAt 時，
+ * 仍能以 updatedAt 或病人編號作為替代值進行合理排序。
+ * @param {Object} patient 病人資料物件
+ * @returns {number} 代表排序權重的時間戳記或數字
+ */
+function getPatientTimestamp(patient) {
+    let dateValue = 0;
+    if (patient && patient.createdAt) {
+        if (patient.createdAt.seconds !== undefined) {
+            dateValue = patient.createdAt.seconds * 1000;
+        } else {
+            const d = new Date(patient.createdAt);
+            dateValue = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+        }
+    } else if (patient && patient.updatedAt) {
+        if (patient.updatedAt.seconds !== undefined) {
+            dateValue = patient.updatedAt.seconds * 1000;
+        } else {
+            const d = new Date(patient.updatedAt);
+            dateValue = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+        }
+    }
+    // 如果時間戳為 0 且有病人編號，使用病人編號數值作為次要排序
+    if (!dateValue && patient && patient.patientNumber) {
+        // 從 patientNumber 中擷取連續的數字，例如 P000123 -> 123
+        const match = String(patient.patientNumber).match(/(\d+)/);
+        if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num)) {
+                // 乘以 1000 以避免與毫秒級時間戳相差過大
+                dateValue = num * 1000;
+            }
+        }
+    }
+    return dateValue || 0;
+}
+
+/**
  * 全域的分頁設定，用於控制各模組的當前頁碼與每頁顯示數量。
  * 當搜尋或篩選條件改變時，應重置 currentPage 為 1。
  */
@@ -1840,18 +1880,9 @@ async function attachPatientListListener() {
                 } catch (_lsErr) {
                     /* 忽略 localStorage 錯誤 */
                 }
-                // 若當前仍在病人管理頁面，將列表頁數重置為第一頁並立即刷新列表。
-                // 這樣可以確保當其他使用者新增病人時，
-                // 使用者看到最新的病人出現在第一頁。
+                // 若當前仍在病人管理頁面，立即刷新列表
                 const sectionEl = document.getElementById('patientManagement');
                 if (sectionEl && !sectionEl.classList.contains('hidden')) {
-                    try {
-                        if (paginationSettings && paginationSettings.patientList) {
-                            paginationSettings.patientList.currentPage = 1;
-                        }
-                    } catch (_setPageErr) {
-                        /* 忽略設定頁碼錯誤 */
-                    }
                     loadPatientList();
                 }
             } catch (innerErr) {
@@ -3583,7 +3614,7 @@ async function savePatient() {
             }
         }
 
-        // 更新快取資料，下一次讀取時重新載入。
+        // 更新快取資料，下一次讀取時重新載入
         // 新增或更新病人後，除了清除病人列表快取之外，
         // 也應清除分頁游標與病人數量快取，
         // 以避免新增或更新的資料未立即反映在列表上。
@@ -3598,16 +3629,14 @@ async function savePatient() {
         // 清除病人總數快取以重新計算頁數
         patientsCountCache = null;
 
-        // 新增病人後預設跳回第一頁，確保最新建立的病人顯示在列表頂端。
-        // 在編輯病人（editingPatientId 為真）時則維持使用者原來的頁面。
-        try {
-            if (!editingPatientId && paginationSettings && paginationSettings.patientList) {
-                paginationSettings.patientList.currentPage = 1;
-            }
-        } catch (_setPageErr) {
-            // 如果 paginationSettings 尚未初始化，忽略錯誤
-        }
         // 重新載入病人列表
+        // 在新增或更新病人後，將分頁重置至第一頁。這可以確保最新的
+        // 病人資料會出現在第一頁，避免使用者在其他頁面看不到
+        // 剛新增的病人。未重置分頁可能導致在最後一頁
+        // 依舊停留在舊的頁碼，使得新增的病人出現在最後一頁。
+        if (paginationSettings && paginationSettings.patientList) {
+            paginationSettings.patientList.currentPage = 1;
+        }
         await loadPatientListFromFirebase();
         hideAddPatientForm();
         updateStatistics();
@@ -3676,27 +3705,13 @@ async function loadPatientListFromFirebase() {
             let filteredPatients = (searchResult && searchResult.success && Array.isArray(searchResult.data)) ? searchResult.data : [];
             // 依照 createdAt 由新至舊排序
             filteredPatients = filteredPatients.slice();
+            // 依據時間戳記由新到舊排序。使用 getPatientTimestamp() 可處理
+            // createdAt 缺失或格式不正確的情況，並以 updatedAt 或
+            // patientNumber 作為備援排序依據。
             filteredPatients.sort((a, b) => {
-                // 取用 createdAt 或 updatedAt 作為排序依據，若無則設定為最早
-                let dateA = 0;
-                let dateB = 0;
-                if (a && a.createdAt) {
-                    if (a.createdAt.seconds) {
-                        dateA = a.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(a.createdAt);
-                        dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                    }
-                }
-                if (b && b.createdAt) {
-                    if (b.createdAt.seconds) {
-                        dateB = b.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(b.createdAt);
-                        dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                    }
-                }
-                return dateB - dateA;
+                const tsA = getPatientTimestamp(a);
+                const tsB = getPatientTimestamp(b);
+                return tsB - tsA;
             });
             patientListFiltered = filteredPatients;
             renderPatientListTable(false);
@@ -3764,26 +3779,11 @@ function renderPatientListTable(pageChange = false) {
     // 確保「創建時間最新」的病人顯示在列表上方。當 createdAt 不存在時，將其
     // 時間值視為 0，這樣會將沒有時間戳的資料排在最後。
     if (Array.isArray(patientListFiltered) && patientListFiltered.length > 1) {
+        // 使用 getPatientTimestamp() 以統一處理 createdAt/updatedAt/編號。
         patientListFiltered.sort((a, b) => {
-            let dateA = 0;
-            let dateB = 0;
-            if (a && a.createdAt) {
-                if (a.createdAt.seconds !== undefined) {
-                    dateA = a.createdAt.seconds * 1000;
-                } else {
-                    const d = new Date(a.createdAt);
-                    dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                }
-            }
-            if (b && b.createdAt) {
-                if (b.createdAt.seconds !== undefined) {
-                    dateB = b.createdAt.seconds * 1000;
-                } else {
-                    const d = new Date(b.createdAt);
-                    dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                }
-            }
-            return dateB - dateA;
+            const tsA = getPatientTimestamp(a);
+            const tsB = getPatientTimestamp(b);
+            return tsB - tsA;
         });
     }
     const totalItems = patientListFiltered.length;
@@ -3908,26 +3908,11 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
     // 先按照建立時間 (createdAt) 將頁面項目由新到舊排序，確保最新建立的病人位於最前面。
     let sortedPageItems;
     if (Array.isArray(pageItems) && pageItems.length > 1) {
+        // 依照時間戳記由新到舊排序頁面項目。
         sortedPageItems = pageItems.slice().sort((a, b) => {
-            let dateA = 0;
-            let dateB = 0;
-            if (a && a.createdAt) {
-                if (a.createdAt.seconds !== undefined) {
-                    dateA = a.createdAt.seconds * 1000;
-                } else {
-                    const d = new Date(a.createdAt);
-                    dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                }
-            }
-            if (b && b.createdAt) {
-                if (b.createdAt.seconds !== undefined) {
-                    dateB = b.createdAt.seconds * 1000;
-                } else {
-                    const d = new Date(b.createdAt);
-                    dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                }
-            }
-            return dateB - dateA;
+            const tsA = getPatientTimestamp(a);
+            const tsB = getPatientTimestamp(b);
+            return tsB - tsA;
         });
     } else {
         sortedPageItems = pageItems;
@@ -15783,28 +15768,13 @@ async function importClinicBackup(data) {
                 return cloned;
             })
             : [];
-        // 將病人資料依 createdAt 由新至舊排序，以模擬 Firestore 預設排序
+        // 將病人資料依時間戳記由新至舊排序，以模擬 Firestore 預設排序。
+        // 使用 getPatientTimestamp() 來處理缺少 createdAt 的情況。
         if (Array.isArray(patientCache) && patientCache.length > 1) {
             patientCache.sort((a, b) => {
-                let dateA = 0;
-                let dateB = 0;
-                if (a && a.createdAt) {
-                    if (a.createdAt.seconds !== undefined) {
-                        dateA = a.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(a.createdAt);
-                        dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                    }
-                }
-                if (b && b.createdAt) {
-                    if (b.createdAt.seconds !== undefined) {
-                        dateB = b.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(b.createdAt);
-                        dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                    }
-                }
-                return dateB - dateA;
+                const tsA = getPatientTimestamp(a);
+                const tsB = getPatientTimestamp(b);
+                return tsB - tsA;
             });
         }
         consultationCache = Array.isArray(data.consultations)
@@ -15869,27 +15839,11 @@ async function importClinicBackup(data) {
             ? paginationSettings.patientList.itemsPerPage
             : 10;
         if (Array.isArray(patientCache)) {
-            // 先依 createdAt 由新至舊排序，模擬 Firestore 預設排序
+            // 先依時間戳記由新至舊排序，模擬 Firestore 預設排序
             const sortedPatients = patientCache.slice().sort((a, b) => {
-                let dateA = 0;
-                let dateB = 0;
-                if (a && a.createdAt) {
-                    if (a.createdAt.seconds !== undefined) {
-                        dateA = a.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(a.createdAt);
-                        dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                    }
-                }
-                if (b && b.createdAt) {
-                    if (b.createdAt.seconds !== undefined) {
-                        dateB = b.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(b.createdAt);
-                        dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                    }
-                }
-                return dateB - dateA;
+                const tsA = getPatientTimestamp(a);
+                const tsB = getPatientTimestamp(b);
+                return tsB - tsA;
             });
             // 依每頁大小切分分頁快取
             for (let i = 0; i < sortedPatients.length; i += perPage) {
