@@ -1270,59 +1270,68 @@
 
         // 同步到 Google Calendar
         function syncToGoogle() {
-            // 創建 Google Calendar 事件格式
+            // 將所有班次轉換為 Google Calendar 事件格式
             const events = shifts.map(shift => {
-                // 透過 ID 找到對應的人員
                 const staffMember = findStaffById(shift.staffId);
                 let endDateStr = shift.date;
                 let endTimeStr = shift.endTime;
                 const startMinutes = parseTimeToMinutes(shift.startTime);
                 let endMinutes = parseTimeToMinutes(shift.endTime);
-                // 若班次跨日或結束時間為 24:00，需將結束日期加一天並將時間設為 00:00
+                // 若班次跨日或結束時間為 24:00 或更晚，調整結束日期與時間
                 if (endMinutes <= startMinutes || endMinutes >= 24 * 60) {
                     const dateObj = new Date(shift.date);
                     dateObj.setDate(dateObj.getDate() + 1);
                     endDateStr = dateObj.toISOString().split('T')[0];
-                    // 24:00 或跨日情況下結束時間設為 00:00
+                    // 若為 24:00 或更晚，設為 00:00
                     endTimeStr = '00:00';
                 }
                 const startDateTime = `${shift.date}T${shift.startTime}:00`;
                 const endDateTime = `${endDateStr}T${endTimeStr}:00`;
-                // Localised role label and shift type for the title and description
                 const roleLabel = staffMember.role === 'doctor' ? translate('醫師') : staffMember.role === 'nurse' ? translate('護理師') : '';
                 const shiftTypeName = translate(getShiftTypeName(shift.type));
                 return {
                     title: `${staffMember.name} - ${roleLabel}${translate('排班')}`,
                     start: startDateTime,
                     end: endDateTime,
-                    // 移除部門資訊，以避免顯示不必要的欄位
                     description: `${translate('班別:')} ${shiftTypeName}${shift.notes ? '\n' + translate('備註:') + ' ' + shift.notes : ''}`
                 };
             });
 
-            // 生成 Google Calendar URL
-            const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-            const event = events[0]; // 示範用第一個事件
-            if (event) {
-                const params = new URLSearchParams({
-                    text: event.title,
-                    dates: `${event.start.replace(/[-:]/g, '')}/${event.end.replace(/[-:]/g, '')}`,
-                    details: event.description
-                });
-                // 從本地取得診所設定，以設定事件的地點
-                try {
-                    const clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
-                    if (clinicSettings && clinicSettings.address) {
-                        params.set('location', clinicSettings.address);
-                    }
-                } catch (_e) {
-                    /* 如果解析失敗，忽略地點設定 */
-                }
-                window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
-                showNotification(translate('正在開啟 Google Calendar...'));
-            } else {
-            showNotification(translate('沒有排班資料可同步'));
+            // 如果沒有排班資料，提醒使用者
+            if (!events.length) {
+                showNotification(translate('沒有排班資料可同步'));
+                return;
             }
+            // 從本地取得診所設定，以設定事件的地點（所有事件使用相同地點設定）
+            let clinicLocation = '';
+            try {
+                const clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
+                if (clinicSettings && clinicSettings.address) {
+                    clinicLocation = clinicSettings.address;
+                }
+            } catch (_e) {
+                /* 解析失敗時不設定 location */
+            }
+
+            // 基本 Google Calendar 建立事件 URL
+            const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+            // 使用逐個打開的方式，同步所有班次到 Google Calendar。
+            // 由於 Google Calendar 的模板連結無法一次建立多個事件，我們為每個班次開啟一個新分頁。
+            events.forEach((event, index) => {
+                setTimeout(() => {
+                    const params = new URLSearchParams({
+                        text: event.title,
+                        dates: `${event.start.replace(/[-:]/g, '')}/${event.end.replace(/[-:]/g, '')}`,
+                        details: event.description
+                    });
+                    if (clinicLocation) {
+                        params.set('location', clinicLocation);
+                    }
+                    window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
+                }, index * 500); // 每 0.5 秒打開一個事件，避免同時開啟太多分頁
+            });
+            // 提示使用者正在開啟 Google Calendar（每個班次會開啟一個新頁籤）
+            showNotification(translate('正在開啟 Google Calendar...'));
         }
 
         // 匯出 iCal

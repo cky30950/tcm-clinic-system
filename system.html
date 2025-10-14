@@ -4118,20 +4118,18 @@
 
         // 同步到 Google Calendar
         function syncToGoogle() {
-            // 創建 Google Calendar 事件格式，支援跨日班次與 24:00 結束時間
+            // 將所有班次轉換為 Google Calendar 事件格式，支援跨日班次與 24:00 結束時間
             const events = shifts.map(shift => {
                 const member = getStaffMemberById(shift.staffId);
-                // 計算結束日期與時間
                 let endDateStr = shift.date;
                 let endTimeStr = shift.endTime;
                 const startMinutes = parseTimeToMinutes(shift.startTime);
                 let endMinutes = parseTimeToMinutes(shift.endTime);
-                // 若班次跨日或結束時間為 24:00，調整結束日期與時間
+                // 若班次跨日或結束時間為 24:00 或更晚，調整結束日期與時間
                 if (endMinutes <= startMinutes || endMinutes >= 24 * 60) {
                     const dateObj = new Date(shift.date);
                     dateObj.setDate(dateObj.getDate() + 1);
                     endDateStr = dateObj.toISOString().split('T')[0];
-                    // 若為 24:00 或更晚，設為 00:00
                     if (endMinutes >= 24 * 60) {
                         endTimeStr = '00:00';
                     }
@@ -4142,25 +4140,40 @@
                     title: `${member.name} - ${member.role === 'doctor' ? '醫師' : '護理師'}排班`,
                     start: startDateTime,
                     end: endDateTime,
-                    // 移除部門與狀態，僅顯示班別與備註
                     description: `班別: ${shift.type}${shift.notes ? '\n備註: ' + shift.notes : ''}`
                 };
             });
 
-            // 生成 Google Calendar URL
-            const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-            const event = events[0]; // 只取第一個事件示範
-            if (event) {
-                const params = new URLSearchParams({
-                    text: event.title,
-                    dates: `${event.start.replace(/[-:]/g, '')}/${event.end.replace(/[-:]/g, '')}`,
-                    details: event.description
-                });
-                window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
-                showNotification('正在開啟 Google Calendar...');
-            } else {
+            if (!events.length) {
                 showNotification('沒有排班資料可同步');
+                return;
             }
+            // 取得診所地點設定（若有）
+            let clinicLocation = '';
+            try {
+                const clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
+                if (clinicSettings && clinicSettings.address) {
+                    clinicLocation = clinicSettings.address;
+                }
+            } catch (_e) {
+                /* 忽略解析錯誤 */
+            }
+            const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+            // 逐個打開所有班次的 Google Calendar 建立事件頁面，避免只能建立單一事件
+            events.forEach((event, index) => {
+                setTimeout(() => {
+                    const params = new URLSearchParams({
+                        text: event.title,
+                        dates: `${event.start.replace(/[-:]/g, '')}/${event.end.replace(/[-:]/g, '')}`,
+                        details: event.description
+                    });
+                    if (clinicLocation) {
+                        params.set('location', clinicLocation);
+                    }
+                    window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
+                }, index * 500);
+            });
+            showNotification('正在開啟 Google Calendar...');
         }
 
         // 匯出 iCal
@@ -4531,6 +4544,7 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"b2074e7888b746fe9fbbc15492b4c3d4","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
