@@ -1270,112 +1270,132 @@ async function fetchUsers(forceRefresh = false) {
         
         // 浮動提示功能
         function showToast(message, type = 'info') {
-            // 將訊息翻譯為當前語言，如果可用
-            try {
-                if (window.t) {
-                    message = window.t(message);
-                } else {
-                    const lang = localStorage.getItem('lang') || 'zh';
-                    const dict = (window.translations && window.translations[lang]) || {};
-                    message = dict[message] || message;
+                 // 將訊息翻譯為當前語言，如果可用
+                 try {
+                     if (window.t) {
+                         message = window.t(message);
+                     } else {
+                         const lang = localStorage.getItem('lang') || 'zh';
+                         const dict = window.translations && window.translations[lang] || {};
+                         message = dict[message] || message;
+                     }
+                 } catch (e) {
+                     // 若翻譯失敗則保持原訊息
+                 }
+                // 若已載入 Toastr，使用它顯示訊息並提前返回。這會避免舊的自訂 .toast 樣式影響位置。
+                if (typeof toastr !== 'undefined') {
+                    // 設定 Toastr 的顯示選項，將提示置於畫面上方居中
+                    toastr.options = {
+                        positionClass: 'toast-top-center',
+                        timeOut: 4000,
+                        closeButton: true,
+                        progressBar: true
+                    };
+                    switch (type) {
+                        case 'success':
+                            toastr.success(message);
+                            break;
+                        case 'error':
+                            toastr.error(message);
+                            break;
+                        case 'warning':
+                            toastr.warning(message);
+                            break;
+                        default:
+                            toastr.info(message);
+                            break;
+                    }
+                    return;
                 }
-            } catch (_e) {
-                // 若翻譯失敗則保持原訊息
+                // 移除現有的提示
+            const existingToast = document.querySelector('.toast');
+            if (existingToast) {
+                existingToast.remove();
             }
-            // 使用 Toastr 顯示提示，如果可用
-            if (typeof toastr !== 'undefined') {
-                // 設定提示選項：顯示位置、消失時間、關閉按鈕與進度條
-                toastr.options = {
-                    positionClass: 'toast-top-right',
-                    timeOut: 4000,
-                    closeButton: true,
-                    progressBar: true
-                };
-                switch (type) {
-                    case 'success':
-                        toastr.success(message);
-                        break;
-                    case 'error':
-                        toastr.error(message);
-                        break;
-                    case 'warning':
-                        toastr.warning(message);
-                        break;
-                    default:
-                        toastr.info(message);
-                        break;
-                }
-            } else {
-                // 若未載入 Toastr，退而使用簡易的 console 訊息
-                try {
-                    console.log(`[${type}] ${message}`);
-                } catch (_err) {
-                    /* 忽略錯誤 */
-                }
-            }
-        }
-
-        // 使用 SweetAlert2 顯示訊息彈窗
-        async function showAlert(message, type = 'info') {
-            try {
-                if (window.t) {
-                    message = window.t(message);
-                } else {
-                    const lang = localStorage.getItem('lang') || 'zh';
-                    const dict = (window.translations && window.translations[lang]) || {};
-                    message = dict[message] || message;
-                }
-            } catch (_e) {
-                /* 翻譯失敗時保持原訊息 */
-            }
-            if (typeof Swal !== 'undefined') {
-                await Swal.fire({
-                    text: message,
-                    icon: type,
-                    confirmButtonText: '確定'
-                });
-            } else {
-                // Fallback to原生 alert
-                window.alert(message);
-            }
-        }
-
-        // 使用 SweetAlert2 顯示確認彈窗，回傳布林值
-        async function showConfirm(message, type = 'question') {
-            try {
-                if (window.t) {
-                    message = window.t(message);
-                } else {
-                    const lang = localStorage.getItem('lang') || 'zh';
-                    const dict = (window.translations && window.translations[lang]) || {};
-                    message = dict[message] || message;
-                }
-            } catch (_e) {
-                /* 翻譯失敗時保持原訊息 */
-            }
-            if (typeof Swal !== 'undefined') {
-                const result = await Swal.fire({
-                    text: message,
-                    icon: type,
-                    showCancelButton: true,
-                    confirmButtonText: '確定',
-                    cancelButtonText: '取消'
-                });
-                return result.isConfirmed;
-            }
-            // Fallback 使用原生 confirm
-            return window.confirm(message);
+            
+            // 創建新的提示
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            // 設置圖標
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+            
+            toast.innerHTML = `
+                <div class="toast-icon">${icons[type] || icons.info}</div>
+                <div class="toast-content">${message}</div>
+            `;
+            
+            // 添加到頁面
+            document.body.appendChild(toast);
+            
+            // 顯示動畫
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 100);
+            
+            // 4秒後淡出並移除
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }, 4000);
         }
 
         // 將提示函式與彈窗函式掛載到全域 window 對象，方便在其他模組呼叫。
         if (!window.showToast) {
             window.showToast = showToast;
         }
+        // SweetAlert2 提示函式：顯示簡單訊息
         if (!window.showAlert) {
-            window.showAlert = showAlert;
+            window.showAlert = async function (msg, type = 'info') {
+                // 若載入了 SweetAlert2，則使用其顯示訊息；否則退回原生 alert
+                if (typeof Swal !== 'undefined') {
+                    await Swal.fire({
+                        text: msg,
+                        icon: type,
+                        confirmButtonText: '確定'
+                    });
+                } else {
+                    window.alert(msg);
+                }
+            };
         }
+        // SweetAlert2 確認函式：回傳布林值
         if (!window.showConfirm) {
-            window.showConfirm = showConfirm;
+            window.showConfirm = async function (msg, type = 'question') {
+                if (typeof Swal !== 'undefined') {
+                    const result = await Swal.fire({
+                        text: msg,
+                        icon: type,
+                        showCancelButton: true,
+                        confirmButtonText: '確定',
+                        cancelButtonText: '取消'
+                    });
+                    return result.isConfirmed;
+                }
+                // Fallback 使用原生 confirm
+                return window.confirm(msg);
+            };
+        }
+        // 將原生 alert 包裝為 SweetAlert2，以統一彈窗風格
+        if (!window._originalAlert) {
+            window._originalAlert = window.alert;
+            window.alert = function (msg) {
+                if (typeof window.showAlert === 'function') {
+                    window.showAlert(msg, 'info');
+                } else {
+                    window._originalAlert(msg);
+                }
+            };
         }
 
         // 播放候診提醒音效

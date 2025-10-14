@@ -9,17 +9,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Firebase SDK -->
 <script type="module" src="firebase_init.js"></script>
-
-    <!-- Toastr CSS and SweetAlert2 CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.20/dist/sweetalert2.min.css">
-
-    <!-- jQuery is required for Toastr -->
-    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
-    <!-- Toastr JS -->
-    <script src="https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.js"></script>
-    <!-- SweetAlert2 JS -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.20/dist/sweetalert2.all.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Noto Sans TC', sans-serif; }
@@ -32,55 +21,11 @@
             color: #9ca3af; /* text-gray-400 */
         }
         
-        /* 浮動提示樣式 */
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            min-width: 300px;
-            max-width: 500px;
-            padding: 16px 20px;
-            border-radius: 12px;
-            color: white;
-            font-weight: 500;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-            transform: translateX(100%);
-            transition: all 0.3s ease-in-out;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .toast.show {
-            transform: translateX(0);
-        }
-        
-        .toast.success {
-            background: linear-gradient(135deg, #10b981, #059669);
-        }
-        
-        .toast.error {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-        }
-        
-        .toast.warning {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-        }
-        
-        .toast.info {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-        }
-        
-        .toast-icon {
-            font-size: 20px;
-            flex-shrink: 0;
-        }
-        
-        .toast-content {
-            flex: 1;
-            line-height: 1.4;
-        }
+        /*
+         * 原本的自訂 .toast 樣式已由 Toastr 取代。為避免與 Toastr 的內建樣式衝突，
+         * 故將此區塊移除。若需要自訂 Toastr 風格，可覆寫其預設類別名稱
+         * （例如 .toast-top-right, .toast-success 等）來調整樣式。
+         */
 
         /* 讓病歷欄位內容長字串換行避免溢出 */
         .medical-field {
