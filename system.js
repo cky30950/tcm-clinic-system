@@ -3370,6 +3370,26 @@ async function logout() {
                 if (paginationSettings && paginationSettings.patientList) {
                     paginationSettings.patientList.currentPage = 1;
                 }
+                /*
+                 * 當離開病人管理區域後再次進入時，patientPagesCache 與 patientPageCursors
+                 * 可能依然保留上次載入的分頁資料，導致重新載入時仍然顯示舊的內容（尤其是第一頁）。
+                 * 為了確保取得最新的病人資料，進入病人管理區域時應清空相關快取，
+                 * 包括 patientCache、patientPagesCache、patientPageCursors 及 patientsCountCache。
+                 * 這樣 loadPatientListFromFirebase() 在載入資料時會重新查詢 Firestore，
+                 * 避免使用舊快取而導致最新病人沒有出現在第一頁。
+                 */
+                try {
+                    patientCache = null;
+                    if (typeof patientPagesCache === 'object') {
+                        patientPagesCache = {};
+                    }
+                    if (typeof patientPageCursors === 'object') {
+                        patientPageCursors = {};
+                    }
+                    patientsCountCache = null;
+                } catch (_err) {
+                    // 忽略清空快取時的錯誤
+                }
                 // 載入病人列表後設置即時監聽，確保他人新增或編輯病人資料時能即時更新畫面。
                 loadPatientList();
                 attachPatientListListener();
