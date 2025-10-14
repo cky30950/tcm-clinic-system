@@ -1268,76 +1268,10 @@
             }, 0);
         }
 
-        // 同步到 Google Calendar
-        function syncToGoogle() {
-            // 將所有班次轉換為 Google Calendar 事件格式
-            const events = shifts.map(shift => {
-                const staffMember = findStaffById(shift.staffId);
-                let endDateStr = shift.date;
-                let endTimeStr = shift.endTime;
-                const startMinutes = parseTimeToMinutes(shift.startTime);
-                let endMinutes = parseTimeToMinutes(shift.endTime);
-                // 若班次跨日或結束時間為 24:00 或更晚，調整結束日期與時間
-                if (endMinutes <= startMinutes || endMinutes >= 24 * 60) {
-                    const dateObj = new Date(shift.date);
-                    dateObj.setDate(dateObj.getDate() + 1);
-                    endDateStr = dateObj.toISOString().split('T')[0];
-                    // 若為 24:00 或更晚，設為 00:00
-                    endTimeStr = '00:00';
-                }
-                const startDateTime = `${shift.date}T${shift.startTime}:00`;
-                const endDateTime = `${endDateStr}T${endTimeStr}:00`;
-                const roleLabel = staffMember.role === 'doctor' ? translate('醫師') : staffMember.role === 'nurse' ? translate('護理師') : '';
-                const shiftTypeName = translate(getShiftTypeName(shift.type));
-                return {
-                    title: `${staffMember.name} - ${roleLabel}${translate('排班')}`,
-                    start: startDateTime,
-                    end: endDateTime,
-                    description: `${translate('班別:')} ${shiftTypeName}${shift.notes ? '\n' + translate('備註:') + ' ' + shift.notes : ''}`
-                };
-            });
-
-            // 如果沒有排班資料，提醒使用者
-            if (!events.length) {
-                showNotification(translate('沒有排班資料可同步'));
-                return;
-            }
-            // 從本地取得診所設定，以設定事件的地點（所有事件使用相同地點設定）
-            let clinicLocation = '';
-            try {
-                const clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
-                if (clinicSettings && clinicSettings.address) {
-                    clinicLocation = clinicSettings.address;
-                }
-            } catch (_e) {
-                /* 解析失敗時不設定 location */
-            }
-
-            // 基本 Google Calendar 建立事件 URL
-            const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-            /*
-             * 使用逐個開啟新分頁的方式將排班資料轉成 Google Calendar 事件。之前使用
-             * setTimeout 於迴圈中延遲開啟頁面，但大多數瀏覽器會將延遲開啟的視窗視為
-             * 非使用者觸發的彈出視窗而被攔截，導致只能新增第一筆排班。為了確保所有排班
-             * 都能成功建立事件，改為在單一的使用者觸發事件中同步開啟所有分頁。這樣
-             * 每個 window.open 呼叫都在原始事件堆疊中執行，瀏覽器會允許連續開啟多個
-             * 分頁。由於無法同時建立多個事件，故仍需逐一開啟。
-             */
-            for (const event of events) {
-                const params = new URLSearchParams({
-                    text: event.title,
-                    dates: `${event.start.replace(/[-:]/g, '')}/${event.end.replace(/[-:]/g, '')}`,
-                    details: event.description
-                });
-                if (clinicLocation) {
-                    params.set('location', clinicLocation);
-                }
-                // 在同一次使用者互動中連續呼叫 window.open，瀏覽器會允許連續彈出
-                window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
-            }
-            // 同步完成提示
-            showNotification(translate('正在開啟 Google Calendar...')); 
-        }
+        // 已移除同步至 Google Calendar 的功能
+        // function syncToGoogle() {
+        //     /* 此函式已停用。 */
+        // }
 
         // 匯出 iCal
         function exportToICal() {
@@ -2164,7 +2098,8 @@
 // Expose functions to global schedule namespace
   window.scheduleNavigateCalendar = navigateCalendar;
   window.scheduleGoToToday = goToToday;
-  window.scheduleSyncToGoogle = syncToGoogle;
+  // 已移除同步 Google 功能，不再暴露 scheduleSyncToGoogle
+  // window.scheduleSyncToGoogle = undefined;
   window.scheduleExportToICal = exportToICal;
   // 列印功能：暴露 schedulePrintShiftTable 以列印當前月份的排班表
   window.scheduleApplyFilters = applyFilters;

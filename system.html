@@ -3193,7 +3193,7 @@
                     </select>
                 </div>
                 <div class="sync-controls">
-                    <button class="sync-btn" onclick="scheduleSyncToGoogle()"><span class="text-1xl mr-1">📅</span> 同步 Google</button>
+                    <!-- 已移除同步 Google 功能 -->
                     <button class="sync-btn" onclick="scheduleExportToICal()"><span class="text-1xl mr-1">📋</span> 匯出 iCal</button>
                     <!-- 新增列印更表按鈕：列印當前月份的排班表 -->
                     <button class="sync-btn" onclick="schedulePrintShiftTable()"><span class="text-1xl mr-1">🖨️</span> 列印更表</button>
@@ -4118,68 +4118,7 @@
             updateStats();
         }
 
-        // 同步到 Google Calendar
-        function syncToGoogle() {
-            // 將所有班次轉換為 Google Calendar 事件格式，支援跨日班次與 24:00 結束時間
-            const events = shifts.map(shift => {
-                const member = getStaffMemberById(shift.staffId);
-                let endDateStr = shift.date;
-                let endTimeStr = shift.endTime;
-                const startMinutes = parseTimeToMinutes(shift.startTime);
-                let endMinutes = parseTimeToMinutes(shift.endTime);
-                // 若班次跨日或結束時間為 24:00 或更晚，調整結束日期與時間
-                if (endMinutes <= startMinutes || endMinutes >= 24 * 60) {
-                    const dateObj = new Date(shift.date);
-                    dateObj.setDate(dateObj.getDate() + 1);
-                    endDateStr = dateObj.toISOString().split('T')[0];
-                    if (endMinutes >= 24 * 60) {
-                        endTimeStr = '00:00';
-                    }
-                }
-                const startDateTime = `${shift.date}T${shift.startTime}:00`;
-                const endDateTime = `${endDateStr}T${endTimeStr}:00`;
-                return {
-                    title: `${member.name} - ${member.role === 'doctor' ? '醫師' : '護理師'}排班`,
-                    start: startDateTime,
-                    end: endDateTime,
-                    description: `班別: ${shift.type}${shift.notes ? '\n備註: ' + shift.notes : ''}`
-                };
-            });
-
-            if (!events.length) {
-                showNotification('沒有排班資料可同步');
-                return;
-            }
-            // 取得診所地點設定（若有）
-            let clinicLocation = '';
-            try {
-                const clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
-                if (clinicSettings && clinicSettings.address) {
-                    clinicLocation = clinicSettings.address;
-                }
-            } catch (_e) {
-                /* 忽略解析錯誤 */
-            }
-            const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-            /*
-             * 逐一開啟 Google Calendar 建立事件頁面。為避免瀏覽器阻擋非使用者觸發的
-             * 彈出視窗，不再使用 setTimeout 延遲開啟，而是在同一個使用者事件處理程式
-             * 中連續呼叫 window.open。這樣瀏覽器會認為這些呼叫都是直接由點擊觸發，
-             * 因此允許一次開啟多個分頁，避免只能建立第一個事件的問題。
-             */
-            for (const event of events) {
-                const params = new URLSearchParams({
-                    text: event.title,
-                    dates: `${event.start.replace(/[-:]/g, '')}/${event.end.replace(/[-:]/g, '')}`,
-                    details: event.description
-                });
-                if (clinicLocation) {
-                    params.set('location', clinicLocation);
-                }
-                window.open(`${baseUrl}&${params.toString()}`, '_blank', 'noopener,noreferrer');
-            }
-            showNotification('正在開啟 Google Calendar...');
-        }
+        // 已移除同步至 Google Calendar 功能，原有程式碼已刪除
 
         // 匯出 iCal
         function exportToICal() {
