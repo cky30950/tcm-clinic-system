@@ -15459,13 +15459,34 @@ async function exportClinicBackup() {
             console.error('讀取套票資料失敗:', e);
         }
         const billingData = Array.isArray(billingItems) ? billingItems : [];
-        // 組合備份資料：僅包含病人資料、診症記錄、用戶資料、套票資料與收費項目
+        // 讀取 Realtime Database 所有資料並移除掛號及問診相關資料
+        let rtdbBackupData = {};
+        try {
+            const rootSnap = await window.firebase.get(
+                window.firebase.ref(window.firebase.rtdb)
+            );
+            if (rootSnap && rootSnap.exists()) {
+                rtdbBackupData = rootSnap.val() || {};
+            }
+        } catch (e) {
+            console.warn('匯出備份時取得 Realtime Database 資料失敗:', e);
+        }
+        // 移除實時掛號與問診資料節點（若存在）
+        if (rtdbBackupData && typeof rtdbBackupData === 'object') {
+            delete rtdbBackupData.appointments;
+            delete rtdbBackupData.consultations;
+            delete rtdbBackupData.consultation;
+            delete rtdbBackupData.onlineConsultations;
+        }
+        // 組合備份資料：包含病人資料、診症記錄、用戶資料、套票資料、收費項目以及 Realtime Database 的其他資料
         const backup = {
             patients: patientsData,
             consultations: consultationsData,
             users: usersData,
             billingItems: billingData,
-            patientPackages: packageData
+            patientPackages: packageData,
+            // 將 RTDB 資料存於 rtdb 屬性中，方便還原
+            rtdb: rtdbBackupData
         };
         const json = JSON.stringify(backup, null, 2);
         const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
@@ -15514,14 +15535,27 @@ async function handleBackupFile(file) {
     }
     const button = document.getElementById('backupImportBtn');
     setButtonLoading(button);
-    // 顯示匯入進度條。只需還原病人資料、診症記錄、用戶資料、套票資料與收費項目
-    // 因此步驟數調整為 5
-    const totalStepsForBackupImport = 5;
-    showBackupProgressBar(totalStepsForBackupImport);
     try {
+        // 讀取使用者選擇的檔案內容
         const text = await file.text();
         const data = JSON.parse(text);
-        // 傳入進度回調以更新匯入進度。進度步驟預設為 5
+        // 動態計算需要匯入的步驟數：預設 5 個步驟（patients、consultations、users、billingItems、patientPackages），
+        // 若包含 Realtime Database 備份資料，則再加 1
+        let totalStepsForBackupImport = 5;
+        try {
+            if (data && typeof data === 'object') {
+                const rtdbBackup = data.rtdb || data.rtdbData || data.realtimeDatabase;
+                if (rtdbBackup && typeof rtdbBackup === 'object') {
+                    totalStepsForBackupImport += 1;
+                }
+            }
+        } catch (_calcErr) {
+            // 若計算步驟數失敗，仍使用預設值
+            totalStepsForBackupImport = 5;
+        }
+        // 顯示匯入進度條，使用計算出的步驟總數
+        showBackupProgressBar(totalStepsForBackupImport);
+        // 傳入進度回調以更新匯入進度條
         await importClinicBackup(data, function(step, total) {
             updateBackupProgressBar(step, total);
         }, totalStepsForBackupImport);
@@ -15538,7 +15572,7 @@ async function handleBackupFile(file) {
 }
 
 /**
- * 將備份資料寫回 Firestore，覆蓋現有資料。Realtime Database 資料不受影響。
+ * 將備份資料寫回 Firestore 與 Realtime Database，覆蓋現有資料（Realtime Database 僅還原非掛號與問診資料）。
  * @param {Object} data 備份物件
  */
 async function importClinicBackup(data) {
@@ -15630,26 +15664,121 @@ async function importClinicBackup(data) {
             console.error('更新 ' + collectionName + ' 資料時發生錯誤:', err);
         }
     }
+    // helper：覆蓋 Realtime Database 根節點資料（除 appointments 與問診相關資料外）
+    async function replaceRealtimeDatabase(rtdbObj) {
+        try {
+            if (!rtdbObj || typeof rtdbObj !== 'object') return;
+            // 取得現有的 RTDB 根節點資料
+            let existingSnap;
+            try {
+                existingSnap = await window.firebase.get(
+                    window.firebase.ref(window.firebase.rtdb)
+                );
+            } catch (_e) {
+                existingSnap = null;
+            }
+            const existingData = existingSnap && existingSnap.exists() ? existingSnap.val() : {};
+            // 判斷需要刪除的節點：現有但不在新資料內，且不屬於排除的節點
+            const keysToDelete = [];
+            if (existingData && typeof existingData === 'object') {
+                for (const key of Object.keys(existingData)) {
+                    if (
+                        key === 'appointments' ||
+                        key === 'consultations' ||
+                        key === 'consultation' ||
+                        key === 'onlineConsultations'
+                    ) {
+                        continue;
+                    }
+                    if (!Object.prototype.hasOwnProperty.call(rtdbObj, key)) {
+                        keysToDelete.push(key);
+                    }
+                }
+            }
+            // 刪除不再需要的節點
+            for (const key of keysToDelete) {
+                try {
+                    await window.firebase.remove(
+                        window.firebase.ref(window.firebase.rtdb, key)
+                    );
+                } catch (_delErr) {
+                    console.error(
+                        '刪除 Realtime Database 節點 ' + key + ' 時發生錯誤:',
+                        _delErr
+                    );
+                }
+            }
+            // 寫入新的資料
+            for (const key of Object.keys(rtdbObj)) {
+                const value = rtdbObj[key];
+                // 跳過排除的節點（以防備份中包含）
+                if (
+                    key === 'appointments' ||
+                    key === 'consultations' ||
+                    key === 'consultation' ||
+                    key === 'onlineConsultations'
+                ) {
+                    continue;
+                }
+                try {
+                    await window.firebase.set(
+                        window.firebase.ref(window.firebase.rtdb, key),
+                        value
+                    );
+                } catch (_setErr) {
+                    console.error(
+                        '寫入 Realtime Database 節點 ' + key + ' 時發生錯誤:',
+                        _setErr
+                    );
+                }
+            }
+        } catch (err) {
+            console.error('更新 Realtime Database 資料時發生錯誤:', err);
+        }
+    }
+
     // 覆蓋各集合並更新進度
     let stepCount = 0;
+    // 先還原 Realtime Database 資料（若有提供），此為額外的一步
+    const rtdbBackup = data && (data.rtdb || data.rtdbData || data.realtimeDatabase);
+    if (rtdbBackup && typeof rtdbBackup === 'object') {
+        await replaceRealtimeDatabase(rtdbBackup);
+        stepCount++;
+        if (progressCallback) progressCallback(stepCount, totalSteps);
+    }
     // 覆蓋需要還原的集合，順序為：patients -> consultations -> users -> billingItems -> patientPackages
-    await replaceCollection('patients', Array.isArray(data.patients) ? data.patients : []);
+    await replaceCollection(
+        'patients',
+        Array.isArray(data.patients) ? data.patients : []
+    );
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
 
-    await replaceCollection('consultations', Array.isArray(data.consultations) ? data.consultations : []);
+    await replaceCollection(
+        'consultations',
+        Array.isArray(data.consultations) ? data.consultations : []
+    );
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
 
-    await replaceCollection('users', Array.isArray(data.users) ? data.users : []);
+    await replaceCollection(
+        'users',
+        Array.isArray(data.users) ? data.users : []
+    );
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
 
-    await replaceCollection('billingItems', Array.isArray(data.billingItems) ? data.billingItems : []);
+    await replaceCollection(
+        'billingItems',
+        Array.isArray(data.billingItems) ? data.billingItems : []
+    );
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
 
-    await replaceCollection('patientPackages', Array.isArray(data.patientPackages) ? data.patientPackages : []);
+    await replaceCollection(
+        'patientPackages',
+        Array.isArray(data.patientPackages) ? data.patientPackages : []
+    );
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
     /*
@@ -15744,6 +15873,26 @@ async function importClinicBackup(data) {
             localStorage.setItem('billingItems', JSON.stringify(billingItems));
         } catch (_lsErr) {
             // 忽略 localStorage 錯誤
+        }
+        // 若備份中包含 Realtime Database 的 herbInventory，更新本地快取及全域狀態
+        try {
+            const rtdbBackupForHerb = data && (data.rtdb || data.rtdbData || data.realtimeDatabase);
+            if (
+                rtdbBackupForHerb &&
+                typeof rtdbBackupForHerb === 'object' &&
+                rtdbBackupForHerb.herbInventory &&
+                typeof rtdbBackupForHerb.herbInventory === 'object'
+            ) {
+                herbInventory = { ...rtdbBackupForHerb.herbInventory };
+                herbInventoryInitialized = true;
+                try {
+                    localStorage.setItem('herbInventory', JSON.stringify(herbInventory));
+                } catch (_herbErr) {
+                    // 忽略 localStorage 錯誤
+                }
+            }
+        } catch (_ignore) {
+            // 忽略 herbInventory 更新錯誤
         }
         // 更新病人總數快取
         patientsCountCache = Array.isArray(patientCache) ? patientCache.length : 0;
