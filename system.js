@@ -1172,10 +1172,10 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
         const pageSize = paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage
             ? paginationSettings.patientList.itemsPerPage
             : 10;
-        // 建立基礎查詢：依照 patientNumber 由新至舊排序
+        // 建立基礎查詢：依照 createdAt 由新至舊排序
         let q = window.firebase.firestoreQuery(
             window.firebase.collection(window.firebase.db, 'patients'),
-            window.firebase.orderBy('patientNumber', 'desc'),
+            window.firebase.orderBy('createdAt', 'desc'),
             window.firebase.limit(pageSize)
         );
         // 如果頁碼大於 1，且前一頁已記錄最後一筆文件，則以該文件為起點
@@ -3656,22 +3656,29 @@ async function loadPatientListFromFirebase() {
                 console.error('搜尋病人時發生錯誤:', _searchErr);
             }
             let filteredPatients = (searchResult && searchResult.success && Array.isArray(searchResult.data)) ? searchResult.data : [];
-            // 為確保「編號最新」的病人優先顯示，改為依照病人編號排序。
-            // patientNumber 格式為 'P' 加上數字，例如 'P000001'。
-            // 解析數字並以降序排列，沒有有效編號的病人視為 0。
+            // 依照 createdAt 由新至舊排序
             filteredPatients = filteredPatients.slice();
             filteredPatients.sort((a, b) => {
-                const numA = (() => {
-                    const pn = a && a.patientNumber ? String(a.patientNumber) : '';
-                    const match = pn.match(/\d+/);
-                    return match ? parseInt(match[0], 10) : 0;
-                })();
-                const numB = (() => {
-                    const pn = b && b.patientNumber ? String(b.patientNumber) : '';
-                    const match = pn.match(/\d+/);
-                    return match ? parseInt(match[0], 10) : 0;
-                })();
-                return numB - numA;
+                // 取用 createdAt 或 updatedAt 作為排序依據，若無則設定為最早
+                let dateA = 0;
+                let dateB = 0;
+                if (a && a.createdAt) {
+                    if (a.createdAt.seconds) {
+                        dateA = a.createdAt.seconds * 1000;
+                    } else {
+                        const d = new Date(a.createdAt);
+                        dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                    }
+                }
+                if (b && b.createdAt) {
+                    if (b.createdAt.seconds) {
+                        dateB = b.createdAt.seconds * 1000;
+                    } else {
+                        const d = new Date(b.createdAt);
+                        dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                    }
+                }
+                return dateB - dateA;
             });
             patientListFiltered = filteredPatients;
             renderPatientListTable(false);
@@ -3734,22 +3741,31 @@ function renderPatientListTable(pageChange = false) {
     if (!pageChange) {
         paginationSettings.patientList.currentPage = 1;
     }
-    // 在渲染表格之前，根據病人編號由新到舊排序病人資料。
+    // 在渲染表格之前，根據建立時間 (createdAt) 由新到舊排序病人資料
     // 由於 patientListFiltered 可能已經按照其他條件排序，在這裡額外排序可以
-    // 確保「編號最新」的病人顯示在列表上方。當 patientNumber 不存在時視為 0。
+    // 確保「創建時間最新」的病人顯示在列表上方。當 createdAt 不存在時，將其
+    // 時間值視為 0，這樣會將沒有時間戳的資料排在最後。
     if (Array.isArray(patientListFiltered) && patientListFiltered.length > 1) {
         patientListFiltered.sort((a, b) => {
-            const numA = (() => {
-                const pn = a && a.patientNumber ? String(a.patientNumber) : '';
-                const match = pn.match(/\d+/);
-                return match ? parseInt(match[0], 10) : 0;
-            })();
-            const numB = (() => {
-                const pn = b && b.patientNumber ? String(b.patientNumber) : '';
-                const match = pn.match(/\d+/);
-                return match ? parseInt(match[0], 10) : 0;
-            })();
-            return numB - numA;
+            let dateA = 0;
+            let dateB = 0;
+            if (a && a.createdAt) {
+                if (a.createdAt.seconds !== undefined) {
+                    dateA = a.createdAt.seconds * 1000;
+                } else {
+                    const d = new Date(a.createdAt);
+                    dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                }
+            }
+            if (b && b.createdAt) {
+                if (b.createdAt.seconds !== undefined) {
+                    dateB = b.createdAt.seconds * 1000;
+                } else {
+                    const d = new Date(b.createdAt);
+                    dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                }
+            }
+            return dateB - dateA;
         });
     }
     const totalItems = patientListFiltered.length;
@@ -3871,21 +3887,29 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
     // 判斷是否具有刪除權限
     // 刪除權限開放給診所管理者、護理師與醫師
     const showDelete = currentUserData && currentUserData.position && ['診所管理', '護理師', '醫師'].includes(currentUserData.position.trim());
-    // 先按照病人編號將頁面項目由新到舊排序，確保最新編號的病人位於最前面。
+    // 先按照建立時間 (createdAt) 將頁面項目由新到舊排序，確保最新建立的病人位於最前面。
     let sortedPageItems;
     if (Array.isArray(pageItems) && pageItems.length > 1) {
         sortedPageItems = pageItems.slice().sort((a, b) => {
-            const numA = (() => {
-                const pn = a && a.patientNumber ? String(a.patientNumber) : '';
-                const match = pn.match(/\d+/);
-                return match ? parseInt(match[0], 10) : 0;
-            })();
-            const numB = (() => {
-                const pn = b && b.patientNumber ? String(b.patientNumber) : '';
-                const match = pn.match(/\d+/);
-                return match ? parseInt(match[0], 10) : 0;
-            })();
-            return numB - numA;
+            let dateA = 0;
+            let dateB = 0;
+            if (a && a.createdAt) {
+                if (a.createdAt.seconds !== undefined) {
+                    dateA = a.createdAt.seconds * 1000;
+                } else {
+                    const d = new Date(a.createdAt);
+                    dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                }
+            }
+            if (b && b.createdAt) {
+                if (b.createdAt.seconds !== undefined) {
+                    dateB = b.createdAt.seconds * 1000;
+                } else {
+                    const d = new Date(b.createdAt);
+                    dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
+                }
+            }
+            return dateB - dateA;
         });
     } else {
         sortedPageItems = pageItems;
@@ -11055,10 +11079,45 @@ async function initializeSystemAfterLogin() {
                         return false;
                     }
                 }) : [];
-                const totalAll = searchFiltered.length;
-                const totalHerbsAll = searchFiltered.filter(item => item.type === 'herb').length;
-                const totalFormulasAll = searchFiltered.filter(item => item.type === 'formula').length;
-                // 新增計算已停用資料數量：根據庫存資訊中的 disabled 屬性
+                // 依據庫存的 disabled 屬性計算各類型總數。若 item 被標記為停用，
+                // 則不納入「全部」「中藥材」與「方劑」的總數統計。已停用的項目將單獨計算。
+                const totalAll = searchFiltered.filter(item => {
+                    try {
+                        if (typeof getHerbInventory === 'function') {
+                            const inv = getHerbInventory(item.id);
+                            // 不計算停用項目
+                            return !(inv && inv.disabled);
+                        }
+                    } catch (_e) {
+                        // 若取得庫存資訊失敗則視為啟用
+                    }
+                    return true;
+                }).length;
+                const totalHerbsAll = searchFiltered.filter(item => {
+                    if (item.type !== 'herb') return false;
+                    try {
+                        if (typeof getHerbInventory === 'function') {
+                            const inv = getHerbInventory(item.id);
+                            return !(inv && inv.disabled);
+                        }
+                    } catch (_e) {
+                        // 若無法取得庫存資訊，預設視為啟用
+                    }
+                    return true;
+                }).length;
+                const totalFormulasAll = searchFiltered.filter(item => {
+                    if (item.type !== 'formula') return false;
+                    try {
+                        if (typeof getHerbInventory === 'function') {
+                            const inv = getHerbInventory(item.id);
+                            return !(inv && inv.disabled);
+                        }
+                    } catch (_e) {
+                        // 預設視為啟用
+                    }
+                    return true;
+                }).length;
+                // 計算已停用資料數量：根據庫存資訊中的 disabled 屬性
                 const totalDisabledAll = searchFiltered.filter(item => {
                     try {
                         if (typeof getHerbInventory === 'function') {
@@ -11204,8 +11263,37 @@ async function initializeSystemAfterLogin() {
             // 計算當前篩選條件下各類型的總數（非頁面數量）
             // herbLibrary 包含中藥材與方劑兩種類型，這裡統計的是在篩選條件下
             // 所有符合條件的項目總數，避免只顯示當前頁的數量
-            const totalHerbsInFiltered = filteredItems.filter(item => item.type === 'herb').length;
-            const totalFormulasInFiltered = filteredItems.filter(item => item.type === 'formula').length;
+            // 計算當前篩選條件下各類型的總數（非頁面數量）
+            // 當篩選不是 "disabled" 時，已停用項目不納入統計；
+            // 若當前篩選為 "disabled"，則計算所有停用項目。
+            const totalHerbsInFiltered = filteredItems.filter(item => {
+                if (item.type !== 'herb') return false;
+                // 若當前篩選為 disabled，則全部計入
+                if (currentHerbFilter === 'disabled') return true;
+                try {
+                    if (typeof getHerbInventory === 'function') {
+                        const inv = getHerbInventory(item.id);
+                        // 僅計算未停用的項目
+                        return !(inv && inv.disabled);
+                    }
+                } catch (_e) {
+                    // 若無法取得庫存資訊，預設視為啟用
+                }
+                return true;
+            }).length;
+            const totalFormulasInFiltered = filteredItems.filter(item => {
+                if (item.type !== 'formula') return false;
+                if (currentHerbFilter === 'disabled') return true;
+                try {
+                    if (typeof getHerbInventory === 'function') {
+                        const inv = getHerbInventory(item.id);
+                        return !(inv && inv.disabled);
+                    }
+                } catch (_e) {
+                    // 預設視為啟用
+                }
+                return true;
+            }).length;
             // 按類型分組顯示分頁資料
             const herbsInPage = pageItems.filter(item => item.type === 'herb');
             const formulasInPage = pageItems.filter(item => item.type === 'formula');
