@@ -1147,6 +1147,26 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
     if (!forceRefresh && patientPagesCache[pageNumber]) {
         return patientPagesCache[pageNumber];
     }
+
+    /*
+     * 為解決跳頁顯示相同資料的問題，當使用者直接跳至第 N 頁時，若
+     * 之前的頁面尚未載入（缺少 patientPageCursors[N-1] 或
+     * patientPagesCache[N-1]），先依序載入所有前置頁面。
+     * 這樣可建立每一頁對應的游標，避免 Firestore 從頭開始查詢導致
+     * 取得相同資料。呼叫 fetchPatientsPage(i) 會遞迴執行此邏輯。
+     */
+    if (!forceRefresh && pageNumber > 1) {
+        const prevPage = pageNumber - 1;
+        // 如果缺少前一頁的游標或快取，逐頁載入缺失的頁面
+        if (!patientPageCursors[prevPage] || !patientPagesCache[prevPage]) {
+            for (let i = 1; i < pageNumber; i++) {
+                if (!patientPagesCache[i]) {
+                    await fetchPatientsPage(i, forceRefresh);
+                }
+            }
+        }
+    }
+
     await waitForFirebaseDb();
     try {
         const pageSize = paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage
