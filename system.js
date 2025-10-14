@@ -685,8 +685,7 @@ async function deleteCurrentUserAccount() {
         const confirmMsg = lang === 'en'
             ? 'Are you sure you want to delete your account?\nThis action cannot be undone.'
             : '確定要刪除您的帳號嗎？\n此操作無法復原！';
-        const confirmedDelAccount = await showConfirmation(confirmMsg, 'warning');
-        if (!confirmedDelAccount) {
+        if (!confirm(confirmMsg)) {
             return;
         }
         // 找到刪除按鈕並顯示讀取圈
@@ -1269,79 +1268,66 @@ async function fetchUsers(forceRefresh = false) {
             localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
         }
         
-        // 浮動提示功能改用 Toastr 提供視覺與功能性提示
+        // 浮動提示功能
         function showToast(message, type = 'info') {
-            // 將訊息翻譯為當前語言，如果可用
-            try {
-                if (window.t) {
-                    message = window.t(message);
-                } else {
-                    const lang = localStorage.getItem('lang') || 'zh';
-                    const dict = window.translations && window.translations[lang] || {};
-                    message = dict[message] || message;
-                }
-            } catch (e) {
-                // 若翻譯失敗則保持原訊息
+                 // 將訊息翻譯為當前語言，如果可用
+                 try {
+                     if (window.t) {
+                         message = window.t(message);
+                     } else {
+                         const lang = localStorage.getItem('lang') || 'zh';
+                         const dict = window.translations && window.translations[lang] || {};
+                         message = dict[message] || message;
+                     }
+                 } catch (e) {
+                     // 若翻譯失敗則保持原訊息
+                 }
+                 // 移除現有的提示
+            const existingToast = document.querySelector('.toast');
+            if (existingToast) {
+                existingToast.remove();
             }
-            // 設定 Toastr 選項：帶關閉按鈕與進度條，位置固定於右上角，顯示時間依訊息長度調整
-            const timeout = Math.max(3000, (message || '').length * 100);
-            toastr.options = {
-                closeButton: true,
-                progressBar: true,
-                positionClass: 'toast-top-right',
-                timeOut: timeout,
-                extendedTimeOut: timeout + 1000
+            
+            // 創建新的提示
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            // 設置圖標
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
             };
-            // 根據類型呼叫對應的 Toastr 方法
-            let method = 'info';
-            if (type === 'success') method = 'success';
-            else if (type === 'error') method = 'error';
-            else if (type === 'warning') method = 'warning';
-            else if (type === 'info') method = 'info';
-            toastr[method](message);
+            
+            toast.innerHTML = `
+                <div class="toast-icon">${icons[type] || icons.info}</div>
+                <div class="toast-content">${message}</div>
+            `;
+            
+            // 添加到頁面
+            document.body.appendChild(toast);
+            
+            // 顯示動畫
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 100);
+            
+            // 4秒後淡出並移除
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }, 4000);
         }
 
         // 將提示函式掛載到全域 window 對象，方便在其他模組呼叫。
         if (!window.showToast) {
             window.showToast = showToast;
-        }
-
-        /**
-         * 使用 SweetAlert2 顯示確認彈窗。
-         * 傳入訊息與圖示類型，返回一個 Promise，解析為布林值代表是否確認。
-         * 預設圖示為 warning。
-         * @param {string} message 提示訊息，可含換行符
-         * @param {string} type SweetAlert2 圖示類型，例如 'warning'、'info'、'question'
-         * @returns {Promise<boolean>} 使用者是否確認
-         */
-        async function showConfirmation(message, type = 'warning') {
-            // 翻譯訊息
-            try {
-                if (window.t) {
-                    message = window.t(message);
-                } else {
-                    const lang = localStorage.getItem('lang') || 'zh';
-                    const dict = window.translations && window.translations[lang] || {};
-                    message = dict[message] || message;
-                }
-            } catch (e) {
-                // 保持原訊息
-            }
-            const lang = localStorage.getItem('lang') || 'zh';
-            const okLabel = lang === 'en' ? 'OK' : '確定';
-            const cancelLabel = lang === 'en' ? 'Cancel' : '取消';
-            const result = await Swal.fire({
-                icon: type || 'warning',
-                html: (message || '').replace(/\n/g, '<br/>'),
-                showCancelButton: true,
-                confirmButtonText: okLabel,
-                cancelButtonText: cancelLabel,
-                focusConfirm: false
-            });
-            return !!(result && result.isConfirmed);
-        }
-        if (!window.showConfirmation) {
-            window.showConfirmation = showConfirmation;
         }
 
         // 播放候診提醒音效
@@ -4019,8 +4005,7 @@ async function deletePatient(id) {
         const zhConfirmMsg = `確定要刪除病人「${patient.name}」的資料嗎？\n\n注意：相關的診症記錄、掛號及套票也會一併刪除！`;
         const enConfirmMsg = `Are you sure you want to delete the patient \"${patient.name}\"?\n\nNote: related consultation records, appointments and packages will also be deleted.`;
         const confirmMessage = lang === 'en' ? enConfirmMsg : zhConfirmMsg;
-        const confirmedDelPatient = await showConfirmation(confirmMessage, 'warning');
-        if (confirmedDelPatient) {
+        if (confirm(confirmMessage)) {
             // 顯示刪除中狀態
             showToast('刪除中...', 'info');
 
@@ -6272,8 +6257,7 @@ async function removeAppointment(appointmentId) {
         const zhMsg = `確定要移除 ${patient.name} 的掛號嗎？\n\n狀態：${statusTextZh}\n掛號時間：${timeStr}\n\n注意：此操作無法復原！`;
         const enMsg = `Are you sure you want to remove the registration for ${patient.name}?\n\nStatus: ${statusTextEn}\nRegistration time: ${timeStr}\n\nNote: this action cannot be undone!`;
         const confirmMsg = lang2 === 'en' ? enMsg : zhMsg;
-        const confirmedRemove = await showConfirmation(confirmMsg, 'warning');
-        if (confirmedRemove) {
+        if (confirm(confirmMsg)) {
             // 從掛號列表中移除
             appointments = appointments.filter(apt => apt.id !== appointmentId);
             localStorage.setItem('appointments', JSON.stringify(appointments));
@@ -6394,8 +6378,7 @@ async function startConsultation(appointmentId) {
             const zhMsg2 = `您目前正在為 ${consultingPatientName} 診症。\n\n是否要結束該病人的診症並開始為 ${patient.name} 診症？\n\n注意：${consultingPatientName} 的狀態將改回候診中。`;
             const enMsg2 = `You are currently consulting ${consultingPatientName}.\n\nDo you want to finish that patient's consultation and start consulting ${patient.name}?\n\nNote: ${consultingPatientName}'s status will revert to waiting.`;
             const confirmMsg2 = lang3 === 'en' ? enMsg2 : zhMsg2;
-            const confirmedSwitch = await showConfirmation(confirmMsg2, 'warning');
-            if (confirmedSwitch) {
+            if (confirm(confirmMsg2)) {
                 consultingAppointment.status = 'waiting';
                 delete consultingAppointment.consultationStartTime;
                 delete consultingAppointment.consultingDoctor;
@@ -6806,8 +6789,7 @@ async function showConsultationForm(appointment) {
                     const zhMsg5 = `確定要取消 ${patient.name} 的診症嗎？\n\n病人狀態將回到候診中，已填寫的診症內容將會遺失。\n\n注意：此操作無法復原！`;
                     const enMsg5 = `Are you sure you want to cancel the consultation for ${patient.name}?\n\nThe patient's status will return to waiting, and any filled consultation content will be lost.\n\nNote: this action cannot be undone!`;
                     const confirmMsg5 = lang5 === 'en' ? enMsg5 : zhMsg5;
-                    const confirmedCancel = await showConfirmation(confirmMsg5, 'warning');
-                    if (confirmedCancel) {
+                    if (confirm(confirmMsg5)) {
                         // 將狀態改回候診中
                         appointment.status = 'waiting';
                         delete appointment.consultationStartTime;
@@ -6886,7 +6868,7 @@ async function saveConsultation() {
                     const lang6 = localStorage.getItem('lang') || 'zh';
                     const zhMsg6 = `套票「${item.name}」購買成功！\n\n是否立即使用第一次？\n\n套票詳情：\n• 總次數：${item.packageUses} 次\n• 有效期：${item.validityDays} 天`;
                     const enMsg6 = `Package \"${item.name}\" purchased successfully!\n\nDo you want to use the first session now?\n\nPackage details:\n• Total uses: ${item.packageUses}\n• Valid for: ${item.validityDays} days`;
-                    const confirmUse = await showConfirmation(lang6 === 'en' ? enMsg6 : zhMsg6, 'question');
+                    const confirmUse = confirm(lang6 === 'en' ? enMsg6 : zhMsg6);
                     // 如使用者選擇立即使用，先在收費列表中加入一個套票使用項目（尚未取得 packageRecordId）
                     let usageItemId = null;
                     if (confirmUse) {
@@ -9988,8 +9970,7 @@ async function withdrawConsultation(appointmentId) {
         const zhMsg7 = `確定要撤回 ${patient.name} 的診症嗎？\n\n此操作將會：\n• 刪除該次病歷記錄\n• 病人狀態回到「已掛號」\n• 退回本次病歷使用的套票\n• 所有診症資料將永久遺失\n\n診斷：${consultation.diagnosis || '無記錄'}\n\n注意：此操作無法復原！`;
         const enMsg7 = `Are you sure you want to retract the consultation for ${patient.name}?\n\nThis action will:\n• Delete this medical record\n• Revert the patient's status to 'Registered'\n• Return the package used for this record\n• Permanently erase all consultation data\n\nDiagnosis: ${consultation.diagnosis || 'No record'}\n\nNote: this action cannot be undone!`;
         const confirmMsg7 = lang7 === 'en' ? enMsg7 : zhMsg7;
-        const confirmedRetract = await showConfirmation(confirmMsg7, 'warning');
-        if (!confirmedRetract) {
+        if (!confirm(confirmMsg7)) {
             return;
         }
     // 刪除診症記錄
@@ -10279,8 +10260,7 @@ async function editMedicalRecord(appointmentId) {
             const zhMsg4 = `您目前正在為 ${consultingPatientName} 診症。\n\n是否要結束該病人的診症並開始修改 ${patient.name} 的病歷？\n\n注意：${consultingPatientName} 的狀態將改回候診中。`;
             const enMsg4 = `You are currently consulting ${consultingPatientName}.\n\nDo you want to finish that patient's consultation and start editing ${patient.name}'s medical record?\n\nNote: ${consultingPatientName}'s status will revert to waiting.`;
             const msg4 = lang4 === 'en' ? enMsg4 : zhMsg4;
-            const confirmEdit = await showConfirmation(msg4, 'warning');
-            if (confirmEdit) {
+            if (confirm(msg4)) {
                 // 結束當前診症的病人
                 consultingAppointment.status = 'waiting';
                 delete consultingAppointment.consultationStartTime;
@@ -12266,7 +12246,7 @@ async function initializeSystemAfterLogin() {
                 const langDel = localStorage.getItem('lang') || 'zh';
                 const zhMsgDel = `確定要刪除收費項目「${item.name}」嗎？\n\n此操作無法復原！`;
                 const enMsgDel = `Are you sure you want to delete the billing item \"${item.name}\"?\n\nThis action cannot be undone!`;
-                const confirmDel = await showConfirmation(langDel === 'en' ? enMsgDel : zhMsgDel, 'warning');
+                const confirmDel = confirm(langDel === 'en' ? enMsgDel : zhMsgDel);
                 if (confirmDel) {
                     billingItems = billingItems.filter(b => String(b.id) !== idStr);
                     try {
@@ -14626,8 +14606,7 @@ async function toggleUserStatus(id) {
     const actionEn = user.active ? 'disable' : 'enable';
     const enMsg8 = `Are you sure you want to ${actionEn} user \"${user.name}\"?\n\n${user.active ? 'Once disabled, this user will not be able to log in.' : 'Once enabled, this user will be able to log in normally.'}`;
     const confirmMsg8 = lang8 === 'en' ? enMsg8 : zhMsg8;
-    const confirmedToggle = await showConfirmation(confirmMsg8, 'warning');
-    if (confirmedToggle) {
+    if (confirm(confirmMsg8)) {
         // 顯示處理中狀態
         showToast('處理中...', 'info');
 
@@ -14716,8 +14695,7 @@ async function deleteUser(id) {
     const zhMsg9 = `確定要刪除用戶「${user.name}」嗎？\n\n職位：${user.position}\n電子郵件：${user.email || '未設定'}\n\n注意：此操作無法復原！`;
     const enMsg9 = `Are you sure you want to delete user \"${user.name}\"?\n\nPosition: ${user.position}\nEmail: ${user.email || 'Not set'}\n\nNote: this action cannot be undone!`;
     const confirmMsg9 = lang9 === 'en' ? enMsg9 : zhMsg9;
-    const confirmedDelUser = await showConfirmation(confirmMsg9, 'warning');
-    if (confirmedDelUser) {
+    if (confirm(confirmMsg9)) {
         // 顯示刪除中狀態
         showToast('刪除中...', 'info');
 
@@ -15481,34 +15459,35 @@ async function exportClinicBackup() {
             console.error('讀取套票資料失敗:', e);
         }
         const billingData = Array.isArray(billingItems) ? billingItems : [];
-        // 讀取 Realtime Database 資料，排除即時掛號及診症資料
-        let rtdbData = null;
+        // 讀取 Realtime Database 所有資料並移除掛號及問診相關資料
+        let rtdbBackupData = {};
         try {
-            const rtdbSnap = await window.firebase.get(window.firebase.ref(window.firebase.rtdb));
-            const allRtdb = (rtdbSnap && rtdbSnap.exists()) ? rtdbSnap.val() : {};
-            if (allRtdb && typeof allRtdb === 'object') {
-                rtdbData = {};
-                for (const key of Object.keys(allRtdb)) {
-                    if (!['appointments', 'consultations', 'consultation', 'onlineConsultations'].includes(key)) {
-                        rtdbData[key] = allRtdb[key];
-                    }
-                }
+            const rootSnap = await window.firebase.get(
+                window.firebase.ref(window.firebase.rtdb)
+            );
+            if (rootSnap && rootSnap.exists()) {
+                rtdbBackupData = rootSnap.val() || {};
             }
         } catch (e) {
-            console.warn('讀取 Realtime Database 資料失敗:', e);
-            rtdbData = null;
+            console.warn('匯出備份時取得 Realtime Database 資料失敗:', e);
         }
-        // 組合備份資料：僅包含病人資料、診症記錄、用戶資料、套票資料與收費項目，以及可選的 Realtime Database
+        // 移除實時掛號與問診資料節點（若存在）
+        if (rtdbBackupData && typeof rtdbBackupData === 'object') {
+            delete rtdbBackupData.appointments;
+            delete rtdbBackupData.consultations;
+            delete rtdbBackupData.consultation;
+            delete rtdbBackupData.onlineConsultations;
+        }
+        // 組合備份資料：包含病人資料、診症記錄、用戶資料、套票資料、收費項目以及 Realtime Database 的其他資料
         const backup = {
             patients: patientsData,
             consultations: consultationsData,
             users: usersData,
             billingItems: billingData,
-            patientPackages: packageData
+            patientPackages: packageData,
+            // 將 RTDB 資料存於 rtdb 屬性中，方便還原
+            rtdb: rtdbBackupData
         };
-        if (rtdbData) {
-            backup.rtdb = rtdbData;
-        }
         const json = JSON.stringify(backup, null, 2);
         const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
         const url = URL.createObjectURL(blob);
@@ -15550,32 +15529,33 @@ async function handleBackupFile(file) {
         const lang = localStorage.getItem('lang') || 'zh';
         const zhMsg = '匯入備份將覆蓋現有資料，確定要繼續嗎？';
         const enMsg = 'Importing a backup will overwrite existing data; are you sure you want to continue?';
-        const confirmed = await showConfirmation(lang === 'en' ? enMsg : zhMsg, 'warning');
-        if (!confirmed) {
+        if (!window.confirm(lang === 'en' ? enMsg : zhMsg)) {
             return;
         }
     }
     const button = document.getElementById('backupImportBtn');
     setButtonLoading(button);
-    // 動態計算匯入步驟。基本五步：patients、consultations、users、billingItems、patientPackages。
-    let totalStepsForBackupImport = 5;
-    let data;
     try {
+        // 讀取使用者選擇的檔案內容
         const text = await file.text();
-        data = JSON.parse(text);
-        if (data && typeof data.rtdb === 'object' && data.rtdb !== null) {
-            totalStepsForBackupImport++;
+        const data = JSON.parse(text);
+        // 動態計算需要匯入的步驟數：預設 5 個步驟（patients、consultations、users、billingItems、patientPackages），
+        // 若包含 Realtime Database 備份資料，則再加 1
+        let totalStepsForBackupImport = 5;
+        try {
+            if (data && typeof data === 'object') {
+                const rtdbBackup = data.rtdb || data.rtdbData || data.realtimeDatabase;
+                if (rtdbBackup && typeof rtdbBackup === 'object') {
+                    totalStepsForBackupImport += 1;
+                }
+            }
+        } catch (_calcErr) {
+            // 若計算步驟數失敗，仍使用預設值
+            totalStepsForBackupImport = 5;
         }
-    } catch (parseErr) {
-        console.error('讀取備份檔案失敗:', parseErr);
-        showToast('讀取備份檔案失敗，請確認檔案格式是否正確', 'error');
-        clearButtonLoading(button);
-        return;
-    }
-    // 顯示匯入進度條
-    showBackupProgressBar(totalStepsForBackupImport);
-    try {
-        // 傳入進度回調以更新匯入進度。第三個參數為總步驟數
+        // 顯示匯入進度條，使用計算出的步驟總數
+        showBackupProgressBar(totalStepsForBackupImport);
+        // 傳入進度回調以更新匯入進度條
         await importClinicBackup(data, function(step, total) {
             updateBackupProgressBar(step, total);
         }, totalStepsForBackupImport);
@@ -15592,7 +15572,7 @@ async function handleBackupFile(file) {
 }
 
 /**
- * 將備份資料寫回 Firestore，覆蓋現有資料。Realtime Database 資料不受影響。
+ * 將備份資料寫回 Firestore 與 Realtime Database，覆蓋現有資料（Realtime Database 僅還原非掛號與問診資料）。
  * @param {Object} data 備份物件
  */
 async function importClinicBackup(data) {
@@ -15684,50 +15664,123 @@ async function importClinicBackup(data) {
             console.error('更新 ' + collectionName + ' 資料時發生錯誤:', err);
         }
     }
-    // 覆蓋各集合並更新進度
-    let stepCount = 0;
-    // 覆蓋需要還原的集合，順序為：patients -> consultations -> users -> billingItems -> patientPackages
-    await replaceCollection('patients', Array.isArray(data.patients) ? data.patients : []);
-    stepCount++;
-    if (progressCallback) progressCallback(stepCount, totalSteps);
-
-    await replaceCollection('consultations', Array.isArray(data.consultations) ? data.consultations : []);
-    stepCount++;
-    if (progressCallback) progressCallback(stepCount, totalSteps);
-
-    await replaceCollection('users', Array.isArray(data.users) ? data.users : []);
-    stepCount++;
-    if (progressCallback) progressCallback(stepCount, totalSteps);
-
-    await replaceCollection('billingItems', Array.isArray(data.billingItems) ? data.billingItems : []);
-    stepCount++;
-    if (progressCallback) progressCallback(stepCount, totalSteps);
-
-    await replaceCollection('patientPackages', Array.isArray(data.patientPackages) ? data.patientPackages : []);
-    stepCount++;
-    if (progressCallback) progressCallback(stepCount, totalSteps);
-    // 如果備份包含 Realtime Database 資料，將其寫回
-    const rtdbData = data && typeof data.rtdb === 'object' ? data.rtdb : null;
-    if (rtdbData) {
+    // helper：覆蓋 Realtime Database 根節點資料（除 appointments 與問診相關資料外）
+    async function replaceRealtimeDatabase(rtdbObj) {
         try {
-            for (const key of Object.keys(rtdbData)) {
-                await window.firebase.set(window.firebase.ref(window.firebase.rtdb, key), rtdbData[key]);
+            if (!rtdbObj || typeof rtdbObj !== 'object') return;
+            // 取得現有的 RTDB 根節點資料
+            let existingSnap;
+            try {
+                existingSnap = await window.firebase.get(
+                    window.firebase.ref(window.firebase.rtdb)
+                );
+            } catch (_e) {
+                existingSnap = null;
             }
-            // 更新本地中藥庫存或其他即時資料快取
-            if (typeof initHerbInventory === 'function') {
-                await initHerbInventory(true);
-            } else if (rtdbData.herbInventory) {
+            const existingData = existingSnap && existingSnap.exists() ? existingSnap.val() : {};
+            // 判斷需要刪除的節點：現有但不在新資料內，且不屬於排除的節點
+            const keysToDelete = [];
+            if (existingData && typeof existingData === 'object') {
+                for (const key of Object.keys(existingData)) {
+                    if (
+                        key === 'appointments' ||
+                        key === 'consultations' ||
+                        key === 'consultation' ||
+                        key === 'onlineConsultations'
+                    ) {
+                        continue;
+                    }
+                    if (!Object.prototype.hasOwnProperty.call(rtdbObj, key)) {
+                        keysToDelete.push(key);
+                    }
+                }
+            }
+            // 刪除不再需要的節點
+            for (const key of keysToDelete) {
                 try {
-                    herbInventory = rtdbData.herbInventory || {};
-                    herbInventoryInitialized = true;
-                } catch (_e) {}
+                    await window.firebase.remove(
+                        window.firebase.ref(window.firebase.rtdb, key)
+                    );
+                } catch (_delErr) {
+                    console.error(
+                        '刪除 Realtime Database 節點 ' + key + ' 時發生錯誤:',
+                        _delErr
+                    );
+                }
+            }
+            // 寫入新的資料
+            for (const key of Object.keys(rtdbObj)) {
+                const value = rtdbObj[key];
+                // 跳過排除的節點（以防備份中包含）
+                if (
+                    key === 'appointments' ||
+                    key === 'consultations' ||
+                    key === 'consultation' ||
+                    key === 'onlineConsultations'
+                ) {
+                    continue;
+                }
+                try {
+                    await window.firebase.set(
+                        window.firebase.ref(window.firebase.rtdb, key),
+                        value
+                    );
+                } catch (_setErr) {
+                    console.error(
+                        '寫入 Realtime Database 節點 ' + key + ' 時發生錯誤:',
+                        _setErr
+                    );
+                }
             }
         } catch (err) {
-            console.error('還原 Realtime Database 資料時發生錯誤:', err);
+            console.error('更新 Realtime Database 資料時發生錯誤:', err);
         }
+    }
+
+    // 覆蓋各集合並更新進度
+    let stepCount = 0;
+    // 先還原 Realtime Database 資料（若有提供），此為額外的一步
+    const rtdbBackup = data && (data.rtdb || data.rtdbData || data.realtimeDatabase);
+    if (rtdbBackup && typeof rtdbBackup === 'object') {
+        await replaceRealtimeDatabase(rtdbBackup);
         stepCount++;
         if (progressCallback) progressCallback(stepCount, totalSteps);
     }
+    // 覆蓋需要還原的集合，順序為：patients -> consultations -> users -> billingItems -> patientPackages
+    await replaceCollection(
+        'patients',
+        Array.isArray(data.patients) ? data.patients : []
+    );
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
+    await replaceCollection(
+        'consultations',
+        Array.isArray(data.consultations) ? data.consultations : []
+    );
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
+    await replaceCollection(
+        'users',
+        Array.isArray(data.users) ? data.users : []
+    );
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
+    await replaceCollection(
+        'billingItems',
+        Array.isArray(data.billingItems) ? data.billingItems : []
+    );
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
+
+    await replaceCollection(
+        'patientPackages',
+        Array.isArray(data.patientPackages) ? data.patientPackages : []
+    );
+    stepCount++;
+    if (progressCallback) progressCallback(stepCount, totalSteps);
     /*
      * 匯入完成後更新本地快取並刷新應用程式資料。
      * 為了節省 Firebase 讀取量，我們直接將備份資料寫入快取與全域變數，
@@ -15820,6 +15873,26 @@ async function importClinicBackup(data) {
             localStorage.setItem('billingItems', JSON.stringify(billingItems));
         } catch (_lsErr) {
             // 忽略 localStorage 錯誤
+        }
+        // 若備份中包含 Realtime Database 的 herbInventory，更新本地快取及全域狀態
+        try {
+            const rtdbBackupForHerb = data && (data.rtdb || data.rtdbData || data.realtimeDatabase);
+            if (
+                rtdbBackupForHerb &&
+                typeof rtdbBackupForHerb === 'object' &&
+                rtdbBackupForHerb.herbInventory &&
+                typeof rtdbBackupForHerb.herbInventory === 'object'
+            ) {
+                herbInventory = { ...rtdbBackupForHerb.herbInventory };
+                herbInventoryInitialized = true;
+                try {
+                    localStorage.setItem('herbInventory', JSON.stringify(herbInventory));
+                } catch (_herbErr) {
+                    // 忽略 localStorage 錯誤
+                }
+            }
+        } catch (_ignore) {
+            // 忽略 herbInventory 更新錯誤
         }
         // 更新病人總數快取
         patientsCountCache = Array.isArray(patientCache) ? patientCache.length : 0;
@@ -15921,8 +15994,7 @@ async function handleTemplateImportFile(file) {
       const lang = localStorage.getItem('lang') || 'zh';
       const zhMsg = '匯入模板資料將新增資料（不會刪除現有模板庫資料），是否繼續？';
       const enMsg = 'Importing template data will add new entries (existing template library data will not be deleted). Do you want to continue?';
-      const confirmedTemplate = await showConfirmation(lang === 'en' ? enMsg : zhMsg, 'warning');
-      if (!confirmedTemplate) {
+      if (!window.confirm(lang === 'en' ? enMsg : zhMsg)) {
         return;
       }
     }
@@ -16175,8 +16247,7 @@ async function handleHerbImportFile(file) {
       const lang = localStorage.getItem('lang') || 'zh';
       const zhMsg = '匯入中藥資料將新增資料（不會刪除現有中藥庫資料），是否繼續？';
       const enMsg = 'Importing herbal data will add new entries (existing herb library data will not be deleted). Do you want to continue?';
-      const confirmedHerb = await showConfirmation(lang === 'en' ? enMsg : zhMsg, 'warning');
-      if (!confirmedHerb) {
+      if (!window.confirm(lang === 'en' ? enMsg : zhMsg)) {
         return;
       }
     }
@@ -19339,7 +19410,7 @@ function closeMedicalRecordDetail() {
  * @param {string} recordId - 要刪除的病歷記錄 ID
  * @param {string} patientName - 病人名稱，用於提示中顯示
  */
-async function confirmDeleteMedicalRecord(recordId, patientName) {
+function confirmDeleteMedicalRecord(recordId, patientName) {
     try {
         const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
         let message;
@@ -19349,8 +19420,7 @@ async function confirmDeleteMedicalRecord(recordId, patientName) {
             // 中文提示
             message = `確定要刪除病歷「${patientName} - ${recordId}」嗎？\n此動作無法恢復！`;
         }
-        const confirmed = await showConfirmation(message, 'warning');
-        if (!confirmed) {
+        if (!window.confirm(message)) {
             return;
         }
         deleteMedicalRecord(recordId);
@@ -20895,14 +20965,13 @@ function refreshTemplateCategoryFilters() {
           }
 
 
-async function deleteHerbCombination(id) {
+function deleteHerbCombination(id) {
             // 刪除藥方組合確認訊息支援中英文
             {
               const lang = localStorage.getItem('lang') || 'zh';
               const zhMsg = '確定要刪除此藥方組合嗎？';
               const enMsg = 'Are you sure you want to delete this herb combination?';
-              const confirmed = await showConfirmation(lang === 'en' ? enMsg : zhMsg, 'warning');
-              if (!confirmed) return;
+              if (!confirm(lang === 'en' ? enMsg : zhMsg)) return;
             }
             herbCombinations = herbCombinations.filter(h => h.id !== id);
             renderHerbCombinations();
@@ -21071,14 +21140,13 @@ async function deleteHerbCombination(id) {
           }
 
 
-async function deleteAcupointCombination(id) {
+function deleteAcupointCombination(id) {
             // 刪除穴位組合確認訊息支援中英文
             {
               const lang = localStorage.getItem('lang') || 'zh';
               const zhMsg = '確定要刪除此穴位組合嗎？';
               const enMsg = 'Are you sure you want to delete this acupuncture combination?';
-              const confirmed = await showConfirmation(lang === 'en' ? enMsg : zhMsg, 'warning');
-              if (!confirmed) return;
+              if (!confirm(lang === 'en' ? enMsg : zhMsg)) return;
             }
             acupointCombinations = acupointCombinations.filter(a => a.id !== id);
             renderAcupointCombinations();
@@ -22148,14 +22216,13 @@ async function deleteAcupointCombination(id) {
             }
           }
 
-          async function removeCategory(type, index) {
+          function removeCategory(type, index) {
             // 刪除此分類確認訊息支援中英文
             {
               const lang = localStorage.getItem('lang') || 'zh';
               const zhMsg = '確定要刪除此分類嗎？';
               const enMsg = 'Are you sure you want to delete this category?';
-              const confirmed = await showConfirmation(lang === 'en' ? enMsg : zhMsg, 'warning');
-              if (!confirmed) {
+              if (!confirm(lang === 'en' ? enMsg : zhMsg)) {
                 return;
               }
             }
