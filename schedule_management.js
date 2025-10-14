@@ -1173,7 +1173,11 @@
 
             if (!staffId || !date || !startTime || !endTime || !type) {
                 // Show translated message when required fields are missing
-                alert(translate('請填寫所有必填欄位！'));
+                if (typeof window.showAlert === 'function') {
+                    window.showAlert(translate('請填寫所有必填欄位！'), 'warning');
+                } else {
+                    window.alert(translate('請填寫所有必填欄位！'));
+                }
                 // 釋放提交鎖定，讓使用者可以再次嘗試
                 shiftSubmitInProgress = false;
                 return;
@@ -1457,7 +1461,9 @@
             if (!ensureAdmin('清空所有排班')) {
                 return;
             }
-            if (confirm(translate('確定要清空所有排班嗎？此操作無法復原。'))) {
+            // 使用 SweetAlert2 的確認視窗
+            const confirmed = await window.showConfirm(translate('確定要清空所有排班嗎？此操作無法復原。'), 'warning');
+            if (confirmed) {
                 // 清除目前月份的所有排班
                 shifts = [];
                 // 從資料庫移除當月節點
@@ -1470,7 +1476,7 @@
                 }
                 renderCalendar();
                 updateStats();
-                showNotification(translate('所有排班已清空！'));
+                showNotification(translate('所有排班已清空！'), 'success');
             }
         }
 
@@ -1532,7 +1538,9 @@
                                  translate('備註：') + `${shift.notes || translate('無')}\n\n` +
                                  translate('此操作無法復原！');
             
-            if (confirm(confirmMessage)) {
+            // SweetAlert2 確認視窗
+            const confirmed = await window.showConfirm(confirmMessage, 'warning');
+            if (confirmed) {
                 const shiftIndex = shifts.findIndex(s => s.id == shiftId);
                 if (shiftIndex !== -1) {
                     // 儲存將要刪除的排班資訊，以便刪除資料庫
@@ -1547,9 +1555,9 @@
                     }
                     renderCalendar();
                     updateStats();
-                    showNotification(translate('排班已刪除！'));
+                    showNotification(translate('排班已刪除！'), 'success');
                 } else {
-                    showNotification(translate('刪除失敗：找不到排班資料！'));
+                    showNotification(translate('刪除失敗：找不到排班資料！'), 'error');
                 }
             }
         }
@@ -1559,16 +1567,22 @@
             const staffMember = findStaffById(shift.staffId);
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
             
-            // 顯示排班詳情，移除部門與狀態資訊以簡化顯示
-            // Display shift details with translated labels while preserving dynamic data.
-            alert(`${translate('排班詳情：')}
-${translate('姓名：')}${staffMember.name}
-${translate('職位：')}${staffMember.level}
-${translate('日期：')}${shift.date}
-${translate('時間：')}${shift.startTime} - ${shift.endTime} (${duration} ${translate('小時')})
-${translate('備註：')}${shift.notes || translate('無')}
-${translate('聯絡電話：')}${staffMember.phone}
-${translate('電子郵件：')}${staffMember.email}`);
+            // 組合排班詳情訊息，移除部門與狀態資訊以簡化顯示
+            const detailMsg =
+                translate('排班詳情：') + '\n' +
+                translate('姓名：') + staffMember.name + '\n' +
+                translate('職位：') + staffMember.level + '\n' +
+                translate('日期：') + shift.date + '\n' +
+                translate('時間：') + shift.startTime + ' - ' + shift.endTime + ' (' + duration + ' ' + translate('小時') + ')' + '\n' +
+                translate('備註：') + (shift.notes || translate('無')) + '\n' +
+                translate('聯絡電話：') + staffMember.phone + '\n' +
+                translate('電子郵件：') + staffMember.email;
+            // 使用 SweetAlert2 顯示詳細資訊
+            if (typeof window.showAlert === 'function') {
+                window.showAlert(detailMsg, 'info');
+            } else {
+                window.alert(detailMsg);
+            }
         }
 
         // 根據ID顯示排班詳情
@@ -1596,14 +1610,22 @@ ${translate('電子郵件：')}${staffMember.email}`);
 
 
         // 顯示通知
-        function showNotification(message) {
+        // 改用全域的 showToast 函式（由 Toastr 提供）來顯示提示訊息。
+        function showNotification(message, type = 'info') {
+            // 若已載入 Toastr 封裝的 showToast，則直接呼叫
+            if (typeof window.showToast === 'function') {
+                window.showToast(message, type);
+                return;
+            }
+            // 否則退回原本的 DOM 操作方式
             const notification = document.getElementById('notification');
-            notification.textContent = message;
-            notification.classList.add('show');
-            
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 3000);
+            if (notification) {
+                notification.textContent = message;
+                notification.classList.add('show');
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
         }
 
         // 固定排班功能
@@ -1669,7 +1691,11 @@ ${translate('電子郵件：')}${staffMember.email}`);
             }
             
             if (selectedDays.length === 0) {
-                alert(translate('請至少選擇一個工作日！'));
+                if (typeof window.showAlert === 'function') {
+                    window.showAlert(translate('請至少選擇一個工作日！'), 'warning');
+                } else {
+                    window.alert(translate('請至少選擇一個工作日！'));
+                }
                 return;
             }
             
@@ -1679,7 +1705,11 @@ ${translate('電子郵件：')}${staffMember.email}`);
                 startTime = document.getElementById('fixedStartTime').value;
                 endTime = document.getElementById('fixedEndTime').value;
                 if (!startTime || !endTime) {
-                    alert(translate('請設定自訂時間！'));
+                    if (typeof window.showAlert === 'function') {
+                        window.showAlert(translate('請設定自訂時間！'), 'warning');
+                    } else {
+                        window.alert(translate('請設定自訂時間！'));
+                    }
                     return;
                 }
             } else {
@@ -1714,8 +1744,12 @@ ${translate('電子郵件：')}${staffMember.email}`);
                     const startDateStr = document.getElementById('rangeStartDate').value;
                     const endDateStr = document.getElementById('rangeEndDate').value;
                     if (!startDateStr || !endDateStr) {
-                    alert(translate('請設定自訂日期範圍！'));
-                    return;
+                        if (typeof window.showAlert === 'function') {
+                            window.showAlert(translate('請設定自訂日期範圍！'), 'warning');
+                        } else {
+                            window.alert(translate('請設定自訂日期範圍！'));
+                        }
+                        return;
                     }
                     startDate = new Date(startDateStr);
                     endDate = new Date(endDateStr);
@@ -1834,7 +1868,12 @@ ${translate('電子郵件：')}${staffMember.email}`);
                 .sort((a, b) => new Date(a.date) - new Date(b.date));
             
             if (staffShifts.length === 0) {
-                alert(`${staffMember.name} ${translate('目前沒有排班記錄。')}`);
+                const noRecordMsg = `${staffMember.name} ${translate('目前沒有排班記錄。')}`;
+                if (typeof window.showAlert === 'function') {
+                    window.showAlert(noRecordMsg, 'info');
+                } else {
+                    window.alert(noRecordMsg);
+                }
                 return;
             }
             
@@ -1855,11 +1894,16 @@ ${translate('電子郵件：')}${staffMember.email}`);
                 if (shift.notes) scheduleText += `   ${translate('備註:')} ${shift.notes}\n`;
             });
             // Display the assembled schedule text
-            alert(scheduleText);
+            // 使用 SweetAlert2 彈窗呈現排班記錄
+            if (typeof window.showAlert === 'function') {
+                window.showAlert(scheduleText, 'info');
+            } else {
+                window.alert(scheduleText);
+            }
         }
 
         // 聯絡人員
-        function contactStaff(staffId) {
+        async function contactStaff(staffId) {
             const staffMember = findStaffById(staffId);
             // Build contact information using translated labels while preserving icons and data.
             const contactInfo = `${translate('聯絡')} ${staffMember.name}:\n\n` +
@@ -1868,7 +1912,9 @@ ${translate('電子郵件：')}${staffMember.email}`);
                               `🏥 ${translate('部門:')} ${staffMember.department}\n` +
                               `👔 ${translate('職位:')} ${staffMember.level}`;
             
-            if (confirm(contactInfo + '\n\n' + translate('要撥打電話嗎？'))) {
+            const confirmMsg = contactInfo + '\n\n' + translate('要撥打電話嗎？');
+            const confirmed = await window.showConfirm(confirmMsg, 'question');
+            if (confirmed) {
                 // 在實際應用中，這裡可以整合電話系統
                 window.open(`tel:${staffMember.phone}`, '_blank', 'noopener,noreferrer');
             }
@@ -1964,11 +2010,20 @@ ${translate('電子郵件：')}${staffMember.email}`);
                         try { printWin.print(); } catch (_) {} finally { printWin.close(); }
                     }, 300);
                 } else {
-                    alert(translate('無法開啟列印視窗，請檢查瀏覽器設定。'));
+                    // 顯示錯誤訊息
+                    if (typeof window.showAlert === 'function') {
+                        window.showAlert(translate('無法開啟列印視窗，請檢查瀏覽器設定。'), 'error');
+                    } else {
+                        window.alert(translate('無法開啟列印視窗，請檢查瀏覽器設定。'));
+                    }
                 }
             } catch (err) {
                 console.error('printCurrentMonthSchedule error', err);
-                alert(translate('列印排班表時發生錯誤！'));
+                if (typeof window.showAlert === 'function') {
+                    window.showAlert(translate('列印排班表時發生錯誤！'), 'error');
+                } else {
+                    window.alert(translate('列印排班表時發生錯誤！'));
+                }
             }
         }
 
