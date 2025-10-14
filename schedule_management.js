@@ -1453,13 +1453,42 @@
         // 檢查排班是否符合篩選條件
         function passesFilter(shift) {
             const staffMember = findStaffById(shift.staffId);
-            
-            // Do not filter by department.  The department filter has been
-            // removed from the UI, so always allow all departments.
-            if (currentFilters.role && staffMember.role !== currentFilters.role) return false;
+
+            // When the role filter is set to "self" we want to show only
+            // the current user's own shifts.  The current user information
+            // may be stored in several different global variables depending
+            // on how authentication data is loaded.  Try each possible
+            // location in turn to find a user object with an id.
+            if (currentFilters.role === 'self') {
+                let currentUser = null;
+                try {
+                    if (typeof currentUserData !== 'undefined' && currentUserData && currentUserData.id !== undefined) {
+                        currentUser = currentUserData;
+                    } else if (typeof window !== 'undefined' && window.currentUserData && window.currentUserData.id !== undefined) {
+                        currentUser = window.currentUserData;
+                    } else if (typeof window !== 'undefined' && window.currentUser && window.currentUser.id !== undefined) {
+                        currentUser = window.currentUser;
+                    }
+                } catch (_e) {
+                    // ignore errors when retrieving currentUser
+                    currentUser = null;
+                }
+                const currentUserId = currentUser && currentUser.id;
+                // If we cannot determine the current user's id or the shift
+                // does not belong to the current user, exclude the shift.
+                if (!currentUserId || String(shift.staffId) !== String(currentUserId)) return false;
+            } else {
+                // Do not filter by department.  The department filter has been
+                // removed from the UI, so always allow all departments.  For
+                // role filters like doctor or nurse, ensure the staff member's
+                // role matches the selected value.
+                if (currentFilters.role && staffMember.role !== currentFilters.role) return false;
+            }
+
+            // Apply remaining filters for shift type and staff name search.
             if (currentFilters.shiftType && shift.type !== currentFilters.shiftType) return false;
             if (currentFilters.staffSearch && !staffMember.name.toLowerCase().includes(currentFilters.staffSearch)) return false;
-            
+
             return true;
         }
 
