@@ -6046,9 +6046,17 @@ function getOperationButtons(appointment, patient = null) {
                 if (isAppointmentDoctor) {
                     buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs whitespace-nowrap cursor-not-allowed" ${disabledTooltip}>開始診症</span>`);
                 }
+                // 如果為管理員或護理師，則禁用取消候診按鈕
+                if (canManage) {
+                    buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs whitespace-nowrap cursor-not-allowed" ${disabledTooltip}>取消候診</span>`);
+                }
             } else {
                 if (isAppointmentDoctor) {
                     buttons.push(`<button onclick="startConsultation(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">開始診症</button>`);
+                }
+                // 管理員或護理師可以取消候診，將狀態回復為已掛號
+                if (canManage) {
+                    buttons.push(`<button onclick="cancelWaiting(${appointment.id})" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">取消候診</button>`);
                 }
             }
             break;
@@ -6293,6 +6301,116 @@ async function removeAppointment(appointmentId) {
     } catch (error) {
         console.error('移除掛號錯誤:', error);
         showToast('移除掛號時發生錯誤', 'error');
+    } finally {
+        if (loadingButton) {
+            clearButtonLoading(loadingButton);
+        }
+    }
+}
+
+/**
+ * 取消候診：將病人狀態從候診中改回已掛號。
+ * 僅限管理員或護理師可操作。
+ * @param {number|string} appointmentId - 掛號 ID
+ */
+async function cancelWaiting(appointmentId) {
+    // 取得最新的掛號資料，避免長時間待機後本地資料過期
+    const appointment = await getLatestAppointmentById(appointmentId);
+    if (!appointment) {
+        showToast('找不到掛號記錄！', 'error');
+        return;
+    }
+    // 取得觸發按鈕：優先使用事件目標，其次透過 DOM 查找
+    let loadingButton = null;
+    try {
+        if (typeof event !== 'undefined' && event && event.currentTarget) {
+            loadingButton = event.currentTarget;
+        }
+    } catch (_e) {}
+    if (!loadingButton) {
+        try {
+            loadingButton = document.querySelector('button[onclick="cancelWaiting(' + appointmentId + ')"]');
+        } catch (_e) {
+            loadingButton = null;
+        }
+    }
+    if (loadingButton) {
+        setButtonLoading(loadingButton, '處理中...');
+    }
+    try {
+        // 從 Firebase 獲取病人資料，確保取得最新資料
+        const result = await safeGetPatients(true);
+        if (!result || !result.success) {
+            showToast('無法讀取病人資料！', 'error');
+            return;
+        }
+        const patient = result.data.find(p => p.id === appointment.patientId);
+        if (!patient) {
+            showToast('找不到病人資料！', 'error');
+            return;
+        }
+        // 只能對候診中狀態的掛號取消候診
+        if (appointment.status !== 'waiting') {
+            const statusNames = {
+                'registered': '已掛號',
+                'consulting': '診症中',
+                'completed': '已完成'
+            };
+            const currentStatusName = statusNames[appointment.status] || appointment.status;
+            const lang = localStorage.getItem('lang') || 'zh';
+            const statusNamesEnMap = {
+                '已掛號': 'registered',
+                '診症中': 'consulting',
+                '已完成': 'completed'
+            };
+            const currentStatusNameEn = statusNamesEnMap[currentStatusName] || currentStatusName;
+            const zhMsg = `無法取消候診！病人 ${patient.name} 目前狀態為「${currentStatusName}」，只有候診中的病人可以取消候診。`;
+            const enMsg = `Cannot cancel waiting! Patient ${patient.name} is currently "${currentStatusNameEn}". Only patients who are "waiting" can cancel waiting.`;
+            const msg = lang === 'en' ? enMsg : zhMsg;
+            showToast(msg, 'warning');
+            return;
+        }
+        // 確認操作（支援中英文）
+        const langConfirm = localStorage.getItem('lang') || 'zh';
+        const zhMsg2 = `確定要取消 ${patient.name} 的候診嗎？\n\n病人狀態將回到已掛號，是否繼續？`;
+        const enMsg2 = `Are you sure you want to cancel waiting for ${patient.name}?\n\nThe patient's status will revert to registered. Do you want to proceed?`;
+        const confirmMsg = langConfirm === 'en' ? enMsg2 : zhMsg2;
+        const confirmed = await showConfirmation(confirmMsg, 'warning');
+        if (!confirmed) {
+            return;
+        }
+        // 更新狀態為已掛號，移除到達資訊
+        appointment.status = 'registered';
+        delete appointment.arrivedAt;
+        delete appointment.confirmedBy;
+        // 更新全域陣列中的對應掛號，以避免參照不同步
+        try {
+            if (Array.isArray(appointments)) {
+                const idx = appointments.findIndex(apt => apt && String(apt.id) === String(appointment.id));
+                if (idx >= 0) {
+                    appointments[idx] = { ...appointment };
+                }
+            }
+        } catch (_e) {}
+        // 保存狀態變更
+        try {
+            localStorage.setItem('appointments', JSON.stringify(appointments));
+        } catch (_err) {}
+        // 同步更新到 Firebase
+        await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
+        // 通知使用者已取消候診
+        {
+            const lang = localStorage.getItem('lang') || 'zh';
+            const zhMsg3 = `已取消 ${patient.name} 的候診，病人狀態回到已掛號`;
+            const enMsg3 = `Cancelled waiting for ${patient.name} and reverted status to registered`;
+            const msg = lang === 'en' ? enMsg3 : zhMsg3;
+            showToast(msg, 'success');
+        }
+        // 重新載入掛號列表
+        loadTodayAppointments();
+    } catch (error) {
+        console.error('取消候診時發生錯誤:', error);
+        showToast('取消候診時發生錯誤', 'error');
     } finally {
         if (loadingButton) {
             clearButtonLoading(loadingButton);
@@ -19513,6 +19631,8 @@ async function deleteMedicalRecord(recordId) {
 (function() {
   window.attemptMainLogin = attemptMainLogin;
   window.cancelConsultation = cancelConsultation;
+  // 將取消候診函式掛載至全域，供 HTML 內的 onclick 調用
+  window.cancelWaiting = cancelWaiting;
   window.clearBillingSearch = clearBillingSearch;
   window.clearPatientSearch = clearPatientSearch;
   window.clearPrescriptionSearch = clearPrescriptionSearch;
