@@ -12515,8 +12515,11 @@ async function initializeSystemAfterLogin() {
                 id: itemId,
                 type: type,
                 name: item.name,
-                dosage: type === 'herb' ? (item.dosage || '6g') : null,
-                customDosage: '6', // 中藥材和方劑都預設6克
+                // When adding a new item to the prescription, default the dosage based on the item type.
+                // Herbs default to 1 g; formulas do not use the `dosage` field for display purposes and remain null.
+                dosage: type === 'herb' ? (item.dosage || '1g') : null,
+                // Set the custom dosage default based on the item type: 1 g for herbs, 5 g for formulas.
+                customDosage: type === 'herb' ? '1' : '5',
                 composition: type === 'formula' ? item.composition : null,
                 effects: item.effects
             };
@@ -12650,7 +12653,7 @@ async function initializeSystemAfterLogin() {
                                             }
                                         })()}
                                         <input type="number"
-                                               value="${item.customDosage || '6'}"
+                                               value="${item.customDosage || (item.type === 'herb' ? '1' : '5')}"
                                                min="0.5"
                                                max="100"
                                                step="0.5"
@@ -12678,7 +12681,10 @@ async function initializeSystemAfterLogin() {
             // 但這會在病歷或診症記錄中呈現為項目上下出現空行。
             // 因此統一將 herb 與 formula 項目都只添加一個換行符號，避免多餘空白。
             selectedPrescriptionItems.forEach(item => {
-                const dosage = item.customDosage || '6';
+                // Use the item's custom dosage if provided; otherwise fall back to the default
+                // of 1 g for herbs or 5 g for formulas. This ensures prescriptions reflect the
+                // new default dosing policy (herbs 1g, formulas 5g).
+                const dosage = item.customDosage || (item.type === 'herb' ? '1' : '5');
                 prescriptionText += `${item.name} ${dosage}g\n`;
             });
             
@@ -13582,14 +13588,16 @@ async function searchBillingForConsultation() {
                     
                     if (foundItem) {
                         // 找到中藥材
-                        const prescriptionItem = {
-                            id: foundItem.id,
-                            type: 'herb',
-                            name: foundItem.name,
-                            dosage: foundItem.dosage || '6g',
-                            customDosage: dosage,
-                            effects: foundItem.effects
-                        };
+                            const prescriptionItem = {
+                                id: foundItem.id,
+                                type: 'herb',
+                                name: foundItem.name,
+                                // When reconstructing a prescription from text and the original
+                                // entry lacks a dosage, default to 1 g for herbs.
+                                dosage: foundItem.dosage || '1g',
+                                customDosage: dosage,
+                                effects: foundItem.effects
+                            };
                         selectedPrescriptionItems.push(prescriptionItem);
                     } else {
                         // 沒找到中藥材，尋找方劑
@@ -21591,7 +21599,8 @@ async function deleteAcupointCombination(id) {
                     type: 'herb',
                     name: ing.name,
                     dosage: ing.dosage || '',
-                    customDosage: numeric ? numeric[0] : '6',
+                    // For herb combinations without a specified dosage, default to 1 g.
+                    customDosage: numeric ? numeric[0] : '1',
                     composition: null,
                     effects: ''
                   });
