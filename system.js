@@ -6370,15 +6370,16 @@ async function cancelWaiting(appointmentId) {
             showToast(msg, 'warning');
             return;
         }
-        // 確認操作（支援中英文）
-        const langConfirm = localStorage.getItem('lang') || 'zh';
-        const zhMsg2 = `確定要取消 ${patient.name} 的候診嗎？\n\n病人狀態將回到已掛號，是否繼續？`;
-        const enMsg2 = `Are you sure you want to cancel waiting for ${patient.name}?\n\nThe patient's status will revert to registered. Do you want to proceed?`;
-        const confirmMsg = langConfirm === 'en' ? enMsg2 : zhMsg2;
-        const confirmed = await showConfirmation(confirmMsg, 'warning');
-        if (!confirmed) {
-            return;
-        }
+        /*
+         * 取消候診不再需要顯示確認視窗。
+         * 按下「取消候診」按鈕後，將直接將病人狀態從候診中改回已掛號。
+         * 以下留存雙語訊息字串以供未來擴充需求，但此版本已不再呼叫 showConfirmation。
+         */
+        // const langConfirm = localStorage.getItem('lang') || 'zh';
+        // const zhMsg2 = `確定要取消 ${patient.name} 的候診嗎？\n\n病人狀態將回到已掛號，是否繼續？`;
+        // const enMsg2 = `Are you sure you want to cancel waiting for ${patient.name}?\n\nThe patient's status will revert to registered. Do you want to proceed?`;
+        // const confirmMsg = langConfirm === 'en' ? enMsg2 : zhMsg2;
+        // 不需要確認，直接繼續處理取消候診。
         // 更新狀態為已掛號，移除到達資訊
         appointment.status = 'registered';
         delete appointment.arrivedAt;
