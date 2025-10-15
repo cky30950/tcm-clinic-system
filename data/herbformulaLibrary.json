@@ -477,20 +477,6 @@
       "englishName": "GuiZhiGanCaoTang"
     },
     {
-      "id": 1755100000033,
-      "type": "formula",
-      "name": "茯苓桂枝白朮甘草湯",
-      "composition": "茯苓\n桂枝\n白朮\n甘草",
-      "createdAt": "2025-08-13T12:00:00.033Z",
-      "source": "傷寒論",
-      "effects": "溫陽化飲，健脾利濕",
-      "cautions": "陰虛津虧者忌用",
-      "indications": "中陽不足，痰飲內停，胸脅支滿，目眩心悸，或短氣而咳，舌苔白滑，脈弦滑",
-      "usage": "水煎服",
-      "updatedAt": "2025-08-13T12:00:00.033Z",
-      "englishName": "FuLingGuiZhiBaiShuGanCaoTang"
-    },
-    {
       "id": 1755100000034,
       "type": "formula",
       "name": "桂枝人參湯",
@@ -1987,20 +1973,6 @@
       "usage": "散劑，飲服方寸匕",
       "updatedAt": "2025-08-13T12:00:00.140Z",
       "englishName": "BaiHeHuaShiSan"
-    },
-    {
-      "id": 1755100000141,
-      "type": "formula",
-      "name": "甘草小麥大棗湯",
-      "composition": "甘草\n小麥\n大棗",
-      "createdAt": "2025-08-13T12:00:00.141Z",
-      "source": "金匱要略",
-      "effects": "養心安神，和中緩急",
-      "cautions": "痰火擾心者慎用",
-      "indications": "婦人臟躁，喜悲傷欲哭，象如神靈所作，數欠伸",
-      "usage": "水煎服",
-      "updatedAt": "2025-08-13T12:00:00.141Z",
-      "englishName": "GanCaoXiaoMaiDaZaoTang"
     },
     {
       "id": 1755100000142,
@@ -3627,20 +3599,6 @@
       "englishName": "LianPuYin"
     },
     {
-      "id": 1755400000004,
-      "type": "formula",
-      "name": "八味逍遙散",
-      "composition": "當歸\n白芍\n白朮\n茯苓\n柴胡\n甘草\n煨薑\n薄荷\n牡丹皮\n梔子",
-      "createdAt": "2025-08-16T10:00:00.004Z",
-      "source": "太平惠民和劑局方",
-      "effects": "疏肝清熱，養血健脾",
-      "cautions": "陰虛津虧者慎用",
-      "indications": "肝鬱血虛，化火生熱，煩躁易怒，頭痛目澀，頰赤口乾，月經不調",
-      "usage": "水煎服",
-      "updatedAt": "2025-08-16T10:00:00.004Z",
-      "englishName": "BaWeiXiaoYaoSan"
-    },
-    {
       "id": 1755400000005,
       "type": "formula",
       "name": "痛瀉要方",
@@ -3681,20 +3639,6 @@
       "usage": "水煎服",
       "updatedAt": "2025-08-16T10:00:00.009Z",
       "englishName": "DangGuiYinZi"
-    },
-    {
-      "id": 1755400000010,
-      "type": "formula",
-      "name": "黃連阿膠雞子黃湯",
-      "composition": "黃連\n黃芩\n芍藥\n雞子黃\n阿膠",
-      "createdAt": "2025-08-16T10:00:00.010Z",
-      "source": "傷寒論",
-      "effects": "滋陰降火，除煩安神",
-      "cautions": "脾胃虛寒者慎用",
-      "indications": "少陰病，心中煩，不得臥",
-      "usage": "水煎服，阿膠烊化，雞子黃攪勻兌服",
-      "updatedAt": "2025-08-16T10:00:00.010Z",
-      "englishName": "HuangLianAJiaoJiZiHuangTang"
     },
     {
       "id": 1755400000012,
