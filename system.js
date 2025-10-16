@@ -18543,7 +18543,7 @@ window.addEventListener('load', async () => {
 // 初始化系統
 document.addEventListener('DOMContentLoaded', function() {
     
-    updateClinicSettingsDisplay();
+    // 系統管理相關初始化移至 systemmanagement.js，避免在此處過早調用
 
     // 保持所有中藥材及方劑欄位可見（包含性味、歸經、主治、用法）
     
