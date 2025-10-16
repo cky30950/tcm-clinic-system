@@ -200,12 +200,10 @@ async function manageBilling() {
             throw new Error('network');
         }
         const data = await response.json();
-        if (data && data.url) {
-            // 以新分頁開啟客戶門戶，避免覆蓋現有系統頁面
-            window.open(data.url, '_blank');
-        } else {
-            showToast('無法取得客戶門戶連結！', 'error');
-        }
+        // 修改：直接使用指定的 Stripe 登入頁面。
+        // 不論後端是否回傳 URL，皆導向客戶提供的訂閱與付款管理連結。
+        const billingUrl = 'https://billing.stripe.com/p/login/00w00l9Sk5I98irfdLcjS00';
+        window.open(billingUrl, '_blank');
     } catch (err) {
         console.error('建立客戶門戶會話失敗:', err);
         showToast('開啟付款管理視窗失敗！', 'error');
