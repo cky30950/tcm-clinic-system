@@ -182,6 +182,37 @@ function finishBackupProgressBar(success) {
 }
 
 /**
+ * 開啟 Stripe 客戶門戶以管理訂閱與付款。
+ * 這個函式會呼叫後端端點建立客戶門戶會話，然後導向使用者至該會話的 URL。
+ * 若建立失敗或未取得 URL，會顯示錯誤提示。
+ */
+async function manageBilling() {
+    try {
+        // 取得當前登入使用者的 UID。可以依需求改為其他識別碼或客戶 ID。
+        const uid = (window.currentUser && window.currentUser.uid) ? window.currentUser.uid : null;
+        // 透過 POST 請求呼叫後端建立客戶門戶會話
+        const response = await fetch('/create-customer-portal-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid })
+        });
+        if (!response.ok) {
+            throw new Error('network');
+        }
+        const data = await response.json();
+        if (data && data.url) {
+            // 以新分頁開啟客戶門戶，避免覆蓋現有系統頁面
+            window.open(data.url, '_blank');
+        } else {
+            showToast('無法取得客戶門戶連結！', 'error');
+        }
+    } catch (err) {
+        console.error('建立客戶門戶會話失敗:', err);
+        showToast('開啟付款管理視窗失敗！', 'error');
+    }
+}
+
+/**
  * 等待 Firebase DataManager 準備就緒的輔助函式。
  * 某些情況下網頁載入時 Firebase 仍在初始化，直接讀取資料會失敗。
  */
@@ -687,6 +718,8 @@ window.systemManagement.updateClinicSettingsDisplay = updateClinicSettingsDispla
 window.systemManagement.showBackupProgressBar = showBackupProgressBar;
 window.systemManagement.updateBackupProgressBar = updateBackupProgressBar;
 window.systemManagement.finishBackupProgressBar = finishBackupProgressBar;
+// 將 manageBilling 函式綁定到 systemManagement 命名空間，供系統管理頁面按鈕呼叫
+window.systemManagement.manageBilling = manageBilling;
 window.systemManagement.ensureFirebaseReady = ensureFirebaseReady;
 window.systemManagement.exportClinicBackup = exportClinicBackup;
 window.systemManagement.triggerBackupImport = triggerBackupImport;
@@ -701,6 +734,8 @@ window.updateClinicSettingsDisplay = updateClinicSettingsDisplay;
 window.showBackupProgressBar = showBackupProgressBar;
 window.updateBackupProgressBar = updateBackupProgressBar;
 window.finishBackupProgressBar = finishBackupProgressBar;
+// 將 manageBilling 函式綁定到全域空間，以便直接呼叫
+window.manageBilling = manageBilling;
 window.ensureFirebaseReady = ensureFirebaseReady;
 window.exportClinicBackup = exportClinicBackup;
 window.triggerBackupImport = triggerBackupImport;
