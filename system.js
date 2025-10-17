@@ -77,42 +77,49 @@ document.addEventListener('DOMContentLoaded', function () {
         if (qtyUnitSelect) {
             // 初始化 prevUnit 為當前選定的單位（預設為 g）
             qtyUnitSelect.dataset.prevUnit = qtyUnitSelect.value || 'g';
-            qtyUnitSelect.addEventListener('change', function (e) {
-                const select = e.target;
-                const newUnit = select.value || 'g';
-                const prevUnit = select.dataset.prevUnit || 'g';
+            // 若先前已綁定監聽器，先移除，避免重複綁定
+            if (qtyUnitSelect._unitChangeHandler) {
+                qtyUnitSelect.removeEventListener('change', qtyUnitSelect._unitChangeHandler);
+            }
+            // 定義新的變更處理函式
+            qtyUnitSelect._unitChangeHandler = function (e) {
+                const selectEl = e && e.target ? e.target : qtyUnitSelect;
+                const newUnitVal = selectEl.value || 'g';
+                const prevUnitVal = selectEl.dataset.prevUnit || 'g';
                 // 若單位未改變，則不需轉換
-                if (newUnit === prevUnit) {
+                if (newUnitVal === prevUnitVal) {
                     return;
                 }
                 // 讀取輸入欄位
                 const qtyInput = document.getElementById('inventoryQuantity');
                 const thrInput = document.getElementById('inventoryThreshold');
                 // 取得轉換因子
-                const prevFactor = UNIT_FACTOR_MAP[prevUnit] || 1;
-                const newFactor = UNIT_FACTOR_MAP[newUnit] || 1;
+                const prevFactor = UNIT_FACTOR_MAP[prevUnitVal] || 1;
+                const newFactorVal = UNIT_FACTOR_MAP[newUnitVal] || 1;
                 // 換算剩餘數量
                 if (qtyInput) {
-                    const qVal = parseFloat(qtyInput.value);
-                    if (!isNaN(qVal)) {
-                        const grams = qVal * prevFactor;
-                        const newQty = grams / newFactor;
-                        // 保留最多三位小數，避免精度過長
-                        qtyInput.value = (Math.round(newQty * 1000) / 1000).toString();
+                    const qValRaw = parseFloat(qtyInput.value);
+                    if (!isNaN(qValRaw)) {
+                        const grams = qValRaw * prevFactor;
+                        const convertedQty = grams / newFactorVal;
+                        // 四捨五入到小數點后三位，避免精度過長
+                        qtyInput.value = (Math.round(convertedQty * 1000) / 1000).toString();
                     }
                 }
                 // 換算補貨警戒量
                 if (thrInput) {
-                    const tVal = parseFloat(thrInput.value);
-                    if (!isNaN(tVal)) {
-                        const grams = tVal * prevFactor;
-                        const newThr = grams / newFactor;
-                        thrInput.value = (Math.round(newThr * 1000) / 1000).toString();
+                    const thrValRaw = parseFloat(thrInput.value);
+                    if (!isNaN(thrValRaw)) {
+                        const grams = thrValRaw * prevFactor;
+                        const convertedThr = grams / newFactorVal;
+                        thrInput.value = (Math.round(convertedThr * 1000) / 1000).toString();
                     }
                 }
                 // 更新前一次的單位為新的選項
-                select.dataset.prevUnit = newUnit;
-            });
+                selectEl.dataset.prevUnit = newUnitVal;
+            };
+            // 綁定新的監聽器
+            qtyUnitSelect.addEventListener('change', qtyUnitSelect._unitChangeHandler);
         }
     } catch (_e) {
         // 忽略任何異常以避免影響其他功能
@@ -2364,6 +2371,57 @@ async function openInventoryModal(itemId) {
                     qtyUnitSel.value = unit;
                     // 更新 prevUnit 屬性以便後續換算使用
                     qtyUnitSel.dataset.prevUnit = unit;
+
+                    /**
+                     * 確保在庫存編輯彈窗開啟時綁定單位變更事件。原本的單位變更監聽器僅在 DOMContentLoaded
+                     * 觸發時註冊，由於 system.js 可能在 DOMContentLoaded 之後載入，導致該監聽器不會執行，
+                     * 造成切換單位時數量與警戒量未自動換算。為了解決此問題，我們在開啟彈窗時動態綁定
+                     * change 事件，並在重複開啟彈窗時移除舊的監聽器以避免重複綁定。
+                     */
+                    try {
+                        // 移除先前的監聽器（若存在），避免重複觸發
+                        if (qtyUnitSel._unitChangeHandler) {
+                            qtyUnitSel.removeEventListener('change', qtyUnitSel._unitChangeHandler);
+                        }
+                        // 定義新的變更處理函式
+                        qtyUnitSel._unitChangeHandler = function (e) {
+                            const selectEl = e && e.target ? e.target : qtyUnitSel;
+                            const newUnitVal = selectEl.value || 'g';
+                            const prevUnitVal = selectEl.dataset.prevUnit || 'g';
+                            // 若未改變則不處理
+                            if (newUnitVal === prevUnitVal) {
+                                return;
+                            }
+                            const prevFactor = UNIT_FACTOR_MAP[prevUnitVal] || 1;
+                            const newFactorVal = UNIT_FACTOR_MAP[newUnitVal] || 1;
+                            // 換算剩餘數量
+                            if (qtyInput) {
+                                const qValRaw = parseFloat(qtyInput.value);
+                                if (!isNaN(qValRaw)) {
+                                    const grams = qValRaw * prevFactor;
+                                    const convertedQty = grams / newFactorVal;
+                                    // 四捨五入到小數點后三位，避免精度過長
+                                    qtyInput.value = (Math.round(convertedQty * 1000) / 1000).toString();
+                                }
+                            }
+                            // 換算補貨警戒量
+                            if (thrInput) {
+                                const thrValRaw = parseFloat(thrInput.value);
+                                if (!isNaN(thrValRaw)) {
+                                    const grams = thrValRaw * prevFactor;
+                                    const convertedThr = grams / newFactorVal;
+                                    thrInput.value = (Math.round(convertedThr * 1000) / 1000).toString();
+                                }
+                            }
+                            // 更新上一次選擇的單位
+                            selectEl.dataset.prevUnit = newUnitVal;
+                        };
+                        // 綁定新的監聽器
+                        qtyUnitSel.addEventListener('change', qtyUnitSel._unitChangeHandler);
+                    } catch (_e) {
+                        // 監聽器綁定失敗則記錄錯誤但不阻斷流程
+                        console.error('綁定庫存單位變更監聽器失敗:', _e);
+                    }
                 }
             } catch (_e) {}
             // 設定啟用/停用下拉選擇的值
