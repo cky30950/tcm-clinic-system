@@ -13332,6 +13332,41 @@ async function initializeSystemAfterLogin() {
                 // 若元素不存在，忽略錯誤
             }
         }
+
+        /**
+         * 檢查目前處方中的藥材是否存在禁忌配伍。
+         * 若存在相斥的藥材，會將第一組相斥藥對顯示於錯誤區域；
+         * 若無禁忌配伍，則清除錯誤提示。
+         */
+        function checkPrescriptionConflicts() {
+            try {
+                // 如沒有或僅有一個項目，無需檢查
+                if (!Array.isArray(selectedPrescriptionItems) || selectedPrescriptionItems.length < 2) {
+                    displayPrescriptionError('');
+                    return;
+                }
+                // 檢查任意兩個藥材名稱是否有禁忌
+                for (let i = 0; i < selectedPrescriptionItems.length; i++) {
+                    const nameA = selectedPrescriptionItems[i].name || '';
+                    for (let j = i + 1; j < selectedPrescriptionItems.length; j++) {
+                        const nameB = selectedPrescriptionItems[j].name || '';
+                        if (isForbiddenCombination(nameA, nameB)) {
+                            const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                            const zhMsg = `藥材${nameA}與${nameB}存在禁忌配伍，請注意使用！`;
+                            const enMsg = `${nameA} is incompatible with ${nameB} in the prescription; please use with caution.`;
+                            const msg = (langSel && langSel.toLowerCase().startsWith('en')) ? enMsg : zhMsg;
+                            displayPrescriptionError(msg);
+                            return;
+                        }
+                    }
+                }
+                // 若沒有任何禁忌，清除提示
+                displayPrescriptionError('');
+            } catch (_e) {
+                // 發生異常時，隱藏錯誤提示
+                displayPrescriptionError('');
+            }
+        }
         
         // 添加到處方內容
         function addToPrescription(type, itemId) {
@@ -13339,27 +13374,7 @@ async function initializeSystemAfterLogin() {
             const item = herbLibrary.find(h => h.id === itemId);
             if (!item) return;
 
-            // 先清除舊的禁忌提示
-            displayPrescriptionError('');
-
-            // 檢查禁忌配伍：判斷即將加入的藥材是否與已有處方藥材存在禁忌關係。
-            try {
-                const newName = item.name || '';
-                for (const existing of selectedPrescriptionItems) {
-                    const existingName = existing.name || '';
-                    if (isForbiddenCombination(newName, existingName)) {
-                        // 若存在禁忌，建立錯誤訊息並顯示於固定區域，停止添加
-                        const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
-                        const zhMsg = `藥材${newName}與處方中已有的${existingName}存在禁忌配伍，請勿同時使用！`;
-                        const enMsg = `${newName} is incompatible with ${existingName} in the prescription and cannot be combined.`;
-                        const msg = (langSel && langSel.toLowerCase().startsWith('en')) ? enMsg : zhMsg;
-                        displayPrescriptionError(msg);
-                        return;
-                    }
-                }
-            } catch (_e) {
-                // 若檢查失敗，為安全起見仍允許添加，但不終止流程
-            }
+            // 不阻止禁忌配伍的藥材加入處方，但稍後會在全局檢查中顯示錯誤提示
             
             // 檢查是否已經添加過
             const existingIndex = selectedPrescriptionItems.findIndex(p => p.id === itemId);
@@ -13389,7 +13404,10 @@ async function initializeSystemAfterLogin() {
             };
             
             selectedPrescriptionItems.push(prescriptionItem);
-            
+
+            // 檢查是否有禁忌配伍並更新錯誤提示
+            checkPrescriptionConflicts();
+
             // 更新顯示
             updatePrescriptionDisplay();
             
@@ -13736,8 +13754,8 @@ async function initializeSystemAfterLogin() {
             if (index >= 0 && index < selectedPrescriptionItems.length) {
                 const removedItem = selectedPrescriptionItems.splice(index, 1)[0];
                 updatePrescriptionDisplay();
-                // 移除處方項目後，清除任何禁忌提示（使用者正在調整處方）
-                displayPrescriptionError('');
+                // 移除處方項目後，重新檢查是否仍有禁忌配伍
+                checkPrescriptionConflicts();
                 // 移除處方項目時，若游標仍在原位置會導致 tooltip 殘留，故手動隱藏
                 if (typeof hideTooltip === 'function') {
                     hideTooltip();
