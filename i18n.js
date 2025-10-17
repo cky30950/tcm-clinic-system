@@ -83,6 +83,8 @@ window.translations = {
         "+ 新增病人": "+ 新增病人",
         "+ 新增穴位組合": "+ 新增穴位組合",
         "+ 新增藥方組合": "+ 新增藥方組合",
+        // Button label used in batch inventory restock for adding a new herb
+        "+ 新增藥材": "+ 新增藥材",
         "管理分類": "管理分類",
         "一般用戶": "一般用戶",
         "上月": "上月",
@@ -1126,6 +1128,8 @@ window.translations = {
         "+ 新增病人": "+ Add Patient",
         "+ 新增穴位組合": "+ Add Acupoint Combo",
         "+ 新增藥方組合": "+ Add Formula Combo",
+        // Button label used in batch inventory restock for adding a new herb
+        "+ 新增藥材": "+ Add Herb",
         "管理分類": "Manage Categories",
         "一般用戶": "General User",
         "上月": "Last Month",
