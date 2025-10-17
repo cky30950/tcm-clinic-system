@@ -13209,11 +13209,131 @@ async function initializeSystemAfterLogin() {
         
         // 存儲已選擇的收費項目
         let selectedBillingItems = [];
+
+        // ----------------------------------------------------------------------------------------
+        // 禁忌配伍設定
+        //
+        // 中醫處方中存在某些藥材彼此相反或相畏的情況，即所謂「十八反」與「十九畏」。
+        // 這裡定義一張禁忌配伍對照表，利用藥材名稱的包含關係來檢查是否出現禁忌組合。
+        // 為簡便起見，若名稱包含在以下任何鍵或值中，則視為同一類別。例如「附子」屬於烏頭類；
+        // 「川烏」「草烏」亦視為烏頭，同樣與貝母、半夏、瓜蔞等藥相斥。
+        // 此表採對稱設計，每個藥材鍵的值為一組與之禁忌的藥材名稱陣列。
+        const FORBIDDEN_MAP = {
+            // 甘草類禁忌：甘草不可與甘遂、大戟、芫花、海藻同用
+            '甘草': ['甘遂', '大戟', '芫花', '海藻'],
+            '甘遂': ['甘草'],
+            '大戟': ['甘草'],
+            '芫花': ['甘草'],
+            '海藻': ['甘草'],
+            // 烏頭類（包括附子、川烏、草烏）禁忌：不可與貝母、瓜蔞、半夏、白蘞、白芨、天花粉等同用
+            '烏頭': ['貝母', '川貝母', '浙貝母', '瓜蔞', '瓜蔞皮', '瓜蔞仁', '天花粉', '半夏', '白蘞', '白芨'],
+            '附子': ['貝母', '川貝母', '浙貝母', '瓜蔞', '瓜蔞皮', '瓜蔞仁', '天花粉', '半夏', '白蘞', '白芨'],
+            '川烏': ['犀角', '貝母', '川貝母', '浙貝母', '瓜蔞', '瓜蔞皮', '瓜蔞仁', '天花粉', '半夏', '白蘞', '白芨'],
+            '草烏': ['犀角', '貝母', '川貝母', '浙貝母', '瓜蔞', '瓜蔞皮', '瓜蔞仁', '天花粉', '半夏', '白蘞', '白芨'],
+            // 上述禁忌對應對稱關係
+            '貝母': ['烏頭', '附子'],
+            '川貝母': ['烏頭', '附子'],
+            '浙貝母': ['烏頭', '附子'],
+            '瓜蔞': ['烏頭', '附子'],
+            '瓜蔞皮': ['烏頭', '附子'],
+            '瓜蔞仁': ['烏頭', '附子'],
+            '天花粉': ['烏頭', '附子'],
+            '半夏': ['烏頭', '附子'],
+            '白蘞': ['烏頭', '附子'],
+            '白芨': ['烏頭', '附子'],
+            '犀角': ['川烏', '草烏'],
+            // 藜蘆禁忌：藜蘆不可與人參、沙參、丹參、玄參、苦參、細辛、芍藥同用
+            '藜蘆': ['人參', '沙參', '丹參', '玄參', '苦參', '細辛', '芍藥'],
+            '人參': ['藜蘆', '五靈脂'],
+            '沙參': ['藜蘆'],
+            '丹參': ['藜蘆'],
+            '玄參': ['藜蘆'],
+            '苦參': ['藜蘆'],
+            '細辛': ['藜蘆'],
+            '芍藥': ['藜蘆'],
+            // 硫黃與朴硝相畏
+            '硫黃': ['朴硝'],
+            '朴硝': ['硫黃'],
+            // 水銀與砒霜相畏
+            '水銀': ['砒霜'],
+            '砒霜': ['水銀'],
+            // 狼毒與密陀僧相畏
+            '狼毒': ['密陀僧'],
+            '密陀僧': ['狼毒'],
+            // 巴豆與牽牛子相畏
+            '巴豆': ['牽牛子'],
+            '牽牛子': ['巴豆'],
+            // 丁香與鬱金相畏
+            '丁香': ['鬱金'],
+            '鬱金': ['丁香'],
+            // 牙硝與三棱（又稱京三棱、三梭）相畏
+            '牙硝': ['三棱', '京三棱', '三梭'],
+            '三棱': ['牙硝'],
+            '京三棱': ['牙硝'],
+            '三梭': ['牙硝'],
+            // 官桂與石脂相畏
+            '官桂': ['石脂'],
+            '石脂': ['官桂'],
+            // 五靈脂與人參相畏
+            '五靈脂': ['人參']
+        };
+
+        /**
+         * 判斷兩個藥材名稱是否構成禁忌配伍。
+         * 以包含關係進行比對：若名稱包含指定關鍵字即視為匹配。
+         * @param {string} nameA
+         * @param {string} nameB
+         * @returns {boolean} true 表示構成禁忌
+         */
+        function isForbiddenCombination(nameA, nameB) {
+            if (!nameA || !nameB) return false;
+            // 迭代地圖中的每個鍵值對
+            for (const key in FORBIDDEN_MAP) {
+                if (!Object.prototype.hasOwnProperty.call(FORBIDDEN_MAP, key)) continue;
+                const forbiddenList = FORBIDDEN_MAP[key];
+                // 若第一個名稱包含鍵，且第二個名稱包含列表中的任何一個項目
+                if (nameA.includes(key)) {
+                    for (const forb of forbiddenList) {
+                        if (nameB.includes(forb)) {
+                            return true;
+                        }
+                    }
+                }
+                // 互換比對：若第二個名稱包含鍵，且第一個名稱包含列表中的任何一個項目
+                if (nameB.includes(key)) {
+                    for (const forb of forbiddenList) {
+                        if (nameA.includes(forb)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
         
         // 添加到處方內容
         function addToPrescription(type, itemId) {
             const item = herbLibrary.find(h => h.id === itemId);
             if (!item) return;
+
+            // 檢查禁忌配伍：判斷即將加入的藥材是否與已有處方藥材存在禁忌關係。
+            try {
+                const newName = item.name || '';
+                for (const existing of selectedPrescriptionItems) {
+                    const existingName = existing.name || '';
+                    if (isForbiddenCombination(newName, existingName)) {
+                        // 若存在禁忌，提示使用者且不允許添加
+                        const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                        const zhMsg = `藥材 ${newName} 與處方中已有的 ${existingName} 存在禁忌配伍，請勿同時使用！`;
+                        const enMsg = `${newName} is incompatible with ${existingName} in the prescription and cannot be combined.`;
+                        const msg = (langSel && langSel.toLowerCase().startsWith('en')) ? enMsg : zhMsg;
+                        showToast(msg, 'error');
+                        return;
+                    }
+                }
+            } catch (_e) {
+                // 若檢查失敗，為安全起見仍允許添加，但不終止流程
+            }
             
             // 檢查是否已經添加過
             const existingIndex = selectedPrescriptionItems.findIndex(p => p.id === itemId);
