@@ -2741,24 +2741,16 @@ async function saveInventoryChanges() {
                 if (btnLabel && typeof window.t === 'function') {
                     btnLabel.textContent = window.t('批量入庫');
                 }
-                // 設置批量入庫庫存類型選單初始值與翻譯
-                const typeSelect = document.getElementById('batchInventoryTypeSelect');
-                if (typeSelect) {
-                    // 將選單的值設為當前庫存模式，預設顆粒沖劑
-                    try {
-                        typeSelect.value = currentInventoryMode || 'granule';
-                    } catch (_e) {}
-                    // 更新選項文字的翻譯
+                // 顯示當前庫存類型於批量入庫彈窗標題右側
+                const typeDisplay = document.getElementById('batchInventoryTypeDisplay');
+                if (typeDisplay) {
+                    const mode = (currentInventoryMode === 'slice') ? 'slice' : 'granule';
+                    let label = mode === 'slice' ? '飲片' : '顆粒沖劑';
+                    // 使用翻譯函式轉換庫存類型文字
                     if (typeof window.t === 'function') {
-                        for (let i = 0; i < typeSelect.options.length; i++) {
-                            const opt = typeSelect.options[i];
-                            if (opt.value === 'granule') {
-                                opt.textContent = window.t('顆粒沖劑');
-                            } else if (opt.value === 'slice') {
-                                opt.textContent = window.t('飲片');
-                            }
-                        }
+                        label = window.t(label);
                     }
+                    typeDisplay.textContent = label;
                 }
             } catch (_e) {
                 /* 忽略翻譯錯誤 */
@@ -2846,6 +2838,29 @@ async function saveInventoryChanges() {
                         // 清除 searchContainer 內容，插入標籤
                         searchContainer.innerHTML = '';
                         searchContainer.appendChild(nameSpan);
+                        // 根據藥材庫存設定顯示單位，並將單位存於行的資料集
+                        try {
+                            // 取得藥材單位，預設為 g
+                            let herbUnit = 'g';
+                            if (typeof getHerbInventory === 'function') {
+                                const invInfo = getHerbInventory(h.id);
+                                if (invInfo && invInfo.unit) {
+                                    herbUnit = invInfo.unit;
+                                }
+                            }
+                            // 存放單位於 dataset，以便儲存時使用
+                            row.dataset.herbUnit = herbUnit;
+                            // 更新顯示單位文字
+                            const unitDisplay = row.querySelector('span.batch-herb-unit');
+                            if (unitDisplay) {
+                                let label = (typeof UNIT_LABEL_MAP !== 'undefined' && UNIT_LABEL_MAP && UNIT_LABEL_MAP[herbUnit]) ? UNIT_LABEL_MAP[herbUnit] : herbUnit;
+                                // 使用翻譯函式轉換單位文字
+                                label = (typeof window.t === 'function') ? window.t(label) : label;
+                                unitDisplay.textContent = label;
+                            }
+                        } catch (_err) {
+                            // 忽略錯誤
+                        }
                     });
                     suggestionList.appendChild(item);
                 });
@@ -2869,18 +2884,12 @@ async function saveInventoryChanges() {
             qtyInput.placeholder = (typeof window.t === 'function') ? window.t('數量') : '數量';
             qtyInput.className = 'batch-herb-qty w-24 border border-gray-300 rounded px-2 py-1';
             row.appendChild(qtyInput);
-            // 單位下拉
-            const unitSelect = document.createElement('select');
-            unitSelect.className = 'batch-herb-unit border border-gray-300 rounded px-2 py-1 w-20';
-            ['g','jin','liang','qian'].forEach(u => {
-                const opt = document.createElement('option');
-                opt.value = u;
-                let label = UNIT_LABEL_MAP && UNIT_LABEL_MAP[u] ? UNIT_LABEL_MAP[u] : u;
-                label = (typeof window.t === 'function') ? window.t(label) : label;
-                opt.textContent = label;
-                unitSelect.appendChild(opt);
-            });
-            row.appendChild(unitSelect);
+            // 顯示單位：依藥材設定顯示單位標籤，不可修改
+            const unitDisplay = document.createElement('span');
+            // 使用與原 select 相同的寬度與樣式，以保持外觀一致
+            unitDisplay.className = 'batch-herb-unit w-20 border border-gray-300 rounded px-2 py-1 text-sm text-gray-600 bg-gray-50 flex items-center justify-center';
+            unitDisplay.textContent = '';
+            row.appendChild(unitDisplay);
             // 刪除按鈕
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
@@ -2962,7 +2971,6 @@ async function saveInventoryChanges() {
                 // 處理每一行新增的中藥／方劑
                 for (const row of rows) {
                     const qtyInput = row.querySelector('input.batch-herb-qty');
-                    const unitSelect = row.querySelector('select.batch-herb-unit');
                     let herbId = '';
                     // 先從行的資料集取得 herbId，這是搜尋介面選取後設定的
                     if (row.dataset && row.dataset.herbId) {
@@ -2975,21 +2983,22 @@ async function saveInventoryChanges() {
                             herbId = selectEl.value;
                         }
                     }
-                    if (!qtyInput || !unitSelect || !herbId) continue;
+                    // 行內若沒有藥材或數量輸入框則跳過
+                    if (!qtyInput || !herbId) continue;
                     const qVal = parseFloat(qtyInput.value);
                     if (isNaN(qVal) || qVal <= 0) continue;
-                    const unit = unitSelect.value || 'g';
-                    const factor = UNIT_FACTOR_MAP[unit] || 1;
-                    const addBase = qVal * factor;
-                    // 取得當前類別的現有庫存數據
+                    // 取得該藥材的單位，優先使用資料集保存的 herbUnit；若無則從庫存資料取得；最終預設為 g
                     let inv = {quantity: 0, threshold: 0, unit: 'g', disabled: false};
                     try {
                         if (typeof getHerbInventory === 'function') {
                             inv = getHerbInventory(herbId);
                         }
-                    } catch (_e) {
-                        // 忽略錯誤，使用預設值
+                    } catch (_errInv) {
+                        // 忽略錯誤
                     }
+                    const unitVal = (row.dataset && row.dataset.herbUnit) ? row.dataset.herbUnit : (inv && inv.unit ? inv.unit : 'g');
+                    const factor = UNIT_FACTOR_MAP[unitVal] || 1;
+                    const addBase = qVal * factor;
                     const existingBaseQty = typeof inv.quantity === 'number' ? inv.quantity : 0;
                     const existingThreshold = typeof inv.threshold === 'number' ? inv.threshold : 0;
                     const existingUnit = inv.unit || 'g';
