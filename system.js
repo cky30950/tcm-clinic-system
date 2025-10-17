@@ -2590,29 +2590,92 @@ async function saveInventoryChanges() {
             // 行容器
             const row = document.createElement('div');
             row.className = 'flex flex-wrap items-center gap-2';
-            // 中藥下拉選單
-            const select = document.createElement('select');
-            select.className = 'batch-herb-select border border-gray-300 rounded px-2 py-1 flex-1';
-            const defaultOption = document.createElement('option');
-            defaultOption.value = '';
-            defaultOption.textContent = (typeof window.t === 'function') ? window.t('請選擇中藥') : '請選擇中藥';
-            select.appendChild(defaultOption);
-            if (Array.isArray(herbLibrary)) {
-                herbLibrary.forEach(h => {
-                    const opt = document.createElement('option');
-                    opt.value = h.id;
-                    let name = h.name;
+            // 搜尋中藥輸入框及建議清單
+            // 使用 search container 包裝輸入框與建議列表，方便絕對定位
+            const searchContainer = document.createElement('div');
+            // 設置 flex-1 以便與後方數量/單位等元素均分空間
+            searchContainer.className = 'relative flex-1';
+            const herbInput = document.createElement('input');
+            herbInput.type = 'text';
+            herbInput.className = 'batch-herb-input border border-gray-300 rounded px-2 py-1 w-full';
+            // 使用現有翻譯字串作為 placeholder，如無則顯示固定中文
+            herbInput.placeholder = (typeof window.t === 'function') ? (window.t('搜尋藥材或方劑') || '搜尋藥材或方劑') : '搜尋藥材或方劑';
+            // 建議列表容器，初始隱藏
+            const suggestionList = document.createElement('div');
+            suggestionList.className = 'absolute z-10 mt-1 max-h-60 overflow-y-auto bg-white border border-gray-300 rounded w-full hidden';
+            // 在每一行記錄被選中的 herbId
+            row.dataset.herbId = '';
+            // 輔助函式：根據輸入值篩選建議
+            function updateSuggestions() {
+                const query = herbInput.value.trim().toLowerCase();
+                // 清空建議內容
+                suggestionList.innerHTML = '';
+                if (!query) {
+                    suggestionList.classList.add('hidden');
+                    // 若清空輸入框則也清空已選 herbId
+                    row.dataset.herbId = '';
+                    return;
+                }
+                // 取前 10 筆匹配結果
+                const matches = [];
+                if (Array.isArray(herbLibrary)) {
+                    for (const h of herbLibrary) {
+                        // 避免列出已停用的藥材，可在此處增加條件
+                        let name = h.name || '';
+                        let englishName = h.englishName || '';
+                        // 判斷語言，如果當前語言為英文則搜尋英文名稱
+                        let searchTarget = name;
+                        try {
+                            const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                            if (langSel && langSel.toLowerCase().startsWith('en') && englishName) {
+                                searchTarget = englishName;
+                            }
+                        } catch (_e) {}
+                        if (searchTarget.toLowerCase().includes(query) || englishName.toLowerCase().includes(query)) {
+                            matches.push(h);
+                            if (matches.length >= 10) break;
+                        }
+                    }
+                }
+                if (matches.length === 0) {
+                    suggestionList.classList.add('hidden');
+                    return;
+                }
+                // 建立建議項目
+                matches.forEach(h => {
+                    const item = document.createElement('div');
+                    item.className = 'px-2 py-1 cursor-pointer hover:bg-gray-100';
+                    let displayName = h.name;
                     try {
                         const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
                         if (langSel && langSel.toLowerCase().startsWith('en') && h.englishName) {
-                            name = h.englishName;
+                            displayName = h.englishName;
                         }
                     } catch (_e) {}
-                    opt.textContent = name;
-                    select.appendChild(opt);
+                    item.textContent = displayName;
+                    item.addEventListener('click', () => {
+                        herbInput.value = displayName;
+                        row.dataset.herbId = h.id;
+                        suggestionList.classList.add('hidden');
+                    });
+                    suggestionList.appendChild(item);
                 });
+                suggestionList.classList.remove('hidden');
             }
-            row.appendChild(select);
+            // 綁定輸入事件以更新建議
+            herbInput.addEventListener('input', updateSuggestions);
+            // 當輸入框獲得焦點時更新建議（輸入值不變也可重新顯示）
+            herbInput.addEventListener('focus', updateSuggestions);
+            // 若點擊外部則隱藏建議列表
+            document.addEventListener('click', function(ev) {
+                // 若點擊不是本輸入框或建議列表，且不是建議列表的子元素，則隱藏
+                if (!searchContainer.contains(ev.target)) {
+                    suggestionList.classList.add('hidden');
+                }
+            });
+            searchContainer.appendChild(herbInput);
+            searchContainer.appendChild(suggestionList);
+            row.appendChild(searchContainer);
             // 數量輸入框
             const qtyInput = document.createElement('input');
             qtyInput.type = 'number';
@@ -2661,12 +2724,26 @@ async function saveInventoryChanges() {
                 const saveBtn = document.querySelector('#batchInventoryModal button[onclick="saveBatchInventory()"]');
                 setButtonLoading(saveBtn);
                 for (const row of rows) {
-                    const select = row.querySelector('select.batch-herb-select');
+                    // 取得輸入框和單位選擇器
                     const qtyInput = row.querySelector('input.batch-herb-qty');
                     const unitSelect = row.querySelector('select.batch-herb-unit');
-                    if (!select || !qtyInput || !unitSelect) continue;
-                    const herbId = select.value;
-                    if (!herbId) continue;
+                    // 從行的 dataset 或輸入框中取得 herbId
+                    let herbId = '';
+                    if (row.dataset && row.dataset.herbId) {
+                        herbId = row.dataset.herbId;
+                    } else {
+                        // 兼容早期下拉選單的情況
+                        const inputEl = row.querySelector('input.batch-herb-input');
+                        if (inputEl && inputEl.dataset && inputEl.dataset.herbId) {
+                            herbId = inputEl.dataset.herbId;
+                        } else {
+                            const selectEl = row.querySelector('select.batch-herb-select');
+                            if (selectEl) {
+                                herbId = selectEl.value;
+                            }
+                        }
+                    }
+                    if (!qtyInput || !unitSelect || !herbId) continue;
                     const qVal = parseFloat(qtyInput.value);
                     if (isNaN(qVal) || qVal <= 0) continue;
                     const unit = unitSelect.value || 'g';
