@@ -2525,6 +2525,197 @@ async function saveInventoryChanges() {
             clearButtonLoading(saveBtn);
         }
     }
+        // 批量入庫功能函式
+        function openBatchInventoryModal() {
+            try {
+                // 確保中藥庫資料已載入後再開啟彈窗
+                if (typeof initHerbLibrary === 'function' && !herbLibraryLoaded) {
+                    initHerbLibrary().then(() => {
+                        _openBatchModalInner();
+                    });
+                } else {
+                    _openBatchModalInner();
+                }
+            } catch (e) {
+                console.error('openBatchInventoryModal error:', e);
+            }
+        }
+
+        function _openBatchModalInner() {
+            const modal = document.getElementById('batchInventoryModal');
+            if (!modal) return;
+            // 清空既有的行
+            const rowsContainer = document.getElementById('batchRows');
+            if (rowsContainer) rowsContainer.innerHTML = '';
+            // 預設添加一行
+            addBatchRow();
+            // 根據語言更新彈窗文字與按鈕
+            try {
+                const title = document.getElementById('batchInventoryModalTitle');
+                if (title && typeof window.t === 'function') {
+                    title.textContent = window.t('批量入庫');
+                }
+                const addButton = modal.querySelector('button[onclick="addBatchRow()"]');
+                if (addButton && typeof window.t === 'function') {
+                    addButton.textContent = '+ ' + window.t('新增藥材');
+                }
+                const cancelBtn = modal.querySelector('button[onclick="hideBatchInventoryModal()"]');
+                if (cancelBtn && typeof window.t === 'function') {
+                    cancelBtn.textContent = window.t('取消');
+                }
+                const saveBtn = modal.querySelector('button[onclick="saveBatchInventory()"]');
+                if (saveBtn && typeof window.t === 'function') {
+                    saveBtn.textContent = window.t('儲存');
+                }
+                const btnLabel = document.getElementById('batchInventoryBtnText');
+                if (btnLabel && typeof window.t === 'function') {
+                    btnLabel.textContent = window.t('批量入庫');
+                }
+            } catch (_e) {
+                /* 忽略翻譯錯誤 */
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function hideBatchInventoryModal() {
+            const modal = document.getElementById('batchInventoryModal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function addBatchRow() {
+            const rowsContainer = document.getElementById('batchRows');
+            if (!rowsContainer) return;
+            // 行容器
+            const row = document.createElement('div');
+            row.className = 'flex flex-wrap items-center gap-2';
+            // 中藥下拉選單
+            const select = document.createElement('select');
+            select.className = 'batch-herb-select border border-gray-300 rounded px-2 py-1 flex-1';
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = (typeof window.t === 'function') ? window.t('請選擇中藥') : '請選擇中藥';
+            select.appendChild(defaultOption);
+            if (Array.isArray(herbLibrary)) {
+                herbLibrary.forEach(h => {
+                    const opt = document.createElement('option');
+                    opt.value = h.id;
+                    let name = h.name;
+                    try {
+                        const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                        if (langSel && langSel.toLowerCase().startsWith('en') && h.englishName) {
+                            name = h.englishName;
+                        }
+                    } catch (_e) {}
+                    opt.textContent = name;
+                    select.appendChild(opt);
+                });
+            }
+            row.appendChild(select);
+            // 數量輸入框
+            const qtyInput = document.createElement('input');
+            qtyInput.type = 'number';
+            qtyInput.min = '0';
+            qtyInput.step = '0.5';
+            qtyInput.placeholder = (typeof window.t === 'function') ? window.t('數量') : '數量';
+            qtyInput.className = 'batch-herb-qty w-24 border border-gray-300 rounded px-2 py-1';
+            row.appendChild(qtyInput);
+            // 單位下拉
+            const unitSelect = document.createElement('select');
+            unitSelect.className = 'batch-herb-unit border border-gray-300 rounded px-2 py-1 w-20';
+            ['g','jin','liang','qian'].forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u;
+                let label = UNIT_LABEL_MAP && UNIT_LABEL_MAP[u] ? UNIT_LABEL_MAP[u] : u;
+                label = (typeof window.t === 'function') ? window.t(label) : label;
+                opt.textContent = label;
+                unitSelect.appendChild(opt);
+            });
+            row.appendChild(unitSelect);
+            // 刪除按鈕
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'text-red-500 hover:text-red-700 px-2';
+            removeBtn.textContent = '×';
+            removeBtn.addEventListener('click', function() {
+                row.remove();
+            });
+            row.appendChild(removeBtn);
+            rowsContainer.appendChild(row);
+        }
+
+        async function saveBatchInventory() {
+            try {
+                // 確保庫存初始化完成
+                if (typeof initHerbInventory === 'function' && !herbInventoryInitialized) {
+                    try { await initHerbInventory(); } catch (_e) {}
+                }
+                const rowsContainer = document.getElementById('batchRows');
+                if (!rowsContainer) return;
+                const rows = rowsContainer.querySelectorAll('.flex');
+                if (!rows || rows.length === 0) {
+                    hideBatchInventoryModal();
+                    return;
+                }
+                const saveBtn = document.querySelector('#batchInventoryModal button[onclick="saveBatchInventory()"]');
+                setButtonLoading(saveBtn);
+                for (const row of rows) {
+                    const select = row.querySelector('select.batch-herb-select');
+                    const qtyInput = row.querySelector('input.batch-herb-qty');
+                    const unitSelect = row.querySelector('select.batch-herb-unit');
+                    if (!select || !qtyInput || !unitSelect) continue;
+                    const herbId = select.value;
+                    if (!herbId) continue;
+                    const qVal = parseFloat(qtyInput.value);
+                    if (isNaN(qVal) || qVal <= 0) continue;
+                    const unit = unitSelect.value || 'g';
+                    const factor = UNIT_FACTOR_MAP[unit] || 1;
+                    const addBase = qVal * factor;
+                    let inv = {quantity: 0, threshold: 0, unit: 'g', disabled: false};
+                    try {
+                        if (typeof getHerbInventory === 'function') {
+                            inv = getHerbInventory(herbId);
+                        }
+                    } catch (_e) {}
+                    const existingBaseQty = typeof inv.quantity === 'number' ? inv.quantity : 0;
+                    const existingThreshold = typeof inv.threshold === 'number' ? inv.threshold : 0;
+                    const existingUnit = inv.unit || 'g';
+                    const existingDisabled = !!inv.disabled;
+                    const newBaseQty = existingBaseQty + addBase;
+                    if (typeof setHerbInventory === 'function') {
+                        await setHerbInventory(herbId, newBaseQty, existingThreshold, existingUnit, existingDisabled);
+                    }
+                    try {
+                        if (typeof herbInventory !== 'undefined') {
+                            herbInventory[String(herbId)] = {
+                                quantity: newBaseQty,
+                                threshold: existingThreshold,
+                                unit: existingUnit,
+                                disabled: existingDisabled
+                            };
+                        }
+                    } catch (_e) {}
+                }
+                showToast((typeof window.t === 'function') ? window.t('庫存已更新！') : '庫存已更新！', 'success');
+                hideBatchInventoryModal();
+                try {
+                    if (typeof displayHerbLibrary === 'function') {
+                        displayHerbLibrary();
+                    }
+                    if (typeof updatePrescriptionDisplay === 'function') {
+                        updatePrescriptionDisplay();
+                    }
+                } catch (_e) {}
+            } catch (err) {
+                console.error('批量入庫錯誤:', err);
+                showToast((typeof window.t === 'function') ? window.t('批量入庫失敗！') : '批量入庫失敗！', 'error');
+            } finally {
+                const saveBtn = document.querySelector('#batchInventoryModal button[onclick="saveBatchInventory()"]');
+                clearButtonLoading(saveBtn);
+            }
+        }
+
         // 初始化穴位庫資料
         let acupointLibrary = [];
         // 穴位庫編輯狀態與篩選條件
@@ -19976,6 +20167,12 @@ async function deleteMedicalRecord(recordId) {
   window.openInventoryModal = openInventoryModal;
   window.hideInventoryModal = hideInventoryModal;
   window.saveInventoryChanges = saveInventoryChanges;
+
+  // 批量入庫功能掛載至全域
+  window.openBatchInventoryModal = openBatchInventoryModal;
+  window.hideBatchInventoryModal = hideBatchInventoryModal;
+  window.addBatchRow = addBatchRow;
+  window.saveBatchInventory = saveBatchInventory;
 
   // 帳號安全相關函式掛載至全域，供帳號安全設定頁的按鈕呼叫
   window.loadAccountSecurity = loadAccountSecurity;

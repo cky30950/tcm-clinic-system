@@ -89,6 +89,13 @@ window.translations = {
         "不使用問診資料": "不使用問診資料",
         "中藥庫": "中藥庫",
         "中藥服用方法": "中藥服用方法",
+        // 批量入庫相關翻譯
+        "批量入庫": "批量入庫",
+        "新增藥材": "新增藥材",
+        "請選擇中藥": "請選擇中藥",
+        "數量": "數量",
+        "單位": "單位",
+        "批量入庫失敗！": "批量入庫失敗！",
         "中藥材": "中藥材",
         "中藥材名稱 *": "中藥材名稱 *",
         "中醫診斷 *": "中醫診斷 *",
@@ -640,6 +647,13 @@ window.translations = {
         // Inventory type selector translations
         "顆粒沖劑": "Granules",
         "飲片": "Herbal slices",
+        // Batch restocking translations
+        "批量入庫": "Batch restock",
+        "新增藥材": "Add Herb",
+        "請選擇中藥": "Select Herb",
+        "數量": "Quantity",
+        "單位": "Unit",
+        "批量入庫失敗！": "Batch restock failed!",
         // Inventory management translations
         "編輯庫存": "Edit Inventory",
         "剩餘數量": "Remaining Quantity",
