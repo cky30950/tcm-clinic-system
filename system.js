@@ -13695,7 +13695,22 @@ async function initializeSystemAfterLogin() {
                                                oninput="updatePrescriptionDosageLive(${index}, this.value)"
                                                onchange="updatePrescriptionDosage(${index}, this.value)"
                                                onclick="this.select()">
-                                        <span class="text-sm text-gray-600 font-medium">g</span>
+                                        ${(() => {
+                                            try {
+                                                // 取得該藥材或方劑的單位，若不存在則預設為克（g）。
+                                                const inv2 = (typeof getHerbInventory === 'function') ? getHerbInventory(item.id) : { unit: 'g' };
+                                                const unit2 = (inv2 && inv2.unit) ? inv2.unit : 'g';
+                                                // 從映射中取得原始單位標籤（中文），不存在則默認為『克』
+                                                const rawUnit2 = (typeof UNIT_LABEL_MAP !== 'undefined' && UNIT_LABEL_MAP && UNIT_LABEL_MAP[unit2]) ? UNIT_LABEL_MAP[unit2] : '克';
+                                                // 使用翻譯函式將單位標籤轉換為當前語言
+                                                const unitTranslated2 = (typeof window.t === 'function') ? window.t(rawUnit2) : rawUnit2;
+                                                return `<span class="text-sm text-gray-600 font-medium">${unitTranslated2}</span>`;
+                                            } catch (_err2) {
+                                                // 若發生錯誤，回傳預設單位『克』
+                                                const defaultUnit2 = (typeof window.t === 'function') ? window.t('克') : '克';
+                                                return `<span class="text-sm text-gray-600 font-medium">${defaultUnit2}</span>`;
+                                            }
+                                        })()}
                                     </div>
                                     <button onclick="removePrescriptionItem(${index})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>
                                 </div>
@@ -13715,13 +13730,29 @@ async function initializeSystemAfterLogin() {
             // 但這會在病歷或診症記錄中呈現為項目上下出現空行。
             // 因此統一將 herb 與 formula 項目都只添加一個換行符號，避免多餘空白。
             selectedPrescriptionItems.forEach(item => {
-                // Use the item's custom dosage if provided; otherwise fall back to the default
-                // of 1 g for herbs or 5 g for formulas. This ensures prescriptions reflect the
-                // new default dosing policy (herbs 1g, formulas 5g).
+                // 使用項目的 customDosage（如果有），否則根據類型給予預設值：中藥材 1、方劑 5。
                 const dosage = item.customDosage || (item.type === 'herb' ? '1' : '5');
-                prescriptionText += `${item.name} ${dosage}g\n`;
+                // 根據中藥庫中的單位設定來顯示正確的單位；若沒有對應單位則默認為『克』
+                let unitLabelForText = '';
+                try {
+                    if (typeof getHerbInventory === 'function') {
+                        const inv3 = getHerbInventory(item.id);
+                        const unit3 = (inv3 && inv3.unit) ? inv3.unit : 'g';
+                        const rawUnit3 = (typeof UNIT_LABEL_MAP !== 'undefined' && UNIT_LABEL_MAP && UNIT_LABEL_MAP[unit3]) ? UNIT_LABEL_MAP[unit3] : '克';
+                        const translatedUnit3 = (typeof window.t === 'function') ? window.t(rawUnit3) : rawUnit3;
+                        unitLabelForText = translatedUnit3;
+                    } else {
+                        // 若無法取得 getHerbInventory 函式，預設顯示為『克』
+                        unitLabelForText = (typeof window.t === 'function') ? window.t('克') : '克';
+                    }
+                } catch (_unitErr) {
+                    // 發生錯誤時仍使用預設單位『克』
+                    unitLabelForText = (typeof window.t === 'function') ? window.t('克') : '克';
+                }
+                // 若為方劑類型，通常以『克』為單位，除非庫存中另有定義；仍使用上方取得的 unitLabelForText
+                prescriptionText += `${item.name} ${dosage}${unitLabelForText}\n`;
             });
-            
+
             hiddenTextarea.value = prescriptionText.trim();
         }
         
