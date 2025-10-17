@@ -20792,6 +20792,98 @@ async function deleteMedicalRecord(recordId) {
   // 將封裝函式掛載至全域，以便 HTML 按鈕呼叫
   window.openHerbCombo = openHerbCombo;
   window.openAcupointCombo = openAcupointCombo;
+  // =======================================
+  // 穴位圖選擇功能定義與掛載
+  /**
+   * 顯示穴位圖選擇彈窗。載入穴位庫資料後，依經絡分類顯示穴位。
+   */
+  async function showAcupointMapModal() {
+    try {
+      const modal = document.getElementById('acupointMapModal');
+      const merContainer = document.getElementById('acupointMapMeridians');
+      const listContainer = document.getElementById('acupointMapList');
+      if (!modal || !merContainer || !listContainer) return;
+      await initAcupointLibrary();
+      const meridians = Array.from(new Set((Array.isArray(acupointLibrary) ? acupointLibrary : []).map(item => item && item.meridian).filter(Boolean)));
+      meridians.sort((a, b) => String(a || '').localeCompare(String(b || ''), 'zh-Hans-CN', { sensitivity: 'base' }));
+      merContainer.innerHTML = '';
+      if (meridians.length === 0) {
+        listContainer.innerHTML = '<div class="text-gray-500 text-sm col-span-full">沒有可用的穴位資料</div>';
+        modal.classList.remove('hidden');
+        return;
+      }
+      meridians.forEach((mer, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = mer;
+        btn.className = 'px-2 py-1 rounded border border-blue-300 text-sm hover:bg-blue-100 whitespace-nowrap';
+        btn.onclick = function() {
+          Array.from(merContainer.children).forEach(child => {
+            child.classList.remove('bg-blue-500', 'text-white');
+          });
+          btn.classList.add('bg-blue-500', 'text-white');
+          showAcupointMapList(mer);
+        };
+        if (idx === 0) {
+          btn.classList.add('bg-blue-500', 'text-white');
+        }
+        merContainer.appendChild(btn);
+      });
+      showAcupointMapList(meridians[0]);
+      modal.classList.remove('hidden');
+    } catch (e) {
+      console.error('顯示穴位圖彈窗失敗：', e);
+    }
+  }
+
+  /**
+   * 隱藏穴位圖選擇彈窗。
+   */
+  function hideAcupointMapModal() {
+    const modal = document.getElementById('acupointMapModal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+  }
+
+  /**
+   * 根據經絡顯示穴位列表。
+   * @param {string} meridian 經絡名稱
+   */
+  function showAcupointMapList(meridian) {
+    try {
+      const listContainer = document.getElementById('acupointMapList');
+      if (!listContainer) return;
+      const items = Array.isArray(acupointLibrary) ? acupointLibrary.filter(item => item && item.meridian === meridian) : [];
+      if (!items || items.length === 0) {
+        listContainer.innerHTML = '<div class="text-gray-500 text-sm col-span-full">此經絡尚無穴位</div>';
+        return;
+      }
+      const sorted = items.slice().sort((a, b) => {
+        const an = (a && a.name) ? a.name : '';
+        const bn = (b && b.name) ? b.name : '';
+        return an.localeCompare(bn, 'zh-Hans-CN', { sensitivity: 'base' });
+      });
+      listContainer.innerHTML = '';
+      sorted.forEach(item => {
+        const name = (item && item.name) ? item.name : '';
+        const div = document.createElement('div');
+        div.className = 'p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded cursor-pointer text-center text-sm';
+        div.textContent = name;
+        div.onclick = function() {
+          addAcupointToNotes(name);
+          hideAcupointMapModal();
+        };
+        listContainer.appendChild(div);
+      });
+    } catch (e) {
+      console.error('顯示穴位列表失敗：', e);
+    }
+  }
+
+  // 將穴位圖函式掛載至全域，供 HTML 呼叫
+  window.showAcupointMapModal = showAcupointMapModal;
+  window.hideAcupointMapModal = hideAcupointMapModal;
   // 中藥庫庫存彈窗功能
   window.openInventoryModal = openInventoryModal;
   window.hideInventoryModal = hideInventoryModal;
