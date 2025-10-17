@@ -2752,6 +2752,31 @@ async function saveInventoryChanges() {
                 } catch (_e) {
                     // 忽略錯誤並使用當前模式
                 }
+                // 驗證每一行是否有選擇藥材並填寫有效數量
+                let allValid = true;
+                for (const row of rows) {
+                    const qtyInputTemp = row.querySelector('input.batch-herb-qty');
+                    let herbIdTemp = '';
+                    if (row.dataset && row.dataset.herbId) {
+                        herbIdTemp = row.dataset.herbId;
+                    }
+                    if (!herbIdTemp) {
+                        const selectElTemp = row.querySelector('select.batch-herb-select');
+                        if (selectElTemp) {
+                            herbIdTemp = selectElTemp.value;
+                        }
+                    }
+                    const qValTemp = qtyInputTemp ? parseFloat(qtyInputTemp.value) : NaN;
+                    if (!herbIdTemp || isNaN(qValTemp) || qValTemp <= 0) {
+                        allValid = false;
+                        break;
+                    }
+                }
+                if (!allValid) {
+                    // 顯示錯誤提示，不進行保存
+                    showToast((typeof window.t === 'function') ? (window.t('請選擇中藥') + ' / ' + window.t('數量')) : '請選擇中藥 / 數量', 'error');
+                    return;
+                }
                 // 臨時設定全域庫存模式，讓後續更新庫存使用指定路徑
                 currentInventoryMode = selectedInventoryMode;
                 setButtonLoading(saveBtn);
