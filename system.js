@@ -68,6 +68,57 @@ const UNIT_LABEL_MAP = {
     qian: '錢'
 };
 
+// 在庫存編輯彈窗中，當用戶切換數量單位時，根據所選單位自動換算庫存與補貨警戒量。
+// 透過 dataset.prevUnit 儲存前一次的單位，以便計算轉換比例。
+document.addEventListener('DOMContentLoaded', function () {
+    try {
+        const qtyUnitSelect = document.getElementById('inventoryQuantityUnit');
+        // 若元素存在才綁定事件，以避免其他頁面無此元素導致錯誤。
+        if (qtyUnitSelect) {
+            // 初始化 prevUnit 為當前選定的單位（預設為 g）
+            qtyUnitSelect.dataset.prevUnit = qtyUnitSelect.value || 'g';
+            qtyUnitSelect.addEventListener('change', function (e) {
+                const select = e.target;
+                const newUnit = select.value || 'g';
+                const prevUnit = select.dataset.prevUnit || 'g';
+                // 若單位未改變，則不需轉換
+                if (newUnit === prevUnit) {
+                    return;
+                }
+                // 讀取輸入欄位
+                const qtyInput = document.getElementById('inventoryQuantity');
+                const thrInput = document.getElementById('inventoryThreshold');
+                // 取得轉換因子
+                const prevFactor = UNIT_FACTOR_MAP[prevUnit] || 1;
+                const newFactor = UNIT_FACTOR_MAP[newUnit] || 1;
+                // 換算剩餘數量
+                if (qtyInput) {
+                    const qVal = parseFloat(qtyInput.value);
+                    if (!isNaN(qVal)) {
+                        const grams = qVal * prevFactor;
+                        const newQty = grams / newFactor;
+                        // 保留最多三位小數，避免精度過長
+                        qtyInput.value = (Math.round(newQty * 1000) / 1000).toString();
+                    }
+                }
+                // 換算補貨警戒量
+                if (thrInput) {
+                    const tVal = parseFloat(thrInput.value);
+                    if (!isNaN(tVal)) {
+                        const grams = tVal * prevFactor;
+                        const newThr = grams / newFactor;
+                        thrInput.value = (Math.round(newThr * 1000) / 1000).toString();
+                    }
+                }
+                // 更新前一次的單位為新的選項
+                select.dataset.prevUnit = newUnit;
+            });
+        }
+    } catch (_e) {
+        // 忽略任何異常以避免影響其他功能
+    }
+});
+
 // 用於掛號搜尋結果的鍵盤導航索引
 // 當病人搜尋結果出現時，此索引用於記錄當前選中項目；-1 表示未選中
 let patientSearchSelectionIndex = -1;
@@ -2308,7 +2359,12 @@ async function openInventoryModal(itemId) {
             // 設定單位選擇器的值
             try {
                 const qtyUnitSel = document.getElementById('inventoryQuantityUnit');
-                if (qtyUnitSel) qtyUnitSel.value = unit;
+                if (qtyUnitSel) {
+                    // 設定單位選擇器的值
+                    qtyUnitSel.value = unit;
+                    // 更新 prevUnit 屬性以便後續換算使用
+                    qtyUnitSel.dataset.prevUnit = unit;
+                }
             } catch (_e) {}
             // 設定啟用/停用下拉選擇的值
             try {
