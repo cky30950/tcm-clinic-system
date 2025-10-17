@@ -2930,22 +2930,32 @@ async function saveInventoryChanges() {
         }
 
         async function saveBatchInventory() {
+            // 在按下儲存時立即顯示按鈕讀取圈，防止重複點擊
+            const saveBtn = getLoadingButtonFromEvent('#batchInventoryModal button[onclick="saveBatchInventory()"]');
+            setButtonLoading(saveBtn);
             // 記錄原本的庫存模式，以便在儲存完成後恢復
             const originalInventoryMode = currentInventoryMode;
             try {
                 // 確保庫存初始化完成
                 if (typeof initHerbInventory === 'function' && !herbInventoryInitialized) {
-                    try { await initHerbInventory(); } catch (_e) {}
+                    try {
+                        await initHerbInventory();
+                    } catch (_e) {
+                        /* 忽略初始化錯誤 */
+                    }
                 }
                 const rowsContainer = document.getElementById('batchRows');
-                if (!rowsContainer) return;
+                if (!rowsContainer) {
+                    clearButtonLoading(saveBtn);
+                    return;
+                }
                 // 僅選取具有 batch-row 類別的行，避免選到單位顯示 span 內的 flex 元素
                 const rows = rowsContainer.querySelectorAll('.batch-row');
                 if (!rows || rows.length === 0) {
                     hideBatchInventoryModal();
+                    clearButtonLoading(saveBtn);
                     return;
                 }
-                const saveBtn = document.querySelector('#batchInventoryModal button[onclick="saveBatchInventory()"]');
                 // 從批量入庫彈窗的下拉選擇中取得要更新的庫存類型
                 let selectedInventoryMode = currentInventoryMode;
                 try {
@@ -2957,7 +2967,7 @@ async function saveInventoryChanges() {
                         }
                     }
                 } catch (_e) {
-                    // 忽略錯誤並使用當前模式
+                    /* 忽略錯誤並使用當前模式 */
                 }
                 // 驗證每一行是否有選擇藥材並填寫有效數量
                 let allValid = true;
@@ -2982,6 +2992,7 @@ async function saveInventoryChanges() {
                 if (!allValid) {
                     // 顯示錯誤提示，不進行保存
                     showToast((typeof window.t === 'function') ? (window.t('請選擇中藥') + ' / ' + window.t('數量')) : '請選擇中藥 / 數量', 'error');
+                    clearButtonLoading(saveBtn);
                     return;
                 }
                 // 臨時設定全域庫存模式，讓後續更新庫存使用指定路徑
@@ -2993,9 +3004,8 @@ async function saveInventoryChanges() {
                         await initHerbInventory(true);
                     }
                 } catch (_initErr) {
-                    // 忽略初始化錯誤
+                    /* 忽略初始化錯誤 */
                 }
-                setButtonLoading(saveBtn);
                 // 處理每一行新增的中藥／方劑
                 for (const row of rows) {
                     const qtyInput = row.querySelector('input.batch-herb-qty');
@@ -3016,13 +3026,13 @@ async function saveInventoryChanges() {
                     const qVal = parseFloat(qtyInput.value);
                     if (isNaN(qVal) || qVal <= 0) continue;
                     // 取得該藥材的單位，優先使用資料集保存的 herbUnit；若無則從庫存資料取得；最終預設為 g
-                    let inv = {quantity: 0, threshold: 0, unit: 'g', disabled: false};
+                    let inv = { quantity: 0, threshold: 0, unit: 'g', disabled: false };
                     try {
                         if (typeof getHerbInventory === 'function') {
                             inv = getHerbInventory(herbId);
                         }
                     } catch (_errInv) {
-                        // 忽略錯誤
+                        /* 忽略錯誤 */
                     }
                     const unitVal = (row.dataset && row.dataset.herbUnit) ? row.dataset.herbUnit : (inv && inv.unit ? inv.unit : 'g');
                     const factor = UNIT_FACTOR_MAP[unitVal] || 1;
@@ -3054,15 +3064,17 @@ async function saveInventoryChanges() {
                 showToast((typeof window.t === 'function') ? window.t('庫存已更新！') : '庫存已更新！', 'success');
                 // 隱藏批量入庫對話框
                 hideBatchInventoryModal();
+                // 刷新中藥庫列表與處方顯示，以反映庫存變化
                 try {
-                    // 刷新中藥庫列表與處方顯示，以反映庫存變化
                     if (typeof displayHerbLibrary === 'function') {
                         displayHerbLibrary();
                     }
                     if (typeof updatePrescriptionDisplay === 'function') {
                         updatePrescriptionDisplay();
                     }
-                } catch (_e) {}
+                } catch (_e) {
+                    /* 忽略刷新錯誤 */
+                }
             } catch (err) {
                 console.error('批量入庫錯誤:', err);
                 showToast((typeof window.t === 'function') ? window.t('批量入庫失敗！') : '批量入庫失敗！', 'error');
@@ -3072,7 +3084,9 @@ async function saveInventoryChanges() {
                     if (typeof originalInventoryMode !== 'undefined') {
                         currentInventoryMode = originalInventoryMode;
                     }
-                } catch (_e) {}
+                } catch (_e) {
+                    /* 忽略錯誤 */
+                }
                 // 重新初始化庫存資料，以載入原本庫存模式的資料，避免本地快取為選擇模式下的資料
                 try {
                     if (typeof initHerbInventory === 'function') {
@@ -3081,7 +3095,6 @@ async function saveInventoryChanges() {
                 } catch (_initErr) {
                     /* 忽略錯誤 */
                 }
-                const saveBtn = document.querySelector('#batchInventoryModal button[onclick="saveBatchInventory()"]');
                 clearButtonLoading(saveBtn);
             }
         }
@@ -20789,6 +20802,26 @@ async function deleteMedicalRecord(recordId) {
   window.hideBatchInventoryModal = hideBatchInventoryModal;
   window.addBatchRow = addBatchRow;
   window.saveBatchInventory = saveBatchInventory;
+
+  // 在腳本載入時為批量入庫彈窗註冊點擊事件，以便當使用者點擊彈窗遮罩（黑色背景）時即可關閉彈窗。
+  // 其他彈窗預設已支援點擊遮罩關閉，批量入庫彈窗在先前版本中未實作此行為，故於此補上。
+  (function attachBatchModalOutsideClick() {
+    try {
+      const modal = document.getElementById('batchInventoryModal');
+      if (modal && !modal.dataset.outsideClickBound) {
+        modal.addEventListener('click', function (evt) {
+          // 僅當點擊目標為覆蓋層本身（即黑色背景）時才關閉，避免在內部表單點擊時關閉彈窗
+          if (evt.target === modal) {
+            hideBatchInventoryModal();
+          }
+        });
+        // 使用資料屬性標記以避免重複綁定事件
+        modal.dataset.outsideClickBound = 'true';
+      }
+    } catch (e) {
+      console.error('批量入庫彈窗外部點擊事件綁定失敗:', e);
+    }
+  })();
 
   // 帳號安全相關函式掛載至全域，供帳號安全設定頁的按鈕呼叫
   window.loadAccountSecurity = loadAccountSecurity;
