@@ -2768,9 +2768,9 @@ async function saveInventoryChanges() {
         function addBatchRow() {
             const rowsContainer = document.getElementById('batchRows');
             if (!rowsContainer) return;
-            // 行容器
+            // 行容器。新增自訂類別 'batch-row' 以利後續驗證選擇正確的行。
             const row = document.createElement('div');
-            row.className = 'flex flex-wrap items-center gap-2';
+            row.className = 'batch-row flex flex-wrap items-center gap-2';
             // 搜尋中藥輸入框及建議清單
             const searchContainer = document.createElement('div');
             // flex-1 以便與其他欄位均分寬度
@@ -2939,7 +2939,8 @@ async function saveInventoryChanges() {
                 }
                 const rowsContainer = document.getElementById('batchRows');
                 if (!rowsContainer) return;
-                const rows = rowsContainer.querySelectorAll('.flex');
+                // 僅選取具有 batch-row 類別的行，避免選到單位顯示 span 內的 flex 元素
+                const rows = rowsContainer.querySelectorAll('.batch-row');
                 if (!rows || rows.length === 0) {
                     hideBatchInventoryModal();
                     return;
