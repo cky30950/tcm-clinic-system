@@ -781,7 +781,9 @@
                                                 <button type="button" onclick="clearAcupointNotesSearch()" class="absolute right-2 top-1 text-gray-400 hover:text-gray-600 text-sm">×</button>
                                             </div>
                                             <!-- 新增穴位圖按鈕：使用封裝函式開啟穴位圖並顯示讀取狀態 -->
-                                            <button type="button" onclick="openAcupointMap(event)" class="ml-2 flex items-center whitespace-nowrap text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200">
+                                            <button type="button"
+                                                    onclick="if (window.openAcupointMap) { openAcupointMap(event); } else if (window.showAcupointMapModal) { showAcupointMapModal(); }"
+                                                    class="ml-2 flex items-center whitespace-nowrap text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200">
                                                 🗺️ 穴位圖
                                             </button>
                                         </div>
