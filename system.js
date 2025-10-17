@@ -13383,10 +13383,29 @@ async function initializeSystemAfterLogin() {
             try {
                 const sel = document.getElementById('prescriptionTypeSelect');
                 if (!sel) return;
+                // 設定提示訊息，根據語言切換
+                const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                const zhTitle = '所有藥刪除後才可轉換';
+                const enTitle = 'Remove all medicines before switching';
+                const titleMsg = (langSel && langSel.toLowerCase().startsWith('en')) ? enTitle : zhTitle;
+
                 if (Array.isArray(selectedPrescriptionItems) && selectedPrescriptionItems.length > 0) {
+                    // 禁用選單並套用灰階樣式與禁用游標
                     sel.disabled = true;
+                    sel.classList.add('opacity-50');
+                    sel.classList.add('cursor-not-allowed');
+                    // 若存在自訂背景色，保持不變；否則設定為灰色系
+                    // 將文字顏色調淡
+                    sel.style.color = '#9ca3af';
+                    // 設定懸浮提示
+                    sel.setAttribute('title', titleMsg);
                 } else {
+                    // 恢復可用狀態與原本樣式
                     sel.disabled = false;
+                    sel.classList.remove('opacity-50');
+                    sel.classList.remove('cursor-not-allowed');
+                    sel.style.color = '';
+                    sel.removeAttribute('title');
                 }
             } catch (_e) {
                 // ignore errors
