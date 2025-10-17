@@ -13345,7 +13345,8 @@ async function initializeSystemAfterLogin() {
                     displayPrescriptionError('');
                     return;
                 }
-                // 檢查任意兩個藥材名稱是否有禁忌
+                // 檢查所有兩兩藥材是否有禁忌，收集所有禁忌組合
+                const conflictMessages = [];
                 for (let i = 0; i < selectedPrescriptionItems.length; i++) {
                     const nameA = selectedPrescriptionItems[i].name || '';
                     for (let j = i + 1; j < selectedPrescriptionItems.length; j++) {
@@ -13355,13 +13356,18 @@ async function initializeSystemAfterLogin() {
                             const zhMsg = `藥材${nameA}與${nameB}存在禁忌配伍，請注意使用！`;
                             const enMsg = `${nameA} is incompatible with ${nameB} in the prescription; please use with caution.`;
                             const msg = (langSel && langSel.toLowerCase().startsWith('en')) ? enMsg : zhMsg;
-                            displayPrescriptionError(msg);
-                            return;
+                            conflictMessages.push(msg);
                         }
                     }
                 }
-                // 若沒有任何禁忌，清除提示
-                displayPrescriptionError('');
+                if (conflictMessages.length > 0) {
+                    // 將所有禁忌訊息使用換行符號串接，避免重複顯示相同訊息
+                    const combined = Array.from(new Set(conflictMessages)).join('\n');
+                    displayPrescriptionError(combined);
+                } else {
+                    // 若沒有任何禁忌，清除提示
+                    displayPrescriptionError('');
+                }
             } catch (_e) {
                 // 發生異常時，隱藏錯誤提示
                 displayPrescriptionError('');
