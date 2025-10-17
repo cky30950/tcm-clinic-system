@@ -2571,6 +2571,25 @@ async function saveInventoryChanges() {
                 if (btnLabel && typeof window.t === 'function') {
                     btnLabel.textContent = window.t('批量入庫');
                 }
+                // 設置批量入庫庫存類型選單初始值與翻譯
+                const typeSelect = document.getElementById('batchInventoryTypeSelect');
+                if (typeSelect) {
+                    // 將選單的值設為當前庫存模式，預設顆粒沖劑
+                    try {
+                        typeSelect.value = currentInventoryMode || 'granule';
+                    } catch (_e) {}
+                    // 更新選項文字的翻譯
+                    if (typeof window.t === 'function') {
+                        for (let i = 0; i < typeSelect.options.length; i++) {
+                            const opt = typeSelect.options[i];
+                            if (opt.value === 'granule') {
+                                opt.textContent = window.t('顆粒沖劑');
+                            } else if (opt.value === 'slice') {
+                                opt.textContent = window.t('飲片');
+                            }
+                        }
+                    }
+                }
             } catch (_e) {
                 /* 忽略翻譯錯誤 */
             }
@@ -2591,39 +2610,33 @@ async function saveInventoryChanges() {
             const row = document.createElement('div');
             row.className = 'flex flex-wrap items-center gap-2';
             // 搜尋中藥輸入框及建議清單
-            // 使用 search container 包裝輸入框與建議列表，方便絕對定位
             const searchContainer = document.createElement('div');
-            // 設置 flex-1 以便與後方數量/單位等元素均分空間
+            // flex-1 以便與其他欄位均分寬度
             searchContainer.className = 'relative flex-1';
+            // 初始時建立輸入框讓使用者輸入搜尋
             const herbInput = document.createElement('input');
             herbInput.type = 'text';
             herbInput.className = 'batch-herb-input border border-gray-300 rounded px-2 py-1 w-full';
-            // 使用現有翻譯字串作為 placeholder，如無則顯示固定中文
             herbInput.placeholder = (typeof window.t === 'function') ? (window.t('搜尋藥材或方劑') || '搜尋藥材或方劑') : '搜尋藥材或方劑';
-            // 建議列表容器，初始隱藏
+            // 建議列表容器，透過絕對定位顯示在輸入框下方
             const suggestionList = document.createElement('div');
             suggestionList.className = 'absolute z-10 mt-1 max-h-60 overflow-y-auto bg-white border border-gray-300 rounded w-full hidden';
-            // 在每一行記錄被選中的 herbId
+            // 行資料設定 herbId 默認為空
             row.dataset.herbId = '';
-            // 輔助函式：根據輸入值篩選建議
+            // 更新建議列表的函式
             function updateSuggestions() {
                 const query = herbInput.value.trim().toLowerCase();
-                // 清空建議內容
                 suggestionList.innerHTML = '';
                 if (!query) {
                     suggestionList.classList.add('hidden');
-                    // 若清空輸入框則也清空已選 herbId
                     row.dataset.herbId = '';
                     return;
                 }
-                // 取前 10 筆匹配結果
                 const matches = [];
                 if (Array.isArray(herbLibrary)) {
                     for (const h of herbLibrary) {
-                        // 避免列出已停用的藥材，可在此處增加條件
                         let name = h.name || '';
                         let englishName = h.englishName || '';
-                        // 判斷語言，如果當前語言為英文則搜尋英文名稱
                         let searchTarget = name;
                         try {
                             const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
@@ -2641,7 +2654,6 @@ async function saveInventoryChanges() {
                     suggestionList.classList.add('hidden');
                     return;
                 }
-                // 建立建議項目
                 matches.forEach(h => {
                     const item = document.createElement('div');
                     item.className = 'px-2 py-1 cursor-pointer hover:bg-gray-100';
@@ -2654,21 +2666,24 @@ async function saveInventoryChanges() {
                     } catch (_e) {}
                     item.textContent = displayName;
                     item.addEventListener('click', () => {
-                        herbInput.value = displayName;
+                        // 選定建議後，記錄 id 並用文字標籤取代輸入框
                         row.dataset.herbId = h.id;
                         suggestionList.classList.add('hidden');
+                        // 建立 span 顯示藥名
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'batch-herb-name px-2 py-1 w-full';
+                        nameSpan.textContent = displayName;
+                        // 清除 searchContainer 內容，插入標籤
+                        searchContainer.innerHTML = '';
+                        searchContainer.appendChild(nameSpan);
                     });
                     suggestionList.appendChild(item);
                 });
                 suggestionList.classList.remove('hidden');
             }
-            // 綁定輸入事件以更新建議
             herbInput.addEventListener('input', updateSuggestions);
-            // 當輸入框獲得焦點時更新建議（輸入值不變也可重新顯示）
             herbInput.addEventListener('focus', updateSuggestions);
-            // 若點擊外部則隱藏建議列表
             document.addEventListener('click', function(ev) {
-                // 若點擊不是本輸入框或建議列表，且不是建議列表的子元素，則隱藏
                 if (!searchContainer.contains(ev.target)) {
                     suggestionList.classList.add('hidden');
                 }
@@ -2709,6 +2724,8 @@ async function saveInventoryChanges() {
         }
 
         async function saveBatchInventory() {
+            // 記錄原本的庫存模式，以便在儲存完成後恢復
+            const originalInventoryMode = currentInventoryMode;
             try {
                 // 確保庫存初始化完成
                 if (typeof initHerbInventory === 'function' && !herbInventoryInitialized) {
@@ -2722,25 +2739,35 @@ async function saveInventoryChanges() {
                     return;
                 }
                 const saveBtn = document.querySelector('#batchInventoryModal button[onclick="saveBatchInventory()"]');
+                // 從批量入庫彈窗的下拉選擇中取得要更新的庫存類型
+                let selectedInventoryMode = currentInventoryMode;
+                try {
+                    const typeSelect = document.getElementById('batchInventoryTypeSelect');
+                    if (typeSelect) {
+                        const val = typeSelect.value;
+                        if (val === 'granule' || val === 'slice') {
+                            selectedInventoryMode = val;
+                        }
+                    }
+                } catch (_e) {
+                    // 忽略錯誤並使用當前模式
+                }
+                // 臨時設定全域庫存模式，讓後續更新庫存使用指定路徑
+                currentInventoryMode = selectedInventoryMode;
                 setButtonLoading(saveBtn);
                 for (const row of rows) {
-                    // 取得輸入框和單位選擇器
                     const qtyInput = row.querySelector('input.batch-herb-qty');
                     const unitSelect = row.querySelector('select.batch-herb-unit');
-                    // 從行的 dataset 或輸入框中取得 herbId
                     let herbId = '';
+                    // 先從行的資料集取得 herbId，這是搜尋介面選取後設定的
                     if (row.dataset && row.dataset.herbId) {
                         herbId = row.dataset.herbId;
-                    } else {
-                        // 兼容早期下拉選單的情況
-                        const inputEl = row.querySelector('input.batch-herb-input');
-                        if (inputEl && inputEl.dataset && inputEl.dataset.herbId) {
-                            herbId = inputEl.dataset.herbId;
-                        } else {
-                            const selectEl = row.querySelector('select.batch-herb-select');
-                            if (selectEl) {
-                                herbId = selectEl.value;
-                            }
+                    }
+                    // 兼容舊版下拉選單
+                    if (!herbId) {
+                        const selectEl = row.querySelector('select.batch-herb-select');
+                        if (selectEl) {
+                            herbId = selectEl.value;
                         }
                     }
                     if (!qtyInput || !unitSelect || !herbId) continue;
@@ -2788,6 +2815,12 @@ async function saveInventoryChanges() {
                 console.error('批量入庫錯誤:', err);
                 showToast((typeof window.t === 'function') ? window.t('批量入庫失敗！') : '批量入庫失敗！', 'error');
             } finally {
+                // 恢復原本的庫存模式
+                try {
+                    if (typeof originalInventoryMode !== 'undefined') {
+                        currentInventoryMode = originalInventoryMode;
+                    }
+                } catch (_e) {}
                 const saveBtn = document.querySelector('#batchInventoryModal button[onclick="saveBatchInventory()"]');
                 clearButtonLoading(saveBtn);
             }
