@@ -2857,6 +2857,21 @@ async function saveInventoryChanges() {
                                 // 使用翻譯函式轉換單位文字
                                 label = (typeof window.t === 'function') ? window.t(label) : label;
                                 unitDisplay.textContent = label;
+                                // 更新樣式：移除預設淡色文字與透明邊框，改為正常色與實際邊框與背景
+                                try {
+                                    unitDisplay.classList.remove('text-gray-400');
+                                    unitDisplay.classList.add('text-gray-600');
+                                    // 變更邊框為實線顏色、加上圓角和淡背景
+                                    unitDisplay.classList.remove('border-transparent');
+                                    unitDisplay.classList.add('border-gray-300');
+                                    // 若之前沒有圓角，新增圓角樣式
+                                    unitDisplay.classList.add('rounded');
+                                    // 加入淡灰背景以利辨識
+                                    unitDisplay.classList.remove('bg-transparent');
+                                    unitDisplay.classList.add('bg-gray-50');
+                                } catch (_e) {
+                                    /* 忽略錯誤 */
+                                }
                             }
                         } catch (_err) {
                             // 忽略錯誤
@@ -2886,9 +2901,21 @@ async function saveInventoryChanges() {
             row.appendChild(qtyInput);
             // 顯示單位：依藥材設定顯示單位標籤，不可修改
             const unitDisplay = document.createElement('span');
-            // 使用與原 select 相同的寬度與樣式，以保持外觀一致
-            unitDisplay.className = 'batch-herb-unit w-20 border border-gray-300 rounded px-2 py-1 text-sm text-gray-600 bg-gray-50 flex items-center justify-center';
-            unitDisplay.textContent = '';
+            /*
+             * 預設僅顯示淡色文字而不顯示邊框，避免在未選取藥材時出現明顯的長框。
+             * 使用固定寬度 w-20 以維持欄位對齊，但邊框設為 transparent 以去除框線，
+             * 背景透明、文字色偏淡，類似 placeholder 效果。當使用者選擇藥材後，再動態
+             * 加回實際邊框與背景顏色。
+             */
+            unitDisplay.className =
+                'batch-herb-unit w-20 border border-transparent px-2 py-1 text-sm text-gray-400 bg-transparent flex items-center justify-center';
+            // 預設顯示「單位」字樣（可透過翻譯函式翻譯）
+            try {
+                const placeholderLabel = (typeof window.t === 'function') ? window.t('單位') : '單位';
+                unitDisplay.textContent = placeholderLabel;
+            } catch (_e) {
+                unitDisplay.textContent = '單位';
+            }
             row.appendChild(unitDisplay);
             // 刪除按鈕
             const removeBtn = document.createElement('button');
