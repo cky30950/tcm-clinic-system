@@ -777,14 +777,11 @@
                                                 <input type="text" id="acupointNotesSearch" placeholder="搜尋穴位名稱、經絡或定位..." 
                                                        class="w-full border border-blue-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                                        oninput="searchAcupointForNotes()">
-                                                <!-- 清除搜尋內容按鈕 -->
                                                 <button type="button" onclick="clearAcupointNotesSearch()" class="absolute right-2 top-1 text-gray-400 hover:text-gray-600 text-sm">×</button>
                                             </div>
-                                            <!-- 新增穴位圖按鈕：使用封裝函式開啟穴位圖並顯示讀取狀態 -->
-                                            <button type="button"
-                                                    onclick="if (window.openAcupointMap) { openAcupointMap(event); } else if (window.showAcupointMapModal) { showAcupointMapModal(); }"
-                                                    class="ml-2 flex items-center whitespace-nowrap text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200">
-                                                🗺️ 穴位圖
+                                            <!-- 圖選穴位按鈕，點擊開啟穴位圖選擇彈窗 -->
+                                            <button type="button" onclick="openAcupointDiagram()" class="ml-2 flex items-center text-blue-600 hover:text-blue-800 text-sm px-2 py-1 border border-blue-300 rounded">
+                                                🗺️ 圖選穴位
                                             </button>
                                         </div>
                                         <!-- 搜索結果 -->
@@ -2310,19 +2307,16 @@
         </div>
 
         <!-- 穴位圖選擇彈窗 -->
-        <div id="acupointMapModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-xl shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div id="acupointDiagramModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
                 <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl">
                     <h3 class="text-lg font-bold text-gray-800">穴位圖選擇</h3>
-                    <button type="button" onclick="hideAcupointMapModal()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+                    <button onclick="hideAcupointDiagramModal()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
                 </div>
-                <div class="p-4 space-y-4">
-                    <!-- 經絡分類按鈕列表 -->
-                    <div id="acupointMapMeridians" class="flex flex-wrap gap-2">
-                        <!-- 動態載入經絡分類 -->
-                    </div>
-                    <!-- 穴位列表 -->
-                    <div id="acupointMapList" class="grid grid-cols-2 gap-2">
+                <div id="acupointDiagramContent" class="p-4">
+                    <!-- 使用占位圖作為穴位圖，可由管理者替換成實際穴位圖 -->
+                    <img id="acupointDiagramImage" src="placeholder_light_gray_block.png" alt="穴位圖" class="w-full h-auto mb-4 border border-gray-200 rounded">
+                    <div id="acupointDiagramList" class="space-y-3">
                         <!-- 動態載入穴位列表 -->
                     </div>
                 </div>
