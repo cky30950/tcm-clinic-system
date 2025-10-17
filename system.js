@@ -126,6 +126,60 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
+// DOMContentLoaded 事件：初始化處方搜尋區域的庫存模式選單
+document.addEventListener('DOMContentLoaded', function () {
+    try {
+        const selectEl = document.getElementById('prescriptionTypeSelect');
+        if (selectEl) {
+            // 設定預設值為當前庫存模式，若不存在則使用 granule
+            let defaultMode = 'granule';
+            try {
+                if (typeof currentInventoryMode !== 'undefined' && (currentInventoryMode === 'granule' || currentInventoryMode === 'slice')) {
+                    defaultMode = currentInventoryMode;
+                } else {
+                    // 嘗試從 localStorage 讀取
+                    const storedMode = (typeof localStorage !== 'undefined') ? localStorage.getItem('inventoryMode') : null;
+                    if (storedMode === 'granule' || storedMode === 'slice') {
+                        defaultMode = storedMode;
+                    }
+                }
+            } catch (_e) {
+                /* 忽略 localStorage 讀取錯誤 */
+            }
+            selectEl.value = defaultMode;
+            // 翻譯選項文字（若可用）
+            const granOpt = selectEl.querySelector('option[value="granule"]');
+            const sliceOpt = selectEl.querySelector('option[value="slice"]');
+            if (granOpt) {
+                let label = '顆粒沖劑';
+                try {
+                    if (typeof window.t === 'function') {
+                        const translated = window.t('顆粒沖劑');
+                        if (translated) label = translated;
+                    }
+                } catch (_e) {
+                    /* 忽略翻譯錯誤 */
+                }
+                granOpt.textContent = label;
+            }
+            if (sliceOpt) {
+                let label = '飲片';
+                try {
+                    if (typeof window.t === 'function') {
+                        const translated = window.t('飲片');
+                        if (translated) label = translated;
+                    }
+                } catch (_e) {
+                    /* 忽略翻譯錯誤 */
+                }
+                sliceOpt.textContent = label;
+            }
+        }
+    } catch (_e) {
+        /* 忽略初始化錯誤 */
+    }
+});
+
 // 用於掛號搜尋結果的鍵盤導航索引
 // 當病人搜尋結果出現時，此索引用於記錄當前選中項目；-1 表示未選中
 let patientSearchSelectionIndex = -1;
@@ -197,6 +251,45 @@ function changeInventoryType(type) {
         });
     }
 }
+
+/**
+ * 在處方中選擇顆粒沖劑或飲片時切換庫存模式。
+ * 這個函式會呼叫原有的 changeInventoryType 更新全域庫存模式，
+ * 並在切換後觸發重新搜尋處方用藥，以便顯示新的庫存餘量。
+ * @param {string} type 'granule' 或 'slice'
+ */
+function onPrescriptionTypeChange(type) {
+    // 檢查輸入是否有效
+    if (type !== 'granule' && type !== 'slice') {
+        return;
+    }
+    // 切換全域庫存模式
+    try {
+        changeInventoryType(type);
+    } catch (_e) {
+        // 若切換失敗，仍然嘗試後續動作
+    }
+    // 若使用者在處方搜尋欄中已輸入關鍵字，稍後重新搜尋以更新結果
+    try {
+        const searchEl = document.getElementById('prescriptionSearch');
+        const query = searchEl && searchEl.value ? String(searchEl.value).trim() : '';
+        if (query && query.length > 0) {
+            // 延遲執行以等待庫存資料刷新
+            setTimeout(function () {
+                try {
+                    searchHerbsForPrescription();
+                } catch (_e) {
+                    /* 忽略搜索錯誤 */
+                }
+            }, 300);
+        }
+    } catch (_e) {
+        /* 忽略搜尋相關錯誤 */
+    }
+}
+
+// 將處方庫存模式切換函式公開到全域，供 HTML select 調用
+window.onPrescriptionTypeChange = onPrescriptionTypeChange;
 
 // 將庫存切換函式暴露到全域，供 HTML 事件調用
 window.changeInventoryType = changeInventoryType;
