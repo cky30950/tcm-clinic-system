@@ -269,6 +269,16 @@ function onPrescriptionTypeChange(type) {
     } catch (_e) {
         // 若切換失敗，仍然嘗試後續動作
     }
+
+    // 同步中藥庫的下拉選單，使其反映新的庫存模式
+    try {
+        const invSel = document.getElementById('inventoryTypeSelect');
+        if (invSel && invSel.value !== type) {
+            invSel.value = type;
+        }
+    } catch (_e) {
+        /* 忽略同步錯誤 */
+    }
     // 若使用者在處方搜尋欄中已輸入關鍵字，稍後重新搜尋以更新結果
     try {
         const searchEl = document.getElementById('prescriptionSearch');
@@ -287,6 +297,73 @@ function onPrescriptionTypeChange(type) {
         /* 忽略搜尋相關錯誤 */
     }
 }
+
+// 當使用者從中藥庫介面選擇顆粒沖劑或飲片時呼叫此函式。
+// 會同步調整診症系統的下拉選單並切換庫存模式，但若處方已有內容則不允許切換。
+function onInventoryTypeChange(type) {
+    // 檢查輸入類型有效
+    if (type !== 'granule' && type !== 'slice') {
+        return;
+    }
+    // 若處方中已有藥材且與當前庫存類別不同，不允許切換
+    try {
+        if (Array.isArray(selectedPrescriptionItems) && selectedPrescriptionItems.length > 0 && currentInventoryMode !== type) {
+            // 將庫存下拉選單的值還原為當前模式
+            const invSel = document.getElementById('inventoryTypeSelect');
+            if (invSel) {
+                invSel.value = currentInventoryMode;
+            }
+            // 顯示提醒：必須清空處方才能切換
+            try {
+                const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                const zhMsg = '請先刪除所有處方內容才能切換藥材類別';
+                const enMsg = 'Please remove all prescription items before switching inventory type';
+                const msg = (langSel && langSel.toLowerCase().startsWith('en')) ? enMsg : zhMsg;
+                showToast(msg, 'warning');
+            } catch (_toastErr) {
+                /* 忽略提示錯誤 */
+            }
+            return;
+        }
+    } catch (_e) {
+        /* 若檢查處方內容失敗，不阻止切換 */
+    }
+    // 同步診症系統的下拉選單（若未禁用）
+    try {
+        const presSel = document.getElementById('prescriptionTypeSelect');
+        if (presSel) {
+            // 更新值；若禁用則只改值而不觸發 onchange
+            presSel.value = type;
+        }
+    } catch (_e) {
+        /* 忽略同步錯誤 */
+    }
+    // 執行庫存類型切換
+    try {
+        changeInventoryType(type);
+    } catch (_e) {
+        /* 忽略庫存類型切換錯誤 */
+    }
+    // 若處方搜尋欄有內容，更新搜索結果以反映新庫存餘量
+    try {
+        const searchEl = document.getElementById('prescriptionSearch');
+        const query = searchEl && searchEl.value ? String(searchEl.value).trim() : '';
+        if (query && query.length > 0) {
+            setTimeout(function () {
+                try {
+                    searchHerbsForPrescription();
+                } catch (_e) {
+                    /* 忽略搜索錯誤 */
+                }
+            }, 300);
+        }
+    } catch (_e) {
+        /* 忽略搜尋錯誤 */
+    }
+}
+
+// 將庫存類型改變函式暴露到全域，以便中藥庫選單使用
+window.onInventoryTypeChange = onInventoryTypeChange;
 
 // 將處方庫存模式切換函式公開到全域，供 HTML select 調用
 window.onPrescriptionTypeChange = onPrescriptionTypeChange;
