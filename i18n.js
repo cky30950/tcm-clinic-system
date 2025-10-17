@@ -614,6 +614,9 @@ window.translations = {
         "管理訂閱/付款": "管理訂閱/付款",
         "無法取得客戶門戶連結！": "無法取得客戶門戶連結！",
         "開啟付款管理視窗失敗！": "開啟付款管理視窗失敗！",
+        // 庫存類型選擇
+        "顆粒沖劑": "顆粒沖劑",
+        "飲片": "飲片",
     },
     en: {
         // Updated inventory and alert labels without trailing space
@@ -634,6 +637,9 @@ window.translations = {
         "診症完成後無法調整套票數量": "Package quantity cannot be adjusted after the consultation is completed",
         "選擇的醫師無效，請重新選擇！": "Selected doctor is invalid, please choose again!",
         "未偵測到有效的中藥庫資料": "No valid Chinese medicine library data detected",
+        // Inventory type selector translations
+        "顆粒沖劑": "Granules",
+        "飲片": "Herbal slices",
         // Inventory management translations
         "編輯庫存": "Edit Inventory",
         "剩餘數量": "Remaining Quantity",

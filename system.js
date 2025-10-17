@@ -106,6 +106,44 @@ function changeHerbSortOrder(order) {
 window.changeHerbSortOrder = changeHerbSortOrder;
 
 /**
+ * 切換顆粒沖劑與飲片的顯示模式。
+ * 根據選擇更新 currentInventoryMode 並保存到 localStorage，
+ * 然後重新初始化庫存資料以切換資料來源。
+ * @param {string} type 'granule' 或 'slice'
+ */
+function changeInventoryType(type) {
+    if (type !== 'granule' && type !== 'slice') {
+        return;
+    }
+    currentInventoryMode = type;
+    // 保存選擇至 localStorage，以便下次載入
+    try {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('inventoryMode', type);
+        }
+    } catch (_e) {
+        // 忽略 localStorage 錯誤
+    }
+    // 強制刷新庫存資料，切換監聽路徑
+    if (typeof initHerbInventory === 'function') {
+        initHerbInventory(true).then(() => {
+            // 重新渲染中藥庫列表
+            if (typeof displayHerbLibrary === 'function') {
+                displayHerbLibrary();
+            }
+        }).catch((_err) => {
+            // 初始化失敗時至少嘗試刷新畫面
+            if (typeof displayHerbLibrary === 'function') {
+                displayHerbLibrary();
+            }
+        });
+    }
+}
+
+// 將庫存切換函式暴露到全域，供 HTML 事件調用
+window.changeInventoryType = changeInventoryType;
+
+/**
  * 確保在指定父元素之後存在分頁容器，若不存在則建立。
  * 分頁容器統一使用 flex 排版與 margin-top 提升顯示效果。
  * @param {string} parentId - 將在其後插入分頁容器的元素 ID。
@@ -1790,6 +1828,20 @@ let herbLibrary = [];
 let herbInventory = {};
 let herbInventoryInitialized = false;
 let herbInventoryListenerAttached = false;
+// 目前庫存模式：'granule' 表示顆粒沖劑，'slice' 表示飲片。
+// 預設從 localStorage 讀取，若無則為 'granule'。
+let currentInventoryMode = 'granule';
+try {
+    const savedMode = (typeof localStorage !== 'undefined') ? localStorage.getItem('inventoryMode') : null;
+    if (savedMode === 'slice' || savedMode === 'granule') {
+        currentInventoryMode = savedMode;
+    }
+} catch (_e) {
+    // 忽略讀取 localStorage 的錯誤
+    currentInventoryMode = 'granule';
+}
+// 跟蹤當前庫存監聽的資料路徑，便於在切換模式時取消監聽
+let herbInventoryRefPath = null;
 
 //
 // ===============================
@@ -1881,30 +1933,33 @@ function detachPatientListListener() {
  * @param {boolean} forceRefresh
  */
 async function initHerbInventory(forceRefresh = false) {
-    // 如果不是強制刷新且已初始化過，且監聽器仍然存在，直接返回。
-    // 若已初始化但監聽器已被取消（herbInventoryListenerAttached 為 false），
-    // 仍需重新掛載監聽以恢復即時更新。因此不應過早返回。
-    if (herbInventoryInitialized && herbInventoryListenerAttached && !forceRefresh) {
+    // 根據當前庫存模式決定讀取資料的路徑。'granule' 對應原有顆粒沖劑資料，
+    // 'slice' 對應飲片資料。預設為 'herbInventory'。
+    const dbPath = (currentInventoryMode === 'slice') ? 'herbInventorySlice' : 'herbInventory';
+    // 如果不是強制刷新且已初始化過，且監聽器仍然存在且路徑未改變，直接返回。
+    // 若已初始化但監聽器已被取消（herbInventoryListenerAttached 為 false），或路徑改變時，仍需重新掛載監聽。
+    if (herbInventoryInitialized && herbInventoryListenerAttached && !forceRefresh && herbInventoryRefPath === dbPath) {
         return;
     }
     // 等待 Firebase 初始化完成
     await waitForFirebaseDb();
-    const inventoryRef = window.firebase.ref(window.firebase.rtdb, 'herbInventory');
-    // 存儲全域參考以便離開頁面時可取消監聽，減少不必要的 Realtime Database 流量
-    try {
-        window.herbInventoryRef = inventoryRef;
-    } catch (_e) {
-        // 若無法設置全域，忽略
-    }
-    // 若為強制刷新且監聽已經掛載，先取消舊的監聽以避免多重回呼
-    if (forceRefresh && herbInventoryListenerAttached) {
+    const inventoryRef = window.firebase.ref(window.firebase.rtdb, dbPath);
+    // 若為強制刷新或路徑改變且監聽已經掛載，先取消舊的監聽以避免多重回呼
+    if ((forceRefresh || herbInventoryRefPath !== dbPath) && herbInventoryListenerAttached && typeof window.herbInventoryRef !== 'undefined' && window.herbInventoryRef) {
         try {
-            window.firebase.off(inventoryRef, 'value');
+            window.firebase.off(window.herbInventoryRef, 'value');
             herbInventoryListenerAttached = false;
         } catch (err) {
             console.error('重置中藥庫存監聽時發生錯誤:', err);
         }
     }
+    // 更新全域參考及路徑，以便後續取消監聽
+    try {
+        window.herbInventoryRef = inventoryRef;
+    } catch (_e) {
+        // 若無法設置全域，忽略
+    }
+    herbInventoryRefPath = dbPath;
     // 讀取當前庫存快照
     try {
         const snapshot = await window.firebase.get(inventoryRef);
@@ -1983,7 +2038,9 @@ async function setHerbInventory(itemId, quantity, threshold, unit, disabled) {
         // 確保為布林值
         data.disabled = !!disabled;
     }
-    const refPath = window.firebase.ref(window.firebase.rtdb, 'herbInventory/' + String(itemId));
+    // 根據當前庫存模式選擇儲存路徑
+    const dbPath = (currentInventoryMode === 'slice') ? 'herbInventorySlice' : 'herbInventory';
+    const refPath = window.firebase.ref(window.firebase.rtdb, dbPath + '/' + String(itemId));
     await window.firebase.update(refPath, data);
 }
 
@@ -11104,6 +11161,15 @@ async function initializeSystemAfterLogin() {
             // 初始化庫存資料
             if (typeof initHerbInventory === 'function') {
                 await initHerbInventory();
+            }
+            // 設置庫存類型下拉選單的預設值
+            try {
+                const invSelect = document.getElementById('inventoryTypeSelect');
+                if (invSelect) {
+                    invSelect.value = currentInventoryMode || 'granule';
+                }
+            } catch (_e) {
+                // 忽略
             }
             // 計算全院中藥及方劑使用次數，供排序與卡片顯示
             if (typeof computeGlobalUsageCounts === 'function') {
