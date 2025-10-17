@@ -13373,6 +13373,25 @@ async function initializeSystemAfterLogin() {
                 displayPrescriptionError('');
             }
         }
+
+        /**
+         * 根據當前處方是否有內容決定庫存類型下拉選單是否可用。
+         * 若處方中已有藥材或方劑，則禁用選擇以防止切換不同類別；
+         * 當處方為空時，重新啟用選擇。
+         */
+        function updatePrescriptionTypeSelectStatus() {
+            try {
+                const sel = document.getElementById('prescriptionTypeSelect');
+                if (!sel) return;
+                if (Array.isArray(selectedPrescriptionItems) && selectedPrescriptionItems.length > 0) {
+                    sel.disabled = true;
+                } else {
+                    sel.disabled = false;
+                }
+            } catch (_e) {
+                // ignore errors
+            }
+        }
         
         // 添加到處方內容
         function addToPrescription(type, itemId) {
@@ -13416,6 +13435,9 @@ async function initializeSystemAfterLogin() {
 
             // 更新顯示
             updatePrescriptionDisplay();
+
+            // 根據是否有處方內容決定是否允許切換庫存類型
+            updatePrescriptionTypeSelectStatus();
             
             // 如果是第一個處方項目，自動添加藥費
             if (selectedPrescriptionItems.length === 1) {
@@ -13762,6 +13784,8 @@ async function initializeSystemAfterLogin() {
                 updatePrescriptionDisplay();
                 // 移除處方項目後，重新檢查是否仍有禁忌配伍
                 checkPrescriptionConflicts();
+                // 同時根據處方內容決定是否允許切換庫存類型
+                updatePrescriptionTypeSelectStatus();
                 // 移除處方項目時，若游標仍在原位置會導致 tooltip 殘留，故手動隱藏
                 if (typeof hideTooltip === 'function') {
                     hideTooltip();
