@@ -2949,7 +2949,17 @@ async function saveInventoryChanges() {
                 }
                 // 臨時設定全域庫存模式，讓後續更新庫存使用指定路徑
                 currentInventoryMode = selectedInventoryMode;
+                // 在切換庫存模式後，重新初始化庫存資料，以確保讀取正確的現有庫存。
+                // 若載入失敗，仍繼續執行，僅使用當前本地 herbInventory 資料。
+                try {
+                    if (typeof initHerbInventory === 'function') {
+                        await initHerbInventory(true);
+                    }
+                } catch (_initErr) {
+                    // 忽略初始化錯誤
+                }
                 setButtonLoading(saveBtn);
+                // 處理每一行新增的中藥／方劑
                 for (const row of rows) {
                     const qtyInput = row.querySelector('input.batch-herb-qty');
                     const unitSelect = row.querySelector('select.batch-herb-unit');
@@ -2971,20 +2981,25 @@ async function saveInventoryChanges() {
                     const unit = unitSelect.value || 'g';
                     const factor = UNIT_FACTOR_MAP[unit] || 1;
                     const addBase = qVal * factor;
+                    // 取得當前類別的現有庫存數據
                     let inv = {quantity: 0, threshold: 0, unit: 'g', disabled: false};
                     try {
                         if (typeof getHerbInventory === 'function') {
                             inv = getHerbInventory(herbId);
                         }
-                    } catch (_e) {}
+                    } catch (_e) {
+                        // 忽略錯誤，使用預設值
+                    }
                     const existingBaseQty = typeof inv.quantity === 'number' ? inv.quantity : 0;
                     const existingThreshold = typeof inv.threshold === 'number' ? inv.threshold : 0;
                     const existingUnit = inv.unit || 'g';
                     const existingDisabled = !!inv.disabled;
                     const newBaseQty = existingBaseQty + addBase;
+                    // 寫入新的庫存數據
                     if (typeof setHerbInventory === 'function') {
                         await setHerbInventory(herbId, newBaseQty, existingThreshold, existingUnit, existingDisabled);
                     }
+                    // 同步更新本地快取 herbInventory（此時 currentInventoryMode 為選擇的類型）。
                     try {
                         if (typeof herbInventory !== 'undefined') {
                             herbInventory[String(herbId)] = {
@@ -2994,11 +3009,16 @@ async function saveInventoryChanges() {
                                 disabled: existingDisabled
                             };
                         }
-                    } catch (_e) {}
+                    } catch (_e) {
+                        /* 忽略本地更新錯誤 */
+                    }
                 }
+                // 顯示成功訊息
                 showToast((typeof window.t === 'function') ? window.t('庫存已更新！') : '庫存已更新！', 'success');
+                // 隱藏批量入庫對話框
                 hideBatchInventoryModal();
                 try {
+                    // 刷新中藥庫列表與處方顯示，以反映庫存變化
                     if (typeof displayHerbLibrary === 'function') {
                         displayHerbLibrary();
                     }
@@ -3010,12 +3030,20 @@ async function saveInventoryChanges() {
                 console.error('批量入庫錯誤:', err);
                 showToast((typeof window.t === 'function') ? window.t('批量入庫失敗！') : '批量入庫失敗！', 'error');
             } finally {
-                // 恢復原本的庫存模式
+                // 在批量入庫完成後，恢復原本的庫存模式
                 try {
                     if (typeof originalInventoryMode !== 'undefined') {
                         currentInventoryMode = originalInventoryMode;
                     }
                 } catch (_e) {}
+                // 重新初始化庫存資料，以載入原本庫存模式的資料，避免本地快取為選擇模式下的資料
+                try {
+                    if (typeof initHerbInventory === 'function') {
+                        await initHerbInventory(true);
+                    }
+                } catch (_initErr) {
+                    /* 忽略錯誤 */
+                }
                 const saveBtn = document.querySelector('#batchInventoryModal button[onclick="saveBatchInventory()"]');
                 clearButtonLoading(saveBtn);
             }
