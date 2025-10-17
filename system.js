@@ -13310,11 +13310,37 @@ async function initializeSystemAfterLogin() {
             }
             return false;
         }
+
+        /**
+         * 顯示或清除處方禁忌配伍錯誤訊息。
+         * 當 message 為空字串或 null 時，將隱藏錯誤區域。
+         * 透過此函式可在頁面固定位置呈現錯誤提醒，不使用彈窗。
+         * @param {string} message 錯誤訊息；空值時隱藏提示
+         */
+        function displayPrescriptionError(message) {
+            try {
+                const errorEl = document.getElementById('prescriptionError');
+                if (!errorEl) return;
+                if (message) {
+                    errorEl.textContent = message;
+                    errorEl.classList.remove('hidden');
+                } else {
+                    errorEl.textContent = '';
+                    errorEl.classList.add('hidden');
+                }
+            } catch (_e) {
+                // 若元素不存在，忽略錯誤
+            }
+        }
         
         // 添加到處方內容
         function addToPrescription(type, itemId) {
+            // 取得目標藥材資料
             const item = herbLibrary.find(h => h.id === itemId);
             if (!item) return;
+
+            // 先清除舊的禁忌提示
+            displayPrescriptionError('');
 
             // 檢查禁忌配伍：判斷即將加入的藥材是否與已有處方藥材存在禁忌關係。
             try {
@@ -13322,12 +13348,12 @@ async function initializeSystemAfterLogin() {
                 for (const existing of selectedPrescriptionItems) {
                     const existingName = existing.name || '';
                     if (isForbiddenCombination(newName, existingName)) {
-                        // 若存在禁忌，提示使用者且不允許添加
+                        // 若存在禁忌，建立錯誤訊息並顯示於固定區域，停止添加
                         const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
-                        const zhMsg = `藥材 ${newName} 與處方中已有的 ${existingName} 存在禁忌配伍，請勿同時使用！`;
+                        const zhMsg = `藥材${newName}與處方中已有的${existingName}存在禁忌配伍，請勿同時使用！`;
                         const enMsg = `${newName} is incompatible with ${existingName} in the prescription and cannot be combined.`;
                         const msg = (langSel && langSel.toLowerCase().startsWith('en')) ? enMsg : zhMsg;
-                        showToast(msg, 'error');
+                        displayPrescriptionError(msg);
                         return;
                     }
                 }
@@ -13710,6 +13736,8 @@ async function initializeSystemAfterLogin() {
             if (index >= 0 && index < selectedPrescriptionItems.length) {
                 const removedItem = selectedPrescriptionItems.splice(index, 1)[0];
                 updatePrescriptionDisplay();
+                // 移除處方項目後，清除任何禁忌提示（使用者正在調整處方）
+                displayPrescriptionError('');
                 // 移除處方項目時，若游標仍在原位置會導致 tooltip 殘留，故手動隱藏
                 if (typeof hideTooltip === 'function') {
                     hideTooltip();
