@@ -20789,9 +20789,47 @@ async function deleteMedicalRecord(recordId) {
     }
   }
 
+  /**
+   * 新增封裝函式：點擊「穴位圖」按鈕時顯示載入狀態並打開穴位圖選擇視窗。
+   * 這個函式會在按鈕上顯示讀取圈，延遲短暫時間後調用 showAcupointMapModal。
+   * 如果出現例外錯誤，會輸出至 console，但不會阻塞其他功能。
+   * @param {Event} ev - 點擊事件對象，用於取得當前按鈕元素
+   */
+  async function openAcupointMap(ev) {
+    let btn = null;
+    try {
+      // 優先從事件目標取得按鈕
+      if (ev && ev.currentTarget) {
+        btn = ev.currentTarget;
+      }
+      // 如果無法從事件取得，則回退到尋找第一個包含 openAcupointMap 的按鈕
+      if (!btn) {
+        btn = document.querySelector('button[onclick*="openAcupointMap"]');
+      }
+      // 顯示讀取狀態
+      if (btn) {
+        setButtonLoading(btn);
+      }
+      // 輕微延遲讓使用者感受讀取狀態
+      await new Promise(resolve => setTimeout(resolve, 200));
+      // 調用原本的顯示穴位圖彈窗函式
+      if (typeof showAcupointMapModal === 'function') {
+        await showAcupointMapModal();
+      }
+    } catch (err) {
+      console.error('開啟穴位圖按鈕錯誤:', err);
+    } finally {
+      // 無論成功或失敗都清除讀取狀態
+      if (btn) {
+        clearButtonLoading(btn);
+      }
+    }
+  }
+
   // 將封裝函式掛載至全域，以便 HTML 按鈕呼叫
   window.openHerbCombo = openHerbCombo;
   window.openAcupointCombo = openAcupointCombo;
+  window.openAcupointMap = openAcupointMap;
   // =======================================
   // 穴位圖選擇功能定義與掛載
   /**
@@ -20912,6 +20950,23 @@ async function deleteMedicalRecord(recordId) {
       }
     } catch (e) {
       console.error('批量入庫彈窗外部點擊事件綁定失敗:', e);
+    }
+  })();
+
+  // 在腳本載入時為穴位圖選擇彈窗註冊遮罩點擊事件，使使用者點擊黑色背景時可以關閉彈窗。
+  (function attachAcupointMapModalOutsideClick() {
+    try {
+      const modal = document.getElementById('acupointMapModal');
+      if (modal && !modal.dataset.outsideClickBound) {
+        modal.addEventListener('click', function(evt) {
+          if (evt.target === modal) {
+            hideAcupointMapModal();
+          }
+        });
+        modal.dataset.outsideClickBound = 'true';
+      }
+    } catch (e) {
+      console.error('穴位圖彈窗外部點擊事件綁定失敗:', e);
     }
   })();
 
