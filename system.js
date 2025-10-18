@@ -2800,15 +2800,35 @@ async function saveInventoryChanges() {
                         let name = h.name || '';
                         let englishName = h.englishName || '';
                         let searchTarget = name;
+                        // 根據語言選擇比較名稱或英文名稱
                         try {
                             const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
                             if (langSel && langSel.toLowerCase().startsWith('en') && englishName) {
                                 searchTarget = englishName;
                             }
                         } catch (_e) {}
-                        if (searchTarget.toLowerCase().includes(query) || englishName.toLowerCase().includes(query)) {
-                            matches.push(h);
-                            if (matches.length >= 10) break;
+                        // 比對輸入字串
+                        const lowerSearchTarget = searchTarget.toLowerCase();
+                        const lowerEnglishName = englishName.toLowerCase();
+                        if (lowerSearchTarget.includes(query) || lowerEnglishName.includes(query)) {
+                            // 過濾已停用的中藥庫存：僅顯示當前庫存類型中啟用的項目
+                            let disabled = false;
+                            try {
+                                if (typeof getHerbInventory === 'function') {
+                                    const invInfo = getHerbInventory(h.id);
+                                    if (invInfo && invInfo.disabled) {
+                                        disabled = true;
+                                    }
+                                }
+                            } catch (_e) {
+                                // 若無法取得庫存資訊，視為啟用
+                                disabled = false;
+                            }
+                            // 若未被停用，加入匹配陣列
+                            if (!disabled) {
+                                matches.push(h);
+                                if (matches.length >= 10) break;
+                            }
                         }
                     }
                 }
