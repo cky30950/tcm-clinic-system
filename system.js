@@ -6885,15 +6885,9 @@ function createAppointmentRow(appointment, patient, index) {
             </td>
             <td class="px-4 py-3 text-sm text-gray-900">
                 ${(() => {
-                    // 掛號列表的主訴文字僅顯示前八個字，超過部分以「⋯」取代。
-                    // 若診症已完成且掛號物件含有 diagnosis 屬性，則優先顯示中醫診斷內容。
-                    let fullComplaint = '';
-                    if (appointment.status === 'completed' && appointment.diagnosis) {
-                        fullComplaint = appointment.diagnosis;
-                    } else {
-                        fullComplaint = appointment.chiefComplaint || '';
-                    }
-                    // 如果沒有內容或為空字串，顯示「無」
+                    // 掛號列表的主訴文字僅顯示前八個字，超過部分以「⋯」取代，避免過長內容影響版面。
+                    const fullComplaint = appointment.chiefComplaint || '';
+                    // 如果沒有主訴或主訴為空字串，顯示「無」
                     if (!fullComplaint) {
                         return '<div class="max-w-xs truncate" title="無">無</div>';
                     }
@@ -8126,8 +8120,6 @@ async function saveConsultation() {
                 }
                 // 更新掛號資料中的主訴內容，確保掛號列表顯示最新的主訴
                 appointment.chiefComplaint = symptoms;
-                // 儲存中醫診斷於掛號記錄中，以便完成後在掛號列表顯示
-                appointment.diagnosis = diagnosis;
                 // 更新本地儲存的 appointments 陣列
                 localStorage.setItem('appointments', JSON.stringify(appointments));
                 // 同步更新到 Firebase
@@ -8152,8 +8144,6 @@ async function saveConsultation() {
                 appointment.completedBy = currentUser;
                 // 將本次症狀保存至掛號資料中的主訴，確保掛號列表顯示最新主訴
                 appointment.chiefComplaint = symptoms;
-                // 儲存中醫診斷於掛號記錄中，以便完成後在掛號列表顯示
-                appointment.diagnosis = diagnosis;
                 localStorage.setItem('appointments', JSON.stringify(appointments));
                 await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
                 showToast('診症記錄已保存！', 'success');
