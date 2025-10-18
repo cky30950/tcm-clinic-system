@@ -184,6 +184,14 @@ document.addEventListener('DOMContentLoaded', function () {
 // 當病人搜尋結果出現時，此索引用於記錄當前選中項目；-1 表示未選中
 let patientSearchSelectionIndex = -1;
 
+// 用於個人慣用中藥組合搜尋結果的鍵盤導航索引
+// herbIngredientSearchSelectionIndex 用於記錄中藥材組合搜尋目前選中的項目；-1 表示沒有選中
+let herbIngredientSearchSelectionIndex = -1;
+
+// 用於個人慣用穴位組合搜尋結果的鍵盤導航索引
+// acupointComboSearchSelectionIndex 用於記錄穴位組合搜尋目前選中的項目；-1 表示沒有選中
+let acupointComboSearchSelectionIndex = -1;
+
 // 為病人詳細資料中的套票情況新增分頁設定。
 // 若條件改變（例如重新查看另一位病人），應重置 currentPage 為 1。
 paginationSettings.patientPackageStatus = { currentPage: 1, itemsPerPage: 6 };
@@ -2785,8 +2793,12 @@ async function saveInventoryChanges() {
             suggestionList.className = 'absolute z-10 mt-1 max-h-60 overflow-y-auto bg-white border border-gray-300 rounded w-full hidden';
             // 行資料設定 herbId 默認為空
             row.dataset.herbId = '';
+            // 用於此行搜尋結果的鍵盤選擇索引
+            let suggestionIndex = -1;
             // 更新建議列表的函式
             function updateSuggestions() {
+                // 重置選擇索引
+                suggestionIndex = -1;
                 const query = herbInput.value.trim().toLowerCase();
                 suggestionList.innerHTML = '';
                 if (!query) {
@@ -2903,6 +2915,58 @@ async function saveInventoryChanges() {
             }
             herbInput.addEventListener('input', updateSuggestions);
             herbInput.addEventListener('focus', updateSuggestions);
+            // 鍵盤事件處理：支援方向鍵選擇與 Enter 選取建議
+            herbInput.addEventListener('keydown', function(ev) {
+                const key = ev && ev.key;
+                if (!key || !(['ArrowUp', 'ArrowDown', 'Enter'].includes(key))) {
+                    return;
+                }
+                // 僅在建議列表顯示時處理
+                if (suggestionList.classList.contains('hidden')) {
+                    return;
+                }
+                const items = Array.from(suggestionList.children);
+                if (!items || items.length === 0) {
+                    return;
+                }
+                if (key === 'ArrowDown') {
+                    ev.preventDefault();
+                    suggestionIndex = (suggestionIndex + 1) % items.length;
+                    items.forEach((el, idx) => {
+                        if (idx === suggestionIndex) {
+                            el.classList.add('bg-gray-200');
+                        } else {
+                            el.classList.remove('bg-gray-200');
+                        }
+                    });
+                    const currentEl = items[suggestionIndex];
+                    if (currentEl && typeof currentEl.scrollIntoView === 'function') {
+                        currentEl.scrollIntoView({ block: 'nearest' });
+                    }
+                } else if (key === 'ArrowUp') {
+                    ev.preventDefault();
+                    suggestionIndex = (suggestionIndex - 1 + items.length) % items.length;
+                    items.forEach((el, idx) => {
+                        if (idx === suggestionIndex) {
+                            el.classList.add('bg-gray-200');
+                        } else {
+                            el.classList.remove('bg-gray-200');
+                        }
+                    });
+                    const currentEl = items[suggestionIndex];
+                    if (currentEl && typeof currentEl.scrollIntoView === 'function') {
+                        currentEl.scrollIntoView({ block: 'nearest' });
+                    }
+                } else if (key === 'Enter') {
+                    if (suggestionIndex >= 0 && suggestionIndex < items.length) {
+                        ev.preventDefault();
+                        const selectedEl = items[suggestionIndex];
+                        if (selectedEl && typeof selectedEl.click === 'function') {
+                            selectedEl.click();
+                        }
+                    }
+                }
+            });
             document.addEventListener('click', function(ev) {
                 if (!searchContainer.contains(ev.target)) {
                     suggestionList.classList.add('hidden');
@@ -5667,6 +5731,133 @@ function handlePatientSearchKeyDown(ev) {
         }
     } catch (err) {
         console.error('處理掛號搜尋鍵盤事件錯誤:', err);
+    }
+}
+
+/**
+ * 處理個人慣用中藥組合搜尋欄的鍵盤事件。
+ * 允許使用者透過方向鍵在搜尋結果中移動選擇，並用 Enter 鍵選取。
+ * @param {KeyboardEvent} ev 鍵盤事件
+ */
+function handleHerbIngredientSearchKeyDown(ev) {
+    const key = ev && ev.key;
+    // 只處理上下方向鍵與 Enter 鍵
+    if (!key || !(['ArrowUp', 'ArrowDown', 'Enter'].includes(key))) {
+        return;
+    }
+    try {
+        const resultsContainer = document.getElementById('herbIngredientSearchResults');
+        const resultsList = document.getElementById('herbIngredientSearchList');
+        // 必須存在且為顯示狀態
+        if (!resultsContainer || resultsContainer.classList.contains('hidden')) {
+            return;
+        }
+        // 找出可選項目：僅挑選帶有 cursor-pointer 的 div
+        const items = Array.from(resultsList.querySelectorAll('div.cursor-pointer'));
+        if (!items || items.length === 0) {
+            return;
+        }
+        if (key === 'ArrowDown') {
+            ev.preventDefault();
+            herbIngredientSearchSelectionIndex = (herbIngredientSearchSelectionIndex + 1) % items.length;
+            items.forEach((el, idx) => {
+                if (idx === herbIngredientSearchSelectionIndex) {
+                    el.classList.add('bg-green-200');
+                } else {
+                    el.classList.remove('bg-green-200');
+                }
+            });
+            const currentEl = items[herbIngredientSearchSelectionIndex];
+            if (currentEl && typeof currentEl.scrollIntoView === 'function') {
+                currentEl.scrollIntoView({ block: 'nearest' });
+            }
+        } else if (key === 'ArrowUp') {
+            ev.preventDefault();
+            herbIngredientSearchSelectionIndex = (herbIngredientSearchSelectionIndex - 1 + items.length) % items.length;
+            items.forEach((el, idx) => {
+                if (idx === herbIngredientSearchSelectionIndex) {
+                    el.classList.add('bg-green-200');
+                } else {
+                    el.classList.remove('bg-green-200');
+                }
+            });
+            const currentEl = items[herbIngredientSearchSelectionIndex];
+            if (currentEl && typeof currentEl.scrollIntoView === 'function') {
+                currentEl.scrollIntoView({ block: 'nearest' });
+            }
+        } else if (key === 'Enter') {
+            if (herbIngredientSearchSelectionIndex >= 0 && herbIngredientSearchSelectionIndex < items.length) {
+                ev.preventDefault();
+                const selectedEl = items[herbIngredientSearchSelectionIndex];
+                if (selectedEl && typeof selectedEl.click === 'function') {
+                    selectedEl.click();
+                }
+            }
+        }
+    } catch (err) {
+        console.error('處理中藥組合搜尋鍵盤事件錯誤:', err);
+    }
+}
+
+/**
+ * 處理個人慣用穴位組合搜尋欄的鍵盤事件。
+ * 允許使用者透過方向鍵在搜尋結果中移動選擇，並用 Enter 鍵選取。
+ * @param {KeyboardEvent} ev 鍵盤事件
+ */
+function handleAcupointComboSearchKeyDown(ev) {
+    const key = ev && ev.key;
+    if (!key || !(['ArrowUp', 'ArrowDown', 'Enter'].includes(key))) {
+        return;
+    }
+    try {
+        const resultsContainer = document.getElementById('acupointPointSearchResults');
+        const resultsList = document.getElementById('acupointPointSearchList');
+        if (!resultsContainer || resultsContainer.classList.contains('hidden')) {
+            return;
+        }
+        const items = Array.from(resultsList.querySelectorAll('div.cursor-pointer'));
+        if (!items || items.length === 0) {
+            return;
+        }
+        if (key === 'ArrowDown') {
+            ev.preventDefault();
+            acupointComboSearchSelectionIndex = (acupointComboSearchSelectionIndex + 1) % items.length;
+            items.forEach((el, idx) => {
+                if (idx === acupointComboSearchSelectionIndex) {
+                    el.classList.add('bg-blue-200');
+                } else {
+                    el.classList.remove('bg-blue-200');
+                }
+            });
+            const currentEl = items[acupointComboSearchSelectionIndex];
+            if (currentEl && typeof currentEl.scrollIntoView === 'function') {
+                currentEl.scrollIntoView({ block: 'nearest' });
+            }
+        } else if (key === 'ArrowUp') {
+            ev.preventDefault();
+            acupointComboSearchSelectionIndex = (acupointComboSearchSelectionIndex - 1 + items.length) % items.length;
+            items.forEach((el, idx) => {
+                if (idx === acupointComboSearchSelectionIndex) {
+                    el.classList.add('bg-blue-200');
+                } else {
+                    el.classList.remove('bg-blue-200');
+                }
+            });
+            const currentEl = items[acupointComboSearchSelectionIndex];
+            if (currentEl && typeof currentEl.scrollIntoView === 'function') {
+                currentEl.scrollIntoView({ block: 'nearest' });
+            }
+        } else if (key === 'Enter') {
+            if (acupointComboSearchSelectionIndex >= 0 && acupointComboSearchSelectionIndex < items.length) {
+                ev.preventDefault();
+                const selectedEl = items[acupointComboSearchSelectionIndex];
+                if (selectedEl && typeof selectedEl.click === 'function') {
+                    selectedEl.click();
+                }
+            }
+        }
+    } catch (err) {
+        console.error('處理穴位組合搜尋鍵盤事件錯誤:', err);
     }
 }
         
@@ -24045,11 +24236,24 @@ ${item.points.map(pt => {
           function searchHerbForCombo() {
             const input = document.getElementById('herbIngredientSearch');
             if (!input) return;
+            // 綁定鍵盤事件以支援方向鍵選擇與 Enter 選取，避免重複綁定
+            try {
+              if (!input.dataset.bindKeyDown) {
+                input.addEventListener('keydown', handleHerbIngredientSearchKeyDown);
+                input.dataset.bindKeyDown = 'true';
+              }
+            } catch (_e) {
+              /* 忽略綁定錯誤 */
+            }
+            // 每次搜尋前重置選中索引
+            herbIngredientSearchSelectionIndex = -1;
             const searchTerm = input.value.trim().toLowerCase();
             const resultsContainer = document.getElementById('herbIngredientSearchResults');
             const resultsList = document.getElementById('herbIngredientSearchList');
             if (!resultsContainer || !resultsList) return;
             if (searchTerm.length < 1) {
+              // 搜尋字串為空時，重置索引
+              herbIngredientSearchSelectionIndex = -1;
               resultsContainer.classList.add('hidden');
               // 當搜尋字串為空時，同步隱藏任何提示框
               if (typeof hideTooltip === 'function') {
@@ -24206,6 +24410,17 @@ ${item.points.map(pt => {
           async function searchAcupointForCombo() {
             const input = document.getElementById('acupointPointSearch');
             if (!input) return;
+            // 綁定鍵盤事件以支援方向鍵選擇與 Enter 選取，避免重複綁定
+            try {
+              if (!input.dataset.bindKeyDown) {
+                input.addEventListener('keydown', handleAcupointComboSearchKeyDown);
+                input.dataset.bindKeyDown = 'true';
+              }
+            } catch (_e) {
+              /* 忽略綁定錯誤 */
+            }
+            // 每次搜尋前重置選中索引
+            acupointComboSearchSelectionIndex = -1;
             const searchTerm = input.value.trim().toLowerCase();
             const resultsContainer = document.getElementById('acupointPointSearchResults');
             const resultsList = document.getElementById('acupointPointSearchList');
