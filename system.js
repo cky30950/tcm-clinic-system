@@ -10600,27 +10600,23 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         const dosage = match[2];
                         const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
                         if (isFormula) {
-                            // 方劑：嘗試收集緊接在後的組成行。只要下一行不是符合藥材格式，就視為組成。
-                            const compositionParts = [];
-                            while (i + 1 < lines.length) {
+                            // 如果是方劑，檢查下一行是否為組成說明，非藥材格式的行視為組成
+                            let composition = '';
+                            if (i + 1 < lines.length) {
                                 const nextLine = lines[i + 1].trim();
-                                // 下一行是空行或沒有劑量g的藥材，視為方劑組成
                                 if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
-                                    compositionParts.push(nextLine);
+                                    composition = nextLine;
                                     i++;
-                                } else {
-                                    break;
                                 }
                             }
-                            const compositionText = compositionParts
-                                .map(part => part.trim())
-                                .filter(part => part)
-                                .join('、');
-                            const compositionHtml = compositionText
-                                ? ` <span style="font-size: 0.66em;">(${compositionText})</span>`
-                                : '';
-                            // 建立方劑區塊：名稱、劑量以及組成（若有）。
-                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g${compositionHtml}</div>`);
+                            // 建立方劑區塊，顯示名稱與劑量，若有組成則在下一行以較小字體顯示
+                            if (composition) {
+                                // 將組成中的換行轉換為 <br> 以便於 HTML 顯示
+                                const compHtml = composition.replace(/\n/g, '<br>');
+                                itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g<br><span style="font-size: 9px; color: #666;">${compHtml}</span></div>`);
+                            } else {
+                                itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
+                            }
                         } else {
                             // 普通藥材區塊
                             itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
@@ -14028,7 +14024,13 @@ async function initializeSystemAfterLogin() {
                     unitLabelForText = (typeof window.t === 'function') ? window.t('克') : '克';
                 }
                 // 若為方劑類型，通常以『克』為單位，除非庫存中另有定義；仍使用上方取得的 unitLabelForText
+                // 先添加主條目（名稱 + 劑量 + 單位）
                 prescriptionText += `${item.name} ${dosage}${unitLabelForText}\n`;
+                // 如果為方劑且有組成資訊，則在下一行加入方劑組成
+                if (item.type === 'formula' && item.composition) {
+                    // 保持原始的換行格式，不進行單位轉換；直接加入組成內容
+                    prescriptionText += `${item.composition}\n`;
+                }
             });
 
             hiddenTextarea.value = prescriptionText.trim();
