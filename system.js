@@ -10609,9 +10609,14 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                                     i++;
                                 }
                             }
-                            // 建立方劑區塊，只顯示名稱與劑量，不顯示組成
-                            // 若有組成行，前面已跳過
-                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
+                            // 建立方劑區塊：名稱與劑量在第一行，若有組成則於下一行以較小字體顯示
+                            if (composition) {
+                                itemsList.push(
+                                    `<div style="margin-bottom: 4px;">\${itemName} \${dosage}g<br><span style="font-size: 9px; color: #666;">\${composition}</span></div>`
+                                );
+                            } else {
+                                itemsList.push(`<div style="margin-bottom: 4px;">\${itemName} \${dosage}g</div>`);
+                            }
                         } else {
                             // 普通藥材區塊
                             itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
@@ -13932,7 +13937,18 @@ async function initializeSystemAfterLogin() {
                                 <div class="flex items-center">
                                     <div class="flex-1">
                                         <div class="font-semibold text-gray-900">${window.escapeHtml(displayName)}</div>
-                                        ${item.type === 'formula' ? `<div class="text-xs text-gray-600">${typeLabel}</div>` : ''}
+                                        ${item.type === 'formula'
+                                            ? (() => {
+                                                // 針對方劑，在藥單中除了顯示類型標籤外，額外顯示方劑組成。
+                                                // 使用 fullItem 以便取得完整資料，若缺少組成則顯示空字串。
+                                                const compositionText = (fullItem && fullItem.composition)
+                                                    ? fullItem.composition.replace(/\n/g, '、')
+                                                    : '';
+                                                // 使用 escapeHtml 函式避免 XSS
+                                                const escapedComposition = window.escapeHtml(compositionText);
+                                                return `<div class="text-xs text-gray-600">${typeLabel}</div><div class="text-xs text-gray-500">組成：${escapedComposition}</div>`;
+                                            })()
+                                            : ''}
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         ${(() => {
@@ -14020,6 +14036,17 @@ async function initializeSystemAfterLogin() {
                 }
                 // 若為方劑類型，通常以『克』為單位，除非庫存中另有定義；仍使用上方取得的 unitLabelForText
                 prescriptionText += `${item.name} ${dosage}${unitLabelForText}\n`;
+                // 若為方劑，且存在組成資訊，則在下一行加入組成內容，使其可於印製藥單時顯示。
+                if (item.type === 'formula' && item.composition) {
+                    try {
+                        // 將組成中的換行符替換為頓號以更易於閱讀
+                        const compLine = item.composition.trim().replace(/\n/g, '、');
+                        // 不以『組成：』開頭，避免列印邏輯誤判為一般說明行。
+                        prescriptionText += `${compLine}\n`;
+                    } catch (_e) {
+                        // 若處理組成時發生錯誤，忽略並繼續
+                    }
+                }
             });
 
             hiddenTextarea.value = prescriptionText.trim();
