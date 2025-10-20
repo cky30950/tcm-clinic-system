@@ -7815,6 +7815,22 @@ async function showConsultationForm(appointment) {
             // 清空處方和收費項目選擇
             selectedPrescriptionItems = [];
             selectedBillingItems = [];
+
+            // 在關閉表單時，確保處方顯示與庫存類型選單狀態同步更新。
+            try {
+                if (typeof updatePrescriptionDisplay === 'function') {
+                    updatePrescriptionDisplay();
+                }
+            } catch (_e) {
+                /* 忽略更新顯示時的錯誤 */
+            }
+            try {
+                if (typeof updatePrescriptionTypeSelectStatus === 'function') {
+                    updatePrescriptionTypeSelectStatus();
+                }
+            } catch (_e) {
+                /* 忽略錯誤 */
+            }
             
             // 滾動回頂部
             document.getElementById('consultationSystem').scrollIntoView({ behavior: 'smooth' });
@@ -13869,6 +13885,14 @@ async function initializeSystemAfterLogin() {
                 hiddenTextarea.value = '';
                 // 隱藏服藥天數設定
                 medicationSettings.style.display = 'none';
+                // 當處方內容為空時，應重新啟用庫存類型選單
+                try {
+                    if (typeof updatePrescriptionTypeSelectStatus === 'function') {
+                        updatePrescriptionTypeSelectStatus();
+                    }
+                } catch (_e) {
+                    /* 忽略錯誤 */
+                }
                 return;
             }
             
@@ -14023,6 +14047,16 @@ async function initializeSystemAfterLogin() {
             });
 
             hiddenTextarea.value = prescriptionText.trim();
+
+            // 更新庫存類型選單狀態（啟用或禁用）。
+            // 呼叫此函式以確保在處方內容變化後，顆粒/飲片切換選單能正確更新。
+            try {
+                if (typeof updatePrescriptionTypeSelectStatus === 'function') {
+                    updatePrescriptionTypeSelectStatus();
+                }
+            } catch (_e) {
+                /* 忽略任何錯誤以避免影響其他功能 */
+            }
         }
         
         // 更新服藥天數
