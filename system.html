@@ -4486,6 +4486,92 @@
     <script src="chat_module.js"></script>
     <!-- 語言國際化腳本，必須在系統腳本之後載入 -->
     <script src="i18n.js"></script>
+
+    <!-- 穴位圖按鈕備援腳本：確保在 CSP 禁止 inline handler 或 acupointMap.js 加載失敗時仍能正常開啟 -->
+    <script>
+    (function() {
+      /**
+       * 備援開啟穴位圖函式。若全局 openAcupointMap 已定義則優先呼叫，否則手動渲染資料並顯示模態框。
+       */
+      function fallbackOpenAcupointMap() {
+        try {
+          // 如果有正式函式，直接調用
+          if (typeof window.openAcupointMap === 'function') {
+            window.openAcupointMap();
+            return;
+          }
+          // 若未載入穴位庫，嘗試初始化
+          if (typeof window.initAcupointLibrary === 'function' && (!window.acupointLibraryLoaded || !Array.isArray(window.acupointLibrary) || window.acupointLibrary.length === 0)) {
+            const p = window.initAcupointLibrary();
+            // initAcupointLibrary 可能為 Promise，處理完後再重試
+            if (p && typeof p.then === 'function') {
+              p.catch(() => {}).then(() => fallbackOpenAcupointMap());
+              return;
+            }
+          }
+          // 渲染列表與標記（若定義）
+          if (typeof window.renderAcupointMapList === 'function') {
+            window.renderAcupointMapList('');
+          }
+          if (typeof window.renderAcupointMarkers === 'function') {
+            window.renderAcupointMarkers();
+          }
+          // 顯示模態框
+          var modal = document.getElementById('acupointMapModal');
+          if (modal) {
+            modal.classList.remove('hidden');
+          }
+        } catch (err) {
+          console.error('Fallback openAcupointMap error', err);
+        }
+      }
+      /**
+       * 備援關閉穴位圖函式。若全局 closeAcupointMap 已定義則優先呼叫，否則手動隱藏模態框。
+       */
+      function fallbackCloseAcupointMap() {
+        try {
+          if (typeof window.closeAcupointMap === 'function') {
+            window.closeAcupointMap();
+            return;
+          }
+          var modal = document.getElementById('acupointMapModal');
+          if (modal) {
+            modal.classList.add('hidden');
+          }
+        } catch (err) {
+          console.error('Fallback closeAcupointMap error', err);
+        }
+      }
+      /**
+       * 綁定穴位圖相關按鈕。為避免 CSP 導致的 inline 事件失效，使用 addEventListener 綁定。
+       */
+      function bindAcupointMapFallback() {
+        try {
+          var openBtn = document.getElementById('openAcupointMapButton');
+          if (openBtn) {
+            openBtn.removeEventListener('click', fallbackOpenAcupointMap);
+            openBtn.addEventListener('click', fallbackOpenAcupointMap);
+          }
+          // 針對模態框內第一個按鈕（關閉按鈕）也綁定備援功能
+          var closeBtn = document.querySelector('#acupointMapModal button');
+          if (closeBtn) {
+            closeBtn.removeEventListener('click', fallbackCloseAcupointMap);
+            closeBtn.addEventListener('click', fallbackCloseAcupointMap);
+          }
+        } catch (err) {
+          console.error('Fallback bind error', err);
+        }
+      }
+      // 等待 DOM 就緒後綁定事件
+      if (typeof document !== 'undefined') {
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+          bindAcupointMapFallback();
+        } else {
+          document.addEventListener('DOMContentLoaded', bindAcupointMapFallback);
+        }
+      }
+    })();
+    </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
