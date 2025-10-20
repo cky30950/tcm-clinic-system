@@ -9225,6 +9225,15 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             showToast('找不到病人資料！', 'error');
             return;
         }
+
+        // 確保中藥庫已載入，供後續處方解析使用（如需判斷方劑組成）
+        if (typeof initHerbLibrary === 'function' && !herbLibraryLoaded) {
+            try {
+                await initHerbLibrary();
+            } catch (err) {
+                console.error('初始化中藥庫失敗', err);
+            }
+        }
         
         // 解析收費項目以計算總金額
         let totalAmount = 0;
@@ -9601,7 +9610,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                     i++;
                                     continue;
                                 }
-                                const itemMatch = line.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
+                                const itemMatch = line.match(/^(.+?)\s*(\d+(?:\.\d+)?)g$/);
                                 if (itemMatch) {
                                     const itemName = itemMatch[1].trim();
                                     const dosage = itemMatch[2];
@@ -9619,7 +9628,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                         while (j < lines.length) {
                                             const nextLine = lines[j].trim();
                                             // 下一行若非藥材（沒有數字劑量），視為組成
-                                            if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
+                                        if (nextLine && !nextLine.match(/^.+?\s*\d+(?:\.\d+)?g$/)) {
                                                 compositions.push(nextLine);
                                                 j++;
                                             } else {
@@ -10632,7 +10641,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         continue;
                     }
                     // 判斷是否符合「名稱 劑量g」格式
-                    const match = raw.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
+                    // 允許名稱與劑量之間沒有空格或有任意空格，避免輸入時省略空格導致無法識別
+                    const match = raw.match(/^(.+?)\s*(\d+(?:\.\d+)?)g$/);
                     if (match) {
                         const itemName = match[1].trim();
                         const dosage = match[2];
@@ -10650,7 +10660,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                             while (j < lines.length) {
                                 const nextLine = lines[j].trim();
                                 // 下一行若非藥材（沒有數字劑量），視為組成部分
-                                if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
+                                // 允許名稱與劑量之間沒有空格或有任意空格
+                                if (nextLine && !nextLine.match(/^.+?\s*\d+(?:\.\d+)?g$/)) {
                                     compositions.push(nextLine);
                                     j++;
                                 } else {
@@ -14985,7 +14996,7 @@ async function searchBillingForConsultation() {
                 }
                 
                 // 檢查是否為藥材/方劑格式（名稱 劑量g）
-                const itemMatch = line.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
+                const itemMatch = line.match(/^(.+?)\s*(\d+(?:\.\d+)?)g$/);
                 if (itemMatch) {
                     const itemName = itemMatch[1].trim();
                     const dosage = itemMatch[2];
