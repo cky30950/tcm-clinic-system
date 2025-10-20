@@ -10569,14 +10569,6 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             showToast('找不到病人資料！', 'error');
             return;
         }
-        // 在解析處方前，確保中藥庫資料已載入，以便查詢方劑的組成
-        try {
-            if (typeof initHerbLibrary === 'function') {
-                await initHerbLibrary();
-            }
-        } catch (_initErr) {
-            // 若初始化失敗，仍使用現有的 herbLibrary
-        }
         // 解析診療日期
         let consultationDate;
         if (consultation.date && consultation.date.seconds) {
@@ -10606,51 +10598,36 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     if (match) {
                         const itemName = match[1].trim();
                         const dosage = match[2];
-                        // 判斷是否為方劑（依名稱包含常見後綴）
                         const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
                         if (isFormula) {
-                            // 對於方劑，嘗試取得組成資訊：先檢查處方下一行是否為組成，若沒有則從 herbLibrary 查詢
-                            let composition = '';
-                            // 檢查下一行是否為非藥材格式（即未符合「名稱 劑量g」的格式），視為組成說明
-                            if (i + 1 < lines.length) {
+                            // 方劑：嘗試收集緊接在後的組成行。只要下一行不是符合藥材格式，就視為組成。
+                            const compositionParts = [];
+                            while (i + 1 < lines.length) {
                                 const nextLine = lines[i + 1].trim();
+                                // 下一行是空行或沒有劑量g的藥材，視為方劑組成
                                 if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
-                                    composition = nextLine;
-                                    // 標記已消耗一行組成資訊
+                                    compositionParts.push(nextLine);
                                     i++;
+                                } else {
+                                    break;
                                 }
                             }
-                            // 如果處方中未提供組成，嘗試從中藥庫查找相同名稱的方劑組成
-                            if (!composition && Array.isArray(herbLibrary)) {
-                                try {
-                                    const found = herbLibrary.find(h => h && h.name === itemName && h.composition);
-                                    if (found && found.composition) {
-                                        composition = found.composition;
-                                    }
-                                } catch (_ignore) {
-                                    // 查找失敗時不設定 composition
-                                }
-                            }
-                            // 處理組成字串：將換行、逗號與頓號分隔符轉換為單一頓號，並移除空白項目
-                            let compStr = '';
-                            if (composition) {
-                                try {
-                                    const parts = composition.split(/[\n,，、]+/).map(p => p.trim()).filter(Boolean);
-                                    compStr = parts.join('、');
-                                } catch (_err) {
-                                    compStr = composition.replace(/\n/g, '、');
-                                }
-                            }
-                            // 組合 HTML：方劑名稱右側顯示組成（括號及較小字體），再接劑量
-                            const compHtml = compStr ? ` <span style="font-size: 0.67em;">（${window.escapeHtml(compStr)}）</span>` : '';
-                            itemsList.push(`<div style="margin-bottom: 4px;">${window.escapeHtml(itemName)}${compHtml} ${window.escapeHtml(dosage)}g</div>`);
+                            const compositionText = compositionParts
+                                .map(part => part.trim())
+                                .filter(part => part)
+                                .join('、');
+                            const compositionHtml = compositionText
+                                ? ` <span style="font-size: 0.66em;">(${compositionText})</span>`
+                                : '';
+                            // 建立方劑區塊：名稱、劑量以及組成（若有）。
+                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g${compositionHtml}</div>`);
                         } else {
-                            // 普通藥材區塊，直接顯示名稱與劑量，並進行轉義
-                            itemsList.push(`<div style="margin-bottom: 4px;">${window.escapeHtml(itemName)} ${window.escapeHtml(dosage)}g</div>`);
+                            // 普通藥材區塊
+                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
                         }
                     } else {
-                        // 其他說明行直接以較小字體顯示，並進行 HTML 轉義
-                        itemsList.push(`<div style="margin-bottom: 4px; font-size: 9px; color: #666;">${window.escapeHtml(raw)}</div>`);
+                        // 其他說明行直接以較小字體顯示
+                        itemsList.push(`<div style="margin-bottom: 4px; font-size: 9px; color: #666;">${raw}</div>`);
                     }
                     i++;
                 }
@@ -13954,23 +13931,6 @@ async function initializeSystemAfterLogin() {
                         } catch (_err) {
                             typeLabel = item.type === 'formula' ? '方劑' : '中藥材';
                         }
-                        // 計算方劑組成字串並組裝 HTML。
-                        // 如果為方劑且有組成資料，將組成拆為「、」分隔的字串並用括號包住，
-                        // 同時設定較小的字體大小（2/3）顯示於名稱右側。
-                        let compositionStr = '';
-                        if (item.type === 'formula') {
-                            const compSource = fullItem && fullItem.composition ? fullItem.composition : (item.composition || '');
-                            if (compSource) {
-                                try {
-                                    // 以換行符或逗號分割後再以頓號連接，並過濾掉空白項目
-                                    const parts = compSource.split(/[\n,]+/).map(p => p.trim()).filter(Boolean);
-                                    compositionStr = parts.join('、');
-                                } catch (_cErr) {
-                                    compositionStr = compSource.replace(/\n/g, '、');
-                                }
-                            }
-                        }
-                        const compositionHtml = compositionStr ? ` <span class="text-xs text-gray-500" style="font-size: 0.66em;">（${window.escapeHtml(compositionStr)}）</span>` : '';
                         // 建立 HTML，並綁定 tooltip 事件於整個項目容器
                         return `
                             <div class="${bgColor} border rounded-lg p-3 cursor-pointer"
@@ -13980,7 +13940,7 @@ async function initializeSystemAfterLogin() {
                                  onmouseleave="hideTooltip()">
                                 <div class="flex items-center">
                                     <div class="flex-1">
-                                        <div class="font-semibold text-gray-900">${window.escapeHtml(displayName)}${compositionHtml}</div>
+                                        <div class="font-semibold text-gray-900">${window.escapeHtml(displayName)}</div>
                                         ${item.type === 'formula' ? `<div class="text-xs text-gray-600">${typeLabel}</div>` : ''}
                                     </div>
                                     <div class="flex items-center space-x-2">
