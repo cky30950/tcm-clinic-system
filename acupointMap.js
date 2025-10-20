@@ -231,4 +231,31 @@
     window.clearAcupointMapSearch = clearAcupointMapSearch;
     window.addAcupointFromMap = addAcupointFromMap;
     window.renderAcupointMarkers = renderAcupointMarkers;
+
+    /**
+     * 初始化時替穴位圖按鈕綁定事件。由於某些環境中內嵌 onclick 可能被框架覆寫，
+     * 因此在 DOMContentLoaded 後透過 JavaScript 綁定事件，確保按鈕可以觸發開啟穴位圖功能。
+     */
+    function bindAcupointMapButton() {
+        try {
+            const btn = document.getElementById('openAcupointMapButton');
+            if (btn) {
+                // 移除可能已有的 click 事件，避免重複觸發
+                btn.removeEventListener('click', openAcupointMap);
+                btn.addEventListener('click', openAcupointMap);
+            }
+        } catch (err) {
+            console.error('綁定穴位圖按鈕失敗：', err);
+        }
+    }
+
+    // 在 DOM 完全載入後綁定按鈕事件
+    if (typeof document !== 'undefined') {
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            // 若頁面已載入則立即綁定
+            bindAcupointMapButton();
+        } else {
+            document.addEventListener('DOMContentLoaded', bindAcupointMapButton);
+        }
+    }
 })();

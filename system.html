@@ -780,7 +780,8 @@
                                                 <button type="button" onclick="clearAcupointNotesSearch()" class="absolute right-2 top-1 text-gray-400 hover:text-gray-600 text-sm">×</button>
                                             </div>
                                             <!-- 新增穴位圖功能按鈕：點擊可開啟穴位圖模態框 -->
-                                            <button type="button" onclick="window.openAcupointMap()" class="ml-2 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded transition duration-200 whitespace-nowrap">
+                                            <!-- 將按鈕標記 id 以便腳本掛載事件，保留 onclick 做為備份 -->
+                                            <button type="button" id="openAcupointMapButton" onclick="window.openAcupointMap()" class="ml-2 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded transition duration-200 whitespace-nowrap">
                                                 🗺️&nbsp;穴位圖
                                             </button>
                                         </div>
