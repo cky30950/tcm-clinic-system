@@ -10578,7 +10578,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         } else {
             consultationDate = new Date();
         }
-        // 組合處方內容 - 將處方項目分為三欄顯示以節省空間，方劑的組成使用較小字體顯示於方劑名稱下方
+        // 組合處方內容 - 將處方項目分為三欄顯示以節省空間，方劑的組成使用括號顯示於方劑名稱右側且字體較小
         let prescriptionHtml = '';
         if (consultation.prescription) {
             try {
@@ -10609,12 +10609,15 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                                     i++;
                                 }
                             }
-                            // 建立方劑區塊，顯示名稱與劑量，若有組成則在下一行以較小字體顯示
+                            // 若有組成，將其轉換為以頓號隔開的文字，並使用小字體置於方劑名稱右側的括號內
                             if (composition) {
-                                // 將組成中的換行轉換為 <br> 以便於 HTML 顯示
-                                const compHtml = composition.replace(/\n/g, '<br>');
-                                itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g<br><span style="font-size: 9px; color: #666;">${compHtml}</span></div>`);
+                                // 將逗號、中文逗號等替換為頓號以統一格式
+                                const compStr = composition.replace(/[，,、]/g, '、');
+                                itemsList.push(
+                                    `<div style="margin-bottom: 4px;">${itemName} ${dosage}g <span style="font-size: 9px;">（${compStr}）</span></div>`
+                                );
                             } else {
+                                // 若無組成，僅顯示名稱與劑量
                                 itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
                             }
                         } else {
@@ -14024,13 +14027,7 @@ async function initializeSystemAfterLogin() {
                     unitLabelForText = (typeof window.t === 'function') ? window.t('克') : '克';
                 }
                 // 若為方劑類型，通常以『克』為單位，除非庫存中另有定義；仍使用上方取得的 unitLabelForText
-                // 先添加主條目（名稱 + 劑量 + 單位）
                 prescriptionText += `${item.name} ${dosage}${unitLabelForText}\n`;
-                // 如果為方劑且有組成資訊，則在下一行加入方劑組成
-                if (item.type === 'formula' && item.composition) {
-                    // 保持原始的換行格式，不進行單位轉換；直接加入組成內容
-                    prescriptionText += `${item.composition}\n`;
-                }
             });
 
             hiddenTextarea.value = prescriptionText.trim();
