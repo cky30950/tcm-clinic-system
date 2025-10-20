@@ -21383,19 +21383,21 @@ async function deleteMedicalRecord(recordId) {
         }
       }
 
-      // 現病史：若已有內容，附加模板的現病史
-      if (formCurrentHistory) {
+      // 現病史：載入後追加至「主訴及現病史」欄位（formSymptoms）後方。
+      // 不再寫入 formCurrentHistory，以免混淆。
+      {
         let value = '';
         if (template.currentHistory) {
           value = template.currentHistory;
         } else {
           value = parseSection('現病史');
         }
-        if (value) {
-          if (formCurrentHistory.value && formCurrentHistory.value.trim()) {
-            formCurrentHistory.value = formCurrentHistory.value.trim() + '\n' + value;
+        if (value && formSymptoms) {
+          // 將現病史內容加在主訴內容之後
+          if (formSymptoms.value && formSymptoms.value.trim()) {
+            formSymptoms.value = formSymptoms.value.trim() + '\n' + value;
           } else {
-            formCurrentHistory.value = value;
+            formSymptoms.value = value;
           }
         }
       }
