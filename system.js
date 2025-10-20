@@ -9607,17 +9607,32 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                     const dosage = itemMatch[2];
                                     const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
                                     if (isFormula) {
-                                        let composition = '';
-                                        if (i + 1 < lines.length) {
-                                            const nextLine = lines[i + 1].trim();
+                                        // 收集方劑的組成行直到遇到下一個藥材條目為止
+                                        const compositions = [];
+                                        let j = i + 1;
+                                        while (j < lines.length) {
+                                            const nextLine = lines[j].trim();
+                                            // 下一行若非藥材（沒有數字劑量），視為組成
                                             if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
-                                                composition = nextLine.replace(/\n/g, '、').replace(/、/g, ',');
-                                                i++;
+                                                compositions.push(nextLine);
+                                                j++;
+                                            } else {
+                                                break;
                                             }
                                         }
-                                        allItems.push(`${itemName} ${dosage}g`);
+                                        // 若有組成行則調整索引跳過它們
+                                        if (compositions.length > 0) {
+                                            i = j - 1;
+                                        }
+                                        const compStr = compositions.join('、');
+                                        if (compStr) {
+                                            allItems.push(`${itemName} ${dosage}g<span style="font-size: 0.67em;">(${compStr})</span>`);
+                                        } else {
+                                            allItems.push(`${itemName} ${dosage}g`);
+                                        }
                                     } else {
-                                        allItems.push(`${itemName}${dosage}g`);
+                                        // 普通藥材區塊
+                                        allItems.push(`${itemName} ${dosage}g`);
                                     }
                                 } else {
                                     allItems.push(`<div style="margin: 2px 0; font-size: 9px; color: #666;">${line}</div>`);
@@ -10578,7 +10593,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         } else {
             consultationDate = new Date();
         }
-        // 組合處方內容 - 將處方項目分為三欄顯示以節省空間，方劑的組成使用括號顯示於方劑名稱右側且字體較小
+        // 組合處方內容 - 將處方項目分為三欄顯示以節省空間，方劑的組成使用較小字體顯示於方劑名稱下方
         let prescriptionHtml = '';
         if (consultation.prescription) {
             try {
@@ -10600,24 +10615,28 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         const dosage = match[2];
                         const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
                         if (isFormula) {
-                            // 如果是方劑，檢查下一行是否為組成說明，非藥材格式的行視為組成
-                            let composition = '';
-                            if (i + 1 < lines.length) {
-                                const nextLine = lines[i + 1].trim();
+                            // 如果是方劑，收集後續的組成行直到遇到下一個藥材條目
+                            const compositions = [];
+                            let j = i + 1;
+                            while (j < lines.length) {
+                                const nextLine = lines[j].trim();
+                                // 下一行若非藥材（沒有數字劑量），視為組成部分
                                 if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
-                                    composition = nextLine;
-                                    i++;
+                                    compositions.push(nextLine);
+                                    j++;
+                                } else {
+                                    break;
                                 }
                             }
-                            // 若有組成，將其轉換為以頓號隔開的文字，並使用小字體置於方劑名稱右側的括號內
-                            if (composition) {
-                                // 將逗號、中文逗號等替換為頓號以統一格式
-                                const compStr = composition.replace(/[，,、]/g, '、');
-                                itemsList.push(
-                                    `<div style="margin-bottom: 4px;">${itemName} ${dosage}g <span style="font-size: 9px;">（${compStr}）</span></div>`
-                                );
+                            // 若有組成行，調整索引以跳過這些行
+                            if (compositions.length > 0) {
+                                i = j - 1;
+                            }
+                            const compStr = compositions.join('、');
+                            if (compStr) {
+                                // 將組成放在方劑名稱右側，用括號包住並縮小字體
+                                itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g <span style="font-size: 0.67em;">(${compStr})</span></div>`);
                             } else {
-                                // 若無組成，僅顯示名稱與劑量
                                 itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
                             }
                         } else {
