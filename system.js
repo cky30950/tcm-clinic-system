@@ -799,7 +799,6 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
             return getTime(b) - getTime(a);
         });
         // 組合每一行紀錄：日期 + 主訴 + 現病史 + 舌象 + 脈象
-        // 為了提升可讀性，紀錄之間以一道分隔線區隔，且舌象與脈象內容以括號包覆。
         const lines = records.map(c => {
             let dateObj = null;
             if (c.date) {
@@ -815,28 +814,29 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
                     dateObj = new Date(c.createdAt);
                 }
             }
-            const dateStr = dateObj
-                ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`
-                : '';
+            const dateStr = dateObj ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}` : '';
             const symptoms = c.symptoms ? String(c.symptoms).replace(/\n/g, ' ').trim() : '';
             const history = c.currentHistory ? String(c.currentHistory).replace(/\n/g, ' ').trim() : '';
             const tongue = c.tongue ? String(c.tongue).replace(/\n/g, ' ').trim() : '';
             const pulse = c.pulse ? String(c.pulse).replace(/\n/g, ' ').trim() : '';
             const parts = [];
-            // 主訴與現病史仍然直接顯示
+            // 主訴與現病史直接顯示
             if (symptoms) parts.push(symptoms);
             if (history) parts.push(history);
-            // 舌象與脈象改以括號包覆，便於辨識
-            if (tongue) parts.push(`(${tongue})`);
-            if (pulse) parts.push(`(${pulse})`);
+            // 將舌象與脈象以逗號串接，例如「舌紅，脈弱」
+            const special = [];
+            if (tongue) special.push(tongue);
+            if (pulse) special.push(pulse);
+            if (special.length) parts.push(special.join('，'));
             const content = parts.join(' ').trim();
             return `${dateStr} ${content}`.trim();
         });
-        // 將結果填入表單欄位，使用分隔線區隔各筆紀錄。
+        // 將結果填入表單欄位
         const historyField = document.getElementById('formCurrentHistory');
         if (historyField) {
-            // 使用較短的橫線做為分隔符號，避免間距過大
-            const separator = '\n--------------------\n';
+            // 使用較短的橫線作為分隔符號，並盡量減少縱向間距
+            // 採用單行分隔線，不再於其上下額外加空行，避免分得太開
+            const separator = '\n──────────\n';
             historyField.value = lines.join(separator);
         }
     } catch (e) {
