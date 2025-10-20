@@ -746,6 +746,98 @@ function computePersonalStatistics(doctor) {
 }
 
 /**
+ * 載入指定病人過往的主訴及現病史紀錄，並依日期由新到舊填入過往記錄欄位。
+ * 此函式會嘗試載入全部診症資料（若尚未載入），再依病人 ID 及排除的診症 ID 進行篩選。
+ * 每一行格式為：YYYY-MM-DD 主訴 現病史，其中主訴在前，現病史在後；若缺其中一項則只顯示現有資訊。
+ *
+ * @param {string|number} patientId - 目標病人的 ID
+ * @param {string|number|null} excludeConsultationId - 若提供，將從紀錄中排除此診症 ID
+ */
+async function loadPastRecords(patientId, excludeConsultationId = null) {
+    try {
+        // 若 consultations 尚未載入，嘗試從 Firebase 取得全部診症記錄
+        if (!Array.isArray(consultations) || consultations.length === 0) {
+            try {
+                if (window.firebaseDataManager && typeof window.firebaseDataManager.getConsultations === 'function') {
+                    const consResult = await window.firebaseDataManager.getConsultations();
+                    if (consResult && consResult.success && Array.isArray(consResult.data)) {
+                        consultations = consResult.data;
+                    }
+                }
+            } catch (err) {
+                console.error('載入診症記錄時發生錯誤:', err);
+            }
+        }
+        if (!Array.isArray(consultations)) {
+            return;
+        }
+        // 篩選出同一病人的診症紀錄，排除正在編輯的紀錄（若有提供）
+        const records = consultations.filter(c => {
+            if (!c || (typeof c.patientId === 'undefined')) return false;
+            if (String(c.patientId) !== String(patientId)) return false;
+            if (excludeConsultationId && String(c.id) === String(excludeConsultationId)) return false;
+            return true;
+        }).sort((a, b) => {
+            // 依日期由新到舊排序
+            const getTime = (c) => {
+                let d = null;
+                if (c.date) {
+                    if (typeof c.date === 'object' && c.date.seconds) {
+                        d = new Date(c.date.seconds * 1000);
+                    } else {
+                        d = new Date(c.date);
+                    }
+                } else if (c.createdAt) {
+                    if (typeof c.createdAt === 'object' && c.createdAt.seconds) {
+                        d = new Date(c.createdAt.seconds * 1000);
+                    } else {
+                        d = new Date(c.createdAt);
+                    }
+                }
+                return d ? d.getTime() : 0;
+            };
+            return getTime(b) - getTime(a);
+        });
+        // 組合每一行紀錄：日期 + 主訴 + 現病史
+        const lines = records.map(c => {
+            let dateObj = null;
+            if (c.date) {
+                if (typeof c.date === 'object' && c.date.seconds) {
+                    dateObj = new Date(c.date.seconds * 1000);
+                } else {
+                    dateObj = new Date(c.date);
+                }
+            } else if (c.createdAt) {
+                if (typeof c.createdAt === 'object' && c.createdAt.seconds) {
+                    dateObj = new Date(c.createdAt.seconds * 1000);
+                } else {
+                    dateObj = new Date(c.createdAt);
+                }
+            }
+            const dateStr = dateObj ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}` : '';
+            const symptoms = c.symptoms ? String(c.symptoms).replace(/\n/g, ' ').trim() : '';
+            const history = c.currentHistory ? String(c.currentHistory).replace(/\n/g, ' ').trim() : '';
+            let content = '';
+            if (symptoms && history) {
+                content = `${symptoms} ${history}`;
+            } else if (symptoms) {
+                content = symptoms;
+            } else if (history) {
+                content = history;
+            }
+            return `${dateStr} ${content}`.trim();
+        });
+        // 將結果填入表單欄位
+        const historyField = document.getElementById('formCurrentHistory');
+        if (historyField) {
+            historyField.value = lines.join('\n');
+        }
+    } catch (e) {
+        console.error('載入過往記錄時發生錯誤:', e);
+    }
+}
+
+/**
  * 載入個人統計分析頁面並渲染統計結果。
  * 若 consultations 尚未載入，會先載入全部診症記錄。
  */
@@ -7734,6 +7826,16 @@ async function showConsultationForm(appointment) {
                 console.warn('consultationSaveButtonText element not found when starting consultation. Skipping text update.');
             }
         }
+
+        // 載入過往記錄：顯示患者既往的主訴及現病史，排除當前編輯的記錄
+        try {
+            await loadPastRecords(
+                appointment.patientId,
+                (appointment.status === 'completed' && appointment.consultationId) ? appointment.consultationId : null
+            );
+        } catch (err) {
+            console.error('載入過往記錄時發生錯誤:', err);
+        }
         
         document.getElementById('consultationForm').classList.remove('hidden');
         
@@ -8033,7 +8135,8 @@ async function saveConsultation() {
             symptoms: symptoms,
             tongue: document.getElementById('formTongue').value.trim(),
             pulse: document.getElementById('formPulse').value.trim(),
-            currentHistory: document.getElementById('formCurrentHistory').value.trim(),
+            // 現病史欄位已整合至主訴輸入區，僅保存於主訴欄位，不再單獨儲存
+            currentHistory: '',
             diagnosis: diagnosis,
             syndrome: document.getElementById('formSyndrome').value.trim(),
             acupunctureNotes: (() => {
