@@ -823,11 +823,11 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
             // 主訴與現病史直接顯示
             if (symptoms) parts.push(symptoms);
             if (history) parts.push(history);
-            // 將舌象與脈象以逗號串接，例如「舌紅，脈弱」
+            // 將舌象與脈象以逗號串接並用括號包覆，例如「(舌紅，脈弱)」
             const special = [];
             if (tongue) special.push(tongue);
             if (pulse) special.push(pulse);
-            if (special.length) parts.push(special.join('，'));
+            if (special.length) parts.push(`(${special.join('，')})`);
             const content = parts.join(' ').trim();
             return `${dateStr} ${content}`.trim();
         });
