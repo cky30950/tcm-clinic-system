@@ -9225,15 +9225,6 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             showToast('找不到病人資料！', 'error');
             return;
         }
-
-        // 確保中藥庫已載入，供後續處方解析使用（如需判斷方劑組成）
-        if (typeof initHerbLibrary === 'function' && !herbLibraryLoaded) {
-            try {
-                await initHerbLibrary();
-            } catch (err) {
-                console.error('初始化中藥庫失敗', err);
-            }
-        }
         
         // 解析收費項目以計算總金額
         let totalAmount = 0;
@@ -9610,53 +9601,23 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                     i++;
                                     continue;
                                 }
-                                const itemMatch = line.match(/^(.+?)\s*(\d+(?:\.\d+)?)g$/);
+                                const itemMatch = line.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
                                 if (itemMatch) {
                                     const itemName = itemMatch[1].trim();
                                     const dosage = itemMatch[2];
-                                    // 嘗試判斷是否為方劑，透過字尾與 herbLibrary 判斷
-                                    const suffixFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
-                                    let foundFormula = null;
-                                    if (Array.isArray(herbLibrary)) {
-                                        foundFormula = herbLibrary.find(item => item && item.name === itemName && item.type === 'formula');
-                                    }
-                                    const isFormula = suffixFormula || !!foundFormula;
+                                    const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
                                     if (isFormula) {
-                                        // 收集方劑的組成行直到遇到下一個藥材條目為止
-                                        let compositions = [];
-                                        let j = i + 1;
-                                        while (j < lines.length) {
-                                            const nextLine = lines[j].trim();
-                                            // 下一行若非藥材（沒有數字劑量），視為組成
-                                        if (nextLine && !nextLine.match(/^.+?\s*\d+(?:\.\d+)?g$/)) {
-                                                compositions.push(nextLine);
-                                                j++;
-                                            } else {
-                                                break;
+                                        let composition = '';
+                                        if (i + 1 < lines.length) {
+                                            const nextLine = lines[i + 1].trim();
+                                            if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
+                                                composition = nextLine.replace(/\n/g, '、').replace(/、/g, ',');
+                                                i++;
                                             }
                                         }
-                                        // 若有組成行則調整索引跳過它們
-                                        if (compositions.length > 0) {
-                                            i = j - 1;
-                                        }
-                                        // 如果沒有手動輸入組成，嘗試從 herbLibrary 中取得
-                                        if (compositions.length === 0 && foundFormula && foundFormula.composition) {
-                                            try {
-                                                const parts = foundFormula.composition.split(/[\n,，、;]+/).map(p => p.trim()).filter(Boolean);
-                                                compositions = parts;
-                                            } catch (_e) {
-                                                compositions = [foundFormula.composition];
-                                            }
-                                        }
-                                        const compStr = compositions.join('、');
-                                        if (compStr) {
-                                            allItems.push(`${itemName} ${dosage}g<span style="font-size: 0.67em;">(${compStr})</span>`);
-                                        } else {
-                                            allItems.push(`${itemName} ${dosage}g`);
-                                        }
-                                    } else {
-                                        // 普通藥材區塊
                                         allItems.push(`${itemName} ${dosage}g`);
+                                    } else {
+                                        allItems.push(`${itemName}${dosage}g`);
                                     }
                                 } else {
                                     allItems.push(`<div style="margin: 2px 0; font-size: 9px; color: #666;">${line}</div>`);
@@ -10622,14 +10583,6 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         if (consultation.prescription) {
             try {
                 // 解析處方內容行並移除空行
-                // 確保中藥庫已載入，否則嘗試初始化一次
-                if (typeof initHerbLibrary === 'function' && !herbLibraryLoaded) {
-                    try {
-                        await initHerbLibrary();
-                    } catch (err) {
-                        console.error('初始化中藥庫失敗', err);
-                    }
-                }
                 const lines = consultation.prescription.split('\n').filter(line => line.trim());
                 const itemsList = [];
                 let i = 0;
@@ -10641,54 +10594,24 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         continue;
                     }
                     // 判斷是否符合「名稱 劑量g」格式
-                    // 允許名稱與劑量之間沒有空格或有任意空格，避免輸入時省略空格導致無法識別
-                    const match = raw.match(/^(.+?)\s*(\d+(?:\.\d+)?)g$/);
+                    const match = raw.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
                     if (match) {
                         const itemName = match[1].trim();
                         const dosage = match[2];
-                        // 嘗試判斷是否為方劑：先以字尾判斷，再以 herbLibrary 查詢類型為 formula
-                        const suffixFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
-                        let foundFormula = null;
-                        if (Array.isArray(herbLibrary)) {
-                            foundFormula = herbLibrary.find(item => item && item.name === itemName && item.type === 'formula');
-                        }
-                        const isFormula = suffixFormula || !!foundFormula;
+                        const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
                         if (isFormula) {
-                            // 如果是方劑，收集後續的組成行直到遇到下一個藥材條目
-                            let compositions = [];
-                            let j = i + 1;
-                            while (j < lines.length) {
-                                const nextLine = lines[j].trim();
-                                // 下一行若非藥材（沒有數字劑量），視為組成部分
-                                // 允許名稱與劑量之間沒有空格或有任意空格
-                                if (nextLine && !nextLine.match(/^.+?\s*\d+(?:\.\d+)?g$/)) {
-                                    compositions.push(nextLine);
-                                    j++;
-                                } else {
-                                    break;
+                            // 如果是方劑，檢查下一行是否為組成說明，非藥材格式的行視為組成
+                            let composition = '';
+                            if (i + 1 < lines.length) {
+                                const nextLine = lines[i + 1].trim();
+                                if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
+                                    composition = nextLine;
+                                    i++;
                                 }
                             }
-                            // 若有組成行，調整索引以跳過這些行
-                            if (compositions.length > 0) {
-                                i = j - 1;
-                            }
-                            // 如果沒有手動輸入組成，從中藥庫中查找組成資料
-                            if (compositions.length === 0 && foundFormula && foundFormula.composition) {
-                                try {
-                                    const parts = foundFormula.composition.split(/[\n,，、;]+/).map(p => p.trim()).filter(Boolean);
-                                    compositions = parts;
-                                } catch (_e) {
-                                    // 如果 split 過程出錯，直接使用原始組成字串
-                                    compositions = [foundFormula.composition];
-                                }
-                            }
-                            const compStr = compositions.join('、');
-                            if (compStr) {
-                                // 將組成放在方劑名稱右側，用括號包住並縮小字體
-                                itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g <span style="font-size: 0.67em;">(${compStr})</span></div>`);
-                            } else {
-                                itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
-                            }
+                            // 建立方劑區塊，只顯示名稱與劑量，不顯示組成
+                            // 若有組成行，前面已跳過
+                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
                         } else {
                             // 普通藥材區塊
                             itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
@@ -14996,7 +14919,7 @@ async function searchBillingForConsultation() {
                 }
                 
                 // 檢查是否為藥材/方劑格式（名稱 劑量g）
-                const itemMatch = line.match(/^(.+?)\s*(\d+(?:\.\d+)?)g$/);
+                const itemMatch = line.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
                 if (itemMatch) {
                     const itemName = itemMatch[1].trim();
                     const dosage = itemMatch[2];
