@@ -779,11 +779,6 @@
                                                        oninput="searchAcupointForNotes()">
                                                 <button type="button" onclick="clearAcupointNotesSearch()" class="absolute right-2 top-1 text-gray-400 hover:text-gray-600 text-sm">×</button>
                                             </div>
-                                            <!-- 新增穴位圖功能按鈕：點擊可開啟穴位圖模態框 -->
-                                            <!-- 將按鈕標記 id 以便腳本掛載事件。移除 inline onclick 以避免 CSP 阻擋 -->
-                                            <button type="button" id="openAcupointMapButton" class="ml-2 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded transition duration-200 whitespace-nowrap">
-                                                🗺️&nbsp;穴位圖
-                                            </button>
                                         </div>
                                         <!-- 搜索結果 -->
                                         <div id="acupointNotesSearchResults" class="hidden">
@@ -2303,46 +2298,6 @@
                 </div>
                 <div id="acupointComboList" class="p-4 space-y-3">
                     <!-- 動態載入穴位組合 -->
-                </div>
-            </div>
-        </div>
-
-        <!-- 穴位圖選擇彈窗 -->
-        <!--
-            這個模態框用於顯示全身穴位圖，並提供一個可搜尋穴位的列表供醫師快速查找。
-            使用者可以透過右側列表選取穴位，點擊後會將該穴位加入針灸備註。
-            模態框預設為 hidden，透過 openAcupointMap() 函式顯示。
-        -->
-        <div id="acupointMapModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-xl shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col">
-                <!-- 標題列 -->
-                <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl z-10">
-                    <h3 class="text-lg font-bold text-gray-800">穴位圖</h3>
-                    <button type="button" onclick="window.closeAcupointMap()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
-                </div>
-                <!-- 內容區 -->
-                <div class="p-4 flex flex-col md:flex-row gap-4 overflow-y-auto">
-                    <!-- 左側顯示穴位圖 -->
-                    <div class="flex-1 md:w-2/3 overflow-auto">
-                        <!-- 將圖像包裹在 relative 容器中以放置可點擊的穴位標記 -->
-                        <div class="relative w-full h-auto">
-                            <img id="acupointMapImage" src="images/combined_three.png" alt="穴位圖" class="w-full h-auto object-contain rounded select-none">
-                            <!-- 標記覆蓋層，用於放置每個可點擊穴位點 -->
-                            <div id="acupointMapOverlay" class="absolute top-0 left-0 w-full h-full"></div>
-                        </div>
-                    </div>
-                    <!-- 右側顯示搜尋與列表 -->
-                    <div class="md:w-1/3 flex flex-col">
-                        <div class="mb-2 flex items-center">
-                            <input type="text" id="acupointMapSearch" placeholder="搜尋穴位名稱..." 
-                                   class="w-full border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                   oninput="searchAcupointInMap()">
-                            <button type="button" onclick="clearAcupointMapSearch()" class="ml-2 text-gray-400 hover:text-gray-600 text-sm">×</button>
-                        </div>
-                        <div id="acupointMapList" class="overflow-y-auto border border-gray-200 rounded p-2 flex-1">
-                            <!-- 動態載入穴位列表 -->
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -4478,100 +4433,12 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script src="schedule_management.js"></script><script src="system.js"></script>
-    <!-- 穴位圖模態框相關腳本，需在 system.js 之後載入以存取全局函式 -->
-    <script src="acupointMap.js" defer></script>
     <!-- 系統管理相關腳本拆分至獨立檔案 -->
     <script src="systemmanagement.js"></script>
     <!-- 新增聊天模組腳本，需在 system.js 之後載入 -->
     <script src="chat_module.js"></script>
     <!-- 語言國際化腳本，必須在系統腳本之後載入 -->
     <script src="i18n.js"></script>
-
-    <!-- 穴位圖按鈕備援腳本：確保在 CSP 禁止 inline handler 或 acupointMap.js 加載失敗時仍能正常開啟 -->
-    <script>
-    (function() {
-      /**
-       * 備援開啟穴位圖函式。若全局 openAcupointMap 已定義則優先呼叫，否則手動渲染資料並顯示模態框。
-       */
-      function fallbackOpenAcupointMap() {
-        try {
-          // 如果有正式函式，直接調用
-          if (typeof window.openAcupointMap === 'function') {
-            window.openAcupointMap();
-            return;
-          }
-          // 若未載入穴位庫，嘗試初始化
-          if (typeof window.initAcupointLibrary === 'function' && (!window.acupointLibraryLoaded || !Array.isArray(window.acupointLibrary) || window.acupointLibrary.length === 0)) {
-            const p = window.initAcupointLibrary();
-            // initAcupointLibrary 可能為 Promise，處理完後再重試
-            if (p && typeof p.then === 'function') {
-              p.catch(() => {}).then(() => fallbackOpenAcupointMap());
-              return;
-            }
-          }
-          // 渲染列表與標記（若定義）
-          if (typeof window.renderAcupointMapList === 'function') {
-            window.renderAcupointMapList('');
-          }
-          if (typeof window.renderAcupointMarkers === 'function') {
-            window.renderAcupointMarkers();
-          }
-          // 顯示模態框
-          var modal = document.getElementById('acupointMapModal');
-          if (modal) {
-            modal.classList.remove('hidden');
-          }
-        } catch (err) {
-          console.error('Fallback openAcupointMap error', err);
-        }
-      }
-      /**
-       * 備援關閉穴位圖函式。若全局 closeAcupointMap 已定義則優先呼叫，否則手動隱藏模態框。
-       */
-      function fallbackCloseAcupointMap() {
-        try {
-          if (typeof window.closeAcupointMap === 'function') {
-            window.closeAcupointMap();
-            return;
-          }
-          var modal = document.getElementById('acupointMapModal');
-          if (modal) {
-            modal.classList.add('hidden');
-          }
-        } catch (err) {
-          console.error('Fallback closeAcupointMap error', err);
-        }
-      }
-      /**
-       * 綁定穴位圖相關按鈕。為避免 CSP 導致的 inline 事件失效，使用 addEventListener 綁定。
-       */
-      function bindAcupointMapFallback() {
-        try {
-          var openBtn = document.getElementById('openAcupointMapButton');
-          if (openBtn) {
-            openBtn.removeEventListener('click', fallbackOpenAcupointMap);
-            openBtn.addEventListener('click', fallbackOpenAcupointMap);
-          }
-          // 針對模態框內第一個按鈕（關閉按鈕）也綁定備援功能
-          var closeBtn = document.querySelector('#acupointMapModal button');
-          if (closeBtn) {
-            closeBtn.removeEventListener('click', fallbackCloseAcupointMap);
-            closeBtn.addEventListener('click', fallbackCloseAcupointMap);
-          }
-        } catch (err) {
-          console.error('Fallback bind error', err);
-        }
-      }
-      // 等待 DOM 就緒後綁定事件
-      if (typeof document !== 'undefined') {
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-          bindAcupointMapFallback();
-        } else {
-          document.addEventListener('DOMContentLoaded', bindAcupointMapFallback);
-        }
-      }
-    })();
-    </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"96f142c32d05b42b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"97172fa8b875b31b","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"b2074e7888b746fe9fbbc15492b4c3d4"}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
@@ -4675,7 +4542,6 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"b2074e7888b746fe9fbbc15492b4c3d4","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
