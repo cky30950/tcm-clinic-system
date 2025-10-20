@@ -10609,10 +10609,10 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                                     i++;
                                 }
                             }
-                            // 建立方劑區塊：名稱與劑量在第一行，若有組成則於下一行以較小字體顯示
+                            // 建立方劑區塊：名稱與劑量，若有組成則在名稱右方用括號括住，字體大小為原本的一半
                             if (composition) {
                                 itemsList.push(
-                                    `<div style="margin-bottom: 4px;">\${itemName} \${dosage}g<br><span style="font-size: 9px; color: #666;">\${composition}</span></div>`
+                                    `<div style="margin-bottom: 4px;">\${itemName} \${dosage}g <span style="font-size: 0.5em; color: #666;">(\${composition})</span></div>`
                                 );
                             } else {
                                 itemsList.push(`<div style="margin-bottom: 4px;">\${itemName} \${dosage}g</div>`);
@@ -13937,18 +13937,7 @@ async function initializeSystemAfterLogin() {
                                 <div class="flex items-center">
                                     <div class="flex-1">
                                         <div class="font-semibold text-gray-900">${window.escapeHtml(displayName)}</div>
-                                        ${item.type === 'formula'
-                                            ? (() => {
-                                                // 針對方劑，在藥單中除了顯示類型標籤外，額外顯示方劑組成。
-                                                // 使用 fullItem 以便取得完整資料，若缺少組成則顯示空字串。
-                                                const compositionText = (fullItem && fullItem.composition)
-                                                    ? fullItem.composition.replace(/\n/g, '、')
-                                                    : '';
-                                                // 使用 escapeHtml 函式避免 XSS
-                                                const escapedComposition = window.escapeHtml(compositionText);
-                                                return `<div class="text-xs text-gray-600">${typeLabel}</div><div class="text-xs text-gray-500">組成：${escapedComposition}</div>`;
-                                            })()
-                                            : ''}
+                                        ${item.type === 'formula' ? `<div class="text-xs text-gray-600">${typeLabel}</div>` : ''}
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         ${(() => {
