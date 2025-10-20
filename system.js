@@ -798,7 +798,7 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
             };
             return getTime(b) - getTime(a);
         });
-        // 組合每一行紀錄：日期 + 主訴 + 現病史
+        // 組合每一行紀錄：日期 + 主訴 + 現病史 + 舌象 + 脈象
         const lines = records.map(c => {
             let dateObj = null;
             if (c.date) {
@@ -817,14 +817,14 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
             const dateStr = dateObj ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}` : '';
             const symptoms = c.symptoms ? String(c.symptoms).replace(/\n/g, ' ').trim() : '';
             const history = c.currentHistory ? String(c.currentHistory).replace(/\n/g, ' ').trim() : '';
-            let content = '';
-            if (symptoms && history) {
-                content = `${symptoms} ${history}`;
-            } else if (symptoms) {
-                content = symptoms;
-            } else if (history) {
-                content = history;
-            }
+            const tongue = c.tongue ? String(c.tongue).replace(/\n/g, ' ').trim() : '';
+            const pulse = c.pulse ? String(c.pulse).replace(/\n/g, ' ').trim() : '';
+            const parts = [];
+            if (symptoms) parts.push(symptoms);
+            if (history) parts.push(history);
+            if (tongue) parts.push(tongue);
+            if (pulse) parts.push(pulse);
+            const content = parts.join(' ').trim();
             return `${dateStr} ${content}`.trim();
         });
         // 將結果填入表單欄位
