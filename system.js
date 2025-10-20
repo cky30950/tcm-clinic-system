@@ -9605,10 +9605,16 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                 if (itemMatch) {
                                     const itemName = itemMatch[1].trim();
                                     const dosage = itemMatch[2];
-                                    const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
+                                    // 嘗試判斷是否為方劑，透過字尾與 herbLibrary 判斷
+                                    const suffixFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
+                                    let foundFormula = null;
+                                    if (Array.isArray(herbLibrary)) {
+                                        foundFormula = herbLibrary.find(item => item && item.name === itemName && item.type === 'formula');
+                                    }
+                                    const isFormula = suffixFormula || !!foundFormula;
                                     if (isFormula) {
                                         // 收集方劑的組成行直到遇到下一個藥材條目為止
-                                        const compositions = [];
+                                        let compositions = [];
                                         let j = i + 1;
                                         while (j < lines.length) {
                                             const nextLine = lines[j].trim();
@@ -9623,6 +9629,15 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                         // 若有組成行則調整索引跳過它們
                                         if (compositions.length > 0) {
                                             i = j - 1;
+                                        }
+                                        // 如果沒有手動輸入組成，嘗試從 herbLibrary 中取得
+                                        if (compositions.length === 0 && foundFormula && foundFormula.composition) {
+                                            try {
+                                                const parts = foundFormula.composition.split(/[\n,，、;]+/).map(p => p.trim()).filter(Boolean);
+                                                compositions = parts;
+                                            } catch (_e) {
+                                                compositions = [foundFormula.composition];
+                                            }
                                         }
                                         const compStr = compositions.join('、');
                                         if (compStr) {
@@ -10598,6 +10613,14 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         if (consultation.prescription) {
             try {
                 // 解析處方內容行並移除空行
+                // 確保中藥庫已載入，否則嘗試初始化一次
+                if (typeof initHerbLibrary === 'function' && !herbLibraryLoaded) {
+                    try {
+                        await initHerbLibrary();
+                    } catch (err) {
+                        console.error('初始化中藥庫失敗', err);
+                    }
+                }
                 const lines = consultation.prescription.split('\n').filter(line => line.trim());
                 const itemsList = [];
                 let i = 0;
@@ -10613,10 +10636,16 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     if (match) {
                         const itemName = match[1].trim();
                         const dosage = match[2];
-                        const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
+                        // 嘗試判斷是否為方劑：先以字尾判斷，再以 herbLibrary 查詢類型為 formula
+                        const suffixFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
+                        let foundFormula = null;
+                        if (Array.isArray(herbLibrary)) {
+                            foundFormula = herbLibrary.find(item => item && item.name === itemName && item.type === 'formula');
+                        }
+                        const isFormula = suffixFormula || !!foundFormula;
                         if (isFormula) {
                             // 如果是方劑，收集後續的組成行直到遇到下一個藥材條目
-                            const compositions = [];
+                            let compositions = [];
                             let j = i + 1;
                             while (j < lines.length) {
                                 const nextLine = lines[j].trim();
@@ -10631,6 +10660,16 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                             // 若有組成行，調整索引以跳過這些行
                             if (compositions.length > 0) {
                                 i = j - 1;
+                            }
+                            // 如果沒有手動輸入組成，從中藥庫中查找組成資料
+                            if (compositions.length === 0 && foundFormula && foundFormula.composition) {
+                                try {
+                                    const parts = foundFormula.composition.split(/[\n,，、;]+/).map(p => p.trim()).filter(Boolean);
+                                    compositions = parts;
+                                } catch (_e) {
+                                    // 如果 split 過程出錯，直接使用原始組成字串
+                                    compositions = [foundFormula.composition];
+                                }
                             }
                             const compStr = compositions.join('、');
                             if (compStr) {
