@@ -10958,7 +10958,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     // 將方劑的組成統一列在處方內容的左下角
                     let compositionHtml = '';
                     if (formulaCompositions.length > 0) {
-                        compositionHtml += '<div style="margin-top: 4px; font-size: 9px;">';
+                        // 方劑組成列表字體縮小至約三分之一大小
+                        compositionHtml += '<div style="margin-top: 4px; font-size: 0.33em;">';
                         formulaCompositions.forEach((fc) => {
                             compositionHtml += `<div>${fc.name}：${fc.composition}</div>`;
                         });
