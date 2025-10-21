@@ -105,6 +105,10 @@ function magnify(img, zoom) {
     const h = lens.offsetHeight / 2;
     // 依據放大倍率設定背景大小
     lens.style.backgroundSize = (img.width * zoom) + 'px ' + (img.height * zoom) + 'px';
+    // 在鏡片中心加入指標點
+    const pointer = document.createElement('div');
+    pointer.className = 'magnifier-pointer';
+    lens.appendChild(pointer);
 
     // 事件處理函式，根據滑鼠位置更新鏡片位置與背景偏移
     function moveLens(e) {
@@ -121,7 +125,9 @@ function magnify(img, zoom) {
         lens.style.left = (x - w) + 'px';
         lens.style.top = (y - h) + 'px';
         // 更新背景位置使放大區域對準鏡片中心
-        lens.style.backgroundPosition = '-' + ((x * zoom) - w) + 'px -' + ((y * zoom) - h) + 'px';
+        // 考慮鏡片邊框寬度，以避免視覺偏差
+        const bw = parseInt(window.getComputedStyle(lens).borderTopWidth) || 0;
+        lens.style.backgroundPosition = '-' + ((x * zoom) - w + bw) + 'px -' + ((y * zoom) - h + bw) + 'px';
     }
     // 計算滑鼠在圖片內的座標
     function getCursorPos(e) {

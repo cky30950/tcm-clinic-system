@@ -217,6 +217,24 @@
             z-index: 1000;
             box-shadow: 0 0 4px rgba(0,0,0,0.3);
         }
+
+        /*
+         * 放大鏡內的指標點樣式
+         *
+         * 用於指示目前放大的精確位置。置於鏡片正中央，顯示為半透明的小圓點，不會攔截滑鼠事件。
+         */
+        .magnifier-pointer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 8px;
+            height: 8px;
+            margin-top: -4px;
+            margin-left: -4px;
+            background-color: rgba(255, 0, 0, 0.7);
+            border-radius: 50%;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-green-50 to-blue-50 min-h-screen">
