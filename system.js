@@ -10730,14 +10730,16 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                             let composition = '';
                             if (i + 1 < lines.length) {
                                 const nextLine = lines[i + 1].trim();
+                                // 若下一行不符合「名稱 劑量」模式，則視為組成說明
                                 if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
                                     composition = nextLine;
+                                    // 跳過組成行，避免重複處理
                                     i++;
                                 }
                             }
-                            // 建立方劑區塊，只顯示名稱與劑量，不顯示組成
-                            // 若有組成行，前面已跳過
-                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
+                            // 將組成加入括號顯示在方劑名稱與劑量之後。
+                            // 如果沒有組成說明，則不添加括號
+                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g${composition ? `（${composition}）` : ''}</div>`);
                         } else {
                             // 普通藥材區塊
                             itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
