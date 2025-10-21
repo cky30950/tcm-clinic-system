@@ -6543,11 +6543,17 @@ function subscribeToAppointments() {
         try {
             // 判斷是否有病人狀態變更為候診中需要通知
             const toNotify = [];
+            // 判斷是否有病人狀態變更為完成診症需要通知診所助理
+            const completedNotify = [];
             for (const apt of newAppointments) {
                 const prevStatus = window.previousAppointmentStatuses[apt.id];
                 // 當前狀態為候診中且與先前狀態不同，視為新的候診事件
                 if (prevStatus !== undefined && prevStatus !== apt.status && apt.status === 'waiting') {
                     toNotify.push(apt);
+                }
+                // 若狀態由其它狀態變更為 completed，視為完成診症事件
+                if (prevStatus !== undefined && prevStatus !== apt.status && apt.status === 'completed') {
+                    completedNotify.push(apt);
                 }
                 // 更新狀態紀錄
                 window.previousAppointmentStatuses[apt.id] = apt.status;
@@ -6596,6 +6602,48 @@ function subscribeToAppointments() {
                                 playNotificationSound();
                             }
                         }
+                    }
+                }
+            }
+
+            // 如果有診症完成通知，且目前使用者為護理師、診所管理或診所助理，則提示並播放音效
+            if (completedNotify.length > 0 && currentUserData && currentUserData.position && ['護理師', '診所管理', '診所助理'].includes(currentUserData.position)) {
+                let patientsList2 = null;
+                for (const apt of completedNotify) {
+                    // 僅通知該完成事件
+                    // 優先使用掛號物件中的病人姓名
+                    let patientName = '';
+                    if (apt.patientName) {
+                        patientName = apt.patientName;
+                    } else {
+                        // 僅當缺少 patientName 時才讀取一次完整病人列表
+                        if (!patientsList2) {
+                            try {
+                                patientsList2 = await fetchPatients();
+                            } catch (fetchErr) {
+                                console.error('讀取病人資料以取得姓名時發生錯誤:', fetchErr);
+                            }
+                        }
+                        if (Array.isArray(patientsList2)) {
+                            let patient = patientsList2.find(p => p && p.id === apt.patientId);
+                            // 若未找到，嘗試跨裝置刷新取得病人資料
+                            if (!patient) {
+                                try {
+                                    patient = await getPatientByIdWithRefresh(apt.patientId);
+                                } catch (_e) {
+                                    patient = null;
+                                }
+                            }
+                            patientName = patient ? patient.name : '';
+                        }
+                    }
+                    if (patientName) {
+                        const lang = localStorage.getItem('lang') || 'zh';
+                        const zhMsg = `病人 ${patientName} 已完成診症，可進行後續處理。`;
+                        const enMsg = `Patient ${patientName}'s consultation has been completed. Please proceed with follow-up.`;
+                        const msg = lang === 'en' ? enMsg : zhMsg;
+                        showToast(msg, 'info');
+                        playNotificationSound();
                     }
                 }
             }
