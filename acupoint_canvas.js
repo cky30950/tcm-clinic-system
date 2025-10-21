@@ -118,7 +118,8 @@
         ac._normY = normY;
         const x = stageW * normX;
         const y = stageH * normY;
-        const circle = new Konva.Circle({ x: x, y: y, radius: 4, fill: 'rgba(0, 119, 204, 0.6)', stroke: '#0077cc', strokeWidth: 1, name: 'acupoint-shape' });
+        // 使用較大的紅色標記使其易於辨識
+        const circle = new Konva.Circle({ x: x, y: y, radius: 6, fill: 'rgba(255, 0, 0, 0.5)', stroke: '#ff0000', strokeWidth: 1.5, name: 'acupoint-shape' });
         circle.acupointData = ac;
         circle.on('mouseenter', function() {
           try { stage.container().style.cursor = 'pointer'; } catch (e) {}
@@ -213,25 +214,68 @@
 
   // 掛鉤 loadAcupointLibrary，在載入穴位庫後初始化畫布
   ready(function() {
-    const maxAttempts = 20;
-    let attempts = 0;
-    const timer = setInterval(function() {
-      attempts += 1;
-      if (typeof window.loadAcupointLibrary === 'function') {
-        const original = window.loadAcupointLibrary;
-        window.loadAcupointLibrary = async function(...args) {
-          const result = await original.apply(this, args);
-          try {
+    // 嘗試掛鉤 loadAcupointLibrary，如果可取得則於資料載入後初始化畫布
+    (function hookLoadAcupointLibrary() {
+      const maxAttempts = 20;
+      let attempts = 0;
+      const timer = setInterval(function() {
+        attempts += 1;
+        if (typeof window.loadAcupointLibrary === 'function') {
+          // 包裹原函式
+          const original = window.loadAcupointLibrary;
+          window.loadAcupointLibrary = async function(...args) {
+            const result = await original.apply(this, args);
+            try {
+              if (typeof window.initAcupointCanvas === 'function') {
+                window.initAcupointCanvas();
+              }
+            } catch (err) { console.warn(err); }
+            return result;
+          };
+          clearInterval(timer);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(timer);
+        }
+      }, 200);
+    })();
+
+    // 監聽穴位庫區域顯示與尺寸變化：當區域可視並且尚未初始化畫布時嘗試初始化
+    (function observeAcupointSection() {
+      function tryInitIfVisible() {
+        try {
+          // 取得穴位庫區域與容器
+          const section = document.getElementById('acupointLibrary');
+          const container = document.getElementById('acupointImageContainer');
+          if (!section || !container) return;
+          // 檢查區域是否隱藏
+          const hiddenByClass = section.classList.contains('hidden');
+          const style = window.getComputedStyle(section);
+          const hiddenByStyle = style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0';
+          if (!hiddenByClass && !hiddenByStyle) {
+            // 區域已顯示，若尚未建立畫布則初始化
             if (typeof window.initAcupointCanvas === 'function') {
-              window.initAcupointCanvas();
+              const stageExist = !!document.getElementById('acupointCanvasStage');
+              if (!stageExist) {
+                window.initAcupointCanvas();
+              }
             }
-          } catch (err) { console.warn(err); }
-          return result;
-        };
-        clearInterval(timer);
-      } else if (attempts >= maxAttempts) {
-        clearInterval(timer);
+          }
+        } catch (err) {
+          // ignore
+        }
       }
-    }, 200);
+      // 初始檢查
+      tryInitIfVisible();
+      // 使用 MutationObserver 監聽 class 及 style 改變
+      const target = document.getElementById('acupointLibrary');
+      if (target) {
+        const observer = new MutationObserver(() => {
+          tryInitIfVisible();
+        });
+        observer.observe(target, { attributes: true, attributeFilter: ['class', 'style'] });
+      }
+      // 同時監聽視窗 resize 以避免畫布大小錯誤
+      window.addEventListener('resize', tryInitIfVisible);
+    })();
   });
 })();
