@@ -9745,8 +9745,24 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     <div class="prescription-section">
                         <div class="prescription-title">📋 ${TR.prescription}</div>
                         <div class="prescription-content">${(() => {
-                            const lines = consultation.prescription.split('\n').filter(line => line.trim());
-                            const allItems = [];
+                                const lines = consultation.prescription.split('\n').filter(line => line.trim());
+                                // 解析結構化處方資料，建立名稱映射，用於查找方劑組成
+                                const structuredMap = {};
+                                if (consultation.prescriptionStructured) {
+                                    try {
+                                        const _arr = JSON.parse(consultation.prescriptionStructured);
+                                        if (Array.isArray(_arr)) {
+                                            _arr.forEach((itm) => {
+                                                if (itm && itm.name) {
+                                                    structuredMap[itm.name] = itm;
+                                                }
+                                            });
+                                        }
+                                    } catch (_e) {
+                                        /* 忽略解析錯誤 */
+                                    }
+                                }
+                                const allItems = [];
                             let i = 0;
                             while (i < lines.length) {
                                 const line = lines[i].trim();
@@ -9760,29 +9776,58 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                     const dosage = itemMatch[2];
                                     const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
                                     if (isFormula) {
-                                        // 優先從 herbLibrary 中取得組成資訊
+                                        // 嘗試從結構化資料取得方劑組成
                                         let compositionText = '';
                                         try {
-                                            if (Array.isArray(herbLibrary)) {
-                                                const fullItem = herbLibrary.find(h => h && h.name === itemName && h.type === 'formula');
-                                                if (fullItem && fullItem.composition) {
-                                                    compositionText = String(fullItem.composition).replace(/\n/g, '、');
-                                                }
+                                            const structuredItem = structuredMap[itemName];
+                                            if (structuredItem && structuredItem.composition) {
+                                                compositionText = String(structuredItem.composition);
                                             }
                                         } catch (_e) {
                                             /* 忽略錯誤 */
                                         }
-                                        // 若未能取得組成，檢查下一行是否為組成
+                                        // 如果結構化資料無組成，再從 herbLibrary 取得
+                                        if (!compositionText) {
+                                            try {
+                                                if (Array.isArray(herbLibrary)) {
+                                                    const fullItem = herbLibrary.find(h => h && h.name === itemName && h.type === 'formula');
+                                                    if (fullItem && fullItem.composition) {
+                                                        compositionText = String(fullItem.composition);
+                                                    }
+                                                }
+                                            } catch (_e) {
+                                                /* 忽略錯誤 */
+                                            }
+                                        }
+                                        // 若仍未取得組成，檢查下一行是否為組成
                                         if (!compositionText) {
                                             if (i + 1 < lines.length) {
                                                 const nextLine = lines[i + 1].trim();
                                                 if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
-                                                    compositionText = nextLine.replace(/\n/g, '、');
+                                                    compositionText = nextLine;
                                                     i++;
                                                 }
                                             }
                                         }
-                                        const compWrap = compositionText ? '（' + compositionText + '）' : '';
+                                        // 對組成做後處理：僅保留藥材名稱
+                                        let processedComposition = '';
+                                        if (compositionText) {
+                                            try {
+                                                const parts = String(compositionText)
+                                                    .replace(/\r/g, '')
+                                                    .split(/[、\n]/)
+                                                    .map(p => p
+                                                        .replace(/\d+(?:\.\d+)?\s*(?:g|克|錢|兩|丸|包)?/gi, '')
+                                                        .replace(/[()（）\[\]]/g, '')
+                                                        .trim()
+                                                    )
+                                                    .filter(p => p);
+                                                processedComposition = parts.join('、');
+                                            } catch (_err) {
+                                                processedComposition = String(compositionText).replace(/\n/g, '、');
+                                            }
+                                        }
+                                        const compWrap = processedComposition ? '（' + processedComposition + '）' : '';
                                         allItems.push(`${itemName} ${dosage}g${compWrap}`);
                                     } else {
                                         allItems.push(`${itemName}${dosage}g`);
@@ -10752,6 +10797,22 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             try {
                 // 解析處方內容行並移除空行
                 const lines = consultation.prescription.split('\n').filter(line => line.trim());
+                // 解析結構化處方，建立名稱對應的結構化項目映射，用於查找方劑的組成資訊
+                const structuredMap = {};
+                if (consultation.prescriptionStructured) {
+                    try {
+                        const _arr = JSON.parse(consultation.prescriptionStructured);
+                        if (Array.isArray(_arr)) {
+                            _arr.forEach((itm) => {
+                                if (itm && itm.name) {
+                                    structuredMap[itm.name] = itm;
+                                }
+                            });
+                        }
+                    } catch (_e) {
+                        /* 忽略 JSON 解析錯誤 */
+                    }
+                }
                 const itemsList = [];
                 let i = 0;
                 // 將每個條目處理為單獨的 HTML 區塊
@@ -10768,30 +10829,59 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         const dosage = match[2];
                         const isFormula = ['湯','散','丸','膏','飲','丹','煎','方','劑'].some(suffix => itemName.includes(suffix));
                         if (isFormula) {
-                            // 如果是方劑，嘗試從 herbLibrary 中取得組成資訊；若無則檢查下一行作為組成
+                            // 如果是方劑，嘗試先從結構化處方資料中取得組成資訊；若無則從 herbLibrary 或下一行獲取
                             let compositionText = '';
+                            // 先從結構化資料取得
                             try {
-                                if (Array.isArray(herbLibrary)) {
-                                    const fullItem = herbLibrary.find(h => h && h.name === itemName && h.type === 'formula');
-                                    if (fullItem && fullItem.composition) {
-                                        compositionText = String(fullItem.composition).replace(/\n/g, '、');
-                                    }
+                                const structuredItem = structuredMap[itemName];
+                                if (structuredItem && structuredItem.composition) {
+                                    compositionText = String(structuredItem.composition);
                                 }
                             } catch (_e) {
-                                /* 忽略錯誤 */
+                                /* ignore */
                             }
-                            // fallback: 若上一個步驟未取得組成，則視下一行為組成（若非藥材格式）
+                            // 若結構化資料中無組成，則查找 herbLibrary
+                            if (!compositionText) {
+                                try {
+                                    if (Array.isArray(herbLibrary)) {
+                                        const fullItem = herbLibrary.find(h => h && h.name === itemName && h.type === 'formula');
+                                        if (fullItem && fullItem.composition) {
+                                            compositionText = String(fullItem.composition);
+                                        }
+                                    }
+                                } catch (_e) {
+                                    /* 忽略錯誤 */
+                                }
+                            }
+                            // 若仍無組成資訊，則視下一行為組成（若非藥材格式）
                             if (!compositionText) {
                                 if (i + 1 < lines.length) {
                                     const nextLine = lines[i + 1].trim();
                                     if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
-                                        compositionText = nextLine.replace(/\n/g, '、');
-                                        i++; // 跳過下一行
+                                        compositionText = nextLine;
+                                        i++; // 跳過下一行作為組成
                                     }
                                 }
                             }
-                            // 將組成用括號括住（若存在），並將組成中的換行符號轉換為頓號
-                            const compWrap = compositionText ? '（' + compositionText + '）' : '';
+                            // 處理組成文字：將換行與頓號分隔並移除劑量與單位，只保留藥材名稱
+                            let processedComposition = '';
+                            if (compositionText) {
+                                try {
+                                    const parts = String(compositionText)
+                                        .replace(/\r/g, '')
+                                        .split(/[、\n]/)
+                                        .map(p => p
+                                            .replace(/\d+(?:\.\d+)?\s*(?:g|克|錢|兩|丸|包)?/gi, '')
+                                            .replace(/[()（）\[\]]/g, '')
+                                            .trim()
+                                        )
+                                        .filter(p => p);
+                                    processedComposition = parts.join('、');
+                                } catch (_err) {
+                                    processedComposition = compositionText.replace(/\n/g, '、');
+                                }
+                            }
+                            const compWrap = processedComposition ? '（' + processedComposition + '）' : '';
                             itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g${compWrap}</div>`);
                         } else {
                             // 普通藥材區塊
