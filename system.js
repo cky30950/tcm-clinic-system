@@ -15468,22 +15468,35 @@ const consultationDate = (() => {
             
             // 載入處方內容
             selectedPrescriptionItems = [];
-            if (consultation.prescription) {
-                // 先將完整處方內容存入隱藏文本域
+            // 先嘗試從結構化處方資料重建
+            let prescriptionLoaded = false;
+            if (consultation.prescriptionStructured) {
+                try {
+                    const parsedItems = JSON.parse(consultation.prescriptionStructured);
+                    if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+                        selectedPrescriptionItems = parsedItems;
+                        prescriptionLoaded = true;
+                    }
+                } catch (_e) {
+                    prescriptionLoaded = false;
+                }
+            }
+            if (prescriptionLoaded) {
+                // 使用更新函式渲染處方並同步隱藏文本域
+                updatePrescriptionDisplay();
+            } else if (consultation.prescription) {
+                // fallback：仍然使用舊版文字處方進行解析
                 document.getElementById('formPrescription').value = consultation.prescription;
-                
-                // 嘗試解析處方內容並重建處方項目列表
+                // 嘗試解析處方內容並生成處方項目列表
                 parsePrescriptionToItems(consultation.prescription);
                 updatePrescriptionDisplay();
-                
-                // 若解析後沒有任何處方項目（可能中藥庫未包含相關藥材），
-                // 則直接顯示原始處方內容，避免呈現空白
+                // 若解析後沒有任何項目，則直接顯示原始文字
                 if (selectedPrescriptionItems.length === 0) {
-                    // 還原隱藏文本域為原始內容
                     document.getElementById('formPrescription').value = consultation.prescription;
-                    const container = document.getElementById('selectedPrescriptionItems');
-                    if (container) {
-                        container.innerHTML = `<div class="text-sm text-gray-900 whitespace-pre-line">${consultation.prescription}</div>`;
+                    const containerEl = document.getElementById('selectedPrescriptionItems');
+                    if (containerEl) {
+                        // 使用 whitespace-pre-line 使原始處方換行保持
+                        containerEl.innerHTML = '<div class="text-sm text-gray-900 whitespace-pre-line">' + consultation.prescription + '</div>';
                     }
                     const medicationSettingsEl = document.getElementById('medicationSettings');
                     if (medicationSettingsEl) {
@@ -15491,7 +15504,7 @@ const consultationDate = (() => {
                     }
                 }
             } else {
-                // 清空處方
+                // 無處方資料時清空
                 document.getElementById('formPrescription').value = '';
                 updatePrescriptionDisplay();
             }
