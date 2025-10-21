@@ -199,6 +199,24 @@
                 width: 100% !important;
             }
         }
+
+        /*
+         * 放大鏡鏡片樣式
+         *
+         * 此樣式定義了放大鏡的外觀，包括邊框、圓形形狀、尺寸、以及遮罩等。
+         * 放大鏡會被絕對定位在圖片容器內，且使用 overflow: hidden 隱藏超出區域。
+         */
+        .img-magnifier-glass {
+            position: absolute;
+            border: 3px solid #000;
+            border-radius: 50%;
+            cursor: none;
+            width: 150px;
+            height: 150px;
+            overflow: hidden;
+            z-index: 1000;
+            box-shadow: 0 0 4px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-green-50 to-blue-50 min-h-screen">
@@ -1313,18 +1331,14 @@
                         <!-- 動態產生的經絡分類按鈕 -->
                     </div>
                 </div>
-
-                <!-- 穴位圖示區域 -->
-                <div class="mb-6">
-                    <!-- 區塊標題 -->
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                        <span class="mr-2">🖼️</span>穴位圖
-                    </h3>
-                    <div class="flex justify-center">
-                        <img src="images/combined_three.png" alt="穴位圖" loading="lazy" class="max-w-full rounded-lg border border-gray-200" />
-                    </div>
-                </div>
-
+    <!-- 穴位圖示展示區 -->
+    <div class="mb-6">
+        <!-- 使用 relative 容器以配合放大鏡絕對定位 -->
+        <div id="acupointImageContainer" class="relative mx-auto max-w-4xl">
+            <!-- 顯示完整穴位圖，供放大鏡取樣，保持高解析度 -->
+            <img id="acupointImage" src="images/combined_three.png" alt="穴位圖" class="w-full h-auto border border-gray-300 rounded-lg shadow-sm">
+        </div>
+    </div>
                 <!-- 穴位庫列表 -->
                 <div class="overflow-x-auto">
                     <div id="acupointLibraryList" class="space-y-4">

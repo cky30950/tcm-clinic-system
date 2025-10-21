@@ -50,6 +50,93 @@ const paginationSettings = {
     medicalRecordList: { currentPage: 1, itemsPerPage: 10 }
 };
 
+/**
+ * 初始化穴位圖放大鏡效果。
+ * 此函式會在 id="acupointImage" 的圖片上添加放大鏡視窗，使使用者可透過滑鼠或觸控放大查看細節。
+ * 若圖片不存在或已經初始化，則不執行任何操作。
+ */
+function initAcupointMagnifier() {
+    try {
+        const img = document.getElementById('acupointImage');
+        if (!img) {
+            return;
+        }
+        // 避免重複建立放大鏡
+        if (img.dataset && img.dataset.magnified) {
+            return;
+        }
+        // 標記為已初始化
+        if (img.dataset) {
+            img.dataset.magnified = 'true';
+        }
+        // 設定放大倍率，可根據需要調整
+        magnify(img, 2);
+    } catch (e) {
+        console.warn('初始化穴位放大鏡失敗:', e);
+    }
+}
+
+/**
+ * 建立放大鏡效果的核心函式。
+ * 在給定的圖片元素上產生一個圓形鏡片，隨著滑鼠移動顯示放大的圖片局部。
+ * @param {HTMLElement} img - 將套用放大鏡效果的圖片元素
+ * @param {number} zoom - 放大倍率，例如 2 表示放大兩倍
+ */
+function magnify(img, zoom) {
+    // 建立鏡片元素
+    const lens = document.createElement('div');
+    lens.setAttribute('class', 'img-magnifier-glass');
+    // 確保父容器為相對定位，若沒有設定則自動設為 relative
+    const container = img.parentElement;
+    if (container) {
+        const style = window.getComputedStyle(container);
+        if (style.position === 'static' || !style.position) {
+            container.style.position = 'relative';
+        }
+        container.insertBefore(lens, img);
+    } else {
+        document.body.insertBefore(lens, img);
+    }
+    // 設定鏡片背景為原圖
+    lens.style.backgroundImage = `url('${img.src}')`;
+    lens.style.backgroundRepeat = 'no-repeat';
+    // 取得鏡片尺寸一半，用於計算定位
+    const w = lens.offsetWidth / 2;
+    const h = lens.offsetHeight / 2;
+    // 依據放大倍率設定背景大小
+    lens.style.backgroundSize = (img.width * zoom) + 'px ' + (img.height * zoom) + 'px';
+
+    // 事件處理函式，根據滑鼠位置更新鏡片位置與背景偏移
+    function moveLens(e) {
+        e.preventDefault();
+        const pos = getCursorPos(e);
+        let x = pos.x;
+        let y = pos.y;
+        // 防止鏡片超出圖片邊界
+        if (x > img.width - (w / zoom)) { x = img.width - (w / zoom); }
+        if (x < w / zoom) { x = w / zoom; }
+        if (y > img.height - (h / zoom)) { y = img.height - (h / zoom); }
+        if (y < h / zoom) { y = h / zoom; }
+        // 更新鏡片的位置
+        lens.style.left = (x - w) + 'px';
+        lens.style.top = (y - h) + 'px';
+        // 更新背景位置使放大區域對準鏡片中心
+        lens.style.backgroundPosition = '-' + ((x * zoom) - w) + 'px -' + ((y * zoom) - h) + 'px';
+    }
+    // 計算滑鼠在圖片內的座標
+    function getCursorPos(e) {
+        const rect = img.getBoundingClientRect();
+        let x = e.pageX - rect.left - window.pageXOffset;
+        let y = e.pageY - rect.top - window.pageYOffset;
+        return { x, y };
+    }
+    // 綁定滑鼠與觸控移動事件
+    lens.addEventListener('mousemove', moveLens);
+    img.addEventListener('mousemove', moveLens);
+    lens.addEventListener('touchmove', moveLens);
+    img.addEventListener('touchmove', moveLens);
+}
+
 // 為穴位庫新增分頁設定，每頁顯示 6 筆資料
 paginationSettings.acupointLibrary = { currentPage: 1, itemsPerPage: 6 };
 
@@ -13175,6 +13262,14 @@ async function initializeSystemAfterLogin() {
             }
             // 初次或重新載入時顯示列表
             displayAcupointLibrary();
+            // 在載入列表後初始化穴位圖放大鏡，確保圖像已存在於 DOM
+            if (typeof initAcupointMagnifier === 'function') {
+                try {
+                    initAcupointMagnifier();
+                } catch (_errMag) {
+                    console.warn('初始化穴位圖放大鏡失敗:', _errMag);
+                }
+            }
         }
 
         /**
