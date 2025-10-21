@@ -10832,6 +10832,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     }
                 }
                 const itemsList = [];
+                // 儲存所有方劑及其組成，以便在處方內容左下角列出
+                const formulaCompositions = [];
                 let i = 0;
                 // 將每個條目處理為單獨的 HTML 區塊
                 while (i < lines.length) {
@@ -10899,10 +10901,16 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                                     processedComposition = compositionText.replace(/\n/g, '、');
                                 }
                             }
-                            // 將組成以較小字體包裝，縮小至約三分之一下
-                            // 將括號及其內容縮小至三分之一大小
-                            const compWrap = processedComposition ? `<span style="font-size: 0.33em;">（${processedComposition}）</span>` : '';
-                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g${compWrap}</div>`);
+                            // 若有組成資訊，收集起來，稍後在處方內容左下角列出，不再於主列表中顯示
+                            if (processedComposition) {
+                                try {
+                                    formulaCompositions.push({ name: itemName, composition: processedComposition });
+                                } catch (_err) {
+                                    // ignore
+                                }
+                            }
+                            // 方劑在主列表僅顯示名稱與劑量，不顯示組成
+                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
                         } else {
                             // 普通藥材區塊
                             itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
@@ -10947,7 +10955,16 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         html += `<div style="flex: 1; padding-right: 4px;">${colItems.join('')}</div>`;
                     });
                     html += '</div>';
-                    prescriptionHtml = html;
+                    // 將方劑的組成統一列在處方內容的左下角
+                    let compositionHtml = '';
+                    if (formulaCompositions.length > 0) {
+                        compositionHtml += '<div style="margin-top: 4px; font-size: 9px;">';
+                        formulaCompositions.forEach((fc) => {
+                            compositionHtml += `<div>${fc.name}：${fc.composition}</div>`;
+                        });
+                        compositionHtml += '</div>';
+                    }
+                    prescriptionHtml = html + compositionHtml;
                 } else {
                     // 若未能解析任何項目，直接以換行顯示原始內容
                     prescriptionHtml = consultation.prescription.replace(/\n/g, '<br>');
