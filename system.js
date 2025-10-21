@@ -10934,19 +10934,13 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         }
                     });
                     const orderedItems = formulasArr.concat(herbsArr, othersArr);
-                    // 將條目平均分配到三欄（直行）以節省垂直空間
-                    const total = orderedItems.length;
+                    // 將條目按行優先方式分配到三欄，確保方劑先水平排列到各欄頂部
                     const columnsCount = 3;
-                    const rows = Math.ceil(total / columnsCount);
-                    const columns = [[], [], []];
-                    for (let col = 0; col < columnsCount; col++) {
-                        for (let row = 0; row < rows; row++) {
-                            const idx = col * rows + row;
-                            if (idx < total) {
-                                columns[col].push(orderedItems[idx]);
-                            }
-                        }
-                    }
+                    const columns = Array.from({ length: columnsCount }, () => []);
+                    orderedItems.forEach((item, idx) => {
+                        const colIdx = idx % columnsCount;
+                        columns[colIdx].push(item);
+                    });
                     // 組合三欄的 HTML 內容
                     let html = '<div style="display: flex;">';
                     columns.forEach((colItems) => {
