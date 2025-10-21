@@ -6776,7 +6776,25 @@ async function loadConsultationForEdit(consultationId) {
             
             // 載入處方內容
             selectedPrescriptionItems = [];
-            if (consultation.prescription) {
+            // 優先使用結構化處方資料（JSON 格式）進行重建，以避免因文字單位差異導致解析失敗
+            let loadedStructured = false;
+            if (consultation.prescriptionStructured) {
+                try {
+                    const parsedItems = JSON.parse(consultation.prescriptionStructured);
+                    if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+                        selectedPrescriptionItems = parsedItems;
+                        loadedStructured = true;
+                    }
+                } catch (_e) {
+                    // ignore parse errors and fallback to legacy text format
+                    loadedStructured = false;
+                }
+            }
+            if (loadedStructured) {
+                // 透過更新函式渲染處方顯示並同步隱藏文本域
+                updatePrescriptionDisplay();
+            } else if (consultation.prescription) {
+                // fallback: 使用舊版文字處方解析
                 // 先將完整處方內容存入隱藏文本域
                 document.getElementById('formPrescription').value = consultation.prescription;
                 // 嘗試解析處方內容並生成處方項目列表
@@ -6787,9 +6805,9 @@ async function loadConsultationForEdit(consultationId) {
                 if (selectedPrescriptionItems.length === 0) {
                     // 還原隱藏文本域為原始內容，因為 updatePrescriptionDisplay 會清空它
                     document.getElementById('formPrescription').value = consultation.prescription;
-                    const container = document.getElementById('selectedPrescriptionItems');
-                    if (container) {
-                        container.innerHTML = `<div class="text-sm text-gray-900 whitespace-pre-line">${consultation.prescription}</div>`;
+                    const containerEl = document.getElementById('selectedPrescriptionItems');
+                    if (containerEl) {
+                        containerEl.innerHTML = `<div class="text-sm text-gray-900 whitespace-pre-line">${consultation.prescription}</div>`;
                     }
                     // 隱藏服藥天數與次數設定
                     const medicationSettingsEl = document.getElementById('medicationSettings');
@@ -8152,6 +8170,15 @@ async function saveConsultation() {
                 return acnEl ? acnEl.innerHTML.trim() : '';
             })(),
             prescription: document.getElementById('formPrescription').value.trim(),
+            // 新增：將處方項目以結構化資料儲存，方便後續編輯，不再依賴解析文字。
+            prescriptionStructured: (() => {
+                try {
+                    // 若 selectedPrescriptionItems 已定義且為陣列，則序列化；否則回傳空陣列
+                    return JSON.stringify(Array.isArray(selectedPrescriptionItems) ? selectedPrescriptionItems : []);
+                } catch (_e) {
+                    return '[]';
+                }
+            })(),
             usage: document.getElementById('formUsage').value.trim(),
             treatmentCourse: document.getElementById('formTreatmentCourse').value.trim(),
             instructions: document.getElementById('formInstructions').value.trim(),
@@ -10730,16 +10757,14 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                             let composition = '';
                             if (i + 1 < lines.length) {
                                 const nextLine = lines[i + 1].trim();
-                                // 若下一行不符合「名稱 劑量」模式，則視為組成說明
                                 if (nextLine && !nextLine.match(/^.+?\s+\d+(?:\.\d+)?g$/)) {
                                     composition = nextLine;
-                                    // 跳過組成行，避免重複處理
                                     i++;
                                 }
                             }
-                            // 將組成加入括號顯示在方劑名稱與劑量之後。
-                            // 如果沒有組成說明，則不添加括號
-                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g${composition ? `（${composition}）` : ''}</div>`);
+                            // 建立方劑區塊，只顯示名稱與劑量，不顯示組成
+                            // 若有組成行，前面已跳過
+                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
                         } else {
                             // 普通藥材區塊
                             itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
@@ -14137,24 +14162,23 @@ async function initializeSystemAfterLogin() {
             selectedPrescriptionItems.forEach(item => {
                 // 使用項目的 customDosage（如果有），否則根據類型給予預設值：中藥材 1、方劑 5。
                 const dosage = item.customDosage || (item.type === 'herb' ? '1' : '5');
-                // 根據中藥庫中的單位設定來顯示正確的單位；若沒有對應單位則默認為『克』
+                // 根據中藥庫中的單位設定來顯示正確的基礎單位；若沒有對應單位則默認為 'g'
                 let unitLabelForText = '';
                 try {
                     if (typeof getHerbInventory === 'function') {
                         const inv3 = getHerbInventory(item.id);
-                        const unit3 = (inv3 && inv3.unit) ? inv3.unit : 'g';
-                        const rawUnit3 = (typeof UNIT_LABEL_MAP !== 'undefined' && UNIT_LABEL_MAP && UNIT_LABEL_MAP[unit3]) ? UNIT_LABEL_MAP[unit3] : '克';
-                        const translatedUnit3 = (typeof window.t === 'function') ? window.t(rawUnit3) : rawUnit3;
-                        unitLabelForText = translatedUnit3;
+                        // 直接使用庫存的基礎單位（如 g、jin、liang 等）作為儲存單位，不再翻譯為中文，
+                        // 以便後續解析保持一致
+                        unitLabelForText = (inv3 && inv3.unit) ? inv3.unit : 'g';
                     } else {
-                        // 若無法取得 getHerbInventory 函式，預設顯示為『克』
-                        unitLabelForText = (typeof window.t === 'function') ? window.t('克') : '克';
+                        // 若無法取得 getHerbInventory 函式，預設顯示為 'g'
+                        unitLabelForText = 'g';
                     }
                 } catch (_unitErr) {
-                    // 發生錯誤時仍使用預設單位『克』
-                    unitLabelForText = (typeof window.t === 'function') ? window.t('克') : '克';
+                    // 發生錯誤時仍使用預設單位 'g'
+                    unitLabelForText = 'g';
                 }
-                // 若為方劑類型，通常以『克』為單位，除非庫存中另有定義；仍使用上方取得的 unitLabelForText
+                // 組合為單行文字，以基礎單位結尾（例如 3g）
                 prescriptionText += `${item.name} ${dosage}${unitLabelForText}\n`;
             });
 
@@ -15064,8 +15088,9 @@ async function searchBillingForConsultation() {
                     continue;
                 }
                 
-                // 檢查是否為藥材/方劑格式（名稱 劑量g）
-                const itemMatch = line.match(/^(.+?)\s+(\d+(?:\.\d+)?)g$/);
+                // 檢查是否為藥材/方劑格式（名稱 + 空格 + 劑量 + 單位）。
+                // 單位可為中文或英文，或直接省略。舊版僅接受 g 結尾，現改為接受任意單位並忽略單位部份。
+                const itemMatch = line.match(/^(.+?)\s+(\d+(?:\.\d+)?)(?:[a-zA-Z\u4e00-\u9fa5]*)$/);
                 if (itemMatch) {
                     const itemName = itemMatch[1].trim();
                     const dosage = itemMatch[2];
