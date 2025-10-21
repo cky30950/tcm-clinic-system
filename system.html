@@ -1355,6 +1355,8 @@
         <div id="acupointImageContainer" class="relative mx-auto max-w-4xl">
             <!-- 顯示完整穴位圖，供放大鏡取樣，保持高解析度 -->
             <img id="acupointImage" src="images/combined_three.png" alt="穴位圖" class="w-full h-auto border border-gray-300 rounded-lg shadow-sm">
+            <!-- Konva 繪圖圖層容器：絕對定位於圖片上方，用於繪製穴位標記 -->
+            <div id="acupointOverlayContainer" class="absolute inset-0"></div>
         </div>
     </div>
                 <!-- 穴位庫列表 -->
@@ -4479,7 +4481,10 @@
     <!-- 載入 Chart.js 用於繪製個人統計分析圖表 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <script src="schedule_management.js"></script><script src="system.js"></script>
+    <script src="schedule_management.js"></script>
+    <!-- 載入 Konva.js 用於在穴位圖上繪製互動點位 -->
+    <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+    <script src="system.js"></script>
     <!-- 系統管理相關腳本拆分至獨立檔案 -->
     <script src="systemmanagement.js"></script>
     <!-- 新增聊天模組腳本，需在 system.js 之後載入 -->
