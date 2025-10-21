@@ -10922,27 +10922,9 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     i++;
                 }
                 if (itemsList.length > 0) {
-                    // 調整順序：方劑排在前、藥材其次、其他說明最後
-                    const formulasArr = [];
-                    const herbsArr = [];
-                    const othersArr = [];
-                    itemsList.forEach((it) => {
-                        try {
-                            const hasDose = /\d+(?:\.\d+)?g/.test(it);
-                            const isFormulaItem = /[湯散丸膏飲丹煎方劑]/.test(it);
-                            if (hasDose && isFormulaItem) {
-                                formulasArr.push(it);
-                            } else if (hasDose) {
-                                herbsArr.push(it);
-                            } else {
-                                othersArr.push(it);
-                            }
-                        } catch (_err) {
-                            herbsArr.push(it);
-                        }
-                    });
-                    const orderedItems = formulasArr.concat(herbsArr, othersArr);
-                    // 將條目按行優先方式分配到三欄，確保方劑先水平排列到各欄頂部
+                    // 按照原始次序排列處方項目，直接使用 itemsList 而不再將方劑移至最前
+                    const orderedItems = itemsList;
+                    // 將條目按行優先方式分配到三欄
                     const columnsCount = 3;
                     const columns = Array.from({ length: columnsCount }, () => []);
                     orderedItems.forEach((item, idx) => {
@@ -10955,11 +10937,10 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         html += `<div style="flex: 1; padding-right: 4px;">${colItems.join('')}</div>`;
                     });
                     html += '</div>';
-                    // 將方劑的組成統一列在處方內容的左下角
+                    // 將方劑的組成統一列在處方內容的左下角，字體稍微放大
                     let compositionHtml = '';
                     if (formulaCompositions.length > 0) {
-                        // 方劑組成列表字體縮小至約三分之一大小
-                        compositionHtml += '<div style="margin-top: 4px; font-size: 0.33em;">';
+                        compositionHtml += '<div style="margin-top: 4px; font-size: 0.5em;">';
                         formulaCompositions.forEach((fc) => {
                             compositionHtml += `<div>${fc.name}：${fc.composition}</div>`;
                         });
