@@ -9841,11 +9841,28 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                             const regularItems = allItems.filter(item => typeof item === 'string' && !item.includes('<div'));
                             const specialLines = allItems.filter(item => typeof item === 'string' && item.includes('<div'));
                             let result = '';
+                            // 先加入其他說明行
                             specialLines.forEach(line => {
                                 result += line;
                             });
                             if (regularItems.length > 0) {
-                                const joined = regularItems.join('、');
+                                // 調整順序：方劑在前、藥材其後
+                                const formulasArr = [];
+                                const herbsArr = [];
+                                regularItems.forEach(it => {
+                                    try {
+                                        const hasDose = /\d+(?:\.\d+)?g/.test(it);
+                                        const isFormulaItem = /[湯散丸膏飲丹煎方劑]/.test(it);
+                                        if (hasDose && isFormulaItem) {
+                                            formulasArr.push(it);
+                                        } else {
+                                            herbsArr.push(it);
+                                        }
+                                    } catch (_err) {
+                                        herbsArr.push(it);
+                                    }
+                                });
+                                const joined = formulasArr.concat(herbsArr).join('、');
                                 result += `<div style="margin: 2px 0;">${joined}</div>`;
                             }
                             return result || consultation.prescription.replace(/\n/g, '<br>');
@@ -10897,8 +10914,28 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     i++;
                 }
                 if (itemsList.length > 0) {
+                    // 調整順序：方劑排在前、藥材其次、其他說明最後
+                    const formulasArr = [];
+                    const herbsArr = [];
+                    const othersArr = [];
+                    itemsList.forEach((it) => {
+                        try {
+                            const hasDose = /\d+(?:\.\d+)?g/.test(it);
+                            const isFormulaItem = /[湯散丸膏飲丹煎方劑]/.test(it);
+                            if (hasDose && isFormulaItem) {
+                                formulasArr.push(it);
+                            } else if (hasDose) {
+                                herbsArr.push(it);
+                            } else {
+                                othersArr.push(it);
+                            }
+                        } catch (_err) {
+                            herbsArr.push(it);
+                        }
+                    });
+                    const orderedItems = formulasArr.concat(herbsArr, othersArr);
                     // 將條目平均分配到三欄（直行）以節省垂直空間
-                    const total = itemsList.length;
+                    const total = orderedItems.length;
                     const columnsCount = 3;
                     const rows = Math.ceil(total / columnsCount);
                     const columns = [[], [], []];
@@ -10906,7 +10943,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         for (let row = 0; row < rows; row++) {
                             const idx = col * rows + row;
                             if (idx < total) {
-                                columns[col].push(itemsList[idx]);
+                                columns[col].push(orderedItems[idx]);
                             }
                         }
                     }
