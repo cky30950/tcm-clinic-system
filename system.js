@@ -9827,8 +9827,8 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                                 processedComposition = String(compositionText).replace(/\n/g, '、');
                                             }
                                         }
-                                        // 將組成文字使用較小字體顯示，縮小至約三分之一下
-                                        const compWrap = processedComposition ? `<span style="font-size: 0.67em;">（${processedComposition}）</span>` : '';
+                                        // 將括號及其內容縮小至三分之一大小
+                                        const compWrap = processedComposition ? `<span style="font-size: 0.33em;">（${processedComposition}）</span>` : '';
                                         allItems.push(`${itemName} ${dosage}g${compWrap}`);
                                     } else {
                                         allItems.push(`${itemName}${dosage}g`);
@@ -10883,7 +10883,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                                 }
                             }
                             // 將組成以較小字體包裝，縮小至約三分之一下
-                            const compWrap = processedComposition ? `<span style="font-size: 0.67em;">（${processedComposition}）</span>` : '';
+                            // 將括號及其內容縮小至三分之一大小
+                            const compWrap = processedComposition ? `<span style="font-size: 0.33em;">（${processedComposition}）</span>` : '';
                             itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g${compWrap}</div>`);
                         } else {
                             // 普通藥材區塊
