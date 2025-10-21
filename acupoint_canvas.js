@@ -241,9 +241,12 @@
 
     // 監聽穴位庫區域顯示與尺寸變化：當區域可視並且尚未初始化畫布時嘗試初始化
     (function observeAcupointSection() {
+      /**
+       * 嘗試在穴位庫可見且資料已載入時初始化畫布。
+       * 若資料尚未載入，會在下一次檢查時再次嘗試。
+       */
       function tryInitIfVisible() {
         try {
-          // 取得穴位庫區域與容器
           const section = document.getElementById('acupointLibrary');
           const container = document.getElementById('acupointImageContainer');
           if (!section || !container) return;
@@ -251,13 +254,11 @@
           const hiddenByClass = section.classList.contains('hidden');
           const style = window.getComputedStyle(section);
           const hiddenByStyle = style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0';
-          if (!hiddenByClass && !hiddenByStyle) {
-            // 區域已顯示，若尚未建立畫布則初始化
+          if (hiddenByClass || hiddenByStyle) return;
+          // 僅當資料已載入時才初始化
+          if (Array.isArray(window.acupointLibrary) && window.acupointLibrary.length > 0) {
             if (typeof window.initAcupointCanvas === 'function') {
-              const stageExist = !!document.getElementById('acupointCanvasStage');
-              if (!stageExist) {
-                window.initAcupointCanvas();
-              }
+              window.initAcupointCanvas();
             }
           }
         } catch (err) {
@@ -266,7 +267,7 @@
       }
       // 初始檢查
       tryInitIfVisible();
-      // 使用 MutationObserver 監聽 class 及 style 改變
+      // 使用 MutationObserver 監聽穴位庫區域狀態變化
       const target = document.getElementById('acupointLibrary');
       if (target) {
         const observer = new MutationObserver(() => {
@@ -274,7 +275,12 @@
         });
         observer.observe(target, { attributes: true, attributeFilter: ['class', 'style'] });
       }
-      // 同時監聽視窗 resize 以避免畫布大小錯誤
+      // 監聽資料載入，當 acupointLibrary 屬性變化時嘗試初始化
+      const dataObserver = new MutationObserver(() => {
+        tryInitIfVisible();
+      });
+      dataObserver.observe(document.body, { attributes: true, childList: true, subtree: true });
+      // 視窗尺寸改變時重新檢查
       window.addEventListener('resize', tryInitIfVisible);
     })();
   });
