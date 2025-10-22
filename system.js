@@ -77,6 +77,70 @@ function initAcupointMagnifier() {
 }
 
 /**
+ * 初始化穴位圖 Leaflet 地圖。
+ * 這個函式在穴位庫頁面會建立一個使用 Simple CRS 的 Leaflet 地圖，
+ * 將 combined_three.png 作為背景圖層，並依據 acupointLibrary 中的 x/y 座標放置標記。
+ * 每個標記會綁定一個彈出視窗，顯示該穴位的詳細資料。
+ */
+function initAcupointMap() {
+    try {
+        const mapContainer = document.getElementById('acupointMap');
+        // 若沒有容器或已初始化過則不重複建立
+        if (!mapContainer || mapContainer.dataset.initialized) {
+            return;
+        }
+        mapContainer.dataset.initialized = 'true';
+        // 建立地圖物件，使用簡易 CRS，可在像素座標中繪製圖像
+        const img = new Image();
+        // 圖片路徑與 HTML 中保持一致
+        img.src = 'images/combined_three.png';
+        img.onload = function () {
+            const w = img.width;
+            const h = img.height;
+            // Leaflet Map，禁用 attribution 與 default 控制，簡化介面
+            const map = L.map(mapContainer, {
+                crs: L.CRS.Simple,
+                minZoom: -1,
+                maxZoom: 4,
+                zoomControl: false,
+                attributionControl: false
+            });
+            // 定義圖片邊界，[y, x]（Lat,Lon）順序
+            const bounds = [[0, 0], [h, w]];
+            L.imageOverlay(img.src, bounds).addTo(map);
+            map.fitBounds(bounds);
+            // 為每個穴位建立標記
+            if (Array.isArray(acupointLibrary)) {
+                acupointLibrary.forEach(ac => {
+                    if (ac && typeof ac.x === 'number' && typeof ac.y === 'number') {
+                        const lat = h * ac.y;
+                        const lon = w * ac.x;
+                        const marker = L.marker([lat, lon]).addTo(map);
+                        // 組合 tooltip 內容，使用現有函式組裝後改為 <br> 換行
+                        let tooltipText = '';
+                        try {
+                            if (typeof getAcupointTooltipContent === 'function') {
+                                tooltipText = getAcupointTooltipContent(ac.name || '');
+                            }
+                        } catch (_err) {
+                            tooltipText = ac.name || '';
+                        }
+                        if (tooltipText && marker.bindPopup) {
+                            marker.bindPopup(tooltipText.replace(/\n/g, '<br>'));
+                        }
+                    }
+                });
+            }
+        };
+        img.onerror = function () {
+            console.warn('無法載入穴位圖圖片，地圖初始化失敗');
+        };
+    } catch (e) {
+        console.warn('初始化穴位地圖失敗:', e);
+    }
+}
+
+/**
  * 建立放大鏡效果的核心函式。
  * 在給定的圖片元素上產生一個圓形鏡片，隨著滑鼠移動顯示放大的圖片局部。
  * @param {HTMLElement} img - 將套用放大鏡效果的圖片元素
@@ -13234,6 +13298,9 @@ async function initializeSystemAfterLogin() {
                         indications: ['咳嗽', '氣喘', '胸痛', '肩背痛', '皮膚病'],
                         method: '斜刺或平刺0.5-0.8寸',
                         category: '肺之募穴',
+                        // 以下為示範用途的相對座標，實際值請自行調整
+                        x: 0.5,
+                        y: 0.3,
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
                     }
@@ -13268,12 +13335,12 @@ async function initializeSystemAfterLogin() {
             }
             // 初次或重新載入時顯示列表
             displayAcupointLibrary();
-            // 在載入列表後初始化穴位圖放大鏡，確保圖像已存在於 DOM
-            if (typeof initAcupointMagnifier === 'function') {
+            // 在載入列表後初始化穴位 Leaflet 地圖，確保容器已存在於 DOM
+            if (typeof initAcupointMap === 'function') {
                 try {
-                    initAcupointMagnifier();
-                } catch (_errMag) {
-                    console.warn('初始化穴位圖放大鏡失敗:', _errMag);
+                    initAcupointMap();
+                } catch (_err) {
+                    console.warn('初始化穴位地圖失敗:', _err);
                 }
             }
         }
