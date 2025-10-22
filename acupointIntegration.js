@@ -26,11 +26,19 @@
         const library = window.acupointLibrary;
         if (Array.isArray(library)) {
             library.forEach(ac => {
-                if (ac && typeof ac.x !== 'number' && typeof ac.y !== 'number') {
-                    const coords = ACUPOINT_COORDS[ac.name];
+                if (ac) {
+                    // 取得穴位名稱，並移除括號及其後內容（例如 國際代碼）
+                    const rawName = ac.name || '';
+                    const key = String(rawName).replace(/\s*\(.*\)$/, '');
+                    const coords = ACUPOINT_COORDS[key];
                     if (coords) {
-                        ac.x = coords.x;
-                        ac.y = coords.y;
+                        // 如果尚未定義 x 或 y，則套用座標；避免覆蓋已有資料
+                        if (typeof ac.x !== 'number') {
+                            ac.x = coords.x;
+                        }
+                        if (typeof ac.y !== 'number') {
+                            ac.y = coords.y;
+                        }
                     }
                 }
             });
