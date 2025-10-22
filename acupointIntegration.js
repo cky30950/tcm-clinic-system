@@ -23,8 +23,21 @@
      * 只有當 acupointLibrary 為陣列且項目沒有 x/y 屬性時才會套用。
      */
     function applyAcupointCoordinates() {
-        const library = window.acupointLibrary;
+        // 從全域環境取得 acupointLibrary：使用全域變數或 window 屬性
+        let library;
+        try {
+            // 優先使用全球變數 acupointLibrary（LET 宣告），若不存在再取 window.acupointLibrary
+            library = typeof acupointLibrary !== 'undefined' ? acupointLibrary : window.acupointLibrary;
+        } catch (_err) {
+            library = window.acupointLibrary;
+        }
         if (Array.isArray(library)) {
+            // 將座標資料同步回 window，以便其他腳本可存取
+            try {
+                if (typeof window !== 'undefined') {
+                    window.acupointLibrary = library;
+                }
+            } catch (_e) {}
             library.forEach(ac => {
                 if (ac) {
                     // 取得穴位名稱，並移除括號及其後內容（例如 國際代碼）
@@ -75,7 +88,13 @@
                 const bounds = [[0,0],[h,w]];
                 L.imageOverlay(img.src, bounds).addTo(map);
                 map.fitBounds(bounds);
-                const library = window.acupointLibrary;
+                // 從全域環境取得 acupointLibrary：使用全域變數或 window 屬性
+                let library;
+                try {
+                    library = typeof acupointLibrary !== 'undefined' ? acupointLibrary : window.acupointLibrary;
+                } catch (_err) {
+                    library = window.acupointLibrary;
+                }
                 if (Array.isArray(library)) {
                     library.forEach(ac => {
                         if (ac && typeof ac.x === 'number' && typeof ac.y === 'number') {
@@ -90,8 +109,37 @@
                             } catch (_err) {
                                 content = ac.name || '';
                             }
-                            if (content && marker.bindPopup) {
-                                marker.bindPopup(content.replace(/\n/g, '<br>'));
+                            if (content) {
+                                const html = content.replace(/\n/g, '<br>');
+                                // 如果全域定義了 showTooltip 則使用自訂提示框，否則使用 Leaflet 彈窗/提示
+                                const hasCustomTooltip = (typeof showTooltip === 'function') && (typeof hideTooltip === 'function') && (typeof moveTooltip === 'function');
+                                if (hasCustomTooltip) {
+                                    // 綁定滑鼠事件以顯示自訂提示
+                                    marker.on('mouseover', function(e) {
+                                        // 由於 showTooltip 期望經過 encodeURIComponent 的內容
+                                        try {
+                                            showTooltip(e.originalEvent, encodeURIComponent(content));
+                                        } catch (_ignore) {}
+                                    });
+                                    marker.on('mousemove', function(e) {
+                                        try {
+                                            moveTooltip(e.originalEvent);
+                                        } catch (_ignore) {}
+                                    });
+                                    marker.on('mouseout', function() {
+                                        try {
+                                            hideTooltip();
+                                        } catch (_ignore) {}
+                                    });
+                                } else {
+                                    // 若沒有自訂提示框，則使用 Leaflet 的彈窗與工具提示
+                                    if (typeof marker.bindPopup === 'function') {
+                                        marker.bindPopup(html);
+                                    }
+                                    if (typeof marker.bindTooltip === 'function') {
+                                        marker.bindTooltip(html, { direction: 'top', offset: [0, -10], opacity: 0.9 });
+                                    }
+                                }
                             }
                         }
                     });
