@@ -193,14 +193,17 @@
                     coordDiv.style.zIndex = '1000';
                     mapContainer.appendChild(coordDiv);
                     // 使用 layerPoint 取得相對於圖像的像素座標，計算相對比例
+                    // 在滑鼠移動時，使用 latlng 取得影像對應的座標，lat 為 y 座標需取負值
                     map.on('mousemove', function(ev) {
-                        const x = ev.layerPoint.x;
-                        const y = ev.layerPoint.y;
-                        // 將座標限制在圖片範圍內，避免當滑鼠略微移出圖片邊緣時無法取得座標
-                        const clampedX = Math.min(Math.max(x, 0), w);
-                        const clampedY = Math.min(Math.max(y, 0), h);
-                        const relX = (clampedX / w).toFixed(4);
-                        const relY = (clampedY / h).toFixed(4);
+                        // ev.latlng.lng 對應圖片的 x 像素座標，範圍 [0, w]
+                        // ev.latlng.lat 為圖片的 y 座標（反向），範圍 [0, -h]
+                        let xCoord = ev.latlng.lng;
+                        let yCoord = -ev.latlng.lat;
+                        // 將座標限制在圖片有效範圍
+                        xCoord = Math.min(Math.max(xCoord, 0), w);
+                        yCoord = Math.min(Math.max(yCoord, 0), h);
+                        const relX = (xCoord / w).toFixed(4);
+                        const relY = (yCoord / h).toFixed(4);
                         coordDiv.textContent = 'x: ' + relX + ', y: ' + relY;
                     });
                     // 當滑鼠移出整個地圖容器時，清空座標顯示；若僅在地圖邊緣滑動，仍保留座標
