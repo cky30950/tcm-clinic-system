@@ -89,7 +89,7 @@
                 const bounds = [[0,0],[h,w]];
                 L.imageOverlay(img.src, bounds).addTo(map);
                 map.fitBounds(bounds);
-                // 將最小縮放層級鎖定為目前顯示全圖的層級，避免縮小超過原始大小
+                // 取得載入全圖後的縮放層級並設為最小縮放，稍後重新設定視窗保持完整顯示
                 const initialZoom = map.getZoom();
                 if (typeof map.setMinZoom === 'function') {
                     map.setMinZoom(initialZoom);
@@ -102,6 +102,10 @@
                 }
                 // 增加邊界黏滯度，使地圖邊緣更難被拖離
                 map.options.maxBoundsViscosity = 1.0;
+                // 重新將地圖視圖設置為圖片中心並使用初始縮放，確保第一次載入即顯示完整圖片
+                const centerLat = h / 2;
+                const centerLon = w / 2;
+                map.setView([centerLat, centerLon], initialZoom);
                 // 從全域環境取得 acupointLibrary：使用全域變數或 window 屬性
                 let library;
                 try {
