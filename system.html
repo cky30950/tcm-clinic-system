@@ -1357,7 +1357,8 @@
     <!-- 穴位圖示展示區 -->
     <div class="mb-6">
         <!-- 使用 relative 容器以配合放大鏡絕對定位 -->
-        <div id="acupointImageContainer" class="relative mx-auto max-w-4xl">
+        <!-- 調整容器寬度使穴位圖的邊框能填滿整個卡片 -->
+        <div id="acupointImageContainer" class="relative w-full">
             <!-- 取代傳統圖片為 Leaflet 地圖容器，後續由 JS 載入圖片並繪製標記 -->
             <!-- 將邊框加粗，使穴位圖的框線與卡片邊界一致 -->
             <div id="acupointMap" class="w-full h-96 border-2 border-gray-300 rounded-lg shadow-sm"></div>
