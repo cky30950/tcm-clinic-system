@@ -176,12 +176,11 @@
                 // 在地圖上顯示滑鼠座標，方便判斷穴位位置
                 try {
                     // 確保容器為相對定位，以便絕對定位的座標顯示元素正確對齊
-                    if (!mapContainer.style.position) {
-                        mapContainer.style.position = 'relative';
-                    }
+                    mapContainer.style.position = 'relative';
                     const coordDiv = document.createElement('div');
                     coordDiv.id = 'coordinateDisplay';
                     coordDiv.style.position = 'absolute';
+                    // 將座標顯示在左下角，避免遮擋地圖內容
                     coordDiv.style.bottom = '8px';
                     coordDiv.style.left = '8px';
                     coordDiv.style.padding = '2px 4px';
@@ -190,15 +189,17 @@
                     coordDiv.style.borderRadius = '4px';
                     coordDiv.style.pointerEvents = 'none';
                     coordDiv.style.color = '#000';
+                    // 調高層級，確保文字不被地圖覆蓋
+                    coordDiv.style.zIndex = '1000';
                     mapContainer.appendChild(coordDiv);
-                    // 更新座標顯示函式
+                    // 使用 layerPoint 取得相對於圖像的像素座標，計算相對比例
                     map.on('mousemove', function(ev) {
-                        const lat = ev.latlng.lat;
-                        const lon = ev.latlng.lng;
+                        const x = ev.layerPoint.x;
+                        const y = ev.layerPoint.y;
                         // 只在滑鼠位於圖像範圍內時顯示座標
-                        if (lat >= 0 && lat <= h && lon >= 0 && lon <= w) {
-                            const relX = (lon / w).toFixed(4);
-                            const relY = (lat / h).toFixed(4);
+                        if (x >= 0 && x <= w && y >= 0 && y <= h) {
+                            const relX = (x / w).toFixed(4);
+                            const relY = (y / h).toFixed(4);
                             coordDiv.textContent = 'x: ' + relX + ', y: ' + relY;
                         } else {
                             coordDiv.textContent = '';
