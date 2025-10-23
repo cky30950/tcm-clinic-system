@@ -203,7 +203,8 @@
                         const relY = (clampedY / h).toFixed(4);
                         coordDiv.textContent = 'x: ' + relX + ', y: ' + relY;
                     });
-                    map.on('mouseout', function() {
+                    // 當滑鼠移出整個地圖容器時，清空座標顯示；若僅在地圖邊緣滑動，仍保留座標
+                    mapContainer.addEventListener('mouseleave', function() {
                         coordDiv.textContent = '';
                     });
                 } catch (coordErr) {
