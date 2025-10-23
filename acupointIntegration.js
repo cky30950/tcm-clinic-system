@@ -196,14 +196,12 @@
                     map.on('mousemove', function(ev) {
                         const x = ev.layerPoint.x;
                         const y = ev.layerPoint.y;
-                        // 只在滑鼠位於圖像範圍內時顯示座標
-                        if (x >= 0 && x <= w && y >= 0 && y <= h) {
-                            const relX = (x / w).toFixed(4);
-                            const relY = (y / h).toFixed(4);
-                            coordDiv.textContent = 'x: ' + relX + ', y: ' + relY;
-                        } else {
-                            coordDiv.textContent = '';
-                        }
+                        // 將座標限制在圖片範圍內，避免當滑鼠略微移出圖片邊緣時無法取得座標
+                        const clampedX = Math.min(Math.max(x, 0), w);
+                        const clampedY = Math.min(Math.max(y, 0), h);
+                        const relX = (clampedX / w).toFixed(4);
+                        const relY = (clampedY / h).toFixed(4);
+                        coordDiv.textContent = 'x: ' + relX + ', y: ' + relY;
                     });
                     map.on('mouseout', function() {
                         coordDiv.textContent = '';
