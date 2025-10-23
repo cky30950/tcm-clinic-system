@@ -15,7 +15,9 @@
     const ACUPOINT_COORDS = {
         // 中府（手太陰肺經的募穴），位於胸外側部，約圖像寬度的 15%、高度的 23% 處。
         // 如需調整位置，可修改 x, y 值（0~1 之間），其中 x 越大越靠右、y 越大越靠下。
-        '中府': { x: 0.15, y: 0.23 }
+        // 調整中府（手太陰肺經第1穴）座標，使其在穴位圖上與實際位置更貼近。
+        // x 和 y 為相對於圖片寬高的比例，經由觀察實際圖片，將位置略往右上方修正。
+        '中府': { x: 0.198, y: 0.266 }
         // 在此加入更多穴位名稱及其對應座標
     };
 
@@ -89,9 +91,9 @@
                 const bounds = [[0,0],[h,w]];
                 L.imageOverlay(img.src, bounds).addTo(map);
                 // 計算當前容器下讓圖片恰好塞滿視窗的基礎縮放值
-                    const baseZoom = map.getBoundsZoom(bounds);
-                    // 使用基礎縮放值即可讓圖片完整填滿容器，避免縮小過多導致圖片顯得過於迷你
-                    const initialZoom = baseZoom;
+                const baseZoom = map.getBoundsZoom(bounds);
+                // 為確保能完整看到圖片，將初始縮放再降低一級；這樣在較窄容器時也能完整顯示整張圖
+                const initialZoom = baseZoom - 1;
                 // 設定最小縮放等於計算後的初始縮放值，禁止再往下縮
                 if (typeof map.setMinZoom === 'function') {
                     map.setMinZoom(initialZoom);
