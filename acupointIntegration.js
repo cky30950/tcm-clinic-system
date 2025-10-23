@@ -88,26 +88,34 @@
                 });
                 const bounds = [[0,0],[h,w]];
                 L.imageOverlay(img.src, bounds).addTo(map);
-                // 計算當前容器下讓圖片恰好塞滿視窗的基礎縮放值
+                // 設定邊界與黏滯度，防止拖出圖片
+                if (typeof map.setMaxBounds === 'function') {
+                    map.setMaxBounds(bounds);
+                }
+                map.options.maxBoundsViscosity = 1.0;
+
+                // 計算初始縮放層級：使用 getBoundsZoom 使圖片完全置入地圖容器
+                // Leaflet 的 Simple CRS 為非經緯度投影，zoom 等級為非負整數。getBoundsZoom
+                // 會返回可以容納該範圍的最大 zoom。如果容器比例與圖片不同，可能留下空白，但
+                // 仍能確保圖片完整可見。此處不提供 inside=true，以防止因比例差導致圖片裁切。
                 const baseZoom = map.getBoundsZoom(bounds);
-                // 為確保能完整看到圖片，將初始縮放再降低一級；這樣在較窄容器時也能完整顯示整張圖
-                const initialZoom = baseZoom - 1;
-                // 設定最小縮放等於計算後的初始縮放值，禁止再往下縮
+                // 初始 zoom 使用 baseZoom，確保一進頁面就能看到整張圖。
+                const initialZoom = baseZoom;
+                // 設定最小縮放為 initialZoom，防止再縮小導致留白或視圖跑到外部。
                 if (typeof map.setMinZoom === 'function') {
                     map.setMinZoom(initialZoom);
                 } else {
                     map.options.minZoom = initialZoom;
                 }
-                // 設定地圖最大邊界，限制圖片邊界以外的拖動
-                if (typeof map.setMaxBounds === 'function') {
-                    map.setMaxBounds(bounds);
+                // 使用者最多可放大多少層級，此處提供 3 級放大空間，可視需要調整。
+                const maxZoomLevel = initialZoom + 3;
+                if (typeof map.setMaxZoom === 'function') {
+                    map.setMaxZoom(maxZoomLevel);
+                } else {
+                    map.options.maxZoom = maxZoomLevel;
                 }
-                // 增加邊界黏滯度，使地圖邊緣更難被拖離
-                map.options.maxBoundsViscosity = 1.0;
-                // 將地圖視圖移到圖片中心並套用初始縮放，讓頁面載入時就能看到整張圖
-                const centerLat = h / 2;
-                const centerLon = w / 2;
-                map.setView([centerLat, centerLon], initialZoom);
+                // 將視圖定位在圖像中心，並使用 initialZoom 作為預設縮放。
+                map.setView([h / 2, w / 2], initialZoom);
                 // 從全域環境取得 acupointLibrary：使用全域變數或 window 屬性
                 let library;
                 try {
