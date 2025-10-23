@@ -81,7 +81,7 @@
                 const h = img.height;
                 const map = L.map(mapContainer, {
                     crs: L.CRS.Simple,
-                    minZoom: -1,
+                    // 不設定 minZoom，初始化後根據圖片尺寸計算
                     maxZoom: 4,
                     zoomControl: false,
                     attributionControl: false
@@ -89,6 +89,19 @@
                 const bounds = [[0,0],[h,w]];
                 L.imageOverlay(img.src, bounds).addTo(map);
                 map.fitBounds(bounds);
+                // 將最小縮放層級鎖定為目前顯示全圖的層級，避免縮小超過原始大小
+                const initialZoom = map.getZoom();
+                if (typeof map.setMinZoom === 'function') {
+                    map.setMinZoom(initialZoom);
+                } else {
+                    map.options.minZoom = initialZoom;
+                }
+                // 設定地圖最大邊界，限制圖片邊界以外的拖動
+                if (typeof map.setMaxBounds === 'function') {
+                    map.setMaxBounds(bounds);
+                }
+                // 增加邊界黏滯度，使地圖邊緣更難被拖離
+                map.options.maxBoundsViscosity = 1.0;
                 // 從全域環境取得 acupointLibrary：使用全域變數或 window 屬性
                 let library;
                 try {
