@@ -13,8 +13,9 @@
      * 若未提供某穴位的座標，將不在地圖上繪製該點。
      */
     const ACUPOINT_COORDS = {
-        // 範例：中府穴，位置位於圖像寬度 50%、高度 30% 之處
-        '中府': { x: 0.5, y: 0.3 }
+        // 中府（手太陰肺經的募穴），位於胸外側部，約圖像寬度的 15%、高度的 23% 處。
+        // 如需調整位置，可修改 x, y 值（0~1 之間），其中 x 越大越靠右、y 越大越靠下。
+        '中府': { x: 0.15, y: 0.23 }
         // 在此加入更多穴位名稱及其對應座標
     };
 
@@ -100,7 +101,14 @@
                         if (ac && typeof ac.x === 'number' && typeof ac.y === 'number') {
                             const lat = h * ac.y;
                             const lon = w * ac.x;
-                            const marker = L.marker([lat, lon]).addTo(map);
+                            // 使用 circleMarker 以小圓點表示穴位，避免標記遮住穴位本身
+                            const marker = L.circleMarker([lat, lon], {
+                                radius: 4,
+                                color: '#2563eb',      // 外框顏色（藍色）
+                                weight: 0,
+                                fillColor: '#2563eb',   // 填充顏色
+                                fillOpacity: 0.85
+                            }).addTo(map);
                             let content = '';
                             try {
                                 if (typeof getAcupointTooltipContent === 'function') {
