@@ -172,6 +172,44 @@
                         }
                     });
                 }
+
+                // 在地圖上顯示滑鼠座標，方便判斷穴位位置
+                try {
+                    // 確保容器為相對定位，以便絕對定位的座標顯示元素正確對齊
+                    if (!mapContainer.style.position) {
+                        mapContainer.style.position = 'relative';
+                    }
+                    const coordDiv = document.createElement('div');
+                    coordDiv.id = 'coordinateDisplay';
+                    coordDiv.style.position = 'absolute';
+                    coordDiv.style.bottom = '8px';
+                    coordDiv.style.left = '8px';
+                    coordDiv.style.padding = '2px 4px';
+                    coordDiv.style.fontSize = '12px';
+                    coordDiv.style.background = 'rgba(255, 255, 255, 0.7)';
+                    coordDiv.style.borderRadius = '4px';
+                    coordDiv.style.pointerEvents = 'none';
+                    coordDiv.style.color = '#000';
+                    mapContainer.appendChild(coordDiv);
+                    // 更新座標顯示函式
+                    map.on('mousemove', function(ev) {
+                        const lat = ev.latlng.lat;
+                        const lon = ev.latlng.lng;
+                        // 只在滑鼠位於圖像範圍內時顯示座標
+                        if (lat >= 0 && lat <= h && lon >= 0 && lon <= w) {
+                            const relX = (lon / w).toFixed(4);
+                            const relY = (lat / h).toFixed(4);
+                            coordDiv.textContent = 'x: ' + relX + ', y: ' + relY;
+                        } else {
+                            coordDiv.textContent = '';
+                        }
+                    });
+                    map.on('mouseout', function() {
+                        coordDiv.textContent = '';
+                    });
+                } catch (coordErr) {
+                    console.warn('Failed to add coordinate display:', coordErr);
+                }
             };
             img.onerror = function() {
                 console.warn('Cannot load image for acupoint map');
