@@ -193,12 +193,12 @@
                     coordDiv.style.zIndex = '1000';
                     mapContainer.appendChild(coordDiv);
                     // 使用 layerPoint 取得相對於圖像的像素座標，計算相對比例
-                    // 在滑鼠移動時，使用 latlng 取得影像對應的座標，lat 為 y 座標需取負值
+                    // 在滑鼠移動時，使用 latlng 取得影像對應的座標，lat 為 y 座標（向下遞增）
                     map.on('mousemove', function(ev) {
                         // ev.latlng.lng 對應圖片的 x 像素座標，範圍 [0, w]
-                        // ev.latlng.lat 為圖片的 y 座標（反向），範圍 [0, -h]
+                        // ev.latlng.lat 對應圖片的 y 像素座標（上方為 0，向下增加）
                         let xCoord = ev.latlng.lng;
-                        let yCoord = -ev.latlng.lat;
+                        let yCoord = ev.latlng.lat;
                         // 將座標限制在圖片有效範圍
                         xCoord = Math.min(Math.max(xCoord, 0), w);
                         yCoord = Math.min(Math.max(yCoord, 0), h);
