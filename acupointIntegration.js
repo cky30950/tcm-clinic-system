@@ -85,9 +85,7 @@
                     // 不設定 minZoom，初始化後根據圖片尺寸計算
                     maxZoom: 4,
                     zoomControl: false,
-                    attributionControl: false,
-                    // 禁用鍵盤導航，避免地圖在獲得焦點時使頁面捲動
-                    keyboard: false
+                    attributionControl: false
                 });
                 const bounds = [[0,0],[h,w]];
                 L.imageOverlay(img.src, bounds).addTo(map);
@@ -164,8 +162,7 @@
                                 } else {
                                     // 若沒有自訂提示框，則使用 Leaflet 的彈窗與工具提示
                                     if (typeof marker.bindPopup === 'function') {
-                                        // 禁用 autopan 以避免彈窗打開時觸發地圖自動平移
-                                        marker.bindPopup(html, { autoPan: false });
+                                        marker.bindPopup(html);
                                     }
                                     if (typeof marker.bindTooltip === 'function') {
                                         marker.bindTooltip(html, { direction: 'top', offset: [0, -10], opacity: 0.9 });
@@ -177,21 +174,24 @@
                 }
 
                 // 在地圖上顯示滑鼠座標，方便判斷穴位位置。
-                // 將顯示元素放入 overlayPane 中，避免影響頁面佈局或觸發自動捲動。
+                // 使用 Leaflet 控制元件而非絕對定位，以避免干擾地圖布局。
                 try {
-                    const coordDiv = L.DomUtil.create('div', 'acupoint-coordinate-display', map.getPanes().overlayPane);
-                    coordDiv.id = 'coordinateDisplay';
-                    // 採用絕對定位，固定在左下角
-                    coordDiv.style.position = 'absolute';
-                    coordDiv.style.bottom = '8px';
-                    coordDiv.style.left = '8px';
-                    coordDiv.style.padding = '2px 4px';
-                    coordDiv.style.fontSize = '12px';
-                    coordDiv.style.background = 'rgba(255, 255, 255, 0.7)';
-                    coordDiv.style.borderRadius = '4px';
-                    coordDiv.style.color = '#000';
-                    coordDiv.style.pointerEvents = 'none';
-                    coordDiv.style.whiteSpace = 'nowrap';
+                    // 自訂一個控制元件放在左下角
+                    const coordControl = L.control({ position: 'bottomleft' });
+                    coordControl.onAdd = function() {
+                        // 建立顯示容器
+                        const div = L.DomUtil.create('div', 'leaflet-coordinate-display');
+                        div.id = 'coordinateDisplay';
+                        div.style.padding = '2px 4px';
+                        div.style.fontSize = '12px';
+                        div.style.background = 'rgba(255, 255, 255, 0.7)';
+                        div.style.borderRadius = '4px';
+                        div.style.color = '#000';
+                        div.style.pointerEvents = 'none';
+                        return div;
+                    };
+                    coordControl.addTo(map);
+                    const coordDiv = coordControl.getContainer();
                     // 監聽滑鼠移動事件，計算相對座標
                     map.on('mousemove', function(ev) {
                         let xCoord = ev.latlng.lng;
@@ -209,20 +209,6 @@
                     });
                 } catch (coordErr) {
                     console.warn('Failed to add coordinate display:', coordErr);
-                }
-
-                // 覆寫 Leaflet 預設的抓取游標，只修改 grab 狀態以避免遮住穴位
-                try {
-                    const style = document.createElement('style');
-                    style.textContent = `
-                        #acupointMap .leaflet-grab,
-                        #acupointMap .leaflet-grabbing {
-                            cursor: default !important;
-                        }
-                    `;
-                    document.head.appendChild(style);
-                } catch (cursorErr) {
-                    console.warn('Failed to apply cursor override:', cursorErr);
                 }
             };
             img.onerror = function() {
