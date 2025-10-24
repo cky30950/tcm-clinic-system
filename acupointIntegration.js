@@ -173,30 +173,27 @@
                     });
                 }
 
-                // 在地圖上顯示滑鼠座標，方便判斷穴位位置
+                // 在地圖上顯示滑鼠座標，方便判斷穴位位置。
+                // 使用 Leaflet 控制元件而非絕對定位，以避免干擾地圖布局。
                 try {
-                    // 確保容器為相對定位，以便絕對定位的座標顯示元素正確對齊
-                    mapContainer.style.position = 'relative';
-                    const coordDiv = document.createElement('div');
-                    coordDiv.id = 'coordinateDisplay';
-                    coordDiv.style.position = 'absolute';
-                    // 將座標顯示在左下角，避免遮擋地圖內容
-                    coordDiv.style.bottom = '8px';
-                    coordDiv.style.left = '8px';
-                    coordDiv.style.padding = '2px 4px';
-                    coordDiv.style.fontSize = '12px';
-                    coordDiv.style.background = 'rgba(255, 255, 255, 0.7)';
-                    coordDiv.style.borderRadius = '4px';
-                    coordDiv.style.pointerEvents = 'none';
-                    coordDiv.style.color = '#000';
-                    // 調高層級，確保文字不被地圖覆蓋
-                    coordDiv.style.zIndex = '1000';
-                    mapContainer.appendChild(coordDiv);
-                    // 使用 layerPoint 取得相對於圖像的像素座標，計算相對比例
-                    // 在滑鼠移動時，使用 latlng 取得影像對應的座標，lat 為 y 座標（向下遞增）
+                    // 自訂一個控制元件放在左下角
+                    const coordControl = L.control({ position: 'bottomleft' });
+                    coordControl.onAdd = function() {
+                        // 建立顯示容器
+                        const div = L.DomUtil.create('div', 'leaflet-coordinate-display');
+                        div.id = 'coordinateDisplay';
+                        div.style.padding = '2px 4px';
+                        div.style.fontSize = '12px';
+                        div.style.background = 'rgba(255, 255, 255, 0.7)';
+                        div.style.borderRadius = '4px';
+                        div.style.color = '#000';
+                        div.style.pointerEvents = 'none';
+                        return div;
+                    };
+                    coordControl.addTo(map);
+                    const coordDiv = coordControl.getContainer();
+                    // 監聽滑鼠移動事件，計算相對座標
                     map.on('mousemove', function(ev) {
-                        // ev.latlng.lng 對應圖片的 x 像素座標，範圍 [0, w]
-                        // ev.latlng.lat 對應圖片的 y 像素座標（上方為 0，向下增加）
                         let xCoord = ev.latlng.lng;
                         let yCoord = ev.latlng.lat;
                         // 將座標限制在圖片有效範圍
@@ -206,8 +203,8 @@
                         const relY = (yCoord / h).toFixed(4);
                         coordDiv.textContent = 'x: ' + relX + ', y: ' + relY;
                     });
-                    // 當滑鼠移出整個地圖容器時，清空座標顯示；若僅在地圖邊緣滑動，仍保留座標
-                    mapContainer.addEventListener('mouseleave', function() {
+                    // 當滑鼠離開地圖時清空顯示
+                    map.on('mouseout', function() {
                         coordDiv.textContent = '';
                     });
                 } catch (coordErr) {
