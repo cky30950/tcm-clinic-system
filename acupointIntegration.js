@@ -174,24 +174,21 @@
                 }
 
                 // 在地圖上顯示滑鼠座標，方便判斷穴位位置。
-                // 使用 Leaflet 控制元件而非絕對定位，以避免干擾地圖布局。
+                // 將顯示元素放入 overlayPane 中，避免影響頁面佈局或觸發自動捲動。
                 try {
-                    // 自訂一個控制元件放在左下角
-                    const coordControl = L.control({ position: 'bottomleft' });
-                    coordControl.onAdd = function() {
-                        // 建立顯示容器
-                        const div = L.DomUtil.create('div', 'leaflet-coordinate-display');
-                        div.id = 'coordinateDisplay';
-                        div.style.padding = '2px 4px';
-                        div.style.fontSize = '12px';
-                        div.style.background = 'rgba(255, 255, 255, 0.7)';
-                        div.style.borderRadius = '4px';
-                        div.style.color = '#000';
-                        div.style.pointerEvents = 'none';
-                        return div;
-                    };
-                    coordControl.addTo(map);
-                    const coordDiv = coordControl.getContainer();
+                    const coordDiv = L.DomUtil.create('div', 'acupoint-coordinate-display', map.getPanes().overlayPane);
+                    coordDiv.id = 'coordinateDisplay';
+                    // 採用絕對定位，固定在左下角
+                    coordDiv.style.position = 'absolute';
+                    coordDiv.style.bottom = '8px';
+                    coordDiv.style.left = '8px';
+                    coordDiv.style.padding = '2px 4px';
+                    coordDiv.style.fontSize = '12px';
+                    coordDiv.style.background = 'rgba(255, 255, 255, 0.7)';
+                    coordDiv.style.borderRadius = '4px';
+                    coordDiv.style.color = '#000';
+                    coordDiv.style.pointerEvents = 'none';
+                    coordDiv.style.whiteSpace = 'nowrap';
                     // 監聽滑鼠移動事件，計算相對座標
                     map.on('mousemove', function(ev) {
                         let xCoord = ev.latlng.lng;
@@ -211,15 +208,10 @@
                     console.warn('Failed to add coordinate display:', coordErr);
                 }
 
-                // 將地圖容器與拖動狀態的游標設為預設箭頭，避免 Leaflet 預設的抓取手勢遮擋穴位
+                // 覆寫 Leaflet 預設的抓取游標，只修改 grab 狀態以避免遮住穴位
                 try {
                     const style = document.createElement('style');
-                    // 只針對穴位圖容器覆寫 Leaflet 的抓取手勢游標
                     style.textContent = `
-                        /* 覆寫 Leaflet 預設抓取手勢，統一顯示為箭頭游標 */
-                        #acupointMap .leaflet-container {
-                            cursor: default !important;
-                        }
                         #acupointMap .leaflet-grab,
                         #acupointMap .leaflet-grabbing {
                             cursor: default !important;
