@@ -203,6 +203,20 @@
                 try {
                     const mapEl = map.getContainer();
                     if (mapEl) {
+                        // 確保地圖容器是相對定位，這樣絕對定位的座標顯示才能依附於地圖，不會導致版面移動
+                        try {
+                            const computedStyle = window.getComputedStyle(mapEl);
+                            const pos = computedStyle ? computedStyle.position : mapEl.style.position;
+                            if (!pos || pos === 'static') {
+                                // 若沒有設定位罝則改為 relative
+                                mapEl.style.position = 'relative';
+                            }
+                        } catch (_posErr) {
+                            // 若無法讀取樣式仍嘗試將定位設為 relative
+                            if (!mapEl.style.position) {
+                                mapEl.style.position = 'relative';
+                            }
+                        }
                         // 若尚未存在 coordinateDisplay，則建立一個新的
                         let coordDiv = mapEl.querySelector('#coordinateDisplay');
                         if (!coordDiv) {
