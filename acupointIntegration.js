@@ -109,6 +109,30 @@
                 const centerLat = h / 2;
                 const centerLon = w / 2;
                 map.setView([centerLat, centerLon], initialZoom);
+
+                // 調整滑鼠指標樣式
+                //
+                // Leaflet 預設會在可拖動的地圖容器上套用 ``cursor: grab`` 或 ``cursor: grabbing``
+                // 的 CSS，這類手掌圖示在穴位圖上顯得較大且可能遮擋穴位位置。
+                // 為了改善使用體驗，這裡主動指定地圖容器的 cursor，並在拖曳開始/結束
+                // 時保持一致。您可以依需求將 'crosshair' 改為其他指標名稱，例如
+                // 'default'、'move' 或 'pointer'，以取得最合適的效果。
+                try {
+                    const mapEl = map.getContainer();
+                    if (mapEl && mapEl.style) {
+                        // 使用十字線指標，較小且不會遮擋穴位
+                        mapEl.style.cursor = 'crosshair';
+                        // 在拖拉開始與結束時維持相同的指標樣式
+                        map.on('dragstart', function() {
+                            mapEl.style.cursor = 'crosshair';
+                        });
+                        map.on('dragend', function() {
+                            mapEl.style.cursor = 'crosshair';
+                        });
+                    }
+                } catch (_cursorErr) {
+                    // 若因未知原因無法設定指標，不影響主要功能
+                }
                 // 從全域環境取得 acupointLibrary：使用全域變數或 window 屬性
                 let library;
                 try {
