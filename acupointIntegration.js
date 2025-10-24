@@ -198,39 +198,48 @@
                 }
 
                 // 在地圖上顯示滑鼠座標，方便判斷穴位位置。
-                // 使用 Leaflet 控制元件而非絕對定位，以避免干擾地圖布局。
+                // 先嘗試在地圖容器內創建一個絕對定位的元素，避免控制元件改變地圖高度。
+                // 使用絕對定位可確保不會推擠原本的布局，解決顯示座標時畫面下移的問題。
                 try {
-                    // 自訂一個控制元件放在左下角
-                    const coordControl = L.control({ position: 'bottomleft' });
-                    coordControl.onAdd = function() {
-                        // 建立顯示容器
-                        const div = L.DomUtil.create('div', 'leaflet-coordinate-display');
-                        div.id = 'coordinateDisplay';
-                        div.style.padding = '2px 4px';
-                        div.style.fontSize = '12px';
-                        div.style.background = 'rgba(255, 255, 255, 0.7)';
-                        div.style.borderRadius = '4px';
-                        div.style.color = '#000';
-                        div.style.pointerEvents = 'none';
-                        return div;
-                    };
-                    coordControl.addTo(map);
-                    const coordDiv = coordControl.getContainer();
-                    // 監聽滑鼠移動事件，計算相對座標
-                    map.on('mousemove', function(ev) {
-                        let xCoord = ev.latlng.lng;
-                        let yCoord = ev.latlng.lat;
-                        // 將座標限制在圖片有效範圍
-                        xCoord = Math.min(Math.max(xCoord, 0), w);
-                        yCoord = Math.min(Math.max(yCoord, 0), h);
-                        const relX = (xCoord / w).toFixed(4);
-                        const relY = (yCoord / h).toFixed(4);
-                        coordDiv.textContent = 'x: ' + relX + ', y: ' + relY;
-                    });
-                    // 當滑鼠離開地圖時清空顯示
-                    map.on('mouseout', function() {
-                        coordDiv.textContent = '';
-                    });
+                    const mapEl = map.getContainer();
+                    if (mapEl) {
+                        // 若尚未存在 coordinateDisplay，則建立一個新的
+                        let coordDiv = mapEl.querySelector('#coordinateDisplay');
+                        if (!coordDiv) {
+                            coordDiv = document.createElement('div');
+                            coordDiv.id = 'coordinateDisplay';
+                            coordDiv.className = 'leaflet-coordinate-display';
+                            // 以絕對定位固定在左下角
+                            coordDiv.style.position = 'absolute';
+                            coordDiv.style.left = '8px';
+                            coordDiv.style.bottom = '8px';
+                            coordDiv.style.padding = '2px 4px';
+                            coordDiv.style.fontSize = '12px';
+                            coordDiv.style.background = 'rgba(255, 255, 255, 0.7)';
+                            coordDiv.style.borderRadius = '4px';
+                            coordDiv.style.color = '#000';
+                            coordDiv.style.pointerEvents = 'none';
+                            coordDiv.style.whiteSpace = 'nowrap';
+                            // 提高 z-index 以避免被其他元素遮蔽
+                            coordDiv.style.zIndex = '1000';
+                            mapEl.appendChild(coordDiv);
+                        }
+                        // 監聽滑鼠移動事件，計算相對座標
+                        map.on('mousemove', function(ev) {
+                            let xCoord = ev.latlng.lng;
+                            let yCoord = ev.latlng.lat;
+                            // 將座標限制在圖片有效範圍
+                            xCoord = Math.min(Math.max(xCoord, 0), w);
+                            yCoord = Math.min(Math.max(yCoord, 0), h);
+                            const relX = (xCoord / w).toFixed(4);
+                            const relY = (yCoord / h).toFixed(4);
+                            coordDiv.textContent = 'x: ' + relX + ', y: ' + relY;
+                        });
+                        // 當滑鼠離開地圖時清空顯示
+                        map.on('mouseout', function() {
+                            coordDiv.textContent = '';
+                        });
+                    }
                 } catch (coordErr) {
                     console.warn('Failed to add coordinate display:', coordErr);
                 }
