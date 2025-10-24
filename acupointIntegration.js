@@ -85,7 +85,9 @@
                     // 不設定 minZoom，初始化後根據圖片尺寸計算
                     maxZoom: 4,
                     zoomControl: false,
-                    attributionControl: false
+                    attributionControl: false,
+                    // 禁用鍵盤導航，避免地圖在獲得焦點時使頁面捲動
+                    keyboard: false
                 });
                 const bounds = [[0,0],[h,w]];
                 L.imageOverlay(img.src, bounds).addTo(map);
@@ -162,7 +164,8 @@
                                 } else {
                                     // 若沒有自訂提示框，則使用 Leaflet 的彈窗與工具提示
                                     if (typeof marker.bindPopup === 'function') {
-                                        marker.bindPopup(html);
+                                        // 禁用 autopan 以避免彈窗打開時觸發地圖自動平移
+                                        marker.bindPopup(html, { autoPan: false });
                                     }
                                     if (typeof marker.bindTooltip === 'function') {
                                         marker.bindTooltip(html, { direction: 'top', offset: [0, -10], opacity: 0.9 });
