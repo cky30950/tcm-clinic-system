@@ -210,6 +210,25 @@
                 } catch (coordErr) {
                     console.warn('Failed to add coordinate display:', coordErr);
                 }
+
+                // 將地圖容器與拖動狀態的游標設為預設箭頭，避免 Leaflet 預設的抓取手勢遮擋穴位
+                try {
+                    const style = document.createElement('style');
+                    // 只針對穴位圖容器覆寫 Leaflet 的抓取手勢游標
+                    style.textContent = `
+                        /* 覆寫 Leaflet 預設抓取手勢，統一顯示為箭頭游標 */
+                        #acupointMap .leaflet-container {
+                            cursor: default !important;
+                        }
+                        #acupointMap .leaflet-grab,
+                        #acupointMap .leaflet-grabbing {
+                            cursor: default !important;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                } catch (cursorErr) {
+                    console.warn('Failed to apply cursor override:', cursorErr);
+                }
             };
             img.onerror = function() {
                 console.warn('Cannot load image for acupoint map');
