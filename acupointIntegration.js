@@ -37,6 +37,99 @@
         // 在此加入更多穴位名稱及其對應座標
     };
 
+    /*
+     * 以下為簡繁字形轉換表，用於在讀取穴位座標時支援同一穴位名稱的不同寫法。
+     * 部分穴位名稱在資料庫中可能採用簡體字，例如「云门」而非「雲門」。
+     * 為避免因字形差異導致座標無法套用，這裡定義了簡繁對應關係，
+     * 並在初始化時自動為 ACUPOINT_COORDS 增加對應的同義鍵。
+     */
+    const CHAR_TO_SIMPLIFIED = {
+        '雲': '云',
+        '門': '门',
+        '處': '处',
+        '頭': '头',
+        '臨': '临',
+        '維': '维',
+        '頜': '颌',
+        '厭': '厌',
+        '陽': '阳',
+        '攢': '攒',
+        // 「衝」與「沖」皆可對應為「冲」，故統一轉為簡體「冲」。
+        '衝': '冲',
+        '沖': '冲'
+    };
+    const CHAR_TO_TRADITIONAL = {
+        '云': ['雲'],
+        '门': ['門'],
+        '处': ['處'],
+        '头': ['頭'],
+        '临': ['臨'],
+        '维': ['維'],
+        '颌': ['頜'],
+        '厌': ['厭'],
+        '阳': ['陽'],
+        '攒': ['攢'],
+        // 「冲」可對應到「沖」與「衝」兩個繁體字，故提供兩種可能。
+        '冲': ['沖', '衝']
+    };
+
+    /**
+     * 將傳入字串中的繁體字轉為對應的簡體字。
+     * 未出現在對照表中的字符將保持不變。
+     * @param {string} str - 原始穴位名稱
+     * @returns {string} 轉換為簡體字的名稱
+     */
+    function toSimplifiedName(str) {
+        return Array.from(str).map(ch => CHAR_TO_SIMPLIFIED[ch] || ch).join('');
+    }
+
+    /**
+     * 將傳入字串中的簡體字轉換成所有可能的繁體字組合。
+     * 若某字符在對照表中有多個繁體對應，將列舉出所有組合可能。
+     * 例如「眉冲」可對應到「眉沖」與「眉衝」。
+     * @param {string} str - 原始穴位名稱
+     * @returns {string[]} 轉換為繁體字的所有可能名稱陣列
+     */
+    function toTraditionalNames(str) {
+        let results = [''];
+        for (const ch of str) {
+            const trads = CHAR_TO_TRADITIONAL[ch];
+            if (trads && trads.length) {
+                const newRes = [];
+                for (const prefix of results) {
+                    for (const t of trads) {
+                        newRes.push(prefix + t);
+                    }
+                }
+                results = newRes;
+            } else {
+                results = results.map(prefix => prefix + ch);
+            }
+        }
+        return results;
+    }
+
+    // 根據簡繁轉換表為 ACUPOINT_COORDS 增加同義鍵。
+    // 這樣可以同時支援簡體與繁體名稱，也能支援「冲」對應到「沖」「衝」的情形。
+    (function generateSynonyms() {
+        // 取得目前所有鍵的列表，以避免在迭代過程中處理新增的鍵
+        const originalEntries = Object.entries(ACUPOINT_COORDS);
+        for (const [name, coords] of originalEntries) {
+            // 將原始名稱轉為簡體
+            const simplified = toSimplifiedName(name);
+            if (simplified && !(simplified in ACUPOINT_COORDS)) {
+                ACUPOINT_COORDS[simplified] = coords;
+            }
+            // 將原始名稱轉為所有可能的繁體名稱
+            const traditionals = toTraditionalNames(name);
+            for (const trad of traditionals) {
+                if (trad && !(trad in ACUPOINT_COORDS)) {
+                    ACUPOINT_COORDS[trad] = coords;
+                }
+            }
+        }
+    })();
+
     /**
      * 將座標資料套用至全域 acupointLibrary。
      * 只有當 acupointLibrary 為陣列且項目沒有 x/y 屬性時才會套用。
@@ -61,8 +154,18 @@
                 if (ac) {
                     // 取得穴位名稱，並移除括號及其後內容（例如 國際代碼）
                     const rawName = ac.name || '';
-                    const key = String(rawName).replace(/\s*\(.*\)$/, '');
-                    const coords = ACUPOINT_COORDS[key];
+                    // 清理名稱：移除括號及其內容，例如「眉冲 (GB13)」->「眉冲」
+                    const cleanedName = String(rawName).replace(/\s*\(.*\)$/, '');
+                    // 先直接查找座標；若找不到，再將名稱轉為簡體後查找。
+                    let coords = ACUPOINT_COORDS[cleanedName];
+                    if (!coords) {
+                        try {
+                            const simplifiedKey = toSimplifiedName(cleanedName);
+                            coords = ACUPOINT_COORDS[simplifiedKey];
+                        } catch (_normErr) {
+                            coords = undefined;
+                        }
+                    }
                     if (coords) {
                         // 如果尚未定義 x 或 y，則套用座標；避免覆蓋已有資料
                         if (typeof ac.x !== 'number') {
