@@ -888,7 +888,7 @@
   },
   {
     "id": 42,
-    "name": "氣捨",
+    "name": "氣舍",
     "meridian": "足陽明胃經",
     "location": "頸部，鎖骨上窩中央，胸鎖乳突肌胸骨頭與鎖骨頭之間",
     "functions": [
@@ -7167,5 +7167,17 @@
     "category": "督脈穴",
     "englishName": "Duiduan (Tip of the Mouth)",
     "internationalCode": "DU-27"
+  },
+  {
+    "id": 334,
+    "name": "素髎",
+    "meridian": "督脈",
+    "location": "面部，鼻尖正中央",
+    "functions": ["開竅醒神", "清熱消腫"],
+    "indications": ["昏迷", "驚厥", "鼻塞", "鼻衄", "酒糟鼻"],
+    "method": "向上斜刺0.3-0.5寸，或點刺出血",
+    "category": "督脈穴",
+    "englishName": "Suliao (Plain Bone-Hole)",
+    "internationalCode": "DU-25"
   }
 ]
