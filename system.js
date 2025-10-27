@@ -6837,7 +6837,7 @@ async function loadConsultationForEdit(consultationId) {
             document.getElementById('formSymptoms').value = consultation.symptoms || '';
             document.getElementById('formTongue').value = consultation.tongue || '';
             document.getElementById('formPulse').value = consultation.pulse || '';
-            document.getElementById('formCurrentHistory').value = consultation.currentHistory || '';
+            // formCurrentHistory 用於顯示過往診症摘要，不應在編輯模式中被覆蓋。舊資料的現病史已與主訴合併，故不載入至此欄位。
             document.getElementById('formDiagnosis').value = consultation.diagnosis || '';
             document.getElementById('formSyndrome').value = consultation.syndrome || '';
             {
@@ -7966,17 +7966,20 @@ async function showConsultationForm(appointment) {
                     }
                 }
             }
-            // 根據問診資料填充現病史欄位
+            // 根據問診資料填充現病史內容
+            // 診症系統已將「主訴」與「現病史」合併至 formSymptoms 欄位，
+            // 因此將現病史摘要直接追加至主訴欄位，而不再寫入過往記錄欄位（formCurrentHistory）。
             if (inquiryDataForPrefill) {
-                const historyField = document.getElementById('formCurrentHistory');
-                if (historyField) {
-                    const historySummary = generateHistorySummaryFromInquiry(inquiryDataForPrefill);
-                    if (historySummary) {
-                        const currentHistory = historyField.value ? historyField.value.trim() : '';
-                        if (!currentHistory) {
-                            historyField.value = historySummary;
+                const historySummary = generateHistorySummaryFromInquiry(inquiryDataForPrefill);
+                if (historySummary) {
+                    // 將現病史內容與主訴內容合併
+                    const symptomsEl = document.getElementById('formSymptoms');
+                    if (symptomsEl) {
+                        const currentVal = symptomsEl.value ? symptomsEl.value.trim() : '';
+                        if (!currentVal) {
+                            symptomsEl.value = historySummary;
                         } else {
-                            historyField.value = currentHistory + '\n' + historySummary;
+                            symptomsEl.value = currentVal + '\n' + historySummary;
                         }
                     }
                 }
@@ -15724,10 +15727,25 @@ const consultationDate = (() => {
             // 若需要再次顯示確認提示，可重新加入 confirm 相關程式碼。
             
             // 載入診症資料
-            document.getElementById('formSymptoms').value = consultation.symptoms || '';
+            // 載入診症資料
+            // 主訴及現病史統一寫入 formSymptoms；若舊紀錄仍使用 currentHistory 儲存現病史，則合併
+            const symptomsEl2 = document.getElementById('formSymptoms');
+            if (symptomsEl2) {
+                const symptomsVal = consultation.symptoms || '';
+                const histVal = consultation.currentHistory || '';
+                if (symptomsVal && histVal) {
+                    symptomsEl2.value = symptomsVal + '\n' + histVal;
+                } else if (symptomsVal) {
+                    symptomsEl2.value = symptomsVal;
+                } else if (histVal) {
+                    symptomsEl2.value = histVal;
+                } else {
+                    symptomsEl2.value = '';
+                }
+            }
             document.getElementById('formTongue').value = consultation.tongue || '';
             document.getElementById('formPulse').value = consultation.pulse || '';
-            document.getElementById('formCurrentHistory').value = consultation.currentHistory || '';
+            // 過往記錄欄位僅顯示既往病歷，不應被覆蓋
             document.getElementById('formDiagnosis').value = consultation.diagnosis || '';
             document.getElementById('formSyndrome').value = consultation.syndrome || '';
                 {
