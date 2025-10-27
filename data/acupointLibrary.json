@@ -7131,5 +7131,41 @@
     "category": "任脈穴",
     "englishName": "Chengjiang (Fluid Receptacle)",
     "internationalCode": "REN-24"
+  },
+  {
+    "id": 331,
+    "name": "璇璣",
+    "meridian": "任脈",
+    "location": "胸部，前正中線上，天突下1寸",
+    "functions": ["寬胸利膈", "清肺止咳"],
+    "indications": ["咳嗽", "氣喘", "胸痛", "咽喉腫痛"],
+    "method": "平刺0.3-0.5寸",
+    "category": "任脈穴",
+    "englishName": "Xuanji (Jade Pivot)",
+    "internationalCode": "REN-21"
+  },
+  {
+    "id": 332,
+    "name": "華蓋",
+    "meridian": "任脈",
+    "location": "胸部，前正中線上，平第1肋間",
+    "functions": ["寬胸理氣", "止咳平喘"],
+    "indications": ["咳嗽", "氣喘", "胸脅脹痛"],
+    "method": "平刺0.3-0.5寸",
+    "category": "任脈穴",
+    "englishName": "Huagai (Ornamental Canopy)",
+    "internationalCode": "REN-20"
+  },
+  {
+    "id": 333,
+    "name": "兌端",
+    "meridian": "督脈",
+    "location": "面部，上唇尖端，人中溝下端皮膚與唇紅交界處",
+    "functions": ["開竅醒神", "清熱解毒"],
+    "indications": ["昏迷", "癲狂", "口歪", "齒痛"],
+    "method": "向上斜刺0.2-0.3寸",
+    "category": "督脈穴",
+    "englishName": "Duiduan (Tip of the Mouth)",
+    "internationalCode": "DU-27"
   }
 ]
