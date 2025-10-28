@@ -104,6 +104,21 @@
       // after a delay so that the UI doesn’t become cluttered. It will be
       // cleared whenever a new preview is displayed to restart the timer.
       this.previewTimer = null;
+
+      // Track the timestamp of the last message preview that has been
+      // displayed to the user. This prevents the preview bubble from
+      // repeatedly showing the same unread messages when the chat is
+      // closed or when the user logs in with existing unread messages.
+      // Only messages with a timestamp greater than this value will
+      // trigger the preview. The value is persisted to localStorage
+      // (see loadLastPreviewedTimestamp/persistLastPreviewedTimestamp)
+      // so that old messages don’t generate a preview across sessions.
+      this.lastPreviewedTimestamp = 0;
+
+      // Bind helper methods for persisting and loading the last previewed
+      // timestamp. These helpers are used in init() and updateChatPreview().
+      this.loadLastPreviewedTimestamp = this.loadLastPreviewedTimestamp.bind(this);
+      this.persistLastPreviewedTimestamp = this.persistLastPreviewedTimestamp.bind(this);
     }
 
     /**
@@ -141,6 +156,22 @@
         this.loadLastSeenTimes();
       } catch (_e) {
         // Ignore errors loading last seen times
+      }
+      // Load the timestamp of the last previewed message so that messages
+      // received before this session do not trigger a preview. If no
+      // timestamp is stored, initialize it to the current time to
+      // suppress previews for existing unread messages. Persist the
+      // initial value so future sessions respect it.
+      try {
+        this.loadLastPreviewedTimestamp();
+        if (!this.lastPreviewedTimestamp || typeof this.lastPreviewedTimestamp !== 'number') {
+          this.lastPreviewedTimestamp = Date.now();
+          if (typeof this.persistLastPreviewedTimestamp === 'function') {
+            this.persistLastPreviewedTimestamp();
+          }
+        }
+      } catch (_e) {
+        // Ignore errors loading preview timestamp
       }
       // Also fetch last seen times from the Realtime Database. This call is
       // asynchronous and will merge any remote data with the locally loaded
@@ -1358,6 +1389,17 @@
       } catch (_err) {
         // Ignore errors during preview determination
       }
+      // Only show the preview for messages that have not already been alerted.
+      // If the timestamp of the latest unread message is not greater than
+      // lastPreviewedTimestamp, treat as no qualifying message so that
+      // the preview does not repeatedly appear for the same messages.
+      if (latestInfo) {
+        const latestTsValue = latestInfo.timestamp || 0;
+        if (!(latestTsValue > (this.lastPreviewedTimestamp || 0))) {
+          // Mark as no latestInfo to trigger hide logic below
+          latestInfo = null;
+        }
+      }
       if (latestInfo) {
         // Build safe HTML for the preview. Escape special characters to
         // prevent injection. Limit message length to a reasonable length.
@@ -1404,6 +1446,12 @@
             this.chatPreview.classList.remove('fade-out');
           }, 300);
         }, 6000);
+        // Update the lastPreviewedTimestamp so this message will not
+        // trigger another preview. Persist to localStorage.
+        this.lastPreviewedTimestamp = latestInfo.timestamp || 0;
+        if (typeof this.persistLastPreviewedTimestamp === 'function') {
+          this.persistLastPreviewedTimestamp();
+        }
       } else {
         // No unread messages or none that qualify; hide preview and clear timer
         if (this.previewTimer) {
@@ -1485,6 +1533,46 @@
         }
       } catch (_e) {
         // Ignore errors reading/parsing localStorage
+      }
+    }
+
+    /**
+     * Persist the lastPreviewedTimestamp to localStorage. This ensures that
+     * the chat preview does not repeatedly show messages that were already
+     * alerted to the user in previous sessions. The timestamp is stored
+     * under a key unique to the current user's UID. Errors accessing
+     * localStorage are silently ignored.
+     */
+    persistLastPreviewedTimestamp() {
+      try {
+        if (!this.currentUserUid) return;
+        const key = `chat_lastPreview_${this.currentUserUid}`;
+        const ts = (typeof this.lastPreviewedTimestamp === 'number') ? this.lastPreviewedTimestamp : 0;
+        localStorage.setItem(key, String(ts));
+      } catch (_e) {
+        // Ignore localStorage errors (e.g. quota exceeded)
+      }
+    }
+
+    /**
+     * Load the lastPreviewedTimestamp from localStorage. If no value is
+     * found or the value is invalid, the timestamp remains zero. This
+     * method should be called after determining the currentUserUid in
+     * init() and before any previews may be displayed. Errors
+     * accessing or parsing localStorage are silently ignored.
+     */
+    loadLastPreviewedTimestamp() {
+      try {
+        if (!this.currentUserUid) return;
+        const key = `chat_lastPreview_${this.currentUserUid}`;
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        const val = parseInt(raw, 10);
+        if (!isNaN(val)) {
+          this.lastPreviewedTimestamp = val;
+        }
+      } catch (_e) {
+        // Ignore localStorage errors
       }
     }
 
