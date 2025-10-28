@@ -196,6 +196,16 @@
                         }
                     }
                 }
+
+    // 將 applyAcupointCoordinates 函式掛載到 window，使其他模組或功能可以手動套用座標資料。
+    // 這在開啟獨立穴位選擇地圖時特別有用，以便確保 acupointLibrary 內的穴位都擁有 x/y 座標可供繪製。
+    try {
+        if (typeof window !== 'undefined') {
+            window.applyAcupointCoordinates = applyAcupointCoordinates;
+        }
+    } catch (_exportErr) {
+        // 若瀏覽器環境不允許設置全域屬性，可忽略此錯誤
+    }
             });
         }
     }

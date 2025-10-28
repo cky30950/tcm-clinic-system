@@ -25536,6 +25536,196 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
   window.addAcupointToNotes = addAcupointToNotes;
   window.clearAcupointNotesSearch = clearAcupointNotesSearch;
 
+  /**
+   * 開啟穴位圖選擇視窗，允許使用者於圖上點選穴位。選取的穴位於按下確認後會
+   * 自動插入至針灸備註欄。此功能使用 SweetAlert2 建立彈窗與 Leaflet
+   * 建立簡易地圖。若尚未載入穴位庫或未套用座標，會先嘗試初始化與套用。
+   */
+  async function openAcupointMapForNotes() {
+    let btn = null;
+    try {
+      // 嘗試取得觸發按鈕，顯示讀取動畫以回饋使用者
+      btn = document.querySelector('button[onclick*="openAcupointMapForNotes"]');
+      if (btn) {
+        try {
+          setButtonLoading(btn);
+        } catch (_er) {}
+      }
+      // 短暫延遲以確保動畫能被看見
+      await new Promise(resolve => setTimeout(resolve, 200));
+      // 確保穴位庫資料已載入
+      try {
+        if (!acupointLibraryLoaded || !Array.isArray(acupointLibrary) || acupointLibrary.length === 0) {
+          await initAcupointLibrary();
+        }
+      } catch (_er) {
+        console.error('初始化穴位庫失敗：', _er);
+      }
+      // 套用座標資料（若未套用）
+      try {
+        if (typeof window.applyAcupointCoordinates === 'function') {
+          window.applyAcupointCoordinates();
+        }
+      } catch (_coordErr) {}
+      // 使用陣列保存使用者選取的穴位名稱
+      const selectedNames = [];
+      // 顯示彈窗；preConfirm 回傳選中的陣列
+      const lang = (localStorage && localStorage.getItem('lang')) || 'zh';
+      const okText = lang && lang.startsWith('en') ? 'OK' : '確定';
+      const cancelText = lang && lang.startsWith('en') ? 'Cancel' : '取消';
+      await Swal.fire({
+        title: lang && lang.startsWith('en') ? 'Select Acupoints' : '選擇穴位',
+        html: '<div id="acupointSelectMapContainer" class="w-full h-96 rounded border border-gray-300"></div>',
+        width: '90%',
+        showCancelButton: true,
+        confirmButtonText: okText,
+        cancelButtonText: cancelText,
+        focusConfirm: false,
+        didOpen: () => {
+          // 初始化地圖並傳入選取陣列
+          try {
+            initAcupointSelectionMap('acupointSelectMapContainer', selectedNames);
+          } catch (initErr) {
+            console.error('初始化穴位選擇地圖錯誤：', initErr);
+          }
+        },
+        preConfirm: () => {
+          // 回傳當前選擇的穴位名稱列表
+          return selectedNames.slice();
+        }
+      }).then(result => {
+        try {
+          if (result && result.value && Array.isArray(result.value)) {
+            result.value.forEach(name => {
+              if (name) {
+                addAcupointToNotes(name);
+              }
+            });
+          }
+        } catch (cbErr) {
+          console.error('加入穴位到備註時發生錯誤：', cbErr);
+        }
+      });
+    } catch (err) {
+      console.error('開啟穴位圖選擇視窗時發生錯誤：', err);
+    } finally {
+      // 清除按鈕讀取狀態
+      if (btn) {
+        try {
+          clearButtonLoading(btn);
+        } catch (_e) {}
+      }
+    }
+  }
+
+  /**
+   * 初始化可互動的穴位地圖，用於穴位選擇彈窗。此函式會在指定容器
+   * 中建立 Leaflet 地圖，並根據 acupointLibrary 中的座標放置標記，
+   * 點擊標記可切換選取狀態。選中的標記會以紅色表示，未選中的標記
+   * 為藍色。選取結果透過 selectedNames 陣列返回。
+   * @param {string} containerId 地圖容器的 ID
+   * @param {string[]} selectedNames 用於儲存選中的穴位名稱的陣列
+   */
+  function initAcupointSelectionMap(containerId, selectedNames) {
+    try {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      // 為避免重複初始化，在容器上打標記
+      if (container.dataset.initialized) {
+        return;
+      }
+      container.dataset.initialized = 'true';
+      // 載入穴位圖圖片後建立地圖
+      const img = new Image();
+      img.src = 'images/combined_three.png';
+      img.onload = function() {
+        const w = img.width;
+        const h = img.height;
+        const map = L.map(container, {
+          crs: L.CRS.Simple,
+          maxZoom: 4,
+          zoomControl: true,
+          attributionControl: false
+        });
+        const bounds = [[0, 0], [h, w]];
+        L.imageOverlay(img.src, bounds).addTo(map);
+        // 計算基礎縮放並略為縮小，以確保整張圖顯示
+        const baseZoom = map.getBoundsZoom(bounds);
+        const initialZoom = baseZoom - 1;
+        if (typeof map.setMinZoom === 'function') {
+          map.setMinZoom(initialZoom);
+        }
+        if (typeof map.setMaxBounds === 'function') {
+          map.setMaxBounds(bounds);
+        }
+        map.options.maxBoundsViscosity = 1.0;
+        map.setView([h / 2, w / 2], initialZoom);
+        // 指標樣式：採用十字線以避免遮擋標記
+        try {
+          const mapEl = map.getContainer();
+          if (mapEl && mapEl.style) {
+            mapEl.style.cursor = 'crosshair';
+            map.on('dragstart', function() {
+              mapEl.style.cursor = 'crosshair';
+            });
+            map.on('dragend', function() {
+              mapEl.style.cursor = 'crosshair';
+            });
+          }
+        } catch (_ignore) {}
+        // 預先定義預設與選中樣式
+        const defaultStyle = { color: '#2563eb', fillColor: '#2563eb', weight: 0, fillOpacity: 0.85, radius: 4 };
+        const selectedStyle = { color: '#dc2626', fillColor: '#dc2626', weight: 0, fillOpacity: 0.85, radius: 5 };
+        // 將座標資料映射至標記
+        (Array.isArray(acupointLibrary) ? acupointLibrary : []).forEach(ac => {
+          if (ac && typeof ac.x === 'number' && typeof ac.y === 'number') {
+            const lat = h * ac.y;
+            const lon = w * ac.x;
+            // 建立圓形標記
+            const marker = L.circleMarker([lat, lon], Object.assign({}, defaultStyle)).addTo(map);
+            marker.acName = ac.name || '';
+            marker.selected = false;
+            // 切換選取狀態並更新陣列與樣式
+            marker.on('click', function() {
+              marker.selected = !marker.selected;
+              if (marker.selected) {
+                marker.setStyle(selectedStyle);
+                if (!selectedNames.includes(marker.acName)) {
+                  selectedNames.push(marker.acName);
+                }
+              } else {
+                marker.setStyle(defaultStyle);
+                const idx = selectedNames.indexOf(marker.acName);
+                if (idx >= 0) selectedNames.splice(idx, 1);
+              }
+            });
+            // 建立提示資訊
+            try {
+              let content = '';
+              if (typeof getAcupointTooltipContent === 'function') {
+                content = getAcupointTooltipContent(marker.acName || '');
+              }
+              if (content) {
+                const html = String(content).replace(/\n/g, '<br>');
+                if (typeof marker.bindTooltip === 'function') {
+                  marker.bindTooltip(html, { direction: 'top', offset: [0, -10], opacity: 0.9 });
+                }
+              }
+            } catch (_toErr) {}
+          }
+        });
+      };
+      img.onerror = function() {
+        console.warn('載入穴位圖影像失敗');
+      };
+    } catch (err) {
+      console.error('初始化穴位選擇地圖失敗：', err);
+    }
+  }
+
+  // 將穴位圖選擇功能掛載至全域，供 HTML 按鈕調用
+  window.openAcupointMapForNotes = openAcupointMapForNotes;
+
           // 初始化
 document.addEventListener('DOMContentLoaded', function() {
             // 初始渲染藥方、穴位與模板列表
