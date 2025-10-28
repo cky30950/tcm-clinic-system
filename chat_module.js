@@ -1313,10 +1313,27 @@
     updateChatPreview() {
       // Do nothing if preview element isn’t present
       if (!this.chatPreview) return;
-      // Always hide the preview if the chat popup is open
+      // Always hide the preview if the chat popup is open. When hiding, apply fade-out.
       const popupHidden = (this.chatPopup && this.chatPopup.classList.contains('hidden'));
       if (!popupHidden) {
-        this.chatPreview.classList.add('hidden');
+        // Clear any existing auto-hide timer
+        if (this.previewTimer) {
+          clearTimeout(this.previewTimer);
+          this.previewTimer = null;
+        }
+        // If preview is currently visible, fade it out then hide
+        if (!this.chatPreview.classList.contains('hidden')) {
+          this.chatPreview.classList.remove('fade-in');
+          this.chatPreview.classList.add('fade-out');
+          // After fade-out completes, hide the preview and remove animation class
+          setTimeout(() => {
+            this.chatPreview.classList.add('hidden');
+            this.chatPreview.classList.remove('fade-out');
+          }, 300);
+        } else {
+          // Ensure hidden state if not visible
+          this.chatPreview.classList.add('hidden');
+        }
         return;
       }
       // Determine the most recent unread message from any channel. Skip
@@ -1358,28 +1375,51 @@
         }
         const safeName = escapeHtml(latestInfo.senderName || '');
         const safeText = escapeHtml(text);
-        // Bold the sender’s name for emphasis. Use span to style text.
-        this.chatPreview.innerHTML = `<strong>${safeName}</strong>: ${safeText}`;
-        this.chatPreview.classList.remove('hidden');
-        // Reset and start timer to auto-hide preview after 6 seconds. This
-        // prevents the preview from lingering indefinitely if the user
-        // doesn’t open the chat. Clear any existing timer first.
+        // Format preview with sender name on top and message below. Use Tailwind classes for styling.
+        // The name is bold and slightly larger; the message is normal weight.
+        this.chatPreview.innerHTML = `
+          <div class="font-medium text-sm text-gray-800 mb-0.5">${safeName}</div>
+          <div class="text-gray-700 text-sm leading-tight break-words">${safeText}</div>
+        `;
+        // Remove any hiding and fade-out classes before showing
+        this.chatPreview.classList.remove('hidden', 'fade-out');
+        // Trigger fade-in animation
+        this.chatPreview.classList.add('fade-in');
+        // Remove fade-in class after animation completes so that future animations can retrigger
+        setTimeout(() => {
+          this.chatPreview.classList.remove('fade-in');
+        }, 300);
+        // Clear any existing timer before starting a new one
         if (this.previewTimer) {
           clearTimeout(this.previewTimer);
         }
+        // Start timer to auto-hide preview after 6 seconds
         this.previewTimer = setTimeout(() => {
-          try {
+          // Initiate fade-out
+          this.chatPreview.classList.remove('fade-in');
+          this.chatPreview.classList.add('fade-out');
+          // After fade-out completes, hide and clean up
+          setTimeout(() => {
             this.chatPreview.classList.add('hidden');
-          } catch (_e) {
-            // ignore if preview element doesn’t exist
-          }
+            this.chatPreview.classList.remove('fade-out');
+          }, 300);
         }, 6000);
       } else {
         // No unread messages or none that qualify; hide preview and clear timer
-        this.chatPreview.classList.add('hidden');
         if (this.previewTimer) {
           clearTimeout(this.previewTimer);
           this.previewTimer = null;
+        }
+        // If preview is visible, fade it out then hide
+        if (!this.chatPreview.classList.contains('hidden')) {
+          this.chatPreview.classList.remove('fade-in');
+          this.chatPreview.classList.add('fade-out');
+          setTimeout(() => {
+            this.chatPreview.classList.add('hidden');
+            this.chatPreview.classList.remove('fade-out');
+          }, 300);
+        } else {
+          this.chatPreview.classList.add('hidden');
         }
       }
     }
