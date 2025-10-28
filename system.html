@@ -841,20 +841,18 @@
                                         <button type="button" onclick="openAcupointCombo(event)" class="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded transition duration-200">📍 載入常用穴位</button>
                                     </div>
                                     <!-- 搜索穴位並添加至針灸備註 -->
-                                    <div class="mb-3 bg-blue-50 rounded-lg p-3 border border-blue-200">
-                                        <div class="flex items-center mb-2">
-                                            <span class="text-sm font-medium text-blue-800 mr-2">🔍 搜索穴位：</span>
-                                            <div class="flex-1 relative">
-                                                <input type="text" id="acupointNotesSearch" placeholder="搜尋穴位名稱、經絡或定位..." 
-                                                       class="w-full border border-blue-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                       oninput="searchAcupointForNotes()">
-                                                <button type="button" onclick="clearAcupointNotesSearch()" class="absolute right-2 top-1 text-gray-400 hover:text-gray-600 text-sm">×</button>
+                                        <div class="mb-3 bg-blue-50 rounded-lg p-3 border border-blue-200">
+                                            <div class="flex items-center mb-2">
+                                                <span class="text-sm font-medium text-blue-800 mr-2">🔍 搜索穴位：</span>
+                                                <div class="flex-1 relative">
+                                                    <input type="text" id="acupointNotesSearch" placeholder="搜尋穴位名稱、經絡或定位..." 
+                                                           class="w-full border border-blue-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                           oninput="searchAcupointForNotes()">
+                                                    <button type="button" onclick="clearAcupointNotesSearch()" class="absolute right-2 top-1 text-gray-400 hover:text-gray-600 text-sm">×</button>
+                                                </div>
+                                                <!-- 新增穴位圖按鈕：開啟穴位地圖以選取穴位 -->
+                                                <button type="button" onclick="openAcupointMapForNotes()" class="ml-2 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200">🗺️ 穴位圖</button>
                                             </div>
-                                            <!-- 新增穴位圖按鈕：開啟可選穴位的圖示視窗 -->
-                                            <button type="button" onclick="openAcupointMapForNotes()" class="ml-2 text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-2 py-1 rounded transition duration-200 whitespace-nowrap">
-                                                🗺️ 穴位圖
-                                            </button>
-                                        </div>
                                         <!-- 搜索結果 -->
                                         <div id="acupointNotesSearchResults" class="hidden">
                                             <div class="bg-white rounded border border-blue-200 max-h-40 overflow-y-auto">
