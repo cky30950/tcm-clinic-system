@@ -26352,3 +26352,51 @@ function hideGlobalCopyright() {
     window.openAcupointMapForNotes = openAcupointMapForNotes;
   }
 })();
+
+
+
+// === Added keyboard navigation for prescription search ===
+(function(){
+let prescriptionSearchIndex = -1;
+const prescriptionSearchInput = document.getElementById("prescriptionSearch");
+if (prescriptionSearchInput) {
+  prescriptionSearchInput.addEventListener("keydown", function (e) {
+    const results = document.querySelectorAll("#prescriptionSearchResults div[data-herb-name]");
+    if (!results.length) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); prescriptionSearchIndex = (prescriptionSearchIndex + 1) % results.length; }
+    else if (e.key === "ArrowUp") { e.preventDefault(); prescriptionSearchIndex = (prescriptionSearchIndex - 1 + results.length) % results.length; }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (prescriptionSearchIndex >= 0 && results[prescriptionSearchIndex]) {
+        results[prescriptionSearchIndex].click();
+        prescriptionSearchIndex = -1;
+      }
+      return;
+    }
+    results.forEach((item, index) => item.classList.toggle("bg-blue-200", index === prescriptionSearchIndex));
+  });
+}
+})();
+
+// === Added keyboard navigation for acupoint search ===
+(function(){
+let acupointSearchIndex = -1;
+const acupointSearchInput = document.getElementById("acupointSearch");
+if (acupointSearchInput) {
+  acupointSearchInput.addEventListener("keydown", function (e) {
+    const results = document.querySelectorAll("#acupointSearchResults div[data-acupoint-name]");
+    if (!results.length) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); acupointSearchIndex = (acupointSearchIndex + 1) % results.length; }
+    else if (e.key === "ArrowUp") { e.preventDefault(); acupointSearchIndex = (acupointSearchIndex - 1 + results.length) % results.length; }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (acupointSearchIndex >= 0 && results[acupointSearchIndex]) {
+        results[acupointSearchIndex].click();
+        acupointSearchIndex = -1;
+      }
+      return;
+    }
+    results.forEach((item, index) => item.classList.toggle("bg-blue-200", index === acupointSearchIndex));
+  });
+}
+})();
