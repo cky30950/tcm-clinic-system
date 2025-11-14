@@ -76,86 +76,7 @@ function initAcupointMagnifier() {
     }
 }
 
-/**
- * 初始化 Konva 覆蓋層，在穴位圖上繪製可點擊的穴位標記。
- * 這個函式會根據 window.acupointCoordinates 提供的座標（原始圖像像素），
- * 將每個標記縮放到圖片當前尺寸並繪製於圖像上方。若未定義資料，則使用預設範例座標。
- */
-function initAcupointKonvaOverlay() {
-    try {
-        const img = document.getElementById('acupointImage');
-        const container = document.getElementById('acupointOverlayContainer');
-        if (!img || !container || typeof Konva === 'undefined') {
-            return;
-        }
-        // 清除舊的子元素
-        container.innerHTML = '';
-        // 準備舞台尺寸
-        const width = img.clientWidth;
-        const height = img.clientHeight;
-        const stage = new Konva.Stage({
-            container: container,
-            width: width,
-            height: height,
-        });
-        const layer = new Konva.Layer();
-        stage.add(layer);
-        // 座標資料
-        const coords = Array.isArray(window.acupointCoordinates) && window.acupointCoordinates.length ? window.acupointCoordinates : [
-            { id: '穴位1', x: 100, y: 100 },
-            { id: '穴位2', x: 300, y: 150 },
-            { id: '穴位3', x: 200, y: 300 },
-            { id: '穴位4', x: 400, y: 250 },
-            { id: '穴位5', x: 350, y: 400 }
-        ];
-        const naturalW = img.naturalWidth || width;
-        const naturalH = img.naturalHeight || height;
-        const sx = width / naturalW;
-        const sy = height / naturalH;
-        const circleNodes = [];
-        coords.forEach(pt => {
-            const circle = new Konva.Circle({
-                x: pt.x * sx,
-                y: pt.y * sy,
-                radius: 6,
-                fill: 'rgba(230, 30, 30, 0.8)',
-                stroke: '#fff',
-                strokeWidth: 1,
-                id: pt.id || ''
-            });
-            circle.on('mouseenter', () => { document.body.style.cursor = 'pointer'; });
-            circle.on('mouseleave', () => { document.body.style.cursor = ''; });
-            circle.on('click', () => {
-                if (typeof showAcupointDetail === 'function' && pt.id) {
-                    try { showAcupointDetail(pt.id); } catch (err) {
-                        console.warn('顯示穴位詳細資訊失敗:', err);
-                    }
-                } else {
-                    alert('點擊了穴位：' + (pt.id || '未知穴位'));
-                }
-            });
-            layer.add(circle);
-            circleNodes.push({ node: circle, data: pt });
-        });
-        layer.draw();
-        // 縮放處理
-        function resizeOverlay() {
-            const newW = img.clientWidth;
-            const newH = img.clientHeight;
-            stage.width(newW);
-            stage.height(newH);
-            const newSx = newW / naturalW;
-            const newSy = newH / naturalH;
-            circleNodes.forEach(item => {
-                item.node.position({ x: item.data.x * newSx, y: item.data.y * newSy });
-            });
-            layer.batchDraw();
-        }
-        window.addEventListener('resize', resizeOverlay);
-    } catch (err) {
-        console.warn('初始化 Konva 覆蓋層失敗:', err);
-    }
-}
+// initAcupointMap 函式已搬至 acupointIntegration.js
 
 /**
  * 建立放大鏡效果的核心函式。
@@ -6916,7 +6837,7 @@ async function loadConsultationForEdit(consultationId) {
             document.getElementById('formSymptoms').value = consultation.symptoms || '';
             document.getElementById('formTongue').value = consultation.tongue || '';
             document.getElementById('formPulse').value = consultation.pulse || '';
-            document.getElementById('formCurrentHistory').value = consultation.currentHistory || '';
+            // formCurrentHistory 用於顯示過往診症摘要，不應在編輯模式中被覆蓋。舊資料的現病史已與主訴合併，故不載入至此欄位。
             document.getElementById('formDiagnosis').value = consultation.diagnosis || '';
             document.getElementById('formSyndrome').value = consultation.syndrome || '';
             {
@@ -8045,17 +7966,20 @@ async function showConsultationForm(appointment) {
                     }
                 }
             }
-            // 根據問診資料填充現病史欄位
+            // 根據問診資料填充現病史內容
+            // 診症系統已將「主訴」與「現病史」合併至 formSymptoms 欄位，
+            // 因此將現病史摘要直接追加至主訴欄位，而不再寫入過往記錄欄位（formCurrentHistory）。
             if (inquiryDataForPrefill) {
-                const historyField = document.getElementById('formCurrentHistory');
-                if (historyField) {
-                    const historySummary = generateHistorySummaryFromInquiry(inquiryDataForPrefill);
-                    if (historySummary) {
-                        const currentHistory = historyField.value ? historyField.value.trim() : '';
-                        if (!currentHistory) {
-                            historyField.value = historySummary;
+                const historySummary = generateHistorySummaryFromInquiry(inquiryDataForPrefill);
+                if (historySummary) {
+                    // 將現病史內容與主訴內容合併
+                    const symptomsEl = document.getElementById('formSymptoms');
+                    if (symptomsEl) {
+                        const currentVal = symptomsEl.value ? symptomsEl.value.trim() : '';
+                        if (!currentVal) {
+                            symptomsEl.value = historySummary;
                         } else {
-                            historyField.value = currentHistory + '\n' + historySummary;
+                            symptomsEl.value = currentVal + '\n' + historySummary;
                         }
                     }
                 }
@@ -13315,6 +13239,7 @@ async function initializeSystemAfterLogin() {
                         indications: ['咳嗽', '氣喘', '胸痛', '肩背痛', '皮膚病'],
                         method: '斜刺或平刺0.5-0.8寸',
                         category: '肺之募穴',
+                        // createdAt 與 updatedAt 留在這裡，座標請在外部模組 acupointIntegration.js 中定義
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
                     }
@@ -13349,20 +13274,12 @@ async function initializeSystemAfterLogin() {
             }
             // 初次或重新載入時顯示列表
             displayAcupointLibrary();
-            // 在載入列表後初始化穴位圖放大鏡，確保圖像已存在於 DOM
-            if (typeof initAcupointMagnifier === 'function') {
+            // 在載入列表後初始化穴位 Leaflet 地圖，確保容器已存在於 DOM
+            if (typeof initAcupointMap === 'function') {
                 try {
-                    initAcupointMagnifier();
-                } catch (_errMag) {
-                    console.warn('初始化穴位圖放大鏡失敗:', _errMag);
-                }
-            }
-            // 在載入列表後初始化 Konva 覆蓋層，繪製穴位標記
-            if (typeof initAcupointKonvaOverlay === 'function') {
-                try {
-                    initAcupointKonvaOverlay();
-                } catch (_errKonva) {
-                    console.warn('初始化 Konva 覆蓋層失敗:', _errKonva);
+                    initAcupointMap();
+                } catch (_err) {
+                    console.warn('初始化穴位地圖失敗:', _err);
                 }
             }
         }
@@ -13487,21 +13404,6 @@ async function initializeSystemAfterLogin() {
                 paginationSettings.acupointLibrary.currentPage = newPage;
                 displayAcupointLibrary();
             }, paginationEl);
-            // 在內容渲染後初始化放大鏡與 Konva 覆蓋層，確保圖像與標記同步
-            if (typeof initAcupointMagnifier === 'function') {
-                try {
-                    initAcupointMagnifier();
-                } catch (_errMag) {
-                    console.warn('初始化穴位圖放大鏡失敗:', _errMag);
-                }
-            }
-            if (typeof initAcupointKonvaOverlay === 'function') {
-                try {
-                    initAcupointKonvaOverlay();
-                } catch (_errKonva) {
-                    console.warn('初始化 Konva 覆蓋層失敗:', _errKonva);
-                }
-            }
         }
 
         /**
@@ -15825,10 +15727,25 @@ const consultationDate = (() => {
             // 若需要再次顯示確認提示，可重新加入 confirm 相關程式碼。
             
             // 載入診症資料
-            document.getElementById('formSymptoms').value = consultation.symptoms || '';
+            // 載入診症資料
+            // 主訴及現病史統一寫入 formSymptoms；若舊紀錄仍使用 currentHistory 儲存現病史，則合併
+            const symptomsEl2 = document.getElementById('formSymptoms');
+            if (symptomsEl2) {
+                const symptomsVal = consultation.symptoms || '';
+                const histVal = consultation.currentHistory || '';
+                if (symptomsVal && histVal) {
+                    symptomsEl2.value = symptomsVal + '\n' + histVal;
+                } else if (symptomsVal) {
+                    symptomsEl2.value = symptomsVal;
+                } else if (histVal) {
+                    symptomsEl2.value = histVal;
+                } else {
+                    symptomsEl2.value = '';
+                }
+            }
             document.getElementById('formTongue').value = consultation.tongue || '';
             document.getElementById('formPulse').value = consultation.pulse || '';
-            document.getElementById('formCurrentHistory').value = consultation.currentHistory || '';
+            // 過往記錄欄位僅顯示既往病歷，不應被覆蓋
             document.getElementById('formDiagnosis').value = consultation.diagnosis || '';
             document.getElementById('formSyndrome').value = consultation.syndrome || '';
                 {
@@ -26238,4 +26155,200 @@ function hideGlobalCopyright() {
   // 將控制函式掛到 window，使其可被外部調用
   window.startInactivityMonitoring = startInactivityMonitoring;
   window.stopInactivityMonitoring = stopInactivityMonitoring;
+})();
+
+/*
+ * 穴位圖選取功能
+ *
+ * 在針灸備註區域提供一個按鈕，點擊可開啟穴位圖的彈窗，使用者可在圖上選擇穴位。
+ * 於彈窗確認後，選取的穴位會以方塊形式添加至針灸備註輸入區。
+ */
+(function() {
+  /**
+   * 開啟穴位選擇地圖的彈窗。
+   * 會自動初始化穴位庫與座標資料，並在彈窗內顯示可互動的穴位圖。
+   * 使用者點擊穴位後可選取或取消，按下確認後將新增選取的穴位至針灸備註。
+   */
+  async function openAcupointMapForNotes() {
+    try {
+      // 確保穴位庫已載入
+      if (!window.acupointLibraryLoaded || !Array.isArray(window.acupointLibrary) || window.acupointLibrary.length === 0) {
+        if (typeof initAcupointLibrary === 'function') {
+          try {
+            await initAcupointLibrary();
+          } catch (_initErr) {
+            console.error('載入穴位庫失敗：', _initErr);
+          }
+        }
+      }
+      // 套用座標資料（若函式存在）
+      try {
+        if (typeof window.applyAcupointCoordinates === 'function') {
+          window.applyAcupointCoordinates();
+        }
+      } catch (_cErr) {}
+      // 從備註欄收集已存在的穴位名稱
+      const existingSpans = document.querySelectorAll('#formAcupunctureNotes span[data-acupoint-name]');
+      const existingSet = new Set();
+      existingSpans.forEach(span => {
+        const n = span && span.dataset ? span.dataset.acupointName : '';
+        if (n) existingSet.add(n);
+      });
+      // 初始化選取名單為已有穴位
+      const selectedNames = Array.from(existingSet);
+      // 決定介面語言
+      let lang = 'zh';
+      try {
+        const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+        if (langSel) lang = langSel.toLowerCase();
+      } catch (_e) {}
+      const isEn = lang.startsWith('en');
+      const title = isEn ? 'Select Acupoints' : '選擇穴位';
+      const confirmText = isEn ? 'Confirm' : '確定';
+      const cancelText = isEn ? 'Cancel' : '取消';
+      // 開啟彈窗
+      await Swal.fire({
+        title: title,
+        html: '<div id="acupointSelectMapContainer" style="width:100%;height:420px;"></div>',
+        width: '80%',
+        showCancelButton: true,
+        confirmButtonText: confirmText,
+        cancelButtonText: cancelText,
+        focusConfirm: false,
+        didOpen: () => {
+          initAcupointSelectionMapForNotes('acupointSelectMapContainer', selectedNames, existingSet);
+        },
+        preConfirm: () => {
+          return selectedNames.slice();
+        }
+      }).then(result => {
+        try {
+          if (result && result.value && Array.isArray(result.value)) {
+            result.value.forEach(name => {
+              if (!existingSet.has(name)) {
+                try {
+                  if (typeof addAcupointToNotes === 'function') {
+                    addAcupointToNotes(name);
+                  }
+                } catch (_addErr) {
+                  console.error('加入穴位到備註失敗：', _addErr);
+                }
+              }
+            });
+          }
+        } catch (_resErr) {
+          console.error('處理穴位選取結果時發生錯誤：', _resErr);
+        }
+      });
+    } catch (err) {
+      console.error('開啟穴位圖彈窗失敗：', err);
+    }
+  }
+
+  /**
+   * 初始化穴位選擇地圖，並在圖上添加穴位標記。
+   * @param {string} containerId 目標容器的 ID
+   * @param {string[]} selectedNames 選取的穴位名稱陣列，會在使用者互動時更新
+   * @param {Set<string>} existingSet 已存在於備註中的穴位名稱集合
+   */
+  function initAcupointSelectionMapForNotes(containerId, selectedNames, existingSet) {
+    try {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      // 載入穴位圖影像
+      const img = new Image();
+      img.src = 'images/combined_three.png';
+      img.onload = function() {
+        try {
+          const w = img.width;
+          const h = img.height;
+          // 套用座標資料，以確保所有穴位都具備 x/y
+          try {
+            if (typeof window.applyAcupointCoordinates === 'function') {
+              window.applyAcupointCoordinates();
+            }
+          } catch (_er) {}
+          // 建立地圖
+          const map = L.map(container, {
+            crs: L.CRS.Simple,
+            maxZoom: 4,
+            zoomControl: true,
+            attributionControl: false
+          });
+          const bounds = [[0, 0], [h, w]];
+          L.imageOverlay(img.src, bounds).addTo(map);
+          const baseZoom = map.getBoundsZoom(bounds);
+          const initialZoom = baseZoom - 1;
+          if (typeof map.setMinZoom === 'function') {
+            map.setMinZoom(initialZoom);
+          } else {
+            map.options.minZoom = initialZoom;
+          }
+          if (typeof map.setMaxBounds === 'function') {
+            map.setMaxBounds(bounds);
+          }
+          map.options.maxBoundsViscosity = 1.0;
+          map.setView([h / 2, w / 2], initialZoom);
+          const defaultStyle = { color: '#2563eb', fillColor: '#2563eb', weight: 0, fillOpacity: 0.85, radius: 4 };
+          const selectedStyle = { color: '#dc2626', fillColor: '#dc2626', weight: 0, fillOpacity: 0.85, radius: 5 };
+          const library = Array.isArray(window.acupointLibrary) ? window.acupointLibrary : [];
+          library.forEach(ac => {
+            if (ac && typeof ac.x === 'number' && typeof ac.y === 'number') {
+              const lat = h * ac.y;
+              const lon = w * ac.x;
+              const marker = L.circleMarker([lat, lon], Object.assign({}, defaultStyle));
+              marker.acName = ac.name || '';
+              marker.selected = false;
+              // 若穴位已在備註中或預設選取，標記為已選
+              if (existingSet.has(marker.acName) || selectedNames.includes(marker.acName)) {
+                marker.selected = true;
+                marker.setStyle(selectedStyle);
+              }
+              marker.addTo(map);
+              // 切換選取狀態
+              marker.on('click', function() {
+                marker.selected = !marker.selected;
+                if (marker.selected) {
+                  marker.setStyle(selectedStyle);
+                  if (!selectedNames.includes(marker.acName)) {
+                    selectedNames.push(marker.acName);
+                  }
+                } else {
+                  marker.setStyle(defaultStyle);
+                  const idx = selectedNames.indexOf(marker.acName);
+                  if (idx >= 0) {
+                    selectedNames.splice(idx, 1);
+                  }
+                }
+              });
+              // 綁定簡易提示或詳細內容
+              try {
+                let tooltipContent = '';
+                if (typeof getAcupointTooltipContent === 'function') {
+                  tooltipContent = getAcupointTooltipContent(marker.acName) || '';
+                } else {
+                  tooltipContent = marker.acName;
+                }
+                const html = String(tooltipContent).replace(/\n/g, '<br>');
+                marker.bindTooltip(html, { direction: 'top', offset: [0, -10], opacity: 0.9 });
+              } catch (_tipErr) {
+                // 如果無法取得提示則忽略
+              }
+            }
+          });
+        } catch (innerErr) {
+          console.error('初始化穴位選擇地圖時發生錯誤：', innerErr);
+        }
+      };
+      img.onerror = function() {
+        console.warn('無法載入穴位圖影像');
+      };
+    } catch (outerErr) {
+      console.error('初始化穴位選擇地圖失敗：', outerErr);
+    }
+  }
+  // 將開啟彈窗的函式掛載至 window，供 HTML 按鈕調用
+  if (typeof window !== 'undefined') {
+    window.openAcupointMapForNotes = openAcupointMapForNotes;
+  }
 })();
