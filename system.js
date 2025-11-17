@@ -26251,7 +26251,7 @@ function hideGlobalCopyright() {
    * @param {string[]} selectedNames 選取的穴位名稱陣列，會在使用者互動時更新
    * @param {Set<string>} existingSet 已存在於備註中的穴位名稱集合
    */
-  function initAcupointSelectionMapForNotes(containerId, selectedNames, existingSet) {
+   async function initAcupointSelectionMapForNotes(containerId, selectedNames, existingSet) {
     try {
       const container = document.getElementById(containerId);
       if (!container) return;
