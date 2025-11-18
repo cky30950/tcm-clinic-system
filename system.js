@@ -26155,70 +26155,7 @@ function hideGlobalCopyright() {
   // 將控制函式掛到 window，使其可被外部調用
   window.startInactivityMonitoring = startInactivityMonitoring;
   window.stopInactivityMonitoring = stopInactivityMonitoring;
-
-  // ==================== 登入後自動初始化穴位資料（完全相容 Modular SDK）===================
-  let acupointDataInitialized = false;
-
-  window.initAcupointDataAfterLogin = async function() {
-    if (acupointDataInitialized) return;
-    try {
-      // 1. 載入穴位庫
-      if (!window.acupointLibraryLoaded && typeof initAcupointLibrary === 'function') {
-        await initAcupointLibrary();
-      }
-
-      // 2. 套用座標
-      if (typeof applyAcupointCoordinates === 'function') {
-        applyAcupointCoordinates();
-      }
-
-      // 3. 初始化診症系統內的穴位圖
-      const mapContainer = document.getElementById('acupointMap');
-      if (mapContainer && typeof initAcupointMap === 'function' && !mapContainer.dataset.initialized) {
-        initAcupointMap();
-      }
-
-      acupointDataInitialized = true;
-      console.log('穴位圖資料初始化完成');
-    } catch (err) {
-      console.warn('自動初始化穴位資料失敗（不影響其他功能）:', err);
-    }
-  };
-
-  // 直接監聽你專案原本就有的登入狀態變數（最穩）
-  // 你的 system.js 裡面一定有類似下面這段（通常在 firebase_init.js 載入後）：
-  // onAuthStateChanged(auth, (user) => { ... })
-  // 所以我們直接攔截全域的 onAuthStateChanged（你專案一定有定義這個函式）
-  if (typeof onAuthStateChanged === 'function') {
-    const original = onAuthStateChanged;
-    window.onAuthStateChanged = function(auth, callback) {
-      return original(auth, (user) => {
-        callback(user);                     // 先執行原本的登入邏輯
-        if (user) {
-          window.initAcupointDataAfterLogin();  // 登入成功 → 立刻準備穴位圖
-        }
-      });
-    };
-  }
-
-  // 同時相容手動登入成功後可能呼叫的函式（很多專案都有）
-  const oldLoginHandler = window.loginSuccess || function() {};
-  window.loginSuccess = function(...args) {
-    oldLoginHandler.apply(this, args);
-    window.initAcupointDataAfterLogin();
-  };
-
-  // 如果現在已經登入（例如直接刷新頁面），也立刻初始化
-  setTimeout(() => {
-    if (window.currentUser || (typeof firebase !== 'undefined' && firebase.auth?.()?.currentUser)) {
-      window.initAcupointDataAfterLogin();
-    }
-  }, 1000);
-
-})();   // ← 原本的結尾，千萬不要動
-
-/*
- * 穴位圖選取功能
+})();
 
 /*
  * 穴位圖選取功能
