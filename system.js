@@ -26309,10 +26309,7 @@ function hideGlobalCopyright() {
           map.setView([h / 2, w / 2], initialZoom);
           const defaultStyle = { color: '#2563eb', fillColor: '#2563eb', weight: 0, fillOpacity: 0.85, radius: 4 };
           const selectedStyle = { color: '#dc2626', fillColor: '#dc2626', weight: 0, fillOpacity: 0.85, radius: 5 };
-          let library = Array.isArray(window.acupointLibrary) ? window.acupointLibrary : [];
-          if ((!library || library.length === 0) && Array.isArray(acupointLibrary)) {
-            library = acupointLibrary;
-          }
+          const library = Array.isArray(window.acupointLibrary) ? window.acupointLibrary : [];
           library.forEach(ac => {
             if (ac && typeof ac.x === 'number' && typeof ac.y === 'number') {
               const lat = h * ac.y;
