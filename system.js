@@ -26155,7 +26155,59 @@ function hideGlobalCopyright() {
   // 將控制函式掛到 window，使其可被外部調用
   window.startInactivityMonitoring = startInactivityMonitoring;
   window.stopInactivityMonitoring = stopInactivityMonitoring;
-})();
+
+  // ==================== 登入後自動初始化穴位資料 ====================
+  // 確保無論使用者怎麼登入（自動監聽或手動點登入），
+  // 進入系統後「診症 → 針灸備註」的穴位圖一定都有點位
+  async function initAcupointDataAfterLogin() {
+    if (window.acupointDataInitialized) return; // 防止重複執行
+    try {
+      // 1. 載入穴位庫
+      if (!window.acupointLibraryLoaded && typeof initAcupointLibrary === 'function') {
+        await initAcupointLibrary();
+      }
+      // 2. 套用座標
+      if (typeof applyAcupointCoordinates === 'function') {
+        applyAcupointCoordinates();
+      }
+      // 3. 初始化穴位圖（只有當診症頁面有這個容器時才執行）
+      const mapContainer = document.getElementById('acupointMap');
+      if (mapContainer && typeof initAcupointMap === 'function' && !mapContainer.dataset.initialized) {
+        initAcupointMap();
+      }
+      window.acupointDataInitialized = true;
+    } catch (err) {
+      console.warn('登入後自動初始化穴位資料失敗（不影響其他功能）:', err);
+    }
+  }
+
+  // 強制掛到全域，確保一定會被觸發
+  window.initAcupointDataAfterLogin = initAcupointDataAfterLogin;
+
+  // 1. 攔截 Firebase 自動登入偵測
+  const origOnAuth = firebase.auth().onAuthStateChanged;
+  firebase.auth().onAuthStateChanged = function(callback) {
+    return origOnAuth(function(user) {
+      callback(user);
+      if (user) initAcupointDataAfterLogin();
+    });
+  };
+
+  // 2. 攔截手動登入成功（很多系統都有 loginSuccess 之類的函式）
+  const oldLoginSuccess = window.loginSuccess;
+  window.loginSuccess = function(...args) {
+    if (oldLoginSuccess) oldLoginSuccess.apply(this, args);
+    initAcupointDataAfterLogin();
+  };
+
+  // 3. 頁面載入時若已經登入（例如直接 F5 刷新），也立即初始化
+  if (firebase.auth().currentUser) {
+    initAcupointDataAfterLogin();
+  }
+})();   // ← 這裡才是原本的結尾
+
+/*
+ * 穴位圖選取功能
 
 /*
  * 穴位圖選取功能
