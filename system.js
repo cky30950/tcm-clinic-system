@@ -3978,6 +3978,18 @@ async function attemptMainLogin() {
             console.error('初始化中藥庫或收費項目資料失敗:', error);
         }
 
+        try {
+            if (typeof window.applyAcupointCoordinates === 'function') {
+                window.applyAcupointCoordinates();
+            }
+        } catch (_e) {}
+        try {
+            if (Array.isArray(acupointLibrary)) {
+                window.acupointLibrary = acupointLibrary;
+            }
+            window.acupointLibraryLoaded = !!acupointLibraryLoaded;
+        } catch (_e) {}
+
         // 登入成功，切換到主系統
         performLogin(currentUserData);
         // 登入後啟動閒置監控，監測長時間未操作自動登出
