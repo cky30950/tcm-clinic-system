@@ -3961,11 +3961,12 @@ async function attemptMainLogin() {
                     }
                 })());
             }
-            // 初始化穴位庫資料，使其與中藥庫和模板庫一樣於登入後即載入
             if (typeof initAcupointLibrary === 'function') {
                 initTasks.push((async () => {
                     try {
                         await initAcupointLibrary();
+                        try { if (typeof window.applyAcupointCoordinates === 'function') { window.applyAcupointCoordinates(); } } catch (_e) {}
+                        try { if (typeof initAcupointMap === 'function') { initAcupointMap(); } } catch (_e2) {}
                     } catch (err) {
                         console.error('初始化穴位庫資料失敗:', err);
                     }
@@ -13226,15 +13227,6 @@ async function initializeSystemAfterLogin() {
                     return newItem;
                 });
                 acupointLibraryLoaded = true;
-                try {
-                    if (typeof window !== 'undefined') {
-                        window.acupointLibrary = acupointLibrary;
-                        window.acupointLibraryLoaded = true;
-                        if (typeof window.applyAcupointCoordinates === 'function') {
-                            window.applyAcupointCoordinates();
-                        }
-                    }
-                } catch (_syncErr) {}
             } catch (err) {
                 console.error('無法讀取穴位庫資料：', err);
                 // fallback：使用預設範例資料
@@ -13254,15 +13246,6 @@ async function initializeSystemAfterLogin() {
                     }
                 ];
                 acupointLibraryLoaded = true;
-                try {
-                    if (typeof window !== 'undefined') {
-                        window.acupointLibrary = acupointLibrary;
-                        window.acupointLibraryLoaded = true;
-                        if (typeof window.applyAcupointCoordinates === 'function') {
-                            window.applyAcupointCoordinates();
-                        }
-                    }
-                } catch (_syncErr2) {}
             }
         }
 
@@ -25110,9 +25093,8 @@ ${item.points.map(pt => {
            * @returns {string} 組合的詳細內容，以換行符分隔
            */
           function getAcupointTooltipContent(name) {
-            const lib = (Array.isArray(window.acupointLibrary) && window.acupointLibrary.length > 0) ? window.acupointLibrary : acupointLibrary;
-            if (!name || !Array.isArray(lib) || lib.length === 0) return '';
-            const item = lib.find(a => a && a.name === name);
+            if (!name || !Array.isArray(acupointLibrary) || acupointLibrary.length === 0) return '';
+            const item = acupointLibrary.find(a => a && a.name === name);
             if (!item) return '';
             const details = [];
             details.push('名稱：' + (item.name || ''));
