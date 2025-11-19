@@ -15359,6 +15359,24 @@ async function searchBillingForConsultation() {
                 selectedPrescriptionItems = [];
                 parsePrescriptionToItems(lastConsultation.prescription);
                 updatePrescriptionDisplay();
+                try {
+                    const daysEl = document.getElementById('medicationDays');
+                    const freqEl = document.getElementById('medicationFrequency');
+                    if (daysEl) {
+                        if (lastConsultation.medicationDays !== undefined && lastConsultation.medicationDays !== null) {
+                            daysEl.value = lastConsultation.medicationDays;
+                        } else {
+                            daysEl.value = '';
+                        }
+                    }
+                    if (freqEl) {
+                        if (lastConsultation.medicationFrequency !== undefined && lastConsultation.medicationFrequency !== null) {
+                            freqEl.value = lastConsultation.medicationFrequency;
+                        } else {
+                            freqEl.value = '';
+                        }
+                    }
+                } catch (_setErr) {}
                 // 在載入上次處方後，自動依照當前服藥天數更新藥費。
                 // 先讀取天數輸入框的值，若無法取得則使用預設5天。
                 try {
@@ -15768,6 +15786,25 @@ const consultationDate = (() => {
             document.getElementById('formFollowUpDate').value = consultation.followUpDate || '';
             document.getElementById('formVisitTime').value = consultation.visitTime || '';
             
+            try {
+                const daysEl = document.getElementById('medicationDays');
+                const freqEl = document.getElementById('medicationFrequency');
+                if (daysEl) {
+                    if (consultation.medicationDays !== undefined && consultation.medicationDays !== null) {
+                        daysEl.value = consultation.medicationDays;
+                    } else {
+                        daysEl.value = '';
+                    }
+                }
+                if (freqEl) {
+                    if (consultation.medicationFrequency !== undefined && consultation.medicationFrequency !== null) {
+                        freqEl.value = consultation.medicationFrequency;
+                    } else {
+                        freqEl.value = '';
+                    }
+                }
+            } catch (_medErr) {}
+
             // 載入休息期間
             if (consultation.restStartDate && consultation.restEndDate) {
                 document.getElementById('formRestStartDate').value = consultation.restStartDate;
