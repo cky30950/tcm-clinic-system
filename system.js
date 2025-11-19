@@ -25460,10 +25460,12 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
       if (insertAtEnd || !range) {
         // 若游標不在備註欄內，或沒有選取範圍，則將 span 插入至最後
         form.appendChild(span);
-        // 將游標移到方塊之後（不插入額外空白，避免輸入位置偏移）
+        // 在方塊後建立一個空文字節點，並將游標置於其中，避免瀏覽器自動插入非破折空白
+        const caretNodeEnd = document.createTextNode('');
+        form.appendChild(caretNodeEnd);
         if (sel) {
           const newRange = document.createRange();
-          newRange.setStartAfter(span);
+          newRange.setStart(caretNodeEnd, 0);
           newRange.collapse(true);
           sel.removeAllRanges();
           sel.addRange(newRange);
@@ -25472,10 +25474,12 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
         // 在選取位置插入 span
         range.deleteContents();
         range.insertNode(span);
-        // 將游標移到方塊之後
+        // 在方塊後建立一個空文字節點，並將游標置於其中
+        const caretNodeInline = document.createTextNode('');
+        span.after(caretNodeInline);
         if (sel) {
           const newRange = document.createRange();
-          newRange.setStartAfter(span);
+          newRange.setStart(caretNodeInline, 0);
           newRange.collapse(true);
           sel.removeAllRanges();
           sel.addRange(newRange);
