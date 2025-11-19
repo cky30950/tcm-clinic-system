@@ -25418,9 +25418,9 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
       span.addEventListener('click', function() {
         const parent = span.parentNode;
         if (parent) {
-          // 若方塊後有單獨的空白文字節點，一併刪除，避免留下殘餘空格
+          // 若方塊後有僅包含空白或零寬字元的文字節點，一併刪除
           const next = span.nextSibling;
-          if (next && next.nodeType === Node.TEXT_NODE && /^\s*$/.test(next.textContent)) {
+          if (next && next.nodeType === Node.TEXT_NODE && /^[\s\u200B]*$/u.test(next.textContent)) {
             parent.removeChild(next);
           }
           parent.removeChild(span);
@@ -25460,28 +25460,22 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
       if (insertAtEnd || !range) {
         // 若游標不在備註欄內，或沒有選取範圍，則將 span 插入至最後
         form.appendChild(span);
-        // 在方塊之後加上一個空格以區隔後續輸入
-        const space = document.createTextNode(' ');
-        form.appendChild(space);
-        // 將游標移到空格之後
+        // 將游標移到方塊之後（不插入額外空白，避免輸入位置偏移）
         if (sel) {
           const newRange = document.createRange();
-          newRange.setStartAfter(space);
+          newRange.setStartAfter(span);
           newRange.collapse(true);
           sel.removeAllRanges();
           sel.addRange(newRange);
         }
       } else {
-        // 在選取位置插入 span 及空格分隔符
+        // 在選取位置插入 span
         range.deleteContents();
         range.insertNode(span);
-        // 在 span 後插入一個空格，以免與後續內容黏在一起
-        const space = document.createTextNode(' ');
-        span.after(space);
-        // 將游標移到空格之後
+        // 將游標移到方塊之後
         if (sel) {
           const newRange = document.createRange();
-          newRange.setStartAfter(space);
+          newRange.setStartAfter(span);
           newRange.collapse(true);
           sel.removeAllRanges();
           sel.addRange(newRange);
