@@ -6855,6 +6855,17 @@ async function loadConsultationForEdit(consultationId) {
                 if (typeof initializeAcupointNotesSpans === 'function') {
                   initializeAcupointNotesSpans();
                 }
+                try {
+                  const el = document.getElementById('formAcupunctureNotes');
+                  if (el) {
+                    const last = el.lastChild;
+                    if (last && last.nodeType === Node.TEXT_NODE) {
+                      last.textContent = ' ';
+                    } else {
+                      el.appendChild(document.createTextNode(' '));
+                    }
+                  }
+                } catch (_e) {}
               }
             }
             document.getElementById('formUsage').value = consultation.usage || '';
@@ -15778,6 +15789,17 @@ const consultationDate = (() => {
                         initializeAcupointNotesSpans();
                       } catch (_e) {}
                     }
+                    try {
+                      const el = document.getElementById('formAcupunctureNotes');
+                      if (el) {
+                        const last = el.lastChild;
+                        if (last && last.nodeType === Node.TEXT_NODE) {
+                          last.textContent = ' ';
+                        } else {
+                          el.appendChild(document.createTextNode(' '));
+                        }
+                      }
+                    } catch (_e) {}
                   }
                 }
             document.getElementById('formUsage').value = consultation.usage || '';
@@ -25461,7 +25483,7 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
         // 若游標不在備註欄內，或沒有選取範圍，則將 span 插入至最後
         form.appendChild(span);
         // 在方塊後建立一個空文字節點，並將游標置於其中，避免瀏覽器自動插入非破折空白
-        const caretNodeEnd = document.createTextNode('');
+        const caretNodeEnd = document.createTextNode(' ');
         form.appendChild(caretNodeEnd);
         if (sel) {
           const newRange = document.createRange();
@@ -25475,7 +25497,7 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
         range.deleteContents();
         range.insertNode(span);
         // 在方塊後建立一個空文字節點，並將游標置於其中
-        const caretNodeInline = document.createTextNode('');
+        const caretNodeInline = document.createTextNode(' ');
         span.after(caretNodeInline);
         if (sel) {
           const newRange = document.createRange();
