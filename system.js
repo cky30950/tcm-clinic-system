@@ -6855,17 +6855,6 @@ async function loadConsultationForEdit(consultationId) {
                 if (typeof initializeAcupointNotesSpans === 'function') {
                   initializeAcupointNotesSpans();
                 }
-                try {
-                  const el = document.getElementById('formAcupunctureNotes');
-                  if (el) {
-                    const last = el.lastChild;
-                    if (last && last.nodeType === Node.TEXT_NODE) {
-                      last.textContent = ' ';
-                    } else {
-                      el.appendChild(document.createTextNode(' '));
-                    }
-                  }
-                } catch (_e) {}
               }
             }
             document.getElementById('formUsage').value = consultation.usage || '';
@@ -15789,17 +15778,6 @@ const consultationDate = (() => {
                         initializeAcupointNotesSpans();
                       } catch (_e) {}
                     }
-                    try {
-                      const el = document.getElementById('formAcupunctureNotes');
-                      if (el) {
-                        const last = el.lastChild;
-                        if (last && last.nodeType === Node.TEXT_NODE) {
-                          last.textContent = ' ';
-                        } else {
-                          el.appendChild(document.createTextNode(' '));
-                        }
-                      }
-                    } catch (_e) {}
                   }
                 }
             document.getElementById('formUsage').value = consultation.usage || '';
@@ -25440,9 +25418,9 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
       span.addEventListener('click', function() {
         const parent = span.parentNode;
         if (parent) {
-          // 若方塊後有僅包含空白或零寬字元的文字節點，一併刪除
+          // 若方塊後有單獨的空白文字節點，一併刪除，避免留下殘餘空格
           const next = span.nextSibling;
-          if (next && next.nodeType === Node.TEXT_NODE && /^[\s\u200B]*$/u.test(next.textContent)) {
+          if (next && next.nodeType === Node.TEXT_NODE && /^\s*$/.test(next.textContent)) {
             parent.removeChild(next);
           }
           parent.removeChild(span);
@@ -25482,26 +25460,28 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
       if (insertAtEnd || !range) {
         // 若游標不在備註欄內，或沒有選取範圍，則將 span 插入至最後
         form.appendChild(span);
-        // 在方塊後建立一個空文字節點，並將游標置於其中，避免瀏覽器自動插入非破折空白
-        const caretNodeEnd = document.createTextNode(' ');
-        form.appendChild(caretNodeEnd);
+        // 在方塊之後加上一個空格以區隔後續輸入
+        const space = document.createTextNode(' ');
+        form.appendChild(space);
+        // 將游標移到空格之後
         if (sel) {
           const newRange = document.createRange();
-          newRange.setStart(caretNodeEnd, 0);
+          newRange.setStartAfter(space);
           newRange.collapse(true);
           sel.removeAllRanges();
           sel.addRange(newRange);
         }
       } else {
-        // 在選取位置插入 span
+        // 在選取位置插入 span 及空格分隔符
         range.deleteContents();
         range.insertNode(span);
-        // 在方塊後建立一個空文字節點，並將游標置於其中
-        const caretNodeInline = document.createTextNode(' ');
-        span.after(caretNodeInline);
+        // 在 span 後插入一個空格，以免與後續內容黏在一起
+        const space = document.createTextNode(' ');
+        span.after(space);
+        // 將游標移到空格之後
         if (sel) {
           const newRange = document.createRange();
-          newRange.setStart(caretNodeInline, 0);
+          newRange.setStartAfter(space);
           newRange.collapse(true);
           sel.removeAllRanges();
           sel.addRange(newRange);
