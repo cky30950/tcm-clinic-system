@@ -944,13 +944,11 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
  * 若 consultations 尚未載入，會先載入全部診症記錄。
  */
 async function loadPersonalStatistics() {
-    if (!Array.isArray(consultations) || consultations.length === 0) {
-        if (typeof loadConsultationsForFinancial === 'function') {
-            try {
-                await loadConsultationsForFinancial();
-            } catch (_e) {
-                console.error('載入診症資料失敗：', _e);
-            }
+    if (typeof loadConsultationsForFinancial === 'function') {
+        try {
+            await loadConsultationsForFinancial(true);
+        } catch (_e) {
+            console.error('載入診症資料失敗：', _e);
         }
     }
     const doctor = currentUser;
@@ -16787,12 +16785,12 @@ async function deleteUser(id) {
         }
 
         // 從 Firebase 載入診症記錄以供財務報表使用
-        async function loadConsultationsForFinancial() {
+        async function loadConsultationsForFinancial(forceRefresh = false) {
             if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
                 return;
             }
             try {
-                const result = await window.firebaseDataManager.getConsultations();
+                const result = await window.firebaseDataManager.getConsultations(forceRefresh);
                 if (result.success) {
                     // 轉換 Firebase Timestamp 為 ISO 字串
                     consultations = result.data.map(item => {
@@ -16991,7 +16989,7 @@ async function deleteUser(id) {
             // 在生成報表前重新載入診症資料，以取得最新收入與統計
             if (typeof loadConsultationsForFinancial === 'function') {
                 try {
-                    await loadConsultationsForFinancial();
+                    await loadConsultationsForFinancial(true);
                 } catch (err) {
                     console.error('重新載入財務資料失敗:', err);
                 }
