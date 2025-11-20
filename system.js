@@ -850,24 +850,25 @@ function computePersonalStatistics(doctor) {
  */
 async function loadPastRecords(patientId, excludeConsultationId = null) {
     try {
-        // 若 consultations 尚未載入，嘗試從 Firebase 取得全部診症記錄
-        if (!Array.isArray(consultations) || consultations.length === 0) {
-            try {
-                if (window.firebaseDataManager && typeof window.firebaseDataManager.getConsultations === 'function') {
-                    const consResult = await window.firebaseDataManager.getConsultations();
-                    if (consResult && consResult.success && Array.isArray(consResult.data)) {
-                        consultations = consResult.data;
-                    }
+        let source = [];
+        try {
+            if (window.firebaseDataManager && typeof window.firebaseDataManager.getPatientConsultations === 'function') {
+                const consResult = await window.firebaseDataManager.getPatientConsultations(String(patientId));
+                if (consResult && consResult.success && Array.isArray(consResult.data)) {
+                    source = consResult.data;
                 }
-            } catch (err) {
-                console.error('載入診症記錄時發生錯誤:', err);
+            }
+        } catch (err) {
+            console.error('載入診症記錄時發生錯誤:', err);
+        }
+        if (!Array.isArray(source) || source.length === 0) {
+            if (Array.isArray(consultations)) {
+                source = consultations;
+            } else {
+                return;
             }
         }
-        if (!Array.isArray(consultations)) {
-            return;
-        }
-        // 篩選出同一病人的診症紀錄，排除正在編輯的紀錄（若有提供）
-        const records = consultations.filter(c => {
+        const records = source.filter(c => {
             if (!c || (typeof c.patientId === 'undefined')) return false;
             if (String(c.patientId) !== String(patientId)) return false;
             if (excludeConsultationId && String(c.id) === String(excludeConsultationId)) return false;
@@ -19536,7 +19537,7 @@ class FirebaseDataManager {
              */
             // 使用 where 條件建立查詢
             const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            const q = window.firebase.firestoreQuery(colRef, window.firebase.where('patientId', '==', patientId));
+            const q = window.firebase.firestoreQuery(colRef, window.firebase.where('patientId', '==', String(patientId)));
             const querySnapshot = await window.firebase.getDocs(q);
             const patientConsultations = [];
             querySnapshot.forEach((docSnap) => {
