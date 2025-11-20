@@ -9301,7 +9301,7 @@ async function printReceiptFromAppointment(appointmentId) {
     }
     try {
         // 從 Firebase 獲取診症記錄
-        const consultationResult = await window.firebaseDataManager.getConsultations();
+        const consultationResult = await window.firebaseDataManager.getConsultations(true);
         if (!consultationResult.success) {
             showToast('無法讀取診症記錄！', 'error');
             return;
@@ -9373,7 +9373,7 @@ async function printAttendanceCertificateFromAppointment(appointmentId) {
     }
     try {
         // 從 Firebase 獲取診症記錄
-        const consultationResult = await window.firebaseDataManager.getConsultations();
+        const consultationResult = await window.firebaseDataManager.getConsultations(true);
         if (!consultationResult.success) {
             showToast('無法讀取診症記錄！', 'error');
             return;
@@ -9443,7 +9443,7 @@ async function printSickLeaveFromAppointment(appointmentId) {
     }
     try {
         // 從 Firebase 獲取診症記錄
-        const consultationResult = await window.firebaseDataManager.getConsultations();
+        const consultationResult = await window.firebaseDataManager.getConsultations(true);
         if (!consultationResult.success) {
             showToast('無法讀取診症記錄！', 'error');
             return;
@@ -9491,7 +9491,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
     // 如果沒有提供診症資料，從 Firebase 獲取
     if (!consultation) {
         try {
-            const consultationResult = await window.firebaseDataManager.getConsultations();
+            const consultationResult = await window.firebaseDataManager.getConsultations(true);
             if (!consultationResult.success) {
                 showToast('無法讀取診症記錄！', 'error');
                 return;
@@ -9499,8 +9499,17 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             
             consultation = consultationResult.data.find(c => String(c.id) === idToFind);
             if (!consultation) {
-                showToast('找不到診症記錄！', 'error');
-                return;
+                try {
+                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
+                    const docSnap = await window.firebase.getDoc(docRef);
+                    if (docSnap && docSnap.exists()) {
+                        consultation = { id: docSnap.id, ...docSnap.data() };
+                    }
+                } catch (_e) {}
+                if (!consultation) {
+                    showToast('找不到診症記錄！', 'error');
+                    return;
+                }
             }
         } catch (error) {
             console.error('讀取診症記錄錯誤:', error);
@@ -10087,7 +10096,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
     // 如果沒有提供診症資料，從 Firebase 獲取
     if (!consultation) {
         try {
-            const consultationResult = await window.firebaseDataManager.getConsultations();
+            const consultationResult = await window.firebaseDataManager.getConsultations(true);
             if (!consultationResult.success) {
                 showToast('無法讀取診症記錄！', 'error');
                 return;
@@ -10095,8 +10104,17 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
             
             consultation = consultationResult.data.find(c => String(c.id) === idToFind);
             if (!consultation) {
-                showToast('找不到診症記錄！', 'error');
-                return;
+                try {
+                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
+                    const docSnap = await window.firebase.getDoc(docRef);
+                    if (docSnap && docSnap.exists()) {
+                        consultation = { id: docSnap.id, ...docSnap.data() };
+                    }
+                } catch (_e) {}
+                if (!consultation) {
+                    showToast('找不到診症記錄！', 'error');
+                    return;
+                }
             }
         } catch (error) {
             console.error('讀取診症記錄錯誤:', error);
@@ -10483,9 +10501,28 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
 async function printSickLeave(consultationId, consultationData = null) {
     let consultation = consultationData;
     
-    // 如果沒有提供診症資料，從本地查找
     if (!consultation) {
-        consultation = consultations.find(c => c.id === consultationId);
+        const idToFind = String(consultationId);
+        try {
+            if (Array.isArray(consultations) && consultations.length > 0) {
+                consultation = consultations.find(c => String(c.id) === idToFind);
+            }
+            if (!consultation && window.firebaseDataManager) {
+                const result = await window.firebaseDataManager.getConsultations(true);
+                if (result && result.success) {
+                    consultation = result.data.find(c => String(c.id) === idToFind);
+                }
+            }
+            if (!consultation) {
+                try {
+                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
+                    const docSnap = await window.firebase.getDoc(docRef);
+                    if (docSnap && docSnap.exists()) {
+                        consultation = { id: docSnap.id, ...docSnap.data() };
+                    }
+                } catch (_e) {}
+            }
+        } catch (_err) {}
         if (!consultation) {
             showToast('找不到診症記錄！', 'error');
             return;
@@ -10916,15 +10953,24 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
     // 若未提供診症資料，從 Firebase 讀取
     if (!consultation) {
         try {
-            const consultationResult = await window.firebaseDataManager.getConsultations();
+            const consultationResult = await window.firebaseDataManager.getConsultations(true);
             if (!consultationResult.success) {
                 showToast('無法讀取診症記錄！', 'error');
                 return;
             }
             consultation = consultationResult.data.find(c => String(c.id) === idToFind);
             if (!consultation) {
-                showToast('找不到診症記錄！', 'error');
-                return;
+                try {
+                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
+                    const docSnap = await window.firebase.getDoc(docRef);
+                    if (docSnap && docSnap.exists()) {
+                        consultation = { id: docSnap.id, ...docSnap.data() };
+                    }
+                } catch (_e) {}
+                if (!consultation) {
+                    showToast('找不到診症記錄！', 'error');
+                    return;
+                }
             }
         } catch (error) {
             console.error('讀取診症記錄錯誤:', error);
