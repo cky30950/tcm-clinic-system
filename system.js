@@ -729,6 +729,7 @@ let globalUsageCounts = {};
 // 個人統計分析的圖表實例，用於更新時先銷毀舊圖表
 let personalHerbChartInstance = null;
 let personalFormulaChartInstance = null;
+let personalStatsCache = {};
 let personalAcupointChartInstance = null;
 
 /**
@@ -791,11 +792,17 @@ async function computeGlobalUsageCounts() {
  * 回傳物件包含 herbCounts、formulaCounts 與 acupointCounts。
  */
 function computePersonalStatistics(doctor) {
+    const cacheKey = String(doctor || 'all');
+    if (personalStatsCache[cacheKey] && personalStatsCache[cacheKey].len === (Array.isArray(consultations) ? consultations.length : 0)) {
+        return personalStatsCache[cacheKey].stats;
+    }
     const herbCounts = {};
     const formulaCounts = {};
     const acupointCounts = {};
     if (!Array.isArray(consultations) || consultations.length === 0) {
-        return { herbCounts, formulaCounts, acupointCounts };
+        const stats = { herbCounts, formulaCounts, acupointCounts };
+        personalStatsCache[cacheKey] = { stats, len: 0 };
+        return stats;
     }
     consultations.forEach(cons => {
         try {
@@ -837,7 +844,9 @@ function computePersonalStatistics(doctor) {
             // 忽略此筆診症的解析錯誤
         }
     });
-    return { herbCounts, formulaCounts, acupointCounts };
+    const stats = { herbCounts, formulaCounts, acupointCounts };
+    personalStatsCache[cacheKey] = { stats, len: consultations.length };
+    return stats;
 }
 
 /**
@@ -17028,7 +17037,7 @@ async function deleteUser(id) {
 
         // 生成財務報表
         // 改為 async 以便在更新報表前重新載入最新的診症資料，確保「更新報表」按鈕真正更新內容。
-        async function generateFinancialReport() {
+        async function generateFinancialReport(forceRefresh = false) {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
             const doctorFilter = document.getElementById('doctorFilter').value;
@@ -17043,10 +17052,11 @@ async function deleteUser(id) {
                 return;
             }
 
-            // 在生成報表前重新載入診症資料，以取得最新收入與統計
             if (typeof loadConsultationsForFinancial === 'function') {
                 try {
-                    await loadConsultationsForFinancial(true);
+                    if (forceRefresh || !Array.isArray(consultations) || consultations.length === 0) {
+                        await loadConsultationsForFinancial(!!forceRefresh);
+                    }
                 } catch (err) {
                     console.error('重新載入財務資料失敗:', err);
                 }
@@ -20901,6 +20911,8 @@ document.addEventListener('DOMContentLoaded', function() {
 // 儲存所有病歷與對應病人名稱，以供列表與搜尋使用
 let medicalRecords = [];
 let medicalRecordPatients = {};
+let medicalRecordsHasMore = false;
+let medicalRecordsLoadingMore = false;
 /**
  * 載入病歷管理頁面：重置搜尋欄、讀取診症記錄與病人資料，並綁定搜尋事件。
  */
@@ -20926,34 +20938,23 @@ function loadMedicalRecordManagement() {
             searchInput.addEventListener('input', listener);
             searchInput._medicalRecordListener = listener;
         }
-        // 同時讀取診症記錄（全頁）與病人列表（強制刷新）
+        // 同時讀取診症記錄（僅第一頁）與病人列表（強制刷新）
         Promise.all([
             window.firebaseDataManager && typeof window.firebaseDataManager.getConsultations === 'function'
                 ? (async () => {
                       await waitForFirebaseDataManager();
                       // 讀取第一頁
                       const first = await window.firebaseDataManager.getConsultations(true);
-                      let allData = (first && first.success && Array.isArray(first.data)) ? first.data.slice() : [];
-                      let hasMore = !!(first && first.success && first.hasMore);
-                      // 連續讀取後續頁面，直至無更多
-                      if (hasMore && typeof window.firebaseDataManager.getConsultationsNextPage === 'function') {
-                          try {
-                              while (hasMore) {
-                                  const next = await window.firebaseDataManager.getConsultationsNextPage();
-                                  if (!next || !next.success) break;
-                                  // getConsultationsNextPage 會回傳累積後的快取
-                                  allData = Array.isArray(next.data) ? next.data.slice() : allData;
-                                  hasMore = !!next.hasMore;
-                              }
-                          } catch (_e) {}
-                      }
-                      return { success: true, data: allData };
+                      const pageData = (first && first.success && Array.isArray(first.data)) ? first.data.slice() : [];
+                      const hasMore = !!(first && first.success && first.hasMore);
+                      return { success: true, data: pageData, hasMore };
                   })()
                 : { success: false, data: [] },
             // 使用 safeGetPatients 以避免 DataManager 尚未載入
             safeGetPatients(true)
         ]).then(([consRes, patientsRes]) => {
             medicalRecords = (consRes && consRes.success && Array.isArray(consRes.data)) ? consRes.data : [];
+            medicalRecordsHasMore = !!(consRes && consRes.hasMore);
             const patients = (patientsRes && patientsRes.success && Array.isArray(patientsRes.data)) ? patientsRes.data : [];
             medicalRecordPatients = {};
             patients.forEach(p => {
@@ -20966,6 +20967,7 @@ function loadMedicalRecordManagement() {
             // 若載入失敗仍清空列表
             medicalRecords = [];
             medicalRecordPatients = {};
+            medicalRecordsHasMore = false;
             displayMedicalRecords(false);
         });
     } catch (error) {
@@ -21138,11 +21140,38 @@ function displayMedicalRecords(pageChange = false) {
     const paginEl = ensurePaginationContainer('medicalRecordList', 'medicalRecordPagination');
     if (paginEl) {
         renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
-            if (paginationSettings.medicalRecordList) {
-                paginationSettings.medicalRecordList.currentPage = newPage;
-            }
-            displayMedicalRecords(true);
+            const requiredCount = newPage * itemsPerPage;
+            ensureMedicalRecordsLoaded(requiredCount).then(() => {
+                if (paginationSettings.medicalRecordList) {
+                    paginationSettings.medicalRecordList.currentPage = newPage;
+                }
+                displayMedicalRecords(true);
+            });
         }, paginEl);
+    }
+}
+
+async function ensureMedicalRecordsLoaded(requiredCount) {
+    try {
+        if (!window.firebaseDataManager || typeof window.firebaseDataManager.getConsultationsNextPage !== 'function') return;
+        if (medicalRecords.length >= requiredCount) return;
+        if (medicalRecordsLoadingMore) return;
+        medicalRecordsLoadingMore = true;
+        let hasMore = medicalRecordsHasMore;
+        while (medicalRecords.length < requiredCount && hasMore) {
+            const next = await window.firebaseDataManager.getConsultationsNextPage();
+            if (!next || !next.success || !Array.isArray(next.data)) {
+                hasMore = false;
+                break;
+            }
+            medicalRecords = next.data.slice();
+            hasMore = !!next.hasMore;
+        }
+        medicalRecordsHasMore = hasMore;
+    } catch (_e) {
+        // 忽略載入更多失敗
+    } finally {
+        medicalRecordsLoadingMore = false;
     }
 }
 
