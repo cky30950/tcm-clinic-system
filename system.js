@@ -2302,8 +2302,7 @@ async function attachPatientListListener() {
         const colRef = window.firebase.collection(window.firebase.db, 'patients');
         let q;
         try {
-            // 使用 orderBy 排序；若 createdAt 不存在於某些文件，則回傳順序可能不一致。
-            q = window.firebase.firestoreQuery(colRef, window.firebase.orderBy('createdAt', 'desc'));
+            q = window.firebase.firestoreQuery(colRef, window.firebase.orderBy('patientNumber', 'desc'));
         } catch (_e) {
             // 若 orderBy 無法使用，直接監聽整個集合
             q = colRef;
@@ -19242,7 +19241,7 @@ class FirebaseDataManager {
             // 透過 searchKeywords 進行查詢
             try {
                 const colRef = window.firebase.collection(window.firebase.db, 'patients');
-                const q = window.firebase.query(
+                const q = window.firebase.firestoreQuery(
                     colRef,
                     window.firebase.where('searchKeywords', 'array-contains', searchTerm),
                     window.firebase.limit(limit)

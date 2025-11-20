@@ -646,27 +646,17 @@ async function importClinicBackup(data) {
             ? paginationSettings.patientList.itemsPerPage
             : 10;
         if (Array.isArray(patientCache)) {
-            // 先依 createdAt 由新至舊排序，模擬 Firestore 預設排序
             const sortedPatients = patientCache.slice().sort((a, b) => {
-                let dateA = 0;
-                let dateB = 0;
-                if (a && a.createdAt) {
-                    if (a.createdAt.seconds !== undefined) {
-                        dateA = a.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(a.createdAt);
-                        dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                    }
-                }
-                if (b && b.createdAt) {
-                    if (b.createdAt.seconds !== undefined) {
-                        dateB = b.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(b.createdAt);
-                        dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                    }
-                }
-                return dateB - dateA;
+                const numA = (a && a.patientNumber !== undefined && a.patientNumber !== null)
+                    ? Number(a.patientNumber)
+                    : 0;
+                const numB = (b && b.patientNumber !== undefined && b.patientNumber !== null)
+                    ? Number(b.patientNumber)
+                    : 0;
+                if (isNaN(numA) && isNaN(numB)) return 0;
+                if (isNaN(numA)) return 1;
+                if (isNaN(numB)) return -1;
+                return numB - numA;
             });
             // 依每頁大小切分分頁快取
             for (let i = 0; i < sortedPatients.length; i += perPage) {
