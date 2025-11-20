@@ -255,8 +255,8 @@ async function exportClinicBackup() {
             while (hasMore) {
                 const nextRes = await window.firebaseDataManager.getConsultationsNextPage();
                 if (nextRes && nextRes.success && Array.isArray(nextRes.data)) {
-                    consultationsData = consultationsData.concat(nextRes.data);
-                    hasMore = !!nextRes.hasMore;
+                    consultationsData = nextRes.data.slice();
+                    hasMore = nextRes.hasMore;
                 } else {
                     hasMore = false;
                 }

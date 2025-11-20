@@ -729,7 +729,6 @@ let globalUsageCounts = {};
 // 個人統計分析的圖表實例，用於更新時先銷毀舊圖表
 let personalHerbChartInstance = null;
 let personalFormulaChartInstance = null;
-let personalStatsCache = {};
 let personalAcupointChartInstance = null;
 
 /**
@@ -792,17 +791,11 @@ async function computeGlobalUsageCounts() {
  * 回傳物件包含 herbCounts、formulaCounts 與 acupointCounts。
  */
 function computePersonalStatistics(doctor) {
-    const cacheKey = String(doctor || 'all');
-    if (personalStatsCache[cacheKey] && personalStatsCache[cacheKey].len === (Array.isArray(consultations) ? consultations.length : 0)) {
-        return personalStatsCache[cacheKey].stats;
-    }
     const herbCounts = {};
     const formulaCounts = {};
     const acupointCounts = {};
     if (!Array.isArray(consultations) || consultations.length === 0) {
-        const stats = { herbCounts, formulaCounts, acupointCounts };
-        personalStatsCache[cacheKey] = { stats, len: 0 };
-        return stats;
+        return { herbCounts, formulaCounts, acupointCounts };
     }
     consultations.forEach(cons => {
         try {
@@ -844,9 +837,7 @@ function computePersonalStatistics(doctor) {
             // 忽略此筆診症的解析錯誤
         }
     });
-    const stats = { herbCounts, formulaCounts, acupointCounts };
-    personalStatsCache[cacheKey] = { stats, len: consultations.length };
-    return stats;
+    return { herbCounts, formulaCounts, acupointCounts };
 }
 
 /**
@@ -953,11 +944,13 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
  * 若 consultations 尚未載入，會先載入全部診症記錄。
  */
 async function loadPersonalStatistics() {
-    if (typeof loadConsultationsForFinancial === 'function') {
-        try {
-            await loadConsultationsForFinancial(true);
-        } catch (_e) {
-            console.error('載入診症資料失敗：', _e);
+    if (!Array.isArray(consultations) || consultations.length === 0) {
+        if (typeof loadConsultationsForFinancial === 'function') {
+            try {
+                await loadConsultationsForFinancial();
+            } catch (_e) {
+                console.error('載入診症資料失敗：', _e);
+            }
         }
     }
     const doctor = currentUser;
@@ -3620,34 +3613,6 @@ function generateSearchKeywords(patient = {}) {
         }
     }
     return Array.from(keywords);
-}
-
-function generateConsultationSearchKeywords(c = {}) {
-    const s = new Set();
-    const addFragments = (str) => {
-        const v = String(str || '').toLowerCase().replace(/\s+/g, '').trim();
-        if (!v) return;
-        s.add(v);
-        const minLen = 3;
-        const maxLen = Math.min(v.length, 24);
-        for (let len = minLen; len <= maxLen; len++) {
-            for (let i = 0; i <= v.length - len; i++) {
-                s.add(v.slice(i, i + len));
-                if (s.size > 300) break;
-            }
-            if (s.size > 300) break;
-        }
-    };
-    addFragments(c.medicalRecordNumber);
-    let doctorStr = '';
-    try {
-        if (typeof c.doctor === 'string') doctorStr = c.doctor;
-        else if (c.doctor && c.doctor.username) doctorStr = c.doctor.username;
-    } catch (_e) {}
-    addFragments(doctorStr);
-    addFragments(c.diagnosis || c.tcmDiagnosis);
-    addFragments(c.symptoms || c.inquirySummary || c.chiefComplaint);
-    return Array.from(s);
 }
 
 // 等待 FirebaseDataManager 初始化的輔助函式
@@ -9338,7 +9303,7 @@ async function printReceiptFromAppointment(appointmentId) {
     }
     try {
         // 從 Firebase 獲取診症記錄
-        const consultationResult = await window.firebaseDataManager.getConsultations(true);
+        const consultationResult = await window.firebaseDataManager.getConsultations();
         if (!consultationResult.success) {
             showToast('無法讀取診症記錄！', 'error');
             return;
@@ -9410,7 +9375,7 @@ async function printAttendanceCertificateFromAppointment(appointmentId) {
     }
     try {
         // 從 Firebase 獲取診症記錄
-        const consultationResult = await window.firebaseDataManager.getConsultations(true);
+        const consultationResult = await window.firebaseDataManager.getConsultations();
         if (!consultationResult.success) {
             showToast('無法讀取診症記錄！', 'error');
             return;
@@ -9480,7 +9445,7 @@ async function printSickLeaveFromAppointment(appointmentId) {
     }
     try {
         // 從 Firebase 獲取診症記錄
-        const consultationResult = await window.firebaseDataManager.getConsultations(true);
+        const consultationResult = await window.firebaseDataManager.getConsultations();
         if (!consultationResult.success) {
             showToast('無法讀取診症記錄！', 'error');
             return;
@@ -9528,7 +9493,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
     // 如果沒有提供診症資料，從 Firebase 獲取
     if (!consultation) {
         try {
-            const consultationResult = await window.firebaseDataManager.getConsultations(true);
+            const consultationResult = await window.firebaseDataManager.getConsultations();
             if (!consultationResult.success) {
                 showToast('無法讀取診症記錄！', 'error');
                 return;
@@ -9536,17 +9501,8 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             
             consultation = consultationResult.data.find(c => String(c.id) === idToFind);
             if (!consultation) {
-                try {
-                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
-                    const docSnap = await window.firebase.getDoc(docRef);
-                    if (docSnap && docSnap.exists()) {
-                        consultation = { id: docSnap.id, ...docSnap.data() };
-                    }
-                } catch (_e) {}
-                if (!consultation) {
-                    showToast('找不到診症記錄！', 'error');
-                    return;
-                }
+                showToast('找不到診症記錄！', 'error');
+                return;
             }
         } catch (error) {
             console.error('讀取診症記錄錯誤:', error);
@@ -10133,7 +10089,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
     // 如果沒有提供診症資料，從 Firebase 獲取
     if (!consultation) {
         try {
-            const consultationResult = await window.firebaseDataManager.getConsultations(true);
+            const consultationResult = await window.firebaseDataManager.getConsultations();
             if (!consultationResult.success) {
                 showToast('無法讀取診症記錄！', 'error');
                 return;
@@ -10141,17 +10097,8 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
             
             consultation = consultationResult.data.find(c => String(c.id) === idToFind);
             if (!consultation) {
-                try {
-                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
-                    const docSnap = await window.firebase.getDoc(docRef);
-                    if (docSnap && docSnap.exists()) {
-                        consultation = { id: docSnap.id, ...docSnap.data() };
-                    }
-                } catch (_e) {}
-                if (!consultation) {
-                    showToast('找不到診症記錄！', 'error');
-                    return;
-                }
+                showToast('找不到診症記錄！', 'error');
+                return;
             }
         } catch (error) {
             console.error('讀取診症記錄錯誤:', error);
@@ -10538,28 +10485,9 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
 async function printSickLeave(consultationId, consultationData = null) {
     let consultation = consultationData;
     
+    // 如果沒有提供診症資料，從本地查找
     if (!consultation) {
-        const idToFind = String(consultationId);
-        try {
-            if (Array.isArray(consultations) && consultations.length > 0) {
-                consultation = consultations.find(c => String(c.id) === idToFind);
-            }
-            if (!consultation && window.firebaseDataManager) {
-                const result = await window.firebaseDataManager.getConsultations(true);
-                if (result && result.success) {
-                    consultation = result.data.find(c => String(c.id) === idToFind);
-                }
-            }
-            if (!consultation) {
-                try {
-                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
-                    const docSnap = await window.firebase.getDoc(docRef);
-                    if (docSnap && docSnap.exists()) {
-                        consultation = { id: docSnap.id, ...docSnap.data() };
-                    }
-                } catch (_e) {}
-            }
-        } catch (_err) {}
+        consultation = consultations.find(c => c.id === consultationId);
         if (!consultation) {
             showToast('找不到診症記錄！', 'error');
             return;
@@ -10990,24 +10918,15 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
     // 若未提供診症資料，從 Firebase 讀取
     if (!consultation) {
         try {
-            const consultationResult = await window.firebaseDataManager.getConsultations(true);
+            const consultationResult = await window.firebaseDataManager.getConsultations();
             if (!consultationResult.success) {
                 showToast('無法讀取診症記錄！', 'error');
                 return;
             }
             consultation = consultationResult.data.find(c => String(c.id) === idToFind);
             if (!consultation) {
-                try {
-                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
-                    const docSnap = await window.firebase.getDoc(docRef);
-                    if (docSnap && docSnap.exists()) {
-                        consultation = { id: docSnap.id, ...docSnap.data() };
-                    }
-                } catch (_e) {}
-                if (!consultation) {
-                    showToast('找不到診症記錄！', 'error');
-                    return;
-                }
+                showToast('找不到診症記錄！', 'error');
+                return;
             }
         } catch (error) {
             console.error('讀取診症記錄錯誤:', error);
@@ -16868,43 +16787,32 @@ async function deleteUser(id) {
         }
 
         // 從 Firebase 載入診症記錄以供財務報表使用
-        async function loadConsultationsForFinancial(forceRefresh = false) {
+        async function loadConsultationsForFinancial() {
             if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
                 return;
             }
             try {
-                const first = await window.firebaseDataManager.getConsultations(forceRefresh);
-                if (!first || !first.success) {
-                    return;
-                }
-                let all = Array.isArray(first.data) ? first.data.slice() : [];
-                let hasMore = !!first.hasMore;
-                while (hasMore && typeof window.firebaseDataManager.getConsultationsNextPage === 'function') {
-                    const next = await window.firebaseDataManager.getConsultationsNextPage();
-                    if (next && next.success) {
-                        all = Array.isArray(next.data) ? next.data.slice() : all;
-                        hasMore = !!next.hasMore;
-                    } else {
-                        hasMore = false;
-                    }
-                }
-                consultations = all.map(item => {
-                    let dateStr = null;
-                    if (item.date) {
-                        if (typeof item.date === 'object' && item.date.seconds) {
-                            dateStr = new Date(item.date.seconds * 1000).toISOString();
-                        } else {
-                            dateStr = item.date;
+                const result = await window.firebaseDataManager.getConsultations();
+                if (result.success) {
+                    // 轉換 Firebase Timestamp 為 ISO 字串
+                    consultations = result.data.map(item => {
+                        let dateStr = null;
+                        if (item.date) {
+                            if (typeof item.date === 'object' && item.date.seconds) {
+                                dateStr = new Date(item.date.seconds * 1000).toISOString();
+                            } else {
+                                dateStr = item.date;
+                            }
+                        } else if (item.createdAt) {
+                            if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
+                                dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
+                            } else {
+                                dateStr = item.createdAt;
+                            }
                         }
-                    } else if (item.createdAt) {
-                        if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
-                            dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
-                        } else {
-                            dateStr = item.createdAt;
-                        }
-                    }
-                    return { ...item, date: dateStr };
-                });
+                        return { ...item, date: dateStr };
+                    });
+                }
             } catch (error) {
                 console.error('載入 Firebase 診症資料失敗:', error);
             }
@@ -17065,7 +16973,7 @@ async function deleteUser(id) {
 
         // 生成財務報表
         // 改為 async 以便在更新報表前重新載入最新的診症資料，確保「更新報表」按鈕真正更新內容。
-        async function generateFinancialReport(forceRefresh = false) {
+        async function generateFinancialReport() {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
             const doctorFilter = document.getElementById('doctorFilter').value;
@@ -17080,11 +16988,10 @@ async function deleteUser(id) {
                 return;
             }
 
+            // 在生成報表前重新載入診症資料，以取得最新收入與統計
             if (typeof loadConsultationsForFinancial === 'function') {
                 try {
-                    if (forceRefresh || !Array.isArray(consultations) || consultations.length === 0) {
-                        await loadConsultationsForFinancial(!!forceRefresh);
-                    }
+                    await loadConsultationsForFinancial();
                 } catch (err) {
                     console.error('重新載入財務資料失敗:', err);
                 }
@@ -17494,8 +17401,8 @@ async function exportClinicBackup() {
             while (hasMore) {
                 const nextRes = await window.firebaseDataManager.getConsultationsNextPage();
                 if (nextRes && nextRes.success && Array.isArray(nextRes.data)) {
-                    consultationsData = consultationsData.concat(nextRes.data);
-                    hasMore = !!nextRes.hasMore;
+                    consultationsData = nextRes.data.slice();
+                    hasMore = nextRes.hasMore;
                 } else {
                     hasMore = false;
                 }
@@ -19397,65 +19304,6 @@ class FirebaseDataManager {
             return { success: false, data: [] };
         }
     }
-    async searchConsultations(term, limit = 50) {
-        if (!this.isReady) {
-            return { success: false, data: [] };
-        }
-        try {
-            await waitForFirebaseDb();
-            const searchTerm = (term || '').trim().toLowerCase();
-            if (!searchTerm) {
-                return { success: true, data: [] };
-            }
-            const results = [];
-            try {
-                const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-                const q = window.firebase.query(
-                    colRef,
-                    window.firebase.where('searchKeywords', 'array-contains', searchTerm),
-                    window.firebase.limit(limit)
-                );
-                const snapshot = await window.firebase.getDocs(q);
-                snapshot.forEach(doc => {
-                    results.push({ id: doc.id, ...doc.data() });
-                });
-            } catch (_err) {}
-            if (results.length < limit) {
-                let localCons = [];
-                if (Array.isArray(this.consultationsCache)) {
-                    localCons = this.consultationsCache;
-                } else {
-                    const first = await this.getConsultations(false);
-                    if (first && first.success && Array.isArray(first.data)) {
-                        localCons = first.data;
-                    }
-                }
-                const seen = new Set(results.map(r => String(r.id)));
-                const low = searchTerm;
-                for (const c of localCons) {
-                    if (results.length >= limit) break;
-                    if (seen.has(String(c.id))) continue;
-                    const numMatch = c.medicalRecordNumber && String(c.medicalRecordNumber).toLowerCase().includes(low);
-                    let doctorStr = '';
-                    try {
-                        if (typeof c.doctor === 'string') doctorStr = c.doctor;
-                        else if (c.doctor && c.doctor.username) doctorStr = c.doctor.username;
-                        else doctorStr = c.doctor && (c.doctor.displayName || c.doctor.name || c.doctor.fullName || c.doctor.email) || '';
-                    } catch (_e) {}
-                    const doctorMatch = doctorStr && String(doctorStr).toLowerCase().includes(low);
-                    const diagMatch = (c.diagnosis || c.tcmDiagnosis) && String(c.diagnosis || c.tcmDiagnosis).toLowerCase().includes(low);
-                    const compMatch = (c.symptoms || c.inquirySummary || c.chiefComplaint) && String(c.symptoms || c.inquirySummary || c.chiefComplaint).toLowerCase().includes(low);
-                    if (numMatch || doctorMatch || diagMatch || compMatch) {
-                        results.push(c);
-                        seen.add(String(c.id));
-                    }
-                }
-            }
-            return { success: true, data: results };
-        } catch (_error) {
-            return { success: false, data: [] };
-        }
-    }
 // 診症記錄管理
     async addConsultation(consultationData) {
         if (!this.isReady) {
@@ -19474,15 +19322,10 @@ class FirebaseDataManager {
             } catch (_omitErr) {
                 dataToWrite = consultationData;
             }
-            let searchKeywords = [];
-            try {
-                searchKeywords = generateConsultationSearchKeywords(dataToWrite);
-            } catch (_kwErr) {}
             const docRef = await window.firebase.addDoc(
                 window.firebase.collection(window.firebase.db, 'consultations'),
                 {
                     ...dataToWrite,
-                    searchKeywords,
                     createdAt: new Date(),
                     createdBy: currentUser
                 }
@@ -19648,15 +19491,10 @@ class FirebaseDataManager {
             } catch (_omitErr) {
                 dataToWrite = consultationData;
             }
-            let searchKeywords = [];
-            try {
-                searchKeywords = generateConsultationSearchKeywords(dataToWrite);
-            } catch (_kwErr) {}
             await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'consultations', consultationId),
                 {
                     ...dataToWrite,
-                    searchKeywords,
                     updatedAt: new Date(),
                     updatedBy: currentUser
                 }
@@ -21008,8 +20846,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // 儲存所有病歷與對應病人名稱，以供列表與搜尋使用
 let medicalRecords = [];
 let medicalRecordPatients = {};
-let medicalRecordsHasMore = false;
-let medicalRecordsLoadingMore = false;
 /**
  * 載入病歷管理頁面：重置搜尋欄、讀取診症記錄與病人資料，並綁定搜尋事件。
  */
@@ -21035,23 +20871,18 @@ function loadMedicalRecordManagement() {
             searchInput.addEventListener('input', listener);
             searchInput._medicalRecordListener = listener;
         }
-        // 同時讀取診症記錄（僅第一頁）與病人列表（強制刷新）
+        // 同時讀取診症記錄與病人列表（使用安全方法等待 DataManager 就緒）
         Promise.all([
             window.firebaseDataManager && typeof window.firebaseDataManager.getConsultations === 'function'
                 ? (async () => {
                       await waitForFirebaseDataManager();
-                      // 讀取第一頁
-                      const first = await window.firebaseDataManager.getConsultations(true);
-                      const pageData = (first && first.success && Array.isArray(first.data)) ? first.data.slice() : [];
-                      const hasMore = !!(first && first.success && first.hasMore);
-                      return { success: true, data: pageData, hasMore };
+                      return await window.firebaseDataManager.getConsultations(true);
                   })()
                 : { success: false, data: [] },
             // 使用 safeGetPatients 以避免 DataManager 尚未載入
             safeGetPatients(true)
         ]).then(([consRes, patientsRes]) => {
             medicalRecords = (consRes && consRes.success && Array.isArray(consRes.data)) ? consRes.data : [];
-            medicalRecordsHasMore = !!(consRes && consRes.hasMore);
             const patients = (patientsRes && patientsRes.success && Array.isArray(patientsRes.data)) ? patientsRes.data : [];
             medicalRecordPatients = {};
             patients.forEach(p => {
@@ -21064,7 +20895,6 @@ function loadMedicalRecordManagement() {
             // 若載入失敗仍清空列表
             medicalRecords = [];
             medicalRecordPatients = {};
-            medicalRecordsHasMore = false;
             displayMedicalRecords(false);
         });
     } catch (error) {
@@ -21076,7 +20906,7 @@ function loadMedicalRecordManagement() {
  * 顯示病歷列表，可依搜尋條件篩選並進行分頁。
  * @param {boolean} pageChange 若為 true 表示僅更換頁碼，不重置目前頁
  */
-async function displayMedicalRecords(pageChange = false) {
+function displayMedicalRecords(pageChange = false) {
     const tbody = document.getElementById('medicalRecordTableBody');
     if (!tbody) return;
     const searchInput = document.getElementById('searchMedicalRecord');
@@ -21084,18 +20914,6 @@ async function displayMedicalRecords(pageChange = false) {
     // 依照搜尋條件過濾
     let filtered = medicalRecords;
     if (term) {
-        try {
-            const itemsPerPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.itemsPerPage) ? paginationSettings.medicalRecordList.itemsPerPage : 10;
-            let currentPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.currentPage) ? paginationSettings.medicalRecordList.currentPage : 1;
-            const need = itemsPerPage * currentPage;
-            if (window.firebaseDataManager && typeof window.firebaseDataManager.searchConsultations === 'function') {
-                const res = await window.firebaseDataManager.searchConsultations(term, need);
-                if (res && res.success && Array.isArray(res.data)) {
-                    filtered = res.data;
-                }
-            }
-        } catch (_remoteErr) {}
-        if (!Array.isArray(filtered) || filtered.length === 0) {
         filtered = medicalRecords.filter(rec => {
             // 使用病歷編號進行搜尋時優先採用 rec.medicalRecordNumber
             // 若不存在則回退至 Firebase 文件 ID。這樣可讓使用者輸入「MR」開頭的編號
@@ -21125,7 +20943,6 @@ async function displayMedicalRecords(pageChange = false) {
             doctorName = doctorName.toLowerCase();
             return recordNum.includes(term) || patientName.includes(term) || doctorName.includes(term);
         });
-        }
     }
     // 將過濾後的病歷依日期排序，最新日期優先。
     // 透過 parseConsultationDate 解析 date、createdAt 或 updatedAt，若解析失敗視為 0。
@@ -21250,38 +21067,11 @@ async function displayMedicalRecords(pageChange = false) {
     const paginEl = ensurePaginationContainer('medicalRecordList', 'medicalRecordPagination');
     if (paginEl) {
         renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
-            const requiredCount = newPage * itemsPerPage;
-            ensureMedicalRecordsLoaded(requiredCount).then(() => {
-                if (paginationSettings.medicalRecordList) {
-                    paginationSettings.medicalRecordList.currentPage = newPage;
-                }
-                displayMedicalRecords(true);
-            });
-        }, paginEl);
-    }
-}
-
-async function ensureMedicalRecordsLoaded(requiredCount) {
-    try {
-        if (!window.firebaseDataManager || typeof window.firebaseDataManager.getConsultationsNextPage !== 'function') return;
-        if (medicalRecords.length >= requiredCount) return;
-        if (medicalRecordsLoadingMore) return;
-        medicalRecordsLoadingMore = true;
-        let hasMore = medicalRecordsHasMore;
-        while (medicalRecords.length < requiredCount && hasMore) {
-            const next = await window.firebaseDataManager.getConsultationsNextPage();
-            if (!next || !next.success || !Array.isArray(next.data)) {
-                hasMore = false;
-                break;
+            if (paginationSettings.medicalRecordList) {
+                paginationSettings.medicalRecordList.currentPage = newPage;
             }
-            medicalRecords = next.data.slice();
-            hasMore = !!next.hasMore;
-        }
-        medicalRecordsHasMore = hasMore;
-    } catch (_e) {
-        // 忽略載入更多失敗
-    } finally {
-        medicalRecordsLoadingMore = false;
+            displayMedicalRecords(true);
+        }, paginEl);
     }
 }
 
