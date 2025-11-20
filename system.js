@@ -3622,6 +3622,34 @@ function generateSearchKeywords(patient = {}) {
     return Array.from(keywords);
 }
 
+function generateConsultationSearchKeywords(c = {}) {
+    const s = new Set();
+    const addFragments = (str) => {
+        const v = String(str || '').toLowerCase().replace(/\s+/g, '').trim();
+        if (!v) return;
+        s.add(v);
+        const minLen = 3;
+        const maxLen = Math.min(v.length, 24);
+        for (let len = minLen; len <= maxLen; len++) {
+            for (let i = 0; i <= v.length - len; i++) {
+                s.add(v.slice(i, i + len));
+                if (s.size > 300) break;
+            }
+            if (s.size > 300) break;
+        }
+    };
+    addFragments(c.medicalRecordNumber);
+    let doctorStr = '';
+    try {
+        if (typeof c.doctor === 'string') doctorStr = c.doctor;
+        else if (c.doctor && c.doctor.username) doctorStr = c.doctor.username;
+    } catch (_e) {}
+    addFragments(doctorStr);
+    addFragments(c.diagnosis || c.tcmDiagnosis);
+    addFragments(c.symptoms || c.inquirySummary || c.chiefComplaint);
+    return Array.from(s);
+}
+
 // 等待 FirebaseDataManager 初始化的輔助函式
 // 某些函式需要等待 DataManager isReady 再繼續
 async function waitForFirebaseDataManager() {
@@ -19369,6 +19397,65 @@ class FirebaseDataManager {
             return { success: false, data: [] };
         }
     }
+    async searchConsultations(term, limit = 50) {
+        if (!this.isReady) {
+            return { success: false, data: [] };
+        }
+        try {
+            await waitForFirebaseDb();
+            const searchTerm = (term || '').trim().toLowerCase();
+            if (!searchTerm) {
+                return { success: true, data: [] };
+            }
+            const results = [];
+            try {
+                const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+                const q = window.firebase.query(
+                    colRef,
+                    window.firebase.where('searchKeywords', 'array-contains', searchTerm),
+                    window.firebase.limit(limit)
+                );
+                const snapshot = await window.firebase.getDocs(q);
+                snapshot.forEach(doc => {
+                    results.push({ id: doc.id, ...doc.data() });
+                });
+            } catch (_err) {}
+            if (results.length < limit) {
+                let localCons = [];
+                if (Array.isArray(this.consultationsCache)) {
+                    localCons = this.consultationsCache;
+                } else {
+                    const first = await this.getConsultations(false);
+                    if (first && first.success && Array.isArray(first.data)) {
+                        localCons = first.data;
+                    }
+                }
+                const seen = new Set(results.map(r => String(r.id)));
+                const low = searchTerm;
+                for (const c of localCons) {
+                    if (results.length >= limit) break;
+                    if (seen.has(String(c.id))) continue;
+                    const numMatch = c.medicalRecordNumber && String(c.medicalRecordNumber).toLowerCase().includes(low);
+                    let doctorStr = '';
+                    try {
+                        if (typeof c.doctor === 'string') doctorStr = c.doctor;
+                        else if (c.doctor && c.doctor.username) doctorStr = c.doctor.username;
+                        else doctorStr = c.doctor && (c.doctor.displayName || c.doctor.name || c.doctor.fullName || c.doctor.email) || '';
+                    } catch (_e) {}
+                    const doctorMatch = doctorStr && String(doctorStr).toLowerCase().includes(low);
+                    const diagMatch = (c.diagnosis || c.tcmDiagnosis) && String(c.diagnosis || c.tcmDiagnosis).toLowerCase().includes(low);
+                    const compMatch = (c.symptoms || c.inquirySummary || c.chiefComplaint) && String(c.symptoms || c.inquirySummary || c.chiefComplaint).toLowerCase().includes(low);
+                    if (numMatch || doctorMatch || diagMatch || compMatch) {
+                        results.push(c);
+                        seen.add(String(c.id));
+                    }
+                }
+            }
+            return { success: true, data: results };
+        } catch (_error) {
+            return { success: false, data: [] };
+        }
+    }
 // 診症記錄管理
     async addConsultation(consultationData) {
         if (!this.isReady) {
@@ -19387,10 +19474,15 @@ class FirebaseDataManager {
             } catch (_omitErr) {
                 dataToWrite = consultationData;
             }
+            let searchKeywords = [];
+            try {
+                searchKeywords = generateConsultationSearchKeywords(dataToWrite);
+            } catch (_kwErr) {}
             const docRef = await window.firebase.addDoc(
                 window.firebase.collection(window.firebase.db, 'consultations'),
                 {
                     ...dataToWrite,
+                    searchKeywords,
                     createdAt: new Date(),
                     createdBy: currentUser
                 }
@@ -19556,10 +19648,15 @@ class FirebaseDataManager {
             } catch (_omitErr) {
                 dataToWrite = consultationData;
             }
+            let searchKeywords = [];
+            try {
+                searchKeywords = generateConsultationSearchKeywords(dataToWrite);
+            } catch (_kwErr) {}
             await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'consultations', consultationId),
                 {
                     ...dataToWrite,
+                    searchKeywords,
                     updatedAt: new Date(),
                     updatedBy: currentUser
                 }
@@ -20979,7 +21076,7 @@ function loadMedicalRecordManagement() {
  * 顯示病歷列表，可依搜尋條件篩選並進行分頁。
  * @param {boolean} pageChange 若為 true 表示僅更換頁碼，不重置目前頁
  */
-function displayMedicalRecords(pageChange = false) {
+async function displayMedicalRecords(pageChange = false) {
     const tbody = document.getElementById('medicalRecordTableBody');
     if (!tbody) return;
     const searchInput = document.getElementById('searchMedicalRecord');
@@ -20987,6 +21084,18 @@ function displayMedicalRecords(pageChange = false) {
     // 依照搜尋條件過濾
     let filtered = medicalRecords;
     if (term) {
+        try {
+            const itemsPerPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.itemsPerPage) ? paginationSettings.medicalRecordList.itemsPerPage : 10;
+            let currentPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.currentPage) ? paginationSettings.medicalRecordList.currentPage : 1;
+            const need = itemsPerPage * currentPage;
+            if (window.firebaseDataManager && typeof window.firebaseDataManager.searchConsultations === 'function') {
+                const res = await window.firebaseDataManager.searchConsultations(term, need);
+                if (res && res.success && Array.isArray(res.data)) {
+                    filtered = res.data;
+                }
+            }
+        } catch (_remoteErr) {}
+        if (!Array.isArray(filtered) || filtered.length === 0) {
         filtered = medicalRecords.filter(rec => {
             // 使用病歷編號進行搜尋時優先採用 rec.medicalRecordNumber
             // 若不存在則回退至 Firebase 文件 ID。這樣可讓使用者輸入「MR」開頭的編號
@@ -21016,6 +21125,7 @@ function displayMedicalRecords(pageChange = false) {
             doctorName = doctorName.toLowerCase();
             return recordNum.includes(term) || patientName.includes(term) || doctorName.includes(term);
         });
+        }
     }
     // 將過濾後的病歷依日期排序，最新日期優先。
     // 透過 parseConsultationDate 解析 date、createdAt 或 updatedAt，若解析失敗視為 0。
