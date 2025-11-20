@@ -1232,6 +1232,8 @@ let patientConsultationsCache = {};
 // patientPageCursors[pageNumber] 儲存該頁最後一筆文件的快照，用於下一頁查詢。
 let patientPagesCache = {};
 let patientPageCursors = {};
+let patientPageCursorIds = {};
+try { patientPageCursorIds = JSON.parse(localStorage.getItem('patientPageCursorIds') || '{}') || {}; } catch (_e) {}
 
 // 快取病人總數，用於分頁計算。讀取一次後會快取，除非強制刷新。
 let patientsCountCache = null;
@@ -1610,6 +1612,7 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
     if (forceRefresh) {
         patientPagesCache = {};
         patientPageCursors = {};
+        try { patientPageCursorIds = {}; localStorage.removeItem('patientPageCursorIds'); } catch (_e) {}
     }
     // 若快取中已有對應頁資料，直接返回
     if (!forceRefresh && patientPagesCache[pageNumber]) {
@@ -1625,11 +1628,24 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
      */
     if (!forceRefresh && pageNumber > 1) {
         const prevPage = pageNumber - 1;
-        // 如果缺少前一頁的游標或快取，逐頁載入缺失的頁面
         if (!patientPageCursors[prevPage] || !patientPagesCache[prevPage]) {
-            for (let i = 1; i < pageNumber; i++) {
+            try { patientPageCursorIds = JSON.parse(localStorage.getItem('patientPageCursorIds') || '{}') || patientPageCursorIds; } catch (_e) {}
+            let nearest = 0;
+            for (const k in patientPageCursorIds) {
+                const p = Number(k);
+                if (p > 0 && p < pageNumber && p > nearest) nearest = p;
+            }
+            if (nearest && !patientPageCursors[nearest]) {
+                const id = patientPageCursorIds[nearest];
+                if (id) {
+                    const snap = await window.firebase.getDoc(window.firebase.doc(window.firebase.db, 'patients', id));
+                    if (snap && snap.exists()) patientPageCursors[nearest] = snap;
+                }
+            }
+            const start = nearest ? nearest + 1 : 1;
+            for (let i = start; i < pageNumber; i++) {
                 if (!patientPagesCache[i]) {
-                    await fetchPatientsPage(i, forceRefresh);
+                    await fetchPatientsPage(i, false);
                 }
             }
         }
@@ -1662,6 +1678,12 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
         if (docs.length > 0) {
             const lastDoc = snapshot.docs[snapshot.docs.length - 1];
             patientPageCursors[pageNumber] = lastDoc;
+            try {
+                if (lastDoc && lastDoc.id) {
+                    patientPageCursorIds[pageNumber] = lastDoc.id;
+                    localStorage.setItem('patientPageCursorIds', JSON.stringify(patientPageCursorIds));
+                }
+            } catch (_e) {}
         }
         // 快取本頁資料
         patientPagesCache[pageNumber] = docs;
@@ -2314,6 +2336,7 @@ async function attachPatientListListener() {
                 patientCache = null;
                 patientPagesCache = {};
                 patientPageCursors = {};
+                try { patientPageCursorIds = {}; localStorage.removeItem('patientPageCursorIds'); } catch (_e) {}
                 patientsCountCache = null;
                 try {
                     // 移除本地儲存的快取，以便下次重新載入
@@ -4609,6 +4632,7 @@ async function savePatient() {
         if (typeof patientPageCursors === 'object') {
             patientPageCursors = {};
         }
+        try { patientPageCursorIds = {}; localStorage.removeItem('patientPageCursorIds'); } catch (_e) {}
         // 清除病人總數快取以重新計算頁數
         patientsCountCache = null;
 
@@ -5065,6 +5089,7 @@ async function deletePatient(id) {
                 if (typeof patientPageCursors === 'object') {
                     patientPageCursors = {};
                 }
+                try { patientPageCursorIds = {}; localStorage.removeItem('patientPageCursorIds'); } catch (_e) {}
                 patientsCountCache = null;
             // 重新載入病人列表並更新統計後，重新載入今日掛號，以清除刪除病人對應的掛號
             await loadPatientListFromFirebase();

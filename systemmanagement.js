@@ -641,6 +641,7 @@ async function importClinicBackup(data) {
         // 重新產生病人分頁快取，使 fetchPatientsPage() 可以直接從快取取得資料
         patientPagesCache = {};
         patientPageCursors = {};
+        try { localStorage.removeItem('patientPageCursorIds'); } catch (_e) {}
         // 取得每頁顯示數量
         const perPage = (paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage)
             ? paginationSettings.patientList.itemsPerPage
