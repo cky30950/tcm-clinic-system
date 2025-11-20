@@ -3,6 +3,14 @@
 let currentUser = null;
 let currentUserData = null;
 
+function normalizeDoctor(d) {
+    if (!d) return '';
+    if (typeof d === 'string') return d;
+    if (typeof d === 'object') {
+        return d.username || d.displayName || d.name || d.fullName || d.email || '';
+    }
+    return String(d || '');
+}
 // 全域自訂權限（Custom Claims）儲存區
 // 於 Firebase 登入後載入使用者的 ID Token 並解析其中的自訂權限，再存入此對象
 // 以便其他模組（例如 schedule_management.js）可直接存取
@@ -799,7 +807,7 @@ function computePersonalStatistics(doctor) {
     }
     consultations.forEach(cons => {
         try {
-            if (doctor && cons.doctor && String(cons.doctor) !== String(doctor)) {
+            if (doctor && cons.doctor && normalizeDoctor(cons.doctor) !== normalizeDoctor(doctor)) {
                 return;
             }
             const pres = cons && cons.prescription ? cons.prescription : '';
@@ -944,11 +952,13 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
  * 若 consultations 尚未載入，會先載入全部診症記錄。
  */
 async function loadPersonalStatistics() {
-    if (typeof loadConsultationsForFinancial === 'function') {
-        try {
-            await loadConsultationsForFinancial(true);
-        } catch (_e) {
-            console.error('載入診症資料失敗：', _e);
+    if (!Array.isArray(consultations) || consultations.length === 0) {
+        if (typeof loadConsultationsForFinancial === 'function') {
+            try {
+                await loadConsultationsForFinancial();
+            } catch (_e) {
+                console.error('載入診症資料失敗：', _e);
+            }
         }
     }
     const doctor = currentUser;
@@ -8301,7 +8311,7 @@ async function saveConsultation() {
         // Assemble consultation data common to both new and edit operations
         const consultationData = {
             appointmentId: currentConsultingAppointmentId,
-            patientId: appointment.patientId,
+            patientId: String(appointment.patientId),
             symptoms: symptoms,
             tongue: document.getElementById('formTongue').value.trim(),
             pulse: document.getElementById('formPulse').value.trim(),
@@ -9301,7 +9311,7 @@ async function printReceiptFromAppointment(appointmentId) {
     }
     try {
         // 從 Firebase 獲取診症記錄
-        const consultationResult = await window.firebaseDataManager.getConsultations(true);
+        const consultationResult = await window.firebaseDataManager.getConsultations();
         if (!consultationResult.success) {
             showToast('無法讀取診症記錄！', 'error');
             return;
@@ -9373,7 +9383,7 @@ async function printAttendanceCertificateFromAppointment(appointmentId) {
     }
     try {
         // 從 Firebase 獲取診症記錄
-        const consultationResult = await window.firebaseDataManager.getConsultations(true);
+        const consultationResult = await window.firebaseDataManager.getConsultations();
         if (!consultationResult.success) {
             showToast('無法讀取診症記錄！', 'error');
             return;
@@ -9443,7 +9453,7 @@ async function printSickLeaveFromAppointment(appointmentId) {
     }
     try {
         // 從 Firebase 獲取診症記錄
-        const consultationResult = await window.firebaseDataManager.getConsultations(true);
+        const consultationResult = await window.firebaseDataManager.getConsultations();
         if (!consultationResult.success) {
             showToast('無法讀取診症記錄！', 'error');
             return;
@@ -9491,7 +9501,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
     // 如果沒有提供診症資料，從 Firebase 獲取
     if (!consultation) {
         try {
-            const consultationResult = await window.firebaseDataManager.getConsultations(true);
+            const consultationResult = await window.firebaseDataManager.getConsultations();
             if (!consultationResult.success) {
                 showToast('無法讀取診症記錄！', 'error');
                 return;
@@ -9499,17 +9509,8 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             
             consultation = consultationResult.data.find(c => String(c.id) === idToFind);
             if (!consultation) {
-                try {
-                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
-                    const docSnap = await window.firebase.getDoc(docRef);
-                    if (docSnap && docSnap.exists()) {
-                        consultation = { id: docSnap.id, ...docSnap.data() };
-                    }
-                } catch (_e) {}
-                if (!consultation) {
-                    showToast('找不到診症記錄！', 'error');
-                    return;
-                }
+                showToast('找不到診症記錄！', 'error');
+                return;
             }
         } catch (error) {
             console.error('讀取診症記錄錯誤:', error);
@@ -10096,7 +10097,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
     // 如果沒有提供診症資料，從 Firebase 獲取
     if (!consultation) {
         try {
-            const consultationResult = await window.firebaseDataManager.getConsultations(true);
+            const consultationResult = await window.firebaseDataManager.getConsultations();
             if (!consultationResult.success) {
                 showToast('無法讀取診症記錄！', 'error');
                 return;
@@ -10104,17 +10105,8 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
             
             consultation = consultationResult.data.find(c => String(c.id) === idToFind);
             if (!consultation) {
-                try {
-                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
-                    const docSnap = await window.firebase.getDoc(docRef);
-                    if (docSnap && docSnap.exists()) {
-                        consultation = { id: docSnap.id, ...docSnap.data() };
-                    }
-                } catch (_e) {}
-                if (!consultation) {
-                    showToast('找不到診症記錄！', 'error');
-                    return;
-                }
+                showToast('找不到診症記錄！', 'error');
+                return;
             }
         } catch (error) {
             console.error('讀取診症記錄錯誤:', error);
@@ -10501,28 +10493,9 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
 async function printSickLeave(consultationId, consultationData = null) {
     let consultation = consultationData;
     
+    // 如果沒有提供診症資料，從本地查找
     if (!consultation) {
-        const idToFind = String(consultationId);
-        try {
-            if (Array.isArray(consultations) && consultations.length > 0) {
-                consultation = consultations.find(c => String(c.id) === idToFind);
-            }
-            if (!consultation && window.firebaseDataManager) {
-                const result = await window.firebaseDataManager.getConsultations(true);
-                if (result && result.success) {
-                    consultation = result.data.find(c => String(c.id) === idToFind);
-                }
-            }
-            if (!consultation) {
-                try {
-                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
-                    const docSnap = await window.firebase.getDoc(docRef);
-                    if (docSnap && docSnap.exists()) {
-                        consultation = { id: docSnap.id, ...docSnap.data() };
-                    }
-                } catch (_e) {}
-            }
-        } catch (_err) {}
+        consultation = consultations.find(c => c.id === consultationId);
         if (!consultation) {
             showToast('找不到診症記錄！', 'error');
             return;
@@ -10953,24 +10926,15 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
     // 若未提供診症資料，從 Firebase 讀取
     if (!consultation) {
         try {
-            const consultationResult = await window.firebaseDataManager.getConsultations(true);
+            const consultationResult = await window.firebaseDataManager.getConsultations();
             if (!consultationResult.success) {
                 showToast('無法讀取診症記錄！', 'error');
                 return;
             }
             consultation = consultationResult.data.find(c => String(c.id) === idToFind);
             if (!consultation) {
-                try {
-                    const docRef = window.firebase.doc(window.firebase.db, 'consultations', idToFind);
-                    const docSnap = await window.firebase.getDoc(docRef);
-                    if (docSnap && docSnap.exists()) {
-                        consultation = { id: docSnap.id, ...docSnap.data() };
-                    }
-                } catch (_e) {}
-                if (!consultation) {
-                    showToast('找不到診症記錄！', 'error');
-                    return;
-                }
+                showToast('找不到診症記錄！', 'error');
+                return;
             }
         } catch (error) {
             console.error('讀取診症記錄錯誤:', error);
@@ -16831,12 +16795,12 @@ async function deleteUser(id) {
         }
 
         // 從 Firebase 載入診症記錄以供財務報表使用
-        async function loadConsultationsForFinancial(forceRefresh = false) {
+        async function loadConsultationsForFinancial() {
             if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
                 return;
             }
             try {
-                const result = await window.firebaseDataManager.getConsultations(forceRefresh);
+                const result = await window.firebaseDataManager.getConsultations();
                 if (result.success) {
                     // 轉換 Firebase Timestamp 為 ISO 字串
                     consultations = result.data.map(item => {
@@ -17035,7 +16999,7 @@ async function deleteUser(id) {
             // 在生成報表前重新載入診症資料，以取得最新收入與統計
             if (typeof loadConsultationsForFinancial === 'function') {
                 try {
-                    await loadConsultationsForFinancial(true);
+                    await loadConsultationsForFinancial();
                 } catch (err) {
                     console.error('重新載入財務資料失敗:', err);
                 }
@@ -17067,7 +17031,7 @@ async function deleteUser(id) {
             return consultations.filter(consultation => {
                 const consultationDate = new Date(consultation.date);
                 const dateInRange = consultationDate >= start && consultationDate <= end;
-                const doctorMatch = !doctorFilter || consultation.doctor === doctorFilter;
+                const doctorMatch = !doctorFilter || normalizeDoctor(consultation.doctor) === normalizeDoctor(doctorFilter);
                 const isCompleted = consultation.status === 'completed';
 
                 return dateInRange && doctorMatch && isCompleted;
@@ -17088,14 +17052,15 @@ async function deleteUser(id) {
                 totalRevenue += consultationRevenue;
 
                 // 醫師統計
-                if (!doctorStats[consultation.doctor]) {
-                    doctorStats[consultation.doctor] = {
+                const docKey = normalizeDoctor(consultation.doctor);
+                if (!doctorStats[docKey]) {
+                    doctorStats[docKey] = {
                         count: 0,
                         revenue: 0
                     };
                 }
-                doctorStats[consultation.doctor].count += 1;
-                doctorStats[consultation.doctor].revenue += consultationRevenue;
+                doctorStats[docKey].count += 1;
+                doctorStats[docKey].revenue += consultationRevenue;
 
                 // 服務統計
                 parsed.items.forEach(item => {
@@ -19573,8 +19538,9 @@ class FirebaseDataManager {
 
         try {
             // 若快取存在且不需要強制刷新，直接回傳快取資料
-            if (!forceRefresh && patientConsultationsCache && Array.isArray(patientConsultationsCache[patientId])) {
-                return { success: true, data: patientConsultationsCache[patientId] };
+            const pidStr = String(patientId);
+            if (!forceRefresh && patientConsultationsCache && Array.isArray(patientConsultationsCache[pidStr])) {
+                return { success: true, data: patientConsultationsCache[pidStr] };
             }
             /**
              * 改為直接使用 Firestore 查詢特定 patientId 的診療記錄，避免先讀取全部後再過濾。
@@ -19582,7 +19548,7 @@ class FirebaseDataManager {
              */
             // 使用 where 條件建立查詢
             const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            const q = window.firebase.firestoreQuery(colRef, window.firebase.where('patientId', '==', patientId));
+            const q = window.firebase.firestoreQuery(colRef, window.firebase.where('patientId', '==', pidStr));
             const querySnapshot = await window.firebase.getDocs(q);
             const patientConsultations = [];
             querySnapshot.forEach((docSnap) => {
@@ -19599,7 +19565,7 @@ class FirebaseDataManager {
                 return dateB - dateA;
             });
             // 儲存至快取以供後續使用
-            patientConsultationsCache[patientId] = patientConsultations;
+            patientConsultationsCache[pidStr] = patientConsultations;
             return { success: true, data: patientConsultations };
         } catch (error) {
             console.error('讀取病人診症記錄失敗:', error);
@@ -20915,28 +20881,12 @@ function loadMedicalRecordManagement() {
             searchInput.addEventListener('input', listener);
             searchInput._medicalRecordListener = listener;
         }
-        // 同時讀取診症記錄（全頁）與病人列表（強制刷新）
+        // 同時讀取診症記錄與病人列表（使用安全方法等待 DataManager 就緒）
         Promise.all([
             window.firebaseDataManager && typeof window.firebaseDataManager.getConsultations === 'function'
                 ? (async () => {
                       await waitForFirebaseDataManager();
-                      // 讀取第一頁
-                      const first = await window.firebaseDataManager.getConsultations(true);
-                      let allData = (first && first.success && Array.isArray(first.data)) ? first.data.slice() : [];
-                      let hasMore = !!(first && first.success && first.hasMore);
-                      // 連續讀取後續頁面，直至無更多
-                      if (hasMore && typeof window.firebaseDataManager.getConsultationsNextPage === 'function') {
-                          try {
-                              while (hasMore) {
-                                  const next = await window.firebaseDataManager.getConsultationsNextPage();
-                                  if (!next || !next.success) break;
-                                  // getConsultationsNextPage 會回傳累積後的快取
-                                  allData = Array.isArray(next.data) ? next.data.slice() : allData;
-                                  hasMore = !!next.hasMore;
-                              }
-                          } catch (_e) {}
-                      }
-                      return { success: true, data: allData };
+                      return await window.firebaseDataManager.getConsultations(true);
                   })()
                 : { success: false, data: [] },
             // 使用 safeGetPatients 以避免 DataManager 尚未載入
@@ -20947,7 +20897,7 @@ function loadMedicalRecordManagement() {
             medicalRecordPatients = {};
             patients.forEach(p => {
                 const name = p.name || p.patientName || p.fullName || p.displayName || p.chineseName || p.englishName || '';
-                medicalRecordPatients[p.id] = name;
+                medicalRecordPatients[String(p.id)] = name;
             });
             displayMedicalRecords(false);
         }).catch(err => {
@@ -20979,7 +20929,7 @@ function displayMedicalRecords(pageChange = false) {
             // 若不存在則回退至 Firebase 文件 ID。這樣可讓使用者輸入「MR」開頭的編號
             // 就能搜尋到對應病歷，而不會只比對隱晦的文件 ID。【857813225103928†L1617-L1625】
             const recordNum = String(rec.medicalRecordNumber || rec.id || '').toLowerCase();
-            const patientName = String(medicalRecordPatients[rec.patientId] || '').toLowerCase();
+            const patientName = String(medicalRecordPatients[String(rec.patientId)] || '').toLowerCase();
             let doctorName = '';
             // 依據醫師資料設定顯示名稱，若為字串（可能為 username 或角色），
             // 則使用 getDoctorDisplayName() 嘗試從用戶列表取得顯示名稱；
@@ -21067,7 +21017,7 @@ function displayMedicalRecords(pageChange = false) {
             const recordNumDisplay = rec.medicalRecordNumber || rec.id || '';
             // 實際用於載入與刪除的病歷 ID 必須使用 Firebase 文件 ID
             const recordId = rec.id || '';
-            const patientName = medicalRecordPatients[rec.patientId] || '';
+            const patientName = medicalRecordPatients[String(rec.patientId)] || '';
             let doctorName = '';
             if (rec.doctor) {
                 try {
