@@ -3804,6 +3804,122 @@ async function fetchJsonWithFallback(fileName) {
     throw new Error(`無法取得 ${fileName} 資料`);
 }
 
+let diagnosisSuggestions = { tongue: [], pulse: [], tcmDiagnosis: [], syndrome: [] };
+let suggestionsLoaded = false;
+async function initSuggestions(forceRefresh = false) {
+    if (suggestionsLoaded && !forceRefresh) return;
+    try {
+        const data = await fetchJsonWithFallback('suggestions.json');
+        diagnosisSuggestions = {
+            tongue: Array.isArray(data.tongue) ? data.tongue : [],
+            pulse: Array.isArray(data.pulse) ? data.pulse : [],
+            tcmDiagnosis: Array.isArray(data.tcmDiagnosis) ? data.tcmDiagnosis : [],
+            syndrome: Array.isArray(data.syndrome) ? data.syndrome : []
+        };
+        suggestionsLoaded = true;
+        setupTypeaheadForDiagnosisFields();
+    } catch (e) {
+        console.error('讀取建議資料失敗:', e);
+    }
+}
+
+function attachTypeahead(inputEl, source) {
+    if (!inputEl || !Array.isArray(source)) return;
+    if (inputEl._typeaheadAttached) return;
+    const dropdown = document.createElement('div');
+    dropdown.className = 'absolute z-50 bg-white border border-gray-200 rounded shadow-md max-h-48 overflow-auto hidden';
+    document.body.appendChild(dropdown);
+    let activeIndex = -1;
+    let matches = [];
+    function position() {
+        const rect = inputEl.getBoundingClientRect();
+        dropdown.style.left = `${rect.left + window.scrollX}px`;
+        dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+        dropdown.style.width = `${rect.width}px`;
+    }
+    function hide() {
+        dropdown.classList.add('hidden');
+        activeIndex = -1;
+    }
+    function show() {
+        position();
+        dropdown.classList.remove('hidden');
+    }
+    function render() {
+        dropdown.innerHTML = matches.map((m, i) => `<div data-idx="${i}" class="px-3 py-1 text-sm hover:bg-blue-50 cursor-pointer ${i === activeIndex ? 'bg-blue-100' : ''}">${m}</div>`).join('');
+        show();
+    }
+    function currentToken() {
+        const caret = inputEl.selectionStart || 0;
+        const prefix = String(inputEl.value || '').slice(0, caret);
+        const token = prefix.split(/[\n,，。；;、\s]/).pop();
+        return String(token || '').trim();
+    }
+    function update() {
+        const token = currentToken();
+        if (!token) { hide(); return; }
+        const lower = token.toLowerCase();
+        matches = source.filter(s => String(s).toLowerCase().includes(lower)).slice(0, 8);
+        if (matches.length === 0) { hide(); return; }
+        activeIndex = 0;
+        render();
+    }
+    function insert(val) {
+        const start = inputEl.selectionStart || 0;
+        const end = inputEl.selectionEnd || start;
+        const v = String(inputEl.value || '');
+        const token = currentToken();
+        const tokenStart = v.slice(0, start).lastIndexOf(token);
+        const before = v.slice(0, tokenStart);
+        const after = v.slice(end);
+        const sep = before.endsWith(' ') || before.endsWith('，') || before.endsWith('、') || before.endsWith(',') ? '' : (before ? '，' : '');
+        inputEl.value = `${before}${sep}${val}${after}`;
+        const pos = (before + sep + val).length;
+        inputEl.selectionStart = pos;
+        inputEl.selectionEnd = pos;
+        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+        hide();
+    }
+    inputEl.addEventListener('input', update);
+    inputEl.addEventListener('keydown', function (e) {
+        if (dropdown.classList.contains('hidden')) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            activeIndex = Math.min(activeIndex + 1, matches.length - 1);
+            render();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeIndex = Math.max(activeIndex - 1, 0);
+            render();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (activeIndex >= 0 && matches[activeIndex]) insert(matches[activeIndex]);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            hide();
+        }
+    });
+    dropdown.addEventListener('mousedown', function (e) {
+        const target = e.target;
+        const idx = target && target.getAttribute('data-idx');
+        if (idx != null) insert(matches[Number(idx)]);
+    });
+    inputEl.addEventListener('blur', function () { setTimeout(hide, 100); });
+    window.addEventListener('scroll', function () { if (!dropdown.classList.contains('hidden')) position(); });
+    inputEl._typeaheadAttached = true;
+}
+
+function setupTypeaheadForDiagnosisFields() {
+    const elTongue = document.getElementById('formTongue');
+    const elPulse = document.getElementById('formPulse');
+    const elDiag = document.getElementById('formDiagnosis');
+    const elSyn = document.getElementById('formSyndrome');
+    if (elTongue) attachTypeahead(elTongue, diagnosisSuggestions.tongue);
+    if (elPulse) attachTypeahead(elPulse, diagnosisSuggestions.pulse);
+    if (elDiag) attachTypeahead(elDiag, diagnosisSuggestions.tcmDiagnosis);
+    if (elSyn) attachTypeahead(elSyn, diagnosisSuggestions.syndrome);
+}
+
     
 
 // 主要登入功能
@@ -3958,6 +4074,15 @@ async function attemptMainLogin() {
                         await initTemplateLibrary();
                     } catch (err) {
                         console.error('初始化模板庫資料失敗:', err);
+                    }
+                })());
+            }
+            if (typeof initSuggestions === 'function') {
+                initTasks.push((async () => {
+                    try {
+                        await initSuggestions();
+                    } catch (err) {
+                        console.error('初始化建議資料失敗:', err);
                     }
                 })());
             }
