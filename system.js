@@ -221,6 +221,24 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
+// 針對 Logo 圖片提供載入失敗的後備處理：改用備用圖片
+document.addEventListener('DOMContentLoaded', function () {
+    try {
+        const logos = document.querySelectorAll('img[src="images/myLogo.png"]');
+        logos.forEach(img => {
+            function setFallback() {
+                try { img.src = 'images/combined_three.png'; } catch (_) {}
+            }
+            img.addEventListener('error', setFallback);
+            if (img.complete && img.naturalWidth === 0) {
+                const orig = img.src;
+                img.src = '';
+                img.src = orig;
+            }
+        });
+    } catch (_) {}
+});
+
 // DOMContentLoaded 事件：初始化處方搜尋區域的庫存模式選單
 document.addEventListener('DOMContentLoaded', function () {
     try {
