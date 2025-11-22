@@ -21026,7 +21026,7 @@ async function displayMedicalRecords(pageChange = false) {
         paginationSettings.medicalRecordList.currentPage = currentPage;
     }
     const startIdx = (currentPage - 1) * itemsPerPage;
-    const pageItems = filtered.slice(startIdx, startIdx + itemsPerPage);
+    const pageItems = term ? filtered.slice(startIdx, startIdx + itemsPerPage) : filtered;
     tbody.innerHTML = '';
     // 決定語言顯示
     let lang = 'zh';
