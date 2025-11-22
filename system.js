@@ -20883,6 +20883,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // 儲存所有病歷與對應病人名稱，以供列表與搜尋使用
 let medicalRecords = [];
 let medicalRecordPatients = {};
+let medicalRecordsLoadingAll = false;
 /**
  * 載入病歷管理頁面：重置搜尋欄、讀取診症記錄與病人資料，並綁定搜尋事件。
  */
@@ -20927,6 +20928,9 @@ function loadMedicalRecordManagement() {
                 medicalRecordPatients[p.id] = name;
             });
             displayMedicalRecords(false);
+            try {
+                progressiveLoadAllConsultations();
+            } catch (_e) {}
         }).catch(err => {
             console.error('載入病歷資料失敗:', err);
             // 若載入失敗仍清空列表
@@ -20943,7 +20947,7 @@ function loadMedicalRecordManagement() {
  * 顯示病歷列表，可依搜尋條件篩選並進行分頁。
  * @param {boolean} pageChange 若為 true 表示僅更換頁碼，不重置目前頁
  */
-async function displayMedicalRecords(pageChange = false) {
+function displayMedicalRecords(pageChange = false) {
     const tbody = document.getElementById('medicalRecordTableBody');
     if (!tbody) return;
     const searchInput = document.getElementById('searchMedicalRecord');
@@ -21009,65 +21013,6 @@ async function displayMedicalRecords(pageChange = false) {
     }
     const itemsPerPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.itemsPerPage) ? paginationSettings.medicalRecordList.itemsPerPage : 10;
     let currentPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.currentPage) ? paginationSettings.medicalRecordList.currentPage : 1;
-    // 若需要更多資料以覆蓋目前頁面或進行完整搜尋，動態載入下一頁
-    try {
-        const dataMgr = window.firebaseDataManager;
-        if (dataMgr && typeof dataMgr.getConsultationsNextPage === 'function') {
-            if (term) {
-                // 搜尋時為了涵蓋全部病歷，迭代讀取剩餘分頁
-                // 僅在還有更多資料時進行
-                let safety = 50;
-                // 嘗試在載入更多資料後重新計算過濾結果
-                while (dataMgr.consultationsHasMore && safety-- > 0) {
-                    const nextRes = await dataMgr.getConsultationsNextPage();
-                    if (nextRes && nextRes.success && Array.isArray(nextRes.data)) {
-                        medicalRecords = nextRes.data;
-                        // 重新套用搜尋過濾
-                        filtered = medicalRecords.filter(rec => {
-                            const recordNum = String(rec.medicalRecordNumber || rec.id || '').toLowerCase();
-                            const patientName = String(medicalRecordPatients[rec.patientId] || '').toLowerCase();
-                            let doctorName = '';
-                            if (rec.doctor) {
-                                try {
-                                    if (typeof rec.doctor === 'string') {
-                                        doctorName = typeof getDoctorDisplayName === 'function'
-                                            ? getDoctorDisplayName(rec.doctor) : rec.doctor;
-                                    } else if (rec.doctor.username) {
-                                        doctorName = typeof getDoctorDisplayName === 'function'
-                                            ? getDoctorDisplayName(rec.doctor.username) : (rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '');
-                                    } else {
-                                        doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
-                                    }
-                                } catch (_err) {
-                                    doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
-                                }
-                            }
-                            doctorName = doctorName.toLowerCase();
-                            return recordNum.includes(term) || patientName.includes(term) || doctorName.includes(term);
-                        });
-                    } else {
-                        break;
-                    }
-                }
-            } else {
-                // 非搜尋時，僅在頁面需要更多資料時再載入下一頁以節省流量
-                const requiredCount = (currentPage - 1) * itemsPerPage + itemsPerPage;
-                let safety = 50;
-                while (medicalRecords.length < requiredCount && dataMgr.consultationsHasMore && safety-- > 0) {
-                    const nextRes = await dataMgr.getConsultationsNextPage();
-                    if (nextRes && nextRes.success && Array.isArray(nextRes.data)) {
-                        medicalRecords = nextRes.data;
-                        // 更新過濾結果（無搜尋條件時為全部）
-                        filtered = medicalRecords;
-                    } else {
-                        break;
-                    }
-                }
-            }
-        }
-    } catch (_pageLoadErr) {
-        console.warn('病歷管理分頁資料載入失敗:', _pageLoadErr);
-    }
     const totalItems = filtered.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     if (currentPage > totalPages) {
@@ -21169,6 +21114,30 @@ async function displayMedicalRecords(pageChange = false) {
             displayMedicalRecords(true);
         }, paginEl);
     }
+}
+
+async function progressiveLoadAllConsultations() {
+    try {
+        if (!window.firebaseDataManager) return;
+        if (medicalRecordsLoadingAll) return;
+        medicalRecordsLoadingAll = true;
+        try {
+            let hasMore = !!window.firebaseDataManager.consultationsHasMore;
+            while (hasMore) {
+                const res = await window.firebaseDataManager.getConsultationsNextPage();
+                if (res && Array.isArray(res.data)) {
+                    medicalRecords = res.data;
+                    try {
+                        displayMedicalRecords(true);
+                    } catch (_r) {}
+                }
+                hasMore = !!(res && res.hasMore);
+                await new Promise(r => setTimeout(r, 200));
+            }
+        } finally {
+            medicalRecordsLoadingAll = false;
+        }
+    } catch (_err) {}
 }
 
 /**
