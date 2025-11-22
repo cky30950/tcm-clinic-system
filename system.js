@@ -25832,16 +25832,24 @@ document.addEventListener('DOMContentLoaded', function() {
                         const container = document.getElementById('acupointNotesSearchResults');
                         if (!list || !container || container.classList.contains('hidden')) return;
                         const items = Array.from(list.children);
+                        const applyHighlight = function() {
+                            items.forEach(function(n, i) {
+                                const isSel = i === acupointNotesSearchSelectionIndex;
+                                n.classList.toggle('bg-blue-100', isSel);
+                                n.classList.toggle('ring-2', isSel);
+                                n.classList.toggle('ring-blue-400', isSel);
+                                n.classList.toggle('bg-blue-50', !isSel);
+                                if (isSel) { n.scrollIntoView({ block: 'nearest' }); }
+                            });
+                        };
                         if (e.key === 'ArrowDown') {
                             e.preventDefault();
                             acupointNotesSearchSelectionIndex = Math.min(acupointNotesSearchSelectionIndex + 1, items.length - 1);
-                            items.forEach(function(n, i) { n.classList.toggle('bg-blue-100', i === acupointNotesSearchSelectionIndex); });
-                            if (acupointNotesSearchSelectionIndex >= 0 && items[acupointNotesSearchSelectionIndex]) { items[acupointNotesSearchSelectionIndex].scrollIntoView({ block: 'nearest' }); }
+                            applyHighlight();
                         } else if (e.key === 'ArrowUp') {
                             e.preventDefault();
                             acupointNotesSearchSelectionIndex = Math.max(acupointNotesSearchSelectionIndex - 1, 0);
-                            items.forEach(function(n, i) { n.classList.toggle('bg-blue-100', i === acupointNotesSearchSelectionIndex); });
-                            if (acupointNotesSearchSelectionIndex >= 0 && items[acupointNotesSearchSelectionIndex]) { items[acupointNotesSearchSelectionIndex].scrollIntoView({ block: 'nearest' }); }
+                            applyHighlight();
                         } else if (e.key === 'Enter') {
                             if (acupointNotesSearchSelectionIndex >= 0 && items[acupointNotesSearchSelectionIndex]) {
                                 e.preventDefault();
