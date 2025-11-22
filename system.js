@@ -25739,7 +25739,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             return;
                         }
                         const lower = q.toLowerCase();
-                        const items = list.filter(function(s) { return String(s).toLowerCase().includes(lower); }).slice(0, 8);
+                        const items = list.filter(function(s) { return String(s).toLowerCase().includes(lower); }).slice(0, 16);
                         render(items);
                     };
                     el.addEventListener('input', debounce(filter, 150));
