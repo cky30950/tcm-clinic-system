@@ -852,30 +852,24 @@ function computePersonalStatistics(doctor) {
  */
 async function loadPastRecords(patientId, excludeConsultationId = null) {
     try {
-        // 若 consultations 尚未載入，嘗試從 Firebase 取得全部診症記錄
-        if (!Array.isArray(consultations) || consultations.length === 0) {
-            try {
-                if (window.firebaseDataManager && typeof window.firebaseDataManager.getConsultations === 'function') {
-                    const consResult = await window.firebaseDataManager.getConsultations();
-                    if (consResult && consResult.success && Array.isArray(consResult.data)) {
-                        consultations = consResult.data;
-                    }
-                }
-            } catch (err) {
-                console.error('載入診症記錄時發生錯誤:', err);
+        let records = [];
+        try {
+            const res = await window.firebaseDataManager.getPatientConsultations(patientId, true);
+            if (res && res.success && Array.isArray(res.data)) {
+                records = res.data;
             }
+        } catch (err) {
+            console.error('載入診症記錄時發生錯誤:', err);
         }
-        if (!Array.isArray(consultations)) {
+        if (!Array.isArray(records) || records.length === 0) {
             return;
         }
-        // 篩選出同一病人的診症紀錄，排除正在編輯的紀錄（若有提供）
-        const records = consultations.filter(c => {
+        records = records.filter(c => {
             if (!c || (typeof c.patientId === 'undefined')) return false;
             if (String(c.patientId) !== String(patientId)) return false;
             if (excludeConsultationId && String(c.id) === String(excludeConsultationId)) return false;
             return true;
         }).sort((a, b) => {
-            // 依日期由新到舊排序
             const getTime = (c) => {
                 let d = null;
                 if (c.date) {
@@ -9517,8 +9511,13 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             
             consultation = consultationResult.data.find(c => String(c.id) === idToFind);
             if (!consultation) {
-                showToast('找不到診症記錄！', 'error');
-                return;
+                const singleRes = await window.firebaseDataManager.getConsultationById(idToFind);
+                if (singleRes && singleRes.success && singleRes.data) {
+                    consultation = singleRes.data;
+                } else {
+                    showToast('找不到診症記錄！', 'error');
+                    return;
+                }
             }
         } catch (error) {
             console.error('讀取診症記錄錯誤:', error);
@@ -19494,6 +19493,45 @@ class FirebaseDataManager {
         } catch (error) {
             console.error('讀取診症記錄下一頁失敗:', error);
             return { success: false, data: [] };
+        }
+    }
+
+    async getConsultationById(consultationId) {
+        if (!this.isReady) return { success: false, data: null };
+        try {
+            const idStr = String(consultationId);
+            let found = null;
+            if (Array.isArray(this.consultationsCache)) {
+                found = this.consultationsCache.find(c => String(c.id) === idStr) || null;
+            }
+            if (found) {
+                return { success: true, data: found };
+            }
+            const docRef = window.firebase.doc(window.firebase.db, 'consultations', idStr);
+            const docSnap = await window.firebase.getDoc(docRef);
+            if (docSnap && docSnap.exists()) {
+                const record = { id: docSnap.id, ...docSnap.data() };
+                if (Array.isArray(this.consultationsCache)) {
+                    this.consultationsCache.push(record);
+                    try {
+                        localStorage.setItem('consultations', JSON.stringify(this.consultationsCache));
+                    } catch (lsErr) {
+                        console.warn('保存診症記錄到本地失敗:', lsErr);
+                    }
+                } else {
+                    this.consultationsCache = [record];
+                    try {
+                        localStorage.setItem('consultations', JSON.stringify(this.consultationsCache));
+                    } catch (lsErr) {
+                        console.warn('保存診症記錄到本地失敗:', lsErr);
+                    }
+                }
+                return { success: true, data: record };
+            }
+            return { success: false, data: null };
+        } catch (error) {
+            console.error('讀取單筆診症記錄失敗:', error);
+            return { success: false, data: null };
         }
     }
 
