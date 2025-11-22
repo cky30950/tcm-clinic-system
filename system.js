@@ -20884,7 +20884,6 @@ document.addEventListener('DOMContentLoaded', function() {
 let medicalRecords = [];
 let medicalRecordPatients = {};
 let medicalRecordsLoadingAll = false;
-let medicalRecordsLoadingPage = false;
 /**
  * 載入病歷管理頁面：重置搜尋欄、讀取診症記錄與病人資料，並綁定搜尋事件。
  */
@@ -20929,6 +20928,9 @@ function loadMedicalRecordManagement() {
                 medicalRecordPatients[p.id] = name;
             });
             displayMedicalRecords(false);
+            try {
+                progressiveLoadAllConsultations();
+            } catch (_e) {}
         }).catch(err => {
             console.error('載入病歷資料失敗:', err);
             // 若載入失敗仍清空列表
@@ -21011,14 +21013,7 @@ function displayMedicalRecords(pageChange = false) {
     }
     const itemsPerPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.itemsPerPage) ? paginationSettings.medicalRecordList.itemsPerPage : 10;
     let currentPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.currentPage) ? paginationSettings.medicalRecordList.currentPage : 1;
-    let totalItems = filtered.length;
-    let blockUpperBound = ((Math.floor((currentPage - 1) / 10) + 1) * 10 * itemsPerPage);
-    if (window.firebaseDataManager && window.firebaseDataManager.consultationsHasMore) {
-        if (totalItems < blockUpperBound) totalItems = blockUpperBound;
-        if (!medicalRecordsLoadingPage && (!Array.isArray(medicalRecords) || medicalRecords.length < blockUpperBound)) {
-            try { ensureMedicalRecordsForIndex(blockUpperBound); } catch (_e) {}
-        }
-    }
+    const totalItems = filtered.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     if (currentPage > totalPages) {
         currentPage = totalPages;
@@ -21028,17 +21023,6 @@ function displayMedicalRecords(pageChange = false) {
     }
     const startIdx = (currentPage - 1) * itemsPerPage;
     const pageItems = filtered.slice(startIdx, startIdx + itemsPerPage);
-    if ((!pageItems || pageItems.length === 0) && window.firebaseDataManager && window.firebaseDataManager.consultationsHasMore) {
-        if (!medicalRecordsLoadingPage) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="px-4 py-8 text-center text-gray-500">正在載入該頁資料...</td>
-                </tr>
-            `;
-            ensureMedicalRecordsForIndex(blockUpperBound);
-            return;
-        }
-    }
     tbody.innerHTML = '';
     // 決定語言顯示
     let lang = 'zh';
@@ -21152,27 +21136,6 @@ async function progressiveLoadAllConsultations() {
             }
         } finally {
             medicalRecordsLoadingAll = false;
-        }
-    } catch (_err) {}
-}
-
-async function ensureMedicalRecordsForIndex(minCount) {
-    try {
-        if (!window.firebaseDataManager) return;
-        if (medicalRecordsLoadingPage) return;
-        medicalRecordsLoadingPage = true;
-        try {
-            let hasMore = !!window.firebaseDataManager.consultationsHasMore;
-            while (hasMore && (!Array.isArray(medicalRecords) || medicalRecords.length < minCount)) {
-                const res = await window.firebaseDataManager.getConsultationsNextPage();
-                if (res && Array.isArray(res.data)) {
-                    medicalRecords = res.data;
-                }
-                hasMore = !!(res && res.hasMore);
-            }
-        } finally {
-            medicalRecordsLoadingPage = false;
-            try { displayMedicalRecords(true); } catch (_e) {}
         }
     } catch (_err) {}
 }
