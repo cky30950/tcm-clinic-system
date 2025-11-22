@@ -21153,6 +21153,15 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             const snap = await window.firebase.getDocs(q);
             const arr = [];
             snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
+            try {
+                arr.sort((a, b) => {
+                    const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
+                    const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                    const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
+                    const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
+                    return tB - tA;
+                });
+            } catch (_e) {}
             medicalRecordPageCache[1] = arr;
             medicalRecordPageCursors[1] = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
             return arr;
@@ -21180,6 +21189,15 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         const snap2 = await window.firebase.getDocs(q);
         const arr2 = [];
         snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
+        try {
+            arr2.sort((a, b) => {
+                const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
+                const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
+                const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
+                return tB - tA;
+            });
+        } catch (_e) {}
         medicalRecordPageCache[page] = arr2;
         medicalRecordPageCursors[page] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : medicalRecordPageCursors[prevPage];
         return arr2;
@@ -21248,6 +21266,15 @@ async function searchMedicalRecords(term, limitCount = 50) {
                 });
             } catch (_e) {}
         }
+        try {
+            out.sort((a, b) => {
+                const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
+                const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
+                const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
+                return tB - tA;
+            });
+        } catch (_e) {}
         return out;
     } catch (_err) {
         return [];
