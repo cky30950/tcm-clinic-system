@@ -25736,10 +25736,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             e.preventDefault();
                             sel = Math.min(sel + 1, items.length - 1);
                             items.forEach(function(n, i) { n.classList.toggle('bg-blue-100', i === sel); });
+                            if (sel >= 0 && items[sel]) { items[sel].scrollIntoView({ block: 'nearest' }); }
                         } else if (e.key === 'ArrowUp') {
                             e.preventDefault();
                             sel = Math.max(sel - 1, 0);
                             items.forEach(function(n, i) { n.classList.toggle('bg-blue-100', i === sel); });
+                            if (sel >= 0 && items[sel]) { items[sel].scrollIntoView({ block: 'nearest' }); }
                         } else if (e.key === 'Enter') {
                             if (sel >= 0 && items[sel]) {
                                 e.preventDefault();
