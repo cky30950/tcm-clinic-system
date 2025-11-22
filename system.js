@@ -21012,9 +21012,12 @@ function displayMedicalRecords(pageChange = false) {
     const itemsPerPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.itemsPerPage) ? paginationSettings.medicalRecordList.itemsPerPage : 10;
     let currentPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.currentPage) ? paginationSettings.medicalRecordList.currentPage : 1;
     let totalItems = filtered.length;
+    let blockUpperBound = ((Math.floor((currentPage - 1) / 10) + 1) * 10 * itemsPerPage);
     if (window.firebaseDataManager && window.firebaseDataManager.consultationsHasMore) {
-        const minForNext = (currentPage * itemsPerPage) + itemsPerPage;
-        if (totalItems < minForNext) totalItems = minForNext;
+        if (totalItems < blockUpperBound) totalItems = blockUpperBound;
+        if (!medicalRecordsLoadingPage && (!Array.isArray(medicalRecords) || medicalRecords.length < blockUpperBound)) {
+            try { ensureMedicalRecordsForIndex(blockUpperBound); } catch (_e) {}
+        }
     }
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     if (currentPage > totalPages) {
@@ -21032,7 +21035,7 @@ function displayMedicalRecords(pageChange = false) {
                     <td colspan="6" class="px-4 py-8 text-center text-gray-500">正在載入該頁資料...</td>
                 </tr>
             `;
-            ensureMedicalRecordsForIndex(startIdx + itemsPerPage);
+            ensureMedicalRecordsForIndex(blockUpperBound);
             return;
         }
     }
