@@ -219,7 +219,8 @@
                 if (ac) {
                     // 取得穴位名稱，並移除括號及其後內容（例如 國際代碼）
                     const rawName = ac.name || '';
-                    const cleanedName = String(rawName).replace(/\s*\(.*\)$/, '').trim();
+                    // 清理名稱：移除括號及其內容，例如「眉冲 (GB13)」->「眉冲」
+                    const cleanedName = String(rawName).replace(/\s*\(.*\)$/, '');
                     // 先直接查找座標；若找不到，再將名稱轉為簡體後查找。
                     let coords = ACUPOINT_COORDS[cleanedName];
                     if (!coords) {
