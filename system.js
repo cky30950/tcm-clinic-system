@@ -21183,6 +21183,22 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             const arr = [];
             snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
             try {
+                for (const r of arr) {
+                    if (r && typeof r.date === 'string') {
+                        const parsed = parseConsultationDate(r.date);
+                        if (parsed && !isNaN(parsed.getTime())) {
+                            try {
+                                await window.firebase.updateDoc(
+                                    window.firebase.doc(window.firebase.db, 'consultations', r.id),
+                                    { date: parsed }
+                                );
+                                r.date = parsed;
+                            } catch (_udErr) {}
+                        }
+                    }
+                }
+            } catch (_normErr) {}
+            try {
                 arr.sort((a, b) => {
                     const A = parseConsultationDate(a.date || null);
                     const B = parseConsultationDate(b.date || null);
@@ -21219,6 +21235,22 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         const arr2 = [];
         snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
         try {
+            for (const r of arr2) {
+                if (r && typeof r.date === 'string') {
+                    const parsed = parseConsultationDate(r.date);
+                    if (parsed && !isNaN(parsed.getTime())) {
+                        try {
+                            await window.firebase.updateDoc(
+                                window.firebase.doc(window.firebase.db, 'consultations', r.id),
+                                { date: parsed }
+                            );
+                            r.date = parsed;
+                        } catch (_udErr2) {}
+                    }
+                }
+            }
+        } catch (_normErr2) {}
+        try {
             arr2.sort((a, b) => {
                 const A = parseConsultationDate(a.date || null);
                 const B = parseConsultationDate(b.date || null);
@@ -21252,6 +21284,22 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             const snap = await window.firebase.getDocs(q);
             const arr = [];
             snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
+            try {
+                for (const r of arr) {
+                    if (r && typeof r.date === 'string') {
+                        const parsed = parseConsultationDate(r.date);
+                        if (parsed && !isNaN(parsed.getTime())) {
+                            try {
+                                await window.firebase.updateDoc(
+                                    window.firebase.doc(window.firebase.db, 'consultations', r.id),
+                                    { date: parsed }
+                                );
+                                r.date = parsed;
+                            } catch (_udErr3) {}
+                        }
+                    }
+                }
+            } catch (_normErr3) {}
             try {
                 arr.sort((a, b) => {
                     const A = parseConsultationDate(a.date || null);
@@ -21287,6 +21335,22 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
         const snap2 = await window.firebase.getDocs(q);
         const arr2 = [];
         snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
+        try {
+            for (const r of arr2) {
+                if (r && typeof r.date === 'string') {
+                    const parsed = parseConsultationDate(r.date);
+                    if (parsed && !isNaN(parsed.getTime())) {
+                        try {
+                            await window.firebase.updateDoc(
+                                window.firebase.doc(window.firebase.db, 'consultations', r.id),
+                                { date: parsed }
+                            );
+                            r.date = parsed;
+                        } catch (_udErr4) {}
+                    }
+                }
+            }
+        } catch (_normErr4) {}
         try {
             arr2.sort((a, b) => {
                 const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
