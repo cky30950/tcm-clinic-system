@@ -941,12 +941,31 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
  */
 async function loadPersonalStatistics() {
     if (!Array.isArray(consultations) || consultations.length === 0) {
-        if (typeof loadConsultationsForFinancial === 'function') {
-            try {
-                await loadConsultationsForFinancial();
-            } catch (_e) {
-                console.error('載入診症資料失敗：', _e);
+        try {
+            if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
+                const res = await window.firebaseDataManager.getConsultationsByDoctor(currentUser);
+                if (res && res.success) {
+                    consultations = res.data.map(item => {
+                        let dateStr = null;
+                        if (item.date) {
+                            if (typeof item.date === 'object' && item.date.seconds) {
+                                dateStr = new Date(item.date.seconds * 1000).toISOString();
+                            } else {
+                                dateStr = item.date;
+                            }
+                        } else if (item.createdAt) {
+                            if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
+                                dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
+                            } else {
+                                dateStr = item.createdAt;
+                            }
+                        }
+                        return { id: item.id, date: dateStr, doctor: item.doctor, prescription: item.prescription, acupunctureNotes: item.acupunctureNotes };
+                    });
+                }
             }
+        } catch (_e) {
+            console.error('載入診症資料失敗：', _e);
         }
     }
     const doctor = currentUser;
@@ -16784,10 +16803,47 @@ async function deleteUser(id) {
                 return;
             }
             try {
-                const result = await window.firebaseDataManager.getConsultations();
-                if (result.success) {
-                    // 轉換 Firebase Timestamp 為 ISO 字串
-                    consultations = result.data.map(item => {
+                const startEl = document.getElementById('startDate');
+                const endEl = document.getElementById('endDate');
+                const doctorEl = document.getElementById('doctorFilter');
+                if (startEl && endEl) {
+                    const startVal = startEl.value;
+                    const endVal = endEl.value;
+                    const doctorVal = doctorEl ? doctorEl.value : '';
+                    const targeted = await window.firebaseDataManager.getConsultationsByRangeAndDoctor(startVal, endVal, doctorVal || null, true);
+                    if (targeted && targeted.success) {
+                        consultations = targeted.data.map(item => {
+                            let dateStr = null;
+                            if (item.date) {
+                                if (typeof item.date === 'object' && item.date.seconds) {
+                                    dateStr = new Date(item.date.seconds * 1000).toISOString();
+                                } else {
+                                    dateStr = item.date;
+                                }
+                            } else if (item.createdAt) {
+                                if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
+                                    dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
+                                } else {
+                                    dateStr = item.createdAt;
+                                }
+                            }
+                            return { id: item.id, date: dateStr, doctor: item.doctor, status: item.status, billingItems: item.billingItems, prescription: item.prescription, acupunctureNotes: item.acupunctureNotes };
+                        });
+                        return;
+                    }
+                }
+                let res = await window.firebaseDataManager.getConsultations(true);
+                if (res && res.success) {
+                    let all = res.data;
+                    while (res.hasMore) {
+                        res = await window.firebaseDataManager.getConsultationsNextPage();
+                        if (res && res.success && Array.isArray(res.data)) {
+                            all = res.data;
+                        } else {
+                            break;
+                        }
+                    }
+                    consultations = all.map(item => {
                         let dateStr = null;
                         if (item.date) {
                             if (typeof item.date === 'object' && item.date.seconds) {
@@ -19476,6 +19532,102 @@ class FirebaseDataManager {
         } catch (error) {
             console.error('讀取診症記錄下一頁失敗:', error);
             return { success: false, data: [] };
+        }
+    }
+
+    async getConsultationsByRangeAndDoctor(startDateStr, endDateStr, doctorFilter = null, completedOnly = true) {
+        if (!this.isReady) return { success: false, data: [] };
+        try {
+            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+            const start = new Date(startDateStr);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(endDateStr);
+            end.setHours(23, 59, 59, 999);
+            const pageSize = 100;
+            const parts = [];
+            if (completedOnly) parts.push(window.firebase.where('status', '==', 'completed'));
+            if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
+            parts.push(window.firebase.orderBy('date', 'asc'));
+            parts.push(window.firebase.where('date', '>=', start));
+            parts.push(window.firebase.where('date', '<=', end));
+            parts.push(window.firebase.limit(pageSize));
+            let q = window.firebase.firestoreQuery(colRef, ...parts);
+            let snap = await window.firebase.getDocs(q);
+            const list = [];
+            snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+            let lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            while (snap.docs.length === pageSize && lastVisible) {
+                const nextParts = [];
+                if (completedOnly) nextParts.push(window.firebase.where('status', '==', 'completed'));
+                if (doctorFilter) nextParts.push(window.firebase.where('doctor', '==', doctorFilter));
+                nextParts.push(window.firebase.orderBy('date', 'asc'));
+                nextParts.push(window.firebase.where('date', '>=', start));
+                nextParts.push(window.firebase.where('date', '<=', end));
+                nextParts.push(window.firebase.startAfter(lastVisible));
+                nextParts.push(window.firebase.limit(pageSize));
+                q = window.firebase.firestoreQuery(colRef, ...nextParts);
+                snap = await window.firebase.getDocs(q);
+                snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+                lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            }
+            return { success: true, data: list };
+        } catch (error) {
+            console.warn('目標條件查詢失敗，改用完整載入:', error);
+            try {
+                let res = await this.getConsultations(true);
+                if (!res || !res.success) return { success: false, data: [] };
+                while (res.hasMore) {
+                    res = await this.getConsultationsNextPage();
+                    if (!res || !res.success) break;
+                }
+                return { success: true, data: Array.isArray(this.consultationsCache) ? this.consultationsCache.slice() : [] };
+            } catch (_e) {
+                return { success: false, data: [] };
+            }
+        }
+    }
+
+    async getConsultationsByDoctor(doctor, pageSize = 100) {
+        if (!this.isReady) return { success: false, data: [] };
+        try {
+            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+            let q = window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.where('doctor', '==', doctor),
+                window.firebase.orderBy('date', 'asc'),
+                window.firebase.limit(pageSize)
+            );
+            let snap = await window.firebase.getDocs(q);
+            const list = [];
+            snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+            let lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            while (snap.docs.length === pageSize && lastVisible) {
+                q = window.firebase.firestoreQuery(
+                    colRef,
+                    window.firebase.where('doctor', '==', doctor),
+                    window.firebase.orderBy('date', 'asc'),
+                    window.firebase.startAfter(lastVisible),
+                    window.firebase.limit(pageSize)
+                );
+                snap = await window.firebase.getDocs(q);
+                snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+                lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            }
+            return { success: true, data: list };
+        } catch (error) {
+            try {
+                let res = await this.getConsultations(true);
+                if (!res || !res.success) return { success: false, data: [] };
+                while (res.hasMore) {
+                    res = await this.getConsultationsNextPage();
+                    if (!res || !res.success) break;
+                }
+                const all = Array.isArray(this.consultationsCache) ? this.consultationsCache.slice() : [];
+                const filtered = all.filter(c => c && String(c.doctor) === String(doctor));
+                return { success: true, data: filtered };
+            } catch (_e) {
+                return { success: false, data: [] };
+            }
         }
     }
 
