@@ -8492,7 +8492,8 @@ async function saveConsultation() {
                     existing = consResult.data.find(c => String(c.id) === String(appointment.consultationId));
                 }
             }
-            consultationData.date = existing && existing.date ? existing.date : new Date();
+            let vtEdit = parseConsultationDate(consultationData.visitTime);
+            consultationData.date = (vtEdit && !isNaN(vtEdit.getTime())) ? vtEdit : (existing && existing.date ? existing.date : new Date());
             consultationData.doctor = existing && existing.doctor ? existing.doctor : currentUser;
             // Update the existing consultation record
             const updateResult = await window.firebaseDataManager.updateConsultation(String(appointment.consultationId), consultationData);
@@ -8535,7 +8536,8 @@ async function saveConsultation() {
             // New consultation: assign the current date and doctor
             // 為新的病歷產生一個唯一的病歷編號
             consultationData.medicalRecordNumber = generateMedicalRecordNumber();
-            consultationData.date = new Date();
+            let vtNew = parseConsultationDate(consultationData.visitTime);
+            consultationData.date = (vtNew && !isNaN(vtNew.getTime())) ? vtNew : new Date();
             consultationData.doctor = currentUser;
             const result = await window.firebaseDataManager.addConsultation(consultationData);
             if (result && result.success) {
@@ -21662,8 +21664,8 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             snapLast.forEach(d => arrLast.push({ id: d.id, ...d.data() }));
             try {
                 arrLast.sort((a, b) => {
-                    const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
-                    const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                    const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
+                    const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
                     const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                     const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                     return tB - tA;
@@ -21683,16 +21685,22 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
             try {
                 for (const r of arr) {
-                    if (r && typeof r.date === 'string') {
-                        const parsed = parseConsultationDate(r.date);
+                    if (r) {
+                        const parsed = parseConsultationDate(r.visitTime || r.date || r.createdAt || r.updatedAt || null);
                         if (parsed && !isNaN(parsed.getTime())) {
+                            let curr = null;
                             try {
-                                await window.firebase.updateDoc(
-                                    window.firebase.doc(window.firebase.db, 'consultations', r.id),
-                                    { date: parsed }
-                                );
-                                r.date = parsed;
-                            } catch (_udErr) {}
+                                curr = r.date && r.date.seconds ? new Date(r.date.seconds * 1000) : (r.date instanceof Date ? r.date : (typeof r.date === 'string' ? new Date(r.date) : null));
+                            } catch (_eCurr) {}
+                            if (!curr || isNaN(curr.getTime()) || curr.getTime() !== parsed.getTime()) {
+                                try {
+                                    await window.firebase.updateDoc(
+                                        window.firebase.doc(window.firebase.db, 'consultations', r.id),
+                                        { date: parsed }
+                                    );
+                                    r.date = parsed;
+                                } catch (_udErr) {}
+                            }
                         }
                     }
                 }
@@ -21735,16 +21743,22 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
         try {
             for (const r of arr2) {
-                if (r && typeof r.date === 'string') {
-                    const parsed = parseConsultationDate(r.date);
+                if (r) {
+                    const parsed = parseConsultationDate(r.visitTime || r.date || r.createdAt || r.updatedAt || null);
                     if (parsed && !isNaN(parsed.getTime())) {
+                        let curr = null;
                         try {
-                            await window.firebase.updateDoc(
-                                window.firebase.doc(window.firebase.db, 'consultations', r.id),
-                                { date: parsed }
-                            );
-                            r.date = parsed;
-                        } catch (_udErr2) {}
+                            curr = r.date && r.date.seconds ? new Date(r.date.seconds * 1000) : (r.date instanceof Date ? r.date : (typeof r.date === 'string' ? new Date(r.date) : null));
+                        } catch (_eCurr2) {}
+                        if (!curr || isNaN(curr.getTime()) || curr.getTime() !== parsed.getTime()) {
+                            try {
+                                await window.firebase.updateDoc(
+                                    window.firebase.doc(window.firebase.db, 'consultations', r.id),
+                                    { date: parsed }
+                                );
+                                r.date = parsed;
+                            } catch (_udErr2) {}
+                        }
                     }
                 }
             }
@@ -21785,16 +21799,22 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
             try {
                 for (const r of arr) {
-                    if (r && typeof r.date === 'string') {
-                        const parsed = parseConsultationDate(r.date);
+                    if (r) {
+                        const parsed = parseConsultationDate(r.visitTime || r.date || r.createdAt || r.updatedAt || null);
                         if (parsed && !isNaN(parsed.getTime())) {
+                            let curr = null;
                             try {
-                                await window.firebase.updateDoc(
-                                    window.firebase.doc(window.firebase.db, 'consultations', r.id),
-                                    { date: parsed }
-                                );
-                                r.date = parsed;
-                            } catch (_udErr3) {}
+                                curr = r.date && r.date.seconds ? new Date(r.date.seconds * 1000) : (r.date instanceof Date ? r.date : (typeof r.date === 'string' ? new Date(r.date) : null));
+                            } catch (_eCurr3) {}
+                            if (!curr || isNaN(curr.getTime()) || curr.getTime() !== parsed.getTime()) {
+                                try {
+                                    await window.firebase.updateDoc(
+                                        window.firebase.doc(window.firebase.db, 'consultations', r.id),
+                                        { date: parsed }
+                                    );
+                                    r.date = parsed;
+                                } catch (_udErr3) {}
+                            }
                         }
                     }
                 }
@@ -21836,24 +21856,30 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
         snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
         try {
             for (const r of arr2) {
-                if (r && typeof r.date === 'string') {
-                    const parsed = parseConsultationDate(r.date);
+                if (r) {
+                    const parsed = parseConsultationDate(r.visitTime || r.date || r.createdAt || r.updatedAt || null);
                     if (parsed && !isNaN(parsed.getTime())) {
+                        let curr = null;
                         try {
-                            await window.firebase.updateDoc(
-                                window.firebase.doc(window.firebase.db, 'consultations', r.id),
-                                { date: parsed }
-                            );
-                            r.date = parsed;
-                        } catch (_udErr4) {}
+                            curr = r.date && r.date.seconds ? new Date(r.date.seconds * 1000) : (r.date instanceof Date ? r.date : (typeof r.date === 'string' ? new Date(r.date) : null));
+                        } catch (_eCurr4) {}
+                        if (!curr || isNaN(curr.getTime()) || curr.getTime() !== parsed.getTime()) {
+                            try {
+                                await window.firebase.updateDoc(
+                                    window.firebase.doc(window.firebase.db, 'consultations', r.id),
+                                    { date: parsed }
+                                );
+                                r.date = parsed;
+                            } catch (_udErr4) {}
+                        }
                     }
                 }
             }
         } catch (_normErr4) {}
         try {
             arr2.sort((a, b) => {
-                const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
-                const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
+                const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
                 const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                 const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                 return tB - tA;
