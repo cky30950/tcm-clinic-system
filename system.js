@@ -20998,7 +20998,7 @@ async function displayMedicalRecords(pageChange = false) {
     try {
         const getTimestamp = (rec) => {
             try {
-                const raw = rec.visitTime || rec.date || rec.createdAt || rec.updatedAt || null;
+                const raw = rec.date || null;
                 const parsed = parseConsultationDate(raw);
                 return parsed && !isNaN(parsed.getTime()) ? parsed.getTime() : 0;
             } catch (_err) {
@@ -21075,7 +21075,7 @@ async function displayMedicalRecords(pageChange = false) {
             }
             let dateStr = '';
             try {
-                const rawDate = rec.visitTime || rec.date || rec.createdAt || rec.updatedAt || null;
+                const rawDate = rec.date || null;
                 const parsed = parseConsultationDate(rawDate);
                 if (parsed && !isNaN(parsed.getTime())) {
                     const locale = lang === 'en' ? 'en-US' : 'zh-TW';
@@ -21184,8 +21184,8 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
             try {
                 arr.sort((a, b) => {
-                    const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
-                    const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
+                    const A = parseConsultationDate(a.date || null);
+                    const B = parseConsultationDate(b.date || null);
                     const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                     const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                     return tB - tA;
@@ -21220,8 +21220,8 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
         try {
             arr2.sort((a, b) => {
-                const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
-                const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
+                const A = parseConsultationDate(a.date || null);
+                const B = parseConsultationDate(b.date || null);
                 const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                 const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                 return tB - tA;
@@ -21254,8 +21254,8 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
             try {
                 arr.sort((a, b) => {
-                    const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
-                    const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
+                    const A = parseConsultationDate(a.date || null);
+                    const B = parseConsultationDate(b.date || null);
                     const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                     const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                     return tB - tA;
@@ -21439,8 +21439,8 @@ async function searchMedicalRecords(term, limitCount = 50) {
         }
         try {
             out.sort((a, b) => {
-                const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
-                const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
+                const A = parseConsultationDate(a.date || null);
+                const B = parseConsultationDate(b.date || null);
                 const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                 const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                 return tB - tA;
