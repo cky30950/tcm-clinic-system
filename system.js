@@ -20998,7 +20998,7 @@ async function displayMedicalRecords(pageChange = false) {
     try {
         const getTimestamp = (rec) => {
             try {
-                const raw = rec.date || rec.createdAt || rec.updatedAt || null;
+                const raw = rec.visitTime || rec.date || rec.createdAt || rec.updatedAt || null;
                 const parsed = parseConsultationDate(raw);
                 return parsed && !isNaN(parsed.getTime()) ? parsed.getTime() : 0;
             } catch (_err) {
@@ -21075,7 +21075,7 @@ async function displayMedicalRecords(pageChange = false) {
             }
             let dateStr = '';
             try {
-                const rawDate = rec.date || rec.createdAt || rec.updatedAt || null;
+                const rawDate = rec.visitTime || rec.date || rec.createdAt || rec.updatedAt || null;
                 const parsed = parseConsultationDate(rawDate);
                 if (parsed && !isNaN(parsed.getTime())) {
                     const locale = lang === 'en' ? 'en-US' : 'zh-TW';
@@ -21155,7 +21155,7 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             const lastPageSize = rem === 0 ? pageSize : rem;
             q = window.firebase.firestoreQuery(
                 colRef,
-                window.firebase.orderBy('createdAt', 'asc'),
+                window.firebase.orderBy('date', 'asc'),
                 window.firebase.limit(lastPageSize)
             );
             const snapLast = await window.firebase.getDocs(q);
@@ -21176,7 +21176,7 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         if (page === 1) {
             q = window.firebase.firestoreQuery(
                 colRef,
-                window.firebase.orderBy('createdAt', 'desc'),
+                window.firebase.orderBy('date', 'desc'),
                 window.firebase.limit(pageSize)
             );
             const snap = await window.firebase.getDocs(q);
@@ -21184,8 +21184,8 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
             try {
                 arr.sort((a, b) => {
-                    const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
-                    const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                    const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
+                    const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
                     const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                     const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                     return tB - tA;
@@ -21211,7 +21211,7 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         }
         q = window.firebase.firestoreQuery(
             colRef,
-            window.firebase.orderBy('createdAt', 'desc'),
+            window.firebase.orderBy('date', 'desc'),
             window.firebase.startAfter(last),
             window.firebase.limit(pageSize)
         );
@@ -21220,8 +21220,8 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
         try {
             arr2.sort((a, b) => {
-                const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
-                const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
+                const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
                 const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                 const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                 return tB - tA;
@@ -21246,7 +21246,7 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
         if (ascIndex === 1) {
             q = window.firebase.firestoreQuery(
                 colRef,
-                window.firebase.orderBy('createdAt', 'asc'),
+                window.firebase.orderBy('date', 'asc'),
                 window.firebase.limit(pageSize)
             );
             const snap = await window.firebase.getDocs(q);
@@ -21254,8 +21254,8 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
             try {
                 arr.sort((a, b) => {
-                    const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
-                    const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                    const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
+                    const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
                     const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                     const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                     return tB - tA;
@@ -21280,7 +21280,7 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
         }
         q = window.firebase.firestoreQuery(
             colRef,
-            window.firebase.orderBy('createdAt', 'asc'),
+            window.firebase.orderBy('date', 'asc'),
             window.firebase.startAfter(last),
             window.firebase.limit(pageSize)
         );
@@ -21383,10 +21383,64 @@ async function searchMedicalRecords(term, limitCount = 50) {
                 });
             } catch (_e) {}
         }
+        // 依醫師名稱搜尋：先在用戶清單中比對名稱/顯示名/帳號，取得對應 username 清單
+        let doctorUsernames = [];
+        try {
+            const ures = await (window.firebaseDataManager && typeof window.firebaseDataManager.getUsers === 'function'
+                ? window.firebaseDataManager.getUsers()
+                : { success: false, data: [] });
+            const usersArr = (ures && ures.success && Array.isArray(ures.data)) ? ures.data : [];
+            const seenUser = new Set();
+            usersArr.forEach(u => {
+                const fields = [u.displayName, u.fullName, u.name, u.username, u.email].map(x => String(x || '').toLowerCase());
+                if (fields.some(v => v && v.includes(lc))) {
+                    const uname = String(u.username || '').trim();
+                    if (uname && !seenUser.has(uname)) {
+                        doctorUsernames.push(uname);
+                        seenUser.add(uname);
+                    }
+                }
+            });
+        } catch (_e) {}
+        for (const uname of doctorUsernames.slice(0, 10)) {
+            if (out.length >= limitCount) break;
+            try {
+                const col = window.firebase.collection(window.firebase.db, 'consultations');
+                // doctor 可能是字串 username
+                const qA = window.firebase.firestoreQuery(
+                    col,
+                    window.firebase.where('doctor', '==', uname),
+                    window.firebase.limit(Math.max(1, Math.min(10, limitCount - out.length)))
+                );
+                const sA = await window.firebase.getDocs(qA);
+                sA.forEach(d => {
+                    const id = String(d.id);
+                    if (!seen.has(id) && out.length < limitCount) {
+                        out.push({ id: d.id, ...d.data() });
+                        seen.add(id);
+                    }
+                });
+                if (out.length >= limitCount) break;
+                // 或 doctor 為物件，取其中 username
+                const qB = window.firebase.firestoreQuery(
+                    col,
+                    window.firebase.where('doctor.username', '==', uname),
+                    window.firebase.limit(Math.max(1, Math.min(10, limitCount - out.length)))
+                );
+                const sB = await window.firebase.getDocs(qB);
+                sB.forEach(d => {
+                    const id = String(d.id);
+                    if (!seen.has(id) && out.length < limitCount) {
+                        out.push({ id: d.id, ...d.data() });
+                        seen.add(id);
+                    }
+                });
+            } catch (_e) {}
+        }
         try {
             out.sort((a, b) => {
-                const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
-                const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
+                const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
                 const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                 const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                 return tB - tA;
