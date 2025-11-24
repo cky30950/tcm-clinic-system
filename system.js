@@ -9202,7 +9202,7 @@ function displayConsultationMedicalHistoryPage() {
                 <div class="flex justify-between items-center">
                     <div class="flex items-center space-x-4">
                         <span class="font-semibold text-gray-900 text-lg">
-                            ${formatConsultationDateTime(consultation.date)}
+                            ${formatConsultationDateTime(consultation.visitTime || consultation.date)}
                         </span>
                         <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded">
                             ${doctorLabel}${getDoctorDisplayName(consultation.doctor)}
@@ -21516,7 +21516,7 @@ async function displayMedicalRecords(pageChange = false) {
     try {
         const getTimestamp = (rec) => {
             try {
-                const raw = rec.date || null;
+                const raw = rec.visitTime || rec.date || rec.createdAt || rec.updatedAt || null;
                 const parsed = parseConsultationDate(raw);
                 return parsed && !isNaN(parsed.getTime()) ? parsed.getTime() : 0;
             } catch (_err) {
@@ -21529,7 +21529,6 @@ async function displayMedicalRecords(pageChange = false) {
             return tB - tA;
         });
     } catch (_sortErr) {
-        // 忽略排序失敗
     }
     if (!pageChange) {
         if (paginationSettings.medicalRecordList) {
@@ -21593,7 +21592,7 @@ async function displayMedicalRecords(pageChange = false) {
             }
             let dateStr = '';
             try {
-                const rawDate = rec.date || null;
+                const rawDate = rec.visitTime || rec.date || rec.createdAt || rec.updatedAt || null;
                 const parsed = parseConsultationDate(rawDate);
                 if (parsed && !isNaN(parsed.getTime())) {
                     const locale = lang === 'en' ? 'en-US' : 'zh-TW';
@@ -21718,8 +21717,8 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             } catch (_normErr) {}
             try {
                 arr.sort((a, b) => {
-                    const A = parseConsultationDate(a.date || null);
-                    const B = parseConsultationDate(b.date || null);
+                    const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
+                    const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
                     const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                     const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                     return tB - tA;
@@ -21770,8 +21769,8 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         } catch (_normErr2) {}
         try {
             arr2.sort((a, b) => {
-                const A = parseConsultationDate(a.date || null);
-                const B = parseConsultationDate(b.date || null);
+                const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
+                const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
                 const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                 const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                 return tB - tA;
@@ -21820,8 +21819,8 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             } catch (_normErr3) {}
             try {
                 arr.sort((a, b) => {
-                    const A = parseConsultationDate(a.date || null);
-                    const B = parseConsultationDate(b.date || null);
+                    const A = parseConsultationDate(a.visitTime || a.date || a.createdAt || a.updatedAt || null);
+                    const B = parseConsultationDate(b.visitTime || b.date || b.createdAt || b.updatedAt || null);
                     const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
                     const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
                     return tB - tA;
