@@ -20888,6 +20888,8 @@ let medicalRecordTotalCount = 0;
 let medicalRecordPageCursors = {}; // { pageNumber: lastDocSnapshot }
 let medicalRecordPageCache = {};   // { pageNumber: Array<consultation> }
 let medicalRecordSearchCache = {}; // { term: Array<consultation> }
+let medicalRecordAscPageCursors = {}; // { ascIndex: lastDocSnapshot }
+let medicalRecordAscPageCache = {};   // { ascIndex: Array<consultation> }
 /**
  * 載入病歷管理頁面：重置搜尋欄、讀取診症記錄與病人資料，並綁定搜尋事件。
  */
@@ -20956,7 +20958,7 @@ async function displayMedicalRecords(pageChange = false) {
         medicalRecords = Array.isArray(res) ? res : [];
         filtered = medicalRecords;
     } else {
-        const pageData = await fetchMedicalRecordPage(currentPage, itemsPerPage);
+    const pageData = await fetchMedicalRecordPageOptimized(currentPage, itemsPerPage);
         medicalRecords = Array.isArray(pageData) ? pageData : [];
         filtered = medicalRecords;
     }
@@ -21123,6 +21125,8 @@ async function displayMedicalRecords(pageChange = false) {
 function initializeMedicalRecordPagination() {
     medicalRecordPageCursors = {};
     medicalRecordPageCache = {};
+    medicalRecordAscPageCursors = {};
+    medicalRecordAscPageCache = {};
 }
 
 async function getConsultationsCount() {
@@ -21144,6 +21148,31 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         }
         const colRef = window.firebase.collection(window.firebase.db, 'consultations');
         let q;
+        const totalItems = typeof medicalRecordTotalCount === 'number' ? medicalRecordTotalCount : null;
+        const totalPages = totalItems ? Math.ceil(totalItems / pageSize) : null;
+        if (totalPages && page === totalPages) {
+            const rem = totalItems % pageSize;
+            const lastPageSize = rem === 0 ? pageSize : rem;
+            q = window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.orderBy('createdAt', 'asc'),
+                window.firebase.limit(lastPageSize)
+            );
+            const snapLast = await window.firebase.getDocs(q);
+            const arrLast = [];
+            snapLast.forEach(d => arrLast.push({ id: d.id, ...d.data() }));
+            try {
+                arrLast.sort((a, b) => {
+                    const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
+                    const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                    const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
+                    const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
+                    return tB - tA;
+                });
+            } catch (_e) {}
+            medicalRecordPageCache[page] = arrLast;
+            return arrLast;
+        }
         if (page === 1) {
             q = window.firebase.firestoreQuery(
                 colRef,
@@ -21203,6 +21232,94 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         return arr2;
     } catch (_err) {
         return [];
+    }
+}
+
+async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
+    try {
+        await waitForFirebaseDb();
+        if (medicalRecordAscPageCache[ascIndex]) {
+            return medicalRecordAscPageCache[ascIndex];
+        }
+        const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+        let q;
+        if (ascIndex === 1) {
+            q = window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.orderBy('createdAt', 'asc'),
+                window.firebase.limit(pageSize)
+            );
+            const snap = await window.firebase.getDocs(q);
+            const arr = [];
+            snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
+            try {
+                arr.sort((a, b) => {
+                    const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
+                    const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                    const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
+                    const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
+                    return tB - tA;
+                });
+            } catch (_e) {}
+            medicalRecordAscPageCache[1] = arr;
+            medicalRecordAscPageCursors[1] = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            return arr;
+        }
+        let prev = ascIndex - 1;
+        if (!medicalRecordAscPageCursors[prev]) {
+            for (let a = 1; a <= prev; a++) {
+                if (medicalRecordAscPageCache[a]) continue;
+                await fetchMedicalRecordPageAsc(a, pageSize);
+            }
+        }
+        const last = medicalRecordAscPageCursors[prev];
+        if (!last) {
+            medicalRecordAscPageCache[ascIndex] = [];
+            medicalRecordAscPageCursors[ascIndex] = null;
+            return [];
+        }
+        q = window.firebase.firestoreQuery(
+            colRef,
+            window.firebase.orderBy('createdAt', 'asc'),
+            window.firebase.startAfter(last),
+            window.firebase.limit(pageSize)
+        );
+        const snap2 = await window.firebase.getDocs(q);
+        const arr2 = [];
+        snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
+        try {
+            arr2.sort((a, b) => {
+                const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
+                const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
+                const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
+                return tB - tA;
+            });
+        } catch (_e) {}
+        medicalRecordAscPageCache[ascIndex] = arr2;
+        medicalRecordAscPageCursors[ascIndex] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : medicalRecordAscPageCursors[prev];
+        return arr2;
+    } catch (_err) {
+        return [];
+    }
+}
+
+async function fetchMedicalRecordPageOptimized(page = 1, pageSize = 10) {
+    try {
+        const totalItems = typeof medicalRecordTotalCount === 'number' ? medicalRecordTotalCount : null;
+        const totalPages = totalItems ? Math.ceil(totalItems / pageSize) : null;
+        if (!totalPages) {
+            return await fetchMedicalRecordPage(page, pageSize);
+        }
+        const distStart = page - 1;
+        const distEnd = totalPages - page;
+        if (distEnd < distStart) {
+            const ascIndex = distEnd + 1;
+            return await fetchMedicalRecordPageAsc(ascIndex, pageSize);
+        }
+        return await fetchMedicalRecordPage(page, pageSize);
+    } catch (_e) {
+        return await fetchMedicalRecordPage(page, pageSize);
     }
 }
 
