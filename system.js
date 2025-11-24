@@ -17042,6 +17042,7 @@ async function deleteUser(id) {
             const items = [];
             const lines = billingText.split('\n');
             let totalAmount = 0;
+            let totalAmountSum = 0;
 
             lines.forEach(line => {
                 line = line.trim();
@@ -17071,9 +17072,13 @@ async function deleteUser(id) {
                         totalAmount: isDiscount ? -amount : amount,
                         category: getFinancialCategoryFromItemName(itemName)
                     });
+                    totalAmountSum += isDiscount ? -amount : amount;
                 }
             });
 
+            if (!totalAmount) {
+                totalAmount = totalAmountSum;
+            }
             return { items, totalAmount };
         }
 
@@ -17261,6 +17266,9 @@ async function deleteUser(id) {
 
                 // 服務統計
                 parsed.items.forEach(item => {
+                    if (item.category === 'discount') {
+                        return;
+                    }
                     if (!serviceStats[item.category]) {
                         serviceStats[item.category] = {
                             name: getFinancialCategoryDisplayName(item.category),
