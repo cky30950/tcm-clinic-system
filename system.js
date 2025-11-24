@@ -722,6 +722,25 @@ function hasAccessToSection(sectionId) {
 // 初始化全域變數
 let patients = [];
 let consultations = [];
+function readCache(name, key) {
+    try {
+        const s = localStorage.getItem(name);
+        if (!s) return null;
+        const obj = JSON.parse(s);
+        const v = obj && obj[key];
+        return v || null;
+    } catch (_e) {
+        return null;
+    }
+}
+function writeCache(name, key, value) {
+    try {
+        const s = localStorage.getItem(name);
+        const obj = s ? JSON.parse(s) : {};
+        obj[key] = value;
+        localStorage.setItem(name, JSON.stringify(obj));
+    } catch (_e) {}
+}
 let appointments = [];
 // 快取病人列表，避免重複從 Firestore 讀取
 let patientCache = null;
@@ -942,7 +961,7 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
 async function loadPersonalStatistics() {
     const cacheKey = String(currentUser || '');
     window.personalStatsCache = window.personalStatsCache || {};
-    const existing = window.personalStatsCache[cacheKey];
+    const existing = window.personalStatsCache[cacheKey] || readCache('personalStatsCache', cacheKey);
     if (!existing) {
         if (!Array.isArray(consultations) || consultations.length === 0) {
             try {
@@ -975,7 +994,8 @@ async function loadPersonalStatistics() {
     } else {
         try {
             if (window.firebaseDataManager && typeof window.firebaseDataManager.hasDoctorConsultationUpdates === 'function') {
-                const changed = await window.firebaseDataManager.hasDoctorConsultationUpdates(currentUser, existing.lastSyncAt);
+                const lastSyncAtRef = existing.lastSyncAt ? new Date(existing.lastSyncAt) : null;
+                const changed = await window.firebaseDataManager.hasDoctorConsultationUpdates(currentUser, lastSyncAtRef);
                 if (!changed) {
                     renderPersonalStatistics(existing.stats);
                     return;
@@ -1021,7 +1041,9 @@ async function loadPersonalStatistics() {
         }
         return latest ? new Date(latest) : new Date();
     })();
-    window.personalStatsCache[cacheKey] = { stats, lastSyncAt, list: consultations };
+    const entry = { stats, lastSyncAt: lastSyncAt.toISOString(), list: consultations };
+    window.personalStatsCache[cacheKey] = entry;
+    writeCache('personalStatsCache', cacheKey, entry);
     renderPersonalStatistics(stats);
 }
 
@@ -17090,11 +17112,12 @@ async function deleteUser(id) {
             }
 
             const cacheKey = `${startDate}|${endDate}|${doctorFilter||''}`;
-            const existing = financialReportCache[cacheKey];
+            const existing = financialReportCache[cacheKey] || readCache('financialReportCache', cacheKey);
             if (existing) {
                 try {
                     if (window.firebaseDataManager && typeof window.firebaseDataManager.hasConsultationUpdates === 'function') {
-                        const hasUpdates = await window.firebaseDataManager.hasConsultationUpdates(startDate, endDate, doctorFilter || null, existing.lastSyncAt);
+                        const lastSyncAtRef = existing.lastSyncAt ? new Date(existing.lastSyncAt) : null;
+                        const hasUpdates = await window.firebaseDataManager.hasConsultationUpdates(startDate, endDate, doctorFilter || null, lastSyncAtRef);
                         if (!hasUpdates) {
                             updateFinancialKeyMetrics(existing.stats);
                             updateFinancialTables(existing.filteredConsultations, existing.stats);
@@ -17102,7 +17125,7 @@ async function deleteUser(id) {
                             showToast('財務報表已更新（使用快取）！', 'success');
                             return;
                         }
-                        const deltaRes = await window.firebaseDataManager.getConsultationsDeltaByRangeAndDoctor(existing.lastSyncAt, doctorFilter || null, true);
+                        const deltaRes = await window.firebaseDataManager.getConsultationsDeltaByRangeAndDoctor(lastSyncAtRef, doctorFilter || null, true);
                         if (deltaRes && deltaRes.success) {
                             const normalize = (item) => {
                                 let dateStr = null;
@@ -17154,7 +17177,9 @@ async function deleteUser(id) {
                                 }
                                 return latest ? new Date(latest) : new Date();
                             })();
-                            financialReportCache[cacheKey] = { filteredConsultations: merged, stats, lastSyncAt };
+                            const entry = { filteredConsultations: merged, stats, lastSyncAt: lastSyncAt.toISOString() };
+                            financialReportCache[cacheKey] = entry;
+                            writeCache('financialReportCache', cacheKey, entry);
                             document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
                             showToast('財務報表已更新！', 'success');
                             return;
@@ -17189,7 +17214,9 @@ async function deleteUser(id) {
                 }
                 return latest ? new Date(latest) : new Date();
             })();
-            financialReportCache[cacheKey] = { filteredConsultations, stats, lastSyncAt };
+            const entry = { filteredConsultations, stats, lastSyncAt: lastSyncAt.toISOString() };
+            financialReportCache[cacheKey] = entry;
+            writeCache('financialReportCache', cacheKey, entry);
             document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
             showToast('財務報表已更新！', 'success');
         }
