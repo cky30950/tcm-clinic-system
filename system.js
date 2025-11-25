@@ -1644,43 +1644,72 @@ async function fetchPatients(forceRefresh = false, pageNumber = null) {
  * @returns {Promise<Object|null>} 找到的病人物件，若找不到則為 null
  */
 async function getPatientByIdWithRefresh(id) {
-    // 若未提供 ID，直接回傳 null
     if (id === undefined || id === null) return null;
     const idStr = String(id);
     try {
-        // 先從本地快取尋找
-        let all = await fetchPatients(false);
-        if (Array.isArray(all) && all.length > 0) {
-            const found = all.find(p => p && String(p.id) === idStr);
-            if (found) return found;
+        if (Array.isArray(patientCache) && patientCache.length > 0) {
+            const hit = patientCache.find(p => p && String(p.id) === idStr);
+            if (hit) return hit;
         }
-        // 若未找到，強制重新讀取整個列表
-        all = await fetchPatients(true);
-        if (Array.isArray(all) && all.length > 0) {
-            const found2 = all.find(p => p && String(p.id) === idStr);
-            if (found2) return found2;
-        }
-        // 仍未找到時，嘗試直接向 FirebaseDataManager 取得資料
         try {
-            // 確保 DataManager 就緒後使用 safeGetPatients 取得完整病人列表
-            if (typeof waitForFirebaseDataManager === 'function') {
-                await waitForFirebaseDataManager();
-            }
-            // 在跨裝置情況下強制從後端重新讀取病人資料，以獲取最新資訊
-            const result = await safeGetPatients(true);
-            if (result && result.success && Array.isArray(result.data)) {
-                const found3 = result.data.find(p => p && String(p.id) === idStr);
-                if (found3) {
-                    return found3;
+            const stored = localStorage.getItem('patients');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) {
+                    const hitLocal = parsed.find(p => p && String(p.id) === idStr);
+                    if (hitLocal) {
+                        if (!Array.isArray(patientCache)) patientCache = [];
+                        const exists = patientCache.find(p => p && String(p.id) === idStr);
+                        if (!exists) patientCache.push(hitLocal);
+                        return hitLocal;
+                    }
                 }
             }
-        } catch (innerErr) {
-            console.error('直接從 Firebase 取得病人資料時發生錯誤:', innerErr);
+        } catch (_e) {}
+        await waitForFirebaseDb();
+        const docRef = window.firebase.doc(window.firebase.db, 'patients', idStr);
+        const snap = await window.firebase.getDoc(docRef);
+        if (snap && snap.exists()) {
+            const record = { id: snap.id, ...snap.data() };
+            if (!Array.isArray(patientCache)) patientCache = [];
+            const idx = patientCache.findIndex(p => p && String(p.id) === idStr);
+            if (idx >= 0) patientCache[idx] = record; else patientCache.push(record);
+            try { localStorage.setItem('patients', JSON.stringify(patientCache)); } catch (_lsErr) {}
+            return record;
         }
-    } catch (err) {
-        console.error('取得病人資料時發生錯誤:', err);
-    }
+        const res = await safeGetPatients(true);
+        if (res && res.success && Array.isArray(res.data)) {
+            const found = res.data.find(p => p && String(p.id) === idStr);
+            if (found) return found;
+        }
+    } catch (err) {}
     return null;
+}
+
+async function refreshPatientCacheById(patientId) {
+    const idStr = String(patientId);
+    try {
+        await waitForFirebaseDb();
+        const docRef = window.firebase.doc(window.firebase.db, 'patients', idStr);
+        const snap = await window.firebase.getDoc(docRef);
+        if (snap && snap.exists()) {
+            const record = { id: snap.id, ...snap.data() };
+            if (!Array.isArray(patientCache)) patientCache = [];
+            const idx = patientCache.findIndex(p => p && String(p.id) === idStr);
+            if (idx >= 0) patientCache[idx] = record; else patientCache.push(record);
+            try { localStorage.setItem('patients', JSON.stringify(patientCache)); } catch (_lsErr) {}
+            return record;
+        } else {
+            if (Array.isArray(patientCache)) {
+                const idx = patientCache.findIndex(p => p && String(p.id) === idStr);
+                if (idx >= 0) patientCache.splice(idx, 1);
+                try { localStorage.setItem('patients', JSON.stringify(patientCache)); } catch (_lsErr2) {}
+            }
+            return null;
+        }
+    } catch (_err) {
+        return null;
+    }
 }
 
 /**
@@ -8592,6 +8621,11 @@ async function saveConsultation() {
             await commitPendingPackageChanges();
             // 提交後清空暫存變更
             pendingPackageChanges = [];
+            try {
+                if (appointment && appointment.patientId !== undefined && appointment.patientId !== null) {
+                    await refreshPatientCacheById(appointment.patientId);
+                }
+            } catch (_refreshErr) {}
             // 更新中藥庫存
             try {
                 // 取得服藥天數與次數
@@ -8651,20 +8685,13 @@ async function saveConsultation() {
         let currentPatientConsultations = [];
         let currentPatientHistoryPage = 0;
         
-        async function showPatientMedicalHistory(patientId) {
+async function showPatientMedicalHistory(patientId) {
     try {
-// 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
-const patientResult = await safeGetPatients(true);
-if (!patientResult.success) {
-    showToast('無法讀取病人資料！', 'error');
-    return;
-}
-
-const patient = patientResult.data.find(p => p.id === patientId);
-if (!patient) {
-    showToast('找不到病人資料！', 'error');
-    return;
-}
+            const patient = await getPatientByIdWithRefresh(patientId);
+            if (!patient) {
+                showToast('找不到病人資料！', 'error');
+                return;
+            }
             
             // 獲取該病人的所有診症記錄（從 Firestore 取得）
             // 強制重新取得診症記錄，避免跨裝置快取不一致
@@ -9022,15 +9049,7 @@ async function viewPatientMedicalHistory(patientId) {
         setButtonLoading(loadingButton, '讀取中...');
     }
     try {
-        // 從 Firebase 獲取病人資料
-        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
-        const patientResult = await safeGetPatients(true);
-        if (!patientResult.success) {
-            showToast('無法讀取病人資料', 'error');
-            return;
-        }
-        
-        const patient = patientResult.data.find(p => p.id === patientId);
+        const patient = await getPatientByIdWithRefresh(patientId);
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
@@ -12091,36 +12110,21 @@ async function loadPatientConsultationSummary(patientId) {
             `;
         }
 
-        // 計算可用套票數量（activePkgCount）。
-        // 優先使用病人文件中的 packageActiveCount 欄位，若不存在則退回至利用 pkgs 計算。
         let activePkgCount = 0;
         try {
-            // 嘗試從快取或讀取所有病人資料中取得指定病人
-            let allPatientsForCount = [];
-            if (Array.isArray(patientCache) && patientCache.length > 0) {
-                allPatientsForCount = patientCache;
-            } else {
-                // 若快取不存在，從 Firebase 讀取
-                allPatientsForCount = await fetchPatients();
-            }
-            const targetPatient = allPatientsForCount.find((p) => String(p.id) === String(patientId));
+            const targetPatient = await getPatientByIdWithRefresh(patientId);
             if (targetPatient && typeof targetPatient.packageActiveCount === 'number') {
                 activePkgCount = targetPatient.packageActiveCount;
+            } else if (Array.isArray(pkgs)) {
+                activePkgCount = pkgs.filter(p => p && typeof p.remainingUses === 'number' && p.remainingUses > 0).length;
             } else {
-                // 若病人資料中無彙總欄位，則使用已載入的 pkgs 計算
-                if (Array.isArray(pkgs)) {
-                    activePkgCount = pkgs.filter(p => p && typeof p.remainingUses === 'number' && p.remainingUses > 0).length;
-                } else {
-                    activePkgCount = 0;
-                }
+                activePkgCount = 0;
             }
-        } catch (activeCountErr) {
-            console.error('取得病人可用套票數量失敗:', activeCountErr);
-            // 作為最後保險，使用 pkgs 計算
+        } catch (_activeErr) {
             if (Array.isArray(pkgs)) {
                 try {
                     activePkgCount = pkgs.filter(p => p && typeof p.remainingUses === 'number' && p.remainingUses > 0).length;
-                } catch (fallbackErr) {
+                } catch (_fallbackErr) {
                     activePkgCount = 0;
                 }
             } else {
