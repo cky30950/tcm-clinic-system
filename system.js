@@ -3874,10 +3874,9 @@ async function getLatestAppointmentById(appointmentId) {
     // 若還是沒有找到，從後端讀取單筆資料
     if (!found) {
         try {
-            const result = await window.firebaseDataManager.getAppointment(appointmentId);
+            const result = await window.firebaseDataManager.getAppointment(String(appointmentId));
             if (result && result.success && result.data) {
                 found = result.data;
-                // 更新全域陣列及本地快取
                 if (!Array.isArray(appointments)) appointments = [];
                 const index = appointments.findIndex(apt => apt && String(apt.id) === idStr);
                 if (index >= 0) {
@@ -3885,15 +3884,24 @@ async function getLatestAppointmentById(appointmentId) {
                 } else {
                     appointments.push({ ...found });
                 }
-                try {
-                    localStorage.setItem('appointments', JSON.stringify(appointments));
-                } catch (_storageErr) {
-                    // 若無法寫入 localStorage，忽略
+                try { localStorage.setItem('appointments', JSON.stringify(appointments)); } catch (_storageErr) {}
+            }
+        } catch (_err) {}
+    }
+
+    // 最後回退：重新讀取掛號列表後尋找
+    if (!found) {
+        try {
+            const listRes = await window.firebaseDataManager.getAppointments();
+            if (listRes && listRes.success && Array.isArray(listRes.data)) {
+                const fromList = listRes.data.find(item => item && String(item.id) === idStr) || null;
+                if (fromList) {
+                    found = fromList;
+                    appointments = listRes.data.map(item => ({ ...item }));
+                    try { localStorage.setItem('appointments', JSON.stringify(appointments)); } catch (_e) {}
                 }
             }
-        } catch (err) {
-            console.error('getLatestAppointmentById: 讀取單筆掛號時發生錯誤:', err);
-        }
+        } catch (_e) {}
     }
 
     return found || null;
