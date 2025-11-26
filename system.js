@@ -21546,7 +21546,7 @@ async function loadMedicalRecordManagement() {
         medicalRecordPatients = {};
         patients.forEach(p => {
             const name = p.name || p.patientName || p.fullName || p.displayName || p.chineseName || p.englishName || '';
-            medicalRecordPatients[p.id] = name;
+            medicalRecordPatients[String(p.id).trim()] = name;
         });
         await displayMedicalRecords(false);
     } catch (error) {
@@ -21595,7 +21595,7 @@ async function displayMedicalRecords(pageChange = false) {
             // 若不存在則回退至 Firebase 文件 ID。這樣可讓使用者輸入「MR」開頭的編號
             // 就能搜尋到對應病歷，而不會只比對隱晦的文件 ID。【857813225103928†L1617-L1625】
             const recordNum = String(rec.medicalRecordNumber || rec.id || '').toLowerCase();
-            const patientName = String(medicalRecordPatients[rec.patientId] || '').toLowerCase();
+            const patientName = String(medicalRecordPatients[String(rec.patientId).trim()] || rec.patientName || '').toLowerCase();
             let doctorName = '';
             // 依據醫師資料設定顯示名稱，若為字串（可能為 username 或角色），
             // 則使用 getDoctorDisplayName() 嘗試從用戶列表取得顯示名稱；
@@ -21681,7 +21681,7 @@ async function displayMedicalRecords(pageChange = false) {
             const recordNumDisplay = rec.medicalRecordNumber || rec.id || '';
             // 實際用於載入與刪除的病歷 ID 必須使用 Firebase 文件 ID
             const recordId = rec.id || '';
-            const patientName = medicalRecordPatients[rec.patientId] || '';
+            const patientName = medicalRecordPatients[String(rec.patientId).trim()] || rec.patientName || '';
             let doctorName = '';
             if (rec.doctor) {
                 try {
