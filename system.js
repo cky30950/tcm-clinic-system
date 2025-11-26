@@ -3830,7 +3830,7 @@ async function safeGetPatients(_forceRefresh = false) {
       return { success: false, data: [] };
     }
     // 呼叫原始 getPatients 取得資料
-    const result = await window.firebaseDataManager.getPatients(_forceRefresh === true);
+    const result = await window.firebaseDataManager.getPatients();
     // 若結果為空或格式不正確仍回傳失敗狀態
     if (result && typeof result.success === 'boolean' && Array.isArray(result.data)) {
       return result;
@@ -8723,16 +8723,9 @@ async function saveConsultation() {
         let currentPatientConsultations = [];
         let currentPatientHistoryPage = 0;
         
-async function showPatientMedicalHistory(patientId) {
+        async function showPatientMedicalHistory(patientId) {
     try {
-// 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
-const patientResult = await safeGetPatients(true);
-if (!patientResult.success) {
-    showToast('無法讀取病人資料！', 'error');
-    return;
-}
-
-const patient = patientResult.data.find(p => p.id === patientId);
+const patient = await getPatientByIdWithRefresh(patientId);
 if (!patient) {
     showToast('找不到病人資料！', 'error');
     return;
@@ -8740,7 +8733,7 @@ if (!patient) {
             
             // 獲取該病人的所有診症記錄（從 Firestore 取得）
             // 強制重新取得診症記錄，避免跨裝置快取不一致
-            const consultationResult = await window.firebaseDataManager.getPatientConsultations(patientId, true);
+            const consultationResult = await window.firebaseDataManager.getPatientConsultations(patientId);
             if (!consultationResult.success) {
                 showToast('無法讀取診症記錄！', 'error');
                 return;
@@ -9098,22 +9091,14 @@ async function viewPatientMedicalHistory(patientId) {
         setButtonLoading(loadingButton, '讀取中...');
     }
     try {
-        // 從 Firebase 獲取病人資料
-        // 使用 forceRefresh=true 以確保跨裝置同步取得最新病人資料
-        const patientResult = await safeGetPatients(true);
-        if (!patientResult.success) {
-            showToast('無法讀取病人資料', 'error');
-            return;
-        }
-        
-        const patient = patientResult.data.find(p => p.id === patientId);
+        const patient = await getPatientByIdWithRefresh(patientId);
         if (!patient) {
             showToast('找不到病人資料', 'error');
             return;
         }
         
         // 獲取該病人的所有診症記錄（強制刷新），避免跨裝置快取不一致
-        const consultationResult = await window.firebaseDataManager.getPatientConsultations(patientId, true);
+        const consultationResult = await window.firebaseDataManager.getPatientConsultations(patientId);
         if (!consultationResult.success) {
             showToast('無法讀取診症記錄', 'error');
             return;
@@ -19662,6 +19647,7 @@ class FirebaseDataManager {
             try {
                 if (consultationData && consultationData.patientId) {
                     delete patientConsultationsCache[consultationData.patientId];
+                    try { localStorage.removeItem('patientConsultations:' + String(consultationData.patientId)); } catch (_e) {}
                 } else {
                     // 如果缺少病人 ID，清除所有病人診症快取
                     patientConsultationsCache = {};
@@ -20164,6 +20150,7 @@ class FirebaseDataManager {
             try {
                 if (consultationData && consultationData.patientId) {
                     delete patientConsultationsCache[consultationData.patientId];
+                    try { localStorage.removeItem('patientConsultations:' + String(consultationData.patientId)); } catch (_e) {}
                 } else {
                     // 如果無法確定病人 ID，則清除所有病人診症快取
                     patientConsultationsCache = {};
@@ -20186,6 +20173,16 @@ class FirebaseDataManager {
             if (patientConsultationsCache && Array.isArray(patientConsultationsCache[patientId])) {
                 return { success: true, data: patientConsultationsCache[patientId] };
             }
+            try {
+                const stored = localStorage.getItem('patientConsultations:' + String(patientId));
+                if (stored) {
+                    const arr = JSON.parse(stored);
+                    if (Array.isArray(arr)) {
+                        patientConsultationsCache[patientId] = arr;
+                        return { success: true, data: arr };
+                    }
+                }
+            } catch (_lsErr) {}
             /**
              * 改為直接使用 Firestore 查詢特定 patientId 的診療記錄，避免先讀取全部後再過濾。
              * 這樣可降低讀取量，僅在開啟病歷時讀取該病患相關的診療記錄。
@@ -20210,6 +20207,9 @@ class FirebaseDataManager {
             });
             // 儲存至快取以供後續使用
             patientConsultationsCache[patientId] = patientConsultations;
+            try {
+                localStorage.setItem('patientConsultations:' + String(patientId), JSON.stringify(patientConsultations));
+            } catch (_lsErr) {}
             return { success: true, data: patientConsultations };
         } catch (error) {
             console.error('讀取病人診症記錄失敗:', error);
@@ -22443,6 +22443,16 @@ async function deleteMedicalRecord(recordId) {
             } catch (_lsErr) {
                 // 忽略 localStorage 錯誤
             }
+            try {
+                if (typeof localStorage !== 'undefined') {
+                    const keys = Object.keys(localStorage);
+                    for (const k of keys) {
+                        if (k && k.indexOf('patientConsultations:') === 0) {
+                            try { localStorage.removeItem(k); } catch (_e) {}
+                        }
+                    }
+                }
+            } catch (_err) {}
         } catch (_err) {
             // 忽略錯誤
         }
