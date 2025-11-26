@@ -3830,7 +3830,7 @@ async function safeGetPatients(_forceRefresh = false) {
       return { success: false, data: [] };
     }
     // 呼叫原始 getPatients 取得資料
-    const result = await window.firebaseDataManager.getPatients();
+    const result = await window.firebaseDataManager.getPatients(_forceRefresh === true);
     // 若結果為空或格式不正確仍回傳失敗狀態
     if (result && typeof result.success === 'boolean' && Array.isArray(result.data)) {
       return result;
