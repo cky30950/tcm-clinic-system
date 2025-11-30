@@ -811,58 +811,40 @@ async function computeGlobalUsageCounts() {
  * 會比對 consultation.doctor 是否等於 doctor (使用者帳號)。
  * 回傳物件包含 herbCounts、formulaCounts 與 acupointCounts。
  */
-function computePersonalStatistics(doctor, sourceList) {
+function computePersonalStatistics(doctor) {
     const herbCounts = {};
     const formulaCounts = {};
     const acupointCounts = {};
-    
-    // 如果沒有提供 sourceList，則回傳空物件（避免錯誤使用不完整的全域變數）
-    // 這裡我們強制要求傳入 list，不再依賴全域 consultations
-    const listToScan = Array.isArray(sourceList) ? sourceList : [];
-
-    if (listToScan.length === 0) {
+    if (!Array.isArray(consultations) || consultations.length === 0) {
         return { herbCounts, formulaCounts, acupointCounts };
     }
-
-    listToScan.forEach(cons => {
+    consultations.forEach(cons => {
         try {
-            // 確保只計算該醫師的資料
             if (doctor && cons.doctor && String(cons.doctor) !== String(doctor)) {
                 return;
             }
-            
-            // 1. 統計處方 (中藥/方劑)
             const pres = cons && cons.prescription ? cons.prescription : '';
             const lines = pres.split('\n');
             lines.forEach(rawLine => {
                 const line = rawLine.trim();
                 if (!line) return;
-                // 提取藥名，去除劑量和單位 (例如 "當歸 10g" -> "當歸")
                 const match = line.match(/^([^0-9\s\(\)\.]+)/);
                 const name = match ? match[1].trim() : line.split(/[\d\s]/)[0];
                 if (!name) return;
-                
-                // 判斷是方劑還是單味藥
                 let isFormula = false;
-                if (Array.isArray(herbLibrary) && herbLibrary.length > 0) {
+                if (Array.isArray(herbLibrary)) {
                     const found = herbLibrary.find(item => item.name === name);
                     if (found && found.type === 'formula') {
                         isFormula = true;
                     }
                 }
-                // 後備判斷：若 herbLibrary 未載入，依名稱常見特徵判斷
-                if (!isFormula && (name.includes('湯') || name.includes('散') || name.includes('丸') || name.includes('膏'))) {
-                    isFormula = true;
-                }
-
                 if (isFormula) {
                     formulaCounts[name] = (formulaCounts[name] || 0) + 1;
                 } else {
                     herbCounts[name] = (herbCounts[name] || 0) + 1;
                 }
             });
-
-            // 2. 統計穴位 (從針灸備註中解析 data-acupoint-name 標籤)
+            // 解析針灸備註中的穴位名稱
             const acNotes = cons && cons.acupunctureNotes ? cons.acupunctureNotes : '';
             const regex = /data-acupoint-name="(.*?)"/g;
             let matchAc;
@@ -873,10 +855,9 @@ function computePersonalStatistics(doctor, sourceList) {
                 }
             }
         } catch (_e) {
-            // 忽略單筆解析錯誤
+            // 忽略此筆診症的解析錯誤
         }
     });
-
     return { herbCounts, formulaCounts, acupointCounts };
 }
 
@@ -978,63 +959,50 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
  * 若 consultations 尚未載入，會先載入全部診症記錄。
  */
 async function loadPersonalStatistics() {
-    // 顯示載入狀態
-    const herbListEl = document.getElementById('personalHerbList');
-    if (herbListEl) {
-        herbListEl.innerHTML = '<div class="text-center py-4 text-gray-500"><div class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-transparent mr-2"></div>正在同步統計數據...</div>';
-    }
-
-    const doctor = currentUser; // 當前登入醫師
-    if (!doctor) return;
-
-    const cacheKey = `personalStats_${doctor}`; // 專屬快取 Key，避免與其他功能衝突
-    
-    // 1. 讀取本地快取
-    let localData = { list: [], lastSyncAt: null };
-    try {
-        const cachedStr = localStorage.getItem(cacheKey);
-        if (cachedStr) {
-            localData = JSON.parse(cachedStr);
-        }
-    } catch (e) {
-        console.warn('讀取個人統計快取失敗，將重新建立', e);
-        localData = { list: [], lastSyncAt: null };
-    }
-
-    // 準備同步時間點 (如果沒有快取，使用 1970-01-01)
-    const sinceDate = localData.lastSyncAt || new Date(0).toISOString();
-    
-    try {
-        // 確保 Firebase DataManager 已就緒
-        if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
-            
-            // 2. 檢查是否有新數據 (Has Updates?) - 極輕量查詢
-            const hasUpdates = await window.firebaseDataManager.hasDoctorConsultationUpdates(doctor, sinceDate);
-            
-            if (hasUpdates) {
-                console.log(`[統計] 發現自 ${sinceDate} 後的新資料，開始增量同步...`);
-                
-                // 3. 獲取差異數據 (Delta Fetch) - 只下載變動的部分
-                const deltaRes = await window.firebaseDataManager.getConsultationsDeltaByDoctor(doctor, sinceDate);
-                
-                if (deltaRes && deltaRes.success && Array.isArray(deltaRes.data)) {
-                    const newRecords = deltaRes.data;
-                    console.log(`[統計] 下載了 ${newRecords.length} 筆新/更新記錄`);
-
-                    // 4. 合併數據 (Merge)
-                    // 建立 Map 以便去重 (ID 為 Key)，優先使用新下載的資料覆蓋舊資料
-                    const recordMap = new Map();
-                    
-                    // 先放入舊資料
-                    if (Array.isArray(localData.list)) {
-                        localData.list.forEach(item => recordMap.set(String(item.id), item));
+    const cacheKey = String(currentUser || '');
+    window.personalStatsCache = window.personalStatsCache || {};
+    const existing = window.personalStatsCache[cacheKey] || readCache('personalStatsCache', cacheKey);
+    if (!existing) {
+        if (!Array.isArray(consultations) || consultations.length === 0) {
+            try {
+                if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
+                    const res = await window.firebaseDataManager.getConsultationsByDoctor(currentUser);
+                    if (res && res.success) {
+                        consultations = res.data.map(item => {
+                            let dateStr = null;
+                            if (item.date) {
+                                if (typeof item.date === 'object' && item.date.seconds) {
+                                    dateStr = new Date(item.date.seconds * 1000).toISOString();
+                                } else {
+                                    dateStr = item.date;
+                                }
+                            } else if (item.createdAt) {
+                                if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
+                                    dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
+                                } else {
+                                    dateStr = item.createdAt;
+                                }
+                            }
+                            return { id: item.id, date: dateStr, doctor: item.doctor, prescription: item.prescription, acupunctureNotes: item.acupunctureNotes, createdAt: item.createdAt, updatedAt: item.updatedAt };
+                        });
                     }
-                    
-                    // 再放入新資料 (覆蓋舊的)
-                    let maxUpdatedAtTimestamp = new Date(sinceDate).getTime();
-                    
-                    newRecords.forEach(item => {
-                        // 規範化日期格式
+                }
+            } catch (_e) {
+                console.error('載入診症資料失敗：', _e);
+            }
+        }
+    } else {
+        try {
+            if (window.firebaseDataManager && typeof window.firebaseDataManager.hasDoctorConsultationUpdates === 'function') {
+                const lastSyncAtRef = existing.lastSyncAt ? new Date(existing.lastSyncAt) : null;
+                const changed = await window.firebaseDataManager.hasDoctorConsultationUpdates(currentUser, lastSyncAtRef);
+                if (!changed) {
+                    renderPersonalStatistics(existing.stats);
+                    return;
+                }
+                const deltaRes = await window.firebaseDataManager.getConsultationsDeltaByDoctor(currentUser, existing.lastSyncAt);
+                if (deltaRes && deltaRes.success) {
+                    const normalize = (item) => {
                         let dateStr = null;
                         if (item.date) {
                             if (typeof item.date === 'object' && item.date.seconds) {
@@ -1049,59 +1017,33 @@ async function loadPersonalStatistics() {
                                 dateStr = item.createdAt;
                             }
                         }
-                        
-                        // 追蹤最新的更新時間，用於下次同步
-                        const itemUpdate = item.updatedAt 
-                            ? (item.updatedAt.seconds ? item.updatedAt.seconds * 1000 : new Date(item.updatedAt).getTime())
-                            : 0;
-                        const itemCreate = item.createdAt
-                            ? (item.createdAt.seconds ? item.createdAt.seconds * 1000 : new Date(item.createdAt).getTime())
-                            : 0;
-                        const latestTime = Math.max(itemUpdate, itemCreate);
-                        if (latestTime > maxUpdatedAtTimestamp) {
-                            maxUpdatedAtTimestamp = latestTime;
-                        }
-
-                        // 儲存精簡版資料以節省 localStorage 空間
-                        // 我們只存統計需要的欄位：id, doctor, prescription, acupunctureNotes, updatedAt
-                        // 移除 billingItems, symptoms, diagnosis 等大欄位
-                        recordMap.set(String(item.id), {
-                            id: item.id,
-                            doctor: item.doctor,
-                            prescription: item.prescription,
-                            acupunctureNotes: item.acupunctureNotes,
-                            updatedAt: item.updatedAt,
-                            date: dateStr
-                        });
-                    });
-
-                    // 5. 更新本地快取物件
-                    localData.list = Array.from(recordMap.values());
-                    // 更新同步時間標記
-                    localData.lastSyncAt = new Date(maxUpdatedAtTimestamp).toISOString();
-                    
-                    // 6. 寫回 localStorage
-                    try {
-                        localStorage.setItem(cacheKey, JSON.stringify(localData));
-                    } catch (storageErr) {
-                        console.error('LocalStorage 空間不足，無法快取完整統計數據', storageErr);
-                        // 如果空間不足，我們仍使用內存中的數據進行當次渲染，但不寫入快取
+                        return { id: item.id, date: dateStr, doctor: item.doctor, prescription: item.prescription, acupunctureNotes: item.acupunctureNotes, createdAt: item.createdAt, updatedAt: item.updatedAt };
+                    };
+                    const deltas = deltaRes.data.map(normalize);
+                    const index = new Map((existing.list || []).map(c => [String(c.id), c]));
+                    for (const r of deltas) {
+                        index.set(String(r.id), r);
                     }
+                    consultations = Array.from(index.values());
                 }
-            } else {
-                console.log('[統計] 本地資料已是最新，無需下載。');
             }
-        }
-    } catch (err) {
-        console.error('同步個人統計數據失敗:', err);
-        // 即使同步失敗，也嘗試使用本地現有數據顯示
-        showToast('同步數據失敗，將顯示現有快取結果', 'warning');
+        } catch (_e) {}
     }
-
-    // 7. 計算統計 (使用完整且更新後的 localData.list)
-    const stats = computePersonalStatistics(doctor, localData.list);
-    
-    // 8. 渲染圖表與列表
+    const doctor = currentUser;
+    const stats = computePersonalStatistics(doctor);
+    const lastSyncAt = (() => {
+        let latest = 0;
+        for (const c of consultations) {
+            const u = c && c.updatedAt ? (c.updatedAt.seconds ? c.updatedAt.seconds*1000 : new Date(c.updatedAt).getTime()) : 0;
+            const cr = c && c.createdAt ? (c.createdAt.seconds ? c.createdAt.seconds*1000 : new Date(c.createdAt).getTime()) : 0;
+            const t = Math.max(u||0, cr||0);
+            if (t && t > latest) latest = t;
+        }
+        return latest ? new Date(latest) : new Date();
+    })();
+    const entry = { stats, lastSyncAt: lastSyncAt.toISOString(), list: consultations };
+    window.personalStatsCache[cacheKey] = entry;
+    writeCache('personalStatsCache', cacheKey, entry);
     renderPersonalStatistics(stats);
 }
 
