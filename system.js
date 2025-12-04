@@ -955,205 +955,96 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
 }
 
 /**
- * 優化版：載入個人統計分析
- * 特點：
- * 1. 增量更新：只下載上次同步後變更的資料 (節省流量)
- * 2. 獨立快取：不依賴全域 consultations 變數 (確保資料完整)
- * 3. 最小化儲存：只存必要欄位 (節省 LocalStorage 空間)
+ * 載入個人統計分析頁面並渲染統計結果。
+ * 若 consultations 尚未載入，會先載入全部診症記錄。
  */
 async function loadPersonalStatistics() {
-    // 顯示載入狀態
-    const chartContainer = document.getElementById('personalHerbChart').parentElement;
-    if (chartContainer) {
-        // 簡單的 loading 遮罩
-        const loadingId = 'stats-loading-overlay';
-        if (!document.getElementById(loadingId)) {
-            const overlay = document.createElement('div');
-            overlay.id = loadingId;
-            overlay.className = 'absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10';
-            overlay.innerHTML = '<div class="text-blue-600 font-semibold flex items-center"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-2"></div>同步數據中...</div>';
-            chartContainer.style.position = 'relative';
-            chartContainer.appendChild(overlay);
+    const cacheKey = String(currentUser || '');
+    window.personalStatsCache = window.personalStatsCache || {};
+    const existing = window.personalStatsCache[cacheKey] || readCache('personalStatsCache', cacheKey);
+    if (!existing) {
+        if (!Array.isArray(consultations) || consultations.length === 0) {
+            try {
+                if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
+                    const res = await window.firebaseDataManager.getConsultationsByDoctor(currentUser);
+                    if (res && res.success) {
+                        consultations = res.data.map(item => {
+                            let dateStr = null;
+                            if (item.date) {
+                                if (typeof item.date === 'object' && item.date.seconds) {
+                                    dateStr = new Date(item.date.seconds * 1000).toISOString();
+                                } else {
+                                    dateStr = item.date;
+                                }
+                            } else if (item.createdAt) {
+                                if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
+                                    dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
+                                } else {
+                                    dateStr = item.createdAt;
+                                }
+                            }
+                            return { id: item.id, date: dateStr, doctor: item.doctor, prescription: item.prescription, acupunctureNotes: item.acupunctureNotes, createdAt: item.createdAt, updatedAt: item.updatedAt };
+                        });
+                    }
+                }
+            } catch (_e) {
+                console.error('載入診症資料失敗：', _e);
+            }
         }
-    }
-
-    try {
-        if (!currentUser) {
-            console.warn('未登入，無法載入個人統計');
-            return;
-        }
-
-        // 1. 定義快取鍵值 (包含使用者帳號，避免多帳號混淆)
-        const storageKey = `personal_stats_minified_${currentUser}`;
-        
-        // 2. 讀取本地快取
-        let localData = { list: [], lastSyncAt: null };
+    } else {
         try {
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                localData = JSON.parse(stored);
-            }
-        } catch (e) {
-            console.warn('讀取統計快取失敗，將重新下載:', e);
-        }
-
-        // 3. 準備同步時間點
-        // 如果沒有上次同步時間，設為 1970 年 (下載全部)
-        const lastSyncDate = localData.lastSyncAt ? new Date(localData.lastSyncAt) : new Date(0);
-        
-        // 4. 向 Firebase 請求「增量」資料
-        // 使用 window.firebaseDataManager.getConsultationsDeltaByDoctor 
-        // 確保 DataManager 已實作此方法 (system.js 中已存在)
-        if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
-            console.log(`[統計] 開始增量同步，上次同步時間: ${lastSyncDate.toLocaleString()}`);
-            
-            // 這裡我們直接請求變更，如果不支援 delta，它通常會回傳全部或空
-            // 注意：我們傳入 true (completedOnly) 因為統計通常只看已完成的診症
-            const deltaRes = await window.firebaseDataManager.getConsultationsDeltaByDoctor(currentUser, lastSyncDate.toISOString());
-            
-            if (deltaRes && deltaRes.success && Array.isArray(deltaRes.data) && deltaRes.data.length > 0) {
-                console.log(`[統計] 發現 ${deltaRes.data.length} 筆新資料/變更資料`);
-                
-                // 5. 合併資料 (Merge Strategy)
-                // 建立一個 Map 以 ID 為鍵，方便覆蓋舊資料
-                const dataMap = new Map(localData.list.map(item => [String(item.id), item]));
-                
-                // 處理新下載的資料
-                deltaRes.data.forEach(fullRecord => {
-                    // **關鍵優化**：只提取統計需要的欄位 (Minification)
-                    // 這樣可以讓 LocalStorage 存下數千筆甚至上萬筆記錄而不爆滿
-                    const minifiedRecord = {
-                        id: fullRecord.id,
-                        d: fullRecord.date || fullRecord.createdAt, // 日期
-                        p: fullRecord.prescription || '',           // 處方 (核心)
-                        a: fullRecord.acupunctureNotes || '',       // 針灸 (核心)
-                        u: fullRecord.updatedAt || new Date().toISOString() // 更新時間
-                    };
-                    
-                    // 更新 Map (如果 ID 已存在則覆蓋，不存在則新增)
-                    dataMap.set(String(fullRecord.id), minifiedRecord);
-                });
-
-                // 轉回陣列
-                localData.list = Array.from(dataMap.values());
-                
-                // 更新同步時間標記 (使用當前時間，確保下次只抓之後的)
-                localData.lastSyncAt = new Date().toISOString();
-                
-                // 6. 儲存回 LocalStorage
-                try {
-                    localStorage.setItem(storageKey, JSON.stringify(localData));
-                } catch (writeErr) {
-                    console.error('統計資料過大，無法寫入 LocalStorage (建議清除瀏覽器快取或實作 IndexedDB)', writeErr);
-                    // 雖然寫入失敗，但記憶體中的 localData.list 是最新的，仍可繼續運算
+            if (window.firebaseDataManager && typeof window.firebaseDataManager.hasDoctorConsultationUpdates === 'function') {
+                const lastSyncAtRef = existing.lastSyncAt ? new Date(existing.lastSyncAt) : null;
+                const changed = await window.firebaseDataManager.hasDoctorConsultationUpdates(currentUser, lastSyncAtRef);
+                if (!changed) {
+                    renderPersonalStatistics(existing.stats);
+                    return;
                 }
-            } else {
-                console.log('[統計] 無需更新，使用本地快取');
-            }
-        }
-
-        // 7. 計算統計 (使用本地的完整列表)
-        const stats = computeStatsFromMinifiedList(localData.list);
-        
-        // 8. 渲染圖表
-        renderPersonalStatistics(stats);
-
-    } catch (err) {
-        console.error('載入個人統計發生錯誤:', err);
-        showToast('載入統計資料失敗', 'error');
-    } finally {
-        // 移除 Loading 遮罩
-        const overlay = document.getElementById('stats-loading-overlay');
-        if (overlay) overlay.remove();
-    }
-}
-
-/**
- * 專門針對最小化資料結構的統計計算函式
- * @param {Array} minifiedList - 包含 {p: prescription, a: notes} 的陣列
- */
-function computeStatsFromMinifiedList(minifiedList) {
-    const herbCounts = {};
-    const formulaCounts = {};
-    const acupointCounts = {};
-
-    if (!Array.isArray(minifiedList) || minifiedList.length === 0) {
-        return { herbCounts, formulaCounts, acupointCounts };
-    }
-
-    minifiedList.forEach(item => {
-        // 1. 統計處方 (item.p = prescription)
-        const pres = item.p || '';
-        if (pres) {
-            const lines = pres.split('\n');
-            lines.forEach(rawLine => {
-                const line = rawLine.trim();
-                if (!line) return;
-                // 解析藥名：取數字或空格前的部分
-                const match = line.match(/^([^0-9\s\(\)\.]+)/);
-                const name = match ? match[1].trim() : line.split(/[\d\s]/)[0];
-                
-                if (!name) return;
-
-                // 判斷是方劑還是單味藥
-                // 這裡需要依賴全域 herbLibrary 來判斷類型
-                let isFormula = false;
-                if (Array.isArray(window.herbLibrary)) {
-                    const found = window.herbLibrary.find(h => h.name === name);
-                    if (found && found.type === 'formula') {
-                        isFormula = true;
-                    } else if (!found) {
-                        // 如果庫裡找不到，嘗試用名稱特徵判斷 (例如包含 "湯", "散", "丸")
-                        if (/[湯散丸膏飲丹煎方劑]/.test(name)) {
-                            isFormula = true;
+                const deltaRes = await window.firebaseDataManager.getConsultationsDeltaByDoctor(currentUser, existing.lastSyncAt);
+                if (deltaRes && deltaRes.success) {
+                    const normalize = (item) => {
+                        let dateStr = null;
+                        if (item.date) {
+                            if (typeof item.date === 'object' && item.date.seconds) {
+                                dateStr = new Date(item.date.seconds * 1000).toISOString();
+                            } else {
+                                dateStr = item.date;
+                            }
+                        } else if (item.createdAt) {
+                            if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
+                                dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
+                            } else {
+                                dateStr = item.createdAt;
+                            }
                         }
+                        return { id: item.id, date: dateStr, doctor: item.doctor, prescription: item.prescription, acupunctureNotes: item.acupunctureNotes, createdAt: item.createdAt, updatedAt: item.updatedAt };
+                    };
+                    const deltas = deltaRes.data.map(normalize);
+                    const index = new Map((existing.list || []).map(c => [String(c.id), c]));
+                    for (const r of deltas) {
+                        index.set(String(r.id), r);
                     }
-                }
-
-                if (isFormula) {
-                    formulaCounts[name] = (formulaCounts[name] || 0) + 1;
-                } else {
-                    herbCounts[name] = (herbCounts[name] || 0) + 1;
-                }
-            });
-        }
-
-        // 2. 統計穴位 (item.a = acupunctureNotes)
-        // 舊版資料可能包含 data-acupoint-name，或者是純文字
-        const acNotes = item.a || '';
-        if (acNotes) {
-            // 嘗試解析 HTML 標籤中的 data-acupoint-name
-            const regex = /data-acupoint-name="(.*?)"/g;
-            let matchAc;
-            let hasHtmlTags = false;
-            
-            while ((matchAc = regex.exec(acNotes)) !== null) {
-                const acName = matchAc[1];
-                if (acName) {
-                    acupointCounts[acName] = (acupointCounts[acName] || 0) + 1;
-                    hasHtmlTags = true;
+                    consultations = Array.from(index.values());
                 }
             }
-
-            // 如果沒有 HTML 標籤 (可能是手動輸入的純文字，或舊版資料)
-            // 嘗試用頓號或逗號分隔統計
-            if (!hasHtmlTags) {
-                // 移除可能的 "針法：" 文字
-                const cleanText = acNotes.replace(/針法：.*/, '');
-                // 簡單切割
-                const points = cleanText.split(/[、，, ]+/);
-                points.forEach(pt => {
-                    const pName = pt.trim();
-                    // 簡單過濾：長度適中且在中藥庫或穴位庫可能存在的
-                    if (pName && pName.length <= 4) {
-                        acupointCounts[pName] = (acupointCounts[pName] || 0) + 1;
-                    }
-                });
-            }
+        } catch (_e) {}
+    }
+    const doctor = currentUser;
+    const stats = computePersonalStatistics(doctor);
+    const lastSyncAt = (() => {
+        let latest = 0;
+        for (const c of consultations) {
+            const u = c && c.updatedAt ? (c.updatedAt.seconds ? c.updatedAt.seconds*1000 : new Date(c.updatedAt).getTime()) : 0;
+            const cr = c && c.createdAt ? (c.createdAt.seconds ? c.createdAt.seconds*1000 : new Date(c.createdAt).getTime()) : 0;
+            const t = Math.max(u||0, cr||0);
+            if (t && t > latest) latest = t;
         }
-    });
-
-    return { herbCounts, formulaCounts, acupointCounts };
+        return latest ? new Date(latest) : new Date();
+    })();
+    const entry = { stats, lastSyncAt: lastSyncAt.toISOString(), list: consultations };
+    window.personalStatsCache[cacheKey] = entry;
+    writeCache('personalStatsCache', cacheKey, entry);
+    renderPersonalStatistics(stats);
 }
 
 /**
