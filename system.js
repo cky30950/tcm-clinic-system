@@ -13875,155 +13875,134 @@ async function initializeSystemAfterLogin() {
             document.getElementById('addBillingItemModal').classList.remove('hidden');
         }
         
-// -----------------------------------------------------------------------------
-// 修復：儲存收費項目 (saveBillingItem)
-// 1. 確保新增項目後立即同步更新全域 billingItems 陣列。
-// 2. 強制設定 active 為 true (若核取方塊存在)。
-// 3. 確保 billingItemsLoaded 旗標為 true。
-// -----------------------------------------------------------------------------
-async function saveBillingItem() {
-    // 權限檢查：無權限者不得儲存
-    if (!hasAccessToSection('billingManagement')) {
-        showToast('權限不足，無法保存收費項目', 'error');
-        return;
-    }
-    const name = document.getElementById('billingItemName').value.trim();
-    const category = document.getElementById('billingItemCategory').value;
-    let price = parseFloat(document.getElementById('billingItemPrice').value);
-
-    let packageUses = null;
-    let validityDays = null;
-    if (category === 'package') {
-        packageUses = parseInt(document.getElementById('billingItemPackageUses').value);
-        validityDays = parseInt(document.getElementById('billingItemValidityDays').value);
-        if (!packageUses || packageUses <= 0) {
-            showToast('請輸入套票可用次數！', 'error');
-            return;
-        }
-        if (!validityDays || validityDays <= 0) {
-            showToast('請輸入有效天數！', 'error');
-            return;
-        }
-    }
-    
-    if (!name) {
-        showToast('請輸入收費項目名稱！', 'error');
-        return;
-    }
-    
-    if (!category) {
-        showToast('請選擇項目類別！', 'error');
-        return;
-    }
-    
-    if (isNaN(price)) {
-        showToast('請輸入有效的收費金額！', 'error');
-        return;
-    }
-    
-    // 折扣項目允許負數或0-1之間的小數（百分比），其他項目不允許負數
-    if (category !== 'discount' && price < 0) {
-        showToast('除折扣項目外，收費金額不能為負數！', 'error');
-        return;
-    }
-    
-    // 折扣項目的特殊驗證
-    if (category === 'discount') {
-        if (price > 0 && price >= 1 && price <= 10) {
-            // 如果輸入1-10之間的數字，自動轉換為折扣比例
-            price = price / 10;
-            document.getElementById('billingItemPrice').value = price;
-            {
-                const lang = localStorage.getItem('lang') || 'zh';
-                const zhMsg = `已自動轉換為${(price * 100).toFixed(0)}折`;
-                const enMsg = `Automatically converted to ${(price * 100).toFixed(0)}% discount`;
-                const msg = lang === 'en' ? enMsg : zhMsg;
-                showToast(msg, 'info');
+        async function saveBillingItem() {
+            // 權限檢查：無權限者不得儲存
+            if (!hasAccessToSection('billingManagement')) {
+                showToast('權限不足，無法保存收費項目', 'error');
+                return;
             }
-        }
-    }
-    
-    // 取得當前觸發的按鈕並在開始執行儲存時顯示讀取圈
-    const saveBtn = getLoadingButtonFromEvent('button[onclick="saveBillingItem()"]');
-    setButtonLoading(saveBtn);
-    try {
-        // 始終使用字串作為 ID，以避免字串與數字比較造成的匹配問題
-        const newId = editingBillingItemId || String(Date.now());
-        const activeCheckbox = document.getElementById('billingItemActive');
-        
-        const item = {
-            id: newId,
-            name: name,
-            category: category,
-            price: price,
-            unit: document.getElementById('billingItemUnit').value.trim(),
-            description: document.getElementById('billingItemDescription').value.trim(),
-            packageUses: packageUses,
-            validityDays: validityDays,
-            // 確保 active 狀態正確，若元素不存在預設為 true
-            active: activeCheckbox ? activeCheckbox.checked : true,
-            createdAt: editingBillingItemId ? (billingItems.find(b => String(b.id) === String(editingBillingItemId)) || {}).createdAt : new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
+            const name = document.getElementById('billingItemName').value.trim();
+            const category = document.getElementById('billingItemCategory').value;
+            let price = parseFloat(document.getElementById('billingItemPrice').value);
 
-        // 確保全域 billingItems 是陣列
-        if (!Array.isArray(billingItems)) {
-            billingItems = [];
-        }
-
-        // 更新本地資料及提示訊息
-        if (editingBillingItemId) {
-            // 以字串形式比較 ID，以確保能正確找到並覆寫原項目
-            const index = billingItems.findIndex(b => String(b.id) === String(editingBillingItemId));
-            if (index !== -1) {
-                billingItems[index] = item;
-            } else {
-                // 若找不到 ID (罕見)，則當作新增
-                billingItems.push(item);
+            let packageUses = null;
+            let validityDays = null;
+            if (category === 'package') {
+                packageUses = parseInt(document.getElementById('billingItemPackageUses').value);
+                validityDays = parseInt(document.getElementById('billingItemValidityDays').value);
+                if (!packageUses || packageUses <= 0) {
+                    showToast('請輸入套票可用次數！', 'error');
+                    return;
+                }
+                if (!validityDays || validityDays <= 0) {
+                    showToast('請輸入有效天數！', 'error');
+                    return;
+                }
             }
-            showToast('收費項目已更新！', 'success');
-        } else {
-            billingItems.push(item);
-            showToast('收費項目已新增！', 'success');
-        }
-
-        // 標記資料已載入，避免診症系統搜尋時誤以為沒資料
-        billingItemsLoaded = true;
-
-        // 將最新收費項目存回本地以支援跨裝置同步讀取。
-        try {
-            localStorage.setItem('billingItems', JSON.stringify(billingItems));
-        } catch (lsErrUpdate) {
-            console.warn('保存收費項目到本地失敗:', lsErrUpdate);
-        }
-
-        try {
-            // 將收費項目寫入 Firestore
-            // 不儲存 id 欄位，避免與文件 ID 重複
-            let dataToWrite;
+            
+            if (!name) {
+                showToast('請輸入收費項目名稱！', 'error');
+                return;
+            }
+            
+            if (!category) {
+                showToast('請選擇項目類別！', 'error');
+                return;
+            }
+            
+            if (isNaN(price)) {
+                showToast('請輸入有效的收費金額！', 'error');
+                return;
+            }
+            
+            // 折扣項目允許負數或0-1之間的小數（百分比），其他項目不允許負數
+            if (category !== 'discount' && price < 0) {
+                showToast('除折扣項目外，收費金額不能為負數！', 'error');
+                return;
+            }
+            
+            // 折扣項目的特殊驗證
+            if (category === 'discount') {
+                if (price > 0 && price >= 1 && price <= 10) {
+                    // 如果輸入1-10之間的數字，自動轉換為折扣比例
+                    price = price / 10;
+                    document.getElementById('billingItemPrice').value = price;
+                    {
+                        const lang = localStorage.getItem('lang') || 'zh';
+                        const zhMsg = `已自動轉換為${(price * 100).toFixed(0)}折`;
+                        const enMsg = `Automatically converted to ${(price * 100).toFixed(0)}% discount`;
+                        const msg = lang === 'en' ? enMsg : zhMsg;
+                        showToast(msg, 'info');
+                    }
+                }
+            }
+            
+            // 取得當前觸發的按鈕並在開始執行儲存時顯示讀取圈
+            const saveBtn = getLoadingButtonFromEvent('button[onclick="saveBillingItem()"]');
+            setButtonLoading(saveBtn);
             try {
-                const { id, ...rest } = item || {};
-                dataToWrite = { ...rest };
-            } catch (_omitErr) {
-                dataToWrite = item;
+                // 始終使用字串作為 ID，以避免字串與數字比較造成的匹配問題
+                const newId = editingBillingItemId || String(Date.now());
+                const item = {
+                    id: newId,
+                    name: name,
+                    category: category,
+                    price: price,
+                    unit: document.getElementById('billingItemUnit').value.trim(),
+                    description: document.getElementById('billingItemDescription').value.trim(),
+                    packageUses: packageUses,
+                    validityDays: validityDays,
+                    active: document.getElementById('billingItemActive').checked,
+                    createdAt: editingBillingItemId ? (billingItems.find(b => String(b.id) === String(editingBillingItemId)) || {}).createdAt : new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                // 更新本地資料及提示訊息
+                if (editingBillingItemId) {
+                    // 以字串形式比較 ID，以確保能正確找到並覆寫原項目
+                    const index = billingItems.findIndex(b => String(b.id) === String(editingBillingItemId));
+                    if (index !== -1) {
+                        billingItems[index] = item;
+                    }
+                    showToast('收費項目已更新！', 'success');
+                } else {
+                    billingItems.push(item);
+                    showToast('收費項目已新增！', 'success');
+                }
+
+                // 將最新收費項目存回本地以支援跨裝置同步讀取。
+                try {
+                    localStorage.setItem('billingItems', JSON.stringify(billingItems));
+                } catch (lsErrUpdate) {
+                    console.warn('保存收費項目到本地失敗:', lsErrUpdate);
+                }
+
+                try {
+                    // 將收費項目寫入 Firestore
+                    // 不儲存 id 欄位，避免與文件 ID 重複
+                    let dataToWrite;
+                    try {
+                        const { id, ...rest } = item || {};
+                        dataToWrite = { ...rest };
+                    } catch (_omitErr) {
+                        dataToWrite = item;
+                    }
+                    await window.firebase.setDoc(
+                        window.firebase.doc(window.firebase.db, 'billingItems', String(item.id)),
+                        dataToWrite
+                    );
+                } catch (error) {
+                    console.error('儲存收費項目至 Firestore 失敗:', error);
+                }
+                hideAddBillingItemForm();
+                displayBillingItems();
+                // 新增或更新收費項目後，標記已載入，避免診症搜尋時判定為未載入
+                billingItemsLoaded = true;
+            } finally {
+                // 恢復按鈕狀態與內容
+                clearButtonLoading(saveBtn);
             }
-            await window.firebase.setDoc(
-                window.firebase.doc(window.firebase.db, 'billingItems', String(item.id)),
-                dataToWrite
-            );
-        } catch (error) {
-            console.error('儲存收費項目至 Firestore 失敗:', error);
         }
-        hideAddBillingItemForm();
-        displayBillingItems();
-    } catch (err) {
-        console.error('保存收費項目過程發生錯誤:', err);
-        showToast('保存失敗', 'error');
-    } finally {
-        // 恢復按鈕狀態與內容
-        clearButtonLoading(saveBtn);
-    }
-}
         
         async function deleteBillingItem(id) {
     // 權限檢查：無權限者不得刪除
@@ -14909,108 +14888,80 @@ async function saveBillingItem() {
             }
         }
         
-// -----------------------------------------------------------------------------
-// 修復：收費項目搜索功能 (searchBillingForConsultation)
-// 1. 增加防呆機制，確保 billingItems 為陣列。
-// 2. 若全域資料為空，嘗試重新初始化。
-// 3. 確保搜尋比對時轉型為字串，避免錯誤。
-// -----------------------------------------------------------------------------
+        // 收費項目搜索功能
 async function searchBillingForConsultation() {
-    const searchInput = document.getElementById('billingSearch');
-    if (!searchInput) return;
-    
-    const searchTerm = searchInput.value.trim().toLowerCase();
-    const resultsContainer = document.getElementById('billingSearchResults');
-    const resultsList = document.getElementById('billingSearchList');
+            const searchTerm = document.getElementById('billingSearch').value.trim().toLowerCase();
+            const resultsContainer = document.getElementById('billingSearchResults');
+            const resultsList = document.getElementById('billingSearchList');
 
-    if (searchTerm.length < 1) {
-        resultsContainer.classList.add('hidden');
-        return;
-    }
+            if (searchTerm.length < 1) {
+                resultsContainer.classList.add('hidden');
+                return;
+            }
 
-    // 確保收費項目資料已載入。若尚未載入，呼叫初始化函式載入本地或遠端資料。
-    try {
-        if (typeof initBillingItems === 'function' && !billingItemsLoaded) {
-            await initBillingItems();
-        }
-        // 如果載入後仍然是空的（例如剛登入），強制刷新一次
-        if (Array.isArray(billingItems) && billingItems.length === 0 && typeof initBillingItems === 'function') {
-             await initBillingItems(true);
-        }
-    } catch (err) {
-        console.error('載入收費項目資料時發生錯誤:', err);
-    }
+            // 確保收費項目資料已載入。若尚未載入，呼叫初始化函式載入本地或遠端資料。
+            try {
+                if (typeof initBillingItems === 'function' && !billingItemsLoaded) {
+                    await initBillingItems();
+                }
+            } catch (err) {
+                console.error('載入收費項目資料時發生錯誤:', err);
+            }
 
-    // 檢查是否仍無資料，避免搜尋出現空白
-    const itemsForSearch = Array.isArray(billingItems) ? billingItems : [];
+            // 檢查是否仍無資料，避免搜尋出現空白
+            const itemsForSearch = Array.isArray(billingItems) ? billingItems : [];
 
-    // 搜索匹配的收費項目（只顯示啟用的項目）
-    // 使用 String() 強制轉型，防止 name 或 description 為 undefined 時報錯
-    const matchedItems = itemsForSearch.filter(item => 
-        item && item.active !== false && ( // 預設 active 為 undefined 時視為啟用
-            (item.name && String(item.name).toLowerCase().includes(searchTerm)) ||
-            (item.description && String(item.description).toLowerCase().includes(searchTerm))
-        )
-    ).slice(0, 10); // 限制顯示前10個結果
+            // 搜索匹配的收費項目（只顯示啟用的項目）
+            const matchedItems = itemsForSearch.filter(item => 
+                item && item.active && (
+                    (item.name && item.name.toLowerCase().includes(searchTerm)) ||
+                    (item.description && item.description.toLowerCase().includes(searchTerm))
+                )
+            ).slice(0, 10); // 限制顯示前10個結果
 
-    if (!matchedItems || matchedItems.length === 0) {
-        resultsList.innerHTML = `
-            <div class="p-3 text-center text-gray-500 text-sm">
-                找不到符合條件的收費項目
-            </div>
-        `;
-        resultsContainer.classList.remove('hidden');
-        return;
-    }
-
-    // 顯示搜索結果
-    resultsList.innerHTML = matchedItems.map(item => {
-        const categoryNames = {
-            consultation: '診療費',
-            medicine: '藥費',
-            treatment: '治療費',
-            other: '其他',
-            discount: '折扣項目',
-            package: '套票項目',
-            packageUse: '套票使用'
-        };
-        const categoryName = categoryNames[item.category] || '未分類';
-        const bgColor = getCategoryBgColor(item.category);
-        
-        // 處理價格顯示：折扣項目顯示方式不同
-        let priceDisplay = '';
-        if (item.category === 'discount') {
-             if (item.price > 0 && item.price < 1) {
-                 priceDisplay = `${(item.price * 10).toFixed(1)}折`;
-             } else {
-                 priceDisplay = `-$${Math.abs(item.price)}`;
-             }
-        } else {
-             priceDisplay = `$${item.price}`;
-        }
-
-        // 使用 escapeHtml 防止 XSS
-        const safeName = window.escapeHtml(item.name);
-        const safeDesc = item.description ? window.escapeHtml(item.description) : '';
-        const safeUnit = item.unit ? window.escapeHtml(item.unit) : '';
-
-        return `
-            <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToBilling('${item.id}')">
-                <div class="text-center">
-                    <div class="font-semibold text-gray-900 text-sm mb-1">${safeName}</div>
-                    <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${categoryName}</div>
-                    <div class="text-sm font-bold ${item.category === 'discount' ? 'text-red-600' : 'text-green-600'}">
-                        ${priceDisplay}
+            if (!matchedItems || matchedItems.length === 0) {
+                resultsList.innerHTML = `
+                    <div class="p-3 text-center text-gray-500 text-sm">
+                        找不到符合條件的收費項目
                     </div>
-                    ${safeUnit ? `<div class="text-xs text-gray-600">/ ${safeUnit}</div>` : ''}
-                    ${safeDesc ? `<div class="text-xs text-gray-600 mt-1">${safeDesc.substring(0, 30)}${safeDesc.length > 30 ? '...' : ''}</div>` : ''}
-                </div>
-            </div>
-        `;
-    }).join('');
+                `;
+                resultsContainer.classList.remove('hidden');
+                return;
+            }
 
-    resultsContainer.classList.remove('hidden');
-}
+            // 顯示搜索結果
+            resultsList.innerHTML = matchedItems.map(item => {
+                const categoryNames = {
+                    consultation: '診療費',
+                    medicine: '藥費',
+                    treatment: '治療費',
+                    other: '其他',
+                    discount: '折扣項目',
+                    package: '套票項目',
+                    packageUse: '套票使用'
+                };
+                const categoryName = categoryNames[item.category] || '未分類';
+                const bgColor = getCategoryBgColor(item.category);
+
+                return `
+                    <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToBilling('${item.id}')">
+                        <div class="text-center">
+                            <div class="font-semibold text-gray-900 text-sm mb-1">${item.name}</div>
+                            <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${categoryName}</div>
+                            ${item.category !== 'discount' ? `
+                                <div class="text-sm font-bold text-green-600">
+                                    $${item.price}
+                                </div>
+                            ` : ''}
+                            ${item.unit ? `<div class="text-xs text-gray-600">/ ${item.unit}</div>` : ''}
+                            ${item.description ? `<div class="text-xs text-gray-600 mt-1">${item.description.substring(0, 30)}${item.description.length > 30 ? '...' : ''}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            resultsContainer.classList.remove('hidden');
+        }
         
         // 獲取類別背景顏色
         function getCategoryBgColor(category) {
