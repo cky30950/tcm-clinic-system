@@ -21594,10 +21594,12 @@ async function displayMedicalRecords(pageChange = false) {
             </tr>
         `;
     } catch (_e) {}
+
     const searchInput = document.getElementById('searchMedicalRecord');
     const term = searchInput && searchInput.value ? searchInput.value.toLowerCase().trim() : '';
     const itemsPerPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.itemsPerPage) ? paginationSettings.medicalRecordList.itemsPerPage : medicalRecordPageSize;
     let currentPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.currentPage) ? paginationSettings.medicalRecordList.currentPage : 1;
+    
     let filtered = [];
     if (term) {
         let res = medicalRecordSearchCache[term] || null;
@@ -21608,22 +21610,25 @@ async function displayMedicalRecords(pageChange = false) {
         medicalRecords = Array.isArray(res) ? res : [];
         filtered = medicalRecords;
     } else {
-    const pageData = await fetchMedicalRecordPageOptimized(currentPage, itemsPerPage);
+        const pageData = await fetchMedicalRecordPageOptimized(currentPage, itemsPerPage);
         medicalRecords = Array.isArray(pageData) ? pageData : [];
         filtered = medicalRecords;
     }
+
     if (term) {
         filtered = medicalRecords.filter(rec => {
-            // 使用病歷編號進行搜尋時優先採用 rec.medicalRecordNumber
-            // 若不存在則回退至 Firebase 文件 ID。這樣可讓使用者輸入「MR」開頭的編號
-            // 就能搜尋到對應病歷，而不會只比對隱晦的文件 ID。【857813225103928†L1617-L1625】
             const recordNum = String(rec.medicalRecordNumber || rec.id || '').toLowerCase();
-            const patientName = String(medicalRecordPatients[String(rec.patientId).trim()] || rec.patientName || '').toLowerCase();
+            
+            // 搜尋時的名稱查找邏輯增強
+            let pName = '';
+            if (medicalRecordPatients && rec.patientId) {
+                pName = medicalRecordPatients[String(rec.patientId).trim()];
+            }
+            if (!pName) pName = rec.patientName || '';
+            
+            const patientName = String(pName).toLowerCase();
+            
             let doctorName = '';
-            // 依據醫師資料設定顯示名稱，若為字串（可能為 username 或角色），
-            // 則使用 getDoctorDisplayName() 嘗試從用戶列表取得顯示名稱；
-            // 若為物件，則優先使用其 username 再以 getDoctorDisplayName() 轉換，
-            // 否則回退至其自身的 displayName/name/fullName 或 email。
             if (rec.doctor) {
                 try {
                     if (typeof rec.doctor === 'string') {
@@ -21631,20 +21636,20 @@ async function displayMedicalRecords(pageChange = false) {
                             ? getDoctorDisplayName(rec.doctor) : rec.doctor;
                     } else if (rec.doctor.username) {
                         doctorName = typeof getDoctorDisplayName === 'function'
-                            ? getDoctorDisplayName(rec.doctor.username) : (rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '');
+                            ? getDoctorDisplayName(rec.doctor.username) : (rec.doctor.displayName || rec.doctor.name || '');
                     } else {
-                        doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
+                        doctorName = rec.doctor.displayName || rec.doctor.name || '';
                     }
                 } catch (_err) {
-                    doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
+                    doctorName = '';
                 }
             }
             doctorName = doctorName.toLowerCase();
             return recordNum.includes(term) || patientName.includes(term) || doctorName.includes(term);
         });
     }
-    // 將過濾後的病歷依日期排序，最新日期優先。
-    // 透過 parseConsultationDate 解析 date、createdAt 或 updatedAt，若解析失敗視為 0。
+
+    // 排序邏輯
     try {
         const getTimestamp = (rec) => {
             try {
@@ -21663,12 +21668,14 @@ async function displayMedicalRecords(pageChange = false) {
     } catch (_sortErr) {
         // 忽略排序失敗
     }
+
     if (!pageChange) {
         if (paginationSettings.medicalRecordList) {
             paginationSettings.medicalRecordList.currentPage = 1;
         }
         currentPage = 1;
     }
+
     const totalItems = term ? filtered.length : (typeof medicalRecordTotalCount === 'number' ? medicalRecordTotalCount : filtered.length);
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     if (currentPage > totalPages) {
@@ -21677,19 +21684,22 @@ async function displayMedicalRecords(pageChange = false) {
     if (paginationSettings.medicalRecordList) {
         paginationSettings.medicalRecordList.currentPage = currentPage;
     }
+
     const startIdx = (currentPage - 1) * itemsPerPage;
     const pageItems = term ? filtered.slice(startIdx, startIdx + itemsPerPage) : filtered;
+
     tbody.innerHTML = '';
-    // 決定語言顯示
+    
     let lang = 'zh';
     try {
         lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     } catch (_e) {}
+    
     const translations = (typeof window !== 'undefined' && window.translations && window.translations[lang]) ? window.translations[lang] : {};
     const viewLabel = translations['檢視'] || '檢視';
-    // 新增刪除按鈕標籤，可根據語言設定
     const deleteLabel = translations['刪除'] || (lang === 'en' ? 'Delete' : '刪除');
     const noMatchText = term ? (lang === 'en' ? 'No matching records found' : '沒有找到符合條件的病歷') : (lang === 'en' ? 'No medical records yet' : '尚無病歷資料');
+
     if (!pageItems || pageItems.length === 0) {
         tbody.innerHTML = `
             <tr>
@@ -21699,12 +21709,44 @@ async function displayMedicalRecords(pageChange = false) {
             </tr>
         `;
     } else {
+        // 為了確保能找到病人名稱，我們預備一個全域病人的 Map (如果有的話)
+        const globalPatientMap = new Map();
+        if (typeof patients !== 'undefined' && Array.isArray(patients)) {
+            patients.forEach(p => { if(p.id) globalPatientMap.set(String(p.id), p.name); });
+        }
+        if (typeof patientCache !== 'undefined' && Array.isArray(patientCache)) {
+            patientCache.forEach(p => { if(p.id) globalPatientMap.set(String(p.id), p.name); });
+        }
+
         pageItems.forEach(rec => {
-            // 顯示給使用者看的病歷編號應為系統產生的 medicalRecordNumber；若無則回退至文件 ID。
             const recordNumDisplay = rec.medicalRecordNumber || rec.id || '';
-            // 實際用於載入與刪除的病歷 ID 必須使用 Firebase 文件 ID
             const recordId = rec.id || '';
-            const patientName = medicalRecordPatients[String(rec.patientId).trim()] || rec.patientName || '';
+            
+            // --- 修復核心：增強病人名稱查找邏輯 ---
+            let patientName = '';
+            const pidStr = rec.patientId ? String(rec.patientId).trim() : '';
+
+            // 1. 優先使用 loadMedicalRecordManagement 建立的對照表
+            if (pidStr && medicalRecordPatients && medicalRecordPatients[pidStr]) {
+                patientName = medicalRecordPatients[pidStr];
+            }
+            
+            // 2. 如果沒找到，嘗試使用病歷記錄中的快照名稱 (patientName)
+            if (!patientName && rec.patientName) {
+                patientName = rec.patientName;
+            }
+
+            // 3. 如果還是沒找到，嘗試從全域 patients / patientCache 陣列中即時查找
+            if (!patientName && pidStr && globalPatientMap.size > 0) {
+                patientName = globalPatientMap.get(pidStr);
+            }
+
+            // 4. 最後的手段：若真的找不到，標示為未知
+            if (!patientName) {
+                patientName = (window.t ? window.t('未知病人') : '未知病人');
+            }
+            // ----------------------------------------
+
             let doctorName = '';
             if (rec.doctor) {
                 try {
@@ -21715,14 +21757,15 @@ async function displayMedicalRecords(pageChange = false) {
                     } else if (rec.doctor.username) {
                         doctorName = typeof getDoctorDisplayName === 'function'
                             ? getDoctorDisplayName(rec.doctor.username)
-                            : (rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '');
+                            : (rec.doctor.displayName || rec.doctor.name || '');
                     } else {
-                        doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
+                        doctorName = rec.doctor.displayName || rec.doctor.name || '';
                     }
                 } catch (_err) {
-                    doctorName = rec.doctor.displayName || rec.doctor.name || rec.doctor.fullName || rec.doctor.email || '';
+                    doctorName = '';
                 }
             }
+
             let dateStr = '';
             try {
                 const rawDate = rec.date || null;
@@ -21732,23 +21775,21 @@ async function displayMedicalRecords(pageChange = false) {
                     dateStr = parsed.toLocaleDateString(locale, { year: 'numeric', month: '2-digit', day: '2-digit' });
                 }
             } catch (_err) {}
-            // 調整主訴欄位的來源順序：若記錄已有中醫診斷（diagnosis 或 tcmDiagnosis），
-            // 則優先顯示該診斷內容；若無則退回至主訴/問診摘要/現病史等其他欄位。
+
             let complaint = rec.diagnosis || rec.tcmDiagnosis || rec.symptoms || rec.inquirySummary || rec.chiefComplaint || rec.currentHistory || '';
             let complaintDisplay = '';
             if (complaint) {
                 const firstLine = complaint.split('\n').find(l => l.trim() !== '');
                 complaintDisplay = firstLine || '';
-                // 將主訴欄位的顯示長度縮短為 8 個字元，超出部分顯示省略號，
-                // 以免列表佔用過多寬度
                 if (complaintDisplay.length > 8) {
                     complaintDisplay = complaintDisplay.substring(0, 8) + '...';
                 }
             }
+
             tbody.innerHTML += `
                 <tr>
                     <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(recordNumDisplay)}</td>
-                    <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(patientName)}</td>
+                    <td class="px-4 py-2 whitespace-nowrap font-medium text-gray-900">${window.escapeHtml(patientName)}</td>
                     <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(complaintDisplay)}</td>
                     <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(doctorName)}</td>
                     <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(dateStr)}</td>
@@ -21760,7 +21801,7 @@ async function displayMedicalRecords(pageChange = false) {
             `;
         });
     }
-    // 確保分頁容器存在並渲染
+
     const paginEl = ensurePaginationContainer('medicalRecordList', 'medicalRecordPagination');
     if (paginEl) {
         renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
