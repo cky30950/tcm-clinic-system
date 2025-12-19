@@ -686,4 +686,715 @@
             { x: 0.1570, y: 0.6296 }
         ],
         '太乙': [
-            { x: 0.82
+            { x: 0.8223, y: 0.6118 },
+            { x: 0.1680, y: 0.6297 }
+        ],
+        '章門': [
+            { x: 0.8576, y: 0.6116 },
+            { x: 0.1898, y: 0.6278 }
+        ],
+        '京門': [
+            { x: 0.8697, y: 0.6103 }, // 側腹
+            { x: 0.4965, y: 0.6155 }  // 背部
+        ],
+        '水分': [
+            { x: 0.8110, y: 0.5974 },
+            { x: 0.1526, y: 0.6157 }
+        ],
+        '滑肉門': [
+            { x: 0.8221, y: 0.5981 },
+            { x: 0.1678, y: 0.6155 }
+        ],
+        '神闕': [
+            { x: 0.8107, y: 0.5832 },
+            { x: 0.1526, y: 0.6011 }
+        ],
+        '肓俞': [
+            { x: 0.1571, y: 0.6008 },
+            { x: 0.8146, y: 0.5836 }
+        ],
+        '天樞': [
+            { x: 0.8215, y: 0.5845 },
+            { x: 0.1678, y: 0.6013 }
+        ],
+        '大橫': [
+            { x: 0.8346, y: 0.5843 },
+            { x: 0.1834, y: 0.6005 }
+        ],
+        '帶脈': [{ x: 0.8571, y: 0.5856 }],
+        '陰交': [
+            { x: 0.8119, y: 0.5662 },
+            { x: 0.1526, y: 0.5864 }
+        ],
+        '中注': [
+            { x: 0.8152, y: 0.5666 },
+            { x: 0.1565, y: 0.5862 }
+        ],
+        '外陵': [
+            { x: 0.8211, y: 0.5662 },
+            { x: 0.1677, y: 0.5866 }
+        ],
+        '氣海': [
+            { x: 0.8125, y: 0.5572 },
+            { x: 0.1524, y: 0.5789 }
+        ],
+        '腹結': [
+            { x: 0.8352, y: 0.5611 },
+            { x: 0.1836, y: 0.5817 }
+        ],
+        '石門': [
+            { x: 0.8127, y: 0.5491 },
+            { x: 0.1521, y: 0.5706 }
+        ],
+        '四滿': [
+            { x: 0.8157, y: 0.5493 },
+            { x: 0.1563, y: 0.5713 }
+        ],
+        '大巨': [
+            { x: 0.8203, y: 0.5493 },
+            { x: 0.1677, y: 0.5714 }
+        ],
+        '關元': [
+            { x: 0.8134, y: 0.5324 },
+            { x: 0.1519, y: 0.5566 }
+        ],
+        '氣穴': [
+            { x: 0.8164, y: 0.5322 },
+            { x: 0.1563, y: 0.5559 }
+        ],
+        '水道': [
+            { x: 0.8206, y: 0.5319 },
+            { x: 0.1675, y: 0.5561 }
+        ],
+        '五樞': [{ x: 0.8349, y: 0.5332 }],
+        '維道': [{ x: 0.8322, y: 0.5245 }],
+        '中極': [
+            { x: 0.8149, y: 0.5140 },
+            { x: 0.1516, y: 0.5413 }
+        ],
+        '大赫': [
+            { x: 0.8184, y: 0.5143 },
+            { x: 0.1561, y: 0.5408 }
+        ],
+        '歸來': [
+            { x: 0.8221, y: 0.5149 },
+            { x: 0.1672, y: 0.5408 }
+        ],
+        '府舍': [
+            { x: 0.8283, y: 0.5151 },
+            { x: 0.1833, y: 0.5396 }
+        ],
+        '衝門': [{ x: 0.1782, y: 0.5313 }],
+        '曲骨': [
+            { x: 0.8202, y: 0.4965 },
+            { x: 0.1519, y: 0.5256 }
+        ],
+        '橫骨': [
+            { x: 0.8233, y: 0.4978 },
+            { x: 0.1560, y: 0.5247 }
+        ],
+        '會陰': [{ x: 0.5711, y: 0.2271 }],
+        '大椎': [{ x: 0.4524, y: 0.8201 }],
+        '陶道': [{ x: 0.4524, y: 0.8065 }],
+        '身柱': [{ x: 0.4533, y: 0.7779 }],
+        '神道': [{ x: 0.4528, y: 0.7419 }],
+        '靈臺': [{ x: 0.4528, y: 0.7244 }],
+        '至陽': [{ x: 0.4530, y: 0.7089 }],
+        '筋縮': [{ x: 0.4530, y: 0.6728 }],
+        '中樞': [{ x: 0.4533, y: 0.6586 }],
+        '脊中': [{ x: 0.4530, y: 0.6448 }],
+        '懸樞': [{ x: 0.4531, y: 0.6206 }],
+        '命門': [{ x: 0.4530, y: 0.6059 }],
+        '腰陽關': [{ x: 0.4534, y: 0.5760 }],
+        '腰俞': [{ x: 0.4533, y: 0.5087 }],
+        '巨骨': [{ x: 0.5152, y: 0.8164 }],
+        '肩外俞': [{ x: 0.4803, y: 0.8082 }],
+        '肩中俞': [{ x: 0.4719, y: 0.8196 }],
+        '天髎': [{ x: 0.4959, y: 0.8126 }],
+        '曲垣': [{ x: 0.4876, y: 0.7910 }],
+        '附分': [{ x: 0.4786, y: 0.7916 }],
+        '秉風': [{ x: 0.4984, y: 0.7964 }],
+        '魄戶': [{ x: 0.4792, y: 0.7774 }],
+        '臑俞': [{ x: 0.5156, y: 0.7921 }],
+        '膏肓': [{ x: 0.4791, y: 0.7574 }],
+        '天宗': [{ x: 0.4987, y: 0.7626 }],
+        '神堂': [{ x: 0.4789, y: 0.7416 }],
+        '肩貞': [{ x: 0.5165, y: 0.7405 }],
+        '譩譆': [{ x: 0.4789, y: 0.7237 }],
+        '膈關': [{ x: 0.4788, y: 0.7081 }],
+        '魂門': [{ x: 0.4791, y: 0.6740 }],
+        '陽綱': [{ x: 0.4791, y: 0.6581 }],
+        '意捨': [{ x: 0.4790, y: 0.6444 }],
+        '胃倉': [{ x: 0.4790, y: 0.6323 }],
+        '肓門': [{ x: 0.4790, y: 0.6212 }],
+        '志室': [{ x: 0.4791, y: 0.6068 }],
+        '次髎': [{ x: 0.4594, y: 0.5371 }],
+        '中髎': [{ x: 0.4591, y: 0.5248 }],
+        '下髎': [{ x: 0.4593, y: 0.5152 }],
+        '上髎': [{ x: 0.4594, y: 0.5477 }],
+        '會陽': [{ x: 0.4597, y: 0.4977 }],
+        '大杼': [{ x: 0.4654, y: 0.8078 }],
+        '風門': [{ x: 0.4657, y: 0.7930 }],
+        '肺俞': [{ x: 0.4659, y: 0.7775 }],
+        '厥陰俞': [{ x: 0.4660, y: 0.7584 }],
+        '心俞': [{ x: 0.4660, y: 0.7412 }],
+        '督俞': [{ x: 0.4665, y: 0.7248 }],
+        '膈俞': [{ x: 0.4662, y: 0.7088 }],
+        '肝俞': [{ x: 0.4665, y: 0.6739 }],
+        '膽俞': [{ x: 0.4666, y: 0.6586 }],
+        '脾俞': [{ x: 0.4665, y: 0.6446 }],
+        '胃俞': [{ x: 0.4668, y: 0.6324 }],
+        '三焦俞': [{ x: 0.4665, y: 0.6212 }],
+        '腎俞': [{ x: 0.4666, y: 0.6061 }],
+        '氣海俞': [{ x: 0.4666, y: 0.5904 }],
+        '大腸俞': [{ x: 0.4665, y: 0.5757 }],
+        '關元俞': [{ x: 0.4662, y: 0.5576 }],
+        '小腸俞': [{ x: 0.4662, y: 0.5473 }],
+        '膀胱俞': [{ x: 0.4665, y: 0.5373 }],
+        '中膂俞': [{ x: 0.4665, y: 0.5244 }],
+        '白環俞': [{ x: 0.4665, y: 0.5137 }],
+        '胞肓': [{ x: 0.4790, y: 0.5375 }],
+        '秩邊': [{ x: 0.4787, y: 0.5139 }],
+
+        // ==========================================
+        // 下肢 (Lower Limb)
+        // ==========================================
+        '京骨': [
+            { x: 0.8717, y: 0.0294 },
+            { x: 0.5000, y: 0.0180 }
+        ],
+        '金門': [
+            { x: 0.8819, y: 0.0337 },
+            { x: 0.4952, y: 0.0187 }
+        ],
+        '髀關': [
+            { x: 0.8343, y: 0.4402 },
+            { x: 0.1977, y: 0.4811 }
+        ],
+        '箕門': [
+            { x: 0.7826, y: 0.4157 },
+            { x: 0.1672, y: 0.4170 }
+        ],
+        '血海': [
+            { x: 0.7574, y: 0.3635 },
+            { x: 0.1620, y: 0.3527 }
+        ],
+        '陰包': [
+            { x: 0.7790, y: 0.3729 },
+            { x: 0.1597, y: 0.3746 }
+        ],
+        '伏兔': [
+            { x: 0.8439, y: 0.3578 },
+            { x: 0.1898, y: 0.3964 }
+        ],
+        '風市': [{ x: 0.8780, y: 0.3535 }],
+        '曲泉': [{ x: 0.7701, y: 0.3174 }],
+        '陰谷': [{ x: 0.7788, y: 0.3194 }],
+        '陰市': [
+            { x: 0.8508, y: 0.3253 },
+            { x: 0.1863, y: 0.3619 }
+        ],
+        '中瀆': [{ x: 0.8785, y: 0.3342 }],
+        '復溜': [{ x: 0.7934, y: 0.1643 }],
+        '太溪': [{ x: 0.7924, y: 0.1420 }],
+        '犢鼻': [
+            { x: 0.8621, y: 0.2548 },
+            { x: 0.1834, y: 0.3051 }
+        ],
+        '陽陵泉': [{ x: 0.8857, y: 0.2382 }],
+        '足三里': [
+            { x: 0.8711, y: 0.2224 },
+            { x: 0.1831, y: 0.2696 }
+        ],
+        '上巨虛': [
+            { x: 0.8714, y: 0.1870 },
+            { x: 0.1845, y: 0.2355 }
+        ],
+        '條口': [
+            { x: 0.8723, y: 0.1643 },
+            { x: 0.1836, y: 0.2130 }
+        ],
+        '豐隆': [
+            { x: 0.8785, y: 0.1645 },
+            { x: 0.1895, y: 0.2127 }
+        ],
+        '下巨虛': [
+            { x: 0.8721, y: 0.1536 },
+            { x: 0.1836, y: 0.2009 }
+        ],
+        '外丘': [{ x: 0.8866, y: 0.1547 }],
+        '公孫': [
+            { x: 0.7556, y: 0.0888 },
+            { x: 0.1728, y: 0.0749 }
+        ],
+        '然谷': [
+            { x: 0.7718, y: 0.0958 },
+            { x: 0.1681, y: 0.0869 }
+        ],
+        '水泉': [{ x: 0.7934, y: 0.1089 }],
+        '光明': [{ x: 0.8870, y: 0.1290 }],
+        '陽輔': [{ x: 0.8851, y: 0.1155 }],
+        '懸鐘': [{ x: 0.8875, y: 0.1043 }],
+        '跗陽': [
+            { x: 0.9005, y: 0.1045 },
+            { x: 0.4848, y: 0.0799 }
+        ],
+        '解谿': [
+            { x: 0.8756, y: 0.0691 },
+            { x: 0.1761, y: 0.1172 }
+        ],
+        '衝陽': [
+            { x: 0.8613, y: 0.0563 },
+            { x: 0.1834, y: 0.0895 }
+        ],
+        '丘墟': [{ x: 0.8804, y: 0.0608 }],
+        '崑崙': [
+            { x: 0.8984, y: 0.0654 },
+            { x: 0.4814, y: 0.0401 }
+        ],
+        '梁丘': [
+            { x: 0.8531, y: 0.3139 },
+            { x: 0.1845, y: 0.3503 }
+        ],
+        '膝陽關': [{ x: 0.8851, y: 0.2942 }],
+        '陰陵泉': [
+            { x: 0.7634, y: 0.3017 },
+            { x: 0.1669, y: 0.2796 }
+        ],
+        '膝關': [{ x: 0.7712, y: 0.3221 }],
+        '地機': [
+            { x: 0.7673, y: 0.2678 },
+            { x: 0.1662, y: 0.2431 }
+        ],
+        '中都': [
+            { x: 0.7656, y: 0.2253 },
+            { x: 0.1717, y: 0.2073 }
+        ],
+        '漏谷': [
+            { x: 0.7731, y: 0.2133 },
+            { x: 0.1627, y: 0.1935 }
+        ],
+        '蠡溝': [
+            { x: 0.7689, y: 0.1980 },
+            { x: 0.1704, y: 0.1817 }
+        ],
+        '築賓': [{ x: 0.7865, y: 0.1988 }],
+        '三陰交': [
+            { x: 0.7778, y: 0.1750 },
+            { x: 0.1659, y: 0.1582 }
+        ],
+        '交信': [{ x: 0.7871, y: 0.1643 }],
+        '陽交': [
+            { x: 0.8941, y: 0.1540 },
+            { x: 0.4995, y: 0.1363 }
+        ],
+        '飛揚': [
+            { x: 0.9055, y: 0.1543 },
+            { x: 0.4907, y: 0.1365 }
+        ],
+        '中封': [
+            { x: 0.7712, y: 0.1294 },
+            { x: 0.1698, y: 0.1146 }
+        ],
+        '商丘': [
+            { x: 0.7779, y: 0.1255 },
+            { x: 0.1635, y: 0.1134 }
+        ],
+        '照海': [{ x: 0.7831, y: 0.1222 }],
+        '大鐘': [{ x: 0.7979, y: 0.1264 }],
+        '隱白': [
+            { x: 0.7234, y: 0.0816 },
+            { x: 0.1914, y: 0.0565 }
+        ],
+        '行間': [
+            { x: 0.7375, y: 0.0927 },
+            { x: 0.1907, y: 0.0655 }
+        ],
+        '太衝': [
+            { x: 0.7492, y: 0.1017 },
+            { x: 0.1807, y: 0.0834 }
+        ],
+        '大都': [
+            { x: 0.7330, y: 0.0790 },
+            { x: 0.1834, y: 0.0582 }
+        ],
+        '太白': [
+            { x: 0.7456, y: 0.0831 },
+            { x: 0.1761, y: 0.0674 }
+        ],
+        '陷谷': [
+            { x: 0.8480, y: 0.0471 },
+            { x: 0.1916, y: 0.0773 }
+        ],
+        '足臨泣': [{ x: 0.8649, y: 0.0429 }],
+        '申脈': [
+            { x: 0.8891, y: 0.0532 },
+            { x: 0.4872, y: 0.0314 }
+        ],
+        '內庭': [
+            { x: 0.8340, y: 0.0383 },
+            { x: 0.1965, y: 0.0705 }
+        ],
+        '俠溪': [
+            { x: 0.8413, y: 0.0337 },
+            { x: 0.5006, y: 0.0261 }
+        ],
+        '地五會': [
+            { x: 0.8544, y: 0.0363 },
+            { x: 0.4961, y: 0.0279 }
+        ],
+        '僕參': [
+            { x: 0.9002, y: 0.0412 },
+            { x: 0.4805, y: 0.0183 }
+        ],
+        '厲兌': [
+            { x: 0.8211, y: 0.0309 },
+            { x: 0.2031, y: 0.0598 }
+        ],
+        '足竅陰': [
+            { x: 0.8323, y: 0.0252 },
+            { x: 0.5054, y: 0.0248 }
+        ],
+        '至陰': [
+            { x: 0.8394, y: 0.0250 },
+            { x: 0.5122, y: 0.0200 }
+        ],
+        '足通谷': [
+            { x: 0.8487, y: 0.0252 },
+            { x: 0.5081, y: 0.0187 }
+        ],
+        '束骨': [
+            { x: 0.8622, y: 0.0274 },
+            { x: 0.5044, y: 0.0178 }
+        ],
+        '殷門': [{ x: 0.4800, y: 0.3645 }],
+        '浮郄': [{ x: 0.4911, y: 0.2709 }],
+        '委中': [{ x: 0.4809, y: 0.2584 }],
+        '委陽': [{ x: 0.4914, y: 0.2589 }],
+        '合陽': [{ x: 0.4808, y: 0.2313 }],
+        '承筋': [{ x: 0.4821, y: 0.1909 }],
+        '承山': [{ x: 0.4827, y: 0.1496 }],
+        '承扶': [{ x: 0.4797, y: 0.4453 }],
+        '湧泉': [{ x: 0.2568, y: 0.1752 }],
+        '大敦': [{ x: 0.1937, y: 0.0600 }],
+        '急脈': [{ x: 0.1713, y: 0.5143 }],
+        '陰廉': [{ x: 0.1669, y: 0.5019 }],
+        '足五里': [{ x: 0.1671, y: 0.4888 }]
+    };
+
+    /*
+     * 簡繁與異體字轉換表 (Expanded)
+     */
+    const CHAR_TO_SIMPLIFIED = {
+        '雲': '云', '門': '门', '處': '处', '頭': '头', '臨': '临',
+        '維': '维', '頜': '颌', '厭': '厌', '陽': '阳', '攢': '攒',
+        '衝': '冲', '沖': '冲', '僕': '仆', '內': '内', '樑': '梁',
+        '湧': '涌', '郄': '隙', '鍾': '钟', '鐘': '钟', '裏': '里',
+        '臟': '脏', '經': '经', '瘛': '痴', '兪': '俞'
+    };
+    const CHAR_TO_TRADITIONAL = {
+        '云': ['雲'], '门': ['門'], '处': ['處'], '头': ['頭'], '临': ['臨'],
+        '维': ['維'], '颌': ['頜'], '厌': ['厭'], '阳': ['陽'], '攒': ['攢'],
+        '冲': ['沖', '衝'], '仆': ['僕'], '内': ['內'], '梁': ['樑'],
+        '涌': ['湧'], '隙': ['郄'], '钟': ['鍾', '鐘'], '里': ['裏'],
+        '脏': ['臟'], '经': ['經'], '痴': ['瘛'], '俞': ['兪']
+    };
+
+    function normalizeName(str) {
+        if (!str) return '';
+        // 移除所有空白、括號及括號內的內容、數字編號(如 ST36)
+        return str.replace(/\s+/g, '')
+                  .replace(/[\(\[\{].*?[\)\]\}]/g, '')
+                  .trim();
+    }
+
+    function toSimplifiedName(str) {
+        return Array.from(str).map(ch => CHAR_TO_SIMPLIFIED[ch] || ch).join('');
+    }
+
+    function toTraditionalNames(str) {
+        let results = [''];
+        for (const ch of str) {
+            const trads = CHAR_TO_TRADITIONAL[ch];
+            if (trads && trads.length) {
+                const newRes = [];
+                for (const prefix of results) {
+                    for (const t of trads) {
+                        newRes.push(prefix + t);
+                    }
+                }
+                results = newRes;
+            } else {
+                results = results.map(prefix => prefix + ch);
+            }
+        }
+        return results;
+    }
+
+    // 自動生成同義鍵
+    (function generateSynonyms() {
+        const originalEntries = Object.entries(ACUPOINT_COORDS);
+        for (const [name, coordsList] of originalEntries) {
+            const simplified = toSimplifiedName(name);
+            if (simplified && !(simplified in ACUPOINT_COORDS)) {
+                ACUPOINT_COORDS[simplified] = coordsList;
+            }
+            const traditionals = toTraditionalNames(name);
+            for (const trad of traditionals) {
+                if (trad && !(trad in ACUPOINT_COORDS)) {
+                    ACUPOINT_COORDS[trad] = coordsList;
+                }
+            }
+        }
+    })();
+
+    /**
+     * 將座標資料套用至全域 acupointLibrary。
+     */
+    function applyAcupointCoordinates() {
+        let library;
+        try {
+            library = typeof acupointLibrary !== 'undefined' ? acupointLibrary : window.acupointLibrary;
+        } catch (_err) {
+            library = window.acupointLibrary;
+        }
+        
+        let matchCount = 0;
+        let failCount = 0;
+
+        if (Array.isArray(library)) {
+            try {
+                if (typeof window !== 'undefined') {
+                    window.acupointLibrary = library;
+                }
+            } catch (_e) {}
+
+            library.forEach(ac => {
+                if (ac) {
+                    const rawName = ac.name || '';
+                    const cleanedName = normalizeName(rawName);
+                    
+                    // 尋找對應的座標陣列
+                    let coordsList = ACUPOINT_COORDS[cleanedName];
+                    if (!coordsList) {
+                        try {
+                            const simplifiedKey = toSimplifiedName(cleanedName);
+                            coordsList = ACUPOINT_COORDS[simplifiedKey];
+                        } catch (_normErr) {
+                            coordsList = undefined;
+                        }
+                    }
+
+                    // 嘗試異體字模糊搜索 (Last Resort)
+                    if (!coordsList) {
+                         const potentialKeys = Object.keys(ACUPOINT_COORDS);
+                         const foundKey = potentialKeys.find(k => k.includes(cleanedName) || cleanedName.includes(k));
+                         if (foundKey && Math.abs(foundKey.length - cleanedName.length) <= 1) {
+                             coordsList = ACUPOINT_COORDS[foundKey];
+                         }
+                    }
+
+                    // 處理已經存在於物件中的 x, y (字串轉數字)
+                    if (typeof ac.x === 'string' && !Number.isNaN(parseFloat(ac.x))) ac.x = parseFloat(ac.x);
+                    if (typeof ac.y === 'string' && !Number.isNaN(parseFloat(ac.y))) ac.y = parseFloat(ac.y);
+
+                    if (coordsList && coordsList.length > 0) {
+                        matchCount++;
+                        if (typeof ac.x !== 'number') ac.x = coordsList[0].x;
+                        if (typeof ac.y !== 'number') ac.y = coordsList[0].y;
+                        ac.multiCoords = coordsList;
+                    } else if (typeof ac.x === 'number' && typeof ac.y === 'number') {
+                        ac.multiCoords = [{x: ac.x, y: ac.y}];
+                    } else {
+                        // DEBUG: 輸出無法匹配的穴位
+                        console.warn(`[AcupointMap] 無法找到座標: "${rawName}" (cleaned: ${cleanedName})`);
+                        failCount++;
+                    }
+                }
+            });
+            console.log(`[AcupointMap] 初始化完成。成功匹配: ${matchCount}, 失敗: ${failCount}`);
+        }
+        try {
+            if (typeof window !== 'undefined') {
+                window.applyAcupointCoordinates = applyAcupointCoordinates;
+            }
+        } catch (_e) {}
+    }
+
+    /**
+     * 初始化穴位地圖。
+     */
+    window.initAcupointMap = function() {
+        try {
+            const mapContainer = document.getElementById('acupointMap');
+            if (!mapContainer || mapContainer.dataset.initialized) {
+                return;
+            }
+            mapContainer.dataset.initialized = 'true';
+            
+            const img = new Image();
+            img.src = 'images/combined_three.png';
+            img.onload = function() {
+                applyAcupointCoordinates();
+                
+                const w = img.width;
+                const h = img.height;
+                const map = L.map(mapContainer, {
+                    crs: L.CRS.Simple,
+                    maxZoom: 4,
+                    zoomControl: false,
+                    attributionControl: false
+                });
+                
+                const bounds = [[0,0],[h,w]];
+                L.imageOverlay(img.src, bounds).addTo(map);
+                try { map.invalidateSize(); } catch (_e) {}
+                
+                const baseZoom = map.getBoundsZoom(bounds);
+                const initialZoom = baseZoom - 1;
+                
+                if (typeof map.setMinZoom === 'function') map.setMinZoom(initialZoom);
+                else map.options.minZoom = initialZoom;
+                
+                if (typeof map.setMaxBounds === 'function') map.setMaxBounds(bounds);
+                
+                map.options.maxBoundsViscosity = 1.0;
+                map.setView([h / 2, w / 2], initialZoom);
+                
+                // Resize Observer and Events
+                try {
+                    setTimeout(function(){ try { map.invalidateSize(); } catch(_e) {} }, 50);
+                    window.addEventListener('resize', function(){ try { map.invalidateSize(); } catch(_e) {} });
+                    if (typeof ResizeObserver !== 'undefined') {
+                        const ro = new ResizeObserver(function(){ try { map.invalidateSize(); } catch(_e) {} });
+                        ro.observe(mapContainer);
+                    }
+                } catch (_e) {}
+
+                // Cursor Style
+                try {
+                    const mapEl = map.getContainer();
+                    if (mapEl && mapEl.style) {
+                        mapEl.style.cursor = 'crosshair';
+                        map.on('dragstart', function() { mapEl.style.cursor = 'crosshair'; });
+                        map.on('dragend', function() { mapEl.style.cursor = 'crosshair'; });
+                    }
+                } catch (_cursorErr) {}
+
+                // Marker Rendering Logic
+                let library;
+                try {
+                    library = typeof acupointLibrary !== 'undefined' ? acupointLibrary : window.acupointLibrary;
+                } catch (_err) {
+                    library = window.acupointLibrary;
+                }
+                
+                if (Array.isArray(library)) {
+                    library.forEach(ac => {
+                        if (!ac) return;
+
+                        let pointsToDraw = [];
+                        if (ac.multiCoords && Array.isArray(ac.multiCoords)) {
+                            pointsToDraw = ac.multiCoords;
+                        } else if (typeof ac.x === 'number' && typeof ac.y === 'number') {
+                            pointsToDraw = [{x: ac.x, y: ac.y}];
+                        }
+
+                        pointsToDraw.forEach(pt => {
+                            if (typeof pt.x !== 'number' || typeof pt.y !== 'number') return;
+                            
+                            const lat = h * pt.y;
+                            const lon = w * pt.x;
+                            
+                            const marker = L.circleMarker([lat, lon], {
+                                radius: 4,
+                                color: '#2563eb',
+                                weight: 0,
+                                fillColor: '#2563eb',
+                                fillOpacity: 0.85
+                            }).addTo(map);
+
+                            let content = '';
+                            try {
+                                if (typeof getAcupointTooltipContent === 'function') {
+                                    content = getAcupointTooltipContent(ac.name || '');
+                                }
+                            } catch (_err) {
+                                content = ac.name || '';
+                            }
+                            
+                            if (content) {
+                                const html = content.replace(/\n/g, '<br>');
+                                const hasCustomTooltip = (typeof showTooltip === 'function') && (typeof hideTooltip === 'function') && (typeof moveTooltip === 'function');
+                                
+                                if (hasCustomTooltip) {
+                                    marker.on('mouseover', function(e) {
+                                        try { showTooltip(e.originalEvent, encodeURIComponent(content)); } catch (_ignore) {}
+                                    });
+                                    marker.on('mousemove', function(e) {
+                                        try { moveTooltip(e.originalEvent); } catch (_ignore) {}
+                                    });
+                                    marker.on('mouseout', function() {
+                                        try { hideTooltip(); } catch (_ignore) {}
+                                    });
+                                } else {
+                                    if (typeof marker.bindPopup === 'function') marker.bindPopup(html);
+                                    if (typeof marker.bindTooltip === 'function') marker.bindTooltip(html, { direction: 'top', offset: [0, -10], opacity: 0.9 });
+                                }
+                            }
+                        });
+                    });
+                }
+
+                // Coordinate Display (Debug tool)
+                try {
+                    const mapEl = map.getContainer();
+                    if (mapEl) {
+                        try {
+                            const computedStyle = window.getComputedStyle(mapEl);
+                            const pos = computedStyle ? computedStyle.position : mapEl.style.position;
+                            if (!pos || pos === 'static') mapEl.style.position = 'relative';
+                        } catch (_posErr) {
+                            if (!mapEl.style.position) mapEl.style.position = 'relative';
+                        }
+                        
+                        let coordDiv = mapEl.querySelector('#coordinateDisplay');
+                        if (!coordDiv) {
+                            coordDiv = document.createElement('div');
+                            coordDiv.id = 'coordinateDisplay';
+                            coordDiv.className = 'leaflet-coordinate-display';
+                            coordDiv.style.position = 'absolute';
+                            coordDiv.style.left = '8px';
+                            coordDiv.style.bottom = '8px';
+                            coordDiv.style.padding = '2px 4px';
+                            coordDiv.style.fontSize = '12px';
+                            coordDiv.style.background = 'rgba(255, 255, 255, 0.7)';
+                            coordDiv.style.borderRadius = '4px';
+                            coordDiv.style.color = '#000';
+                            coordDiv.style.pointerEvents = 'none';
+                            coordDiv.style.whiteSpace = 'nowrap';
+                            coordDiv.style.zIndex = '1000';
+                            mapEl.appendChild(coordDiv);
+                        }
+                        
+                        map.on('mousemove', function(ev) {
+                            let xCoord = Math.min(Math.max(ev.latlng.lng, 0), w);
+                            let yCoord = Math.min(Math.max(ev.latlng.lat, 0), h);
+                            coordDiv.textContent = 'x: ' + (xCoord / w).toFixed(4) + ', y: ' + (yCoord / h).toFixed(4);
+                        });
+                        map.on('mouseout', function() {
+                            coordDiv.textContent = '';
+                        });
+                    }
+                } catch (coordErr) {
+                    console.warn('Failed to add coordinate display:', coordErr);
+                }
+            };
+            img.onerror = function() {
+                console.warn('Cannot load image for acupoint map');
+            };
+        } catch (e) {
+            console.warn('Failed to initialize acupoint map:', e);
+        }
+    };
+})();
