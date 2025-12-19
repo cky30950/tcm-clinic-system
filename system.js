@@ -2741,6 +2741,7 @@ async function updateInventoryAfterConsultation(consultationId, items, days, fre
         }
     }
     const log = {};
+    const historyEntries = [];
     for (const item of items) {
         if (!item || !item.id) continue;
         const dosageStr = item.customDosage || item.dosage || '';
@@ -2763,9 +2764,11 @@ async function updateInventoryAfterConsultation(consultationId, items, days, fre
             /* 忽略本地更新錯誤 */
         }
         log[String(item.id)] = consumption;
+        historyEntries.push({ itemId: String(item.id), quantity: consumption, unit: inv.unit || 'g' });
     }
     // 將新的消耗量記錄到 inventoryLogs
     await window.firebase.set(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationId)), log);
+    try { await recordInventoryHistory('out', historyEntries, { consultationId: String(consultationId) }); } catch (_e) {}
     // 保存後立即更新處方顯示，以便呈現最新庫存
     try {
         if (typeof updatePrescriptionDisplay === 'function') {
@@ -3452,6 +3455,7 @@ async function saveInventoryChanges() {
                     /* 忽略初始化錯誤 */
                 }
                 // 處理每一行新增的中藥／方劑
+                const historyEntries = [];
                 for (const row of rows) {
                     const qtyInput = row.querySelector('input.batch-herb-qty');
                     let herbId = '';
@@ -3504,7 +3508,9 @@ async function saveInventoryChanges() {
                     } catch (_e) {
                         /* 忽略本地更新錯誤 */
                     }
+                    historyEntries.push({ itemId: String(herbId), quantity: qVal, unit: unitVal });
                 }
+                try { await recordInventoryHistory('in', historyEntries, { mode: selectedInventoryMode }); } catch (_e) {}
                 // 顯示成功訊息
                 showToast((typeof window.t === 'function') ? window.t('庫存已更新！') : '庫存已更新！', 'success');
                 // 隱藏批量入庫對話框
@@ -3544,6 +3550,120 @@ async function saveInventoryChanges() {
             }
         }
 
+        async function recordInventoryHistory(type, entries, extra = {}) {
+            await waitForFirebaseDb();
+            const ts = Date.now();
+            const ref = window.firebase.ref(window.firebase.rtdb, 'inventoryHistory/' + String(type) + '/' + String(ts));
+            const data = { timestamp: ts, entries: Array.isArray(entries) ? entries : [] };
+            for (const k in extra) { data[k] = extra[k]; }
+            await window.firebase.set(ref, data);
+        }
+
+        function openInventoryHistoryModal() {
+            const modal = document.getElementById('inventoryHistoryModal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            switchInventoryHistoryTab('in');
+            loadInventoryHistory('in');
+            loadInventoryHistory('out');
+        }
+
+        function hideInventoryHistoryModal() {
+            const modal = document.getElementById('inventoryHistoryModal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+        }
+
+        function switchInventoryHistoryTab(tab) {
+            const inEl = document.getElementById('inventoryHistoryIn');
+            const outEl = document.getElementById('inventoryHistoryOut');
+            const tabIn = document.getElementById('historyTabIn');
+            const tabOut = document.getElementById('historyTabOut');
+            if (!inEl || !outEl || !tabIn || !tabOut) return;
+            if (tab === 'in') {
+                inEl.classList.remove('hidden');
+                outEl.classList.add('hidden');
+                tabIn.classList.remove('bg-gray-100', 'text-gray-700');
+                tabIn.classList.add('bg-blue-100', 'text-blue-800');
+                tabOut.classList.remove('bg-blue-100', 'text-blue-800');
+                tabOut.classList.add('bg-gray-100', 'text-gray-700');
+            } else {
+                outEl.classList.remove('hidden');
+                inEl.classList.add('hidden');
+                tabOut.classList.remove('bg-gray-100', 'text-gray-700');
+                tabOut.classList.add('bg-blue-100', 'text-blue-800');
+                tabIn.classList.remove('bg-blue-100', 'text-blue-800');
+                tabIn.classList.add('bg-gray-100', 'text-gray-700');
+            }
+        }
+
+        function getHerbNameById(id) {
+            try {
+                if (Array.isArray(herbLibrary)) {
+                    const found = herbLibrary.find(h => String(h.id) === String(id));
+                    if (found && found.name) return found.name;
+                }
+            } catch (_e) {}
+            return String(id);
+        }
+
+        async function loadInventoryHistory(type) {
+            await waitForFirebaseDb();
+            try {
+                if (typeof initHerbLibrary === 'function' && !herbLibraryLoaded) {
+                    await initHerbLibrary();
+                }
+            } catch (_e) {}
+            const containerId = type === 'in' ? 'inventoryHistoryIn' : 'inventoryHistoryOut';
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = '';
+            try {
+                const snap = await window.firebase.get(window.firebase.ref(window.firebase.rtdb, 'inventoryHistory/' + String(type)));
+                const obj = snap && snap.exists() ? snap.val() || {} : {};
+                const keys = Object.keys(obj).sort((a, b) => Number(b) - Number(a));
+                for (const k of keys) {
+                    const rec = obj[k] || {};
+                    const ts = Number(rec.timestamp || k);
+                    const timeText = new Date(ts).toLocaleString();
+                    const div = document.createElement('div');
+                    div.className = 'border rounded px-3 py-2';
+                    const items = Array.isArray(rec.entries) ? rec.entries : [];
+                    const lines = items.map(e => {
+                        const name = getHerbNameById(e.itemId);
+                        const qty = typeof e.quantity === 'number' ? e.quantity : 0;
+                        const unit = e.unit || 'g';
+                        return name + '：' + qty + unit;
+                    });
+                    const extra = [];
+                    if (type === 'in' && rec.mode) { extra.push('類型：' + rec.mode); }
+                    if (type === 'out' && rec.consultationId) { extra.push('診症ID：' + rec.consultationId); }
+                    div.innerHTML = '<div class="text-sm text-gray-600">' + timeText + (extra.length ? '（' + extra.join('，') + '）' : '') + '</div>' +
+                        '<div class="mt-1 text-gray-800">' + (lines.length ? lines.join('；') : '無項目') + '</div>';
+                    container.appendChild(div);
+                }
+            } catch (_e) {}
+            if (type === 'out') {
+                try {
+                    const logSnap = await window.firebase.get(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs'));
+                    const logObj = logSnap && logSnap.exists() ? logSnap.val() || {} : {};
+                    const ids = Object.keys(logObj);
+                    for (const cid of ids) {
+                        const itemsObj = logObj[cid] || {};
+                        const div = document.createElement('div');
+                        div.className = 'border rounded px-3 py-2';
+                        const lines = Object.keys(itemsObj).map(itemId => {
+                            const name = getHerbNameById(itemId);
+                            const qty = typeof itemsObj[itemId] === 'number' ? itemsObj[itemId] : 0;
+                            return name + '：' + qty + 'g';
+                        });
+                        div.innerHTML = '<div class="text-sm text-gray-600">舊出庫記錄（診症ID：' + cid + '）</div>' +
+                            '<div class="mt-1 text-gray-800">' + (lines.length ? lines.join('；') : '無項目') + '</div>';
+                        container.appendChild(div);
+                    }
+                } catch (_e2) {}
+            }
+        }
         // 初始化穴位庫資料
         let acupointLibrary = [];
         // 穴位庫編輯狀態與篩選條件
