@@ -3607,6 +3607,18 @@ async function saveInventoryChanges() {
             return String(id);
         }
 
+        async function getMedicalRecordNumberByConsultationId(id) {
+            try {
+                if (window.firebaseDataManager && typeof window.firebaseDataManager.getConsultationById === 'function') {
+                    const res = await window.firebaseDataManager.getConsultationById(String(id));
+                    if (res && res.success && res.data) {
+                        return res.data.medicalRecordNumber || res.data.id;
+                    }
+                }
+            } catch (_e) {}
+            return String(id);
+        }
+
         async function loadInventoryHistory(type) {
             await waitForFirebaseDb();
             try {
@@ -3619,9 +3631,11 @@ async function saveInventoryChanges() {
             if (!container) return;
             container.innerHTML = '';
             try {
-                const snap = await window.firebase.get(window.firebase.ref(window.firebase.rtdb, 'inventoryHistory/' + String(type)));
+                const baseRef = window.firebase.ref(window.firebase.rtdb, 'inventoryHistory/' + String(type));
+                const q = window.firebase.query(baseRef, window.firebase.orderByChild('timestamp'), window.firebase.limitToLast(20));
+                const snap = await window.firebase.get(q);
                 const obj = snap && snap.exists() ? snap.val() || {} : {};
-                const keys = Object.keys(obj).sort((a, b) => Number(b) - Number(a));
+                const keys = Object.keys(obj).sort((a, b) => Number(b) - Number(a)).slice(0, 20);
                 for (const k of keys) {
                     const rec = obj[k] || {};
                     const ts = Number(rec.timestamp || k);
@@ -3637,7 +3651,10 @@ async function saveInventoryChanges() {
                     });
                     const extra = [];
                     if (type === 'in' && rec.mode) { extra.push('類型：' + rec.mode); }
-                    if (type === 'out' && rec.consultationId) { extra.push('診症ID：' + rec.consultationId); }
+                    if (type === 'out' && rec.consultationId) {
+                        const mrn = await getMedicalRecordNumberByConsultationId(rec.consultationId);
+                        extra.push('病歷編號：' + mrn);
+                    }
                     div.innerHTML = '<div class="text-sm text-gray-600">' + timeText + (extra.length ? '（' + extra.join('，') + '）' : '') + '</div>' +
                         '<div class="mt-1 text-gray-800">' + (lines.length ? lines.join('；') : '無項目') + '</div>';
                     container.appendChild(div);
@@ -3645,9 +3662,11 @@ async function saveInventoryChanges() {
             } catch (_e) {}
             if (type === 'out') {
                 try {
-                    const logSnap = await window.firebase.get(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs'));
+                    const logsRef = window.firebase.ref(window.firebase.rtdb, 'inventoryLogs');
+                    const q2 = window.firebase.query(logsRef, window.firebase.orderByKey(), window.firebase.limitToLast(20));
+                    const logSnap = await window.firebase.get(q2);
                     const logObj = logSnap && logSnap.exists() ? logSnap.val() || {} : {};
-                    const ids = Object.keys(logObj);
+                    const ids = Object.keys(logObj).slice(0, 20);
                     for (const cid of ids) {
                         const itemsObj = logObj[cid] || {};
                         const div = document.createElement('div');
@@ -3657,7 +3676,8 @@ async function saveInventoryChanges() {
                             const qty = typeof itemsObj[itemId] === 'number' ? itemsObj[itemId] : 0;
                             return name + '：' + qty + 'g';
                         });
-                        div.innerHTML = '<div class="text-sm text-gray-600">舊出庫記錄（診症ID：' + cid + '）</div>' +
+                        const mrn = await getMedicalRecordNumberByConsultationId(cid);
+                        div.innerHTML = '<div class="text-sm text-gray-600">舊出庫記錄（病歷編號：' + mrn + '）</div>' +
                             '<div class="mt-1 text-gray-800">' + (lines.length ? lines.join('；') : '無項目') + '</div>';
                         container.appendChild(div);
                     }
