@@ -3619,6 +3619,16 @@ async function saveInventoryChanges() {
             return String(id);
         }
 
+        async function isConsultationMissing(id) {
+            try {
+                if (window.firebaseDataManager && typeof window.firebaseDataManager.getConsultationById === 'function') {
+                    const res = await window.firebaseDataManager.getConsultationById(String(id));
+                    return !(res && res.success && res.data);
+                }
+            } catch (_e) {}
+            return true;
+        }
+
         async function loadInventoryHistory(type) {
             await waitForFirebaseDb();
             try {
@@ -3661,6 +3671,8 @@ async function saveInventoryChanges() {
                     if (type === 'out' && rec.consultationId) {
                         const mrn = await getMedicalRecordNumberByConsultationId(rec.consultationId);
                         extra.push('病歷編號：' + mrn);
+                        const missing = await isConsultationMissing(rec.consultationId);
+                        if (missing) { extra.push('已退回'); }
                     }
                     div.innerHTML = '<div class="text-sm text-gray-600">' + timeText + (extra.length ? '（' + extra.join('，') + '）' : '') + '</div>' +
                         '<div class="mt-1 text-gray-800">' + (lines.length ? lines.join('；') : '無項目') + '</div>';
