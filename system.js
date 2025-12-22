@@ -11500,6 +11500,12 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             // 無處方內容
             prescriptionHtml = '無記錄';
         }
+        // 語言設定
+        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+        const isEnglish = lang === 'en';
+        const htmlLang = isEnglish ? 'en' : 'zh-TW';
+        const dateLocale = isEnglish ? 'en-US' : 'zh-TW';
+        const colon = isEnglish ? ': ' : '：';
         // 組合服藥資訊（支援多處方）
         let medDays = '';
         let medFreq = '';
@@ -11509,9 +11515,13 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                 const mp = JSON.parse(consultation.multiPrescriptions);
                 if (Array.isArray(mp)) {
                     medLines = mp.map((section, idx) => {
-                        const secName = section && section.name ? section.name : `處方${idx + 1}`;
+                        const secName = section && section.name ? section.name : (isEnglish ? `Prescription ${idx + 1}` : `處方${idx + 1}`);
                         const d = parseInt(section && section.days) || 0;
-                        return d > 0 ? `${secName}${colon}${d}${isEnglish ? ' days' : '天'}` : '';
+                        if (d > 0) {
+                            const labelDays = isEnglish ? 'Number of days' : '服藥天數';
+                            return `${secName}${colon}${labelDays}${colon}${d}${isEnglish ? ' days' : '天'}`;
+                        }
+                        return '';
                     }).filter(x => x);
                 }
             } catch (_e) {}
@@ -11523,12 +11533,6 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         if (consultation && consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
             medFreq = consultation.medicationFrequency;
         }
-        // 根據語言動態組合服藥資訊並翻譯標籤
-        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
-        const isEnglish = lang === 'en';
-        const htmlLang = isEnglish ? 'en' : 'zh-TW';
-        const dateLocale = isEnglish ? 'en-US' : 'zh-TW';
-        const colon = isEnglish ? ': ' : '：';
         // 組合服藥資訊
         let medInfoHtml = '';
         if (hasMulti) {
@@ -14846,6 +14850,7 @@ async function initializeSystemAfterLogin() {
                             </button>
                         </div>
                         <div class="flex items-center space-x-2">
+                            <button onclick="removePrescriptionSectionAt(${sIdx})" class="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm flex items-center justify-center">✕</button>
                             <span class="text-sm font-medium text-yellow-800">服藥天數</span>
                             <button onclick="updateMedicationDaysAt(${sIdx}, -1)" class="w-7 h-7 bg-yellow-500 text-white rounded-full text-sm hover:bg-yellow-600 transition duration-200">-</button>
                             <input type="number" id="medicationDays-${sIdx}" value="${parseInt(section.days) || 5}" min="1" max="30" 
