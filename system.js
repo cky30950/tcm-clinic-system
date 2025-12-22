@@ -8428,14 +8428,20 @@ async function showConsultationForm(appointment) {
             if (freqEl) freqEl.value = '2';
             
             // 重置休息期間顯示
-            document.getElementById('restPeriodDisplay').textContent = '請選擇開始和結束日期';
-            document.getElementById('restPeriodDisplay').className = 'text-sm text-gray-500 font-medium';
+            const restEl = document.getElementById('restPeriodDisplay');
+            if (restEl) {
+                restEl.textContent = '請選擇開始和結束日期';
+                restEl.className = 'text-sm text-gray-500 font-medium';
+            }
             
             // 設置預設值
             // 將預設服用方法由「早晚一次，飯後服」改為「溫水化開，飯後服」
-            document.getElementById('formUsage').value = '溫水化開，飯後服';
-            document.getElementById('formInstructions').value = '注意休息，飲食清淡';
-            document.getElementById('formTreatmentCourse').value = '一周';
+            const usageEl = document.getElementById('formUsage');
+            if (usageEl) usageEl.value = '溫水化開，飯後服';
+            const instrEl = document.getElementById('formInstructions');
+            if (instrEl) instrEl.value = '注意休息，飲食清淡';
+            const courseEl = document.getElementById('formTreatmentCourse');
+            if (courseEl) courseEl.value = '一周';
             
             // 清空處方項目
             clearActivePrescriptionItems();
