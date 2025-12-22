@@ -7292,11 +7292,12 @@ async function loadConsultationForEdit(consultationId) {
                 if (consultation.multiPrescriptions) {
                     const mp = JSON.parse(consultation.multiPrescriptions);
                     if (Array.isArray(mp) && mp.length > 0) {
-                        prescriptions = mp.map((p, idx) => ({
-                            name: (p && p.name) ? p.name : `處方${idx + 1}`,
-                            items: Array.isArray(p && p.items) ? p.items : [],
-                            days: parseInt(p && p.days) || 5
-                        }));
+                    prescriptions = mp.map((p, idx) => ({
+                        name: (p && p.name) ? p.name : (idx === 0 ? '處方' : `處方${idx + 1}`),
+                        items: Array.isArray(p && p.items) ? p.items : [],
+                        days: parseInt(p && p.days) || 5,
+                        freq: parseInt(p && p.freq) || (parseInt(consultation.medicationFrequency) || 2)
+                    }));
                         activePrescriptionIndex = 0;
                         selectedPrescriptionItems = prescriptions[0].items;
                         updatePrescriptionDisplay();
@@ -7305,7 +7306,7 @@ async function loadConsultationForEdit(consultationId) {
                     }
                 } else {
                     // fallback: 單處方資料
-                    prescriptions = [{ name: '處方一', items: [], days: (consultation.medicationDays || 5) }];
+                    prescriptions = [{ name: '處方', items: [], days: (consultation.medicationDays || 5), freq: (parseInt(consultation.medicationFrequency) || 2) }];
                     activePrescriptionIndex = 0;
                     selectedPrescriptionItems = prescriptions[0].items;
                     let loadedStructured = false;
@@ -7345,7 +7346,7 @@ async function loadConsultationForEdit(consultationId) {
                 }
             } catch (_err) {
                 // 無法解析時，維持單處方空白狀態
-                prescriptions = [{ name: '處方一', items: [], days: 5 }];
+                prescriptions = [{ name: '處方', items: [], days: 5, freq: 2 }];
                 activePrescriptionIndex = 0;
                 selectedPrescriptionItems = prescriptions[0].items;
                 updatePrescriptionDisplay();
@@ -8421,7 +8422,7 @@ async function showConsultationForm(appointment) {
             });
             
             // 重置多處方狀態與每日次數為預設值
-            prescriptions = [{ name: '處方一', items: [], days: 5 }];
+            prescriptions = [{ name: '處方', items: [], days: 5, freq: 2 }];
             activePrescriptionIndex = 0;
             selectedPrescriptionItems = prescriptions[0].items;
             const freqEl = document.getElementById('medicationFrequency');
@@ -8735,10 +8736,14 @@ async function saveConsultation() {
         // 將服藥天數與每日次數存入診症資料，預設 0 代表未設定
         try {
             const totalDays = getTotalMedicationDays();
-            const freqInputEl = document.getElementById('medicationFrequency');
-            const freqVal = freqInputEl ? parseInt(freqInputEl.value) : 0;
             consultationData.medicationDays = isNaN(totalDays) ? 0 : totalDays;
-            consultationData.medicationFrequency = isNaN(freqVal) ? 0 : freqVal;
+            const avgFreq = (() => {
+                if (!Array.isArray(prescriptions) || prescriptions.length === 0) return 0;
+                let sum = 0;
+                prescriptions.forEach(p => { sum += (parseInt(p.freq) || 0); });
+                return Math.round(sum / prescriptions.length);
+            })();
+            consultationData.medicationFrequency = avgFreq;
         } catch (_e) {
             consultationData.medicationDays = 0;
             consultationData.medicationFrequency = 0;
@@ -11517,11 +11522,13 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     medLines = mp.map((section, idx) => {
                         const secName = section && section.name ? section.name : (isEnglish ? `Prescription ${idx + 1}` : `處方${idx + 1}`);
                         const d = parseInt(section && section.days) || 0;
-                        if (d > 0) {
-                            const labelDays = isEnglish ? 'Number of days' : '服藥天數';
-                            return `${secName}${colon}${labelDays}${colon}${d}${isEnglish ? ' days' : '天'}`;
-                        }
-                        return '';
+                        const f = parseInt(section && section.freq) || (parseInt(consultation.medicationFrequency) || 0);
+                        const labelDays = isEnglish ? 'Number of days' : '服藥天數';
+                        const labelFreq = isEnglish ? 'Times per day' : '每日次數';
+                        const partDays = d > 0 ? `${labelDays}${colon}${d}${isEnglish ? ' days' : '天'}` : '';
+                        const partFreq = f > 0 ? `${labelFreq}${colon}${f}${isEnglish ? '' : '次'}` : '';
+                        const combined = [partDays, partFreq].filter(Boolean).join('　');
+                        return combined ? `${secName}${colon}${combined}` : '';
                     }).filter(x => x);
                 }
             } catch (_e) {}
@@ -14467,7 +14474,7 @@ async function initializeSystemAfterLogin() {
         }
         
         // 多處方支援
-        let prescriptions = [{ name: '處方一', items: [], days: 5 }];
+        let prescriptions = [{ name: '處方', items: [], days: 5, freq: 2 }];
         let activePrescriptionIndex = 0;
         let selectedPrescriptionItems = prescriptions[activePrescriptionIndex].items;
         function setActivePrescription(index) {
@@ -14478,8 +14485,15 @@ async function initializeSystemAfterLogin() {
             checkPrescriptionConflicts();
         }
         function addPrescriptionSection() {
-            const defaultName = `處方${(prescriptions.length + 1)}`;
-            prescriptions.push({ name: defaultName, items: [], days: 5 });
+            const numerals = ['', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+            const idx = prescriptions.length;
+            const defaultName = idx === 0 ? '處方' : `處方${numerals[idx] || (idx + 1)}`;
+            let defaultFreq = 2;
+            try {
+                const fEl = document.getElementById('medicationFrequency');
+                defaultFreq = fEl ? (parseInt(fEl.value) || 2) : 2;
+            } catch (_e) {}
+            prescriptions.push({ name: defaultName, items: [], days: 5, freq: defaultFreq });
             setActivePrescription(prescriptions.length - 1);
         }
         function removePrescriptionSection() {
@@ -14858,6 +14872,13 @@ async function initializeSystemAfterLogin() {
                                    onchange="updateMedicationDaysFromInputAt(${sIdx})" onclick="this.select()">
                             <button onclick="updateMedicationDaysAt(${sIdx}, 1)" class="w-7 h-7 bg-yellow-500 text-white rounded-full text-sm hover:bg-yellow-600 transition duration-200">+</button>
                             <span class="text-sm text-yellow-800">天</span>
+                            <span class="ml-3 text-sm font-medium text-yellow-800">每日次數</span>
+                            <button onclick="updateMedicationFrequencyAt(${sIdx}, -1)" class="w-7 h-7 bg-yellow-500 text-white rounded-full text-sm hover:bg-yellow-600 transition duration-200">-</button>
+                            <input type="number" id="medicationFreq-${sIdx}" value="${parseInt(section.freq) || 2}" min="1" max="6" 
+                                   class="w-14 px-2 py-1 text-center border border-yellow-300 rounded focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-sm"
+                                   onchange="updateMedicationFrequencyFromInputAt(${sIdx})" onclick="this.select()">
+                            <button onclick="updateMedicationFrequencyAt(${sIdx}, 1)" class="w-7 h-7 bg-yellow-500 text-white rounded-full text-sm hover:bg-yellow-600 transition duration-200">+</button>
+                            <span class="text-sm text-yellow-800">次/日</span>
                         </div>
                     </div>
                 `;
@@ -15034,17 +15055,25 @@ async function initializeSystemAfterLogin() {
         // 舊介面包裝：更新目前編輯處方的天數
         function updateMedicationDays(change) { updateMedicationDaysAt(activePrescriptionIndex, change); }
         
-        // 更新服藥次數
-        function updateMedicationFrequency(change) {
-            const frequencyInput = document.getElementById('medicationFrequency');
-            const currentFrequency = parseInt(frequencyInput.value) || 2;
-            const newFrequency = Math.max(1, Math.min(6, currentFrequency + change));
-            frequencyInput.value = newFrequency;
-            
-            // 更新處方顯示
-            if (selectedPrescriptionItems.length > 0) {
-                updatePrescriptionDisplay();
-            }
+        // 依特定處方更新每日次數
+        function updateMedicationFrequencyAt(sectionIdx, change) {
+            if (sectionIdx < 0 || sectionIdx >= prescriptions.length) return;
+            const current = parseInt(prescriptions[sectionIdx].freq) || 2;
+            const next = Math.max(1, Math.min(6, current + change));
+            prescriptions[sectionIdx].freq = next;
+            updatePrescriptionDisplay();
+        }
+        // 舊介面包裝：更新目前編輯處方的每日次數
+        function updateMedicationFrequency(change) { updateMedicationFrequencyAt(activePrescriptionIndex, change); }
+        // 每日次數輸入框直接變更（依處方）
+        function updateMedicationFrequencyFromInputAt(sectionIdx) {
+            if (sectionIdx < 0 || sectionIdx >= prescriptions.length) return;
+            const inputEl = document.getElementById('medicationFreq-' + sectionIdx);
+            const v = parseInt(inputEl && inputEl.value) || 2;
+            const valid = Math.max(1, Math.min(6, v));
+            if (inputEl && valid !== v) inputEl.value = valid;
+            prescriptions[sectionIdx].freq = valid;
+            updatePrescriptionDisplay();
         }
         
         // 根據開藥天數自動更新藥費（傳入加總天數）
