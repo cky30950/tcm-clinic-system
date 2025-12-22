@@ -11583,8 +11583,13 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     medLines = mp.map((section, idx) => {
                         const secName = section && section.name ? section.name : (isEnglish ? `Prescription ${idx + 1}` : `處方${idx + 1}`);
                         const d = parseInt(section && section.days) || 0;
+                        const f = parseInt(section && section.freq) || (parseInt(consultation.medicationFrequency) || 0);
                         const labelDays = isEnglish ? 'Number of days' : '服藥天數';
-                        return d > 0 ? `${secName}${colon}${labelDays}${colon}${d}${isEnglish ? ' days' : '天'}` : '';
+                        const labelFreq = isEnglish ? 'Times per day' : '每日次數';
+                        const partDays = d > 0 ? `${labelDays}${colon}${d}${isEnglish ? ' days' : '天'}` : '';
+                        const partFreq = f > 0 ? `${labelFreq}${colon}${f}${isEnglish ? '' : '次'}` : '';
+                        const combined = [partDays, partFreq].filter(Boolean).join('      ');
+                        return combined ? `${secName}${colon}${combined}` : '';
                     }).filter(x => x);
                 }
             } catch (_e) {}
@@ -11601,9 +11606,6 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         if (hasMulti) {
             if (medLines.length > 0) {
                 medInfoHtml += medLines.map(l => `<div>${l}</div>`).join('');
-            }
-            if (medFreq) {
-                medInfoHtml += `<div><strong>${isEnglish ? 'Times per day' : '每日次數'}${colon}</strong>${medFreq}${isEnglish ? '' : '次'}</div>`;
             }
             if (consultation.usage) {
                 medInfoHtml += `<div><strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${consultation.usage}</div>`;
