@@ -7337,8 +7337,6 @@ async function loadConsultationForEdit(consultationId) {
                             if (containerEl) {
                                 containerEl.innerHTML = `<div class="border border-gray-300 rounded-lg p-3 bg-gray-50"><div class="text-sm text-gray-900 whitespace-pre-line">${consultation.prescription}</div></div>`;
                             }
-                            const freqEl = document.getElementById('medicationFrequencySettings');
-                            if (freqEl) freqEl.style.display = 'none';
                         }
                     } else {
                         updatePrescriptionDisplay();
@@ -14842,29 +14840,25 @@ async function initializeSystemAfterLogin() {
         function updatePrescriptionDisplay() {
             const containerAll = document.getElementById('prescriptionsContainer');
             const hiddenTextarea = document.getElementById('formPrescription');
-            const freqSettings = document.getElementById('medicationFrequencySettings');
             if (!containerAll) return;
-            if (freqSettings) {
-                if (Array.isArray(prescriptions) && prescriptions.length > 0) {
-                    freqSettings.style.display = 'block';
-                } else {
-                    freqSettings.style.display = 'none';
-                }
-            }
             const allSectionsHtml = prescriptions.map((section, sIdx) => {
                 const headerHtml = `
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <input type="text" value="${window.escapeHtml(section.name)}"
-                                   onchange="renamePrescription(${sIdx}, this.value)"
-                                   class="border border-gray-300 rounded px-2 py-1 text-sm w-40">
-                            <button type="button" onclick="setActivePrescription(${sIdx})"
-                                    class="${sIdx === activePrescriptionIndex ? 'bg-blue-600' : 'bg-gray-300'} text-white text-xs px-2 py-1 rounded">
-                                ${sIdx === activePrescriptionIndex ? '編輯中' : '設為編輯'}
-                            </button>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <input type="text" value="${window.escapeHtml(section.name)}"
+                                       onchange="renamePrescription(${sIdx}, this.value)"
+                                       class="border border-gray-300 rounded px-2 py-1 text-sm w-40">
+                                <button type="button" onclick="setActivePrescription(${sIdx})"
+                                        class="${sIdx === activePrescriptionIndex ? 'bg-blue-600' : 'bg-gray-300'} text-white text-xs px-2 py-1 rounded">
+                                    ${sIdx === activePrescriptionIndex ? '編輯中' : '設為編輯'}
+                                </button>
+                            </div>
+                            <div class="flex items-center">
+                                <button onclick="removePrescriptionSectionAt(${sIdx})" class="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm flex items-center justify-center">✕</button>
+                            </div>
                         </div>
-                        <div class="flex items-center space-x-2">
-                            <button onclick="removePrescriptionSectionAt(${sIdx})" class="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm flex items-center justify-center">✕</button>
+                        <div class="flex flex-wrap items-center gap-2">
                             <span class="text-sm font-medium text-yellow-800">服藥天數</span>
                             <button onclick="updateMedicationDaysAt(${sIdx}, -1)" class="w-7 h-7 bg-yellow-500 text-white rounded-full text-sm hover:bg-yellow-600 transition duration-200">-</button>
                             <input type="number" id="medicationDays-${sIdx}" value="${parseInt(section.days) || 5}" min="1" max="30" 
