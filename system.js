@@ -7288,46 +7288,67 @@ async function loadConsultationForEdit(consultationId) {
             }
             
             // 載入處方內容
-            selectedPrescriptionItems = [];
-            // 優先使用結構化處方資料（JSON 格式）進行重建，以避免因文字單位差異導致解析失敗
-            let loadedStructured = false;
-            if (consultation.prescriptionStructured) {
-                try {
-                    const parsedItems = JSON.parse(consultation.prescriptionStructured);
-                    if (Array.isArray(parsedItems) && parsedItems.length > 0) {
-                        selectedPrescriptionItems = parsedItems;
-                        loadedStructured = true;
+            try {
+                if (consultation.multiPrescriptions) {
+                    const mp = JSON.parse(consultation.multiPrescriptions);
+                    if (Array.isArray(mp) && mp.length > 0) {
+                        prescriptions = mp.map((p, idx) => ({
+                            name: (p && p.name) ? p.name : `處方${idx + 1}`,
+                            items: Array.isArray(p && p.items) ? p.items : [],
+                            days: parseInt(p && p.days) || 5
+                        }));
+                        activePrescriptionIndex = 0;
+                        selectedPrescriptionItems = prescriptions[0].items;
+                        updatePrescriptionDisplay();
+                    } else {
+                        throw new Error('multiPrescriptions not array');
                     }
-                } catch (_e) {
-                    // ignore parse errors and fallback to legacy text format
-                    loadedStructured = false;
+                } else {
+                    // fallback: 單處方資料
+                    prescriptions = [{ name: '處方一', items: [], days: (consultation.medicationDays || 5) }];
+                    activePrescriptionIndex = 0;
+                    selectedPrescriptionItems = prescriptions[0].items;
+                    let loadedStructured = false;
+                    if (consultation.prescriptionStructured) {
+                        try {
+                            const parsedItems = JSON.parse(consultation.prescriptionStructured);
+                            if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+                                prescriptions[0].items = parsedItems;
+                                selectedPrescriptionItems = prescriptions[0].items;
+                                loadedStructured = true;
+                            }
+                        } catch (_e) {
+                            loadedStructured = false;
+                        }
+                    }
+                    if (loadedStructured) {
+                        updatePrescriptionDisplay();
+                    } else if (consultation.prescription) {
+                        document.getElementById('formPrescription').value = consultation.prescription;
+                        parsePrescriptionToItems(consultation.prescription);
+                        // 將解析結果設回第一處方
+                        prescriptions[0].items = selectedPrescriptionItems;
+                        updatePrescriptionDisplay();
+                        const hasItems = Array.isArray(selectedPrescriptionItems) && selectedPrescriptionItems.length > 0;
+                        if (!hasItems) {
+                            document.getElementById('formPrescription').value = consultation.prescription;
+                            const containerEl = document.getElementById('prescriptionsContainer');
+                            if (containerEl) {
+                                containerEl.innerHTML = `<div class="border border-gray-300 rounded-lg p-3 bg-gray-50"><div class="text-sm text-gray-900 whitespace-pre-line">${consultation.prescription}</div></div>`;
+                            }
+                            const freqEl = document.getElementById('medicationFrequencySettings');
+                            if (freqEl) freqEl.style.display = 'none';
+                        }
+                    } else {
+                        updatePrescriptionDisplay();
+                    }
                 }
-            }
-            if (loadedStructured) {
-                // 透過更新函式渲染處方顯示並同步隱藏文本域
+            } catch (_err) {
+                // 無法解析時，維持單處方空白狀態
+                prescriptions = [{ name: '處方一', items: [], days: 5 }];
+                activePrescriptionIndex = 0;
+                selectedPrescriptionItems = prescriptions[0].items;
                 updatePrescriptionDisplay();
-            } else if (consultation.prescription) {
-                // fallback: 使用舊版文字處方解析
-                // 先將完整處方內容存入隱藏文本域
-                document.getElementById('formPrescription').value = consultation.prescription;
-                // 嘗試解析處方內容並生成處方項目列表
-                parsePrescriptionToItems(consultation.prescription);
-                updatePrescriptionDisplay();
-                // 如果未能解析出任何處方項目（例如庫中缺少相關藥材或方劑資料），
-                // 則直接將原始處方文本顯示於處方區域，避免顯示為空白
-                if (selectedPrescriptionItems.length === 0) {
-                    // 還原隱藏文本域為原始內容，因為 updatePrescriptionDisplay 會清空它
-                    document.getElementById('formPrescription').value = consultation.prescription;
-                    const containerEl = document.getElementById('selectedPrescriptionItems');
-                    if (containerEl) {
-                        containerEl.innerHTML = `<div class="text-sm text-gray-900 whitespace-pre-line">${consultation.prescription}</div>`;
-                    }
-                    // 隱藏服藥天數與次數設定
-                    const medicationSettingsEl = document.getElementById('medicationSettings');
-                    if (medicationSettingsEl) {
-                        medicationSettingsEl.style.display = 'none';
-                    }
-                }
             }
             
             // 載入收費項目
@@ -8414,7 +8435,7 @@ async function showConsultationForm(appointment) {
             document.getElementById('formTreatmentCourse').value = '一周';
             
             // 清空處方項目
-            selectedPrescriptionItems = [];
+            clearActivePrescriptionItems();
             updatePrescriptionDisplay();
             clearPrescriptionSearch();
             
@@ -8442,7 +8463,7 @@ async function showConsultationForm(appointment) {
             currentConsultingAppointmentId = null;
             
             // 清空處方和收費項目選擇
-            selectedPrescriptionItems = [];
+            clearActivePrescriptionItems();
             selectedBillingItems = [];
 
             // 在關閉表單時，確保處方顯示與庫存類型選單狀態同步更新。
@@ -8675,8 +8696,18 @@ async function saveConsultation() {
             // 新增：將處方項目以結構化資料儲存，方便後續編輯，不再依賴解析文字。
             prescriptionStructured: (() => {
                 try {
-                    // 若 selectedPrescriptionItems 已定義且為陣列，則序列化；否則回傳空陣列
-                    return JSON.stringify(Array.isArray(selectedPrescriptionItems) ? selectedPrescriptionItems : []);
+                    const allItems = Array.isArray(prescriptions)
+                        ? prescriptions.flatMap(p => Array.isArray(p.items) ? p.items : [])
+                        : [];
+                    return JSON.stringify(allItems);
+                } catch (_e) {
+                    return '[]';
+                }
+            })(),
+            // 多處方完整結構
+            multiPrescriptions: (() => {
+                try {
+                    return JSON.stringify(Array.isArray(prescriptions) ? prescriptions : []);
                 } catch (_e) {
                     return '[]';
                 }
@@ -8694,14 +8725,12 @@ async function saveConsultation() {
         };
         // 將服藥天數與每日次數存入診症資料，預設 0 代表未設定
         try {
-            const daysInputEl = document.getElementById('medicationDays');
+            const totalDays = getTotalMedicationDays();
             const freqInputEl = document.getElementById('medicationFrequency');
-            const daysVal = daysInputEl ? parseInt(daysInputEl.value) : 0;
             const freqVal = freqInputEl ? parseInt(freqInputEl.value) : 0;
-            consultationData.medicationDays = isNaN(daysVal) ? 0 : daysVal;
+            consultationData.medicationDays = isNaN(totalDays) ? 0 : totalDays;
             consultationData.medicationFrequency = isNaN(freqVal) ? 0 : freqVal;
         } catch (_e) {
-            // 若讀取失敗，仍保留預設值
             consultationData.medicationDays = 0;
             consultationData.medicationFrequency = 0;
         }
@@ -8847,7 +8876,7 @@ async function saveConsultation() {
             // 更新中藥庫存
             try {
                 // 取得服藥天數與次數
-                const days = parseInt(document.getElementById('medicationDays') && document.getElementById('medicationDays').value) || 1;
+                const days = getTotalMedicationDays() || 1;
                 const freq = parseInt(document.getElementById('medicationFrequency') && document.getElementById('medicationFrequency').value) || 1;
                 // 決定要使用的診症 ID
                 let consultationIdForInv = null;
@@ -8869,9 +8898,12 @@ async function saveConsultation() {
                     }
                 }
                 if (consultationIdForInv && typeof updateInventoryAfterConsultation === 'function') {
+                    const allItems = Array.isArray(prescriptions)
+                        ? prescriptions.flatMap(p => Array.isArray(p.items) ? p.items : [])
+                        : [];
                     await updateInventoryAfterConsultation(
                         consultationIdForInv,
-                        Array.isArray(selectedPrescriptionItems) ? selectedPrescriptionItems : [],
+                        allItems,
                         days,
                         freq,
                         isEditing,
@@ -11286,9 +11318,32 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         } else {
             consultationDate = new Date();
         }
-        // 組合處方內容 - 將處方項目分為三欄顯示以節省空間，方劑的組成使用較小字體顯示於方劑名稱下方
+        // 組合處方內容（支援多處方）
         let prescriptionHtml = '';
-        if (consultation.prescription) {
+        const hasMulti = !!consultation.multiPrescriptions;
+        if (hasMulti) {
+            try {
+                const mp = JSON.parse(consultation.multiPrescriptions);
+                if (Array.isArray(mp) && mp.length > 0) {
+                    let html = '';
+                    mp.forEach((section, sIdx) => {
+                        const secName = section && section.name ? section.name : `處方${sIdx + 1}`;
+                        const items = Array.isArray(section && section.items) ? section.items : [];
+                        const lines = items.map(it => {
+                            const dose = it.customDosage || (it.type === 'herb' ? '1' : '5');
+                            const unit = (it && it.dosage && typeof it.dosage === 'string' && it.dosage.endsWith('g')) ? 'g' : 'g';
+                            return `<div style="margin-bottom: 4px;">${it.name} ${dose}${unit}</div>`;
+                        });
+                        html += `<div style="margin-bottom:6px;"><div style="font-weight:bold;margin-bottom:2px;">${secName}</div>${lines.join('')}</div>`;
+                    });
+                    prescriptionHtml = html;
+                } else {
+                    prescriptionHtml = '無記錄';
+                }
+            } catch (_e) {
+                prescriptionHtml = '無記錄';
+            }
+        } else if (consultation.prescription) {
             try {
                 // 解析處方內容行並移除空行
                 const lines = consultation.prescription.split('\n').filter(line => line.trim());
@@ -11436,11 +11491,25 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             // 無處方內容
             prescriptionHtml = '無記錄';
         }
-        // 組合服藥資訊，優先使用診症記錄中的 medicationDays/medicationFrequency；若無則保持空值
+        // 組合服藥資訊（支援多處方）
         let medDays = '';
         let medFreq = '';
-        if (consultation && consultation.medicationDays && Number(consultation.medicationDays) > 0) {
-            medDays = consultation.medicationDays;
+        let medLines = [];
+        if (hasMulti) {
+            try {
+                const mp = JSON.parse(consultation.multiPrescriptions);
+                if (Array.isArray(mp)) {
+                    medLines = mp.map((section, idx) => {
+                        const secName = section && section.name ? section.name : `處方${idx + 1}`;
+                        const d = parseInt(section && section.days) || 0;
+                        return d > 0 ? `${secName}${colon}${d}${isEnglish ? ' days' : '天'}` : '';
+                    }).filter(x => x);
+                }
+            } catch (_e) {}
+        } else {
+            if (consultation && consultation.medicationDays && Number(consultation.medicationDays) > 0) {
+                medDays = consultation.medicationDays;
+            }
         }
         if (consultation && consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
             medFreq = consultation.medicationFrequency;
@@ -11453,18 +11522,29 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         const colon = isEnglish ? ': ' : '：';
         // 組合服藥資訊
         let medInfoHtml = '';
-        if (medDays) {
-            medInfoHtml += `<strong>${isEnglish ? 'Number of days' : '服藥天數'}${colon}</strong>${medDays}${isEnglish ? ' days' : '天'}&nbsp;`;
-        }
-        if (medFreq) {
-            medInfoHtml += `<strong>${isEnglish ? 'Times per day' : '每日次數'}${colon}</strong>${medFreq}${isEnglish ? '' : '次'}&nbsp;`;
-        }
-        if (consultation.usage) {
-            medInfoHtml += `<strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${consultation.usage}`;
-        }
-        // If there is no prescription (Chinese medicine), clear medication info
-        if (!consultation.prescription || (typeof consultation.prescription === 'string' && consultation.prescription.trim() === '')) {
-            medInfoHtml = '';
+        if (hasMulti) {
+            if (medLines.length > 0) {
+                medInfoHtml += medLines.map(l => `<div>${l}</div>`).join('');
+            }
+            if (medFreq) {
+                medInfoHtml += `<div><strong>${isEnglish ? 'Times per day' : '每日次數'}${colon}</strong>${medFreq}${isEnglish ? '' : '次'}</div>`;
+            }
+            if (consultation.usage) {
+                medInfoHtml += `<div><strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${consultation.usage}</div>`;
+            }
+        } else {
+            if (medDays) {
+                medInfoHtml += `<strong>${isEnglish ? 'Number of days' : '服藥天數'}${colon}</strong>${medDays}${isEnglish ? ' days' : '天'}&nbsp;`;
+            }
+            if (medFreq) {
+                medInfoHtml += `<strong>${isEnglish ? 'Times per day' : '每日次數'}${colon}</strong>${medFreq}${isEnglish ? '' : '次'}&nbsp;`;
+            }
+            if (consultation.usage) {
+                medInfoHtml += `<strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${consultation.usage}`;
+            }
+            if (!consultation.prescription || (typeof consultation.prescription === 'string' && consultation.prescription.trim() === '')) {
+                medInfoHtml = '';
+            }
         }
         // 醫囑及注意事項
         const instructionsHtml = consultation.instructions ? consultation.instructions.replace(/\n/g, '<br>') : '';
@@ -14373,8 +14453,79 @@ async function initializeSystemAfterLogin() {
             resultsContainer.classList.remove('hidden');
         }
         
-        // 存儲已選擇的處方項目
-        let selectedPrescriptionItems = [];
+        // 多處方支援
+        let prescriptions = [{ name: '處方一', items: [], days: 5 }];
+        let activePrescriptionIndex = 0;
+        let selectedPrescriptionItems = prescriptions[activePrescriptionIndex].items;
+        function setActivePrescription(index) {
+            if (index < 0 || index >= prescriptions.length) return;
+            activePrescriptionIndex = index;
+            selectedPrescriptionItems = prescriptions[activePrescriptionIndex].items;
+            updatePrescriptionDisplay();
+            checkPrescriptionConflicts();
+        }
+        function addPrescriptionSection() {
+            const defaultName = `處方${(prescriptions.length + 1)}`;
+            prescriptions.push({ name: defaultName, items: [], days: 5 });
+            setActivePrescription(prescriptions.length - 1);
+        }
+        function removePrescriptionSection() {
+            if (prescriptions.length <= 1) {
+                showToast('至少需要一個處方', 'warning');
+                return;
+            }
+            prescriptions.splice(activePrescriptionIndex, 1);
+            if (activePrescriptionIndex >= prescriptions.length) {
+                activePrescriptionIndex = prescriptions.length - 1;
+            }
+            selectedPrescriptionItems = prescriptions[activePrescriptionIndex].items;
+            updatePrescriptionDisplay();
+            checkPrescriptionConflicts();
+            // 若所有處方皆無內容，移除藥費
+            try {
+                const hasAnyItems = prescriptions.some(p => Array.isArray(p.items) && p.items.length > 0);
+                if (!hasAnyItems) {
+                    const medicineFeeItem = billingItems.find(item => 
+                        item.active && item.category === 'medicine' &&
+                        (item.name.includes('中藥') || item.name.includes('藥費') || item.name.includes('調劑'))
+                    );
+                    if (medicineFeeItem) {
+                        const idx = selectedBillingItems.findIndex(b => b.id === medicineFeeItem.id);
+                        if (idx !== -1) {
+                            selectedBillingItems.splice(idx, 1);
+                            updateBillingDisplay();
+                        }
+                    }
+                }
+            } catch (_e) {}
+        }
+        function renamePrescription(index, newName) {
+            if (index < 0 || index >= prescriptions.length) return;
+            prescriptions[index].name = (newName || '').trim() || `處方${index + 1}`;
+            updatePrescriptionDisplay();
+        }
+        function clearActivePrescriptionItems() {
+            prescriptions[activePrescriptionIndex].items = [];
+            selectedPrescriptionItems = prescriptions[activePrescriptionIndex].items;
+            updatePrescriptionDisplay();
+            checkPrescriptionConflicts();
+            updatePrescriptionTypeSelectStatus();
+        }
+        function setActivePrescriptionItems(itemsArray) {
+            prescriptions[activePrescriptionIndex].items = Array.isArray(itemsArray) ? itemsArray : [];
+            selectedPrescriptionItems = prescriptions[activePrescriptionIndex].items;
+            updatePrescriptionDisplay();
+            checkPrescriptionConflicts();
+            updatePrescriptionTypeSelectStatus();
+        }
+        function getTotalMedicationDays() {
+            let total = 0;
+            prescriptions.forEach(p => {
+                const d = parseInt(p.days) || 0;
+                total += d;
+            });
+            return Math.max(0, total);
+        }
         
         // 存儲已選擇的收費項目
         let selectedBillingItems = [];
@@ -14558,7 +14709,8 @@ async function initializeSystemAfterLogin() {
                 const enTitle = 'Remove all medicines before switching';
                 const titleMsg = (langSel && langSel.toLowerCase().startsWith('en')) ? enTitle : zhTitle;
 
-                if (Array.isArray(selectedPrescriptionItems) && selectedPrescriptionItems.length > 0) {
+                const hasAnyItems = prescriptions.some(p => Array.isArray(p.items) && p.items.length > 0);
+                if (hasAnyItems) {
                     // 禁用選單並套用灰階樣式與禁用游標
                     sel.disabled = true;
                     sel.classList.add('opacity-50');
@@ -14627,11 +14779,13 @@ async function initializeSystemAfterLogin() {
             // 根據是否有處方內容決定是否允許切換庫存類型
             updatePrescriptionTypeSelectStatus();
             
-            // 如果是第一個處方項目，自動添加藥費
-            if (selectedPrescriptionItems.length === 1) {
-                const days = parseInt(document.getElementById('medicationDays').value) || 5;
-                updateMedicineFeeByDays(days);
-            }
+            // 如首次加入任何處方項目，依加總天數自動添加/更新藥費
+            try {
+                const hasAnyItems = prescriptions.some(p => Array.isArray(p.items) && p.items.length > 0);
+                if (hasAnyItems) {
+                    updateMedicineFeeByDays(getTotalMedicationDays());
+                }
+            } catch (_e) {}
             
             // 清除搜索
             clearPrescriptionSearch();
@@ -14659,37 +14813,49 @@ async function initializeSystemAfterLogin() {
         
         // 更新處方顯示
         function updatePrescriptionDisplay() {
-            const container = document.getElementById('selectedPrescriptionItems');
+            const containerAll = document.getElementById('prescriptionsContainer');
             const hiddenTextarea = document.getElementById('formPrescription');
-            const medicationSettings = document.getElementById('medicationSettings');
-            
-            if (selectedPrescriptionItems.length === 0) {
-                container.innerHTML = `
-                    <div class="text-sm text-gray-500 text-center py-4">
-                        請使用上方搜索功能添加中藥材或方劑
+            const freqSettings = document.getElementById('medicationFrequencySettings');
+            if (!containerAll) return;
+            const hasAnyItems = prescriptions.some(p => Array.isArray(p.items) && p.items.length > 0);
+            if (!hasAnyItems) {
+                containerAll.innerHTML = `
+                    <div class="border border-gray-300 rounded-lg p-3 min-h-[120px] bg-gray-50">
+                        <div class="text-sm text-gray-500 text-center py-4">
+                            請使用上方搜索功能添加中藥材或方劑
+                        </div>
                     </div>
                 `;
                 hiddenTextarea.value = '';
-                // 隱藏服藥天數設定
-                medicationSettings.style.display = 'none';
-                // 當處方內容為空時，應重新啟用庫存類型選單
-                try {
-                    if (typeof updatePrescriptionTypeSelectStatus === 'function') {
-                        updatePrescriptionTypeSelectStatus();
-                    }
-                } catch (_e) {
-                    /* 忽略錯誤 */
-                }
+                if (freqSettings) freqSettings.style.display = 'none';
+                try { updatePrescriptionTypeSelectStatus(); } catch (_e) {}
                 return;
             }
-            
-            // 顯示服藥天數設定
-            medicationSettings.style.display = 'block';
-            
-            // 顯示已添加的項目，為每個項目建立自訂 tooltip 以顯示完整資訊
-            const displayHtml = `
-                <div class="space-y-3">
-                    ${selectedPrescriptionItems.map((item, index) => {
+            if (freqSettings) freqSettings.style.display = 'block';
+            const allSectionsHtml = prescriptions.map((section, sIdx) => {
+                const headerHtml = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <input type="text" value="${window.escapeHtml(section.name)}"
+                                   onchange="renamePrescription(${sIdx}, this.value)"
+                                   class="border border-gray-300 rounded px-2 py-1 text-sm w-40">
+                            <button type="button" onclick="setActivePrescription(${sIdx})"
+                                    class="${sIdx === activePrescriptionIndex ? 'bg-blue-600' : 'bg-gray-300'} text-white text-xs px-2 py-1 rounded">
+                                ${sIdx === activePrescriptionIndex ? '編輯中' : '設為編輯'}
+                            </button>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm font-medium text-yellow-800">服藥天數</span>
+                            <button onclick="updateMedicationDaysAt(${sIdx}, -1)" class="w-7 h-7 bg-yellow-500 text-white rounded-full text-sm hover:bg-yellow-600 transition duration-200">-</button>
+                            <input type="number" id="medicationDays-${sIdx}" value="${parseInt(section.days) || 5}" min="1" max="30" 
+                                   class="w-14 px-2 py-1 text-center border border-yellow-300 rounded focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-sm"
+                                   onchange="updateMedicationDaysFromInputAt(${sIdx})" onclick="this.select()">
+                            <button onclick="updateMedicationDaysAt(${sIdx}, 1)" class="w-7 h-7 bg-yellow-500 text-white rounded-full text-sm hover:bg-yellow-600 transition duration-200">+</button>
+                            <span class="text-sm text-yellow-800">天</span>
+                        </div>
+                    </div>
+                `;
+                const itemsHtml = (Array.isArray(section.items) ? section.items : []).map((item, index) => {
                         const bgColor = 'bg-yellow-50 border-yellow-200';
                         // 從 herbLibrary 中找到完整的藥材或方劑資料
                         const fullItem = (Array.isArray(herbLibrary) ? herbLibrary : []).find(h => h && h.id === item.id);
@@ -14772,8 +14938,8 @@ async function initializeSystemAfterLogin() {
                                                max="100"
                                                step="0.5"
                                                class="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-center"
-                                               oninput="updatePrescriptionDosageLive(${index}, this.value)"
-                                               onchange="updatePrescriptionDosage(${index}, this.value)"
+                                               oninput="updatePrescriptionDosageLiveAt(${sIdx}, ${index}, this.value)"
+                                               onchange="updatePrescriptionDosageAt(${sIdx}, ${index}, this.value)"
                                                onclick="this.select()">
                                         ${(() => {
                                             try {
@@ -14784,7 +14950,7 @@ async function initializeSystemAfterLogin() {
                                                 const rawUnit2 = (typeof UNIT_LABEL_MAP !== 'undefined' && UNIT_LABEL_MAP && UNIT_LABEL_MAP[unit2]) ? UNIT_LABEL_MAP[unit2] : '克';
                                                 // 使用翻譯函式將單位標籤轉換為當前語言
                                                 const unitTranslated2 = (typeof window.t === 'function') ? window.t(rawUnit2) : rawUnit2;
-                                                return `<span class="text-sm text-gray-600 font-medium">${unitTranslated2}</span>`;
+                                            return `<span class="text-sm text-gray-600 font-medium">${unitTranslated2}</span>`;
                                             } catch (_err2) {
                                                 // 若發生錯誤，回傳預設單位『克』
                                                 const defaultUnit2 = (typeof window.t === 'function') ? window.t('克') : '克';
@@ -14792,24 +14958,26 @@ async function initializeSystemAfterLogin() {
                                             }
                                         })()}
                                     </div>
-                                    <button onclick="removePrescriptionItem(${index})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>
+                                    <button onclick="removePrescriptionItemAt(${sIdx}, ${index})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>
                                 </div>
                             </div>
                         `;
-                    }).join('')}
-                </div>
-            `;
-
-            container.innerHTML = displayHtml;
-            
-            // 更新隱藏的文本域
+                    }).join('') 
+                const sectionContainer = `
+                    <div class="border border-gray-300 rounded-lg p-3 bg-gray-50 space-y-3">
+                        ${headerHtml}
+                        <div class="space-y-3">
+                            ${itemsHtml}
+                        </div>
+                    </div>
+                `;
+                return sectionContainer;
+            }).join('');
+            containerAll.innerHTML = allSectionsHtml;
+            // 更新隱藏文本域（合併所有處方）
             let prescriptionText = '';
-            
-            // 將處方列表轉為純文字，每個項目後面加上一個換行符號。
-            // 過去版本對方劑類型使用了兩個換行符號 ("\n\n") 來額外留白，
-            // 但這會在病歷或診症記錄中呈現為項目上下出現空行。
-            // 因此統一將 herb 與 formula 項目都只添加一個換行符號，避免多餘空白。
-            selectedPrescriptionItems.forEach(item => {
+            prescriptions.forEach(section => {
+                (section.items || []).forEach(item => {
                 // 使用項目的 customDosage（如果有），否則根據類型給予預設值：中藥材 1、方劑 5。
                 const dosage = item.customDosage || (item.type === 'herb' ? '1' : '5');
                 // 根據中藥庫中的單位設定來顯示正確的基礎單位；若沒有對應單位則默認為 'g'
@@ -14830,8 +14998,8 @@ async function initializeSystemAfterLogin() {
                 }
                 // 組合為單行文字，以基礎單位結尾（例如 3g）
                 prescriptionText += `${item.name} ${dosage}${unitLabelForText}\n`;
+                });
             });
-
             hiddenTextarea.value = prescriptionText.trim();
 
             // 更新庫存類型選單狀態（啟用或禁用）。
@@ -14845,21 +15013,17 @@ async function initializeSystemAfterLogin() {
             }
         }
         
-        // 更新服藥天數
-        function updateMedicationDays(change) {
-            const daysInput = document.getElementById('medicationDays');
-            const currentDays = parseInt(daysInput.value) || 5;
-            const newDays = Math.max(1, Math.min(30, currentDays + change));
-            daysInput.value = newDays;
-            
-            // 更新處方顯示
-            if (selectedPrescriptionItems.length > 0) {
-                updatePrescriptionDisplay();
-            }
-            
-            // 自動更新藥費
-            updateMedicineFeeByDays(newDays);
+        // 依特定處方更新服藥天數
+        function updateMedicationDaysAt(sectionIdx, change) {
+            if (sectionIdx < 0 || sectionIdx >= prescriptions.length) return;
+            const current = parseInt(prescriptions[sectionIdx].days) || 5;
+            const newDays = Math.max(1, Math.min(30, current + change));
+            prescriptions[sectionIdx].days = newDays;
+            updatePrescriptionDisplay();
+            updateMedicineFeeByDays(getTotalMedicationDays());
         }
+        // 舊介面包裝：更新目前編輯處方的天數
+        function updateMedicationDays(change) { updateMedicationDaysAt(activePrescriptionIndex, change); }
         
         // 更新服藥次數
         function updateMedicationFrequency(change) {
@@ -14874,10 +15038,11 @@ async function initializeSystemAfterLogin() {
             }
         }
         
-        // 根據開藥天數自動更新藥費
+        // 根據開藥天數自動更新藥費（傳入加總天數）
         function updateMedicineFeeByDays(days) {
             // 只有在有處方內容時才自動更新藥費
-            if (selectedPrescriptionItems.length === 0) {
+            const hasAnyItems = prescriptions.some(p => Array.isArray(p.items) && p.items.length > 0);
+            if (!hasAnyItems) {
                 return;
             }
             
@@ -14933,25 +15098,19 @@ async function initializeSystemAfterLogin() {
             }
         }
         
-        // 處理天數輸入框直接變更
-        function updateMedicationDaysFromInput() {
-            const daysInput = document.getElementById('medicationDays');
-            const days = parseInt(daysInput.value) || 5;
-            
-            // 確保天數在有效範圍內
+        // 天數輸入框直接變更（依處方）
+        function updateMedicationDaysFromInputAt(sectionIdx) {
+            if (sectionIdx < 0 || sectionIdx >= prescriptions.length) return;
+            const inputEl = document.getElementById('medicationDays-' + sectionIdx);
+            const days = parseInt(inputEl && inputEl.value) || 5;
             const validDays = Math.max(1, Math.min(30, days));
-            if (validDays !== days) {
-                daysInput.value = validDays;
-            }
-            
-            // 更新處方顯示
-            if (selectedPrescriptionItems.length > 0) {
-                updatePrescriptionDisplay();
-            }
-            
-            // 自動更新藥費
-            updateMedicineFeeByDays(validDays);
+            if (inputEl && validDays !== days) inputEl.value = validDays;
+            prescriptions[sectionIdx].days = validDays;
+            updatePrescriptionDisplay();
+            updateMedicineFeeByDays(getTotalMedicationDays());
         }
+        // 舊介面包裝
+        function updateMedicationDaysFromInput() { updateMedicationDaysFromInputAt(activePrescriptionIndex); }
         
         // 更新休息期間顯示
         function updateRestPeriod() {
@@ -15036,7 +15195,8 @@ async function initializeSystemAfterLogin() {
                 }
                 
                 // 如果移除後沒有處方項目了，移除藥費
-                if (selectedPrescriptionItems.length === 0) {
+                const hasAnyItems = prescriptions.some(p => Array.isArray(p.items) && p.items.length > 0);
+                if (!hasAnyItems) {
                     // 尋找並移除藥費項目
                     const medicineFeeItem = billingItems.find(item => 
                         item.active && 
@@ -15053,6 +15213,52 @@ async function initializeSystemAfterLogin() {
                             selectedBillingItems.splice(medicineFeeIndex, 1);
                             updateBillingDisplay();
                         }
+                    }
+                }
+            }
+        }
+        // 多處方：更新指定處方的藥量（change）
+        function updatePrescriptionDosageAt(sectionIdx, index, newDosage) {
+            if (sectionIdx < 0 || sectionIdx >= prescriptions.length) return;
+            const items = prescriptions[sectionIdx].items || [];
+            if (index < 0 || index >= items.length) return;
+            const dosage = parseFloat(newDosage);
+            if (dosage > 0 && dosage <= 100) {
+                items[index].customDosage = newDosage;
+                updatePrescriptionDisplay();
+            } else {
+                updatePrescriptionDisplay();
+                showToast('請輸入有效的藥量（0.5-100克）', 'warning');
+            }
+        }
+        // 多處方：即時更新指定處方的藥量（input）
+        function updatePrescriptionDosageLiveAt(sectionIdx, index, newDosage) {
+            if (sectionIdx < 0 || sectionIdx >= prescriptions.length) return;
+            const items = prescriptions[sectionIdx].items || [];
+            if (index < 0 || index >= items.length) return;
+            items[index].customDosage = newDosage;
+        }
+        // 多處方：移除指定處方的項目
+        function removePrescriptionItemAt(sectionIdx, index) {
+            if (sectionIdx < 0 || sectionIdx >= prescriptions.length) return;
+            const items = prescriptions[sectionIdx].items || [];
+            if (index < 0 || index >= items.length) return;
+            items.splice(index, 1);
+            updatePrescriptionDisplay();
+            checkPrescriptionConflicts();
+            updatePrescriptionTypeSelectStatus();
+            if (typeof hideTooltip === 'function') hideTooltip();
+            const hasAnyItems = prescriptions.some(p => Array.isArray(p.items) && p.items.length > 0);
+            if (!hasAnyItems) {
+                const medicineFeeItem = billingItems.find(item => 
+                    item.active && item.category === 'medicine' &&
+                    (item.name.includes('中藥') || item.name.includes('藥費') || item.name.includes('調劑'))
+                );
+                if (medicineFeeItem) {
+                    const idx = selectedBillingItems.findIndex(b => b.id === medicineFeeItem.id);
+                    if (idx !== -1) {
+                        selectedBillingItems.splice(idx, 1);
+                        updateBillingDisplay();
                     }
                 }
             }
@@ -15722,7 +15928,7 @@ async function searchBillingForConsultation() {
                     return;
                 }
                 // 清空並解析處方
-                selectedPrescriptionItems = [];
+                clearActivePrescriptionItems();
                 parsePrescriptionToItems(lastConsultation.prescription);
                 updatePrescriptionDisplay();
                 try {
@@ -16198,14 +16404,14 @@ const consultationDate = (() => {
             }
             
             // 載入處方內容
-            selectedPrescriptionItems = [];
+            clearActivePrescriptionItems();
             // 先嘗試從結構化處方資料重建
             let prescriptionLoaded = false;
             if (consultation.prescriptionStructured) {
                 try {
                     const parsedItems = JSON.parse(consultation.prescriptionStructured);
                     if (Array.isArray(parsedItems) && parsedItems.length > 0) {
-                        selectedPrescriptionItems = parsedItems;
+                        setActivePrescriptionItems(parsedItems);
                         prescriptionLoaded = true;
                     }
                 } catch (_e) {
