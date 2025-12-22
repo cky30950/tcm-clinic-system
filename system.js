@@ -3672,7 +3672,7 @@ async function saveInventoryChanges() {
                         const mrn = await getMedicalRecordNumberByConsultationId(rec.consultationId);
                         extra.push('病歷編號：' + mrn);
                         const missing = await isConsultationMissing(rec.consultationId);
-                        if (missing) { extra.push('已退回'); }
+                        if (missing) { extra.push('<span class="text-red-600">已退回</span>'); }
                     }
                     div.innerHTML = '<div class="text-sm text-gray-600">' + timeText + (extra.length ? '（' + extra.join('，') + '）' : '') + '</div>' +
                         '<div class="mt-1 text-gray-800">' + (lines.length ? lines.join('；') : '無項目') + '</div>';
@@ -3709,7 +3709,9 @@ async function saveInventoryChanges() {
                             return name + '：' + qty + 'g';
                         });
                         const mrn = await getMedicalRecordNumberByConsultationId(cid);
-                        div.innerHTML = '<div class="text-sm text-gray-600">舊出庫記錄（病歷編號：' + mrn + '）</div>' +
+                        const missing = await isConsultationMissing(cid);
+                        const extraTag = missing ? '，<span class="text-red-600">已退回</span>' : '';
+                        div.innerHTML = '<div class="text-sm text-gray-600">舊出庫記錄（病歷編號：' + mrn + extraTag + '）</div>' +
                             '<div class="mt-1 text-gray-800">' + (lines.length ? lines.join('；') : '無項目') + '</div>';
                         container.appendChild(div);
                     }
