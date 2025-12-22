@@ -14826,21 +14826,13 @@ async function initializeSystemAfterLogin() {
             const hiddenTextarea = document.getElementById('formPrescription');
             const freqSettings = document.getElementById('medicationFrequencySettings');
             if (!containerAll) return;
-            const hasAnyItems = prescriptions.some(p => Array.isArray(p.items) && p.items.length > 0);
-            if (!hasAnyItems) {
-                containerAll.innerHTML = `
-                    <div class="border border-gray-300 rounded-lg p-3 min-h-[120px] bg-gray-50">
-                        <div class="text-sm text-gray-500 text-center py-4">
-                            請使用上方搜索功能添加中藥材或方劑
-                        </div>
-                    </div>
-                `;
-                hiddenTextarea.value = '';
-                if (freqSettings) freqSettings.style.display = 'none';
-                try { updatePrescriptionTypeSelectStatus(); } catch (_e) {}
-                return;
+            if (freqSettings) {
+                if (Array.isArray(prescriptions) && prescriptions.length > 0) {
+                    freqSettings.style.display = 'block';
+                } else {
+                    freqSettings.style.display = 'none';
+                }
             }
-            if (freqSettings) freqSettings.style.display = 'block';
             const allSectionsHtml = prescriptions.map((section, sIdx) => {
                 const headerHtml = `
                     <div class="flex items-center justify-between">
@@ -14864,7 +14856,10 @@ async function initializeSystemAfterLogin() {
                         </div>
                     </div>
                 `;
-                const itemsHtml = (Array.isArray(section.items) ? section.items : []).map((item, index) => {
+                const itemsArray = Array.isArray(section.items) ? section.items : [];
+                const itemsHtml = itemsArray.length === 0
+                    ? `<div class="text-sm text-gray-500 text-center py-4">此處方尚未添加項目，請使用上方搜索功能</div>`
+                    : itemsArray.map((item, index) => {
                         const bgColor = 'bg-yellow-50 border-yellow-200';
                         // 從 herbLibrary 中找到完整的藥材或方劑資料
                         const fullItem = (Array.isArray(herbLibrary) ? herbLibrary : []).find(h => h && h.id === item.id);
@@ -15271,6 +15266,18 @@ async function initializeSystemAfterLogin() {
                     }
                 }
             }
+        }
+        function removePrescriptionSectionAt(sectionIdx) {
+            if (sectionIdx < 0 || sectionIdx >= prescriptions.length) return;
+            if (prescriptions.length <= 1) return;
+            prescriptions.splice(sectionIdx, 1);
+            if (activePrescriptionIndex >= prescriptions.length) {
+                activePrescriptionIndex = prescriptions.length - 1;
+            }
+            selectedPrescriptionItems = prescriptions[activePrescriptionIndex].items;
+            updatePrescriptionDisplay();
+            checkPrescriptionConflicts();
+            updatePrescriptionTypeSelectStatus();
         }
         
         // 清除處方搜索
