@@ -3633,8 +3633,15 @@ async function saveInventoryChanges() {
             try {
                 const baseRef = window.firebase.ref(window.firebase.rtdb, 'inventoryHistory/' + String(type));
                 const q = window.firebase.query(baseRef, window.firebase.orderByChild('timestamp'), window.firebase.limitToLast(20));
-                const snap = await window.firebase.get(q);
-                const obj = snap && snap.exists() ? snap.val() || {} : {};
+                let snap = null;
+                try { snap = await window.firebase.get(q); } catch (_qe) { snap = null; }
+                let obj = snap && snap.exists() ? snap.val() || {} : {};
+                if (!obj || Object.keys(obj).length === 0) {
+                    try {
+                        const snap2 = await window.firebase.get(baseRef);
+                        obj = snap2 && snap2.exists() ? snap2.val() || {} : {};
+                    } catch (_fe) {}
+                }
                 const keys = Object.keys(obj).sort((a, b) => Number(b) - Number(a)).slice(0, 20);
                 for (const k of keys) {
                     const rec = obj[k] || {};
@@ -3659,14 +3666,27 @@ async function saveInventoryChanges() {
                         '<div class="mt-1 text-gray-800">' + (lines.length ? lines.join('；') : '無項目') + '</div>';
                     container.appendChild(div);
                 }
+                if (!container.children.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'text-gray-500 px-3 py-2';
+                    empty.textContent = '暫無記錄';
+                    container.appendChild(empty);
+                }
             } catch (_e) {}
             if (type === 'out') {
                 try {
                     const logsRef = window.firebase.ref(window.firebase.rtdb, 'inventoryLogs');
                     const q2 = window.firebase.query(logsRef, window.firebase.orderByKey(), window.firebase.limitToLast(20));
-                    const logSnap = await window.firebase.get(q2);
-                    const logObj = logSnap && logSnap.exists() ? logSnap.val() || {} : {};
-                    const ids = Object.keys(logObj).slice(0, 20);
+                    let logSnap = null;
+                    try { logSnap = await window.firebase.get(q2); } catch (_qe2) { logSnap = null; }
+                    let logObj = logSnap && logSnap.exists() ? logSnap.val() || {} : {};
+                    if (!logObj || Object.keys(logObj).length === 0) {
+                        try {
+                            const snapAll = await window.firebase.get(logsRef);
+                            logObj = snapAll && snapAll.exists() ? snapAll.val() || {} : {};
+                        } catch (_fe2) {}
+                    }
+                    const ids = Object.keys(logObj).slice(-20).reverse();
                     for (const cid of ids) {
                         const itemsObj = logObj[cid] || {};
                         const div = document.createElement('div');
@@ -3680,6 +3700,12 @@ async function saveInventoryChanges() {
                         div.innerHTML = '<div class="text-sm text-gray-600">舊出庫記錄（病歷編號：' + mrn + '）</div>' +
                             '<div class="mt-1 text-gray-800">' + (lines.length ? lines.join('；') : '無項目') + '</div>';
                         container.appendChild(div);
+                    }
+                    if (!container.children.length) {
+                        const empty2 = document.createElement('div');
+                        empty2.className = 'text-gray-500 px-3 py-2';
+                        empty2.textContent = '暫無記錄';
+                        container.appendChild(empty2);
                     }
                 } catch (_e2) {}
             }
