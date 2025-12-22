@@ -8420,9 +8420,12 @@ async function showConsultationForm(appointment) {
                 }
             });
             
-            // 重置服藥日數和次數為預設值
-            document.getElementById('medicationDays').value = '5';
-            document.getElementById('medicationFrequency').value = '2';
+            // 重置多處方狀態與每日次數為預設值
+            prescriptions = [{ name: '處方一', items: [], days: 5 }];
+            activePrescriptionIndex = 0;
+            selectedPrescriptionItems = prescriptions[0].items;
+            const freqEl = document.getElementById('medicationFrequency');
+            if (freqEl) freqEl.value = '2';
             
             // 重置休息期間顯示
             document.getElementById('restPeriodDisplay').textContent = '請選擇開始和結束日期';
