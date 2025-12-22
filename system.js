@@ -2779,6 +2779,74 @@ async function updateInventoryAfterConsultation(consultationId, items, days, fre
     }
 }
 
+/**
+ * 依多處方結構更新庫存，僅套用與舊紀錄的差異量
+ * @param {string|number} consultationId
+ * @param {Array} prescriptionsList - [{ name, items, days, freq }]
+ * @param {boolean} isEditing
+ * @param {Object|null} previousLog - { itemId: consumption }
+ */
+async function updateInventoryAfterConsultationMulti(consultationId, prescriptionsList, isEditing = false, previousLog = null) {
+    if (!consultationId || !Array.isArray(prescriptionsList)) return;
+    await waitForFirebaseDb();
+    try {
+        if (typeof initHerbInventory === 'function') {
+            await initHerbInventory(false);
+        }
+    } catch (_initErr) {}
+    const newLog = {};
+    for (const section of prescriptionsList) {
+        const d = parseInt(section && section.days) || 0;
+        const f = parseInt(section && section.freq) || 0;
+        if (d <= 0 || f <= 0) continue;
+        const items = Array.isArray(section && section.items) ? section.items : [];
+        for (const it of items) {
+            if (!it || !it.id) continue;
+            const dosageStr = it.customDosage || it.dosage || '';
+            const dosage = parseFloat(dosageStr);
+            if (isNaN(dosage) || dosage <= 0) continue;
+            const consumption = dosage * d * f;
+            const key = String(it.id);
+            newLog[key] = (newLog[key] || 0) + consumption;
+        }
+    }
+    const historyOut = [];
+    const historyIn = [];
+    const allItemIds = new Set([
+        ...Object.keys(newLog),
+        ...(previousLog ? Object.keys(previousLog) : [])
+    ]);
+    for (const key of allItemIds) {
+        const prev = previousLog ? (Number(previousLog[key]) || 0) : 0;
+        const next = Number(newLog[key]) || 0;
+        const delta = next - prev;
+        if (delta === 0) continue;
+        const inv = getHerbInventory(key);
+        const unit = inv.unit || 'g';
+        const currQty = inv.quantity || 0;
+        const newQty = currQty - delta;
+        await setHerbInventory(key, newQty, inv.threshold, unit);
+        try {
+            if (typeof herbInventory !== 'undefined') {
+                herbInventory[String(key)] = {
+                    quantity: newQty,
+                    threshold: inv.threshold,
+                    unit
+                };
+            }
+        } catch (_e) {}
+        if (delta > 0) {
+            historyOut.push({ itemId: String(key), quantity: delta, unit });
+        } else {
+            historyIn.push({ itemId: String(key), quantity: Math.abs(delta), unit });
+        }
+    }
+    await window.firebase.set(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationId)), newLog);
+    try { if (historyIn.length) await recordInventoryHistory('in', historyIn, { consultationId: String(consultationId) }); } catch (_e) {}
+    try { if (historyOut.length) await recordInventoryHistory('out', historyOut, { consultationId: String(consultationId) }); } catch (_e) {}
+    try { if (typeof updatePrescriptionDisplay === 'function') updatePrescriptionDisplay(); } catch (_e) {}
+}
+
 // 用於追蹤正在編輯庫存的項目 ID
 let currentInventoryItemId = null;
 
@@ -8909,15 +8977,10 @@ async function saveConsultation() {
                         prevLog = null;
                     }
                 }
-                if (consultationIdForInv && typeof updateInventoryAfterConsultation === 'function') {
-                    const allItems = Array.isArray(prescriptions)
-                        ? prescriptions.flatMap(p => Array.isArray(p.items) ? p.items : [])
-                        : [];
-                    await updateInventoryAfterConsultation(
+                if (consultationIdForInv && typeof updateInventoryAfterConsultationMulti === 'function') {
+                    await updateInventoryAfterConsultationMulti(
                         consultationIdForInv,
-                        allItems,
-                        days,
-                        freq,
+                        Array.isArray(prescriptions) ? prescriptions : [],
                         isEditing,
                         prevLog
                     );
@@ -11520,13 +11583,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     medLines = mp.map((section, idx) => {
                         const secName = section && section.name ? section.name : (isEnglish ? `Prescription ${idx + 1}` : `處方${idx + 1}`);
                         const d = parseInt(section && section.days) || 0;
-                        const f = parseInt(section && section.freq) || (parseInt(consultation.medicationFrequency) || 0);
                         const labelDays = isEnglish ? 'Number of days' : '服藥天數';
-                        const labelFreq = isEnglish ? 'Times per day' : '每日次數';
-                        const partDays = d > 0 ? `${labelDays}${colon}${d}${isEnglish ? ' days' : '天'}` : '';
-                        const partFreq = f > 0 ? `${labelFreq}${colon}${f}${isEnglish ? '' : '次'}` : '';
-                        const combined = [partDays, partFreq].filter(Boolean).join('　');
-                        return combined ? `${secName}${colon}${combined}` : '';
+                        return d > 0 ? `${secName}${colon}${labelDays}${colon}${d}${isEnglish ? ' days' : '天'}` : '';
                     }).filter(x => x);
                 }
             } catch (_e) {}
