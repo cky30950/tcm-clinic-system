@@ -8421,18 +8421,18 @@ async function showConsultationForm(appointment) {
             });
             
             // 重置服藥日數和次數為預設值
-            document.getElementById('medicationDays').value = '5';
-            document.getElementById('medicationFrequency').value = '2';
+            { const el = document.getElementById('medicationDays'); if (el) el.value = '5'; }
+            { const el = document.getElementById('medicationFrequency'); if (el) el.value = '2'; }
             
             // 重置休息期間顯示
-            document.getElementById('restPeriodDisplay').textContent = '請選擇開始和結束日期';
-            document.getElementById('restPeriodDisplay').className = 'text-sm text-gray-500 font-medium';
+            { const el = document.getElementById('restPeriodDisplay'); if (el) el.textContent = '請選擇開始和結束日期'; }
+            { const el = document.getElementById('restPeriodDisplay'); if (el) el.className = 'text-sm text-gray-500 font-medium'; }
             
             // 設置預設值
             // 將預設服用方法由「早晚一次，飯後服」改為「溫水化開，飯後服」
-            document.getElementById('formUsage').value = '溫水化開，飯後服';
-            document.getElementById('formInstructions').value = '注意休息，飲食清淡';
-            document.getElementById('formTreatmentCourse').value = '一周';
+            { const el = document.getElementById('formUsage'); if (el) el.value = '溫水化開，飯後服'; }
+            { const el = document.getElementById('formInstructions'); if (el) el.value = '注意休息，飲食清淡'; }
+            { const el = document.getElementById('formTreatmentCourse'); if (el) el.value = '一周'; }
             
             // 清空處方項目
             selectedPrescriptionItems = [];
@@ -14650,7 +14650,8 @@ async function initializeSystemAfterLogin() {
             
             // 如果是第一個處方項目，自動添加藥費
             if (selectedPrescriptionItems.length === 1) {
-                const days = parseInt(document.getElementById('medicationDays').value) || 5;
+                const daysEl = document.getElementById('medicationDays');
+                const days = parseInt(daysEl && daysEl.value) || 5;
                 updateMedicineFeeByDays(days);
             }
             
@@ -14685,14 +14686,13 @@ async function initializeSystemAfterLogin() {
             const medicationSettings = document.getElementById('medicationSettings');
             
             if (selectedPrescriptionItems.length === 0) {
-                container.innerHTML = `
+                if (container) container.innerHTML = `
                     <div class="text-sm text-gray-500 text-center py-4">
                         請使用上方搜索功能添加中藥材或方劑
                     </div>
                 `;
-                hiddenTextarea.value = '';
-                // 隱藏服藥天數設定
-                medicationSettings.style.display = 'none';
+                if (hiddenTextarea) hiddenTextarea.value = '';
+                if (medicationSettings) medicationSettings.style.display = 'none';
                 // 當處方內容為空時，應重新啟用庫存類型選單
                 try {
                     if (typeof updatePrescriptionTypeSelectStatus === 'function') {
@@ -14704,8 +14704,7 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
-            // 顯示服藥天數設定
-            medicationSettings.style.display = 'block';
+            if (medicationSettings) medicationSettings.style.display = 'block';
             
             // 顯示已添加的項目，為每個項目建立自訂 tooltip 以顯示完整資訊
             const displayHtml = `
@@ -14830,7 +14829,7 @@ async function initializeSystemAfterLogin() {
                 </div>
             `;
 
-            container.innerHTML = displayHtml;
+            if (container) container.innerHTML = displayHtml;
             
             // 更新隱藏的文本域
             let prescriptionText = '';
@@ -14862,22 +14861,17 @@ async function initializeSystemAfterLogin() {
                 prescriptionText += `${item.name} ${dosage}${unitLabelForText}\n`;
             });
 
-            hiddenTextarea.value = prescriptionText.trim();
+            if (hiddenTextarea) hiddenTextarea.value = prescriptionText.trim();
 
             // 更新庫存類型選單狀態（啟用或禁用）。
             // 呼叫此函式以確保在處方內容變化後，顆粒/飲片切換選單能正確更新。
-            try {
-                if (typeof updatePrescriptionTypeSelectStatus === 'function') {
-                    updatePrescriptionTypeSelectStatus();
-                }
-            } catch (_e) {
-                /* 忽略任何錯誤以避免影響其他功能 */
-            }
+            try { if (typeof updatePrescriptionTypeSelectStatus === 'function') { updatePrescriptionTypeSelectStatus(); } } catch (_e) {}
         }
         
         // 更新服藥天數
         function updateMedicationDays(change) {
             const daysInput = document.getElementById('medicationDays');
+            if (!daysInput) return;
             const currentDays = parseInt(daysInput.value) || 5;
             const newDays = Math.max(1, Math.min(30, currentDays + change));
             daysInput.value = newDays;
@@ -14894,6 +14888,7 @@ async function initializeSystemAfterLogin() {
         // 更新服藥次數
         function updateMedicationFrequency(change) {
             const frequencyInput = document.getElementById('medicationFrequency');
+            if (!frequencyInput) return;
             const currentFrequency = parseInt(frequencyInput.value) || 2;
             const newFrequency = Math.max(1, Math.min(6, currentFrequency + change));
             frequencyInput.value = newFrequency;
