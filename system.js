@@ -9277,31 +9277,81 @@ if (!patient) {
                             <div class="space-y-4">
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">處方內容</span>
-                                    <div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 whitespace-pre-line medical-field">${consultation.prescription || '無記錄'}</div>
+                                    ${(() => {
+                                        let html = '無記錄';
+                                        try {
+                                            if (consultation.multiPrescriptions) {
+                                                const mp = JSON.parse(consultation.multiPrescriptions);
+                                                if (Array.isArray(mp) && mp.length > 0) {
+                                                    const showNames = mp.length > 1;
+                                                    let block = '';
+                                                    mp.forEach((section, sIdx) => {
+                                                        const secName = section && section.name ? section.name : `處方${sIdx + 1}`;
+                                                        const items = Array.isArray(section && section.items) ? section.items : [];
+                                                        const lines = items.map(it => {
+                                                            const dose = it.customDosage || (it.type === 'herb' ? '1' : '5');
+                                                            const unit = (it && it.dosage && typeof it.dosage === 'string' && it.dosage.endsWith('g')) ? 'g' : 'g';
+                                                            return `<div style="margin-bottom: 4px;">${window.escapeHtml(it.name)} ${window.escapeHtml(String(dose))}${unit}</div>`;
+                                                        });
+                                                        block += `<div style="margin-bottom:6px;">${showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}</div>` : ''}${lines.join('')}</div>`;
+                                                    });
+                                                    html = block;
+                                                }
+                                            } else if (consultation.prescription) {
+                                                html = window.escapeHtml(consultation.prescription).replace(/\n/g, '<br>');
+                                            }
+                                        } catch (_e) {
+                                            html = consultation.prescription ? window.escapeHtml(consultation.prescription).replace(/\n/g, '<br>') : '無記錄';
+                                        }
+                                        return `<div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 medical-field">${html}</div>`;
+                                    })()}
                                 </div>
                                 
-                        ${consultation.usage && consultation.prescription ? `
-                                <div>
-                                    <span class="text-sm font-semibold text-gray-700 block mb-2">服用方法</span>
-                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">
-                                        ${(() => {
-                                            try {
-                                                const parts = [];
-                                                if (consultation.medicationDays && Number(consultation.medicationDays) > 0) {
-                                                    parts.push('服藥天數：' + consultation.medicationDays + '天');
+                                ${(() => {
+                                    let showBlock = !!consultation.prescription || !!consultation.multiPrescriptions || !!consultation.usage;
+                                    if (!showBlock) return '';
+                                    let medInfoHtml = '';
+                                    try {
+                                        if (consultation.multiPrescriptions) {
+                                            const mp = JSON.parse(consultation.multiPrescriptions);
+                                            if (Array.isArray(mp) && mp.length > 0) {
+                                                const showNames = mp.length > 1;
+                                                const lines = mp.map((section, idx) => {
+                                                    const secName = section && section.name ? section.name : `處方${idx + 1}`;
+                                                    const d = parseInt(section && section.days) || 0;
+                                                    const f = parseInt(section && section.freq) || (parseInt(consultation.medicationFrequency) || 0);
+                                                    const partDays = d > 0 ? `服藥天數：${d}天` : '';
+                                                    const partFreq = f > 0 ? `每日次數：${f}次` : '';
+                                                    const combined = [partDays, partFreq].filter(Boolean).join('　');
+                                                    return combined ? `${showNames ? (secName + '：') : ''}${combined}` : '';
+                                                }).filter(Boolean);
+                                                if (lines.length > 0) {
+                                                    medInfoHtml += lines.map(l => `<div>${window.escapeHtml(l)}</div>`).join('');
                                                 }
-                                                if (consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
-                                                    parts.push('每日次數：' + consultation.medicationFrequency + '次');
-                                                }
-                                                const prefix = parts.length > 0 ? parts.join('　') + '　' : '';
-                                                return prefix + consultation.usage;
-                                            } catch (_err) {
-                                                return consultation.usage;
                                             }
-                                        })()}
-                                    </div>
-                                </div>
-                                ` : ''}
+                                        } else {
+                                            const parts = [];
+                                            if (consultation.medicationDays && Number(consultation.medicationDays) > 0) {
+                                                parts.push('服藥天數：' + consultation.medicationDays + '天');
+                                            }
+                                            if (consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
+                                                parts.push('每日次數：' + consultation.medicationFrequency + '次');
+                                            }
+                                            if (parts.length > 0) {
+                                                medInfoHtml += `<div>${window.escapeHtml(parts.join('　'))}</div>`;
+                                            }
+                                        }
+                                    } catch (_e) {}
+                                    if (consultation.usage) {
+                                        medInfoHtml += `<div>${window.escapeHtml(consultation.usage)}</div>`;
+                                    }
+                                    return `
+                                        <div>
+                                            <span class="text-sm font-semibold text-gray-700 block mb-2">服用方法</span>
+                                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${medInfoHtml || '無記錄'}</div>
+                                        </div>
+                                    `;
+                                })()}
                                 
                                 ${consultation.treatmentCourse ? `
                                 <div>
@@ -9600,81 +9650,131 @@ function displayConsultationMedicalHistoryPage() {
                 </div>
             </div>
             
-            <div class="p-6">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div class="space-y-4">
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700 block mb-2">主訴</span>
-                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || '無記錄'}</div>
-                        </div>
-                        
-                        ${consultation.currentHistory ? `
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700 block mb-2">現病史</span>
-                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.currentHistory}</div>
-                        </div>
-                        ` : ''}
-                        
-                        ${consultation.tongue ? `
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700 block mb-2">舌象</span>
-                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.tongue}</div>
-                        </div>
-                        ` : ''}
-                        
-                        ${consultation.pulse ? `
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700 block mb-2">脈象</span>
-                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.pulse}</div>
-                        </div>
-                        ` : ''}
-                        
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700 block mb-2">中醫診斷</span>
-                            <div class="bg-green-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-green-400 medical-field">${consultation.diagnosis || '無記錄'}</div>
-                        </div>
-                        
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700 block mb-2">證型診斷</span>
-                            <div class="bg-blue-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-blue-400 medical-field">${consultation.syndrome || '無記錄'}</div>
-                        </div>
-                        
-                        ${consultation.acupunctureNotes ? `
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700 block mb-2">針灸備註</span>
-                            <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.stripHtmlTags(consultation.acupunctureNotes)}</div>
-                        </div>
-                        ` : ''}
-                    </div>
-                    
-                    <div class="space-y-4">
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700 block mb-2">處方內容</span>
-                            <div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 whitespace-pre-line medical-field">${consultation.prescription || '無記錄'}</div>
-                        </div>
-                        
-                        ${consultation.usage && consultation.prescription ? `
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700 block mb-2">服用方法</span>
-                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">
-                                ${(() => {
-                                    try {
-                                        const parts = [];
-                                        if (consultation.medicationDays && Number(consultation.medicationDays) > 0) {
-                                            parts.push('服藥天數：' + consultation.medicationDays + '天');
-                                        }
-                                        if (consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
-                                            parts.push('每日次數：' + consultation.medicationFrequency + '次');
-                                        }
-                                        const prefix = parts.length > 0 ? parts.join('　') + '　' : '';
-                                        return prefix + consultation.usage;
-                                    } catch (_err) {
-                                        return consultation.usage;
-                                    }
-                                })()}
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div class="space-y-4">
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-700 block mb-2">主訴</span>
+                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.symptoms || '無記錄'}</div>
+                                </div>
+                                
+                                ${consultation.currentHistory ? `
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-700 block mb-2">現病史</span>
+                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.currentHistory}</div>
+                                </div>
+                                ` : ''}
+                                
+                                ${consultation.tongue ? `
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-700 block mb-2">舌象</span>
+                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.tongue}</div>
+                                </div>
+                                ` : ''}
+                                
+                                ${consultation.pulse ? `
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-700 block mb-2">脈象</span>
+                                    <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${consultation.pulse}</div>
+                                </div>
+                                ` : ''}
+                                
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-700 block mb-2">中醫診斷</span>
+                                    <div class="bg-green-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-green-400 medical-field">${consultation.diagnosis || '無記錄'}</div>
+                                </div>
+                                
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-700 block mb-2">證型診斷</span>
+                                    <div class="bg-blue-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-blue-400 medical-field">${consultation.syndrome || '無記錄'}</div>
+                                </div>
+                                
+                                ${consultation.acupunctureNotes ? `
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-700 block mb-2">針灸備註</span>
+                                    <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.stripHtmlTags(consultation.acupunctureNotes)}</div>
+                                </div>
+                                ` : ''}
                             </div>
-                        </div>
-                        ` : ''}
+                            
+                            <div class="space-y-4">
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-700 block mb-2">處方內容</span>
+                                    ${(() => {
+                                        let html = '無記錄';
+                                        try {
+                                            if (consultation.multiPrescriptions) {
+                                                const mp = JSON.parse(consultation.multiPrescriptions);
+                                                if (Array.isArray(mp) && mp.length > 0) {
+                                                    const showNames = mp.length > 1;
+                                                    let block = '';
+                                                    mp.forEach((section, sIdx) => {
+                                                        const secName = section && section.name ? section.name : `處方${sIdx + 1}`;
+                                                        const items = Array.isArray(section && section.items) ? section.items : [];
+                                                        const lines = items.map(it => {
+                                                            const dose = it.customDosage || (it.type === 'herb' ? '1' : '5');
+                                                            const unit = (it && it.dosage && typeof it.dosage === 'string' && it.dosage.endsWith('g')) ? 'g' : 'g';
+                                                            return `<div style="margin-bottom: 4px;">${window.escapeHtml(it.name)} ${window.escapeHtml(String(dose))}${unit}</div>`;
+                                                        });
+                                                        block += `<div style="margin-bottom:6px;">${showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}</div>` : ''}${lines.join('')}</div>`;
+                                                    });
+                                                    html = block;
+                                                }
+                                            } else if (consultation.prescription) {
+                                                html = window.escapeHtml(consultation.prescription).replace(/\n/g, '<br>');
+                                            }
+                                        } catch (_e) {
+                                            html = consultation.prescription ? window.escapeHtml(consultation.prescription).replace(/\n/g, '<br>') : '無記錄';
+                                        }
+                                        return `<div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 medical-field">${html}</div>`;
+                                    })()}
+                                </div>
+                                
+                                ${(() => {
+                                    let showBlock = !!consultation.prescription || !!consultation.multiPrescriptions || !!consultation.usage;
+                                    if (!showBlock) return '';
+                                    let medInfoHtml = '';
+                                    try {
+                                        if (consultation.multiPrescriptions) {
+                                            const mp = JSON.parse(consultation.multiPrescriptions);
+                                            if (Array.isArray(mp) && mp.length > 0) {
+                                                const showNames = mp.length > 1;
+                                                const lines = mp.map((section, idx) => {
+                                                    const secName = section && section.name ? section.name : `處方${idx + 1}`;
+                                                    const d = parseInt(section && section.days) || 0;
+                                                    const f = parseInt(section && section.freq) || (parseInt(consultation.medicationFrequency) || 0);
+                                                    const partDays = d > 0 ? `服藥天數：${d}天` : '';
+                                                    const partFreq = f > 0 ? `每日次數：${f}次` : '';
+                                                    const combined = [partDays, partFreq].filter(Boolean).join('　');
+                                                    return combined ? `${showNames ? (secName + '：') : ''}${combined}` : '';
+                                                }).filter(Boolean);
+                                                if (lines.length > 0) {
+                                                    medInfoHtml += lines.map(l => `<div>${window.escapeHtml(l)}</div>`).join('');
+                                                }
+                                            }
+                                        } else {
+                                            const parts = [];
+                                            if (consultation.medicationDays && Number(consultation.medicationDays) > 0) {
+                                                parts.push('服藥天數：' + consultation.medicationDays + '天');
+                                            }
+                                            if (consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
+                                                parts.push('每日次數：' + consultation.medicationFrequency + '次');
+                                            }
+                                            if (parts.length > 0) {
+                                                medInfoHtml += `<div>${window.escapeHtml(parts.join('　'))}</div>`;
+                                            }
+                                        }
+                                    } catch (_e) {}
+                                    if (consultation.usage) {
+                                        medInfoHtml += `<div>${window.escapeHtml(consultation.usage)}</div>`;
+                                    }
+                                    return `
+                                        <div>
+                                            <span class="text-sm font-semibold text-gray-700 block mb-2">服用方法</span>
+                                            <div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${medInfoHtml || '無記錄'}</div>
+                                        </div>
+                                    `;
+                                })()}
                         
                         ${consultation.treatmentCourse ? `
                         <div>
