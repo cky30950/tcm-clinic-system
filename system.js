@@ -14710,15 +14710,6 @@ async function initializeSystemAfterLogin() {
             // 顯示已添加的項目，為每個項目建立自訂 tooltip 以顯示完整資訊
             const displayHtml = `
                 <div class="space-y-3">
-                    ${Array.isArray(selectedPrescriptionItems) && selectedPrescriptionItems.length > 1 ? `
-                        <div class="flex items-center px-3 text-xs text-gray-500">
-                            <div class="flex-1">處方名</div>
-                            <div class="flex items-center space-x-2">
-                                <span>編輯中</span>
-                            </div>
-                            <div class="px-2">×</div>
-                        </div>
-                    ` : ''}
                     ${selectedPrescriptionItems.map((item, index) => {
                         const bgColor = 'bg-yellow-50 border-yellow-200';
                         // 從 herbLibrary 中找到完整的藥材或方劑資料
@@ -14822,7 +14813,7 @@ async function initializeSystemAfterLogin() {
                                             }
                                         })()}
                                     </div>
-                                    ${Array.isArray(selectedPrescriptionItems) && selectedPrescriptionItems.length > 1 ? `<button onclick="removePrescriptionItem(${index})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>` : ''}
+                                    <button onclick="removePrescriptionItem(${index})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>
                                 </div>
                             </div>
                         `;
