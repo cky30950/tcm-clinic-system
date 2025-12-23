@@ -11401,6 +11401,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                 const mp = JSON.parse(consultation.multiPrescriptions);
                 if (Array.isArray(mp) && mp.length > 0) {
                     let html = '';
+                    const showNames = mp.length > 1;
                     mp.forEach((section, sIdx) => {
                         const secName = section && section.name ? section.name : `處方${sIdx + 1}`;
                         const items = Array.isArray(section && section.items) ? section.items : [];
@@ -11409,7 +11410,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                             const unit = (it && it.dosage && typeof it.dosage === 'string' && it.dosage.endsWith('g')) ? 'g' : 'g';
                             return `<div style="margin-bottom: 4px;">${it.name} ${dose}${unit}</div>`;
                         });
-                        html += `<div style="margin-bottom:6px;"><div style="font-weight:bold;margin-bottom:2px;">${secName}</div>${lines.join('')}</div>`;
+                        html += `<div style="margin-bottom:6px;">${showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${secName}</div>` : ''}${lines.join('')}</div>`;
                     });
                     prescriptionHtml = html;
                 } else {
@@ -11580,6 +11581,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             try {
                 const mp = JSON.parse(consultation.multiPrescriptions);
                 if (Array.isArray(mp)) {
+                    const showNames = mp.length > 1;
                     medLines = mp.map((section, idx) => {
                         const secName = section && section.name ? section.name : (isEnglish ? `Prescription ${idx + 1}` : `處方${idx + 1}`);
                         const d = parseInt(section && section.days) || 0;
@@ -11589,7 +11591,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         const partDays = d > 0 ? `${labelDays}${colon}${d}${isEnglish ? ' days' : '天'}` : '';
                         const partFreq = f > 0 ? `${labelFreq}${colon}${f}${isEnglish ? '' : '次'}` : '';
                         const combined = [partDays, partFreq].filter(Boolean).join('      ');
-                        return combined ? `${secName}${colon}${combined}` : '';
+                        return combined ? `${showNames ? (secName + colon) : ''}${combined}` : '';
                     }).filter(x => x);
                 }
             } catch (_e) {}
@@ -15366,6 +15368,24 @@ async function initializeSystemAfterLogin() {
             updatePrescriptionDisplay();
             checkPrescriptionConflicts();
             updatePrescriptionTypeSelectStatus();
+            try {
+                const hasAnyItems = prescriptions.some(p => Array.isArray(p.items) && p.items.length > 0);
+                if (hasAnyItems) {
+                    updateMedicineFeeByDays(getTotalMedicationDays());
+                } else {
+                    const medicineFeeItem = billingItems.find(item => 
+                        item.active && item.category === 'medicine' &&
+                        (item.name.includes('中藥') || item.name.includes('藥費') || item.name.includes('調劑'))
+                    );
+                    if (medicineFeeItem) {
+                        const idx = selectedBillingItems.findIndex(b => b.id === medicineFeeItem.id);
+                        if (idx !== -1) {
+                            selectedBillingItems.splice(idx, 1);
+                            updateBillingDisplay();
+                        }
+                    }
+                }
+            } catch (_e) {}
         }
         
         // 清除處方搜索
