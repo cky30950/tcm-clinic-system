@@ -8391,18 +8391,32 @@ async function showConsultationForm(appointment) {
             });
             
             // 重置服藥日數和次數為預設值
-            document.getElementById('medicationDays').value = '5';
-            document.getElementById('medicationFrequency').value = '2';
+            (function () {
+                const daysEl = document.getElementById('medicationDays');
+                const freqEl = document.getElementById('medicationFrequency');
+                if (daysEl && 'value' in daysEl) daysEl.value = '5';
+                if (freqEl && 'value' in freqEl) freqEl.value = '2';
+            })();
             
             // 重置休息期間顯示
-            document.getElementById('restPeriodDisplay').textContent = '請選擇開始和結束日期';
-            document.getElementById('restPeriodDisplay').className = 'text-sm text-gray-500 font-medium';
+            (function () {
+                const restEl = document.getElementById('restPeriodDisplay');
+                if (restEl) {
+                    restEl.textContent = '請選擇開始和結束日期';
+                    restEl.className = 'text-sm text-gray-500 font-medium';
+                }
+            })();
             
             // 設置預設值
             // 將預設服用方法由「早晚一次，飯後服」改為「溫水化開，飯後服」
-            document.getElementById('formUsage').value = '溫水化開，飯後服';
-            document.getElementById('formInstructions').value = '注意休息，飲食清淡';
-            document.getElementById('formTreatmentCourse').value = '一周';
+            (function () {
+                const usageEl = document.getElementById('formUsage');
+                const instrEl = document.getElementById('formInstructions');
+                const courseEl = document.getElementById('formTreatmentCourse');
+                if (usageEl && 'value' in usageEl) usageEl.value = '溫水化開，飯後服';
+                if (instrEl && 'value' in instrEl) instrEl.value = '注意休息，飲食清淡';
+                if (courseEl && 'value' in courseEl) courseEl.value = '一周';
+            })();
             
             // 清空處方項目
             selectedPrescriptionItems = [];
@@ -14764,15 +14778,22 @@ async function initializeSystemAfterLogin() {
             const hiddenTextarea = document.getElementById('formPrescription');
             const medicationSettings = document.getElementById('medicationSettings');
             
+            if (!container) {
+                return;
+            }
             if (selectedPrescriptionItems.length === 0) {
                 container.innerHTML = `
                     <div class="text-sm text-gray-500 text-center py-4">
                         請使用上方搜索功能添加中藥材或方劑
                     </div>
                 `;
-                hiddenTextarea.value = '';
+                if (hiddenTextarea && 'value' in hiddenTextarea) {
+                    hiddenTextarea.value = '';
+                }
                 // 隱藏服藥天數設定
-                medicationSettings.style.display = 'none';
+                if (medicationSettings && medicationSettings.style) {
+                    medicationSettings.style.display = 'none';
+                }
                 // 當處方內容為空時，應重新啟用庫存類型選單
                 try {
                     if (typeof updatePrescriptionTypeSelectStatus === 'function') {
@@ -14785,7 +14806,9 @@ async function initializeSystemAfterLogin() {
             }
             
             // 顯示服藥天數設定
-            medicationSettings.style.display = 'block';
+            if (medicationSettings && medicationSettings.style) {
+                medicationSettings.style.display = 'block';
+            }
             
             // 顯示已添加的項目，為每個項目建立自訂 tooltip 以顯示完整資訊
             const displayHtml = `
