@@ -9185,15 +9185,15 @@ if (!patient) {
                                                         const lines = mp.map((section, sIdx) => {
                                                             const secName = section && section.name ? section.name : `處方${sIdx + 1}`;
                                                             const items = Array.isArray(section && section.items) ? section.items : [];
-                                                            const itemLines = items.map(it => {
-                                                                const dose = (it && (it.customDosage || it.dosage)) ? (it.customDosage || it.dosage) : '';
-                                                                const unit = dose ? 'g' : '';
-                                                                return `${it.name}${dose ? ' ' + dose + unit : ''}`;
-                                                            });
-                                                            const prefix = showNames ? `${secName} ：` : '';
-                                                            return `${prefix}${itemLines.join('、')}`;
+                                                        const itemLines = items.map(it => {
+                                                            const dose = (it && (it.customDosage || it.dosage)) ? (it.customDosage || it.dosage) : '';
+                                                            const unit = dose ? 'g' : '';
+                                                            return `${it.name}${dose ? ' ' + dose + unit : ''}`;
                                                         });
-                                                        return lines.join('\\n');
+                                                        const prefix = showNames ? `${secName} ：` : '';
+                                                        return `${prefix}${itemLines.join('、')}`;
+                                                    }).filter(l => l && l.trim());
+                                                    return lines.length ? lines.join('\n') : (consultation.prescription || '無記錄');
                                                     }
                                                 }
                                             } catch (_e) {}
@@ -9222,9 +9222,9 @@ if (!patient) {
                                                 const prefix = showNames ? `${secName} ：` : '';
                                                 return `${prefix}${parts.join('　')}`;
                                             }).filter(l => l);
-                                            content = medLines.join('\\n');
+                                            content = medLines.join('\n');
                                             if (consultation.usage) {
-                                                content = content ? (content + '\\n' + consultation.usage) : consultation.usage;
+                                                content = content ? (content + '\n' + consultation.usage) : consultation.usage;
                                             }
                                         }
                                     }
@@ -9620,8 +9620,8 @@ function displayConsultationMedicalHistoryPage() {
                                                     });
                                                     const prefix = showNames ? `${secName} ：` : '';
                                                     return `${prefix}${itemLines.join('、')}`;
-                                                });
-                                                return lines.join('\\n');
+                                                }).filter(l => l && l.trim());
+                                                return lines.length ? lines.join('\n') : (consultation.prescription || '無記錄');
                                             }
                                         }
                                     } catch (_e) {}
@@ -9650,9 +9650,9 @@ function displayConsultationMedicalHistoryPage() {
                                                 const prefix = showNames ? `${secName} ：` : '';
                                                 return `${prefix}${parts.join('　')}`;
                                             }).filter(l => l);
-                                            content = medLines.join('\\n');
+                                            content = medLines.join('\n');
                                             if (consultation.usage) {
-                                                content = content ? (content + '\\n' + consultation.usage) : consultation.usage;
+                                                content = content ? (content + '\n' + consultation.usage) : consultation.usage;
                                             }
                                         }
                                     }
