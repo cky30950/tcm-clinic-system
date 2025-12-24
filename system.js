@@ -2842,6 +2842,12 @@ async function updateInventoryAfterConsultationMulti(consultationId, prescriptio
         }
     }
     await window.firebase.set(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationId)), newLog);
+    try {
+        const ls = localStorage.getItem('inventoryLogs');
+        const obj = ls ? JSON.parse(ls) : {};
+        obj[String(consultationId)] = newLog;
+        localStorage.setItem('inventoryLogs', JSON.stringify(obj));
+    } catch (_e) {}
     try { if (historyIn.length) await recordInventoryHistory('in', historyIn, { consultationId: String(consultationId) }); } catch (_e) {}
     try { if (historyOut.length) await recordInventoryHistory('out', historyOut, { consultationId: String(consultationId) }); } catch (_e) {}
     try { if (typeof updatePrescriptionDisplay === 'function') updatePrescriptionDisplay(); } catch (_e) {}
@@ -3618,11 +3624,34 @@ async function saveInventoryChanges() {
             }
         }
 
-        async function recordInventoryHistory(type, entries, extra = {}) {
+async function recordInventoryHistory(type, entries, extra = {}) {
             await waitForFirebaseDb();
+            const arr = Array.isArray(entries) ? entries : [];
+            if (type === 'out' && extra && extra.consultationId && arr.length) {
+                try {
+                    const baseRef = window.firebase.ref(window.firebase.rtdb, 'inventoryHistory/out');
+                    const q = window.firebase.query(baseRef, window.firebase.orderByChild('timestamp'), window.firebase.limitToLast(50));
+                    let snap = null;
+                    try { snap = await window.firebase.get(q); } catch (_e) { snap = null; }
+                    const obj = snap && snap.exists() ? snap.val() || {} : {};
+                    const norm = (list) => list.slice().map(e => ({ itemId: String(e.itemId), quantity: Number(e.quantity) || 0, unit: e.unit || 'g' }))
+                        .sort((a,b) => a.itemId.localeCompare(b.itemId))
+                        .map(e => e.itemId + ':' + e.quantity + ':' + e.unit).join('|');
+                    const target = norm(arr);
+                    const keys = Object.keys(obj);
+                    let duplicated = false;
+                    for (const k of keys) {
+                        const rec = obj[k] || {};
+                        if (String(rec.consultationId || '') !== String(extra.consultationId)) continue;
+                        const recEntries = Array.isArray(rec.entries) ? rec.entries : [];
+                        if (norm(recEntries) === target) { duplicated = true; break; }
+                    }
+                    if (duplicated) return;
+                } catch (_e) {}
+            }
             const ts = Date.now();
             const ref = window.firebase.ref(window.firebase.rtdb, 'inventoryHistory/' + String(type) + '/' + String(ts));
-            const data = { timestamp: ts, entries: Array.isArray(entries) ? entries : [] };
+            const data = { timestamp: ts, entries: arr };
             for (const k in extra) { data[k] = extra[k]; }
             await window.firebase.set(ref, data);
         }
@@ -8975,6 +9004,15 @@ async function saveConsultation() {
                         }
                     } catch (_err) {
                         prevLog = null;
+                    }
+                    if (!prevLog) {
+                        try {
+                            const ls = localStorage.getItem('inventoryLogs');
+                            if (ls) {
+                                const obj = JSON.parse(ls);
+                                prevLog = obj[String(consultationIdForInv)] || null;
+                            }
+                        } catch (_e) {}
                     }
                 }
                 if (consultationIdForInv && typeof updateInventoryAfterConsultationMulti === 'function') {
