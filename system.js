@@ -15171,25 +15171,30 @@ async function initializeSystemAfterLogin() {
             const hiddenTextarea = document.getElementById('formPrescription');
             if (!containerAll) return;
             const allSectionsHtml = prescriptions.map((section, sIdx) => {
-                const headerHtml = `
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <input type="text" value="${window.escapeHtml(section.name)}"
+                const isSingle = prescriptions.length === 1;
+                const leftControls = `
+                                ${!isSingle ? `<input type="text" value="${window.escapeHtml(section.name)}"
                                        onchange="renamePrescription(${sIdx}, this.value)"
-                                       class="border border-gray-300 rounded px-2 py-1 text-sm w-40">
-                                <button type="button" onclick="setActivePrescription(${sIdx})"
+                                       class="border border-gray-300 rounded px-2 py-1 text-sm w-40">` : ``}
+                                ${!isSingle ? `<button type="button" onclick="setActivePrescription(${sIdx})"
                                         class="${sIdx === activePrescriptionIndex ? 'bg-blue-600' : 'bg-gray-300'} text-white text-xs px-2 py-1 rounded">
                                     ${sIdx === activePrescriptionIndex ? '編輯中' : '設為編輯'}
-                                </button>
+                                </button>` : ``}
                                 <select id="prescriptionModeSelect-${sIdx}" onchange="updatePrescriptionModeAt(${sIdx}, this.value)"
                                         class="px-2 py-1 border border-yellow-300 rounded text-xs bg-white prescription-mode-select">
                                     <option value="granule" ${section.mode === 'slice' ? '' : 'selected'}>${typeof window.t === 'function' ? window.t('顆粒沖劑') : '顆粒沖劑'}</option>
                                     <option value="slice" ${section.mode === 'slice' ? 'selected' : ''}>${typeof window.t === 'function' ? window.t('飲片') : '飲片'}</option>
                                 </select>
+                `;
+                const rightControls = isSingle ? `` : `<button onclick="removePrescriptionSectionAt(${sIdx})" class="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm flex items-center justify-center">✕</button>`;
+                const headerHtml = `
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                ${leftControls}
                             </div>
                             <div class="flex items-center">
-                                <button onclick="removePrescriptionSectionAt(${sIdx})" class="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm flex items-center justify-center">✕</button>
+                                ${rightControls}
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
