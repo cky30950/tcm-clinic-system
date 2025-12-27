@@ -7500,6 +7500,19 @@ async function loadConsultationForEdit(consultationId) {
                     }));
                         activePrescriptionIndex = 0;
                         selectedPrescriptionItems = prescriptions[0].items;
+                        try {
+                            const initMode = (prescriptions[0] && prescriptions[0].mode === 'slice') ? 'slice' : 'granule';
+                            changeInventoryType(initMode);
+                        } catch (_e) {}
+                        try {
+                            const searchEl = document.getElementById('prescriptionSearch');
+                            const query = searchEl && searchEl.value ? String(searchEl.value).trim() : '';
+                            if (query && query.length > 0) {
+                                setTimeout(function () {
+                                    try { searchHerbsForPrescription(); } catch (_e2) {}
+                                }, 300);
+                            }
+                        } catch (_e) {}
                         updatePrescriptionDisplay();
                     } else {
                         throw new Error('multiPrescriptions not array');
@@ -7509,6 +7522,10 @@ async function loadConsultationForEdit(consultationId) {
                     prescriptions = [{ name: '處方', items: [], days: (consultation.medicationDays || 5), freq: (parseInt(consultation.medicationFrequency) || 2), mode: (currentInventoryMode === 'slice' ? 'slice' : 'granule') }];
                     activePrescriptionIndex = 0;
                     selectedPrescriptionItems = prescriptions[0].items;
+                    try {
+                        const initModeX = (prescriptions[0] && prescriptions[0].mode === 'slice') ? 'slice' : 'granule';
+                        changeInventoryType(initModeX);
+                    } catch (_e) {}
                     let loadedStructured = false;
                     if (consultation.prescriptionStructured) {
                         try {
@@ -7529,6 +7546,10 @@ async function loadConsultationForEdit(consultationId) {
                         parsePrescriptionToItems(consultation.prescription);
                         // 將解析結果設回第一處方
                         prescriptions[0].items = selectedPrescriptionItems;
+                        try {
+                            const initMode2 = (prescriptions[0] && prescriptions[0].mode === 'slice') ? 'slice' : 'granule';
+                            changeInventoryType(initMode2);
+                        } catch (_e) {}
                         updatePrescriptionDisplay();
                         const hasItems = Array.isArray(selectedPrescriptionItems) && selectedPrescriptionItems.length > 0;
                         if (!hasItems) {
@@ -7547,6 +7568,10 @@ async function loadConsultationForEdit(consultationId) {
                 prescriptions = [{ name: '處方', items: [], days: 5, freq: 2, mode: (currentInventoryMode === 'slice' ? 'slice' : 'granule') }];
                 activePrescriptionIndex = 0;
                 selectedPrescriptionItems = prescriptions[0].items;
+                try {
+                    const initMode3 = (prescriptions[0] && prescriptions[0].mode === 'slice') ? 'slice' : 'granule';
+                    changeInventoryType(initMode3);
+                } catch (_e) {}
                 updatePrescriptionDisplay();
             }
             
