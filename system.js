@@ -406,65 +406,13 @@ function onPrescriptionTypeChange(type) {
 // 當使用者從中藥庫介面選擇顆粒沖劑或飲片時呼叫此函式。
 // 會同步調整診症系統的下拉選單並切換庫存模式，但若處方已有內容則不允許切換。
 function onInventoryTypeChange(type) {
-    // 檢查輸入類型有效
-    if (type !== 'granule' && type !== 'slice') {
-        return;
-    }
-    // 若處方中已有藥材且與當前庫存類別不同，不允許切換
-    try {
-        if (Array.isArray(selectedPrescriptionItems) && selectedPrescriptionItems.length > 0 && currentInventoryMode !== type) {
-            // 將庫存下拉選單的值還原為當前模式
-            const invSel = document.getElementById('inventoryTypeSelect');
-            if (invSel) {
-                invSel.value = currentInventoryMode;
-            }
-            // 顯示提醒：必須清空處方才能切換
-            try {
-                const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
-                const zhMsg = '請先刪除所有處方內容才能切換藥材類別';
-                const enMsg = 'Please remove all prescription items before switching inventory type';
-                const msg = (langSel && langSel.toLowerCase().startsWith('en')) ? enMsg : zhMsg;
-                showToast(msg, 'warning');
-            } catch (_toastErr) {
-                /* 忽略提示錯誤 */
-            }
-            return;
-        }
-    } catch (_e) {
-        /* 若檢查處方內容失敗，不阻止切換 */
-    }
-    // 同步診症系統的下拉選單（若未禁用）
-    try {
-        const presSel = document.getElementById('prescriptionTypeSelect');
-        if (presSel) {
-            // 更新值；若禁用則只改值而不觸發 onchange
-            presSel.value = type;
-        }
-    } catch (_e) {
-        /* 忽略同步錯誤 */
-    }
-    // 執行庫存類型切換
-    try {
-        changeInventoryType(type);
-    } catch (_e) {
-        /* 忽略庫存類型切換錯誤 */
-    }
-    // 若處方搜尋欄有內容，更新搜索結果以反映新庫存餘量
-    try {
-        const searchEl = document.getElementById('prescriptionSearch');
-        const query = searchEl && searchEl.value ? String(searchEl.value).trim() : '';
-        if (query && query.length > 0) {
-            setTimeout(function () {
-                try {
-                    searchHerbsForPrescription();
-                } catch (_e) {
-                    /* 忽略搜索錯誤 */
-                }
-            }, 300);
-        }
-    } catch (_e) {
-        /* 忽略搜尋錯誤 */
-    }
+    if (type !== 'granule' && type !== 'slice') return;
+    currentHerbLibraryViewMode = type;
+    ensureInventoryCacheForMode(type).then(() => {
+        try { displayHerbLibrary(); } catch (_e) {}
+    }).catch(() => {
+        try { displayHerbLibrary(); } catch (_e) {}
+    });
 }
 
 // 將庫存類型改變函式暴露到全域，以便中藥庫選單使用
@@ -481,6 +429,37 @@ let herbInventoryGranule = {};
 let herbInventorySlice = {};
 let herbInventoryGranuleInitialized = false;
 let herbInventorySliceInitialized = false;
+let currentHerbLibraryViewMode = 'granule';
+async function ensureInventoryCacheForMode(mode) {
+    await waitForFirebaseDb();
+    const path = mode === 'slice' ? 'herbInventorySlice' : 'herbInventory';
+    const ref = window.firebase.ref(window.firebase.rtdb, path);
+    try {
+        const snap = await window.firebase.get(ref);
+        const data = snap && snap.exists() ? snap.val() || {} : {};
+        if (mode === 'slice') {
+            herbInventorySlice = data;
+            herbInventorySliceInitialized = true;
+        } else {
+            herbInventoryGranule = data;
+            herbInventoryGranuleInitialized = true;
+        }
+    } catch (_e) {}
+}
+function getHerbInventoryFromView(itemId) {
+    const mode = currentHerbLibraryViewMode === 'slice' ? 'slice' : 'granule';
+    const obj = mode === 'slice' ? herbInventorySlice : herbInventoryGranule;
+    const inv = obj && obj[String(itemId)];
+    if (inv && typeof inv === 'object') {
+        return {
+            quantity: inv.quantity ?? 0,
+            threshold: inv.threshold ?? 0,
+            unit: inv.unit || 'g',
+            disabled: !!inv.disabled
+        };
+    }
+    return { quantity: 0, threshold: 0, unit: 'g', disabled: false };
+}
 
 /**
  * 確保在指定父元素之後存在分頁容器，若不存在則建立。
@@ -2961,9 +2940,7 @@ async function openInventoryModal(itemId) {
     try {
         currentInventoryItemId = itemId;
         // 初始化庫存資料（若尚未初始化）
-        if (typeof initHerbInventory === 'function' && !herbInventoryInitialized) {
-            try { await initHerbInventory(); } catch (_e) {}
-        }
+        try { await ensureInventoryCacheForMode(currentHerbLibraryViewMode); } catch (_e) {}
         const modal = document.getElementById('inventoryModal');
         const qtyInput = document.getElementById('inventoryQuantity');
         const thrInput = document.getElementById('inventoryThreshold');
@@ -3057,14 +3034,7 @@ async function openInventoryModal(itemId) {
             titleEl.textContent = nameStr ? `${baseTitle} - ${nameStr}` : baseTitle;
         }
         // 取得現有庫存資料
-        let inv = { quantity: 0, threshold: 0 };
-        try {
-            if (typeof getHerbInventory === 'function') {
-                inv = getHerbInventory(itemId);
-            }
-        } catch (_e) {
-            inv = { quantity: 0, threshold: 0 };
-        }
+        let inv = await getHerbInventoryForMode(itemId, currentHerbLibraryViewMode);
         if (qtyInput || thrInput) {
             // 根據儲存的單位將庫存與警戒量換算成相同單位顯示
             const unit = inv.unit || 'g';
@@ -3199,9 +3169,16 @@ async function saveInventoryChanges() {
             disabledVal = false;
         }
         // 更新 Realtime Database，包含所選單位與停用狀態
-        if (typeof setHerbInventory === 'function') {
-            await setHerbInventory(id, quantityBase, thresholdBase, qtyUnit, disabledVal);
-        }
+        await setHerbInventoryForMode(id, quantityBase, thresholdBase, qtyUnit, disabledVal, currentHerbLibraryViewMode);
+        try {
+            if (currentHerbLibraryViewMode === 'slice') {
+                herbInventorySlice[String(id)] = { quantity: quantityBase, threshold: thresholdBase, unit: qtyUnit, disabled: !!disabledVal };
+                herbInventorySliceInitialized = true;
+            } else {
+                herbInventoryGranule[String(id)] = { quantity: quantityBase, threshold: thresholdBase, unit: qtyUnit, disabled: !!disabledVal };
+                herbInventoryGranuleInitialized = true;
+            }
+        } catch (_e) {}
         // 更新本地 herbLibrary 的預設庫存與單位（若存在）
         try {
             if (Array.isArray(herbLibrary)) {
@@ -3360,11 +3337,9 @@ async function saveInventoryChanges() {
                             // 過濾已停用的中藥庫存：僅顯示當前庫存類型中啟用的項目
                             let disabled = false;
                             try {
-                                if (typeof getHerbInventory === 'function') {
-                                    const invInfo = getHerbInventory(h.id);
-                                    if (invInfo && invInfo.disabled) {
-                                        disabled = true;
-                                    }
+                                const invInfo = getHerbInventoryFromView(h.id);
+                                if (invInfo && invInfo.disabled) {
+                                    disabled = true;
                                 }
                             } catch (_e) {
                                 // 若無法取得庫存資訊，視為啟用
@@ -13356,14 +13331,7 @@ async function initializeSystemAfterLogin() {
                 // 遍歷搜尋後的列表並累計非停用項目
                 searchFiltered.forEach(item => {
                     let isDisabled = false;
-                    try {
-                        if (typeof getHerbInventory === 'function') {
-                            const inv = getHerbInventory(item.id);
-                            isDisabled = inv && inv.disabled;
-                        }
-                    } catch (_e) {
-                        isDisabled = false;
-                    }
+                    try { const inv = getHerbInventoryFromView(item.id); isDisabled = inv && inv.disabled; } catch (_e) { isDisabled = false; }
                     // 只有在未被停用時才納入統計
                     if (!isDisabled) {
                         totalAll++;
@@ -13372,17 +13340,7 @@ async function initializeSystemAfterLogin() {
                     }
                 });
                 // 新增計算已停用資料數量：根據庫存資訊中的 disabled 屬性
-                const totalDisabledAll = searchFiltered.filter(item => {
-                    try {
-                        if (typeof getHerbInventory === 'function') {
-                            const inv = getHerbInventory(item.id);
-                            return inv && inv.disabled;
-                        }
-                    } catch (_e) {
-                        // 忽略錯誤
-                    }
-                    return false;
-                }).length;
+                const totalDisabledAll = searchFiltered.filter(item => { try { const inv = getHerbInventoryFromView(item.id); return inv && inv.disabled; } catch (_e) {} return false; }).length;
                 // 更新各分類按鈕的顯示文字
                 const allBtn = document.getElementById('filter-all');
                 if (allBtn) {
@@ -13432,14 +13390,7 @@ async function initializeSystemAfterLogin() {
                     matchesFilter = item.type === 'formula';
                 } else if (currentHerbFilter === 'disabled') {
                     // 已停用：需要檢查庫存資訊的 disabled 屬性
-                    try {
-                        if (typeof getHerbInventory === 'function') {
-                            const inv = getHerbInventory(item.id);
-                            matchesFilter = inv && inv.disabled;
-                        }
-                    } catch (_e) {
-                        matchesFilter = false;
-                    }
+                    try { const inv = getHerbInventoryFromView(item.id); matchesFilter = inv && inv.disabled; } catch (_e) { matchesFilter = false; }
                 }
                 return matchesSearch && matchesFilter;
             }) : [];
@@ -13450,10 +13401,8 @@ async function initializeSystemAfterLogin() {
                     let invA = { disabled: false };
                     let invB = { disabled: false };
                     try {
-                        if (typeof getHerbInventory === 'function') {
-                            invA = getHerbInventory(a.id) || { disabled: false };
-                            invB = getHerbInventory(b.id) || { disabled: false };
-                        }
+                        invA = getHerbInventoryFromView(a.id) || { disabled: false };
+                        invB = getHerbInventoryFromView(b.id) || { disabled: false };
                     } catch (_e) {
                         invA = { disabled: false };
                         invB = { disabled: false };
@@ -13622,7 +13571,7 @@ async function initializeSystemAfterLogin() {
             const safeCautions = herb.cautions ? window.escapeHtml(herb.cautions) : null;
             // 中藥卡片：僅顯示資訊，不提供編輯/刪除操作
             // 取得庫存資料（含停用狀態）
-            const inv = typeof getHerbInventory === 'function' ? getHerbInventory(herb.id) : { quantity: 0, threshold: 0 };
+            const inv = getHerbInventoryFromView(herb.id);
             // 判斷是否停用以決定狀態標籤
             const isDisabled = inv && inv.disabled ? true : false;
             const statusLabel = isDisabled ? '停用' : '啟用';
@@ -13630,7 +13579,7 @@ async function initializeSystemAfterLogin() {
             const statusClass = isDisabled ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
             const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
             const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
-            const unit = (inv && inv.unit) ? inv.unit : 'g';
+            const unit = inv && inv.unit ? inv.unit : 'g';
             const factor = UNIT_FACTOR_MAP[unit] || 1;
             const qtyDisplay = (() => {
                 const val = qty / factor;
@@ -13717,14 +13666,14 @@ async function initializeSystemAfterLogin() {
             const safeCautions = formula.cautions ? window.escapeHtml(formula.cautions) : null;
             // 方劑卡片：僅顯示資訊，不提供編輯/刪除操作
             // 取得庫存資料（含停用狀態）
-            const inv = typeof getHerbInventory === 'function' ? getHerbInventory(formula.id) : { quantity: 0, threshold: 0 };
+            const inv = getHerbInventoryFromView(formula.id);
             // 判斷是否停用以決定狀態標籤
             const isDisabled = inv && inv.disabled ? true : false;
             const statusLabel = isDisabled ? '停用' : '啟用';
             const statusClass = isDisabled ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
             const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
             const thr = inv && typeof inv.threshold === 'number' ? inv.threshold : 0;
-            const unit = (inv && inv.unit) ? inv.unit : 'g';
+            const unit = inv && inv.unit ? inv.unit : 'g';
             const factor = UNIT_FACTOR_MAP[unit] || 1;
             const qtyDisplay = (() => {
                 const val = qty / factor;
