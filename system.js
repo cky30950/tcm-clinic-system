@@ -2642,6 +2642,52 @@ async function setHerbInventory(itemId, quantity, threshold, unit, disabled) {
 }
 
 /**
+ * 以指定模式讀取單一中藥或方劑的庫存資料（不受 currentInventoryMode 影響）。
+ * @param {string|number} itemId
+ * @param {'granule'|'slice'} mode
+ * @returns {Promise<{quantity:number,threshold:number,unit:string,disabled:boolean}>}
+ */
+async function getHerbInventoryForMode(itemId, mode) {
+    await waitForFirebaseDb();
+    const path = (mode === 'slice') ? 'herbInventorySlice' : 'herbInventory';
+    const ref = window.firebase.ref(window.firebase.rtdb, path + '/' + String(itemId));
+    try {
+        const snap = await window.firebase.get(ref);
+        if (snap && snap.exists()) {
+            const inv = snap.val() || {};
+            return {
+                quantity: inv.quantity ?? 0,
+                threshold: inv.threshold ?? 0,
+                unit: inv.unit || 'g',
+                disabled: !!inv.disabled
+            };
+        }
+    } catch (_e) {}
+    return { quantity: 0, threshold: 0, unit: 'g', disabled: false };
+}
+
+/**
+ * 以指定模式寫入單一中藥或方劑的庫存資料（不受 currentInventoryMode 影響）。
+ * @param {string|number} itemId
+ * @param {number} quantity
+ * @param {number} threshold
+ * @param {string} unit
+ * @param {boolean} disabled
+ * @param {'granule'|'slice'} mode
+ */
+async function setHerbInventoryForMode(itemId, quantity, threshold, unit, disabled, mode) {
+    await waitForFirebaseDb();
+    const data = {};
+    if (quantity !== undefined && quantity !== null) data.quantity = Number(quantity);
+    if (threshold !== undefined && threshold !== null) data.threshold = Number(threshold);
+    if (unit !== undefined && unit !== null) data.unit = unit;
+    if (disabled !== undefined && disabled !== null) data.disabled = !!disabled;
+    const path = (mode === 'slice') ? 'herbInventorySlice' : 'herbInventory';
+    const ref = window.firebase.ref(window.firebase.rtdb, path + '/' + String(itemId));
+    await window.firebase.update(ref, data);
+}
+
+/**
  * 在撤回或修改診症時，還原庫存。
  * 讀取 inventoryLogs/{consultationId} 中記錄的消耗量，依序加回庫存並刪除該紀錄。
  * @param {string|number} consultationId
@@ -2664,28 +2710,28 @@ async function revertInventoryForConsultation(consultationId) {
         const logSnap = await window.firebase.get(logRef);
         if (logSnap && logSnap.exists()) {
             const log = logSnap.val() || {};
-            for (const key in log) {
-                const consumption = Number(log[key]) || 0;
-                // 讀取當前庫存資料。若尚未存在該項目，提供預設值。
-                const inv = getHerbInventory(key);
-                // 將消耗量加回庫存
+            for (const rawKey in log) {
+                const consumption = Number(log[rawKey]) || 0;
+                const parts = String(rawKey).split(':');
+                let mode = 'granule';
+                let itemId = String(rawKey);
+                if (parts.length === 2) { mode = parts[0] === 'slice' ? 'slice' : 'granule'; itemId = parts[1]; }
+                const inv = await getHerbInventoryForMode(itemId, mode);
                 const newQty = (inv.quantity || 0) + consumption;
-                // 使用原單位更新庫存。當 inv.unit 不存在時，預設為 'g'
                 const unitToUse = inv.unit || 'g';
                 const thresholdToUse = typeof inv.threshold === 'number' ? inv.threshold : 0;
-                await setHerbInventory(key, newQty, thresholdToUse, unitToUse);
-                // 同步更新本地快取，避免 UI 延遲或未初始化時跳過更新
+                await setHerbInventoryForMode(itemId, newQty, thresholdToUse, unitToUse, inv.disabled, mode);
                 try {
                     if (typeof herbInventory !== 'undefined') {
-                        herbInventory[String(key)] = {
-                            quantity: newQty,
-                            threshold: thresholdToUse,
-                            unit: unitToUse
-                        };
+                        if ((typeof currentInventoryMode !== 'undefined') && ((currentInventoryMode === 'slice' && mode === 'slice') || (currentInventoryMode === 'granule' && mode === 'granule'))) {
+                            herbInventory[String(itemId)] = {
+                                quantity: newQty,
+                                threshold: thresholdToUse,
+                                unit: unitToUse
+                            };
+                        }
                     }
-                } catch (_e) {
-                    /* 忽略本地更新錯誤 */
-                }
+                } catch (_e) {}
             }
             // 移除消耗記錄
             await window.firebase.remove(logRef);
@@ -2800,13 +2846,14 @@ async function updateInventoryAfterConsultationMulti(consultationId, prescriptio
         const f = parseInt(section && section.freq) || 0;
         if (d <= 0 || f <= 0) continue;
         const items = Array.isArray(section && section.items) ? section.items : [];
+        const mode = (section && (section.mode === 'slice' || section.mode === 'granule')) ? section.mode : 'granule';
         for (const it of items) {
             if (!it || !it.id) continue;
             const dosageStr = it.customDosage || it.dosage || '';
             const dosage = parseFloat(dosageStr);
             if (isNaN(dosage) || dosage <= 0) continue;
             const consumption = dosage * d * f;
-            const key = String(it.id);
+            const key = mode + ':' + String(it.id);
             newLog[key] = (newLog[key] || 0) + consumption;
         }
     }
@@ -2832,24 +2879,30 @@ async function updateInventoryAfterConsultationMulti(consultationId, prescriptio
         const next = Number(newLog[key]) || 0;
         const delta = next - prev;
         if (delta === 0) continue;
-        const inv = getHerbInventory(key);
+        const parts = String(key).split(':');
+        let mode = 'granule';
+        let itemId = String(key);
+        if (parts.length === 2) { mode = parts[0] === 'slice' ? 'slice' : 'granule'; itemId = parts[1]; }
+        const inv = await getHerbInventoryForMode(itemId, mode);
         const unit = inv.unit || 'g';
         const currQty = inv.quantity || 0;
         const newQty = currQty - delta;
-        await setHerbInventory(key, newQty, inv.threshold, unit);
+        await setHerbInventoryForMode(itemId, newQty, inv.threshold, unit, inv.disabled, mode);
         try {
             if (typeof herbInventory !== 'undefined') {
-                herbInventory[String(key)] = {
-                    quantity: newQty,
-                    threshold: inv.threshold,
-                    unit
-                };
+                if ((typeof currentInventoryMode !== 'undefined') && ((currentInventoryMode === 'slice' && mode === 'slice') || (currentInventoryMode === 'granule' && mode === 'granule'))) {
+                    herbInventory[String(itemId)] = {
+                        quantity: newQty,
+                        threshold: inv.threshold,
+                        unit
+                    };
+                }
             }
         } catch (_e) {}
         if (delta > 0) {
-            historyOut.push({ itemId: String(key), quantity: delta, unit });
+            historyOut.push({ itemId: String(itemId), quantity: delta, unit });
         } else {
-            historyIn.push({ itemId: String(key), quantity: Math.abs(delta), unit });
+            historyIn.push({ itemId: String(itemId), quantity: Math.abs(delta), unit });
         }
     }
     await window.firebase.set(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationId)), newLog);
@@ -7435,7 +7488,8 @@ async function loadConsultationForEdit(consultationId) {
                         name: (p && p.name) ? p.name : (idx === 0 ? '處方' : `處方${idx + 1}`),
                         items: Array.isArray(p && p.items) ? p.items : [],
                         days: parseInt(p && p.days) || 5,
-                        freq: parseInt(p && p.freq) || (parseInt(consultation.medicationFrequency) || 2)
+                        freq: parseInt(p && p.freq) || (parseInt(consultation.medicationFrequency) || 2),
+                        mode: (p && (p.mode === 'slice' || p.mode === 'granule')) ? p.mode : 'granule'
                     }));
                         activePrescriptionIndex = 0;
                         selectedPrescriptionItems = prescriptions[0].items;
@@ -7445,7 +7499,7 @@ async function loadConsultationForEdit(consultationId) {
                     }
                 } else {
                     // fallback: 單處方資料
-                    prescriptions = [{ name: '處方', items: [], days: (consultation.medicationDays || 5), freq: (parseInt(consultation.medicationFrequency) || 2) }];
+                    prescriptions = [{ name: '處方', items: [], days: (consultation.medicationDays || 5), freq: (parseInt(consultation.medicationFrequency) || 2), mode: (currentInventoryMode === 'slice' ? 'slice' : 'granule') }];
                     activePrescriptionIndex = 0;
                     selectedPrescriptionItems = prescriptions[0].items;
                     let loadedStructured = false;
@@ -7483,7 +7537,7 @@ async function loadConsultationForEdit(consultationId) {
                 }
             } catch (_err) {
                 // 無法解析時，維持單處方空白狀態
-                prescriptions = [{ name: '處方', items: [], days: 5, freq: 2 }];
+                prescriptions = [{ name: '處方', items: [], days: 5, freq: 2, mode: (currentInventoryMode === 'slice' ? 'slice' : 'granule') }];
                 activePrescriptionIndex = 0;
                 selectedPrescriptionItems = prescriptions[0].items;
                 updatePrescriptionDisplay();
@@ -8559,7 +8613,7 @@ async function showConsultationForm(appointment) {
             });
             
             // 重置多處方狀態與每日次數為預設值
-            prescriptions = [{ name: '處方', items: [], days: 5, freq: 2 }];
+            prescriptions = [{ name: '處方', items: [], days: 5, freq: 2, mode: (currentInventoryMode === 'slice' ? 'slice' : 'granule') }];
             activePrescriptionIndex = 0;
             selectedPrescriptionItems = prescriptions[0].items;
             const freqEl = document.getElementById('medicationFrequency');
@@ -14717,13 +14771,19 @@ async function initializeSystemAfterLogin() {
         }
         
         // 多處方支援
-        let prescriptions = [{ name: '處方', items: [], days: 5, freq: 2 }];
+        let prescriptions = [{ name: '處方', items: [], days: 5, freq: 2, mode: (currentInventoryMode === 'slice' ? 'slice' : 'granule') }];
         let activePrescriptionIndex = 0;
         let selectedPrescriptionItems = prescriptions[activePrescriptionIndex].items;
         function setActivePrescription(index) {
             if (index < 0 || index >= prescriptions.length) return;
             activePrescriptionIndex = index;
             selectedPrescriptionItems = prescriptions[activePrescriptionIndex].items;
+            try {
+                const m = prescriptions[activePrescriptionIndex] && prescriptions[activePrescriptionIndex].mode ? prescriptions[activePrescriptionIndex].mode : 'granule';
+                if (m === 'granule' || m === 'slice') {
+                    changeInventoryType(m);
+                }
+            } catch (_e) {}
             updatePrescriptionDisplay();
             checkPrescriptionConflicts();
         }
@@ -14736,7 +14796,8 @@ async function initializeSystemAfterLogin() {
                 const fEl = document.getElementById('medicationFrequency');
                 defaultFreq = fEl ? (parseInt(fEl.value) || 2) : 2;
             } catch (_e) {}
-            prescriptions.push({ name: defaultName, items: [], days: 5, freq: defaultFreq });
+            const defaultMode = (typeof currentInventoryMode !== 'undefined' && (currentInventoryMode === 'slice' || currentInventoryMode === 'granule')) ? currentInventoryMode : 'granule';
+            prescriptions.push({ name: defaultName, items: [], days: 5, freq: defaultFreq, mode: defaultMode });
             setActivePrescription(prescriptions.length - 1);
         }
         function removePrescriptionSection() {
@@ -14772,6 +14833,21 @@ async function initializeSystemAfterLogin() {
         function renamePrescription(index, newName) {
             if (index < 0 || index >= prescriptions.length) return;
             prescriptions[index].name = (newName || '').trim() || `處方${index + 1}`;
+            updatePrescriptionDisplay();
+        }
+        function updatePrescriptionModeAt(sectionIdx, newMode) {
+            if (sectionIdx < 0 || sectionIdx >= prescriptions.length) return;
+            if (newMode !== 'granule' && newMode !== 'slice') return;
+            prescriptions[sectionIdx].mode = newMode;
+            if (sectionIdx === activePrescriptionIndex) {
+                try { changeInventoryType(newMode); } catch (_e) {}
+                try {
+                    const q = document.getElementById('prescriptionSearch');
+                    if (q && q.value && q.value.trim().length > 0) {
+                        setTimeout(() => { try { searchHerbsForPrescription(); } catch (_e) {} }, 300);
+                    }
+                } catch (_e) {}
+            }
             updatePrescriptionDisplay();
         }
         function clearActivePrescriptionItems() {
@@ -15098,6 +15174,11 @@ async function initializeSystemAfterLogin() {
                                         class="${sIdx === activePrescriptionIndex ? 'bg-blue-600' : 'bg-gray-300'} text-white text-xs px-2 py-1 rounded">
                                     ${sIdx === activePrescriptionIndex ? '編輯中' : '設為編輯'}
                                 </button>
+                                <select onchange="updatePrescriptionModeAt(${sIdx}, this.value)"
+                                        class="px-2 py-1 border border-yellow-300 rounded text-xs bg-white">
+                                    <option value="granule" ${section.mode === 'slice' ? '' : 'selected'}>${typeof window.t === 'function' ? window.t('顆粒沖劑') : '顆粒沖劑'}</option>
+                                    <option value="slice" ${section.mode === 'slice' ? 'selected' : ''}>${typeof window.t === 'function' ? window.t('飲片') : '飲片'}</option>
+                                </select>
                             </div>
                             <div class="flex items-center">
                                 <button onclick="removePrescriptionSectionAt(${sIdx})" class="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm flex items-center justify-center">✕</button>
