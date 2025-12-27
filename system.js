@@ -374,16 +374,6 @@ function onPrescriptionTypeChange(type) {
     } catch (_e) {
         // 若切換失敗，仍然嘗試後續動作
     }
-
-    // 同步中藥庫的下拉選單，使其反映新的庫存模式
-    try {
-        const invSel = document.getElementById('inventoryTypeSelect');
-        if (invSel && invSel.value !== type) {
-            invSel.value = type;
-        }
-    } catch (_e) {
-        /* 忽略同步錯誤 */
-    }
     // 若使用者在處方搜尋欄中已輸入關鍵字，稍後重新搜尋以更新結果
     try {
         const searchEl = document.getElementById('prescriptionSearch');
@@ -3263,7 +3253,7 @@ async function saveInventoryChanges() {
                 // 顯示當前庫存類型於批量入庫彈窗標題右側
                 const typeDisplay = document.getElementById('batchInventoryTypeDisplay');
                 if (typeDisplay) {
-                    const mode = (currentInventoryMode === 'slice') ? 'slice' : 'granule';
+                    const mode = (currentHerbLibraryViewMode === 'slice') ? 'slice' : 'granule';
                     let label = mode === 'slice' ? '飲片' : '顆粒沖劑';
                     // 使用翻譯函式轉換庫存類型文字
                     if (typeof window.t === 'function') {
