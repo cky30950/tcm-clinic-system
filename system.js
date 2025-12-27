@@ -15028,36 +15028,29 @@ async function initializeSystemAfterLogin() {
          */
         function updatePrescriptionTypeSelectStatus() {
             try {
-                const sel = document.getElementById('prescriptionTypeSelect');
-                if (!sel) return;
-                // 設定提示訊息，根據語言切換
                 const langSel = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
-                const zhTitle = '所有藥刪除後才可轉換';
-                const enTitle = 'Remove all medicines before switching';
+                const zhTitle = '清空藥品才能選擇';
+                const enTitle = 'Clear all medicines to switch';
                 const titleMsg = (langSel && langSel.toLowerCase().startsWith('en')) ? enTitle : zhTitle;
-
-                const hasAnyItems = prescriptions.some(p => Array.isArray(p.items) && p.items.length > 0);
-                if (hasAnyItems) {
-                    // 禁用選單並套用灰階樣式與禁用游標
-                    sel.disabled = true;
-                    sel.classList.add('opacity-50');
-                    sel.classList.add('cursor-not-allowed');
-                    // 若存在自訂背景色，保持不變；否則設定為灰色系
-                    // 將文字顏色調淡
-                    sel.style.color = '#9ca3af';
-                    // 設定懸浮提示
-                    sel.setAttribute('title', titleMsg);
-                } else {
-                    // 恢復可用狀態與原本樣式
-                    sel.disabled = false;
-                    sel.classList.remove('opacity-50');
-                    sel.classList.remove('cursor-not-allowed');
-                    sel.style.color = '';
-                    sel.removeAttribute('title');
-                }
-            } catch (_e) {
-                // ignore errors
-            }
+                prescriptions.forEach((p, idx) => {
+                    const sel = document.getElementById('prescriptionModeSelect-' + idx);
+                    if (!sel) return;
+                    const hasItems = Array.isArray(p.items) && p.items.length > 0;
+                    if (hasItems) {
+                        sel.disabled = true;
+                        sel.classList.add('opacity-50');
+                        sel.classList.add('cursor-not-allowed');
+                        sel.style.color = '#9ca3af';
+                        sel.setAttribute('title', titleMsg);
+                    } else {
+                        sel.disabled = false;
+                        sel.classList.remove('opacity-50');
+                        sel.classList.remove('cursor-not-allowed');
+                        sel.style.color = '';
+                        sel.removeAttribute('title');
+                    }
+                });
+            } catch (_e) {}
         }
         
         // 添加到處方內容
@@ -15155,8 +15148,8 @@ async function initializeSystemAfterLogin() {
                                         class="${sIdx === activePrescriptionIndex ? 'bg-blue-600' : 'bg-gray-300'} text-white text-xs px-2 py-1 rounded">
                                     ${sIdx === activePrescriptionIndex ? '編輯中' : '設為編輯'}
                                 </button>
-                                <select onchange="updatePrescriptionModeAt(${sIdx}, this.value)"
-                                        class="px-2 py-1 border border-yellow-300 rounded text-xs bg-white">
+                                <select id="prescriptionModeSelect-${sIdx}" onchange="updatePrescriptionModeAt(${sIdx}, this.value)"
+                                        class="px-2 py-1 border border-yellow-300 rounded text-xs bg-white prescription-mode-select">
                                     <option value="granule" ${section.mode === 'slice' ? '' : 'selected'}>${typeof window.t === 'function' ? window.t('顆粒沖劑') : '顆粒沖劑'}</option>
                                     <option value="slice" ${section.mode === 'slice' ? 'selected' : ''}>${typeof window.t === 'function' ? window.t('飲片') : '飲片'}</option>
                                 </select>
