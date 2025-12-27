@@ -2810,6 +2810,17 @@ async function updateInventoryAfterConsultationMulti(consultationId, prescriptio
             newLog[key] = (newLog[key] || 0) + consumption;
         }
     }
+    if (isEditing && previousLog === null) {
+        await window.firebase.set(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationId)), newLog);
+        try {
+            const ls = localStorage.getItem('inventoryLogs');
+            const obj = ls ? JSON.parse(ls) : {};
+            obj[String(consultationId)] = newLog;
+            localStorage.setItem('inventoryLogs', JSON.stringify(obj));
+        } catch (_e) {}
+        try { if (typeof updatePrescriptionDisplay === 'function') updatePrescriptionDisplay(); } catch (_e) {}
+        return;
+    }
     const historyOut = [];
     const historyIn = [];
     const allItemIds = new Set([
@@ -3654,6 +3665,37 @@ async function recordInventoryHistory(type, entries, extra = {}) {
             const data = { timestamp: ts, entries: arr };
             for (const k in extra) { data[k] = extra[k]; }
             await window.firebase.set(ref, data);
+        }
+
+        async function getPreviousInventoryLogFromHistory(consultationId) {
+            if (!consultationId) return null;
+            await waitForFirebaseDb();
+            try {
+                const baseRef = window.firebase.ref(window.firebase.rtdb, 'inventoryHistory/out');
+                const q = window.firebase.query(baseRef, window.firebase.orderByChild('consultationId'), window.firebase.equalTo(String(consultationId)));
+                const snap = await window.firebase.get(q);
+                if (!snap || !snap.exists()) return null;
+                const obj = snap.val() || {};
+                let latest = null;
+                for (const k in obj) {
+                    const rec = obj[k] || {};
+                    if (!Array.isArray(rec.entries)) continue;
+                    if (!latest || Number(rec.timestamp || 0) > Number(latest.timestamp || 0)) {
+                        latest = rec;
+                    }
+                }
+                if (!latest) return null;
+                const log = {};
+                const list = Array.isArray(latest.entries) ? latest.entries : [];
+                for (const e of list) {
+                    const id = String(e.itemId);
+                    const qty = Number(e.quantity) || 0;
+                    log[id] = (log[id] || 0) + qty;
+                }
+                return log;
+            } catch (_e) {
+                return null;
+            }
         }
 
         function openInventoryHistoryModal() {
@@ -9013,6 +9055,9 @@ async function saveConsultation() {
                                 prevLog = obj[String(consultationIdForInv)] || null;
                             }
                         } catch (_e) {}
+                    }
+                    if (!prevLog && typeof getPreviousInventoryLogFromHistory === 'function') {
+                        try { prevLog = await getPreviousInventoryLogFromHistory(consultationIdForInv); } catch (_e) {}
                     }
                 }
                 if (consultationIdForInv && typeof updateInventoryAfterConsultationMulti === 'function') {
