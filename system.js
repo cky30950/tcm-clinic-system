@@ -14790,6 +14790,15 @@ async function initializeSystemAfterLogin() {
                     changeInventoryType(m);
                 }
             } catch (_e) {}
+            try {
+                const searchEl = document.getElementById('prescriptionSearch');
+                const query = searchEl && searchEl.value ? String(searchEl.value).trim() : '';
+                if (query && query.length > 0) {
+                    setTimeout(function () {
+                        try { searchHerbsForPrescription(); } catch (_e2) {}
+                    }, 300);
+                }
+            } catch (_e) {}
             updatePrescriptionDisplay();
             checkPrescriptionConflicts();
         }
