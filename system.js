@@ -476,6 +476,12 @@ window.onPrescriptionTypeChange = onPrescriptionTypeChange;
 // 將庫存切換函式暴露到全域，供 HTML 事件調用
 window.changeInventoryType = changeInventoryType;
 
+// 兩類庫存的本地快取，用於在多處方同時顯示不同模式的餘量
+let herbInventoryGranule = {};
+let herbInventorySlice = {};
+let herbInventoryGranuleInitialized = false;
+let herbInventorySliceInitialized = false;
+
 /**
  * 確保在指定父元素之後存在分頁容器，若不存在則建立。
  * 分頁容器統一使用 flex 排版與 margin-top 提升顯示效果。
@@ -2562,6 +2568,15 @@ async function initHerbInventory(forceRefresh = false) {
         const snapshot = await window.firebase.get(inventoryRef);
         herbInventory = snapshot && snapshot.exists() ? snapshot.val() || {} : {};
         herbInventoryInitialized = true;
+        try {
+            if (currentInventoryMode === 'slice') {
+                herbInventorySlice = herbInventory;
+                herbInventorySliceInitialized = true;
+            } else {
+                herbInventoryGranule = herbInventory;
+                herbInventoryGranuleInitialized = true;
+            }
+        } catch (_e) {}
     } catch (error) {
         console.error('讀取中藥庫存資料失敗:', error);
         herbInventory = {};
@@ -2571,6 +2586,15 @@ async function initHerbInventory(forceRefresh = false) {
     if (!herbInventoryListenerAttached) {
         window.firebase.onValue(inventoryRef, (snap) => {
             herbInventory = snap && snap.exists() ? snap.val() || {} : {};
+            try {
+                if (currentInventoryMode === 'slice') {
+                    herbInventorySlice = herbInventory;
+                    herbInventorySliceInitialized = true;
+                } else {
+                    herbInventoryGranule = herbInventory;
+                    herbInventoryGranuleInitialized = true;
+                }
+            } catch (_e) {}
             // 若有顯示中藥庫，更新畫面
             try {
                 if (document.getElementById('herbLibraryList')) {
@@ -2722,14 +2746,18 @@ async function revertInventoryForConsultation(consultationId) {
                 const thresholdToUse = typeof inv.threshold === 'number' ? inv.threshold : 0;
                 await setHerbInventoryForMode(itemId, newQty, thresholdToUse, unitToUse, inv.disabled, mode);
                 try {
-                    if (typeof herbInventory !== 'undefined') {
-                        if ((typeof currentInventoryMode !== 'undefined') && ((currentInventoryMode === 'slice' && mode === 'slice') || (currentInventoryMode === 'granule' && mode === 'granule'))) {
-                            herbInventory[String(itemId)] = {
-                                quantity: newQty,
-                                threshold: thresholdToUse,
-                                unit: unitToUse
-                            };
-                        }
+                    if (mode === 'slice') {
+                        herbInventorySlice[String(itemId)] = {
+                            quantity: newQty,
+                            threshold: thresholdToUse,
+                            unit: unitToUse
+                        };
+                    } else {
+                        herbInventoryGranule[String(itemId)] = {
+                            quantity: newQty,
+                            threshold: thresholdToUse,
+                            unit: unitToUse
+                        };
                     }
                 } catch (_e) {}
             }
@@ -2889,14 +2917,18 @@ async function updateInventoryAfterConsultationMulti(consultationId, prescriptio
         const newQty = currQty - delta;
         await setHerbInventoryForMode(itemId, newQty, inv.threshold, unit, inv.disabled, mode);
         try {
-            if (typeof herbInventory !== 'undefined') {
-                if ((typeof currentInventoryMode !== 'undefined') && ((currentInventoryMode === 'slice' && mode === 'slice') || (currentInventoryMode === 'granule' && mode === 'granule'))) {
-                    herbInventory[String(itemId)] = {
-                        quantity: newQty,
-                        threshold: inv.threshold,
-                        unit
-                    };
-                }
+            if (mode === 'slice') {
+                herbInventorySlice[String(itemId)] = {
+                    quantity: newQty,
+                    threshold: inv.threshold,
+                    unit
+                };
+            } else {
+                herbInventoryGranule[String(itemId)] = {
+                    quantity: newQty,
+                    threshold: inv.threshold,
+                    unit
+                };
             }
         } catch (_e) {}
         if (delta > 0) {
@@ -15203,12 +15235,12 @@ async function initializeSystemAfterLogin() {
                     </div>
                 `;
                 const itemsArray = Array.isArray(section.items) ? section.items : [];
-                const itemsHtml = itemsArray.length === 0
-                    ? `<div class="text-sm text-gray-500 text-center py-4">此處方尚未添加項目，請使用上方搜索功能</div>`
-                    : itemsArray.map((item, index) => {
-                        const bgColor = 'bg-yellow-50 border-yellow-200';
-                        // 從 herbLibrary 中找到完整的藥材或方劑資料
-                        const fullItem = (Array.isArray(herbLibrary) ? herbLibrary : []).find(h => h && h.id === item.id);
+        const itemsHtml = itemsArray.length === 0
+            ? `<div class="text-sm text-gray-500 text-center py-4">此處方尚未添加項目，請使用上方搜索功能</div>`
+            : itemsArray.map((item, index) => {
+                const bgColor = 'bg-yellow-50 border-yellow-200';
+                // 從 herbLibrary 中找到完整的藥材或方劑資料
+                const fullItem = (Array.isArray(herbLibrary) ? herbLibrary : []).find(h => h && h.id === item.id);
                         // 構建詳細資訊內容
                         const details = [];
                         if (fullItem) {
@@ -15264,7 +15296,11 @@ async function initializeSystemAfterLogin() {
                                     <div class="flex items-center space-x-2">
                                         ${(() => {
                                             try {
-                                                const inv = typeof getHerbInventory === 'function' ? getHerbInventory(item.id) : { quantity: 0, unit: 'g' };
+                                                // 依處方模式選擇對應庫存快取
+                                                const isSlice = section && section.mode === 'slice';
+                                                const invObj = isSlice ? herbInventorySlice : herbInventoryGranule;
+                                                const invRaw = invObj && invObj[String(item.id)];
+                                                const inv = invRaw ? invRaw : { quantity: 0, unit: 'g' };
                                                 const qty = inv && typeof inv.quantity === 'number' ? inv.quantity : 0;
                                                 const unit = inv && inv.unit ? inv.unit : 'g';
                                                 const factor = UNIT_FACTOR_MAP[unit] || 1;
@@ -15293,9 +15329,10 @@ async function initializeSystemAfterLogin() {
                                                onclick="this.select()">
                                         ${(() => {
                                             try {
-                                                // 取得該藥材或方劑的單位，若不存在則預設為克（g）。
-                                                const inv2 = (typeof getHerbInventory === 'function') ? getHerbInventory(item.id) : { unit: 'g' };
-                                                const unit2 = (inv2 && inv2.unit) ? inv2.unit : 'g';
+                                                const isSlice2 = section && section.mode === 'slice';
+                                                const invObj2 = isSlice2 ? herbInventorySlice : herbInventoryGranule;
+                                                const invRaw2 = invObj2 && invObj2[String(item.id)];
+                                                const unit2 = invRaw2 && invRaw2.unit ? invRaw2.unit : 'g';
                                                 // 從映射中取得原始單位標籤（中文），不存在則默認為『克』
                                                 const rawUnit2 = (typeof UNIT_LABEL_MAP !== 'undefined' && UNIT_LABEL_MAP && UNIT_LABEL_MAP[unit2]) ? UNIT_LABEL_MAP[unit2] : '克';
                                                 // 使用翻譯函式將單位標籤轉換為當前語言
