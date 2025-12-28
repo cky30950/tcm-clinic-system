@@ -9454,12 +9454,14 @@ if (!patient) {
                                                     mp.forEach((section, sIdx) => {
                                                         const secName = section && section.name ? section.name : `處方${sIdx + 1}`;
                                                         const items = Array.isArray(section && section.items) ? section.items : [];
-                                                        const lines = items.map(it => {
-                                                            const dose = it.customDosage || (it.type === 'herb' ? '1' : '5');
-                                                            const unit = (it && it.dosage && typeof it.dosage === 'string' && it.dosage.endsWith('g')) ? 'g' : 'g';
-                                                            return `<div style="margin-bottom: 4px;">${window.escapeHtml(it.name)} ${window.escapeHtml(String(dose))}${unit}</div>`;
-                                                        });
-                                                        block += `<div style="margin-bottom:6px;">${showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}</div>` : ''}${lines.join('')}</div>`;
+                                                    const lines = items.map(it => {
+                                                        const dose = it.customDosage || (it.type === 'herb' ? '1' : '5');
+                                                        const unit = (it && it.dosage && typeof it.dosage === 'string' && it.dosage.endsWith('g')) ? 'g' : 'g';
+                                                        return `<div style="margin-bottom: 4px;">${window.escapeHtml(it.name)} ${window.escapeHtml(String(dose))}${unit}</div>`;
+                                                    });
+                                                    const modeLabel = (section && section.mode === 'granule') ? '顆粒沖劑' : ((section && section.mode === 'slice') ? '飲片' : '');
+                                                    const nameWithMode = showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}</div>` : '';
+                                                    block += `<div style="margin-bottom:6px;">${nameWithMode}${lines.join('')}</div>`;
                                                     });
                                                     html = block;
                                                 }
@@ -23187,16 +23189,10 @@ function viewMedicalRecord(recordId, patientId) {
                             const partDays = d > 0 ? `服藥天數：${d}天` : '';
                             const partFreq = f > 0 ? `每日次數：${f}次` : '';
                             const combined = [partDays, partFreq].filter(Boolean).join('　');
-                            const modeLabel = (section && section.mode === 'granule') ? '顆粒沖劑' : ((section && section.mode === 'slice') ? '飲片' : '');
-                            if (!combined) return '';
-                            if (showNames) {
-                                const nameHtml = `${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}：`;
-                                return nameHtml + window.escapeHtml(combined);
-                            }
-                            return window.escapeHtml(combined);
+                            return combined ? `${showNames ? (secName + '：') : ''}${combined}` : '';
                         }).filter(Boolean);
                         if (lines.length > 0) {
-                            medInfoHtml += lines.map(l => `<div>${l}</div>`).join('');
+                            medInfoHtml += lines.map(l => `<div>${window.escapeHtml(l)}</div>`).join('');
                         }
                     }
                 } else {
