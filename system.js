@@ -11676,7 +11676,9 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                             const unit = (it && it.dosage && typeof it.dosage === 'string' && it.dosage.endsWith('g')) ? 'g' : 'g';
                             return `<div style="margin-bottom: 4px;">${it.name} ${dose}${unit}</div>`;
                         });
-                        html += `<div style="margin-bottom:6px;">${showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${secName}</div>` : ''}${lines.join('')}</div>`;
+                        const modeLabel = (section && section.mode === 'granule') ? '顆粒沖劑' : ((section && section.mode === 'slice') ? '飲片' : '');
+                        const nameWithMode = showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}</div>` : '';
+                        html += `<div style="margin-bottom:6px;">${nameWithMode}${lines.join('')}</div>`;
                     });
                     prescriptionHtml = html;
                 } else {
@@ -23151,7 +23153,9 @@ function viewMedicalRecord(recordId, patientId) {
                                 const unit = (it && it.dosage && typeof it.dosage === 'string' && it.dosage.endsWith('g')) ? 'g' : 'g';
                                 return `<div style="margin-bottom: 4px;">${window.escapeHtml(it.name)} ${window.escapeHtml(String(dose))}${unit}</div>`;
                             });
-                            html += `<div style="margin-bottom:6px;">${showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}</div>` : ''}${lines.join('')}</div>`;
+                            const modeLabel = (section && section.mode === 'granule') ? '顆粒沖劑' : ((section && section.mode === 'slice') ? '飲片' : '');
+                            const nameWithMode = showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}</div>` : '';
+                            html += `<div style="margin-bottom:6px;">${nameWithMode}${lines.join('')}</div>`;
                         });
                         prescriptionHtml = html;
                     }
@@ -23183,10 +23187,16 @@ function viewMedicalRecord(recordId, patientId) {
                             const partDays = d > 0 ? `服藥天數：${d}天` : '';
                             const partFreq = f > 0 ? `每日次數：${f}次` : '';
                             const combined = [partDays, partFreq].filter(Boolean).join('　');
-                            return combined ? `${showNames ? (secName + '：') : ''}${combined}` : '';
+                            const modeLabel = (section && section.mode === 'granule') ? '顆粒沖劑' : ((section && section.mode === 'slice') ? '飲片' : '');
+                            if (!combined) return '';
+                            if (showNames) {
+                                const nameHtml = `${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}：`;
+                                return nameHtml + window.escapeHtml(combined);
+                            }
+                            return window.escapeHtml(combined);
                         }).filter(Boolean);
                         if (lines.length > 0) {
-                            medInfoHtml += lines.map(l => `<div>${window.escapeHtml(l)}</div>`).join('');
+                            medInfoHtml += lines.map(l => `<div>${l}</div>`).join('');
                         }
                     }
                 } else {
