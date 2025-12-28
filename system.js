@@ -398,6 +398,13 @@ function onPrescriptionTypeChange(type) {
 function onInventoryTypeChange(type) {
     if (type !== 'granule' && type !== 'slice') return;
     currentHerbLibraryViewMode = type;
+    try {
+        changeInventoryType(type);
+        const prescriptionSelect = document.getElementById('prescriptionTypeSelect');
+        if (prescriptionSelect) {
+            prescriptionSelect.value = type;
+        }
+    } catch (_e) {}
     ensureInventoryCacheForMode(type).then(() => {
         try { displayHerbLibrary(); } catch (_e) {}
     }).catch(() => {
@@ -13266,6 +13273,7 @@ async function initializeSystemAfterLogin() {
                 const invSelect = document.getElementById('inventoryTypeSelect');
                 if (invSelect) {
                     invSelect.value = currentInventoryMode || 'granule';
+                    currentHerbLibraryViewMode = invSelect.value;
                 }
             } catch (_e) {
                 // 忽略
