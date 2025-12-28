@@ -9460,7 +9460,7 @@ if (!patient) {
                                                         return `<div style="margin-bottom: 4px;">${window.escapeHtml(it.name)} ${window.escapeHtml(String(dose))}${unit}</div>`;
                                                     });
                                                     const modeLabel = (section && section.mode === 'granule') ? '顆粒沖劑' : ((section && section.mode === 'slice') ? '飲片' : '');
-                                                    const nameWithMode = showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}</div>` : '';
+                                                    const nameWithMode = `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}</div>`;
                                                     block += `<div style="margin-bottom:6px;">${nameWithMode}${lines.join('')}</div>`;
                                                     });
                                                     html = block;
@@ -9884,7 +9884,9 @@ function displayConsultationMedicalHistoryPage() {
                                                             const unit = (it && it.dosage && typeof it.dosage === 'string' && it.dosage.endsWith('g')) ? 'g' : 'g';
                                                             return `<div style="margin-bottom: 4px;">${window.escapeHtml(it.name)} ${window.escapeHtml(String(dose))}${unit}</div>`;
                                                         });
-                                                        block += `<div style="margin-bottom:6px;">${showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}</div>` : ''}${lines.join('')}</div>`;
+                                                        const modeLabel = (section && section.mode === 'granule') ? '顆粒沖劑' : ((section && section.mode === 'slice') ? '飲片' : '');
+                                                        const nameWithMode = `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}</div>`;
+                                                        block += `<div style="margin-bottom:6px;">${nameWithMode}${lines.join('')}</div>`;
                                                     });
                                                     html = block;
                                                 }
@@ -23156,7 +23158,7 @@ function viewMedicalRecord(recordId, patientId) {
                                 return `<div style="margin-bottom: 4px;">${window.escapeHtml(it.name)} ${window.escapeHtml(String(dose))}${unit}</div>`;
                             });
                             const modeLabel = (section && section.mode === 'granule') ? '顆粒沖劑' : ((section && section.mode === 'slice') ? '飲片' : '');
-                            const nameWithMode = showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}</div>` : '';
+                            const nameWithMode = `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}</div>`;
                             html += `<div style="margin-bottom:6px;">${nameWithMode}${lines.join('')}</div>`;
                         });
                         prescriptionHtml = html;
