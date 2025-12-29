@@ -11672,6 +11672,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                 if (Array.isArray(mp) && mp.length > 0) {
                     let html = '';
                     const showNames = mp.length > 1;
+                    const formulaCompositions = [];
                     mp.forEach((section, sIdx) => {
                         const secName = section && section.name ? section.name : `處方${sIdx + 1}`;
                         const items = Array.isArray(section && section.items) ? section.items : [];
@@ -11680,11 +11681,52 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                             const unit = (it && it.dosage && typeof it.dosage === 'string' && it.dosage.endsWith('g')) ? 'g' : 'g';
                             return `<div style="margin-bottom: 4px;">${it.name} ${dose}${unit}</div>`;
                         });
+                        try {
+                            items.filter(it => it && it.type === 'formula').forEach(it => {
+                                let compositionText = it && it.composition ? String(it.composition) : '';
+                                if (!compositionText) {
+                                    try {
+                                        if (Array.isArray(herbLibrary)) {
+                                            const fullItem = herbLibrary.find(h => h && String(h.id) === String(it.id) && h.type === 'formula');
+                                            if (fullItem && fullItem.composition) compositionText = String(fullItem.composition);
+                                        }
+                                    } catch (_e) {}
+                                }
+                                let processed = '';
+                                if (compositionText) {
+                                    try {
+                                        const parts = String(compositionText)
+                                            .replace(/\r/g, '')
+                                            .split(/[、\n]/)
+                                            .map(p => p
+                                                .replace(/\d+(?:\.\d+)?\s*(?:g|克|錢|兩|丸|包)?/gi, '')
+                                                .replace(/[()（）\[\]]/g, '')
+                                                .trim()
+                                            )
+                                            .filter(p => p);
+                                        processed = parts.join('、');
+                                    } catch (_err) {
+                                        processed = compositionText.replace(/\n/g, '、');
+                                    }
+                                }
+                                if (processed) {
+                                    formulaCompositions.push({ name: it.name, composition: processed });
+                                }
+                            });
+                        } catch (_e) {}
                         const modeLabel = (section && section.mode === 'granule') ? '顆粒沖劑' : ((section && section.mode === 'slice') ? '飲片' : '');
                         const nameWithMode = showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}</div>` : '';
                         html += `<div style="margin-bottom:6px;">${nameWithMode}${lines.join('')}</div>`;
                     });
-                    prescriptionHtml = html;
+                    let compositionHtml = '';
+                    if (formulaCompositions.length > 0) {
+                        compositionHtml += '<div style="margin-top: 4px; font-size: 0.5em;">';
+                        formulaCompositions.forEach((fc) => {
+                            compositionHtml += `<div>${fc.name}：${fc.composition}</div>`;
+                        });
+                        compositionHtml += '</div>';
+                    }
+                    prescriptionHtml = html + compositionHtml;
                 } else {
                     prescriptionHtml = '無記錄';
                 }
@@ -15380,6 +15422,41 @@ async function initializeSystemAfterLogin() {
                         <div class="space-y-3">
                             ${itemsHtml}
                         </div>
+                        ${(() => {
+                            try {
+                                const formulas = (Array.isArray(itemsArray) ? itemsArray : []).filter(it => it && it.type === 'formula');
+                                if (!formulas.length) return '';
+                                const lines = formulas.map(it => {
+                                    let comp = it && it.composition ? String(it.composition) : '';
+                                    if (!comp) {
+                                        try {
+                                            const fullItem = (Array.isArray(herbLibrary) ? herbLibrary : []).find(h => h && h.id === it.id && h.type === 'formula');
+                                            if (fullItem && fullItem.composition) comp = String(fullItem.composition);
+                                        } catch (_e) {}
+                                    }
+                                    let processed = '';
+                                    if (comp) {
+                                        try {
+                                            processed = String(comp)
+                                                .replace(/\r/g, '')
+                                                .split(/[、\n]/)
+                                                .map(p => p
+                                                    .replace(/\d+(?:\.\d+)?\s*(?:g|克|錢|兩|丸|包)?/gi, '')
+                                                    .replace(/[()（）\[\]]/g, '')
+                                                    .trim()
+                                                )
+                                                .filter(p => p)
+                                                .join('、');
+                                        } catch (_err) {
+                                            processed = comp.replace(/\n/g, '、');
+                                        }
+                                    }
+                                    const nm = it && it.name ? it.name : '';
+                                    return `<div>${window.escapeHtml(nm)}：${window.escapeHtml(processed)}</div>`;
+                                }).join('');
+                                return `<div class="mt-1 text-xs text-gray-700">${lines}</div>`;
+                            } catch (_e) { return ''; }
+                        })()}
                     </div>
                 `;
                 return sectionContainer;
