@@ -11676,10 +11676,10 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     mp.forEach((section, sIdx) => {
                         const secName = section && section.name ? section.name : `處方${sIdx + 1}`;
                         const items = Array.isArray(section && section.items) ? section.items : [];
-                        const lines = items.map(it => {
+                        const entries = items.map(it => {
                             const dose = it.customDosage || (it.type === 'herb' ? '1' : '5');
-                            const unit = (it && it.dosage && typeof it.dosage === 'string' && it.dosage.endsWith('g')) ? 'g' : 'g';
-                            return `<div style="margin-bottom: 4px;">${it.name} ${dose}${unit}</div>`;
+                            const unit = 'g';
+                            return `${window.escapeHtml(it.name)} ${window.escapeHtml(String(dose) + unit)}`;
                         });
                         try {
                             items.filter(it => it && it.type === 'formula').forEach(it => {
@@ -11716,7 +11716,18 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         } catch (_e) {}
                         const modeLabel = (section && section.mode === 'granule') ? '顆粒沖劑' : ((section && section.mode === 'slice') ? '飲片' : '');
                         const nameWithMode = showNames ? `<div style="font-weight:bold;margin-bottom:2px;">${window.escapeHtml(secName)}${modeLabel ? `<span style="font-size:0.5em;">（${window.escapeHtml(modeLabel)}）</span>` : ''}</div>` : '';
-                        html += `<div style="margin-bottom:6px;">${nameWithMode}${lines.join('')}</div>`;
+                        let rows = '';
+                        for (let i2 = 0; i2 < entries.length; i2 += 3) {
+                            const a = entries[i2] || '&nbsp;';
+                            const b = entries[i2 + 1] || '&nbsp;';
+                            const c = entries[i2 + 2] || '&nbsp;';
+                            rows += `<div style="display:flex;align-items:center;margin-bottom:4px;">
+                                        <div style="flex:1;text-align:left;">${a}</div>
+                                        <div style="flex:1;text-align:center;">${b}</div>
+                                        <div style="flex:1;text-align:right;">${c}</div>
+                                    </div>`;
+                        }
+                        html += `<div style="margin-bottom:6px;">${nameWithMode}${rows}</div>`;
                     });
                     let compositionHtml = '';
                     if (formulaCompositions.length > 0) {
@@ -11844,21 +11855,18 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     i++;
                 }
                 if (itemsList.length > 0) {
-                    // 按照原始次序排列處方項目，直接使用 itemsList 而不再將方劑移至最前
                     const orderedItems = itemsList;
-                    // 將條目按行優先方式分配到三欄
-                    const columnsCount = 3;
-                    const columns = Array.from({ length: columnsCount }, () => []);
-                    orderedItems.forEach((item, idx) => {
-                        const colIdx = idx % columnsCount;
-                        columns[colIdx].push(item);
-                    });
-                    // 組合三欄的 HTML 內容
-                    let html = '<div style="display: flex;">';
-                    columns.forEach((colItems) => {
-                        html += `<div style="flex: 1; padding-right: 4px;">${colItems.join('')}</div>`;
-                    });
-                    html += '</div>';
+                    let html = '';
+                    for (let j = 0; j < orderedItems.length; j += 3) {
+                        const a = orderedItems[j] || '<div style="visibility:hidden;">&nbsp;</div>';
+                        const b = orderedItems[j + 1] || '<div style="visibility:hidden;">&nbsp;</div>';
+                        const c = orderedItems[j + 2] || '<div style="visibility:hidden;">&nbsp;</div>';
+                        html += `<div style="display:flex;align-items:center;margin-bottom:0;">
+                                    <div style="flex:1;text-align:left;">${a}</div>
+                                    <div style="flex:1;text-align:center;">${b}</div>
+                                    <div style="flex:1;text-align:right;">${c}</div>
+                                 </div>`;
+                    }
                     // 將方劑的組成統一列在處方內容的左下角，字體稍微放大
                     let compositionHtml = '';
                     if (formulaCompositions.length > 0) {
