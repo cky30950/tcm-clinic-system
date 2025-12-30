@@ -11800,9 +11800,9 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     let compositionHtml = '';
                     if (formulaCompositions.length > 0) {
                         compositionHtml += '<div style="margin-top: 4px; font-size: 0.5em;">';
-                        formulaCompositions.forEach((fc) => {
-                            compositionHtml += `<div>${fc.name}：${fc.composition}</div>`;
-                        });
+                        compositionHtml += formulaCompositions.map(fc => 
+                            `<span style="display:inline-block;margin-right:12px;">${window.escapeHtml(fc.name)}：${window.escapeHtml(fc.composition)}</span>`
+                        ).join('');
                         compositionHtml += '</div>';
                     }
                     prescriptionHtml = html + compositionHtml;
@@ -11937,13 +11937,13 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                                     <div style="flex:1;text-align:right;">${d}</div>
                                  </div>`;
                     }
-                    // 將方劑的組成統一列在處方內容的左下角，字體稍微放大
+                    // 方劑組成橫向排列（每行四個）
                     let compositionHtml = '';
                     if (formulaCompositions.length > 0) {
                         compositionHtml += '<div style="margin-top: 4px; font-size: 0.5em;">';
-                        formulaCompositions.forEach((fc) => {
-                            compositionHtml += `<div>${fc.name}：${fc.composition}</div>`;
-                        });
+                        compositionHtml += formulaCompositions.map(fc => 
+                            `<span style="display:inline-block;margin-right:12px;">${window.escapeHtml(fc.name)}：${window.escapeHtml(fc.composition)}</span>`
+                        ).join('');
                         compositionHtml += '</div>';
                     }
                     prescriptionHtml = html + compositionHtml;
