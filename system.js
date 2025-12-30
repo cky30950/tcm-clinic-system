@@ -18770,6 +18770,7 @@ function showExpenseImportModal() {
     const now = new Date();
     const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     if (monthEl && !monthEl.value) monthEl.value = m;
+    try { loadClinicExpensesForSelectedMonth(); } catch (_e) {}
     if (el) el.classList.remove('hidden');
 }
 
@@ -18796,6 +18797,120 @@ async function saveClinicExpense() {
     showToast('成本已儲存', 'success');
     closeExpenseImportModal();
     try { await generateFinancialReport(); } catch (_e) {}
+    try { await loadClinicExpensesForSelectedMonth(); } catch (_e) {}
+}
+
+async function listClinicExpensesForMonth(month) {
+    await waitForFirebaseDb();
+    const colRef = window.firebase.collection(window.firebase.db, 'clinicExpenses');
+    const q = window.firebase.firestoreQuery(colRef, window.firebase.where('month', '==', month));
+    const snapshot = await window.firebase.getDocs(q);
+    const list = [];
+    snapshot.forEach(docSnap => {
+        const d = docSnap.data() || {};
+        list.push({ id: docSnap.id, ...d });
+    });
+    list.sort((a, b) => {
+        const ta = a.updatedAt && a.updatedAt.seconds ? new Date(a.updatedAt.seconds * 1000) : (a.updatedAt ? new Date(a.updatedAt) : new Date(0));
+        const tb = b.updatedAt && b.updatedAt.seconds ? new Date(b.updatedAt.seconds * 1000) : (b.updatedAt ? new Date(b.updatedAt) : new Date(0));
+        return tb - ta;
+    });
+    return list;
+}
+
+async function loadClinicExpensesForSelectedMonth() {
+    const month = document.getElementById('expenseMonth').value;
+    if (!month) return;
+    const list = await listClinicExpensesForMonth(month);
+    const tbody = document.getElementById('expenseListBody');
+    if (!tbody) return;
+    if (list.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="px-4 py-6 text-center text-gray-500">此月份尚無成本資料</td>
+            </tr>
+        `;
+        return;
+    }
+    tbody.innerHTML = list.map(item => {
+        const amt = Number(item.amount) || 0;
+        const note = item.note || '';
+        const type = item.type || '其他費用';
+        return `
+            <tr data-id="${item.id}" class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-sm text-gray-900">${type}</td>
+                <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">$${amt.toLocaleString()}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">${note}</td>
+                <td class="px-4 py-3 text-sm text-right">
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded mr-2" onclick="startEditExpense('${item.id}')">編輯</button>
+                    <button class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded" onclick="deleteExpense('${item.id}')">刪除</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function startEditExpense(id) {
+    const row = Array.from(document.querySelectorAll('#expenseListBody tr')).find(tr => tr.getAttribute('data-id') === id);
+    if (!row) return;
+    const tds = row.querySelectorAll('td');
+    const curType = tds[0].textContent.trim();
+    const curAmountText = tds[1].textContent.replace(/\$|,/g, '').trim();
+    const curAmount = Number(curAmountText) || 0;
+    const curNote = tds[2].textContent.trim();
+    row.innerHTML = `
+        <td class="px-4 py-3">
+            <select id="exp_type_${id}" class="w-full border border-gray-300 rounded-lg px-2 py-1">
+                <option value="針灸用具"${curType==='針灸用具'?' selected':''}>針灸用具</option>
+                <option value="飲片"${curType==='飲片'?' selected':''}>飲片</option>
+                <option value="顆粒沖劑"${curType==='顆粒沖劑'?' selected':''}>顆粒沖劑</option>
+                <option value="場地租金"${curType==='場地租金'?' selected':''}>場地租金</option>
+                <option value="水電費用"${curType==='水電費用'?' selected':''}>水電費用</option>
+                <option value="工資費用"${curType==='工資費用'?' selected':''}>工資費用</option>
+                <option value="其他費用"${curType==='其他費用'?' selected':''}>其他費用</option>
+            </select>
+        </td>
+        <td class="px-4 py-3">
+            <input id="exp_amount_${id}" type="number" min="0" step="1" value="${curAmount}" class="w-full border border-gray-300 rounded-lg px-2 py-1 text-right">
+        </td>
+        <td class="px-4 py-3">
+            <input id="exp_note_${id}" type="text" value="${curNote}" class="w-full border border-gray-300 rounded-lg px-2 py-1">
+        </td>
+        <td class="px-4 py-3 text-right">
+            <button class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded mr-2" onclick="saveEditExpense('${id}')">儲存</button>
+            <button class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded" onclick="cancelEditExpense()">取消</button>
+        </td>
+    `;
+}
+
+async function saveEditExpense(id) {
+    const typeEl = document.getElementById(`exp_type_${id}`);
+    const amountEl = document.getElementById(`exp_amount_${id}`);
+    const noteEl = document.getElementById(`exp_note_${id}`);
+    if (!typeEl || !amountEl) return;
+    const type = typeEl.value;
+    const amount = Number(amountEl.value) || 0;
+    const note = noteEl ? noteEl.value : '';
+    await waitForFirebaseDb();
+    await window.firebase.updateDoc(
+        window.firebase.doc(window.firebase.db, 'clinicExpenses', id),
+        { type, amount, note, updatedAt: new Date(), updatedBy: currentUser || 'system' }
+    );
+    showToast('成本已更新', 'success');
+    await loadClinicExpensesForSelectedMonth();
+}
+
+function cancelEditExpense() {
+    loadClinicExpensesForSelectedMonth();
+}
+
+async function deleteExpense(id) {
+    await waitForFirebaseDb();
+    await window.firebase.deleteDoc(
+        window.firebase.doc(window.firebase.db, 'clinicExpenses', id)
+    );
+    showToast('成本已刪除', 'success');
+    await loadClinicExpensesForSelectedMonth();
 }
 // ================== 資料備份與還原相關函式 ==================
 /**

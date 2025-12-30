@@ -361,7 +361,7 @@
                 <div class="p-6 space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">月份</label>
-                        <input type="month" id="expenseMonth" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                        <input type="month" id="expenseMonth" onchange="loadClinicExpensesForSelectedMonth()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">成本類型</label>
@@ -386,6 +386,23 @@
                     <div class="flex justify-end space-x-3 pt-2">
                         <button onclick="closeExpenseImportModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition duration-200">取消</button>
                         <button onclick="saveClinicExpense()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200">儲存</button>
+                    </div>
+                </div>
+                <div class="px-6 pb-6">
+                    <h4 class="text-lg font-semibold mb-3">本月已輸入成本</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">類型</th>
+                                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">金額</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">備註</th>
+                                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expenseListBody" class="divide-y divide-gray-200">
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
