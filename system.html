@@ -351,41 +351,41 @@
                     </button>
                 </div>
             </div>
-            <div id="expenseImportModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-                <div class="bg-white rounded-xl shadow-2xl max-w-xl w-full">
-                    <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
-                        <h3 class="text-xl font-bold text-gray-800">成本導入</h3>
-                        <button onclick="closeExpenseImportModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+        </div>
+        <div id="expenseImportModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-xl w-full">
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
+                    <h3 class="text-xl font-bold text-gray-800">成本導入</h3>
+                    <button onclick="closeExpenseImportModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">月份</label>
+                        <input type="month" id="expenseMonth" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                     </div>
-                    <div class="p-6 space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">月份</label>
-                            <input type="month" id="expenseMonth" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">成本類型</label>
-                            <select id="expenseType" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                                <option value="針灸用具">針灸用具</option>
-                                <option value="飲片">飲片</option>
-                                <option value="顆粒沖劑">顆粒沖劑</option>
-                                <option value="場地租金">場地租金</option>
-                                <option value="水電費用">水電費用</option>
-                                <option value="工資費用">工資費用</option>
-                                <option value="其他費用">其他費用</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">金額</label>
-                            <input type="number" id="expenseAmount" min="0" step="1" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="輸入金額">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">備註</label>
-                            <textarea id="expenseNote" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="可選填"></textarea>
-                        </div>
-                        <div class="flex justify-end space-x-3 pt-2">
-                            <button onclick="closeExpenseImportModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition duration-200">取消</button>
-                            <button onclick="saveClinicExpense()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200">儲存</button>
-                        </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">成本類型</label>
+                        <select id="expenseType" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                            <option value="針灸用具">針灸用具</option>
+                            <option value="飲片">飲片</option>
+                            <option value="顆粒沖劑">顆粒沖劑</option>
+                            <option value="場地租金">場地租金</option>
+                            <option value="水電費用">水電費用</option>
+                            <option value="工資費用">工資費用</option>
+                            <option value="其他費用">其他費用</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">金額</label>
+                        <input type="number" id="expenseAmount" min="0" step="1" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="輸入金額">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">備註</label>
+                        <textarea id="expenseNote" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="可選填"></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-2">
+                        <button onclick="closeExpenseImportModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition duration-200">取消</button>
+                        <button onclick="saveClinicExpense()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200">儲存</button>
                     </div>
                 </div>
             </div>
