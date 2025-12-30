@@ -1836,17 +1836,140 @@ async function fetchUsers(forceRefresh = false) {
     return userCache;
 }
         
-        // 診所設定
-        let clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
-        if (!clinicSettings.chineseName) {
-            clinicSettings.chineseName = '名醫診所系統';
-            // 預設英文名稱改為 Dr.Great Clinic，而非原本的 TCM Clinic
-            clinicSettings.englishName = 'Dr.Great Clinic';
-            clinicSettings.businessHours = '週一至週五 09:00-18:00';
-            clinicSettings.phone = '(852) 2345-6789';
-            clinicSettings.address = '香港中環皇后大道中123號';
-            localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
+        let clinicSettings = {};
+        let selectedClinicId = localStorage.getItem('selectedClinicId') || '';
+        let clinicsCache = null;
+        async function loadClinics(forceRefresh = false) {
+            if (!forceRefresh && Array.isArray(clinicsCache)) return clinicsCache;
+            await waitForFirebaseDb();
+            const col = window.firebase.collection(window.firebase.db, 'clinics');
+            const snap = await window.firebase.getDocs(col);
+            const list = [];
+            snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+            clinicsCache = list;
+            return clinicsCache;
         }
+        async function ensureClinicsInitialized() {
+            try {
+                const list = await loadClinics(true);
+                if (!Array.isArray(list) || list.length === 0) {
+                    const local = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
+                    const seed = {
+                        chineseName: local.chineseName || '名醫診所系統',
+                        englishName: local.englishName || 'Dr.Great Clinic',
+                        businessHours: local.businessHours || '週一至週五 09:00-18:00',
+                        phone: local.phone || '(852) 2345-6789',
+                        address: local.address || '香港中環皇后大道中123號',
+                        active: true,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    };
+                    const ref = await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'clinics'), seed);
+                    selectedClinicId = String(ref.id);
+                    localStorage.setItem('selectedClinicId', selectedClinicId);
+                    clinicsCache = [{ id: selectedClinicId, ...seed }];
+                    try {
+                        if (currentUserData && currentUserData.id) {
+                            await window.firebase.updateDoc(
+                                window.firebase.doc(window.firebase.db, 'users', String(currentUserData.id)),
+                                {
+                                    personalSettings: {
+                                        selectedClinicId: selectedClinicId
+                                    },
+                                    updatedAt: new Date(),
+                                    updatedBy: currentUser || 'system'
+                                }
+                            );
+                        }
+                    } catch (_e) {}
+                } else {
+                    if (!selectedClinicId) {
+                        const candidate = list.find(c => c.active) || list[0];
+                        selectedClinicId = candidate ? String(candidate.id) : '';
+                        if (selectedClinicId) localStorage.setItem('selectedClinicId', selectedClinicId);
+                    }
+                }
+                await setCurrentClinicSettings();
+            } catch (_e) {
+                const fallback = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
+                clinicSettings = {
+                    chineseName: fallback.chineseName || '名醫診所系統',
+                    englishName: fallback.englishName || 'Dr.Great Clinic',
+                    businessHours: fallback.businessHours || '週一至週五 09:00-18:00',
+                    phone: fallback.phone || '(852) 2345-6789',
+                    address: fallback.address || '香港中環皇后大道中123號'
+                };
+            }
+        }
+        async function setCurrentClinicSettings() {
+            const list = Array.isArray(clinicsCache) ? clinicsCache : await loadClinics();
+            const cur = list.find(c => String(c.id) === String(selectedClinicId)) || null;
+            if (cur) {
+                clinicSettings = {
+                    chineseName: cur.chineseName || '',
+                    englishName: cur.englishName || '',
+                    businessHours: cur.businessHours || '',
+                    phone: cur.phone || '',
+                    address: cur.address || ''
+                };
+            }
+        }
+        async function getClinicById(id) {
+            if (!id) return null;
+            const cached = Array.isArray(clinicsCache) ? clinicsCache.find(c => String(c.id) === String(id)) : null;
+            if (cached) return cached;
+            await waitForFirebaseDb();
+            const docRef = window.firebase.doc(window.firebase.db, 'clinics', String(id));
+            const snap = await window.firebase.getDoc(docRef);
+            return snap && snap.exists() ? { id: snap.id, ...snap.data() } : null;
+        }
+        ensureClinicsInitialized();
+        async function updateSelectedClinicId(id) {
+            selectedClinicId = String(id || '');
+            localStorage.setItem('selectedClinicId', selectedClinicId);
+            try {
+                if (currentUserData && currentUserData.id) {
+                    await window.firebase.updateDoc(
+                        window.firebase.doc(window.firebase.db, 'users', String(currentUserData.id)),
+                        {
+                            personalSettings: {
+                                selectedClinicId: selectedClinicId
+                            },
+                            updatedAt: new Date(),
+                            updatedBy: currentUser || 'system'
+                        }
+                    );
+                }
+            } catch (_e) {}
+            try { await setCurrentClinicSettings(); } catch (_e2) {}
+            try { if (typeof window.systemManagement?.updateClinicSettingsDisplay === 'function') window.systemManagement.updateClinicSettingsDisplay(); } catch (_e3) {}
+        }
+        async function populateClinicSelectorTop() {
+            try {
+                await ensureClinicsInitialized();
+                const sel = document.getElementById('clinicSelectorTop');
+                if (!sel) return;
+                const list = await loadClinics();
+                sel.innerHTML = '';
+                list.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = String(c.id);
+                    opt.textContent = c.chineseName || c.englishName || c.id;
+                    sel.appendChild(opt);
+                });
+                if (selectedClinicId) sel.value = selectedClinicId;
+                sel.onchange = async function() {
+                    await updateSelectedClinicId(this.value);
+                    try {
+                        if (typeof loadTodayAppointments === 'function') await loadTodayAppointments();
+                    } catch (_e) {}
+                    try {
+                        if (typeof initBillingItems === 'function') await initBillingItems(true);
+                    } catch (_e2) {}
+                };
+            } catch (_err) {}
+        }
+        document.addEventListener('DOMContentLoaded', function() { populateClinicSelectorTop(); });
         
         // 浮動提示功能改用 Toastr 提供視覺與功能性提示
         function showToast(message, type = 'info') {
@@ -4079,10 +4202,13 @@ async function recordInventoryHistory(type, entries, extra = {}) {
             // 等待 Firebase 及其資料庫初始化
             await waitForFirebaseDb();
             try {
-                // 從 Firestore 取得 billingItems 集合資料
-                const querySnapshot = await window.firebase.getDocs(
-                    window.firebase.collection(window.firebase.db, 'billingItems')
-                );
+                await waitForFirebaseDb();
+                const colRef = window.firebase.collection(window.firebase.db, 'billingItems');
+                let q = colRef;
+                if (selectedClinicId) {
+                    q = window.firebase.firestoreQuery(colRef, window.firebase.where('clinicId', '==', String(selectedClinicId)));
+                }
+                const querySnapshot = await window.firebase.getDocs(q);
                 const itemsFromFirestore = [];
                 querySnapshot.forEach((docSnap) => {
                     // 將文件 ID 作為 id 欄位，避免依賴資料內的 id
@@ -6829,6 +6955,8 @@ async function selectPatientForRegistration(patientId) {
                 console.warn('載入問診資料選項失敗:', _e);
             }
             document.getElementById('registrationModal').classList.remove('hidden');
+            try { ensureClinicsInitialized(); } catch (_eA) {}
+            try { loadClinicOptionsForAppointment(); } catch (_eB) {}
         }
         
         // 載入醫師選項
@@ -6862,9 +6990,24 @@ async function selectPatientForRegistration(patientId) {
     });
 
     // 如果當前用戶是醫師，預設選擇自己
-    if (currentUserData && currentUserData.position === '醫師') {
-        doctorSelect.value = currentUserData.username;
-    }
+            if (currentUserData && currentUserData.position === '醫師') {
+                doctorSelect.value = currentUserData.username;
+            }
+        }
+        async function loadClinicOptionsForAppointment() {
+            const clinicSelect = document.getElementById('appointmentClinic');
+            if (!clinicSelect) return;
+            clinicSelect.innerHTML = '<option value="">請選擇診所</option>';
+            try {
+                const list = await loadClinics();
+                list.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = String(c.id);
+                    opt.textContent = c.chineseName || c.englishName || c.id;
+                    clinicSelect.appendChild(opt);
+                });
+                if (selectedClinicId) clinicSelect.value = selectedClinicId;
+            } catch (_e) {}
         }
         
         // 關閉掛號彈窗
@@ -6904,6 +7047,7 @@ async function selectPatientForRegistration(patientId) {
             
             const appointmentDateTime = document.getElementById('appointmentDateTime').value;
             const appointmentDoctor = document.getElementById('appointmentDoctor').value;
+            const appointmentClinic = document.getElementById('appointmentClinic') ? document.getElementById('appointmentClinic').value : '';
             const chiefComplaint = document.getElementById('quickChiefComplaint').value.trim();
 
             // 取得選擇的問診資料 ID 並準備對應的資料
@@ -6980,7 +7124,8 @@ async function selectPatientForRegistration(patientId) {
                 chiefComplaint: chiefComplaint || '無特殊主訴',
                 status: 'registered', // registered, waiting, consulting, completed
                 createdAt: new Date().toISOString(),
-                createdBy: currentUserData ? currentUserData.username : currentUser
+                createdBy: currentUserData ? currentUserData.username : currentUser,
+                clinicId: appointmentClinic || selectedClinicId || ''
             };
 
             // 若有選擇問診資料，僅保存問診 ID 與摘要。避免將完整問診內容存入掛號資料，
@@ -7168,7 +7313,10 @@ async function loadTodayAppointments() {
     const targetDateStr = targetDate.toDateString();
     let todayAppointments = appointments.filter(apt => 
         new Date(apt.appointmentTime).toDateString() === targetDateStr
-    );
+    ).filter(apt => {
+        if (!selectedClinicId) return true;
+        return String(apt.clinicId || '') === String(selectedClinicId);
+    });
     
     // 如果當前用戶是醫師，只顯示掛給自己的病人
     if (currentUserData && currentUserData.position === '醫師') {
@@ -9008,6 +9156,7 @@ async function saveConsultation() {
         const consultationData = {
             appointmentId: currentConsultingAppointmentId,
             patientId: appointment.patientId,
+            clinicId: (appointment && appointment.clinicId) ? String(appointment.clinicId) : (selectedClinicId || ''),
             symptoms: symptoms,
             tongue: document.getElementById('formTongue').value.trim(),
             pulse: document.getElementById('formPulse').value.trim(),
@@ -10430,7 +10579,15 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             keepReceipt: isEnglish ? 'Please keep this receipt properly' : '本收據請妥善保存',
             contactCounter: isEnglish ? 'If you have any questions, please contact the counter' : '如有疑問請洽櫃檯'
         };
-        // Construct receipt HTML with localized labels
+        let clinicInfo = null;
+        try { clinicInfo = await getClinicById(consultation.clinicId); } catch (_eC) {}
+        const clinicDisplay = {
+            nameZh: (clinicInfo && clinicInfo.chineseName) ? clinicInfo.chineseName : (clinicSettings.chineseName || '名醫診所系統'),
+            nameEn: (clinicInfo && clinicInfo.englishName) ? clinicInfo.englishName : (clinicSettings.englishName || 'Dr.Great Clinic'),
+            phone: (clinicInfo && clinicInfo.phone) ? clinicInfo.phone : (clinicSettings.phone || '(852) 2345-6789'),
+            address: (clinicInfo && clinicInfo.address) ? clinicInfo.address : (clinicSettings.address || '香港中環皇后大道中123號'),
+            hours: (clinicInfo && clinicInfo.businessHours) ? clinicInfo.businessHours : (clinicSettings.businessHours || '週一至週五 09:00-18:00')
+        };
         const printContent = `
             <!DOCTYPE html>
             <html lang="${htmlLang}">
@@ -10592,13 +10749,16 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                 <div class="receipt-container">
                     <!-- Clinic Header -->
                     <div class="clinic-header">
-                        <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
-                        <div class="clinic-subtitle">${clinicSettings.englishName || 'Dr.Great Clinic'}</div>
-                        <div class="clinic-subtitle">${isEnglish ? 'Tel:' : '電話：'}${clinicSettings.phone || '(852) 2345-6789'}　${isEnglish ? 'Address:' : '地址：'}${clinicSettings.address || '香港中環皇后大道中123號'}</div>
+                        <div class="clinic-subtitle">${isEnglish ? 'Tel:' : '電話：'}${clinicDisplay.phone}　${isEnglish ? 'Address:' : '地址：'}${clinicDisplay.address}</div>
                     </div>
                     
                     <!-- Receipt Title -->
                     <div class="receipt-title">${TR.title}</div>
+                    <div class="info-row" style="margin-top:4px;">
+                        <span class="info-label">${TR.medicalRecordNo}${colon}</span>
+                        <span>${consultation.medicalRecordNumber || consultation.id}</span>
+                        <span style="margin-left:auto;">${clinicDisplay.nameZh}</span>
+                    </div>
                     
                     <!-- Basic Information -->
                     <div class="receipt-info">
@@ -10609,10 +10769,6 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                         <div class="info-row">
                             <span class="info-label">${TR.patientName}${colon}</span>
                             <span>${patient.name}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">${TR.medicalRecordNo}${colon}</span>
-                            <span>${consultation.medicalRecordNumber || consultation.id}</span>
                         </div>
                         <div class="info-row">
                             <span class="info-label">${TR.patientNumber}${colon}</span>
@@ -11152,11 +11308,11 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                     
                     <div class="content">
                         <!-- Clinic Header -->
-                        <div class="clinic-header">
-                            <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
-                            <div class="clinic-subtitle">${clinicSettings.englishName || 'Dr.Great Clinic'}</div>
-                            <div class="clinic-subtitle">${isEnglish ? 'Tel:' : '電話：'}${clinicSettings.phone || '(852) 2345-6789'}　${isEnglish ? 'Address:' : '地址：'}${clinicSettings.address || '香港中環皇后大道中123號'}</div>
-                        </div>
+                    <div class="clinic-header">
+                        <div class="clinic-name">${clinicDisplay.nameZh}</div>
+                        <div class="clinic-subtitle">${clinicDisplay.nameEn}</div>
+                        <div class="clinic-subtitle">${isEnglish ? 'Tel:' : '電話：'}${clinicDisplay.phone}　${isEnglish ? 'Address:' : '地址：'}${clinicDisplay.address}</div>
+                    </div>
                         
                         <!-- Certificate Number -->
                         <div class="certificate-number">
@@ -11253,7 +11409,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                         <!-- Footer Note -->
                         <div class="footer-note">
                             <div>${TC.footerNote1}</div>
-                            <div>${TC.footerTel}${colon}${clinicSettings.phone || '(852) 2345-6789'} | ${TC.footerHours}${colon}${clinicSettings.businessHours || '週一至週五 09:00-18:00'}</div>
+                            <div>${TC.footerTel}${colon}${clinicDisplay.phone} | ${TC.footerHours}${colon}${clinicDisplay.hours}</div>
                             <div style="margin-top: 10px; font-size: 10px;">
                                 ${TC.certificateIssuedAt}${colon}${new Date().toLocaleString(dateLocale)}
                             </div>
@@ -12214,11 +12370,11 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                 </style>
             </head>
             <body>
-                <div class="advice-container">
+                    <div class="advice-container">
                     <div class="clinic-header">
-                        <div class="clinic-name">${clinicSettings.chineseName || '名醫診所系統'}</div>
-                        <div class="clinic-subtitle">${clinicSettings.englishName || 'Dr.Great Clinic'}</div>
-                        <div class="clinic-subtitle">${isEnglish ? 'Tel' : '電話'}${colon}${clinicSettings.phone || '(852) 2345-6789'}　${isEnglish ? 'Address' : '地址'}${colon}${clinicSettings.address || '香港中環皇后大道中123號'}</div>
+                        <div class="clinic-name">${clinicDisplay.nameZh}</div>
+                        <div class="clinic-subtitle">${clinicDisplay.nameEn}</div>
+                        <div class="clinic-subtitle">${isEnglish ? 'Tel' : '電話'}${colon}${clinicDisplay.phone}　${isEnglish ? 'Address' : '地址'}${colon}${clinicDisplay.address}</div>
                     </div>
                     <div class="advice-title">${PI.title}</div>
                     <div class="patient-info">
@@ -12241,7 +12397,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     ${followUpHtml ? `<div class="section-title">${PI.followUp}</div><div class="section-content">${followUpHtml}</div>` : ''}
                     <div class="footer-info">
                         <div class="footer-row"><span>${PI.printTime}${colon}</span><span>${new Date().toLocaleString(dateLocale)}</span></div>
-                        <div class="footer-row"><span>${PI.businessHours}${colon}</span><span>${clinicSettings.businessHours || '週一至週五 09:00-18:00'}</span></div>
+                        <div class="footer-row"><span>${PI.businessHours}${colon}</span><span>${clinicDisplay.hours}</span></div>
                         <div class="footer-row"><span>${PI.saveAdvice}</span><span>${PI.contact}</span></div>
                     </div>
                 </div>
@@ -14411,8 +14567,8 @@ async function initializeSystemAfterLogin() {
                                     (item.description && item.description.toLowerCase().includes(searchTerm));
                 
                 const matchesFilter = currentBillingFilter === 'all' || item.category === currentBillingFilter;
-                
-                return matchesSearch && matchesFilter;
+                const matchesClinic = !selectedClinicId || String(item.clinicId || '') === String(selectedClinicId);
+                return matchesSearch && matchesFilter && matchesClinic;
             });
             
             if (filteredItems.length === 0) {
@@ -14702,6 +14858,7 @@ async function initializeSystemAfterLogin() {
                     packageUses: packageUses,
                     validityDays: validityDays,
                     active: document.getElementById('billingItemActive').checked,
+                    clinicId: selectedClinicId || '',
                     createdAt: editingBillingItemId ? (billingItems.find(b => String(b.id) === String(editingBillingItemId)) || {}).createdAt : new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 };
@@ -17946,6 +18103,8 @@ async function deleteUser(id) {
             }
             // 載入醫師選項
             loadFinancialDoctorOptions();
+            try { await ensureClinicsInitialized(); } catch (_eF) {}
+            loadFinancialClinicOptions();
             // 生成初始報表
             generateFinancialReport();
         }
@@ -17976,6 +18135,23 @@ async function deleteUser(id) {
                 option.textContent = `${doctor.name}`;
                 doctorSelect.appendChild(option);
             });
+        }
+        function loadFinancialClinicOptions() {
+            const clinicSelect = document.getElementById('clinicFilter');
+            if (!clinicSelect) return;
+            clinicSelect.innerHTML = '<option value="">全部診所</option>';
+            (async () => {
+                try {
+                    const list = await loadClinics();
+                    list.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = String(c.id);
+                        opt.textContent = c.chineseName || c.englishName || c.id;
+                        clinicSelect.appendChild(opt);
+                    });
+                    if (selectedClinicId) clinicSelect.value = selectedClinicId;
+                } catch (_e) {}
+            })();
         }
 
         // 從 Firebase 載入用戶資料以供財務報表使用
@@ -18245,6 +18421,8 @@ async function deleteUser(id) {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
             const doctorFilter = document.getElementById('doctorFilter').value;
+            const clinicFilterEl = document.getElementById('clinicFilter');
+            const clinicFilter = clinicFilterEl ? clinicFilterEl.value : '';
             let reportType = '';
             const rptElem = document.getElementById('reportType');
             if (rptElem) {
@@ -18256,7 +18434,7 @@ async function deleteUser(id) {
                 return;
             }
 
-            const cacheKey = `${startDate}|${endDate}|${doctorFilter||''}`;
+            const cacheKey = `${startDate}|${endDate}|${doctorFilter||''}|${clinicFilter||''}`;
             const existing = financialReportCache[cacheKey] || readCache('financialReportCache', cacheKey);
             if (existing) {
                 try {
@@ -18296,8 +18474,9 @@ async function deleteUser(id) {
                                 const d = new Date(c.date);
                                 const dateInRange = d >= start && d <= end;
                                 const doctorMatch = !doctorFilter || c.doctor === doctorFilter;
+                                const clinicMatch = !clinicFilter || String(c.clinicId || '') === String(clinicFilter);
                                 const isCompleted = c.status === 'completed';
-                                return dateInRange && doctorMatch && isCompleted;
+                                return dateInRange && doctorMatch && clinicMatch && isCompleted;
                             };
                             const index = new Map(existing.filteredConsultations.map(c => [String(c.id), c]));
                             for (const r of deltas) {
@@ -18345,7 +18524,7 @@ async function deleteUser(id) {
             }
 
             // 過濾診症資料
-            const filteredConsultations = filterFinancialConsultations(startDate, endDate, doctorFilter);
+            const filteredConsultations = filterFinancialConsultations(startDate, endDate, doctorFilter, clinicFilter);
             
             // 計算統計資料
             const stats = calculateFinancialStatistics(filteredConsultations);
@@ -18375,7 +18554,7 @@ async function deleteUser(id) {
         }
 
         // 過濾診症資料
-        function filterFinancialConsultations(startDate, endDate, doctorFilter) {
+        function filterFinancialConsultations(startDate, endDate, doctorFilter, clinicFilter) {
             const start = new Date(startDate);
             const end = new Date(endDate + 'T23:59:59.999Z');
 
@@ -18383,9 +18562,10 @@ async function deleteUser(id) {
                 const consultationDate = new Date(consultation.date);
                 const dateInRange = consultationDate >= start && consultationDate <= end;
                 const doctorMatch = !doctorFilter || consultation.doctor === doctorFilter;
+                const clinicMatch = !clinicFilter || String(consultation.clinicId || '') === String(clinicFilter);
                 const isCompleted = consultation.status === 'completed';
 
-                return dateInRange && doctorMatch && isCompleted;
+                return dateInRange && doctorMatch && clinicMatch && isCompleted;
             });
         }
 
@@ -25744,6 +25924,11 @@ async function deleteAcupointCombination(id) {
               }
               if (userRecord && userRecord.personalSettings) {
                 const personal = userRecord.personalSettings;
+                if (personal.selectedClinicId) {
+                  selectedClinicId = String(personal.selectedClinicId);
+                  localStorage.setItem('selectedClinicId', selectedClinicId);
+                  try { await setCurrentClinicSettings(); } catch (_e) {}
+                }
                 // 如果有保存的個人慣用中藥組合，則載入，否則清空
                 if (Array.isArray(personal.herbCombinations)) {
                   herbCombinations = personal.herbCombinations;
@@ -25839,7 +26024,8 @@ async function deleteAcupointCombination(id) {
                     acupointCombinations: Array.isArray(acupointCombinations) ? acupointCombinations : [],
                     // 保存個人分類：中藥組合分類與穴位組合分類
                     herbComboCategories: Array.isArray(herbComboCategories) ? herbComboCategories : [],
-                    acupointComboCategories: Array.isArray(acupointComboCategories) ? acupointComboCategories : []
+                    acupointComboCategories: Array.isArray(acupointComboCategories) ? acupointComboCategories : [],
+                    selectedClinicId: selectedClinicId || ''
                   },
                   updatedAt: new Date(),
                   updatedBy: currentUser || 'system'
