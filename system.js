@@ -18310,6 +18310,10 @@ async function deleteUser(id) {
                             }
                             const merged = Array.from(index.values());
                             const stats = calculateFinancialStatistics(merged);
+                            const mlist = monthsInDateRange(startDate, endDate);
+                            const exp = await getClinicExpensesByMonths(mlist);
+                            stats.totalCost = exp.totalCost;
+                            stats.netRevenue = stats.totalRevenue - exp.totalCost;
                             updateFinancialKeyMetrics(stats);
                             updateFinancialTables(merged, stats);
                             const lastSyncAt = (() => {
@@ -18345,6 +18349,10 @@ async function deleteUser(id) {
             
             // 計算統計資料
             const stats = calculateFinancialStatistics(filteredConsultations);
+            const mlist = monthsInDateRange(startDate, endDate);
+            const exp = await getClinicExpensesByMonths(mlist);
+            stats.totalCost = exp.totalCost;
+            stats.netRevenue = stats.totalRevenue - exp.totalCost;
             
             // 更新關鍵指標
             updateFinancialKeyMetrics(stats);
@@ -18465,10 +18473,13 @@ async function deleteUser(id) {
 
         // 更新關鍵指標
         function updateFinancialKeyMetrics(stats) {
-            document.getElementById('totalRevenue').textContent = `$${stats.totalRevenue.toLocaleString()}`;
+            const net = (typeof stats.netRevenue === 'number') ? stats.netRevenue : stats.totalRevenue;
+            document.getElementById('totalRevenue').textContent = `$${net.toLocaleString()}`;
             document.getElementById('totalConsultations').textContent = stats.totalConsultations.toLocaleString();
             document.getElementById('averageRevenue').textContent = `$${Math.round(stats.averageRevenue).toLocaleString()}`;
             document.getElementById('activeDoctors').textContent = stats.activeDoctors;
+            const rc = document.getElementById('revenueChange');
+            if (rc) rc.textContent = '扣除成本後淨收入';
         }
 
         // 更新財務表格
@@ -18501,7 +18512,14 @@ async function deleteUser(id) {
 
             const totalRevenue = stats.totalRevenue;
 
-            tbody.innerHTML = summaryData.map(item => {
+            const totalCost = typeof stats.totalCost === 'number' ? stats.totalCost : 0;
+            const netRevenue = typeof stats.netRevenue === 'number' ? stats.netRevenue : (totalRevenue - totalCost);
+            const extendedRows = [
+                { item: '總成本', amount: totalCost, category: 'expense' },
+                { item: '淨收入', amount: netRevenue, category: 'net' }
+            ];
+
+            tbody.innerHTML = summaryData.concat(extendedRows).map(item => {
                 const percentage = totalRevenue > 0 ? ((item.amount / totalRevenue) * 100).toFixed(1) : '0';
                 return `
                     <tr class="hover:bg-gray-50">
@@ -18689,7 +18707,11 @@ function exportFinancialReport() {
     textReport += `報表標題: 財務報表 - ${reportType}\n`;
     textReport += `期間: ${startDate} 至 ${endDate}\n`;
     textReport += `生成時間: ${new Date().toLocaleString('zh-TW')}\n`;
-    textReport += `總收入: $${stats.totalRevenue.toLocaleString()}\n`;
+    textReport += `總收入(未扣成本): $${stats.totalRevenue.toLocaleString()}\n`;
+    const totalCost = typeof stats.totalCost === 'number' ? stats.totalCost : 0;
+    const netRevenue = typeof stats.netRevenue === 'number' ? stats.netRevenue : (stats.totalRevenue - totalCost);
+    textReport += `總成本: $${totalCost.toLocaleString()}\n`;
+    textReport += `淨收入: $${netRevenue.toLocaleString()}\n`;
     textReport += `總診症數: ${stats.totalConsultations.toLocaleString()}\n`;
     textReport += `平均收入: $${Math.round(stats.averageRevenue).toLocaleString()}\n`;
     textReport += `有效醫師數: ${stats.activeDoctors.toLocaleString()}\n\n`;
@@ -18709,6 +18731,72 @@ function exportFinancialReport() {
     showToast('財務報表已匯出！', 'success');
 }
 
+function monthsInDateRange(startDateStr, endDateStr) {
+    const s = new Date(startDateStr);
+    const e = new Date(endDateStr);
+    const cur = new Date(s.getFullYear(), s.getMonth(), 1);
+    const end = new Date(e.getFullYear(), e.getMonth(), 1);
+    const list = [];
+    while (cur <= end) {
+        const y = cur.getFullYear();
+        const m = String(cur.getMonth() + 1).padStart(2, '0');
+        list.push(`${y}-${m}`);
+        cur.setMonth(cur.getMonth() + 1);
+    }
+    return list;
+}
+
+async function getClinicExpensesByMonths(months) {
+    await waitForFirebaseDb();
+    const snapshot = await window.firebase.getDocs(window.firebase.collection(window.firebase.db, 'clinicExpenses'));
+    let total = 0;
+    const byType = {};
+    snapshot.forEach(docSnap => {
+        const d = docSnap.data() || {};
+        const m = d.month;
+        if (m && months.includes(m)) {
+            const amt = Number(d.amount) || 0;
+            total += amt;
+            const t = d.type || '其他費用';
+            byType[t] = (byType[t] || 0) + amt;
+        }
+    });
+    return { totalCost: total, byType };
+}
+
+function showExpenseImportModal() {
+    const el = document.getElementById('expenseImportModal');
+    const monthEl = document.getElementById('expenseMonth');
+    const now = new Date();
+    const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    if (monthEl && !monthEl.value) monthEl.value = m;
+    if (el) el.classList.remove('hidden');
+}
+
+function closeExpenseImportModal() {
+    const el = document.getElementById('expenseImportModal');
+    if (el) el.classList.add('hidden');
+}
+
+async function saveClinicExpense() {
+    const month = document.getElementById('expenseMonth').value;
+    const type = document.getElementById('expenseType').value;
+    const amount = document.getElementById('expenseAmount').value;
+    const note = document.getElementById('expenseNote').value;
+    if (!month || !type || !amount) {
+        showToast('請填寫月份、類型與金額', 'error');
+        return;
+    }
+    await waitForFirebaseDb();
+    const createdBy = currentUserData ? currentUserData.username : (currentUser || 'system');
+    await window.firebase.addDoc(
+        window.firebase.collection(window.firebase.db, 'clinicExpenses'),
+        { month, type, amount: Number(amount), note: note || '', createdAt: new Date(), updatedAt: new Date(), createdBy }
+    );
+    showToast('成本已儲存', 'success');
+    closeExpenseImportModal();
+    try { await generateFinancialReport(); } catch (_e) {}
+}
 // ================== 資料備份與還原相關函式 ==================
 /**
  * 等待 Firebase DataManager 準備就緒的輔助函式。
