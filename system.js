@@ -12203,11 +12203,10 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         ${consultation.diagnosis ? `<div class="info-row"><span class="info-label">${PI.diagnosis}${colon}</span><span>${consultation.diagnosis}</span></div>` : ''}
                     </div>
                     <div class="section-title">${PI.prescriptionContent}</div>
-                    <div class="section-content" style="font-size: 12px;">${prescriptionHtml}</div>
+                    <div class="section-content">${prescriptionHtml}</div>
                     ${medInfoHtml ? `<div class="section-title">${PI.medicationInfo}</div><div class="section-content">${medInfoHtml}</div>` : ''}
                     ${instructionsHtml ? `<div class="section-title">${PI.instructions}</div><div class="section-content">${instructionsHtml}</div>` : ''}
                     ${followUpHtml ? `<div class="section-title">${PI.followUp}</div><div class="section-content">${followUpHtml}</div>` : ''}
-                    <div class="thank-you">${PI.thankYou}</div>
                     <div class="footer-info">
                         <div class="footer-row"><span>${PI.printTime}${colon}</span><span>${new Date().toLocaleString(dateLocale)}</span></div>
                         <div class="footer-row"><span>${PI.businessHours}${colon}</span><span>${clinicSettings.businessHours || '週一至週五 09:00-18:00'}</span></div>
