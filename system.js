@@ -18770,7 +18770,6 @@ function showExpenseImportModal() {
     const now = new Date();
     const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     if (monthEl && !monthEl.value) monthEl.value = m;
-    try { loadClinicExpensesForSelectedMonth(); } catch (_e) {}
     if (el) el.classList.remove('hidden');
 }
 
@@ -18798,6 +18797,7 @@ async function saveClinicExpense() {
     closeExpenseImportModal();
     try { await generateFinancialReport(); } catch (_e) {}
     try { await loadClinicExpensesForSelectedMonth(); } catch (_e) {}
+    try { await loadClinicExpensesForListMonth(); } catch (_e) {}
 }
 
 async function listClinicExpensesForMonth(month) {
@@ -18850,6 +18850,52 @@ async function loadClinicExpensesForSelectedMonth() {
     }).join('');
 }
 
+async function loadClinicExpensesForListMonth() {
+    const month = document.getElementById('expenseListMonth').value;
+    if (!month) return;
+    const list = await listClinicExpensesForMonth(month);
+    const tbody = document.getElementById('expenseListBody');
+    if (!tbody) return;
+    if (list.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="px-4 py-6 text-center text-gray-500">此月份尚無成本資料</td>
+            </tr>
+        `;
+        return;
+    }
+    tbody.innerHTML = list.map(item => {
+        const amt = Number(item.amount) || 0;
+        const note = item.note || '';
+        const type = item.type || '其他費用';
+        return `
+            <tr data-id="${item.id}" class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-sm text-gray-900">${type}</td>
+                <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">$${amt.toLocaleString()}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">${note}</td>
+                <td class="px-4 py-3 text-sm text-right">
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded mr-2" onclick="startEditExpense('${item.id}')">編輯</button>
+                    <button class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded" onclick="deleteExpense('${item.id}')">刪除</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function showExpenseListModal() {
+    const el = document.getElementById('expenseListModal');
+    const monthEl = document.getElementById('expenseListMonth');
+    const now = new Date();
+    const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    if (monthEl && !monthEl.value) monthEl.value = m;
+    if (el) el.classList.remove('hidden');
+    try { loadClinicExpensesForListMonth(); } catch (_e) {}
+}
+
+function closeExpenseListModal() {
+    const el = document.getElementById('expenseListModal');
+    if (el) el.classList.add('hidden');
+}
 function startEditExpense(id) {
     const row = Array.from(document.querySelectorAll('#expenseListBody tr')).find(tr => tr.getAttribute('data-id') === id);
     if (!row) return;
