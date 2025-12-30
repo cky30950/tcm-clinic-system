@@ -18657,7 +18657,7 @@ async function deleteUser(id) {
         }
 
         // 匯出財務報表
-function exportFinancialReport() {
+async function exportFinancialReport() {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
     // 嘗試取得報表類型：舊的 reportType 元素可能不存在，改用 quickDate 文字或值
@@ -18686,6 +18686,17 @@ function exportFinancialReport() {
     // 過濾診症資料並計算統計以生成更詳細的報表
     const filteredConsultations = filterFinancialConsultations(startDate, endDate, doctorFilter);
     const stats = calculateFinancialStatistics(filteredConsultations);
+    const months = monthsInDateRange(startDate, endDate);
+    let totalCost = 0;
+    let byType = {};
+    try {
+        const exp = await getClinicExpensesByMonths(months);
+        totalCost = exp && typeof exp.totalCost === 'number' ? exp.totalCost : 0;
+        byType = exp && exp.byType ? exp.byType : {};
+    } catch (_e) {
+        totalCost = 0;
+        byType = {};
+    }
     // 準備各區塊文字
     const doctorLines = Object.keys(stats.doctorStats).map(key => {
         const data = stats.doctorStats[key];
@@ -18708,9 +18719,8 @@ function exportFinancialReport() {
     textReport += `期間: ${startDate} 至 ${endDate}\n`;
     textReport += `生成時間: ${new Date().toLocaleString('zh-TW')}\n`;
     textReport += `總收入(未扣成本): $${stats.totalRevenue.toLocaleString()}\n`;
-    const totalCost = typeof stats.totalCost === 'number' ? stats.totalCost : 0;
-    const netRevenue = typeof stats.netRevenue === 'number' ? stats.netRevenue : (stats.totalRevenue - totalCost);
     textReport += `總成本: $${totalCost.toLocaleString()}\n`;
+    const netRevenue = stats.totalRevenue - totalCost;
     textReport += `淨收入: $${netRevenue.toLocaleString()}\n`;
     textReport += `總診症數: ${stats.totalConsultations.toLocaleString()}\n`;
     textReport += `平均收入: $${Math.round(stats.averageRevenue).toLocaleString()}\n`;
@@ -18718,6 +18728,8 @@ function exportFinancialReport() {
     textReport += `醫師統計:\n${doctorLines || '無資料'}\n\n`;
     textReport += `服務分類統計:\n${serviceLines || '無資料'}\n\n`;
     textReport += `每日統計:\n${dailyLines || '無資料'}\n`;
+    const costLines = Object.keys(byType).map(t => `${t}: $${Number(byType[t]||0).toLocaleString()}`).join('\n');
+    textReport += `\n成本統計:\n${costLines || '無資料'}\n`;
     // 創建下載為純文字檔案
     const blob = new Blob([textReport], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
