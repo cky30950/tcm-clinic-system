@@ -441,11 +441,6 @@
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
-                        <div>
-                            <select id="clinicSelectorTop" class="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                                <option value="">載入診所中...</option>
-                            </select>
-                        </div>
                         <span id="userRole" class="text-sm text-gray-600"></span>
                         <button id="logoutButton" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
                             登出
@@ -692,16 +687,6 @@
                                     <option value="">請選擇醫師</option>
                                     <!-- 醫師選項會動態載入 -->
                                 </select>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                    <span class="mr-2">🏥</span><span>掛號診所 *</span>
-                                </label>
-                                <select id="appointmentClinic" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                                    <option value="">請選擇診所</option>
-                                </select>
-                                <p class="text-xs text-gray-500 mt-1">預設為目前選擇的診所</p>
                             </div>
                             
                             <div>
@@ -1770,13 +1755,6 @@
                             </select>
                         </div>
                         
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">診所篩選</label>
-                            <select id="clinicFilter" onchange="generateFinancialReport()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                                <option value="">全部診所</option>
-                            </select>
-                        </div>
-                        
                         <div class="flex items-end space-x-2">
                             <button onclick="generateFinancialReport()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition duration-200 flex items-center">
                                 <span class="mr-2">🔄</span><span>更新報表</span>
@@ -2506,17 +2484,6 @@
             </div>
             
             <div class="p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center space-x-2">
-                        <label class="text-sm text-gray-700">選擇編輯診所</label>
-                        <select id="clinicEditSelector" class="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            <option value="">載入診所中...</option>
-                        </select>
-                    </div>
-                    <button id="createClinicButton" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
-                        新增診所
-                    </button>
-                </div>
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">診所中文名稱 *</label>
@@ -4610,7 +4577,6 @@
     <!-- 載入 Chart.js 用於繪製個人統計分析圖表 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <script type="module" src="firebase_init.js"></script>
     <script src="schedule_management.js"></script><script src="system.js"></script>
     <!-- 系統管理相關腳本拆分至獨立檔案 -->
     <script src="systemmanagement.js"></script>

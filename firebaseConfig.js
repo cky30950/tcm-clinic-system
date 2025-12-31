@@ -1,11 +1,13 @@
+// Firebase configuration file.
+// 填寫您自己的 Firebase 設定值，切勿將此檔案提交至公共版本控制系統。
 const firebaseConfig = {
-    apiKey: "AIzaSyBtUcrBYiE4B1O4xkvIqwxM52Hrh-i6pL8",
-    authDomain: "cheungec-ea477.firebaseapp.com",
-    databaseURL: "https://cheungec-ea477-default-rtdb.firebaseio.com/",
-    projectId: "cheungec-ea477",
-    storageBucket: "cheungec-ea477.firebasestorage.app",
-    messagingSenderId: "986510230799",
-    appId: "1:986510230799:web:f603e67b605e71294f2a7a"
+  apiKey: "AIzaSyCx_BLIWVKZs0vJa5TwL6zoycJexY_5nXU",
+  authDomain: "system-1e90a.firebaseapp.com",
+  databaseURL: "https://system-1e90a-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "system-1e90a",
+  storageBucket: "system-1e90a.firebasestorage.app",
+  messagingSenderId: "80947900109",
+  appId: "1:80947900109:web:b6cd62bb2f1e07971a4384"
 };
 
 export default firebaseConfig;
