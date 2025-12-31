@@ -171,7 +171,7 @@ async function fetchSummariesByDoctor(doctor) {
         const colRef = window.firebase.collection(window.firebase.db, 'consultations');
         let parts = [
             window.firebase.where('doctor', '==', doctor),
-            window.firebase.orderBy('date', 'asc'),
+            window.firebase.orderBy('createdAt', 'asc'),
             window.firebase.limit(pageSize)
         ];
         let q = window.firebase.firestoreQuery(colRef, ...parts);
@@ -290,6 +290,27 @@ async function loadPersonalStatistics() {
         const initialList = cached.list || [];
         renderPersonalStatistics(computeStatsFromSummaries(initialList));
         try {
+            if (!cached.fullFetched) {
+                const full = await fetchSummariesByDoctor(doctor);
+                const monthsFull = computeAvailableMonths(full);
+                populateMonthSelect(monthsFull, personalStatsCurrentMonth || 'ALL');
+                const useFull = personalStatsCurrentMonth === 'ALL' ? full : filterByMonth(full, personalStatsCurrentMonth);
+                const statsFull = computeStatsFromSummaries(useFull);
+                const lastFull = (() => {
+                    let latest = 0;
+                    for (const c of full) {
+                        const t = c && c.updatedAt
+                            ? (c.updatedAt.seconds ? c.updatedAt.seconds * 1000 : new Date(c.updatedAt).getTime())
+                            : 0;
+                        if (t && t > latest) latest = t;
+                    }
+                    return latest ? new Date(latest) : new Date();
+                })();
+                const entryFull = { stats: statsFull, lastSyncAt: lastFull.toISOString(), list: full, fullFetched: true };
+                psWriteCache(doctor, entryFull);
+                renderPersonalStatistics(statsFull);
+                return;
+            }
             const hasUpdates = await window.firebaseDataManager.hasDoctorConsultationUpdates(doctor, new Date(cached.lastSyncAt));
             if (!hasUpdates) return;
             const merged = await applyDeltaUpdates(doctor, cached.lastSyncAt, cached.list || []);
@@ -307,7 +328,7 @@ async function loadPersonalStatistics() {
                 }
                 return latest ? new Date(latest) : new Date();
             })();
-            const entry = { stats, lastSyncAt: lastSyncAt.toISOString(), list: merged };
+            const entry = { stats, lastSyncAt: lastSyncAt.toISOString(), list: merged, fullFetched: true };
             psWriteCache(doctor, entry);
             renderPersonalStatistics(stats);
         } catch (_e) {}
@@ -328,7 +349,7 @@ async function loadPersonalStatistics() {
         }
         return latest ? new Date(latest) : new Date();
     })();
-    const entry = { stats, lastSyncAt: lastSyncAt.toISOString(), list: summaries };
+    const entry = { stats, lastSyncAt: lastSyncAt.toISOString(), list: summaries, fullFetched: true };
     psWriteCache(doctor, entry);
     renderPersonalStatistics(stats);
 }
