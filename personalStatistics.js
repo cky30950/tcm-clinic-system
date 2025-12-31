@@ -1,171 +1,76 @@
 /**
- * 個人統計分析模組
- * 包含載入、計算與渲染個人統計資料的邏輯
+ * 個人統計分析模組（V2）
+ * 僅處理病歷中的「處方」與「針灸備註」欄位，漸進讀取＋本地快取＋增量更新。
  */
-
-// 個人統計分析的圖表實例，用於更新時先銷毀舊圖表
 let personalHerbChartInstance = null;
 let personalFormulaChartInstance = null;
 let personalAcupointChartInstance = null;
 
-/**
- * 計算指定醫師的個人用藥與穴位統計。
- * 會比對 consultation.doctor 是否等於 doctor (使用者帳號)。
- * 回傳物件包含 herbCounts、formulaCounts 與 acupointCounts。
- */
-function computePersonalStatistics(doctor) {
+function psReadCache(doctor) {
+    try {
+        const s = localStorage.getItem('personalStatsV2');
+        if (!s) return null;
+        const obj = JSON.parse(s);
+        const v = obj && obj[String(doctor)];
+        return v || null;
+    } catch (_e) {
+        return null;
+    }
+}
+function psWriteCache(doctor, value) {
+    try {
+        const s = localStorage.getItem('personalStatsV2');
+        const obj = s ? JSON.parse(s) : {};
+        obj[String(doctor)] = value;
+        localStorage.setItem('personalStatsV2', JSON.stringify(obj));
+    } catch (_e) {}
+}
+
+function computeStatsFromSummaries(list) {
     const herbCounts = {};
     const formulaCounts = {};
     const acupointCounts = {};
-    // consultations and herbLibrary are global variables from system.js
-    if (!Array.isArray(consultations) || consultations.length === 0) {
+    if (!Array.isArray(list) || list.length === 0) {
         return { herbCounts, formulaCounts, acupointCounts };
     }
-    consultations.forEach(cons => {
+    const isFormulaName = (name) => {
+        if (!Array.isArray(herbLibrary)) return false;
+        const f = herbLibrary.find(i => i && i.name === name);
+        return !!(f && f.type === 'formula');
+    };
+    for (const item of list) {
         try {
-            if (doctor && cons.doctor && String(cons.doctor) !== String(doctor)) {
-                return;
-            }
-            const pres = cons && cons.prescription ? cons.prescription : '';
+            const pres = item && item.prescription ? String(item.prescription) : '';
             const lines = pres.split('\n');
-            lines.forEach(rawLine => {
-                const line = rawLine.trim();
-                if (!line) return;
-                const match = line.match(/^([^0-9\s\(\)\.]+)/);
-                const name = match ? match[1].trim() : line.split(/[\d\s]/)[0];
-                if (!name) return;
-                let isFormula = false;
-                if (Array.isArray(herbLibrary)) {
-                    const found = herbLibrary.find(item => item.name === name);
-                    if (found && found.type === 'formula') {
-                        isFormula = true;
-                    }
-                }
-                if (isFormula) {
+            for (const raw of lines) {
+                const line = raw.trim();
+                if (!line) continue;
+                const m = line.match(/^([^0-9\s\(\)\.]+)/);
+                const name = m ? m[1].trim() : line.split(/[\d\s]/)[0];
+                if (!name) continue;
+                if (isFormulaName(name)) {
                     formulaCounts[name] = (formulaCounts[name] || 0) + 1;
                 } else {
                     herbCounts[name] = (herbCounts[name] || 0) + 1;
                 }
-            });
-            // 解析針灸備註中的穴位名稱
-            const acNotes = cons && cons.acupunctureNotes ? cons.acupunctureNotes : '';
-            const regex = /data-acupoint-name="(.*?)"/g;
-            let matchAc;
-            while ((matchAc = regex.exec(acNotes)) !== null) {
-                const acName = matchAc[1];
+            }
+            const acNotes = item && item.acupunctureNotes ? String(item.acupunctureNotes) : '';
+            const re = /data-acupoint-name="(.*?)"/g;
+            let mm;
+            while ((mm = re.exec(acNotes)) !== null) {
+                const acName = mm[1];
                 if (acName) {
                     acupointCounts[acName] = (acupointCounts[acName] || 0) + 1;
                 }
             }
-        } catch (_e) {
-            // 忽略此筆診症的解析錯誤
-        }
-    });
+        } catch (_e) {}
+    }
     return { herbCounts, formulaCounts, acupointCounts };
 }
 
-/**
- * 載入個人統計分析頁面並渲染統計結果。
- * 若 consultations 尚未載入，會先載入全部診症記錄。
- */
-async function loadPersonalStatistics() {
-    const cacheKey = String(currentUser || '');
-    window.personalStatsCache = window.personalStatsCache || {};
-    // readCache is global from system.js
-    const existing = window.personalStatsCache[cacheKey] || readCache('personalStatsCache', cacheKey);
-    if (!existing) {
-        if (!Array.isArray(consultations) || consultations.length === 0) {
-            try {
-                if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
-                    const res = await window.firebaseDataManager.getConsultationsByDoctor(currentUser);
-                    if (res && res.success) {
-                        consultations = res.data.map(item => {
-                            let dateStr = null;
-                            if (item.date) {
-                                if (typeof item.date === 'object' && item.date.seconds) {
-                                    dateStr = new Date(item.date.seconds * 1000).toISOString();
-                                } else {
-                                    dateStr = item.date;
-                                }
-                            } else if (item.createdAt) {
-                                if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
-                                    dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
-                                } else {
-                                    dateStr = item.createdAt;
-                                }
-                            }
-                            return { id: item.id, date: dateStr, doctor: item.doctor, prescription: item.prescription, acupunctureNotes: item.acupunctureNotes, createdAt: item.createdAt, updatedAt: item.updatedAt };
-                        });
-                    }
-                }
-            } catch (_e) {
-                console.error('載入診症資料失敗：', _e);
-            }
-        }
-    } else {
-        try {
-            if (window.firebaseDataManager && typeof window.firebaseDataManager.hasDoctorConsultationUpdates === 'function') {
-                const lastSyncAtRef = existing.lastSyncAt ? new Date(existing.lastSyncAt) : null;
-                const changed = await window.firebaseDataManager.hasDoctorConsultationUpdates(currentUser, lastSyncAtRef);
-                if (!changed) {
-                    renderPersonalStatistics(existing.stats);
-                    return;
-                }
-                const deltaRes = await window.firebaseDataManager.getConsultationsDeltaByDoctor(currentUser, existing.lastSyncAt);
-                if (deltaRes && deltaRes.success) {
-                    const normalize = (item) => {
-                        let dateStr = null;
-                        if (item.date) {
-                            if (typeof item.date === 'object' && item.date.seconds) {
-                                dateStr = new Date(item.date.seconds * 1000).toISOString();
-                            } else {
-                                dateStr = item.date;
-                            }
-                        } else if (item.createdAt) {
-                            if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
-                                dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
-                            } else {
-                                dateStr = item.createdAt;
-                            }
-                        }
-                        return { id: item.id, date: dateStr, doctor: item.doctor, prescription: item.prescription, acupunctureNotes: item.acupunctureNotes, createdAt: item.createdAt, updatedAt: item.updatedAt };
-                    };
-                    const deltas = deltaRes.data.map(normalize);
-                    const index = new Map((existing.list || []).map(c => [String(c.id), c]));
-                    for (const r of deltas) {
-                        index.set(String(r.id), r);
-                    }
-                    consultations = Array.from(index.values());
-                }
-            }
-        } catch (_e) {}
-    }
-    const doctor = currentUser;
-    const stats = computePersonalStatistics(doctor);
-    const lastSyncAt = (() => {
-        let latest = 0;
-        for (const c of consultations) {
-            const u = c && c.updatedAt ? (c.updatedAt.seconds ? c.updatedAt.seconds*1000 : new Date(c.updatedAt).getTime()) : 0;
-            const cr = c && c.createdAt ? (c.createdAt.seconds ? c.createdAt.seconds*1000 : new Date(c.createdAt).getTime()) : 0;
-            const t = Math.max(u||0, cr||0);
-            if (t && t > latest) latest = t;
-        }
-        return latest ? new Date(latest) : new Date();
-    })();
-    const entry = { stats, lastSyncAt: lastSyncAt.toISOString(), list: consultations };
-    window.personalStatsCache[cacheKey] = entry;
-    writeCache('personalStatsCache', cacheKey, entry);
-    renderPersonalStatistics(stats);
-}
-
-/**
- * 根據計算的統計資料更新列表與圖表。
- * 只顯示每個類別前 10 名。
- */
 function renderPersonalStatistics(stats) {
     if (!stats) return;
     const { herbCounts, formulaCounts, acupointCounts } = stats;
-    // 渲染列表
     function renderList(counts, listId) {
         const listEl = document.getElementById(listId);
         if (!listEl) return [];
@@ -179,14 +84,11 @@ function renderPersonalStatistics(stats) {
         });
         return entries;
     }
-    // 渲染圖表
     function renderChart(entries, canvasId, oldInstance) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) return null;
         if (oldInstance && typeof oldInstance.destroy === 'function') {
-            try {
-                oldInstance.destroy();
-            } catch (_e) {}
+            try { oldInstance.destroy(); } catch (_e) {}
         }
         const labels = entries.map(e => e[0]);
         const dataVals = entries.map(e => e[1]);
@@ -194,13 +96,8 @@ function renderPersonalStatistics(stats) {
         return new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: '使用次數',
-                        data: dataVals,
-                    },
-                ],
+                labels,
+                datasets: [{ label: '使用次數', data: dataVals }],
             },
             options: {
                 responsive: true,
@@ -219,4 +116,124 @@ function renderPersonalStatistics(stats) {
     personalFormulaChartInstance = renderChart(formulaEntries, 'personalFormulaChart', personalFormulaChartInstance);
     const acEntries = renderList(acupointCounts, 'personalAcupointList');
     personalAcupointChartInstance = renderChart(acEntries, 'personalAcupointChart', personalAcupointChartInstance);
+}
+
+async function fetchSummariesByDoctor(doctor) {
+    const list = [];
+    let lastVisible = null;
+    const pageSize = 50;
+    try {
+        await waitForFirebaseDb();
+        const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+        let parts = [
+            window.firebase.where('doctor', '==', doctor),
+            window.firebase.orderBy('date', 'asc'),
+            window.firebase.limit(pageSize)
+        ];
+        let q = window.firebase.firestoreQuery(colRef, ...parts);
+        let snap = await window.firebase.getDocs(q);
+        const collect = (docSnap) => {
+            const d = docSnap.data();
+            const updatedAt = d.updatedAt || d.createdAt || null;
+            list.push({
+                id: docSnap.id,
+                prescription: d.prescription || '',
+                acupunctureNotes: d.acupunctureNotes || '',
+                updatedAt
+            });
+        };
+        snap.forEach(collect);
+        lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+        while (snap.docs.length === pageSize && lastVisible) {
+            parts = [
+                window.firebase.where('doctor', '==', doctor),
+                window.firebase.orderBy('date', 'asc'),
+                window.firebase.startAfter(lastVisible),
+                window.firebase.limit(pageSize)
+            ];
+            q = window.firebase.firestoreQuery(colRef, ...parts);
+            snap = await window.firebase.getDocs(q);
+            snap.forEach(collect);
+            lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            await new Promise(r => setTimeout(r, 50));
+        }
+    } catch (error) {
+        try {
+            const fallback = await window.firebaseDataManager.getConsultationsByDoctor(doctor, pageSize);
+            if (fallback && fallback.success && Array.isArray(fallback.data)) {
+                for (const d of fallback.data) {
+                    list.push({
+                        id: d.id,
+                        prescription: d.prescription || '',
+                        acupunctureNotes: d.acupunctureNotes || '',
+                        updatedAt: d.updatedAt || d.createdAt || null
+                    });
+                }
+            }
+        } catch (_e) {}
+    }
+    return list;
+}
+
+async function applyDeltaUpdates(doctor, sinceISO, existingList) {
+    const sinceDate = new Date(sinceISO);
+    const index = new Map((existingList || []).map(i => [String(i.id), i]));
+    try {
+        const res = await window.firebaseDataManager.getConsultationsDeltaByDoctor(doctor, sinceDate);
+        if (res && res.success && Array.isArray(res.data)) {
+            for (const d of res.data) {
+                const item = {
+                    id: d.id,
+                    prescription: d.prescription || '',
+                    acupunctureNotes: d.acupunctureNotes || '',
+                    updatedAt: d.updatedAt || d.createdAt || null
+                };
+                index.set(String(item.id), item);
+            }
+        }
+    } catch (_e) {}
+    return Array.from(index.values());
+}
+
+async function loadPersonalStatistics() {
+    const doctor = currentUser;
+    const cached = psReadCache(doctor);
+    if (cached && cached.stats) {
+        renderPersonalStatistics(cached.stats);
+        try {
+            const hasUpdates = await window.firebaseDataManager.hasDoctorConsultationUpdates(doctor, new Date(cached.lastSyncAt));
+            if (!hasUpdates) return;
+            const merged = await applyDeltaUpdates(doctor, cached.lastSyncAt, cached.list || []);
+            const stats = computeStatsFromSummaries(merged);
+            const lastSyncAt = (() => {
+                let latest = 0;
+                for (const c of merged) {
+                    const t = c && c.updatedAt
+                        ? (c.updatedAt.seconds ? c.updatedAt.seconds * 1000 : new Date(c.updatedAt).getTime())
+                        : 0;
+                    if (t && t > latest) latest = t;
+                }
+                return latest ? new Date(latest) : new Date();
+            })();
+            const entry = { stats, lastSyncAt: lastSyncAt.toISOString(), list: merged };
+            psWriteCache(doctor, entry);
+            renderPersonalStatistics(stats);
+        } catch (_e) {}
+        return;
+    }
+    const summaries = await fetchSummariesByDoctor(doctor);
+    const stats = computeStatsFromSummaries(summaries);
+    const lastSyncAt = (() => {
+        let latest = 0;
+        for (const c of summaries) {
+            const t = c && c.updatedAt
+                ? (c.updatedAt.seconds ? c.updatedAt.seconds * 1000 : new Date(c.updatedAt).getTime())
+                : 0;
+            if (t && t > latest) latest = t;
+        }
+        return latest ? new Date(latest) : new Date();
+    })();
+    const entry = { stats, lastSyncAt: lastSyncAt.toISOString(), list: summaries };
+    psWriteCache(doctor, entry);
+    renderPersonalStatistics(stats);
 }
