@@ -18955,11 +18955,11 @@ async function saveEditExpense(id) {
         { type, amount, note, updatedAt: new Date(), updatedBy: currentUser || 'system' }
     );
     showToast('成本已更新', 'success');
-    await loadClinicExpensesForSelectedMonth();
+    await loadClinicExpensesForListMonth();
 }
 
 function cancelEditExpense() {
-    loadClinicExpensesForSelectedMonth();
+    loadClinicExpensesForListMonth();
 }
 
 async function deleteExpense(id) {
@@ -18968,7 +18968,7 @@ async function deleteExpense(id) {
         window.firebase.doc(window.firebase.db, 'clinicExpenses', id)
     );
     showToast('成本已刪除', 'success');
-    await loadClinicExpensesForSelectedMonth();
+    await loadClinicExpensesForListMonth();
 }
 // ================== 資料備份與還原相關函式 ==================
 /**
