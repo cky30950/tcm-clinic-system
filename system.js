@@ -941,123 +941,33 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
  * 若 consultations 尚未載入，會先載入全部診症記錄。
  */
 async function loadPersonalStatistics() {
-    // 確保 currentUser 存在，若為空嘗試從 Firebase Auth 獲取
-    if (!currentUser && window.firebase && window.firebase.auth && window.firebase.auth.currentUser) {
-        currentUser = window.firebase.auth.currentUser.email;
-    }
-    
-    if (!currentUser) {
-        // 若仍未取得使用者資訊，稍作等待後重試
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        if (window.firebase && window.firebase.auth && window.firebase.auth.currentUser) {
-             currentUser = window.firebase.auth.currentUser.email;
-        }
-    }
-
-    if (!currentUser) {
-        console.warn('無法取得當前使用者資訊，無法載入統計資料');
-        showToast('請重新登入以查看統計資料', 'error');
-        return;
-    }
-
     const cacheKey = String(currentUser || '');
     window.personalStatsCache = window.personalStatsCache || {};
     const existing = window.personalStatsCache[cacheKey] || readCache('personalStatsCache', cacheKey);
     if (!existing) {
         if (!Array.isArray(consultations) || consultations.length === 0) {
             try {
-                // 等待 Firebase DataManager 準備就緒
-                if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
-                    showToast('正在連接資料庫...', 'info');
-                    let attempts = 0;
-                    while ((!window.firebaseDataManager || !window.firebaseDataManager.isReady) && attempts < 10) {
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        attempts++;
-                    }
-                }
-
                 if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
-                    showToast('正在載入統計資料...', 'info');
-                    // 改為分批讀取以節省記憶體並防止當機
-                    let tempConsultations = [];
-                    try {
-                        const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-                        const pageSize = 50;
-                        let lastVisible = null;
-                        let hasMore = true;
-                        let totalLoaded = 0;
-
-                        while (hasMore) {
-                            let qArgs = [
-                                colRef,
-                                window.firebase.where('doctor', '==', currentUser),
-                                window.firebase.orderBy('date', 'asc'),
-                                window.firebase.limit(pageSize)
-                            ];
-                            if (lastVisible) {
-                                qArgs.push(window.firebase.startAfter(lastVisible));
-                            }
-                            const q = window.firebase.firestoreQuery(...qArgs);
-                            const snap = await window.firebase.getDocs(q);
-                            
-                            if (snap.empty) {
-                                hasMore = false;
-                                break;
-                            }
-
-                            const batch = snap.docs.map(doc => {
-                                const item = doc.data();
-                                let dateStr = null;
-                                if (item.date) {
-                                    if (typeof item.date === 'object' && item.date.seconds) {
-                                        dateStr = new Date(item.date.seconds * 1000).toISOString();
-                                    } else {
-                                        dateStr = item.date;
-                                    }
-                                } else if (item.createdAt) {
-                                    if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
-                                        dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
-                                    } else {
-                                        dateStr = item.createdAt;
-                                    }
+                    const res = await window.firebaseDataManager.getConsultationsByDoctor(currentUser);
+                    if (res && res.success) {
+                        consultations = res.data.map(item => {
+                            let dateStr = null;
+                            if (item.date) {
+                                if (typeof item.date === 'object' && item.date.seconds) {
+                                    dateStr = new Date(item.date.seconds * 1000).toISOString();
+                                } else {
+                                    dateStr = item.date;
                                 }
-                                // 只保留統計需要的欄位以節省記憶體
-                                return { 
-                                    id: doc.id, 
-                                    date: dateStr, 
-                                    doctor: item.doctor, 
-                                    prescription: item.prescription, 
-                                    acupunctureNotes: item.acupunctureNotes, 
-                                    createdAt: item.createdAt, 
-                                    updatedAt: item.updatedAt 
-                                };
-                            });
-
-                            tempConsultations = tempConsultations.concat(batch);
-                            totalLoaded += batch.length;
-                            lastVisible = snap.docs[snap.docs.length - 1];
-                            
-                            if (snap.docs.length < pageSize) {
-                                hasMore = false;
+                            } else if (item.createdAt) {
+                                if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
+                                    dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
+                                } else {
+                                    dateStr = item.createdAt;
+                                }
                             }
-
-                            // 暫停一小段時間以讓出主執行緒，避免 UI 凍結
-                            await new Promise(resolve => setTimeout(resolve, 50));
-                        }
-                        
-                        consultations = tempConsultations;
-                        if (consultations.length > 0) {
-                            showToast(`載入完成，共 ${consultations.length} 筆資料`, 'success');
-                        } else {
-                            showToast('未找到相關診症記錄', 'info');
-                        }
-                    } catch (err) {
-                        console.error('分批讀取診症資料失敗:', err);
-                        showToast('載入資料時發生錯誤，請稍後再試', 'error');
+                            return { id: item.id, date: dateStr, doctor: item.doctor, prescription: item.prescription, acupunctureNotes: item.acupunctureNotes, createdAt: item.createdAt, updatedAt: item.updatedAt };
+                        });
                     }
-                } else {
-                    console.warn('Firebase DataManager 尚未準備就緒');
-                    showToast('資料庫連接未就緒，請稍後重試', 'warning');
                 }
             } catch (_e) {
                 console.error('載入診症資料失敗：', _e);
@@ -7917,24 +7827,8 @@ function createAppointmentRow(appointment, patient, index) {
     } catch (e) {
         // ignore language detection errors
     }
-    // 計算年齡以便顯示在性別旁
-    let ageDisplay = '';
-    if (patient && patient.birthDate) {
-        const birth = new Date(patient.birthDate);
-        const today = new Date();
-        let age = today.getFullYear() - birth.getFullYear();
-        const monthDiff = today.getMonth() - birth.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-            age--;
-        }
-        ageDisplay = age;
-    }
-
-    // 組合性別與年齡資訊（例如：男24）
-    const infoInParens = genderDisplay ? `${genderDisplay}${ageDisplay}` : ageDisplay;
-
-    // 根據是否存在性別或年齡資訊構造姓名字串
-    const nameWithGender = infoInParens ? `${patient.name} (${infoInParens})` : patient.name;
+    // 根據是否存在性別資訊構造姓名字串
+    const nameWithGender = genderDisplay ? `${patient.name} (${genderDisplay})` : patient.name;
     // 為避免 XSS，使用 escapeHtml 轉義姓名及括號內容（若可用）
     const safeNameWithGender = (typeof window !== 'undefined' && window.escapeHtml) ? window.escapeHtml(nameWithGender) : nameWithGender;
 
@@ -19061,11 +18955,11 @@ async function saveEditExpense(id) {
         { type, amount, note, updatedAt: new Date(), updatedBy: currentUser || 'system' }
     );
     showToast('成本已更新', 'success');
-    await loadClinicExpensesForListMonth();
+    await loadClinicExpensesForSelectedMonth();
 }
 
 function cancelEditExpense() {
-    loadClinicExpensesForListMonth();
+    loadClinicExpensesForSelectedMonth();
 }
 
 async function deleteExpense(id) {
@@ -19074,7 +18968,7 @@ async function deleteExpense(id) {
         window.firebase.doc(window.firebase.db, 'clinicExpenses', id)
     );
     showToast('成本已刪除', 'success');
-    await loadClinicExpensesForListMonth();
+    await loadClinicExpensesForSelectedMonth();
 }
 // ================== 資料備份與還原相關函式 ==================
 /**
