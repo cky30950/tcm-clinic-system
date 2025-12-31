@@ -1946,10 +1946,34 @@ async function fetchUsers(forceRefresh = false) {
         }
         async function populateClinicSelectorTop() {
             try {
-                await ensureClinicsInitialized();
                 const sel = document.getElementById('clinicSelectorTop');
                 if (!sel) return;
-                const list = await loadClinics();
+
+                // 嘗試確保診所資料已初始化
+                try {
+                    await ensureClinicsInitialized();
+                } catch (initErr) {
+                    console.warn('ensureClinicsInitialized failed:', initErr);
+                }
+
+                // 嘗試載入診所列表
+                let list = [];
+                try {
+                    list = await loadClinics();
+                } catch (loadErr) {
+                    console.error('loadClinics failed:', loadErr);
+                    // 嘗試從快取讀取
+                    if (Array.isArray(clinicsCache)) {
+                        list = clinicsCache;
+                    }
+                }
+
+                if (!Array.isArray(list) || list.length === 0) {
+                    // 若無資料，加入一個預設選項或提示
+                    sel.innerHTML = '<option value="">無法載入診所</option>';
+                    return;
+                }
+
                 sel.innerHTML = '';
                 list.forEach(c => {
                     const opt = document.createElement('option');
@@ -1957,17 +1981,45 @@ async function fetchUsers(forceRefresh = false) {
                     opt.textContent = c.chineseName || c.englishName || c.id;
                     sel.appendChild(opt);
                 });
+
+                // 確保 selectedClinicId 有效
+                if (!selectedClinicId || !list.find(c => String(c.id) === String(selectedClinicId))) {
+                    if (list.length > 0) {
+                        selectedClinicId = String(list[0].id);
+                        localStorage.setItem('selectedClinicId', selectedClinicId);
+                        // 更新當前設定
+                        await setCurrentClinicSettings();
+                    }
+                }
+
                 if (selectedClinicId) sel.value = selectedClinicId;
+
                 sel.onchange = async function() {
-                    await updateSelectedClinicId(this.value);
+                    const newId = this.value;
+                    if (!newId) return;
+                    
                     try {
+                        await updateSelectedClinicId(newId);
+                        // 重新載入相關資料
                         if (typeof loadTodayAppointments === 'function') await loadTodayAppointments();
-                    } catch (_e) {}
-                    try {
                         if (typeof initBillingItems === 'function') await initBillingItems(true);
-                    } catch (_e2) {}
+                        
+                        // 更新診所顯示
+                        if (typeof updateClinicSettingsDisplay === 'function') {
+                            updateClinicSettingsDisplay();
+                        } else if (window.systemManagement && typeof window.systemManagement.updateClinicSettingsDisplay === 'function') {
+                            window.systemManagement.updateClinicSettingsDisplay();
+                        }
+                        
+                        showToast('已切換診所', 'success');
+                    } catch (e) {
+                        console.error('切換診所失敗:', e);
+                        showToast('切換診所失敗', 'error');
+                    }
                 };
-            } catch (_err) {}
+            } catch (err) {
+                console.error('populateClinicSelectorTop critical error:', err);
+            }
         }
         document.addEventListener('DOMContentLoaded', function() { populateClinicSelectorTop(); });
         
