@@ -2135,10 +2135,10 @@ function generateMedicalRecordNumber() {
 
 
 // 初始化中藥庫資料
-let herbLibrary = [];
+var herbLibrary;
 
 // 中藥庫存資料
-let herbInventory = {};
+var herbInventory;
 let herbInventoryInitialized = false;
 let herbInventoryListenerAttached = false;
 // 目前庫存模式：'granule' 表示顆粒沖劑，'slice' 表示飲片。
@@ -3811,7 +3811,7 @@ async function recordInventoryHistory(type, entries, extra = {}) {
             }
         }
         // 初始化穴位庫資料
-        let acupointLibrary = [];
+        var acupointLibrary;
         // 穴位庫編輯狀態與篩選條件
         // 移除穴位編輯狀態變數（不再支援新增/編輯/刪除）
         // let editingAcupointId = null;
@@ -24945,28 +24945,9 @@ function refreshTemplateCategoryFilters() {
           // 移除預設的穴位組合範例，預設為空陣列。
           let acupointCombinations = [];
 
-          let prescriptionTemplates = [
-            {
-              id: 1,
-              name: '感冒用藥指導模板',
-              category: '用藥指導',
-              duration: '7天',
-              followUp: '3天後',
-              content: '服藥方法：每日三次，飯後30分鐘溫服。服藥期間多喝溫開水。避免生冷、油膩、辛辣食物。注意事項：充分休息，避免熬夜。如症狀加重或持續發燒請立即回診。療程安排：建議療程7天，服藥3天後回診評估。',
-              note: '',
-              lastModified: '2024-02-15'
-            }
-          ];
+          var prescriptionTemplates;
 
-          let diagnosisTemplates = [
-            {
-              id: 1,
-              name: '感冒診斷模板',
-              category: '內科',
-              content: '症狀描述：患者表現為鼻塞、喉嚨痛、咳嗽等症狀。檢查建議：觀察咽部紅腫狀況，測量體溫。治療建議：建議使用疏風解表類中藥，搭配休息和多喝水。復診安排：3天後回診。',
-              lastModified: '2024-01-20'
-            }
-          ];
+          var diagnosisTemplates;
 
           // 渲染中藥組合
           function renderHerbCombinations(pageChange = false) {
