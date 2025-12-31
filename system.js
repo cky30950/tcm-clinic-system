@@ -966,6 +966,16 @@ async function loadPersonalStatistics() {
     if (!existing) {
         if (!Array.isArray(consultations) || consultations.length === 0) {
             try {
+                // 等待 Firebase DataManager 準備就緒
+                if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+                    showToast('正在連接資料庫...', 'info');
+                    let attempts = 0;
+                    while ((!window.firebaseDataManager || !window.firebaseDataManager.isReady) && attempts < 10) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        attempts++;
+                    }
+                }
+
                 if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
                     showToast('正在載入統計資料...', 'info');
                     // 改為分批讀取以節省記憶體並防止當機
@@ -1045,6 +1055,9 @@ async function loadPersonalStatistics() {
                         console.error('分批讀取診症資料失敗:', err);
                         showToast('載入資料時發生錯誤，請稍後再試', 'error');
                     }
+                } else {
+                    console.warn('Firebase DataManager 尚未準備就緒');
+                    showToast('資料庫連接未就緒，請稍後重試', 'warning');
                 }
             } catch (_e) {
                 console.error('載入診症資料失敗：', _e);
