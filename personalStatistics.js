@@ -247,13 +247,11 @@ function populateMonthSelect(months, currentKey) {
     const sel = document.getElementById('personalStatsMonthSelect');
     if (!sel) return;
     sel.innerHTML = '';
-    const desiredKey = (() => {
-        if (currentKey) return currentKey;
-        const d = new Date();
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        return `${y}-${m}`;
-    })();
+    const allOpt = document.createElement('option');
+    allOpt.value = 'ALL';
+    allOpt.textContent = '全部月份';
+    sel.appendChild(allOpt);
+    const desiredKey = currentKey || 'ALL';
     const seen = new Set();
     if (months && months.length) {
         months.forEach(mk => {
@@ -264,14 +262,10 @@ function populateMonthSelect(months, currentKey) {
             sel.appendChild(opt);
             seen.add(mk);
         });
-        const initialKey = months.includes(desiredKey) ? desiredKey : months[0];
+        const initialKey = desiredKey === 'ALL' ? 'ALL' : (months.includes(desiredKey) ? desiredKey : months[0]);
         sel.value = initialKey;
         personalStatsCurrentMonth = initialKey;
     } else {
-        const opt = document.createElement('option');
-        opt.value = desiredKey;
-        opt.textContent = desiredKey;
-        sel.appendChild(opt);
         sel.value = desiredKey;
         personalStatsCurrentMonth = desiredKey;
     }
@@ -280,7 +274,7 @@ function populateMonthSelect(months, currentKey) {
         try {
             const cache = psReadCache(currentUser);
             const list = cache && Array.isArray(cache.list) ? cache.list : [];
-            const sub = filterByMonth(list, personalStatsCurrentMonth);
+            const sub = personalStatsCurrentMonth === 'ALL' ? list : filterByMonth(list, personalStatsCurrentMonth);
             const stats = computeStatsFromSummaries(sub);
             renderPersonalStatistics(stats);
         } catch (_e) {}
@@ -292,16 +286,16 @@ async function loadPersonalStatistics() {
     const cached = psReadCache(doctor);
     if (cached && cached.stats) {
         const months = computeAvailableMonths(cached.list || []);
-        populateMonthSelect(months, null);
-        const initialList = filterByMonth(cached.list || [], personalStatsCurrentMonth);
+        populateMonthSelect(months, 'ALL');
+        const initialList = cached.list || [];
         renderPersonalStatistics(computeStatsFromSummaries(initialList));
         try {
             const hasUpdates = await window.firebaseDataManager.hasDoctorConsultationUpdates(doctor, new Date(cached.lastSyncAt));
             if (!hasUpdates) return;
             const merged = await applyDeltaUpdates(doctor, cached.lastSyncAt, cached.list || []);
             const months2 = computeAvailableMonths(merged);
-            populateMonthSelect(months2, personalStatsCurrentMonth);
-            const initialList2 = filterByMonth(merged, personalStatsCurrentMonth);
+            populateMonthSelect(months2, personalStatsCurrentMonth || 'ALL');
+            const initialList2 = personalStatsCurrentMonth === 'ALL' ? merged : filterByMonth(merged, personalStatsCurrentMonth);
             const stats = computeStatsFromSummaries(initialList2);
             const lastSyncAt = (() => {
                 let latest = 0;
@@ -321,8 +315,8 @@ async function loadPersonalStatistics() {
     }
     const summaries = await fetchSummariesByDoctor(doctor);
     const months = computeAvailableMonths(summaries);
-    populateMonthSelect(months, null);
-    const initialList = filterByMonth(summaries, personalStatsCurrentMonth);
+    populateMonthSelect(months, 'ALL');
+    const initialList = summaries;
     const stats = computeStatsFromSummaries(initialList);
     const lastSyncAt = (() => {
         let latest = 0;
