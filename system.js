@@ -948,25 +948,72 @@ async function loadPersonalStatistics() {
         if (!Array.isArray(consultations) || consultations.length === 0) {
             try {
                 if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
-                    const res = await window.firebaseDataManager.getConsultationsByDoctor(currentUser);
-                    if (res && res.success) {
-                        consultations = res.data.map(item => {
-                            let dateStr = null;
-                            if (item.date) {
-                                if (typeof item.date === 'object' && item.date.seconds) {
-                                    dateStr = new Date(item.date.seconds * 1000).toISOString();
-                                } else {
-                                    dateStr = item.date;
-                                }
-                            } else if (item.createdAt) {
-                                if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
-                                    dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
-                                } else {
-                                    dateStr = item.createdAt;
-                                }
+                    // 改為分批讀取以節省記憶體並防止當機
+                    consultations = [];
+                    try {
+                        const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+                        const pageSize = 50;
+                        let lastVisible = null;
+                        let hasMore = true;
+
+                        while (hasMore) {
+                            let qArgs = [
+                                colRef,
+                                window.firebase.where('doctor', '==', currentUser),
+                                window.firebase.orderBy('date', 'asc'),
+                                window.firebase.limit(pageSize)
+                            ];
+                            if (lastVisible) {
+                                qArgs.push(window.firebase.startAfter(lastVisible));
                             }
-                            return { id: item.id, date: dateStr, doctor: item.doctor, prescription: item.prescription, acupunctureNotes: item.acupunctureNotes, createdAt: item.createdAt, updatedAt: item.updatedAt };
-                        });
+                            const q = window.firebase.firestoreQuery(...qArgs);
+                            const snap = await window.firebase.getDocs(q);
+                            
+                            if (snap.empty) {
+                                hasMore = false;
+                                break;
+                            }
+
+                            const batch = snap.docs.map(doc => {
+                                const item = doc.data();
+                                let dateStr = null;
+                                if (item.date) {
+                                    if (typeof item.date === 'object' && item.date.seconds) {
+                                        dateStr = new Date(item.date.seconds * 1000).toISOString();
+                                    } else {
+                                        dateStr = item.date;
+                                    }
+                                } else if (item.createdAt) {
+                                    if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
+                                        dateStr = new Date(item.createdAt.seconds * 1000).toISOString();
+                                    } else {
+                                        dateStr = item.createdAt;
+                                    }
+                                }
+                                // 只保留統計需要的欄位以節省記憶體
+                                return { 
+                                    id: doc.id, 
+                                    date: dateStr, 
+                                    doctor: item.doctor, 
+                                    prescription: item.prescription, 
+                                    acupunctureNotes: item.acupunctureNotes, 
+                                    createdAt: item.createdAt, 
+                                    updatedAt: item.updatedAt 
+                                };
+                            });
+
+                            consultations = consultations.concat(batch);
+                            lastVisible = snap.docs[snap.docs.length - 1];
+                            
+                            if (snap.docs.length < pageSize) {
+                                hasMore = false;
+                            }
+
+                            // 暫停一小段時間以讓出主執行緒，避免 UI 凍結
+                            await new Promise(resolve => setTimeout(resolve, 50));
+                        }
+                    } catch (err) {
+                        console.error('分批讀取診症資料失敗:', err);
                     }
                 }
             } catch (_e) {
