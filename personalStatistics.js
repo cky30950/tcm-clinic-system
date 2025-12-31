@@ -193,7 +193,30 @@ async function fetchSummariesByDoctor(doctor) {
         while (snap.docs.length === pageSize && lastVisible) {
             parts = [
                 window.firebase.where('doctor', '==', doctor),
-                window.firebase.orderBy('date', 'asc'),
+                window.firebase.orderBy('createdAt', 'asc'),
+                window.firebase.startAfter(lastVisible),
+                window.firebase.limit(pageSize)
+            ];
+            q = window.firebase.firestoreQuery(colRef, ...parts);
+            snap = await window.firebase.getDocs(q);
+            snap.forEach(collect);
+            lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            await new Promise(r => setTimeout(r, 50));
+        }
+        lastVisible = null;
+        parts = [
+            window.firebase.where('doctor', '==', doctor),
+            window.firebase.orderBy('updatedAt', 'asc'),
+            window.firebase.limit(pageSize)
+        ];
+        q = window.firebase.firestoreQuery(colRef, ...parts);
+        snap = await window.firebase.getDocs(q);
+        snap.forEach(collect);
+        lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+        while (snap.docs.length === pageSize && lastVisible) {
+            parts = [
+                window.firebase.where('doctor', '==', doctor),
+                window.firebase.orderBy('updatedAt', 'asc'),
                 window.firebase.startAfter(lastVisible),
                 window.firebase.limit(pageSize)
             ];
@@ -222,6 +245,111 @@ async function fetchSummariesByDoctor(doctor) {
     return list;
 }
 
+async function fetchSummariesUnionDoctorOrCreator(doctor) {
+    const seen = new Set();
+    const res = [];
+    const byDoctor = await fetchSummariesByDoctor(doctor);
+    for (const it of byDoctor) {
+        const key = String(it.id);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        res.push(it);
+    }
+    try {
+        await waitForFirebaseDb();
+        const pageSize = 50;
+        const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+        let parts = [
+            window.firebase.where('createdBy', '==', doctor),
+            window.firebase.orderBy('createdAt', 'asc'),
+            window.firebase.limit(pageSize)
+        ];
+        let q = window.firebase.firestoreQuery(colRef, ...parts);
+        let snap = await window.firebase.getDocs(q);
+        const collect = (docSnap) => {
+            const d = docSnap.data();
+            const updatedAt = d.updatedAt || d.createdAt || null;
+            const dateIso = normalizeDateIso(d.date) || normalizeDateIso(d.createdAt) || null;
+            const item = {
+                id: docSnap.id,
+                prescription: d.prescription || '',
+                acupunctureNotes: d.acupunctureNotes || '',
+                updatedAt,
+                dateIso
+            };
+            const key = String(item.id);
+            if (!seen.has(key)) {
+                seen.add(key);
+                res.push(item);
+            }
+        };
+        snap.forEach(collect);
+        let lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+        while (snap.docs.length === pageSize && lastVisible) {
+            parts = [
+                window.firebase.where('createdBy', '==', doctor),
+                window.firebase.orderBy('createdAt', 'asc'),
+                window.firebase.startAfter(lastVisible),
+                window.firebase.limit(pageSize)
+            ];
+            q = window.firebase.firestoreQuery(colRef, ...parts);
+            snap = await window.firebase.getDocs(q);
+            snap.forEach(collect);
+            lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            await new Promise(r => setTimeout(r, 50));
+        }
+        parts = [
+            window.firebase.where('createdBy', '==', doctor),
+            window.firebase.orderBy('updatedAt', 'asc'),
+            window.firebase.limit(pageSize)
+        ];
+        q = window.firebase.firestoreQuery(colRef, ...parts);
+        snap = await window.firebase.getDocs(q);
+        snap.forEach(collect);
+        lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+        while (snap.docs.length === pageSize && lastVisible) {
+            parts = [
+                window.firebase.where('createdBy', '==', doctor),
+                window.firebase.orderBy('updatedAt', 'asc'),
+                window.firebase.startAfter(lastVisible),
+                window.firebase.limit(pageSize)
+            ];
+            q = window.firebase.firestoreQuery(colRef, ...parts);
+            snap = await window.firebase.getDocs(q);
+            snap.forEach(collect);
+            lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            await new Promise(r => setTimeout(r, 50));
+        }
+    } catch (_err) {
+        try {
+            let resAll = await window.firebaseDataManager.getConsultations(true);
+            if (resAll && resAll.success) {
+                while (resAll.hasMore) {
+                    resAll = await window.firebaseDataManager.getConsultationsNextPage();
+                    if (!resAll || !resAll.success) break;
+                }
+                const all = Array.isArray(window.firebaseDataManager.consultationsCache) ? window.firebaseDataManager.consultationsCache.slice() : [];
+                for (const d of all) {
+                    const belongs = (d && String(d.doctor) === String(doctor)) || (d && String(d.createdBy) === String(doctor));
+                    if (!belongs) continue;
+                    const item = {
+                        id: d.id,
+                        prescription: d.prescription || '',
+                        acupunctureNotes: d.acupunctureNotes || '',
+                        updatedAt: d.updatedAt || d.createdAt || null,
+                        dateIso: normalizeDateIso(d.date) || normalizeDateIso(d.createdAt) || null
+                    };
+                    const key = String(item.id);
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        res.push(item);
+                    }
+                }
+            }
+        } catch (_e) {}
+    }
+    return res;
+}
 async function applyDeltaUpdates(doctor, sinceISO, existingList) {
     const sinceDate = new Date(sinceISO);
     const index = new Map((existingList || []).map(i => [String(i.id), i]));
@@ -291,7 +419,7 @@ async function loadPersonalStatistics() {
         renderPersonalStatistics(computeStatsFromSummaries(initialList));
         try {
             if (!cached.fullFetched) {
-                const full = await fetchSummariesByDoctor(doctor);
+                const full = await fetchSummariesUnionDoctorOrCreator(doctor);
                 const monthsFull = computeAvailableMonths(full);
                 populateMonthSelect(monthsFull, personalStatsCurrentMonth || 'ALL');
                 const useFull = personalStatsCurrentMonth === 'ALL' ? full : filterByMonth(full, personalStatsCurrentMonth);
@@ -311,9 +439,7 @@ async function loadPersonalStatistics() {
                 renderPersonalStatistics(statsFull);
                 return;
             }
-            const hasUpdates = await window.firebaseDataManager.hasDoctorConsultationUpdates(doctor, new Date(cached.lastSyncAt));
-            if (!hasUpdates) return;
-            const merged = await applyDeltaUpdates(doctor, cached.lastSyncAt, cached.list || []);
+            const merged = await fetchSummariesUnionDoctorOrCreator(doctor);
             const months2 = computeAvailableMonths(merged);
             populateMonthSelect(months2, personalStatsCurrentMonth || 'ALL');
             const initialList2 = personalStatsCurrentMonth === 'ALL' ? merged : filterByMonth(merged, personalStatsCurrentMonth);
@@ -334,7 +460,7 @@ async function loadPersonalStatistics() {
         } catch (_e) {}
         return;
     }
-    const summaries = await fetchSummariesByDoctor(doctor);
+    const summaries = await fetchSummariesUnionDoctorOrCreator(doctor);
     const months = computeAvailableMonths(summaries);
     populateMonthSelect(months, 'ALL');
     const initialList = summaries;
