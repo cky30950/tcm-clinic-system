@@ -941,6 +941,25 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
  * 若 consultations 尚未載入，會先載入全部診症記錄。
  */
 async function loadPersonalStatistics() {
+    // 確保 currentUser 存在，若為空嘗試從 Firebase Auth 獲取
+    if (!currentUser && window.firebase && window.firebase.auth && window.firebase.auth.currentUser) {
+        currentUser = window.firebase.auth.currentUser.email;
+    }
+    
+    if (!currentUser) {
+        // 若仍未取得使用者資訊，稍作等待後重試
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (window.firebase && window.firebase.auth && window.firebase.auth.currentUser) {
+             currentUser = window.firebase.auth.currentUser.email;
+        }
+    }
+
+    if (!currentUser) {
+        console.warn('無法取得當前使用者資訊，無法載入統計資料');
+        showToast('請重新登入以查看統計資料', 'error');
+        return;
+    }
+
     const cacheKey = String(currentUser || '');
     window.personalStatsCache = window.personalStatsCache || {};
     const existing = window.personalStatsCache[cacheKey] || readCache('personalStatsCache', cacheKey);
@@ -948,13 +967,15 @@ async function loadPersonalStatistics() {
         if (!Array.isArray(consultations) || consultations.length === 0) {
             try {
                 if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
+                    showToast('正在載入統計資料...', 'info');
                     // 改為分批讀取以節省記憶體並防止當機
-                    consultations = [];
+                    let tempConsultations = [];
                     try {
                         const colRef = window.firebase.collection(window.firebase.db, 'consultations');
                         const pageSize = 50;
                         let lastVisible = null;
                         let hasMore = true;
+                        let totalLoaded = 0;
 
                         while (hasMore) {
                             let qArgs = [
@@ -1002,7 +1023,8 @@ async function loadPersonalStatistics() {
                                 };
                             });
 
-                            consultations = consultations.concat(batch);
+                            tempConsultations = tempConsultations.concat(batch);
+                            totalLoaded += batch.length;
                             lastVisible = snap.docs[snap.docs.length - 1];
                             
                             if (snap.docs.length < pageSize) {
@@ -1012,8 +1034,16 @@ async function loadPersonalStatistics() {
                             // 暫停一小段時間以讓出主執行緒，避免 UI 凍結
                             await new Promise(resolve => setTimeout(resolve, 50));
                         }
+                        
+                        consultations = tempConsultations;
+                        if (consultations.length > 0) {
+                            showToast(`載入完成，共 ${consultations.length} 筆資料`, 'success');
+                        } else {
+                            showToast('未找到相關診症記錄', 'info');
+                        }
                     } catch (err) {
                         console.error('分批讀取診症資料失敗:', err);
+                        showToast('載入資料時發生錯誤，請稍後再試', 'error');
                     }
                 }
             } catch (_e) {
