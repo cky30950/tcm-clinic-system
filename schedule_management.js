@@ -364,6 +364,7 @@
                 const monthKey = getMonthKey(shift.date);
                 // 從 shift 物件中移除 id 以避免 id 存入資料庫值
                 const { id, ...data } = shift || {};
+                data.clinicId = (shift && shift.clinicId) ? String(shift.clinicId) : (window.selectedClinicId || '');
                 const path = `scheduleShifts/${monthKey}/${id}`;
                 const refPath = window.firebase.ref(window.firebase.rtdb, path);
                 await window.firebase.set(refPath, data);
@@ -423,7 +424,10 @@
                     Object.keys(data).forEach(idKey => {
                         const shiftObj = data[idKey] || {};
                         // 將鍵轉為數字 ID（若為數字字串）並合併資料
-                        shifts.push({ id: isNaN(Number(idKey)) ? idKey : Number(idKey), ...shiftObj });
+                        const merged = { id: isNaN(Number(idKey)) ? idKey : Number(idKey), ...shiftObj };
+                        if (!window.selectedClinicId || String(merged.clinicId || '') === String(window.selectedClinicId)) {
+                            shifts.push(merged);
+                        }
                     });
                 }
             } catch (err) {
@@ -912,7 +916,8 @@
                 type: shiftType,
                 status: 'confirmed',
                 // 拖拽新增排班不再自動加入備註文字
-                notes: ''
+                notes: '',
+                clinicId: window.selectedClinicId || ''
             };
             
             shifts.push(newShift);
@@ -1247,7 +1252,8 @@
                 // 新增模式
                 const newShift = {
                     id: Date.now(),
-                    ...shiftData
+                    ...shiftData,
+                    clinicId: window.selectedClinicId || ''
                 };
                 shifts.push(newShift);
                 showNotification(translate('排班新增成功！'));
@@ -1838,7 +1844,8 @@
                             endTime: endTime,
                             type: shiftType,
                             status: 'confirmed',
-                            notes: notes
+                            notes: notes,
+                            clinicId: window.selectedClinicId || ''
                         };
                         shifts.push(newShift);
                         addedCount++;
