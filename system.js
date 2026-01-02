@@ -11643,7 +11643,15 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         }
                         html += `<div style="margin-bottom:6px;">${nameWithMode}${rows}</div>`;
                     });
-                    prescriptionHtml = html;
+                    let compositionHtml = '';
+                    if (formulaCompositions.length > 0) {
+                        compositionHtml += '<div style="margin-top: 4px; font-size: 0.5em;">';
+                        compositionHtml += formulaCompositions.map(fc => 
+                            `<span style="display:inline-block;margin-right:12px;">${window.escapeHtml(fc.name)}：${window.escapeHtml(fc.composition)}</span>`
+                        ).join('');
+                        compositionHtml += '</div>';
+                    }
+                    prescriptionHtml = html + compositionHtml;
                 } else {
                     prescriptionHtml = '無記錄';
                 }
@@ -11775,7 +11783,16 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                                     <div style="flex:1;text-align:right;">${d}</div>
                                  </div>`;
                     }
-                    prescriptionHtml = html;
+                    // 方劑組成橫向排列（每行四個）
+                    let compositionHtml = '';
+                    if (formulaCompositions.length > 0) {
+                        compositionHtml += '<div style="margin-top: 4px; font-size: 0.5em;">';
+                        compositionHtml += formulaCompositions.map(fc => 
+                            `<span style="display:inline-block;margin-right:12px;">${window.escapeHtml(fc.name)}：${window.escapeHtml(fc.composition)}</span>`
+                        ).join('');
+                        compositionHtml += '</div>';
+                    }
+                    prescriptionHtml = html + compositionHtml;
                 } else {
                     // 若未能解析任何項目，直接以換行顯示原始內容
                     prescriptionHtml = consultation.prescription.replace(/\n/g, '<br>');
