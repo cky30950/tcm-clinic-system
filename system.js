@@ -11643,15 +11643,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         }
                         html += `<div style="margin-bottom:6px;">${nameWithMode}${rows}</div>`;
                     });
-                    let compositionHtml = '';
-                    if (formulaCompositions.length > 0) {
-                        compositionHtml += '<div style="margin-top: 4px; font-size: 0.5em;">';
-                        compositionHtml += formulaCompositions.map(fc => 
-                            `<span style="display:inline-block;margin-right:12px;">${window.escapeHtml(fc.name)}：${window.escapeHtml(fc.composition)}</span>`
-                        ).join('');
-                        compositionHtml += '</div>';
-                    }
-                    prescriptionHtml = html + compositionHtml;
+                    prescriptionHtml = html;
                 } else {
                     prescriptionHtml = '無記錄';
                 }
@@ -11783,16 +11775,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                                     <div style="flex:1;text-align:right;">${d}</div>
                                  </div>`;
                     }
-                    // 方劑組成橫向排列（每行四個）
-                    let compositionHtml = '';
-                    if (formulaCompositions.length > 0) {
-                        compositionHtml += '<div style="margin-top: 4px; font-size: 0.5em;">';
-                        compositionHtml += formulaCompositions.map(fc => 
-                            `<span style="display:inline-block;margin-right:12px;">${window.escapeHtml(fc.name)}：${window.escapeHtml(fc.composition)}</span>`
-                        ).join('');
-                        compositionHtml += '</div>';
-                    }
-                    prescriptionHtml = html + compositionHtml;
+                    prescriptionHtml = html;
                 } else {
                     // 若未能解析任何項目，直接以換行顯示原始內容
                     prescriptionHtml = consultation.prescription.replace(/\n/g, '<br>');
@@ -15356,41 +15339,7 @@ async function initializeSystemAfterLogin() {
                         <div class="space-y-3">
                             ${itemsHtml}
                         </div>
-                        ${(() => {
-                            try {
-                                const formulas = (Array.isArray(itemsArray) ? itemsArray : []).filter(it => it && it.type === 'formula');
-                                if (!formulas.length) return '';
-                                const lines = formulas.map(it => {
-                                    let comp = it && it.composition ? String(it.composition) : '';
-                                    if (!comp) {
-                                        try {
-                                            const fullItem = (Array.isArray(herbLibrary) ? herbLibrary : []).find(h => h && h.id === it.id && h.type === 'formula');
-                                            if (fullItem && fullItem.composition) comp = String(fullItem.composition);
-                                        } catch (_e) {}
-                                    }
-                                    let processed = '';
-                                    if (comp) {
-                                        try {
-                                            processed = String(comp)
-                                                .replace(/\r/g, '')
-                                                .split(/[、\n]/)
-                                                .map(p => p
-                                                    .replace(/\d+(?:\.\d+)?\s*(?:g|克|錢|兩|丸|包)?/gi, '')
-                                                    .replace(/[()（）\[\]]/g, '')
-                                                    .trim()
-                                                )
-                                                .filter(p => p)
-                                                .join('、');
-                                        } catch (_err) {
-                                            processed = comp.replace(/\n/g, '、');
-                                        }
-                                    }
-                                    const nm = it && it.name ? it.name : '';
-                                    return `<div>${window.escapeHtml(nm)}：${window.escapeHtml(processed)}</div>`;
-                                }).join('');
-                                return `<div class="mt-1 text-xs text-gray-700">${lines}</div>`;
-                            } catch (_e) { return ''; }
-                        })()}
+                        ${''}
                     </div>
                 `;
                 return sectionContainer;
