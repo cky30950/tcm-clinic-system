@@ -10,7 +10,6 @@ function showClinicSettingsModal() {
     document.getElementById('clinicPhone').value = clinicSettings.phone || '';
     document.getElementById('clinicAddress').value = clinicSettings.address || '';
     
-    try { populateClinicSelectors(); } catch (_e) {}
     document.getElementById('clinicSettingsModal').classList.remove('hidden');
 }
 
@@ -18,7 +17,7 @@ function hideClinicSettingsModal() {
     document.getElementById('clinicSettingsModal').classList.add('hidden');
 }
 
-async function saveClinicSettings() {
+function saveClinicSettings() {
     const chineseName = document.getElementById('clinicChineseName').value.trim();
     const englishName = document.getElementById('clinicEnglishName').value.trim();
     const businessHours = document.getElementById('clinicBusinessHours').value.trim();
@@ -30,24 +29,22 @@ async function saveClinicSettings() {
         return;
     }
     
+    // 更新診所設定
     clinicSettings.chineseName = chineseName;
     clinicSettings.englishName = englishName;
     clinicSettings.businessHours = businessHours;
     clinicSettings.phone = phone;
     clinicSettings.address = address;
     clinicSettings.updatedAt = new Date().toISOString();
-    try {
-        if (typeof currentClinicId !== 'undefined' && currentClinicId) {
-            await window.firebaseDataManager.updateClinic(currentClinicId, clinicSettings);
-            updateClinicSettingsDisplay();
-            hideClinicSettingsModal();
-            showToast('診所資料已成功更新！', 'success');
-        } else {
-            showToast('未選擇診所', 'error');
-        }
-    } catch (_e) {
-        showToast('更新診所資料失敗！', 'error');
-    }
+    
+    // 保存到本地儲存
+    localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
+    
+    // 更新系統管理頁面的顯示
+    updateClinicSettingsDisplay();
+    
+    hideClinicSettingsModal();
+    showToast('診所資料已成功更新！', 'success');
 }
 
 function updateClinicSettingsDisplay() {

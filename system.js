@@ -1628,112 +1628,16 @@ async function fetchUsers(forceRefresh = false) {
     return userCache;
 }
         
-        let clinicSettings = {};
-        let currentClinicId = localStorage.getItem('currentClinicId') || null;
-        let clinicsList = [];
-        async function initClinics() {
-            await waitForFirebase();
-            const res = await window.firebaseDataManager.getClinics();
-            clinicsList = res && res.success && Array.isArray(res.data) ? res.data : [];
-            if (!clinicsList.length) {
-                const created = await window.firebaseDataManager.addClinic({
-                    chineseName: '名醫診所系統',
-                    englishName: 'Dr.Great Clinic',
-                    businessHours: '週一至週五 09:00-18:00',
-                    phone: '(852) 2345-6789',
-                    address: '香港中環皇后大道中123號',
-                    createdAt: new Date()
-                });
-                if (created && created.success && created.id) {
-                    const single = await window.firebaseDataManager.getClinicById(created.id);
-                    clinicsList = single && single.success && single.data ? [{ id: created.id, ...single.data }] : [];
-                    currentClinicId = created.id;
-                    localStorage.setItem('currentClinicId', currentClinicId);
-                }
-            }
-            if (!currentClinicId && clinicsList.length) {
-                currentClinicId = clinicsList[0].id;
-                localStorage.setItem('currentClinicId', currentClinicId);
-            }
-            if (currentClinicId) {
-                const cur = await window.firebaseDataManager.getClinicById(currentClinicId);
-                clinicSettings = cur && cur.success && cur.data ? cur.data : {};
-            }
-            updateClinicSettingsDisplay();
-            populateClinicSelectors();
-            updateCurrentClinicDisplay();
-        }
-        function populateClinicSelectors() {
-            try {
-                const loginSel = document.getElementById('loginClinicSelector');
-                if (loginSel) {
-                    loginSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${c.chineseName || c.englishName || c.id}</option>`).join('');
-                    if (currentClinicId) loginSel.value = currentClinicId;
-                    loginSel.addEventListener('change', function() {
-                        setCurrentClinicId(this.value);
-                    });
-                }
-            } catch (_e) {}
-            try {
-                const editSel = document.getElementById('clinicSelectForEditing');
-                if (editSel) {
-                    editSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${c.chineseName || c.englishName || c.id}</option>`).join('');
-                    if (currentClinicId) editSel.value = currentClinicId;
-                    editSel.addEventListener('change', async function() {
-                        currentClinicId = this.value;
-                        localStorage.setItem('currentClinicId', currentClinicId);
-                        const cur = await window.firebaseDataManager.getClinicById(currentClinicId);
-                        clinicSettings = cur && cur.success && cur.data ? cur.data : {};
-                        document.getElementById('clinicChineseName').value = clinicSettings.chineseName || '';
-                        document.getElementById('clinicEnglishName').value = clinicSettings.englishName || '';
-                        document.getElementById('clinicBusinessHours').value = clinicSettings.businessHours || '';
-                        document.getElementById('clinicPhone').value = clinicSettings.phone || '';
-                        document.getElementById('clinicAddress').value = clinicSettings.address || '';
-                        updateClinicSettingsDisplay();
-                        updateCurrentClinicDisplay();
-                    });
-                }
-            } catch (_e2) {}
-            try {
-                const addBtn = document.getElementById('addClinicButton');
-                if (addBtn && !addBtn.dataset.bound) {
-                    addBtn.addEventListener('click', async function() {
-                        const created = await window.firebaseDataManager.addClinic({
-                            chineseName: '新診所',
-                            englishName: '',
-                            businessHours: '',
-                            phone: '',
-                            address: '',
-                            createdAt: new Date()
-                        });
-                        if (created && created.success && created.id) {
-                            const listRes = await window.firebaseDataManager.getClinics();
-                            clinicsList = listRes && listRes.success && Array.isArray(listRes.data) ? listRes.data : [];
-                            populateClinicSelectors();
-                            setCurrentClinicId(created.id);
-                            showToast('已新增診所', 'success');
-                        } else {
-                            showToast('新增診所失敗', 'error');
-                        }
-                    });
-                    addBtn.dataset.bound = 'true';
-                }
-            } catch (_e3) {}
-        }
-        async function setCurrentClinicId(id) {
-            currentClinicId = id;
-            localStorage.setItem('currentClinicId', currentClinicId);
-            const cur = await window.firebaseDataManager.getClinicById(currentClinicId);
-            clinicSettings = cur && cur.success && cur.data ? cur.data : {};
-            updateClinicSettingsDisplay();
-            updateCurrentClinicDisplay();
-            try { loadTodayAppointments(); } catch (_e) {}
-        }
-        function updateCurrentClinicDisplay() {
-            const el = document.getElementById('currentClinicDisplay');
-            if (el) {
-                el.textContent = clinicSettings && clinicSettings.chineseName ? `當前診所：${clinicSettings.chineseName}` : '';
-            }
+        // 診所設定
+        let clinicSettings = JSON.parse(localStorage.getItem('clinicSettings') || '{}');
+        if (!clinicSettings.chineseName) {
+            clinicSettings.chineseName = '名醫診所系統';
+            // 預設英文名稱改為 Dr.Great Clinic，而非原本的 TCM Clinic
+            clinicSettings.englishName = 'Dr.Great Clinic';
+            clinicSettings.businessHours = '週一至週五 09:00-18:00';
+            clinicSettings.phone = '(852) 2345-6789';
+            clinicSettings.address = '香港中環皇后大道中123號';
+            localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
         }
         
         // 浮動提示功能改用 Toastr 提供視覺與功能性提示
@@ -4661,7 +4565,6 @@ async function syncUserDataFromFirebase() {
             
             document.getElementById('userRole').textContent = `當前用戶：${getUserDisplayName(user)}`;
             document.getElementById('sidebarUserRole').textContent = `當前用戶：${getUserDisplayName(user)}`;
-            updateCurrentClinicDisplay();
             
             generateSidebarMenu();
             // 登入後更新歡迎頁卡片顯示
@@ -6869,8 +6772,7 @@ async function selectPatientForRegistration(patientId) {
                 chiefComplaint: chiefComplaint || '無特殊主訴',
                 status: 'registered', // registered, waiting, consulting, completed
                 createdAt: new Date().toISOString(),
-                createdBy: currentUserData ? currentUserData.username : currentUser,
-                clinicId: currentClinicId || null
+                createdBy: currentUserData ? currentUserData.username : currentUser
             };
 
             // 若有選擇問診資料，僅保存問診 ID 與摘要。避免將完整問診內容存入掛號資料，
@@ -7059,9 +6961,6 @@ async function loadTodayAppointments() {
     let todayAppointments = appointments.filter(apt => 
         new Date(apt.appointmentTime).toDateString() === targetDateStr
     );
-    if (currentClinicId) {
-        todayAppointments = todayAppointments.filter(apt => String(apt.clinicId || '') === String(currentClinicId));
-    }
     
     // 如果當前用戶是醫師，只顯示掛給自己的病人
     if (currentUserData && currentUserData.position === '醫師') {
@@ -13255,7 +13154,6 @@ async function initializeSystemAfterLogin() {
             document.getElementById('clinicPhone').value = clinicSettings.phone || '';
             document.getElementById('clinicAddress').value = clinicSettings.address || '';
             
-            try { populateClinicSelectors(); } catch (_e) {}
             document.getElementById('clinicSettingsModal').classList.remove('hidden');
         }
         
@@ -13263,7 +13161,7 @@ async function initializeSystemAfterLogin() {
             document.getElementById('clinicSettingsModal').classList.add('hidden');
         }
         
-        async function saveClinicSettings() {
+        function saveClinicSettings() {
             const chineseName = document.getElementById('clinicChineseName').value.trim();
             const englishName = document.getElementById('clinicEnglishName').value.trim();
             const businessHours = document.getElementById('clinicBusinessHours').value.trim();
@@ -13275,28 +13173,22 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
+            // 更新診所設定
             clinicSettings.chineseName = chineseName;
             clinicSettings.englishName = englishName;
             clinicSettings.businessHours = businessHours;
             clinicSettings.phone = phone;
             clinicSettings.address = address;
             clinicSettings.updatedAt = new Date().toISOString();
-            try {
-                if (currentClinicId) {
-                    await window.firebaseDataManager.updateClinic(currentClinicId, clinicSettings);
-                    const listRes = await window.firebaseDataManager.getClinics();
-                    clinicsList = listRes && listRes.success && Array.isArray(listRes.data) ? listRes.data : clinicsList;
-                    updateClinicSettingsDisplay();
-                    populateClinicSelectors();
-                    updateCurrentClinicDisplay();
-                    hideClinicSettingsModal();
-                    showToast('診所資料已成功更新！', 'success');
-                } else {
-                    showToast('未選擇診所', 'error');
-                }
-            } catch (e) {
-                showToast('更新診所資料失敗', 'error');
-            }
+            
+            // 保存到本地儲存
+            localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
+            
+            // 更新系統管理頁面的顯示
+            updateClinicSettingsDisplay();
+            
+            hideClinicSettingsModal();
+            showToast('診所資料已成功更新！', 'success');
         }
         
         function updateClinicSettingsDisplay() {
@@ -20565,78 +20457,6 @@ class FirebaseDataManager {
         console.log('Firebase 數據管理器已準備就緒');
     }
 
-    async addClinic(clinicData) {
-        if (!this.isReady) return { success: false };
-        try {
-            let dataToWrite;
-            try {
-                const { id, ...rest } = clinicData || {};
-                dataToWrite = rest;
-            } catch (_e) {
-                dataToWrite = clinicData;
-            }
-            const docRef = await window.firebase.addDoc(
-                window.firebase.collection(window.firebase.db, 'clinics'),
-                {
-                    ...dataToWrite,
-                    createdAt: new Date()
-                }
-            );
-            return { success: true, id: docRef.id };
-        } catch (err) {
-            return { success: false, error: err && err.message ? err.message : String(err) };
-        }
-    }
-    async getClinics() {
-        if (!this.isReady) return { success: false, data: [] };
-        try {
-            const snap = await window.firebase.getDocs(
-                window.firebase.collection(window.firebase.db, 'clinics')
-            );
-            const list = [];
-            snap.forEach(d => list.push({ id: d.id, ...d.data() }));
-            return { success: true, data: list };
-        } catch (err) {
-            return { success: false, data: [] };
-        }
-    }
-    async getClinicById(id) {
-        if (!this.isReady) return { success: false, data: null };
-        try {
-            const d = await window.firebase.getDoc(
-                window.firebase.doc(window.firebase.db, 'clinics', id)
-            );
-            if (d && d.exists()) {
-                return { success: true, data: d.data() };
-            }
-            return { success: false, data: null };
-        } catch (err) {
-            return { success: false, data: null };
-        }
-    }
-    async updateClinic(id, clinicData) {
-        if (!this.isReady) return { success: false };
-        try {
-            let dataToWrite;
-            try {
-                const { id: _id, ...rest } = clinicData || {};
-                dataToWrite = rest;
-            } catch (_e) {
-                dataToWrite = clinicData;
-            }
-            await window.firebase.updateDoc(
-                window.firebase.doc(window.firebase.db, 'clinics', id),
-                {
-                    ...dataToWrite,
-                    updatedAt: new Date()
-                }
-            );
-            return { success: true };
-        } catch (err) {
-            return { success: false, error: err && err.message ? err.message : String(err) };
-        }
-    }
-
     // 病人數據管理
     async addPatient(patientData) {
         if (!this.isReady) {
@@ -22282,8 +22102,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 300);
         searchInput.addEventListener('input', debouncedLoadPatientList);
     }
-
-    try { initClinics(); } catch (_e) {}
 
     // 掛號彈窗的病人搜尋欄位：加入防抖處理
     const patientSearchInput = document.getElementById('patientSearchInput');

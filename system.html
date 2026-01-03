@@ -274,9 +274,6 @@
     <!-- 登入頁面 -->
     <div id="loginPage" class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative">
-            <div class="absolute top-2 left-2">
-                <select id="loginClinicSelector" class="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"></select>
-            </div>
             <!-- 在登入卡片右上角放置語言切換器 -->
             <div class="absolute top-2 right-2">
                 <select id="languageSelector" class="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
@@ -444,7 +441,6 @@
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
-                        <span id="currentClinicDisplay" class="text-sm text-gray-600"></span>
                         <span id="userRole" class="text-sm text-gray-600"></span>
                         <button id="logoutButton" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
                             登出
@@ -2495,11 +2491,6 @@
             </div>
             
             <div class="p-6">
-                <div class="mb-4 flex items-center gap-3">
-                    <label class="text-sm text-gray-700">選擇診所</label>
-                    <select id="clinicSelectForEditing" class="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"></select>
-                    <button id="addClinicButton" class="ml-auto bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm">新增診所</button>
-                </div>
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">診所中文名稱 *</label>
