@@ -24371,8 +24371,6 @@ function viewMedicalRecord(recordId, patientId) {
         detailHtml += '</div>';
         // 服用方法（含各處方天數與次數）
         (function () {
-            let showBlock = !!rec.prescription || !!rec.multiPrescriptions || !!rec.usage;
-            if (!showBlock) return;
             detailHtml += '<div>';
             detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">服用方法</span>';
             let medInfoHtml = '';
