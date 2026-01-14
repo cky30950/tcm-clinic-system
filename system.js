@@ -9919,8 +9919,6 @@ if (!patient) {
                                 </div>
                                 
                                 ${(() => {
-                                    let showBlock = !!consultation.prescription || !!consultation.multiPrescriptions || !!consultation.usage;
-                                    if (!showBlock) return '';
                                     let medInfoHtml = '';
                                     try {
                                         if (consultation.multiPrescriptions) {
