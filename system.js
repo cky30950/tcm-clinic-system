@@ -1930,12 +1930,12 @@ async function fetchUsers(forceRefresh = false) {
             const el = document.getElementById('currentClinicDisplay');
             if (el) {
                 let name = '';
-                try { name = clinicSettings.chineseName || clinicSettings.englishName || ''; } catch (_eName) {}
+                try { name = clinicSettings.chineseName || clinicSettings.englishName || clinicSettings.name || ''; } catch (_eName) {}
                 if (!name) {
                     try {
                         if (Array.isArray(clinicsList)) {
                             const c = clinicsList.find(c => String(c.id) === String(currentClinicId));
-                            name = (c && (c.chineseName || c.englishName)) || '';
+                            name = (c && (c.chineseName || c.englishName || c.name)) || '';
                         }
                     } catch (_eList) {}
                 }
@@ -1948,12 +1948,12 @@ async function fetchUsers(forceRefresh = false) {
                                 if (res && res.success && res.data) {
                                     clinicSettings = res.data;
                                     let n = '';
-                                    try { n = clinicSettings.chineseName || clinicSettings.englishName || ''; } catch (_eN) {}
+                                    try { n = clinicSettings.chineseName || clinicSettings.englishName || clinicSettings.name || ''; } catch (_eN) {}
                                     if (!n && Array.isArray(clinicsList)) {
                                         const cc = clinicsList.find(c => String(c.id) === String(cid));
-                                        n = (cc && (cc.chineseName || cc.englishName)) || '';
+                                        n = (cc && (cc.chineseName || cc.englishName || cc.name)) || '';
                                     }
-                                    if (n) el.textContent = '當前診所：' + n;
+                                    el.textContent = '當前診所：' + (n || '未命名診所');
                                 }
                             }).catch(() => {});
                         }
@@ -4998,8 +4998,8 @@ async function syncUserDataFromFirebase() {
             
             document.getElementById('userRole').textContent = `當前用戶：${getUserDisplayName(user)}`;
             document.getElementById('sidebarUserRole').textContent = `當前用戶：${getUserDisplayName(user)}`;
-            updateCurrentClinicDisplay();
             try { initClinics(); } catch (_e) {}
+            updateCurrentClinicDisplay();
             
             generateSidebarMenu();
             // 登入後更新歡迎頁卡片顯示
