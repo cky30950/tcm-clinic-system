@@ -9908,63 +9908,51 @@ if (!patient) {
                                                     });
                                                     html = block;
                                                 }
-                                            } else if (consultation.prescription && String(consultation.prescription).trim().length > 0) {
+                                            } else if (consultation.prescription) {
                                                 html = window.escapeHtml(consultation.prescription).replace(/\n/g, '<br>');
                                             }
                                         } catch (_e) {
-                                            html = (consultation.prescription && String(consultation.prescription).trim().length > 0) ? window.escapeHtml(consultation.prescription).replace(/\n/g, '<br>') : '無記錄';
+                                            html = consultation.prescription ? window.escapeHtml(consultation.prescription).replace(/\n/g, '<br>') : '無記錄';
                                         }
                                         return `<div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 medical-field">${html}</div>`;
                                     })()}
                                 </div>
                                 
                                 ${(() => {
-                                    let hasPrescription = false;
+                                    let medInfoHtml = '';
                                     try {
                                         if (consultation.multiPrescriptions) {
-                                            const mpCheck = JSON.parse(consultation.multiPrescriptions);
-                                            hasPrescription = Array.isArray(mpCheck) && mpCheck.length > 0;
-                                        }
-                                    } catch (_e) {}
-                                    if (!hasPrescription && consultation.prescription && String(consultation.prescription).trim().length > 0) {
-                                        hasPrescription = true;
-                                    }
-                                    let medInfoHtml = '';
-                                    if (hasPrescription) {
-                                        try {
-                                            if (consultation.multiPrescriptions) {
-                                                const mp = JSON.parse(consultation.multiPrescriptions);
-                                                if (Array.isArray(mp) && mp.length > 0) {
-                                                    const showNames = mp.length > 1;
-                                                    const lines = mp.map((section, idx) => {
-                                                        const secName = section && section.name ? section.name : `處方${idx + 1}`;
-                                                        const d = parseInt(section && section.days) || 0;
-                                                        const f = parseInt(section && section.freq) || (parseInt(consultation.medicationFrequency) || 0);
-                                                        const partDays = d > 0 ? `服藥天數：${d}天` : '';
-                                                        const partFreq = f > 0 ? `每日次數：${f}次` : '';
-                                                        const combined = [partDays, partFreq].filter(Boolean).join('　');
-                                                        return combined ? `${showNames ? (secName + '：') : ''}${combined}` : '';
-                                                    }).filter(Boolean);
-                                                    if (lines.length > 0) {
-                                                        medInfoHtml += lines.map(l => `<div>${window.escapeHtml(l)}</div>`).join('');
-                                                    }
-                                                }
-                                            } else {
-                                                const parts = [];
-                                                if (consultation.medicationDays && Number(consultation.medicationDays) > 0) {
-                                                    parts.push('服藥天數：' + consultation.medicationDays + '天');
-                                                }
-                                                if (consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
-                                                    parts.push('每日次數：' + consultation.medicationFrequency + '次');
-                                                }
-                                                if (parts.length > 0) {
-                                                    medInfoHtml += `<div>${window.escapeHtml(parts.join('　'))}</div>`;
+                                            const mp = JSON.parse(consultation.multiPrescriptions);
+                                            if (Array.isArray(mp) && mp.length > 0) {
+                                                const showNames = mp.length > 1;
+                                                const lines = mp.map((section, idx) => {
+                                                    const secName = section && section.name ? section.name : `處方${idx + 1}`;
+                                                    const d = parseInt(section && section.days) || 0;
+                                                    const f = parseInt(section && section.freq) || (parseInt(consultation.medicationFrequency) || 0);
+                                                    const partDays = d > 0 ? `服藥天數：${d}天` : '';
+                                                    const partFreq = f > 0 ? `每日次數：${f}次` : '';
+                                                    const combined = [partDays, partFreq].filter(Boolean).join('　');
+                                                    return combined ? `${showNames ? (secName + '：') : ''}${combined}` : '';
+                                                }).filter(Boolean);
+                                                if (lines.length > 0) {
+                                                    medInfoHtml += lines.map(l => `<div>${window.escapeHtml(l)}</div>`).join('');
                                                 }
                                             }
-                                        } catch (_e) {}
-                                        if (consultation.usage && String(consultation.usage).trim().length > 0) {
-                                            medInfoHtml += `<div>${window.escapeHtml(String(consultation.usage).trim())}</div>`;
+                                        } else {
+                                            const parts = [];
+                                            if (consultation.medicationDays && Number(consultation.medicationDays) > 0) {
+                                                parts.push('服藥天數：' + consultation.medicationDays + '天');
+                                            }
+                                            if (consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
+                                                parts.push('每日次數：' + consultation.medicationFrequency + '次');
+                                            }
+                                            if (parts.length > 0) {
+                                                medInfoHtml += `<div>${window.escapeHtml(parts.join('　'))}</div>`;
+                                            }
                                         }
+                                    } catch (_e) {}
+                                    if (consultation.usage) {
+                                        medInfoHtml += `<div>${window.escapeHtml(consultation.usage)}</div>`;
                                     }
                                     return `
                                         <div>
@@ -10374,52 +10362,42 @@ function displayConsultationMedicalHistoryPage() {
                                 </div>
                                 
                                 ${(() => {
-                                    let hasPrescription = false;
+                                    let showBlock = !!consultation.prescription || !!consultation.multiPrescriptions || !!consultation.usage;
+                                    if (!showBlock) return '';
+                                    let medInfoHtml = '';
                                     try {
                                         if (consultation.multiPrescriptions) {
-                                            const mpCheck = JSON.parse(consultation.multiPrescriptions);
-                                            hasPrescription = Array.isArray(mpCheck) && mpCheck.length > 0;
-                                        }
-                                    } catch (_e) {}
-                                    if (!hasPrescription && consultation.prescription && String(consultation.prescription).trim().length > 0) {
-                                        hasPrescription = true;
-                                    }
-                                    let medInfoHtml = '';
-                                    if (hasPrescription) {
-                                        try {
-                                            if (consultation.multiPrescriptions) {
-                                                const mp = JSON.parse(consultation.multiPrescriptions);
-                                                if (Array.isArray(mp) && mp.length > 0) {
-                                                    const showNames = mp.length > 1;
-                                                    const lines = mp.map((section, idx) => {
-                                                        const secName = section && section.name ? section.name : `處方${idx + 1}`;
-                                                        const d = parseInt(section && section.days) || 0;
-                                                        const f = parseInt(section && section.freq) || (parseInt(consultation.medicationFrequency) || 0);
-                                                        const partDays = d > 0 ? `服藥天數：${d}天` : '';
-                                                        const partFreq = f > 0 ? `每日次數：${f}次` : '';
-                                                        const combined = [partDays, partFreq].filter(Boolean).join('　');
-                                                        return combined ? `${showNames ? (secName + '：') : ''}${combined}` : '';
-                                                    }).filter(Boolean);
-                                                    if (lines.length > 0) {
-                                                        medInfoHtml += lines.map(l => `<div>${window.escapeHtml(l)}</div>`).join('');
-                                                    }
-                                                }
-                                            } else {
-                                                const parts = [];
-                                                if (consultation.medicationDays && Number(consultation.medicationDays) > 0) {
-                                                    parts.push('服藥天數：' + consultation.medicationDays + '天');
-                                                }
-                                                if (consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
-                                                    parts.push('每日次數：' + consultation.medicationFrequency + '次');
-                                                }
-                                                if (parts.length > 0) {
-                                                    medInfoHtml += `<div>${window.escapeHtml(parts.join('　'))}</div>`;
+                                            const mp = JSON.parse(consultation.multiPrescriptions);
+                                            if (Array.isArray(mp) && mp.length > 0) {
+                                                const showNames = mp.length > 1;
+                                                const lines = mp.map((section, idx) => {
+                                                    const secName = section && section.name ? section.name : `處方${idx + 1}`;
+                                                    const d = parseInt(section && section.days) || 0;
+                                                    const f = parseInt(section && section.freq) || (parseInt(consultation.medicationFrequency) || 0);
+                                                    const partDays = d > 0 ? `服藥天數：${d}天` : '';
+                                                    const partFreq = f > 0 ? `每日次數：${f}次` : '';
+                                                    const combined = [partDays, partFreq].filter(Boolean).join('　');
+                                                    return combined ? `${showNames ? (secName + '：') : ''}${combined}` : '';
+                                                }).filter(Boolean);
+                                                if (lines.length > 0) {
+                                                    medInfoHtml += lines.map(l => `<div>${window.escapeHtml(l)}</div>`).join('');
                                                 }
                                             }
-                                        } catch (_e) {}
-                                        if (consultation.usage && String(consultation.usage).trim().length > 0) {
-                                            medInfoHtml += `<div>${window.escapeHtml(String(consultation.usage).trim())}</div>`;
+                                        } else {
+                                            const parts = [];
+                                            if (consultation.medicationDays && Number(consultation.medicationDays) > 0) {
+                                                parts.push('服藥天數：' + consultation.medicationDays + '天');
+                                            }
+                                            if (consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
+                                                parts.push('每日次數：' + consultation.medicationFrequency + '次');
+                                            }
+                                            if (parts.length > 0) {
+                                                medInfoHtml += `<div>${window.escapeHtml(parts.join('　'))}</div>`;
+                                            }
                                         }
+                                    } catch (_e) {}
+                                    if (consultation.usage) {
+                                        medInfoHtml += `<div>${window.escapeHtml(consultation.usage)}</div>`;
                                     }
                                     return `
                                         <div>
@@ -12232,7 +12210,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             } catch (_e) {
                 prescriptionHtml = '無記錄';
             }
-        } else if (consultation.prescription && String(consultation.prescription).trim().length > 0) {
+        } else if (consultation.prescription) {
             try {
                 // 解析處方內容行並移除空行
                 const lines = consultation.prescription.split('\n').filter(line => line.trim());
@@ -12368,10 +12346,12 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     }
                     prescriptionHtml = html + compositionHtml;
                 } else {
-                    prescriptionHtml = String(consultation.prescription).trim().length > 0 ? consultation.prescription.replace(/\n/g, '<br>') : '無記錄';
+                    // 若未能解析任何項目，直接以換行顯示原始內容
+                    prescriptionHtml = consultation.prescription.replace(/\n/g, '<br>');
                 }
             } catch (_e) {
-                prescriptionHtml = String(consultation.prescription).trim().length > 0 ? consultation.prescription.replace(/\n/g, '<br>') : '無記錄';
+                // 解析出錯時，退回顯示原始處方內容
+                prescriptionHtml = consultation.prescription.replace(/\n/g, '<br>');
             }
         } else {
             // 無處方內容
@@ -12387,17 +12367,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         let medDays = '';
         let medFreq = '';
         let medLines = [];
-        let hasPrescriptionContent = false;
-        try {
-            if (hasMulti) {
-                const mpCheck = JSON.parse(consultation.multiPrescriptions);
-                hasPrescriptionContent = Array.isArray(mpCheck) && mpCheck.length > 0;
-            }
-        } catch (_e) {}
-        if (!hasPrescriptionContent && consultation.prescription && String(consultation.prescription).trim().length > 0) {
-            hasPrescriptionContent = true;
-        }
-        if (hasMulti && hasPrescriptionContent) {
+        if (hasMulti) {
             try {
                 const mp = JSON.parse(consultation.multiPrescriptions);
                 if (Array.isArray(mp)) {
@@ -12415,17 +12385,17 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     }).filter(x => x);
                 }
             } catch (_e) {}
-        } else if (!hasMulti && hasPrescriptionContent) {
+        } else {
             if (consultation && consultation.medicationDays && Number(consultation.medicationDays) > 0) {
                 medDays = consultation.medicationDays;
             }
-            if (consultation && consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
-                medFreq = consultation.medicationFrequency;
-            }
+        }
+        if (consultation && consultation.medicationFrequency && Number(consultation.medicationFrequency) > 0) {
+            medFreq = consultation.medicationFrequency;
         }
         // 組合服藥資訊
         let medInfoHtml = '';
-        if (hasMulti && hasPrescriptionContent) {
+        if (hasMulti) {
             if (medLines.length > 0) {
                 const rows = [];
                 for (let i = 0; i < medLines.length; i += 2) {
@@ -12440,22 +12410,22 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                 }
                 medInfoHtml += rows.join('');
             }
-            if (consultation.usage && String(consultation.usage).trim().length > 0) {
-                medInfoHtml += `<div><strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${String(consultation.usage).trim()}</div>`;
+            if (consultation.usage) {
+                medInfoHtml += `<div><strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${consultation.usage}</div>`;
             }
-        } else if (!hasMulti && hasPrescriptionContent) {
+        } else {
             if (medDays) {
                 medInfoHtml += `<strong>${isEnglish ? 'Number of days' : '服藥天數'}${colon}</strong>${medDays}${isEnglish ? ' days' : '天'}&nbsp;`;
             }
             if (medFreq) {
                 medInfoHtml += `<strong>${isEnglish ? 'Times per day' : '每日次數'}${colon}</strong>${medFreq}${isEnglish ? '' : '次'}&nbsp;`;
             }
-            if (consultation.usage && String(consultation.usage).trim().length > 0) {
-                medInfoHtml += `<strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${String(consultation.usage).trim()}`;
+            if (consultation.usage) {
+                medInfoHtml += `<strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${consultation.usage}`;
             }
-        }
-        if (!medInfoHtml) {
-            medInfoHtml = '無記錄';
+            if (!consultation.prescription || (typeof consultation.prescription === 'string' && consultation.prescription.trim() === '')) {
+                medInfoHtml = '';
+            }
         }
         // 醫囑及注意事項
         const instructionsHtml = consultation.instructions ? consultation.instructions.replace(/\n/g, '<br>') : '';
@@ -12633,7 +12603,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     </div>
                     <div class="section-title">${PI.prescriptionContent}</div>
                     <div class="section-content">${prescriptionHtml}</div>
-                    <div class="section-title">${PI.medicationInfo}</div><div class="section-content">${medInfoHtml || '無記錄'}</div>
+                    ${medInfoHtml ? `<div class="section-title">${PI.medicationInfo}</div><div class="section-content">${medInfoHtml}</div>` : ''}
                     ${instructionsHtml ? `<div class="section-title">${PI.instructions}</div><div class="section-content">${instructionsHtml}</div>` : ''}
                     ${followUpHtml ? `<div class="section-title">${PI.followUp}</div><div class="section-content">${followUpHtml}</div>` : ''}
                     <div class="footer-info">
