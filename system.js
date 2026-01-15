@@ -4899,7 +4899,7 @@ async function attemptMainLogin() {
         }
 
         // 登入成功，切換到主系統
-        performLogin(currentUserData);
+        await performLogin(currentUserData);
         // 登入後啟動閒置監控，監測長時間未操作自動登出
         try {
             if (typeof startInactivityMonitoring === 'function') {
@@ -5004,7 +5004,7 @@ async function syncUserDataFromFirebase() {
 
         
         // 執行登入
-        function performLogin(user) {
+        async function performLogin(user) {
             // 更新最後登入時間
             const userIndex = users.findIndex(u => u.id === user.id);
             if (userIndex !== -1) {
@@ -5014,6 +5014,7 @@ async function syncUserDataFromFirebase() {
             
             currentUser = user.username;
             currentUserData = user;
+            await loadAllowedSections();
             
             // 切換到主系統
             document.getElementById('loginPage').classList.add('hidden');
@@ -5199,11 +5200,7 @@ async function logout() {
                 templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
             };
 
-            // 根據當前用戶職位決定可使用的功能列表
-            const userPosition = (currentUserData && currentUserData.position) || '';
-            const permissions = ROLE_PERMISSIONS[userPosition] || [];
-
-            // 依序建立側邊選單按鈕（再次檢查權限）
+            const permissions = Array.isArray(allowedSectionsCache) ? allowedSectionsCache : [];
             permissions.forEach(permission => {
                 const item = menuItems[permission];
                 if (!item) return;
