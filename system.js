@@ -647,54 +647,69 @@ function navigatePagination(direction) {
   }
 }
 
-let allowedSectionsCache = null;
-async function loadAllowedSections() {
-  if (!currentUserData || !currentUserData.position) {
-    allowedSectionsCache = [];
-    return;
-  }
-  const body = {
-    position: currentUserData.position,
-    email: currentUserData.email || ''
-  };
-  try {
-    const apiBase = (typeof window.API_BASE_URL !== 'undefined' && window.API_BASE_URL) ? window.API_BASE_URL : 'http://127.0.0.1:5000';
-    const resp = await fetch(apiBase + '/api/access/sections', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await resp.json();
-    allowedSectionsCache = Array.isArray(data.allowedSections) ? data.allowedSections : [];
-  } catch (_e) {
-    const pos = (currentUserData && currentUserData.position) ? String(currentUserData.position).trim() : '';
-    const email = (currentUserData && currentUserData.email) ? String(currentUserData.email).toLowerCase().trim() : '';
-    let allowed = [];
-    if (pos === '診所管理') {
-      allowed = ['patientManagement','consultationSystem','medicalRecordManagement','herbLibrary','acupointLibrary','templateLibrary','scheduleManagement','billingManagement','userManagement','financialReports','systemManagement','accountSecurity'];
-    } else if (pos === '醫師') {
-      allowed = ['patientManagement','consultationSystem','medicalRecordManagement','herbLibrary','acupointLibrary','templateLibrary','scheduleManagement','billingManagement','personalSettings','personalStatistics','accountSecurity'];
-    } else if (pos === '護理師') {
-      allowed = ['patientManagement','consultationSystem','medicalRecordManagement','herbLibrary','acupointLibrary','templateLibrary','scheduleManagement','accountSecurity'];
-    } else if (pos === '用戶') {
-      allowed = ['patientManagement','consultationSystem','templateLibrary','accountSecurity'];
-    }
-    if (pos.includes('管理') || email === 'admin@clinic.com') {
-      if (!allowed.includes('userManagement')) allowed.push('userManagement');
-    }
-    allowedSectionsCache = allowed;
-  }
-}
+/**
+ * 角色與對應可存取的系統區塊對照表。
+ * 每個角色可存取哪些頁面（功能），在此集中定義。
+ */
+const ROLE_PERMISSIONS = {
+  // 新增個人統計分析 (personalStatistics) 權限，診所管理者與醫師可使用
+  // 管理員不需要個人設置與個人統計分析，故移除這兩項
+  // 將模板庫移至穴位庫之後，並將病歷管理調整至診症系統之下，使側邊選單順序為：
+  // 患者管理 -> 診症系統 -> 病歷管理 -> 中藥庫 -> 穴位庫 -> 模板庫 -> 醫療排班 -> 收費管理 -> 用戶管理 -> 財務報表 -> 系統管理 -> 帳號安全
+  '診所管理': ['patientManagement', 'consultationSystem', 'medicalRecordManagement', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
+  // 醫師不需要系統管理權限，也將病歷管理置於診症系統之下，並將模板庫移至穴位庫之後
+  '醫師': ['patientManagement', 'consultationSystem', 'medicalRecordManagement', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
+  // 護理師可使用病歷管理功能，因此將 medicalRecordManagement 置於診症系統之後，同時保留模板庫移至穴位庫之後
+  '護理師': ['patientManagement', 'consultationSystem', 'medicalRecordManagement', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'accountSecurity'],
+  // 用戶無中藥庫或穴位庫權限，維持模板庫在最後
+  '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary', 'accountSecurity']
+};
+
+/**
+ * 判斷當前用戶是否具有存取指定區塊的權限。
+ * @param {string} sectionId
+ * @returns {boolean}
+ */
 function hasAccessToSection(sectionId) {
+  // 若尚未取得用戶資料或未設定職位，則直接拒絕存取
   if (!currentUserData || !currentUserData.position) return false;
-  if (!Array.isArray(allowedSectionsCache)) return false;
-  return allowedSectionsCache.includes(sectionId);
+
+  // 取得用戶職位並移除前後空白
+  const pos = currentUserData.position.trim ? currentUserData.position.trim() : currentUserData.position;
+
+  // 特別處理：用戶管理僅限管理員使用。
+  // 使用 window.isAdminUser（若存在）來判斷是否為管理員，
+  // 以支援例如「系統管理」或包含「管理」的其他職稱，同時保留
+  // 對特定電子郵件 (admin@clinic.com) 的判斷。
+  if (sectionId === 'userManagement') {
+    try {
+      if (typeof window.isAdminUser === 'function') {
+        // 若提供了 isAdminUser 函式，直接以其結果為準。
+        return window.isAdminUser();
+      }
+    } catch (_e) {
+      // 忽略函式執行中的錯誤
+    }
+    // 如果沒有 isAdminUser 或執行失敗，則根據職稱及電子郵件進行判斷。
+    const email = (currentUserData && currentUserData.email
+      ? String(currentUserData.email).toLowerCase().trim()
+      : '');
+    return (
+      pos === '診所管理' ||
+      (pos && pos.includes('管理')) ||
+      email === 'admin@clinic.com'
+    );
+  }
+
+  // 收費項目管理僅限診所管理者或醫師使用
+  if (sectionId === 'billingManagement') {
+    return pos === '診所管理' || pos === '醫師';
+  }
+
+  // 根據角色權限定義判斷（使用修剪後的職位）
+  const allowed = ROLE_PERMISSIONS[pos] || [];
+  return allowed.includes(sectionId);
 }
-document.addEventListener('DOMContentLoaded', function () {
-  setTimeout(function () {
-    try { loadAllowedSections(); } catch (_e) {}
-  }, 0);
-});
 
 // 初始化全域變數
 let patients = [];
@@ -732,43 +747,42 @@ let globalUsageCounts = {};
  * 結果存入 globalUsageCounts，並更新 herbLibrary 的 usageCount 屬性。
  */
 async function computeGlobalUsageCounts() {
+    // 確保 consultations 資料可用，如無資料則嘗試載入
     try {
+        // 登出時停止閒置監控，以免登出後仍然觸發自動登出回調
+        try {
+            if (typeof stopInactivityMonitoring === 'function') {
+                stopInactivityMonitoring();
+            }
+        } catch (_e) {
+            // 忽略停止監控時的錯誤
+        }
         if (!Array.isArray(consultations) || consultations.length === 0) {
             if (typeof loadConsultationsForFinancial === 'function') {
                 await loadConsultationsForFinancial();
             }
         }
-    } catch (_e) {}
-    try {
-        const apiBase = (typeof window.API_BASE_URL !== 'undefined' && window.API_BASE_URL) ? window.API_BASE_URL : 'http://127.0.0.1:5000';
-        const payload = {
-            consultations: Array.isArray(consultations) ? consultations.map(c => ({ prescription: c && c.prescription ? String(c.prescription) : '' })) : []
-        };
-        const resp = await fetch(apiBase + '/api/compute/global-usage', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await resp.json();
-        globalUsageCounts = data && data.usageCounts ? data.usageCounts : {};
     } catch (_e) {
-        globalUsageCounts = {};
-        if (Array.isArray(consultations)) {
-            consultations.forEach(cons => {
-                try {
-                    const pres = cons && cons.prescription ? cons.prescription : '';
-                    const lines = pres.split('\n');
-                    lines.forEach(rawLine => {
-                        const line = rawLine.trim();
-                        if (!line) return;
-                        const match = line.match(/^([^0-9\s\(\)\.]+)/);
-                        const name = match ? match[1].trim() : line.split(/[\d\s]/)[0];
-                        if (!name) return;
-                        globalUsageCounts[name] = (globalUsageCounts[name] || 0) + 1;
-                    });
-                } catch (_e2) {}
-            });
-        }
+        // 忽略載入錯誤
+    }
+    globalUsageCounts = {};
+    if (Array.isArray(consultations)) {
+        consultations.forEach(cons => {
+            try {
+                const pres = cons && cons.prescription ? cons.prescription : '';
+                const lines = pres.split('\n');
+                lines.forEach(rawLine => {
+                    const line = rawLine.trim();
+                    if (!line) return;
+                    const match = line.match(/^([^0-9\s\(\)\.]+)/);
+                    const name = match ? match[1].trim() : line.split(/[\d\s]/)[0];
+                    if (!name) return;
+                    globalUsageCounts[name] = (globalUsageCounts[name] || 0) + 1;
+                });
+            } catch (_e) {
+                // 忽略單筆解析錯誤
+            }
+        });
     }
     if (Array.isArray(herbLibrary)) {
         herbLibrary.forEach(item => {
@@ -830,48 +844,39 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
             };
             return getTime(b) - getTime(a);
         });
-        let lines = [];
-        try {
-            const apiBase = (typeof window.API_BASE_URL !== 'undefined' && window.API_BASE_URL) ? window.API_BASE_URL : 'http://127.0.0.1:5000';
-            const resp = await fetch(apiBase + '/api/records/format-lines', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ records })
-            });
-            const data = await resp.json();
-            lines = Array.isArray(data.lines) ? data.lines : [];
-        } catch (_e) {
-            lines = records.map(c => {
-                let dateObj = null;
-                if (c.date) {
-                    if (typeof c.date === 'object' && c.date.seconds) {
-                        dateObj = new Date(c.date.seconds * 1000);
-                    } else {
-                        dateObj = new Date(c.date);
-                    }
-                } else if (c.createdAt) {
-                    if (typeof c.createdAt === 'object' && c.createdAt.seconds) {
-                        dateObj = new Date(c.createdAt.seconds * 1000);
-                    } else {
-                        dateObj = new Date(c.createdAt);
-                    }
+        // 組合每一行紀錄：日期 + 主訴 + 現病史 + 舌象 + 脈象
+        const lines = records.map(c => {
+            let dateObj = null;
+            if (c.date) {
+                if (typeof c.date === 'object' && c.date.seconds) {
+                    dateObj = new Date(c.date.seconds * 1000);
+                } else {
+                    dateObj = new Date(c.date);
                 }
-                const dateStr = dateObj ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}` : '';
-                const symptoms = c.symptoms ? String(c.symptoms).replace(/\n/g, ' ').trim() : '';
-                const history = c.currentHistory ? String(c.currentHistory).replace(/\n/g, ' ').trim() : '';
-                const tongue = c.tongue ? String(c.tongue).replace(/\n/g, ' ').trim() : '';
-                const pulse = c.pulse ? String(c.pulse).replace(/\n/g, ' ').trim() : '';
-                const parts = [];
-                if (symptoms) parts.push(symptoms);
-                if (history) parts.push(history);
-                const special = [];
-                if (tongue) special.push(tongue);
-                if (pulse) special.push(pulse);
-                if (special.length) parts.push(`(${special.join('，')})`);
-                const content = parts.join(' ').trim();
-                return `${dateStr} ${content}`.trim();
-            });
-        }
+            } else if (c.createdAt) {
+                if (typeof c.createdAt === 'object' && c.createdAt.seconds) {
+                    dateObj = new Date(c.createdAt.seconds * 1000);
+                } else {
+                    dateObj = new Date(c.createdAt);
+                }
+            }
+            const dateStr = dateObj ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}` : '';
+            const symptoms = c.symptoms ? String(c.symptoms).replace(/\n/g, ' ').trim() : '';
+            const history = c.currentHistory ? String(c.currentHistory).replace(/\n/g, ' ').trim() : '';
+            const tongue = c.tongue ? String(c.tongue).replace(/\n/g, ' ').trim() : '';
+            const pulse = c.pulse ? String(c.pulse).replace(/\n/g, ' ').trim() : '';
+            const parts = [];
+            // 主訴與現病史直接顯示
+            if (symptoms) parts.push(symptoms);
+            if (history) parts.push(history);
+            // 將舌象與脈象以逗號串接並用括號包覆，例如「(舌紅，脈弱)」
+            const special = [];
+            if (tongue) special.push(tongue);
+            if (pulse) special.push(pulse);
+            if (special.length) parts.push(`(${special.join('，')})`);
+            const content = parts.join(' ').trim();
+            return `${dateStr} ${content}`.trim();
+        });
         // 將結果填入表單欄位
         const historyField = document.getElementById('formCurrentHistory');
         if (historyField) {
@@ -4909,7 +4914,7 @@ async function attemptMainLogin() {
         }
 
         // 登入成功，切換到主系統
-        await performLogin(currentUserData);
+        performLogin(currentUserData);
         // 登入後啟動閒置監控，監測長時間未操作自動登出
         try {
             if (typeof startInactivityMonitoring === 'function') {
@@ -5014,7 +5019,7 @@ async function syncUserDataFromFirebase() {
 
         
         // 執行登入
-        async function performLogin(user) {
+        function performLogin(user) {
             // 更新最後登入時間
             const userIndex = users.findIndex(u => u.id === user.id);
             if (userIndex !== -1) {
@@ -5024,7 +5029,6 @@ async function syncUserDataFromFirebase() {
             
             currentUser = user.username;
             currentUserData = user;
-            await loadAllowedSections();
             
             // 切換到主系統
             document.getElementById('loginPage').classList.add('hidden');
@@ -5210,7 +5214,11 @@ async function logout() {
                 templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
             };
 
-            const permissions = Array.isArray(allowedSectionsCache) ? allowedSectionsCache : [];
+            // 根據當前用戶職位決定可使用的功能列表
+            const userPosition = (currentUserData && currentUserData.position) || '';
+            const permissions = ROLE_PERMISSIONS[userPosition] || [];
+
+            // 依序建立側邊選單按鈕（再次檢查權限）
             permissions.forEach(permission => {
                 const item = menuItems[permission];
                 if (!item) return;
