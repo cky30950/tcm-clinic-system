@@ -647,69 +647,54 @@ function navigatePagination(direction) {
   }
 }
 
-/**
- * 角色與對應可存取的系統區塊對照表。
- * 每個角色可存取哪些頁面（功能），在此集中定義。
- */
-const ROLE_PERMISSIONS = {
-  // 新增個人統計分析 (personalStatistics) 權限，診所管理者與醫師可使用
-  // 管理員不需要個人設置與個人統計分析，故移除這兩項
-  // 將模板庫移至穴位庫之後，並將病歷管理調整至診症系統之下，使側邊選單順序為：
-  // 患者管理 -> 診症系統 -> 病歷管理 -> 中藥庫 -> 穴位庫 -> 模板庫 -> 醫療排班 -> 收費管理 -> 用戶管理 -> 財務報表 -> 系統管理 -> 帳號安全
-  '診所管理': ['patientManagement', 'consultationSystem', 'medicalRecordManagement', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'billingManagement', 'userManagement', 'financialReports', 'systemManagement', 'accountSecurity'],
-  // 醫師不需要系統管理權限，也將病歷管理置於診症系統之下，並將模板庫移至穴位庫之後
-  '醫師': ['patientManagement', 'consultationSystem', 'medicalRecordManagement', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'billingManagement', 'personalSettings', 'personalStatistics', 'accountSecurity'],
-  // 護理師可使用病歷管理功能，因此將 medicalRecordManagement 置於診症系統之後，同時保留模板庫移至穴位庫之後
-  '護理師': ['patientManagement', 'consultationSystem', 'medicalRecordManagement', 'herbLibrary', 'acupointLibrary', 'templateLibrary', 'scheduleManagement', 'accountSecurity'],
-  // 用戶無中藥庫或穴位庫權限，維持模板庫在最後
-  '用戶': ['patientManagement', 'consultationSystem', 'templateLibrary', 'accountSecurity']
-};
-
-/**
- * 判斷當前用戶是否具有存取指定區塊的權限。
- * @param {string} sectionId
- * @returns {boolean}
- */
-function hasAccessToSection(sectionId) {
-  // 若尚未取得用戶資料或未設定職位，則直接拒絕存取
-  if (!currentUserData || !currentUserData.position) return false;
-
-  // 取得用戶職位並移除前後空白
-  const pos = currentUserData.position.trim ? currentUserData.position.trim() : currentUserData.position;
-
-  // 特別處理：用戶管理僅限管理員使用。
-  // 使用 window.isAdminUser（若存在）來判斷是否為管理員，
-  // 以支援例如「系統管理」或包含「管理」的其他職稱，同時保留
-  // 對特定電子郵件 (admin@clinic.com) 的判斷。
-  if (sectionId === 'userManagement') {
-    try {
-      if (typeof window.isAdminUser === 'function') {
-        // 若提供了 isAdminUser 函式，直接以其結果為準。
-        return window.isAdminUser();
-      }
-    } catch (_e) {
-      // 忽略函式執行中的錯誤
+let allowedSectionsCache = null;
+async function loadAllowedSections() {
+  if (!currentUserData || !currentUserData.position) {
+    allowedSectionsCache = [];
+    return;
+  }
+  const body = {
+    position: currentUserData.position,
+    email: currentUserData.email || ''
+  };
+  try {
+    const apiBase = (typeof window.API_BASE_URL !== 'undefined' && window.API_BASE_URL) ? window.API_BASE_URL : 'http://127.0.0.1:5000';
+    const resp = await fetch(apiBase + '/api/access/sections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    allowedSectionsCache = Array.isArray(data.allowedSections) ? data.allowedSections : [];
+  } catch (_e) {
+    const pos = (currentUserData && currentUserData.position) ? String(currentUserData.position).trim() : '';
+    const email = (currentUserData && currentUserData.email) ? String(currentUserData.email).toLowerCase().trim() : '';
+    let allowed = [];
+    if (pos === '診所管理') {
+      allowed = ['patientManagement','consultationSystem','medicalRecordManagement','herbLibrary','acupointLibrary','templateLibrary','scheduleManagement','billingManagement','userManagement','financialReports','systemManagement','accountSecurity'];
+    } else if (pos === '醫師') {
+      allowed = ['patientManagement','consultationSystem','medicalRecordManagement','herbLibrary','acupointLibrary','templateLibrary','scheduleManagement','billingManagement','personalSettings','personalStatistics','accountSecurity'];
+    } else if (pos === '護理師') {
+      allowed = ['patientManagement','consultationSystem','medicalRecordManagement','herbLibrary','acupointLibrary','templateLibrary','scheduleManagement','accountSecurity'];
+    } else if (pos === '用戶') {
+      allowed = ['patientManagement','consultationSystem','templateLibrary','accountSecurity'];
     }
-    // 如果沒有 isAdminUser 或執行失敗，則根據職稱及電子郵件進行判斷。
-    const email = (currentUserData && currentUserData.email
-      ? String(currentUserData.email).toLowerCase().trim()
-      : '');
-    return (
-      pos === '診所管理' ||
-      (pos && pos.includes('管理')) ||
-      email === 'admin@clinic.com'
-    );
+    if (pos.includes('管理') || email === 'admin@clinic.com') {
+      if (!allowed.includes('userManagement')) allowed.push('userManagement');
+    }
+    allowedSectionsCache = allowed;
   }
-
-  // 收費項目管理僅限診所管理者或醫師使用
-  if (sectionId === 'billingManagement') {
-    return pos === '診所管理' || pos === '醫師';
-  }
-
-  // 根據角色權限定義判斷（使用修剪後的職位）
-  const allowed = ROLE_PERMISSIONS[pos] || [];
-  return allowed.includes(sectionId);
 }
+function hasAccessToSection(sectionId) {
+  if (!currentUserData || !currentUserData.position) return false;
+  if (!Array.isArray(allowedSectionsCache)) return false;
+  return allowedSectionsCache.includes(sectionId);
+}
+document.addEventListener('DOMContentLoaded', function () {
+  setTimeout(function () {
+    try { loadAllowedSections(); } catch (_e) {}
+  }, 0);
+});
 
 // 初始化全域變數
 let patients = [];
