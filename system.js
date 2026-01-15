@@ -732,42 +732,43 @@ let globalUsageCounts = {};
  * 結果存入 globalUsageCounts，並更新 herbLibrary 的 usageCount 屬性。
  */
 async function computeGlobalUsageCounts() {
-    // 確保 consultations 資料可用，如無資料則嘗試載入
     try {
-        // 登出時停止閒置監控，以免登出後仍然觸發自動登出回調
-        try {
-            if (typeof stopInactivityMonitoring === 'function') {
-                stopInactivityMonitoring();
-            }
-        } catch (_e) {
-            // 忽略停止監控時的錯誤
-        }
         if (!Array.isArray(consultations) || consultations.length === 0) {
             if (typeof loadConsultationsForFinancial === 'function') {
                 await loadConsultationsForFinancial();
             }
         }
-    } catch (_e) {
-        // 忽略載入錯誤
-    }
-    globalUsageCounts = {};
-    if (Array.isArray(consultations)) {
-        consultations.forEach(cons => {
-            try {
-                const pres = cons && cons.prescription ? cons.prescription : '';
-                const lines = pres.split('\n');
-                lines.forEach(rawLine => {
-                    const line = rawLine.trim();
-                    if (!line) return;
-                    const match = line.match(/^([^0-9\s\(\)\.]+)/);
-                    const name = match ? match[1].trim() : line.split(/[\d\s]/)[0];
-                    if (!name) return;
-                    globalUsageCounts[name] = (globalUsageCounts[name] || 0) + 1;
-                });
-            } catch (_e) {
-                // 忽略單筆解析錯誤
-            }
+    } catch (_e) {}
+    try {
+        const apiBase = (typeof window.API_BASE_URL !== 'undefined' && window.API_BASE_URL) ? window.API_BASE_URL : 'http://127.0.0.1:5000';
+        const payload = {
+            consultations: Array.isArray(consultations) ? consultations.map(c => ({ prescription: c && c.prescription ? String(c.prescription) : '' })) : []
+        };
+        const resp = await fetch(apiBase + '/api/compute/global-usage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         });
+        const data = await resp.json();
+        globalUsageCounts = data && data.usageCounts ? data.usageCounts : {};
+    } catch (_e) {
+        globalUsageCounts = {};
+        if (Array.isArray(consultations)) {
+            consultations.forEach(cons => {
+                try {
+                    const pres = cons && cons.prescription ? cons.prescription : '';
+                    const lines = pres.split('\n');
+                    lines.forEach(rawLine => {
+                        const line = rawLine.trim();
+                        if (!line) return;
+                        const match = line.match(/^([^0-9\s\(\)\.]+)/);
+                        const name = match ? match[1].trim() : line.split(/[\d\s]/)[0];
+                        if (!name) return;
+                        globalUsageCounts[name] = (globalUsageCounts[name] || 0) + 1;
+                    });
+                } catch (_e2) {}
+            });
+        }
     }
     if (Array.isArray(herbLibrary)) {
         herbLibrary.forEach(item => {
@@ -829,39 +830,48 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
             };
             return getTime(b) - getTime(a);
         });
-        // 組合每一行紀錄：日期 + 主訴 + 現病史 + 舌象 + 脈象
-        const lines = records.map(c => {
-            let dateObj = null;
-            if (c.date) {
-                if (typeof c.date === 'object' && c.date.seconds) {
-                    dateObj = new Date(c.date.seconds * 1000);
-                } else {
-                    dateObj = new Date(c.date);
+        let lines = [];
+        try {
+            const apiBase = (typeof window.API_BASE_URL !== 'undefined' && window.API_BASE_URL) ? window.API_BASE_URL : 'http://127.0.0.1:5000';
+            const resp = await fetch(apiBase + '/api/records/format-lines', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ records })
+            });
+            const data = await resp.json();
+            lines = Array.isArray(data.lines) ? data.lines : [];
+        } catch (_e) {
+            lines = records.map(c => {
+                let dateObj = null;
+                if (c.date) {
+                    if (typeof c.date === 'object' && c.date.seconds) {
+                        dateObj = new Date(c.date.seconds * 1000);
+                    } else {
+                        dateObj = new Date(c.date);
+                    }
+                } else if (c.createdAt) {
+                    if (typeof c.createdAt === 'object' && c.createdAt.seconds) {
+                        dateObj = new Date(c.createdAt.seconds * 1000);
+                    } else {
+                        dateObj = new Date(c.createdAt);
+                    }
                 }
-            } else if (c.createdAt) {
-                if (typeof c.createdAt === 'object' && c.createdAt.seconds) {
-                    dateObj = new Date(c.createdAt.seconds * 1000);
-                } else {
-                    dateObj = new Date(c.createdAt);
-                }
-            }
-            const dateStr = dateObj ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}` : '';
-            const symptoms = c.symptoms ? String(c.symptoms).replace(/\n/g, ' ').trim() : '';
-            const history = c.currentHistory ? String(c.currentHistory).replace(/\n/g, ' ').trim() : '';
-            const tongue = c.tongue ? String(c.tongue).replace(/\n/g, ' ').trim() : '';
-            const pulse = c.pulse ? String(c.pulse).replace(/\n/g, ' ').trim() : '';
-            const parts = [];
-            // 主訴與現病史直接顯示
-            if (symptoms) parts.push(symptoms);
-            if (history) parts.push(history);
-            // 將舌象與脈象以逗號串接並用括號包覆，例如「(舌紅，脈弱)」
-            const special = [];
-            if (tongue) special.push(tongue);
-            if (pulse) special.push(pulse);
-            if (special.length) parts.push(`(${special.join('，')})`);
-            const content = parts.join(' ').trim();
-            return `${dateStr} ${content}`.trim();
-        });
+                const dateStr = dateObj ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}` : '';
+                const symptoms = c.symptoms ? String(c.symptoms).replace(/\n/g, ' ').trim() : '';
+                const history = c.currentHistory ? String(c.currentHistory).replace(/\n/g, ' ').trim() : '';
+                const tongue = c.tongue ? String(c.tongue).replace(/\n/g, ' ').trim() : '';
+                const pulse = c.pulse ? String(c.pulse).replace(/\n/g, ' ').trim() : '';
+                const parts = [];
+                if (symptoms) parts.push(symptoms);
+                if (history) parts.push(history);
+                const special = [];
+                if (tongue) special.push(tongue);
+                if (pulse) special.push(pulse);
+                if (special.length) parts.push(`(${special.join('，')})`);
+                const content = parts.join(' ').trim();
+                return `${dateStr} ${content}`.trim();
+            });
+        }
         // 將結果填入表單欄位
         const historyField = document.getElementById('formCurrentHistory');
         if (historyField) {
