@@ -18360,6 +18360,18 @@ async function deleteUser(id) {
         let currentFinancialTabType = 'summary';
         const financialReportCache = {};
         
+        // 等待 Firebase DataManager 就緒
+        async function waitForFirebaseReady(maxWaitMs = 8000) {
+            const start = Date.now();
+            while (Date.now() - start < maxWaitMs) {
+                if (window.firebaseDataManager && window.firebaseDataManager.isReady) {
+                    return true;
+                }
+                await new Promise(r => setTimeout(r, 200));
+            }
+            return false;
+        }
+        
         // 載入財務報表頁面
         async function loadFinancialReports() {
             // 設置預設日期範圍（本月）
@@ -18370,11 +18382,20 @@ async function deleteUser(id) {
             document.getElementById('startDate').value = formatFinancialDate(firstDayOfMonth);
             document.getElementById('endDate').value = formatFinancialDate(lastDayOfMonth);
             
+            // 等待 Firebase 數據管理器就緒，否則提示稍後更新
+            let ready = true;
+            if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+                ready = await waitForFirebaseReady(8000);
+                if (!ready) {
+                    showToast('系統資料尚未就緒，請稍後點擊「更新報表」', 'warning');
+                }
+            }
+
             // 從 Firebase 更新用戶與診症資料（如可用）
-            if (typeof loadUsersForFinancial === 'function') {
+            if (ready && typeof loadUsersForFinancial === 'function') {
                 await loadUsersForFinancial();
             }
-            if (typeof loadConsultationsForFinancial === 'function') {
+            if (ready && typeof loadConsultationsForFinancial === 'function') {
                 await loadConsultationsForFinancial();
             }
             // 載入醫師選項
@@ -18692,6 +18713,14 @@ async function deleteUser(id) {
         // 生成財務報表
         // 改為 async 以便在更新報表前重新載入最新的診症資料，確保「更新報表」按鈕真正更新內容。
         async function generateFinancialReport() {
+            // 確保 Firebase 就緒，若未就緒則嘗試等待
+            if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+                const ok = await waitForFirebaseReady(6000);
+                if (!ok) {
+                    showToast('系統資料初始化中，請稍後再試', 'error');
+                }
+            }
+
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
             const doctorFilter = document.getElementById('doctorFilter').value;
@@ -18791,6 +18820,10 @@ async function deleteUser(id) {
             }
             if (typeof loadConsultationsForFinancial === 'function') {
                 try {
+                    // 先刷新用戶資料，以便醫師/診所選項與關聯資訊一致
+                    if (typeof loadUsersForFinancial === 'function') {
+                        try { await loadUsersForFinancial(); } catch (_e) {}
+                    }
                     await loadConsultationsForFinancial();
                 } catch (err) {
                     console.error('重新載入財務資料失敗:', err);
@@ -18832,15 +18865,54 @@ async function deleteUser(id) {
             const start = new Date(startDate);
             const end = new Date(endDate + 'T23:59:59.999Z');
 
-            return consultations.filter(consultation => {
-                const consultationDate = new Date(consultation.date);
+            // 取得選定診所名稱以備無 clinicId 時寬鬆匹配
+            let selectedClinicName = '';
+            try {
+                if (clinicFilter) {
+                    const c = (Array.isArray(clinicsList) ? clinicsList : []).find(x => String(x.id) === String(clinicFilter));
+                    selectedClinicName = c ? (c.chineseName || c.englishName || '') : '';
+                }
+            } catch (_e) {}
+
+            // 解析日期容錯：優先使用 consultation.date，無效則使用 createdAt
+            const toDateSafe = (c) => {
+                let d = c && c.date ? new Date(c.date) : null;
+                if (!d || isNaN(d.getTime())) {
+                    if (c && c.createdAt) {
+                        d = (typeof c.createdAt === 'object' && c.createdAt.seconds)
+                            ? new Date(c.createdAt.seconds * 1000)
+                            : new Date(c.createdAt);
+                    }
+                }
+                return d;
+            };
+
+            const result = consultations.filter(consultation => {
+                const consultationDate = toDateSafe(consultation);
+                if (!consultationDate || isNaN(consultationDate.getTime())) {
+                    return false;
+                }
                 const dateInRange = consultationDate >= start && consultationDate <= end;
                 const doctorMatch = !doctorFilter || consultation.doctor === doctorFilter;
-                const clinicMatch = !clinicFilter || (consultation.clinicId && String(consultation.clinicId) === String(clinicFilter));
+                const clinicMatch = !clinicFilter
+                    || (consultation.clinicId && String(consultation.clinicId) === String(clinicFilter))
+                    || (!!selectedClinicName && !!consultation.clinicName && String(consultation.clinicName) === String(selectedClinicName));
                 const isCompleted = consultation.status === 'completed';
 
                 return dateInRange && doctorMatch && clinicMatch && isCompleted;
             });
+
+            // 若有選定診所但部分紀錄缺 clinicId，提示一次
+            try {
+                if (clinicFilter) {
+                    const missingClinicIdCount = consultations.filter(c => !c.clinicId && !!c.clinicName).length;
+                    if (missingClinicIdCount > 0) {
+                        showToast('部分診症記錄缺少診所標識，已改用診所名稱做寬鬆匹配', 'info');
+                    }
+                }
+            } catch (_e) {}
+
+            return result;
         }
 
         // 計算財務統計資料
