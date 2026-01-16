@@ -16983,36 +16983,7 @@ async function searchBillingForConsultation() {
                     parsePrescriptionToItems(lastConsultation.prescription);
                     updatePrescriptionDisplay();
                 }
-                try {
-                    const daysEl = document.getElementById('medicationDays');
-                    const freqEl = document.getElementById('medicationFrequency');
-                    if (daysEl) {
-                        if (lastConsultation.medicationDays !== undefined && lastConsultation.medicationDays !== null) {
-                            daysEl.value = lastConsultation.medicationDays;
-                        } else {
-                            daysEl.value = '';
-                        }
-                    }
-                    if (freqEl) {
-                        if (lastConsultation.medicationFrequency !== undefined && lastConsultation.medicationFrequency !== null) {
-                            freqEl.value = lastConsultation.medicationFrequency;
-                        } else {
-                            freqEl.value = '';
-                        }
-                    }
-                } catch (_setErr) {}
-                // 在載入上次處方後，自動依照當前服藥天數更新藥費。
-                // 先讀取天數輸入框的值，若無法取得則使用預設5天。
-                try {
-                    const daysInputEl = document.getElementById('medicationDays');
-                    const daysVal = daysInputEl ? parseInt(daysInputEl.value) || 5 : 5;
-                    // 只有當載入的處方有內容時才進行藥費更新
-                    if (selectedPrescriptionItems.length > 0) {
-                        updateMedicineFeeByDays(daysVal);
-                    }
-                } catch (_e) {
-                    // 忽略任何錯誤，避免阻斷流程
-                }
+                
             } catch (error) {
                 console.error('讀取病人資料錯誤:', error);
                 showToast('讀取病人資料失敗', 'error');
@@ -17416,24 +17387,7 @@ const consultationDate = (() => {
             document.getElementById('formFollowUpDate').value = consultation.followUpDate || '';
             document.getElementById('formVisitTime').value = consultation.visitTime || '';
             
-            try {
-                const daysEl = document.getElementById('medicationDays');
-                const freqEl = document.getElementById('medicationFrequency');
-                if (daysEl) {
-                    if (consultation.medicationDays !== undefined && consultation.medicationDays !== null) {
-                        daysEl.value = consultation.medicationDays;
-                    } else {
-                        daysEl.value = '';
-                    }
-                }
-                if (freqEl) {
-                    if (consultation.medicationFrequency !== undefined && consultation.medicationFrequency !== null) {
-                        freqEl.value = consultation.medicationFrequency;
-                    } else {
-                        freqEl.value = '';
-                    }
-                }
-            } catch (_medErr) {}
+            
 
             // 載入休息期間
             if (consultation.restStartDate && consultation.restEndDate) {
@@ -17525,6 +17479,14 @@ const consultationDate = (() => {
                 document.getElementById('formPrescription').value = '';
                 updatePrescriptionDisplay();
             }
+            
+            try {
+                const totalDays = getTotalMedicationDays();
+                const daysElSync = document.getElementById('medicationDays');
+                if (daysElSync) {
+                    daysElSync.value = totalDays > 0 ? totalDays : '';
+                }
+            } catch (_syncErr) {}
             
             // 載入收費項目
             // 先保存當前診症中已使用的套票抵扣項目（category 為 packageUse），以避免覆蓋
