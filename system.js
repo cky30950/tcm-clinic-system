@@ -7972,6 +7972,7 @@ async function loadConsultationForEdit(consultationId) {
                 }
                 // 更新顯示
                 updateBillingDisplay();
+                try { syncMedicationDaysWithMedicineFee(); } catch (_e) {}
             }
             
             // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
@@ -16090,6 +16091,23 @@ async function initializeSystemAfterLogin() {
                 }
             }
         }
+        function getMedicineFeeDaysFromSelected() {
+            const item = selectedBillingItems.find(it => it && it.category === 'medicine' && (it.name.includes('中藥') || it.name.includes('藥費') || it.name.includes('調劑')));
+            return item ? (parseInt(item.quantity) || 0) : 0;
+        }
+        function syncMedicationDaysWithMedicineFee() {
+            const hasAnyItems = prescriptions.some(p => Array.isArray(p.items) && p.items.length > 0);
+            if (!hasAnyItems) return;
+            const feeDays = getMedicineFeeDaysFromSelected();
+            if (!feeDays || feeDays < 1) return;
+            const totalDays = getTotalMedicationDays();
+            if (totalDays === feeDays) return;
+            prescriptions = prescriptions.map((p, idx) => {
+                const d = idx === 0 ? feeDays : 0;
+                return { name: p.name, items: p.items, days: d, freq: p.freq, mode: p.mode };
+            });
+            updatePrescriptionDisplay();
+        }
         
         // 天數輸入框直接變更（依處方）
         function updateMedicationDaysFromInputAt(sectionIdx) {
@@ -17528,6 +17546,7 @@ const consultationDate = (() => {
 
                 // 更新收費顯示
                 updateBillingDisplay();
+                try { syncMedicationDaysWithMedicineFee(); } catch (_e) {}
             } else {
                 // 沒有新收費項目，但仍保留先前的套票使用項目
                 if (existingPackageUses && existingPackageUses.length > 0) {
