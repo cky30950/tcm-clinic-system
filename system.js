@@ -16999,7 +16999,18 @@ async function searchBillingForConsultation() {
                 } catch (_e) {}
                 if (!usedMulti) {
                     parsePrescriptionToItems(lastConsultation.prescription);
+                    try {
+                        const medDays = parseInt(lastConsultation.medicationDays);
+                        if (!isNaN(medDays) && medDays > 0 && Array.isArray(prescriptions) && prescriptions.length > 0) {
+                            prescriptions[0].days = medDays;
+                        }
+                        const medFreq = parseInt(lastConsultation.medicationFrequency);
+                        if (!isNaN(medFreq) && medFreq > 0 && Array.isArray(prescriptions) && prescriptions.length > 0) {
+                            prescriptions[0].freq = medFreq;
+                        }
+                    } catch (_e) {}
                     updatePrescriptionDisplay();
+                    try { updateMedicineFeeByDays(getTotalMedicationDays()); } catch (_e) {}
                 }
                 
             } catch (error) {
