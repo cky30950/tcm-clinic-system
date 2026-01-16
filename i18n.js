@@ -666,6 +666,15 @@ window.translations = {
         "餘量：": "Remaining:",
         "剩餘": "Remaining",
         "使用次數": "Usage Count",
+        "名稱": "Name",
+        "當前診所：": "Current Clinic:",
+        "切換": "Switch",
+        "切換診所": "Switch Clinic",
+        "正在載入資料": "Loading Data",
+        "切換診所並載入所需資料…": "Switch clinic and load required data…",
+        "載入中…": "Loading…",
+        "未命名診所": "Unnamed Clinic",
+        "確定": "Confirm",
 
         
         "排序方式": "Sort by",

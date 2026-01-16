@@ -1554,7 +1554,7 @@ async function fetchUsers(forceRefresh = false) {
             try {
                 const loginSel = document.getElementById('loginClinicSelector');
                 if (loginSel) {
-                    loginSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${c.chineseName || c.englishName || c.id}</option>`).join('');
+                    loginSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${getClinicDisplayName(c)}</option>`).join('');
                     if (currentClinicId) loginSel.value = currentClinicId;
                     loginSel.addEventListener('change', function() {
                         setCurrentClinicId(this.value);
@@ -1564,7 +1564,7 @@ async function fetchUsers(forceRefresh = false) {
             try {
                 const editSel = document.getElementById('clinicSelectForEditing');
                 if (editSel) {
-                    editSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${c.chineseName || c.englishName || c.id}</option>`).join('');
+                    editSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${getClinicDisplayName(c)}</option>`).join('');
                     if (currentClinicId) editSel.value = currentClinicId;
                     editSel.addEventListener('change', async function() {
                         currentClinicId = this.value;
@@ -1591,7 +1591,7 @@ async function fetchUsers(forceRefresh = false) {
                         parent.replaceChild(cloned, currentSel);
                         currentSel = cloned;
                     }
-                    currentSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${c.chineseName || c.englishName || c.id}</option>`).join('');
+                    currentSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${getClinicDisplayName(c)}</option>`).join('');
                     if (currentClinicId) currentSel.value = currentClinicId;
                     
                 }
@@ -1718,7 +1718,7 @@ async function fetchUsers(forceRefresh = false) {
                     return;
                 }
             } catch (_guardErr) {}
-            showGlobalLoading(7, '切換診所並載入所需資料…');
+            showGlobalLoading(7, (typeof window.t === 'function' ? window.t('切換診所並載入所需資料…') : '切換診所並載入所需資料…'));
             currentClinicId = id;
             localStorage.setItem('currentClinicId', currentClinicId);
             const cur = await window.firebaseDataManager.getClinicById(currentClinicId);
@@ -1754,21 +1754,32 @@ async function fetchUsers(forceRefresh = false) {
             } catch (_eInvHist) {}
             hideGlobalLoading();
         }
+        function getClinicDisplayName(c) {
+            try {
+                const lang = (localStorage.getItem('lang') || 'zh').toLowerCase();
+                if (lang.startsWith('en')) {
+                    return (c && (c.englishName || c.chineseName || c.name || c.id)) || '';
+                }
+                return (c && (c.chineseName || c.englishName || c.name || c.id)) || '';
+            } catch (_e) {
+                return (c && (c.chineseName || c.englishName || c.name || c.id)) || '';
+            }
+        }
         function updateCurrentClinicDisplay() {
             const el = document.getElementById('currentClinicDisplay');
             if (el) {
                 let name = '';
-                try { name = clinicSettings.chineseName || clinicSettings.englishName || clinicSettings.name || ''; } catch (_eName) {}
+                try { name = getClinicDisplayName(clinicSettings); } catch (_eName) {}
                 if (!name) {
                     try {
                         if (Array.isArray(clinicsList)) {
                             const c = clinicsList.find(c => String(c.id) === String(currentClinicId));
-                            name = (c && (c.chineseName || c.englishName || c.name)) || '';
+                            name = getClinicDisplayName(c || {});
                         }
                     } catch (_eList) {}
                 }
                 if (!name) {
-                    el.textContent = '當前診所：載入中…';
+                    el.textContent = (typeof window.t === 'function' ? window.t('當前診所：') : '當前診所：') + (typeof window.t === 'function' ? window.t('載入中…') : '載入中…');
                     try {
                         const cid = currentClinicId;
                         if (cid && window.firebaseDataManager && typeof window.firebaseDataManager.getClinicById === 'function') {
@@ -1776,18 +1787,18 @@ async function fetchUsers(forceRefresh = false) {
                                 if (res && res.success && res.data) {
                                     clinicSettings = res.data;
                                     let n = '';
-                                    try { n = clinicSettings.chineseName || clinicSettings.englishName || clinicSettings.name || ''; } catch (_eN) {}
+                                    try { n = getClinicDisplayName(clinicSettings); } catch (_eN) {}
                                     if (!n && Array.isArray(clinicsList)) {
                                         const cc = clinicsList.find(c => String(c.id) === String(cid));
-                                        n = (cc && (cc.chineseName || cc.englishName || cc.name)) || '';
+                                        n = getClinicDisplayName(cc || {});
                                     }
-                                    el.textContent = '當前診所：' + (n || '未命名診所');
+                                    el.textContent = (typeof window.t === 'function' ? window.t('當前診所：') : '當前診所：') + (n || (typeof window.t === 'function' ? window.t('未命名診所') : '未命名診所'));
                                 }
                             }).catch(() => {});
                         }
                     } catch (_eAsync) {}
                 } else {
-                    el.textContent = '當前診所：' + name;
+                    el.textContent = (typeof window.t === 'function' ? window.t('當前診所：') : '當前診所：') + name;
                 }
             }
             try {
