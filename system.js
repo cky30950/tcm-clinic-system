@@ -4309,7 +4309,7 @@ function parseJsonWithComments(text) {
     } catch (_e) {
         let t = text;
         t = t.replace(/^\uFEFF/, '');
-        t = t.replace(/\/\*[\s\S]*?\*\
+        t = t.replace(/\/\*[\s\S]*?\*\//g, '');
         t = t.replace(/^\s*\/\/.*$/gm, '');
         t = t.replace(/,\s*([}\]])/g, '$1');
         return JSON.parse(t);
@@ -14159,6 +14159,7 @@ async function initializeSystemAfterLogin() {
             const listContainer = document.getElementById('acupointLibraryList');
             const searchInput = document.getElementById('searchAcupoint');
             const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+            const termNormalized = searchTerm ? searchTerm.replace(/[\s-]/g, '') : '';
             // 依搜尋字串過濾資料
             const searchFiltered = Array.isArray(acupointLibrary) ? acupointLibrary.filter(item => {
                 const nameMatch = item.name && item.name.toLowerCase().includes(searchTerm);
@@ -14170,7 +14171,11 @@ async function initializeSystemAfterLogin() {
                 const methodMatch = item.method && item.method.toLowerCase().includes(searchTerm);
                 // 分類搜尋
                 const categoryMatch = item.category && item.category.toLowerCase().includes(searchTerm);
-                return nameMatch || meridianMatch || locationMatch || funcMatch || indMatch || methodMatch || categoryMatch;
+                const engMatch = item.englishName && item.englishName.toLowerCase().includes(searchTerm);
+                const codeStr = item.internationalCode ? item.internationalCode.toLowerCase() : '';
+                const codeNorm = codeStr ? codeStr.replace(/[\s-]/g, '') : '';
+                const codeMatch = (codeStr && codeStr.includes(searchTerm)) || (termNormalized && codeNorm.includes(termNormalized));
+                return nameMatch || meridianMatch || locationMatch || funcMatch || indMatch || methodMatch || categoryMatch || engMatch || codeMatch;
             }) : [];
             // 計算各經絡的總數量，用於篩選按鈕顯示
             const meridianCounts = {};
@@ -27874,14 +27879,15 @@ ${item.points.map(pt => {
               const funcs = Array.isArray(item.functions) ? item.functions.join('、') : String(item.functions);
               details.push('功效：' + funcs);
             }
-            if (item.indications) {
-              const inds = Array.isArray(item.indications) ? item.indications.join('、') : String(item.indications);
-              details.push('主治：' + inds);
-            }
-            if (item.method) details.push('針法：' + item.method);
-            if (item.category) details.push('分類：' + item.category);
-            return details.join('\n');
+          if (item.indications) {
+            const inds = Array.isArray(item.indications) ? item.indications.join('、') : String(item.indications);
+            details.push('主治：' + inds);
           }
+          if (item.method) details.push('針法：' + item.method);
+          if (item.category) details.push('分類：' + item.category);
+          if (item.internationalCode) details.push('國際代碼：' + item.internationalCode);
+          return details.join('\n');
+        }
 
           // 將穴位搜索與新增函式掛載至 window，使其可由行內事件調用
           window.searchAcupointForCombo = searchAcupointForCombo;
@@ -28045,7 +28051,11 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
           (item.location && item.location.toLowerCase().includes(searchTerm)) ||
           (item.functions && (Array.isArray(item.functions) ? item.functions.join(' ').toLowerCase().includes(searchTerm) : String(item.functions).toLowerCase().includes(searchTerm))) ||
           (item.indications && (Array.isArray(item.indications) ? item.indications.join(' ').toLowerCase().includes(searchTerm) : String(item.indications).toLowerCase().includes(searchTerm))) ||
-          (item.englishName && item.englishName.toLowerCase().includes(searchTerm))
+          (item.englishName && item.englishName.toLowerCase().includes(searchTerm)) ||
+          (item.internationalCode && (
+            item.internationalCode.toLowerCase().includes(searchTerm) ||
+            item.internationalCode.toLowerCase().replace(/[\s-]/g, '').includes(searchTerm.replace(/[\s-]/g, ''))
+          ))
         ))
         .map(item => {
           const nameStr = item.name ? item.name.toLowerCase() : '';
@@ -28054,6 +28064,9 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
           const funcStr = item.functions ? (Array.isArray(item.functions) ? item.functions.join(' ').toLowerCase() : String(item.functions).toLowerCase()) : '';
           const indStr = item.indications ? (Array.isArray(item.indications) ? item.indications.join(' ').toLowerCase() : String(item.indications).toLowerCase()) : '';
           const engStr = item.englishName ? item.englishName.toLowerCase() : '';
+          const codeStr = item.internationalCode ? item.internationalCode.toLowerCase() : '';
+          const codeNorm = codeStr ? codeStr.replace(/[\s-]/g, '') : '';
+          const termNorm = searchTerm ? searchTerm.replace(/[\s-]/g, '') : '';
           let score = Infinity;
           if (nameStr.includes(searchTerm)) {
             score = nameStr.indexOf(searchTerm);
@@ -28067,6 +28080,10 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
             score = 400 + indStr.indexOf(searchTerm);
           } else if (engStr.includes(searchTerm)) {
             score = 500 + engStr.indexOf(searchTerm);
+          } else if (codeStr.includes(searchTerm)) {
+            score = 600 + codeStr.indexOf(searchTerm);
+          } else if (termNorm && codeNorm.includes(termNorm)) {
+            score = 600 + codeNorm.indexOf(termNorm);
           }
           return { item, score };
         })
@@ -28110,6 +28127,7 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
         }
         if (item.method) details.push('針法：' + item.method);
         if (item.category) details.push('分類：' + item.category);
+        if (item.internationalCode) details.push('國際代碼：' + item.internationalCode);
         const encoded = encodeURIComponent(details.join('\n'));
         // 使用藍色背景與邊框呈現搜尋結果，每個結果可點擊加入備註
         return `<div class="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addAcupointToNotes('${safeName}')">${window.escapeHtml(displayName)}</div>`;

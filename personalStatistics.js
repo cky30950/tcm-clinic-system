@@ -404,7 +404,7 @@ function populateMonthSelect(months, currentKey) {
     sel.innerHTML = '';
     const allOpt = document.createElement('option');
     allOpt.value = 'ALL';
-    allOpt.textContent = '全部月份';
+    allOpt.textContent = window.t('全部月份');
     sel.appendChild(allOpt);
     const desiredKey = currentKey || 'ALL';
     const seen = new Set();
@@ -457,7 +457,7 @@ function populateClinicSelect(initialClinicId) {
     sel.innerHTML = '';
     const allOpt = document.createElement('option');
     allOpt.value = 'ALL';
-    allOpt.textContent = '全部診所';
+    allOpt.textContent = window.t('全部診所');
     sel.appendChild(allOpt);
     const clinics = readClinicsForPersonalStats();
     clinics.forEach(c => {
