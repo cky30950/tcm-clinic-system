@@ -1,7 +1,4 @@
-/**
- * 個人統計分析模組（V2）
- * 僅處理病歷中的「處方」與「針灸備註」欄位，漸進讀取＋本地快取＋增量更新。
- */
+
 let personalHerbChartInstance = null;
 let personalFormulaChartInstance = null;
 let personalAcupointChartInstance = null;
