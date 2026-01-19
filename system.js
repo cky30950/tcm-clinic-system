@@ -9203,17 +9203,26 @@ if (!patient) {
     return;
 }
             
-            // 改為僅載入單筆：先取得總數與最新一筆
-            const cntRes = await window.firebaseDataManager.getPatientConsultationsCount(patientId);
-            const latestRes = await window.firebaseDataManager.getPatientLatestConsultation(patientId);
-            if (!cntRes.success) {
-                showToast('無法讀取診症總數！', 'error');
+            // 獲取該病人的所有診症記錄（從 Firestore 取得）
+            // 強制重新取得診症記錄，避免跨裝置快取不一致
+            const consultationResult = await window.firebaseDataManager.getPatientConsultations(patientId);
+            if (!consultationResult.success) {
+                showToast('無法讀取診症記錄！', 'error');
                 return;
             }
-            // 狀態保存：總數、當前索引（最新為最後一筆）、當前單筆記錄
-            window.currentPatientHistoryCount = cntRes.count || 0;
-            window.currentPatientHistoryIndex = window.currentPatientHistoryCount > 0 ? window.currentPatientHistoryCount : 0;
-            window.currentPatientHistoryRecord = latestRes && latestRes.data ? latestRes.data : null;
+            
+            // 使用通用日期解析函式對資料進行排序，按日期升序排列（較舊至較新）
+            currentPatientConsultations = consultationResult.data.slice().sort((a, b) => {
+                const dateA = parseConsultationDate(a.date);
+                const dateB = parseConsultationDate(b.date);
+                // 若其中一個日期無法解析，將其放到較後面
+                if (!dateA || isNaN(dateA.getTime())) return 1;
+                if (!dateB || isNaN(dateB.getTime())) return -1;
+                return dateA - dateB;
+            });
+            
+            // 預設顯示最新的病歷（最近一次診症）
+            currentPatientHistoryPage = currentPatientConsultations.length - 1;
             
             // 設置標題
             document.getElementById('patientMedicalHistoryTitle').textContent = `${patient.name} 的病歷記錄`;
@@ -9276,7 +9285,7 @@ if (!patient) {
             const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
             const dict = (window.translations && window.translations[lang]) ? window.translations[lang] : {};
             
-            if (!window.currentPatientHistoryRecord) {
+            if (currentPatientConsultations.length === 0) {
                 // Use Chinese strings here so the i18n observer can
                 // translate them if necessary.  For zero‑records state
                 // there are no dynamic numbers to handle.
@@ -9290,10 +9299,10 @@ if (!patient) {
                 return;
             }
             
-            const consultation = window.currentPatientHistoryRecord;
-            const totalPages = window.currentPatientHistoryCount || 0;
-            const currentPageNumber = window.currentPatientHistoryIndex || 1;
-            const consultationNumber = window.currentPatientHistoryIndex || 1;
+            const consultation = currentPatientConsultations[currentPatientHistoryPage];
+            const totalPages = currentPatientConsultations.length;
+            const currentPageNumber = currentPatientHistoryPage + 1;
+            const consultationNumber = currentPatientHistoryPage + 1;
 
             // Prepare dynamic translation segments.  We look up static labels
             // from the dictionary and build English phrases when needed.
@@ -9325,7 +9334,7 @@ if (!patient) {
                     
                     <div class="flex items-center space-x-2">
                         <button onclick="changePatientHistoryPage(-1)" 
-                                ${currentPageNumber <= 1 ? 'disabled' : ''}
+                                ${currentPatientHistoryPage === 0 ? 'disabled' : ''}
                                 class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
                             ← ${prevLabel}
                         </button>
@@ -9333,7 +9342,7 @@ if (!patient) {
                             ${currentPageNumber} / ${totalPages}
                         </span>
                         <button onclick="changePatientHistoryPage(1)" 
-                                ${currentPageNumber >= totalPages ? 'disabled' : ''}
+                                ${currentPatientHistoryPage === totalPages - 1 ? 'disabled' : ''}
                                 class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
                             ${nextLabel} →
                         </button>
@@ -9586,15 +9595,10 @@ if (!patient) {
             `;
         }
         
-        async function changePatientHistoryPage(direction) {
-            if (!window.currentPatientHistoryRecord || !window.currentPatientHistoryCount) return;
-            const patientId = currentPatientHistoryPatientId;
-            const currentId = window.currentPatientHistoryRecord.id;
-            const dir = direction < 0 ? 'older' : 'newer';
-            const res = await window.firebaseDataManager.getPatientAdjacentConsultation(patientId, currentId, dir);
-            if (res && res.success && res.data) {
-                window.currentPatientHistoryRecord = res.data;
-                window.currentPatientHistoryIndex = (window.currentPatientHistoryIndex || 1) + (direction < 0 ? -1 : 1);
+        function changePatientHistoryPage(direction) {
+            const newPage = currentPatientHistoryPage + direction;
+            if (newPage >= 0 && newPage < currentPatientConsultations.length) {
+                currentPatientHistoryPage = newPage;
                 displayPatientMedicalHistoryPage();
             }
         }
@@ -9638,16 +9642,30 @@ async function viewPatientMedicalHistory(patientId) {
             return;
         }
         
-        // 改為僅載入單筆：先取得總數與最新一筆
-        const cntRes = await window.firebaseDataManager.getPatientConsultationsCount(patientId);
-        const latestRes = await window.firebaseDataManager.getPatientLatestConsultation(patientId);
-        if (!cntRes.success) {
-            showToast('無法讀取診症總數', 'error');
+        // 獲取該病人的所有診症記錄（強制刷新），避免跨裝置快取不一致
+        const consultationResult = await window.firebaseDataManager.getPatientConsultations(patientId);
+        if (!consultationResult.success) {
+            showToast('無法讀取診症記錄', 'error');
             return;
         }
-        window.currentConsultationHistoryCount = cntRes.count || 0;
-        window.currentConsultationHistoryIndex = window.currentConsultationHistoryCount > 0 ? window.currentConsultationHistoryCount : 0;
-        window.currentConsultationHistoryRecord = latestRes && latestRes.data ? latestRes.data : null;
+
+        /**
+         * Firebase 回傳的診症記錄預設按照日期降序（最新在前），
+         * 但在病歷瀏覽頁面中希望將順序調整為「較舊在左、最新在右」。
+         * 因此這裡先複製一份資料，再使用日期進行升序排序，
+         * 並將當前頁索引設為最後一筆，確保進入頁面時顯示最新的一次診症。
+         */
+        currentConsultationConsultations = consultationResult.data.slice().sort((a, b) => {
+            const dateA = parseConsultationDate(a.date);
+            const dateB = parseConsultationDate(b.date);
+            // 若其中一個日期無法解析，將其放到較後面
+            if (!dateA || isNaN(dateA.getTime())) return 1;
+            if (!dateB || isNaN(dateB.getTime())) return -1;
+            return dateA - dateB;
+        });
+
+        // 預設顯示最新的病歷（最近一次診症在最右）
+        currentConsultationHistoryPage = currentConsultationConsultations.length - 1;
         
         // 設置標題（轉義使用者輸入，避免 XSS）
         document.getElementById('medicalHistoryTitle').textContent = `${window.escapeHtml(patient.name)} 的診症記錄`;
@@ -9716,7 +9734,7 @@ function displayConsultationMedicalHistoryPage() {
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
     const dict = (window.translations && window.translations[lang]) ? window.translations[lang] : {};
     
-    if (!window.currentConsultationHistoryRecord) {
+    if (currentConsultationConsultations.length === 0) {
         // When there are no consultation records, we still allow the text
         // content to be translated by the i18n observer.  Therefore
         // Chinese strings are left intact here and will be replaced if the
@@ -9731,10 +9749,10 @@ function displayConsultationMedicalHistoryPage() {
         return;
     }
     
-    const consultation = window.currentConsultationHistoryRecord;
-    const totalPages = window.currentConsultationHistoryCount || 0;
-    const currentPageNumber = window.currentConsultationHistoryIndex || 1;
-    const consultationNumber = window.currentConsultationHistoryIndex || 1;
+    const consultation = currentConsultationConsultations[currentConsultationHistoryPage];
+    const totalPages = currentConsultationConsultations.length;
+    const currentPageNumber = currentConsultationHistoryPage + 1;
+    const consultationNumber = currentConsultationHistoryPage + 1;
 
     // Build translated dynamic strings.  For Chinese we keep the original
     // formatting; for English we generate equivalent phrases.  The
@@ -9771,21 +9789,21 @@ function displayConsultationMedicalHistoryPage() {
             </div>
             
             <div class="flex items-center space-x-2">
-                        <button onclick="changeConsultationHistoryPage(-1)" 
-                                ${currentPageNumber <= 1 ? 'disabled' : ''}
-                                class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
-                            ← ${prevLabel}
-                        </button>
-                        <span class="text-sm text-gray-600 px-2">
-                            ${currentPageNumber} / ${totalPages}
-                        </span>
-                        <button onclick="changeConsultationHistoryPage(1)" 
-                                ${currentPageNumber >= totalPages ? 'disabled' : ''}
-                                class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
-                            ${nextLabel} →
-                        </button>
-                    </div>
-                </div>
+                <button onclick="changeConsultationHistoryPage(-1)" 
+                        ${currentConsultationHistoryPage === 0 ? 'disabled' : ''}
+                        class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
+                    ← ${prevLabel}
+                </button>
+                <span class="text-sm text-gray-600 px-2">
+                    ${currentPageNumber} / ${totalPages}
+                </span>
+                <button onclick="changeConsultationHistoryPage(1)" 
+                        ${currentConsultationHistoryPage === totalPages - 1 ? 'disabled' : ''}
+                        class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
+                    ${nextLabel} →
+                </button>
+            </div>
+        </div>
         
         <!-- 當前病歷記錄 -->
         <div class="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
@@ -10022,18 +10040,13 @@ function displayConsultationMedicalHistoryPage() {
     `;
 }
         
-async function changeConsultationHistoryPage(direction) {
-    if (!window.currentConsultationHistoryRecord || !window.currentConsultationHistoryCount) return;
-    const patientId = currentConsultationHistoryPatientId;
-    const currentId = window.currentConsultationHistoryRecord.id;
-    const dir = direction < 0 ? 'older' : 'newer';
-    const res = await window.firebaseDataManager.getPatientAdjacentConsultation(patientId, currentId, dir);
-    if (res && res.success && res.data) {
-        window.currentConsultationHistoryRecord = res.data;
-        window.currentConsultationHistoryIndex = (window.currentConsultationHistoryIndex || 1) + (direction < 0 ? -1 : 1);
-        displayConsultationMedicalHistoryPage();
-    }
-}
+        function changeConsultationHistoryPage(direction) {
+            const newPage = currentConsultationHistoryPage + direction;
+            if (newPage >= 0 && newPage < currentConsultationConsultations.length) {
+                currentConsultationHistoryPage = newPage;
+                displayConsultationMedicalHistoryPage();
+            }
+        }
         
         // 關閉診症記錄彈窗
         function closeMedicalHistoryModal() {
@@ -21657,119 +21670,6 @@ class FirebaseDataManager {
         } catch (error) {
             console.error('讀取病人診症記錄失敗:', error);
             return { success: false, data: [] };
-        }
-    }
-    /**
-     * 回傳指定病人之診症記錄總數（不載入內容），用於顯示「共 N 次」。
-     */
-    async getPatientConsultationsCount(patientId) {
-        if (!this.isReady) return { success: false, count: 0 };
-        try {
-            await waitForFirebaseDb();
-            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            const q = window.firebase.firestoreQuery(colRef, window.firebase.where('patientId', '==', String(patientId)));
-            const snapshot = await window.firebase.getCountFromServer(q);
-            const count = snapshot.data().count || 0;
-            return { success: true, count };
-        } catch (error) {
-            console.error('讀取病人診症記錄總數失敗:', error);
-            return { success: false, count: 0 };
-        }
-    }
-    /**
-     * 取得指定病人最新一筆診症（單筆）。
-     */
-    async getPatientLatestConsultation(patientId) {
-        if (!this.isReady) return { success: false, data: null };
-        try {
-            await waitForFirebaseDb();
-            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            const q = window.firebase.firestoreQuery(
-                colRef,
-                window.firebase.where('patientId', '==', String(patientId)),
-                window.firebase.orderBy('date', 'desc'),
-                window.firebase.limit(1)
-            );
-            const snapshot = await window.firebase.getDocs(q);
-            if (!snapshot.docs.length) {
-                const q2 = window.firebase.firestoreQuery(
-                    colRef,
-                    window.firebase.where('patientId', '==', String(patientId)),
-                    window.firebase.orderBy('createdAt', 'desc'),
-                    window.firebase.limit(1)
-                );
-                const snap2 = await window.firebase.getDocs(q2);
-                if (!snap2.docs.length) return { success: true, data: null };
-                const d2 = snap2.docs[0];
-                return { success: true, data: { id: d2.id, ...d2.data() } };
-            }
-            const docSnap = snapshot.docs[0];
-            return { success: true, data: { id: docSnap.id, ...docSnap.data() } };
-        } catch (error) {
-            console.error('讀取最新診症失敗:', error);
-            return { success: false, data: null };
-        }
-    }
-    /**
-     * 取得相鄰診症（單筆），direction: 'older' | 'newer'。
-     * 以當前日期為游標，僅載入下一筆。
-     */
-    async getPatientAdjacentConsultation(patientId, currentRecordId, direction = 'older') {
-        if (!this.isReady) return { success: false, data: null };
-        try {
-            await waitForFirebaseDb();
-            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            const isOlder = direction === 'older';
-            let currentSnap = null;
-            try {
-                const docRef = window.firebase.doc(window.firebase.db, 'consultations', String(currentRecordId));
-                currentSnap = await window.firebase.getDoc(docRef);
-            } catch (_e) { currentSnap = null; }
-            // 主要以 date 排序，使用當前文件快照作為游標
-            let q = window.firebase.firestoreQuery(
-                colRef,
-                window.firebase.where('patientId', '==', String(patientId)),
-                window.firebase.orderBy('date', isOlder ? 'desc' : 'asc'),
-                currentSnap ? window.firebase.startAfter(currentSnap) : window.firebase.limit(1), // 先佔位
-                window.firebase.limit(1)
-            );
-            // 若無快照則退而求其次：以 date 值為游標（轉 Timestamp），或改用 createdAt
-            if (!currentSnap) {
-                // 嘗試以 date 值作為游標
-                try {
-                    const cur = await this.getPatientLatestConsultation(patientId);
-                    const curDate = cur && cur.data ? (cur.data.date || cur.data.createdAt || cur.data.updatedAt) : null;
-                    const parsed = parseConsultationDate(curDate);
-                    const ts = parsed && window.firebase.Timestamp && typeof window.firebase.Timestamp.fromDate === 'function'
-                        ? window.firebase.Timestamp.fromDate(parsed)
-                        : parsed;
-                    q = window.firebase.firestoreQuery(
-                        colRef,
-                        window.firebase.where('patientId', '==', String(patientId)),
-                        window.firebase.orderBy('date', isOlder ? 'desc' : 'asc'),
-                        ts ? window.firebase.startAfter(ts) : window.firebase.limit(1),
-                        window.firebase.limit(1)
-                    );
-                } catch (_e2) {}
-            }
-            let snapshot = await window.firebase.getDocs(q);
-            if (!snapshot.docs.length) {
-                // 以 createdAt 排序作為備援
-                const q2 = window.firebase.firestoreQuery(
-                    colRef,
-                    window.firebase.where('patientId', '==', String(patientId)),
-                    window.firebase.orderBy('createdAt', isOlder ? 'desc' : 'asc'),
-                    currentSnap ? window.firebase.startAfter(currentSnap) : undefined,
-                    window.firebase.limit(1)
-                );
-                snapshot = await window.firebase.getDocs(q2);
-            }
-            if (!snapshot.docs.length) return { success: true, data: null };
-            const nextDoc = snapshot.docs[0];
-            return { success: true, data: { id: nextDoc.id, ...nextDoc.data() } };
-        } catch (error) {
-            console.error('讀取相鄰診症失敗:', error);
-            return { success: false, data: null };
         }
     }
     // 用戶數據管理
