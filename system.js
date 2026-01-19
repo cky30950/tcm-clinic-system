@@ -9589,9 +9589,9 @@ if (!patient) {
         async function changePatientHistoryPage(direction) {
             if (!window.currentPatientHistoryRecord || !window.currentPatientHistoryCount) return;
             const patientId = currentPatientHistoryPatientId;
-            const currentDate = window.currentPatientHistoryRecord.date || window.currentPatientHistoryRecord.createdAt || window.currentPatientHistoryRecord.updatedAt;
+            const currentId = window.currentPatientHistoryRecord.id;
             const dir = direction < 0 ? 'older' : 'newer';
-            const res = await window.firebaseDataManager.getPatientAdjacentConsultation(patientId, currentDate, dir);
+            const res = await window.firebaseDataManager.getPatientAdjacentConsultation(patientId, currentId, dir);
             if (res && res.success && res.data) {
                 window.currentPatientHistoryRecord = res.data;
                 window.currentPatientHistoryIndex = (window.currentPatientHistoryIndex || 1) + (direction < 0 ? -1 : 1);
@@ -10025,9 +10025,9 @@ function displayConsultationMedicalHistoryPage() {
 async function changeConsultationHistoryPage(direction) {
     if (!window.currentConsultationHistoryRecord || !window.currentConsultationHistoryCount) return;
     const patientId = currentConsultationHistoryPatientId;
-    const currentDate = window.currentConsultationHistoryRecord.date || window.currentConsultationHistoryRecord.createdAt || window.currentConsultationHistoryRecord.updatedAt;
+    const currentId = window.currentConsultationHistoryRecord.id;
     const dir = direction < 0 ? 'older' : 'newer';
-    const res = await window.firebaseDataManager.getPatientAdjacentConsultation(patientId, currentDate, dir);
+    const res = await window.firebaseDataManager.getPatientAdjacentConsultation(patientId, currentId, dir);
     if (res && res.success && res.data) {
         window.currentConsultationHistoryRecord = res.data;
         window.currentConsultationHistoryIndex = (window.currentConsultationHistoryIndex || 1) + (direction < 0 ? -1 : 1);
@@ -21667,7 +21667,7 @@ class FirebaseDataManager {
         try {
             await waitForFirebaseDb();
             const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            const q = window.firebase.firestoreQuery(colRef, window.firebase.where('patientId', '==', patientId));
+            const q = window.firebase.firestoreQuery(colRef, window.firebase.where('patientId', '==', String(patientId)));
             const snapshot = await window.firebase.getCountFromServer(q);
             const count = snapshot.data().count || 0;
             return { success: true, count };
@@ -21686,12 +21686,23 @@ class FirebaseDataManager {
             const colRef = window.firebase.collection(window.firebase.db, 'consultations');
             const q = window.firebase.firestoreQuery(
                 colRef,
-                window.firebase.where('patientId', '==', patientId),
+                window.firebase.where('patientId', '==', String(patientId)),
                 window.firebase.orderBy('date', 'desc'),
                 window.firebase.limit(1)
             );
             const snapshot = await window.firebase.getDocs(q);
-            if (!snapshot.docs.length) return { success: true, data: null };
+            if (!snapshot.docs.length) {
+                const q2 = window.firebase.firestoreQuery(
+                    colRef,
+                    window.firebase.where('patientId', '==', String(patientId)),
+                    window.firebase.orderBy('createdAt', 'desc'),
+                    window.firebase.limit(1)
+                );
+                const snap2 = await window.firebase.getDocs(q2);
+                if (!snap2.docs.length) return { success: true, data: null };
+                const d2 = snap2.docs[0];
+                return { success: true, data: { id: d2.id, ...d2.data() } };
+            }
             const docSnap = snapshot.docs[0];
             return { success: true, data: { id: docSnap.id, ...docSnap.data() } };
         } catch (error) {
@@ -21703,24 +21714,59 @@ class FirebaseDataManager {
      * 取得相鄰診症（單筆），direction: 'older' | 'newer'。
      * 以當前日期為游標，僅載入下一筆。
      */
-    async getPatientAdjacentConsultation(patientId, currentDate, direction = 'older') {
+    async getPatientAdjacentConsultation(patientId, currentRecordId, direction = 'older') {
         if (!this.isReady) return { success: false, data: null };
         try {
             await waitForFirebaseDb();
             const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            const parsed = parseConsultationDate(currentDate);
             const isOlder = direction === 'older';
-            const q = window.firebase.firestoreQuery(
+            let currentSnap = null;
+            try {
+                const docRef = window.firebase.doc(window.firebase.db, 'consultations', String(currentRecordId));
+                currentSnap = await window.firebase.getDoc(docRef);
+            } catch (_e) { currentSnap = null; }
+            // 主要以 date 排序，使用當前文件快照作為游標
+            let q = window.firebase.firestoreQuery(
                 colRef,
-                window.firebase.where('patientId', '==', patientId),
+                window.firebase.where('patientId', '==', String(patientId)),
                 window.firebase.orderBy('date', isOlder ? 'desc' : 'asc'),
-                window.firebase.startAfter(parsed),
+                currentSnap ? window.firebase.startAfter(currentSnap) : window.firebase.limit(1), // 先佔位
                 window.firebase.limit(1)
             );
-            const snapshot = await window.firebase.getDocs(q);
+            // 若無快照則退而求其次：以 date 值為游標（轉 Timestamp），或改用 createdAt
+            if (!currentSnap) {
+                // 嘗試以 date 值作為游標
+                try {
+                    const cur = await this.getPatientLatestConsultation(patientId);
+                    const curDate = cur && cur.data ? (cur.data.date || cur.data.createdAt || cur.data.updatedAt) : null;
+                    const parsed = parseConsultationDate(curDate);
+                    const ts = parsed && window.firebase.Timestamp && typeof window.firebase.Timestamp.fromDate === 'function'
+                        ? window.firebase.Timestamp.fromDate(parsed)
+                        : parsed;
+                    q = window.firebase.firestoreQuery(
+                        colRef,
+                        window.firebase.where('patientId', '==', String(patientId)),
+                        window.firebase.orderBy('date', isOlder ? 'desc' : 'asc'),
+                        ts ? window.firebase.startAfter(ts) : window.firebase.limit(1),
+                        window.firebase.limit(1)
+                    );
+                } catch (_e2) {}
+            }
+            let snapshot = await window.firebase.getDocs(q);
+            if (!snapshot.docs.length) {
+                // 以 createdAt 排序作為備援
+                const q2 = window.firebase.firestoreQuery(
+                    colRef,
+                    window.firebase.where('patientId', '==', String(patientId)),
+                    window.firebase.orderBy('createdAt', isOlder ? 'desc' : 'asc'),
+                    currentSnap ? window.firebase.startAfter(currentSnap) : undefined,
+                    window.firebase.limit(1)
+                );
+                snapshot = await window.firebase.getDocs(q2);
+            }
             if (!snapshot.docs.length) return { success: true, data: null };
-            const docSnap = snapshot.docs[0];
-            return { success: true, data: { id: docSnap.id, ...docSnap.data() } };
+            const nextDoc = snapshot.docs[0];
+            return { success: true, data: { id: nextDoc.id, ...nextDoc.data() } };
         } catch (error) {
             console.error('讀取相鄰診症失敗:', error);
             return { success: false, data: null };
