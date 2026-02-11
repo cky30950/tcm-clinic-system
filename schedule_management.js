@@ -2080,73 +2080,77 @@
                 let html = '<!DOCTYPE html><html lang="' + (lang === 'zh' ? 'zh-TW' : 'en') + '"><head><meta charset="UTF-8"><title>' + translate('排班表') + '</title>';
                 html += '<style>';
                 html += 'body{font-family:\'Noto Sans TC\',sans-serif;padding:20px;}';
-                html += 'h2{text-align:center;margin:0 0 20px;font-size:20px;}';
-                html += 'table{width:100%;border-collapse:collapse;margin-top:10px;}';
-                html += 'th,td{border:1px solid #ccc;padding:6px;vertical-align:top;font-size:14px;}';
-                html += 'th{background:#f3f4f6;font-weight:600;}';
-                html += 'ul{margin:0;padding-left:20px;}';
-                html += 'li{margin-bottom:4px;line-height:1.4;}';
-                html += 'em{color:#6b7280;}';
+                html += 'h2{text-align:center;margin:0 0 20px;font-size:22px;font-weight:bold;}';
+                html += 'table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px;}';
+                html += 'th,td{border:1px solid #000;padding:6px;vertical-align:middle;text-align:center;}';
+                html += 'th{background:#e5e7eb;font-weight:bold;padding:10px 4px;}';
+                html += '.date-col{width:60px;white-space:nowrap;}';
+                html += '.day-col{width:40px;}';
+                html += '.weekend{background-color:#f3f4f6;}';
+                html += '.shift-cell{text-align:left;vertical-align:top;}';
+                html += '.staff-item{display:inline-block;margin-right:8px;white-space:nowrap;margin-bottom:2px;}';
                 html += '</style></head><body>';
                 
-                
-                
                 let title;
+                const clinicName = getCurrentClinicName();
                 if (lang === 'en') {
-                    
                     const mm = String(month + 1).padStart(2, '0');
-                    const clinicName = getCurrentClinicName();
-                    title = translate('排班表') + ' - ' + year + '/' + mm + (clinicName ? ' - ' + translate('診所') + ': ' + clinicName : '');
+                    title = translate('排班表') + ' - ' + year + '/' + mm + (clinicName ? ' - ' + clinicName : '');
                 } else {
-                    const clinicName = getCurrentClinicName();
-                    title = year + ' 年 ' + (month + 1) + ' 月' + translate('排班表') + (clinicName ? '（' + translate('診所') + '：' + clinicName + '）' : '');
+                    title = year + ' 年 ' + (month + 1) + ' 月 ' + translate('排班表') + (clinicName ? '（' + clinicName + '）' : '');
                 }
                 html += '<h2>' + title + '</h2>';
                 
-                html += '<table><thead><tr><th style="width:120px;">' + translate('日期') + '</th><th>' + translate('排班') + '</th></tr></thead><tbody>';
+                html += '<table><thead><tr>';
+                html += '<th class="date-col">' + translate('日期') + '</th>';
+                html += '<th class="day-col">' + translate('星期') + '</th>';
+                html += '<th>' + translate('早班') + '<br><span style="font-weight:normal;font-size:0.9em">(08:00-16:00)</span></th>';
+                html += '<th>' + translate('中班') + '<br><span style="font-weight:normal;font-size:0.9em">(16:00-00:00)</span></th>';
+                html += '<th>' + translate('夜班') + '<br><span style="font-weight:normal;font-size:0.9em">(00:00-08:00)</span></th>';
+                html += '<th>' + translate('其他/急診') + '</th>';
+                html += '</tr></thead><tbody>';
                 
                 for (let day = 1; day <= lastDay; day++) {
                     const dateObj = new Date(year, month, day);
                     const dateStr = formatDate(dateObj);
+                    const dayOfWeek = dateObj.getDay();
                     const dayShifts = shifts.filter(s => s.date === dateStr && passesFilter(s));
-                    let cellContent;
-                    if (dayShifts.length === 0) {
-                        
-                        cellContent = `<em>${translate('無排班')}</em>`;
-                    } else {
-                        dayShifts.sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
-                        cellContent = '<ul>';
-                        dayShifts.forEach(shift => {
-                            const staffMember = findStaffById(shift.staffId);
-                            const duration = calculateShiftDuration(shift.startTime, shift.endTime);
-                            
-                            
-                            
-                            const typeName = translate(getShiftTypeName(shift.type));
-                            let info = staffMember.name;
-                            if (staffMember.level) info += ' ' + staffMember.level;
-                            info += ' ' + shift.startTime + '-' + shift.endTime + ' (' + duration + 'h)';
-                            info += ' - ' + typeName;
-                            if (shift.notes) info += ' - ' + shift.notes;
-                            cellContent += '<li>' + info + '</li>';
-                        });
-                        cellContent += '</ul>';
-                    }
                     
-                    const weekdayCh = weekdays[dateObj.getDay()];
-                    const weekdayName = translate(weekdayCh);
-                    let displayDate;
-                    if (lang === 'en') {
+                    const morning = [];
+                    const afternoon = [];
+                    const night = [];
+                    const others = [];
+
+                    dayShifts.forEach(shift => {
+                        const staffMember = findStaffById(shift.staffId);
+                        const name = staffMember.name; 
                         
-                        const mm = String(month + 1).padStart(2, '0');
-                        const dd = String(day).padStart(2, '0');
-                        displayDate = mm + '/' + dd + ' (' + weekdayName + ')';
-                    } else {
-                        displayDate = (month + 1) + '月' + day + '日 (' + weekdayCh + ')';
-                    }
-                    html += '<tr><td>' + displayDate + '</td><td>' + cellContent + '</td></tr>';
+                        if (shift.type === 'morning') morning.push(name);
+                        else if (shift.type === 'afternoon') afternoon.push(name);
+                        else if (shift.type === 'night') night.push(name);
+                        else {
+                            others.push(name + ' (' + shift.startTime + '-' + shift.endTime + ')');
+                        }
+                    });
+
+                    const rowClass = (dayOfWeek === 0 || dayOfWeek === 6) ? 'weekend' : '';
+                    const weekdayCh = weekdays[dayOfWeek];
+                    
+                    let dateDisplay = (month + 1) + '/' + day;
+
+                    html += '<tr class="' + rowClass + '">';
+                    html += '<td class="date-col">' + dateDisplay + '</td>';
+                    html += '<td class="day-col">' + translate(weekdayCh) + '</td>';
+                    
+                    html += '<td class="shift-cell">' + morning.map(n => '<span class="staff-item">' + n + '</span>').join('') + '</td>';
+                    html += '<td class="shift-cell">' + afternoon.map(n => '<span class="staff-item">' + n + '</span>').join('') + '</td>';
+                    html += '<td class="shift-cell">' + night.map(n => '<span class="staff-item">' + n + '</span>').join('') + '</td>';
+                    html += '<td class="shift-cell">' + others.map(n => '<span class="staff-item">' + n + '</span>').join('') + '</td>';
+                    
+                    html += '</tr>';
                 }
                 html += '</tbody></table></body></html>';
+                
                 const printWin = window.open('', '_blank');
                 if (printWin) {
                     printWin.document.open();
@@ -2157,7 +2161,6 @@
                         try { printWin.print(); } catch (_) {} finally { printWin.close(); }
                     }, 300);
                 } else {
-                    
                     const unableMsg = translate('無法開啟列印視窗，請檢查瀏覽器設定。');
                     try {
                         if (typeof window.showToast === 'function') {
@@ -2173,7 +2176,6 @@
                 }
             } catch (err) {
                 console.error('printCurrentMonthSchedule error', err);
-                
                 const errMsg = translate('列印排班表時發生錯誤！');
                 try {
                     if (typeof window.showToast === 'function') {
