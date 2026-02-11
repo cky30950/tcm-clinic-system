@@ -2079,16 +2079,20 @@
                 
                 let html = '<!DOCTYPE html><html lang="' + (lang === 'zh' ? 'zh-TW' : 'en') + '"><head><meta charset="UTF-8"><title>' + translate('排班表') + '</title>';
                 html += '<style>';
-                html += 'body{font-family:\'Noto Sans TC\',sans-serif;padding:20px;}';
-                html += 'h2{text-align:center;margin:0 0 20px;font-size:22px;font-weight:bold;}';
-                html += 'table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px;}';
-                html += 'th,td{border:1px solid #000;padding:6px;vertical-align:middle;text-align:center;}';
-                html += 'th{background:#e5e7eb;font-weight:bold;padding:10px 4px;}';
-                html += '.date-col{width:60px;white-space:nowrap;}';
-                html += '.day-col{width:40px;}';
-                html += '.weekend{background-color:#f3f4f6;}';
-                html += '.shift-cell{text-align:left;vertical-align:top;}';
-                html += '.staff-item{display:inline-block;margin-right:8px;white-space:nowrap;margin-bottom:2px;}';
+                html += '@page { size: A4 portrait; margin: 10mm; }';
+                html += 'body { font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif; font-size: 10.5pt; margin: 0; padding: 0; color: #333; }';
+                html += 'h2 { text-align: center; margin: 0 0 10px 0; font-size: 16pt; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 5px; }';
+                html += 'table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 0; }';
+                html += 'th, td { border: 1px solid #888; padding: 3px 4px; vertical-align: top; word-wrap: break-word; line-height: 1.3; }';
+                html += 'th { background-color: #e0e0e0 !important; font-weight: bold; text-align: center; height: 30px; vertical-align: middle; }';
+                html += '.date-col { width: 45px; text-align: center; font-weight: bold; }';
+                html += '.day-col { width: 35px; text-align: center; }';
+                html += '.weekend { background-color: #f0f0f0 !important; }';
+                html += '.shift-cell { text-align: left; font-size: 10pt; }';
+                html += '.staff-item { display: inline-block; margin-right: 6px; white-space: nowrap; }';
+                html += '.footer { margin-top: 5px; font-size: 8pt; text-align: right; color: #666; }';
+                html += 'tr { page-break-inside: avoid; }';
+                html += '@media print { body { -webkit-print-color-adjust: exact; } }';
                 html += '</style></head><body>';
                 
                 let title;
@@ -2104,9 +2108,9 @@
                 html += '<table><thead><tr>';
                 html += '<th class="date-col">' + translate('日期') + '</th>';
                 html += '<th class="day-col">' + translate('星期') + '</th>';
-                html += '<th>' + translate('早班') + '<br><span style="font-weight:normal;font-size:0.9em">(08:00-16:00)</span></th>';
-                html += '<th>' + translate('中班') + '<br><span style="font-weight:normal;font-size:0.9em">(16:00-00:00)</span></th>';
-                html += '<th>' + translate('夜班') + '<br><span style="font-weight:normal;font-size:0.9em">(00:00-08:00)</span></th>';
+                html += '<th>' + translate('早班') + '<div style="font-size:0.8em; font-weight:normal;">08:00-16:00</div></th>';
+                html += '<th>' + translate('中班') + '<div style="font-size:0.8em; font-weight:normal;">16:00-00:00</div></th>';
+                html += '<th>' + translate('夜班') + '<div style="font-size:0.8em; font-weight:normal;">00:00-08:00</div></th>';
                 html += '<th>' + translate('其他/急診') + '</th>';
                 html += '</tr></thead><tbody>';
                 
@@ -2129,7 +2133,7 @@
                         else if (shift.type === 'afternoon') afternoon.push(name);
                         else if (shift.type === 'night') night.push(name);
                         else {
-                            others.push(name + ' (' + shift.startTime + '-' + shift.endTime + ')');
+                            others.push(name + ' <span style="font-size:0.85em;color:#555;">(' + shift.startTime + '-' + shift.endTime + ')</span>');
                         }
                     });
 
@@ -2149,7 +2153,12 @@
                     
                     html += '</tr>';
                 }
-                html += '</tbody></table></body></html>';
+                html += '</tbody></table>';
+                
+                const nowStr = new Date().toLocaleString(lang === 'zh' ? 'zh-TW' : 'en-US');
+                html += '<div class="footer">' + translate('列印時間：') + nowStr + '</div>';
+                
+                html += '</body></html>';
                 
                 const printWin = window.open('', '_blank');
                 if (printWin) {
