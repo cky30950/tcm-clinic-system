@@ -36,24 +36,58 @@
         let shiftSubmitInProgress = false;
 
         
-        const hkHolidays2025 = [
-            { date: '2025-01-01', name: '元旦' },
-            { date: '2025-01-29', name: '農曆新年初一' },
-            { date: '2025-01-30', name: '農曆新年初二' },
-            { date: '2025-01-31', name: '農曆新年初三' },
+        const hkHolidaysFallback = [
+            { date: '2024-01-01', name: '一月一日' },
+            { date: '2024-02-10', name: '農曆年初一' },
+            { date: '2024-02-12', name: '農曆年初三' },
+            { date: '2024-02-13', name: '農曆年初四' },
+            { date: '2024-03-29', name: '耶穌受難節' },
+            { date: '2024-03-30', name: '耶穌受難節翌日' },
+            { date: '2024-04-01', name: '復活節星期一' },
+            { date: '2024-04-04', name: '清明節' },
+            { date: '2024-05-01', name: '勞動節' },
+            { date: '2024-05-15', name: '佛誕' },
+            { date: '2024-06-10', name: '端午節' },
+            { date: '2024-07-01', name: '香港特別行政區成立紀念日' },
+            { date: '2024-09-18', name: '中秋節翌日' },
+            { date: '2024-10-01', name: '國慶日' },
+            { date: '2024-10-11', name: '重陽節' },
+            { date: '2024-12-25', name: '聖誕節' },
+            { date: '2024-12-26', name: '聖誕節後第一個周日' },
+            { date: '2025-01-01', name: '一月一日' },
+            { date: '2025-01-29', name: '農曆年初一' },
+            { date: '2025-01-30', name: '農曆年初二' },
+            { date: '2025-01-31', name: '農曆年初三' },
             { date: '2025-04-04', name: '清明節' },
-            { date: '2025-04-18', name: '耶穌受難日' },
-            { date: '2025-04-19', name: '耶穌受難日翌日' },
+            { date: '2025-04-18', name: '耶穌受難節' },
+            { date: '2025-04-19', name: '耶穌受難節翌日' },
             { date: '2025-04-21', name: '復活節星期一' },
             { date: '2025-05-01', name: '勞動節' },
             { date: '2025-05-05', name: '佛誕' },
             { date: '2025-05-31', name: '端午節' },
-            { date: '2025-07-01', name: '香港特區成立紀念日' },
+            { date: '2025-07-01', name: '香港特別行政區成立紀念日' },
             { date: '2025-10-01', name: '國慶日' },
             { date: '2025-10-07', name: '中秋節翌日' },
             { date: '2025-10-29', name: '重陽節' },
             { date: '2025-12-25', name: '聖誕節' },
-            { date: '2025-12-26', name: '聖誕節後第一個周日' }
+            { date: '2025-12-26', name: '聖誕節後第一個周日' },
+            { date: '2026-01-01', name: '一月一日' },
+            { date: '2026-02-17', name: '農曆年初一' },
+            { date: '2026-02-18', name: '農曆年初二' },
+            { date: '2026-02-19', name: '農曆年初三' },
+            { date: '2026-04-03', name: '耶穌受難節' },
+            { date: '2026-04-04', name: '耶穌受難節翌日' },
+            { date: '2026-04-06', name: '清明節翌日' },
+            { date: '2026-04-07', name: '復活節星期一翌日' },
+            { date: '2026-05-01', name: '勞動節' },
+            { date: '2026-05-25', name: '佛誕翌日' },
+            { date: '2026-06-19', name: '端午節' },
+            { date: '2026-07-01', name: '香港特別行政區成立紀念日' },
+            { date: '2026-09-26', name: '中秋節翌日' },
+            { date: '2026-10-01', name: '國慶日' },
+            { date: '2026-10-19', name: '重陽節翌日' },
+            { date: '2026-12-25', name: '聖誕節' },
+            { date: '2026-12-26', name: '聖誕節後第一個周日' }
         ];
 
         const usHolidays2025 = [
@@ -71,6 +105,118 @@
             { date: '2025-12-25', name: 'Christmas Day' }
         ];
 
+        const HK_HOLIDAY_1823_TC_URL = 'https://www.1823.gov.hk/common/ical/tc.json';
+        const HK_HOLIDAY_CACHE_KEY_TC = 'hk_public_holidays_1823_tc_v1';
+        const HK_HOLIDAY_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
+
+        function upsertHolidayName(map, date, name) {
+            if (!date || !name) return;
+            const existing = map[date];
+            if (!existing) {
+                map[date] = name;
+                return;
+            }
+            if (existing === name) return;
+            map[date] = existing + ' / ' + name;
+        }
+
+        function buildHolidayMapFromList(list) {
+            const map = Object.create(null);
+            if (!Array.isArray(list)) return map;
+            list.forEach(item => {
+                if (!item) return;
+                upsertHolidayName(map, item.date, item.name);
+            });
+            return map;
+        }
+
+        function parse1823HolidayJson(json) {
+            try {
+                const vc = json && Array.isArray(json.vcalendar) ? json.vcalendar[0] : null;
+                const events = vc && Array.isArray(vc.vevent) ? vc.vevent : [];
+                const out = [];
+                events.forEach(ev => {
+                    if (!ev) return;
+                    const raw = ev.dtstart && Array.isArray(ev.dtstart) ? ev.dtstart[0] : null;
+                    const name = ev.summary || '';
+                    if (!raw || typeof raw !== 'string') return;
+                    if (raw.length !== 8) return;
+                    const yyyy = raw.slice(0, 4);
+                    const mm = raw.slice(4, 6);
+                    const dd = raw.slice(6, 8);
+                    const date = `${yyyy}-${mm}-${dd}`;
+                    if (!name) return;
+                    out.push({ date, name });
+                });
+                return out;
+            } catch (_e) {
+                return [];
+            }
+        }
+
+        let hkHolidayByDate = buildHolidayMapFromList(hkHolidaysFallback);
+        let usHolidayByDate = buildHolidayMapFromList(usHolidays2025);
+        let hkHolidayRemoteLoadInProgress = false;
+
+        function tryHydrateHkHolidaysFromCache() {
+            try {
+                const raw = localStorage.getItem(HK_HOLIDAY_CACHE_KEY_TC);
+                if (!raw) return false;
+                const cached = JSON.parse(raw);
+                if (!cached || !Array.isArray(cached.list)) return false;
+                if (cached.fetchedAt && Date.now() - cached.fetchedAt > HK_HOLIDAY_CACHE_MAX_AGE_MS) {
+                    return false;
+                }
+                const map = buildHolidayMapFromList(cached.list);
+                if (Object.keys(map).length === 0) return false;
+                hkHolidayByDate = map;
+                return true;
+            } catch (_e) {
+                return false;
+            }
+        }
+
+        async function refreshHkHolidaysFrom1823({ force = false } = {}) {
+            if (hkHolidayRemoteLoadInProgress) return;
+            if (!force) {
+                try {
+                    const raw = localStorage.getItem(HK_HOLIDAY_CACHE_KEY_TC);
+                    if (raw) {
+                        const cached = JSON.parse(raw);
+                        if (cached && cached.fetchedAt && Date.now() - cached.fetchedAt <= HK_HOLIDAY_CACHE_MAX_AGE_MS) {
+                            return;
+                        }
+                    }
+                } catch (_e) {
+                    
+                }
+            }
+            if (!window.fetch) return;
+            hkHolidayRemoteLoadInProgress = true;
+            try {
+                const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+                const timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
+                const res = await fetch(HK_HOLIDAY_1823_TC_URL, { signal: controller ? controller.signal : undefined });
+                if (timeoutId) clearTimeout(timeoutId);
+                if (!res || !res.ok) return;
+                const json = await res.json();
+                const list = parse1823HolidayJson(json);
+                const map = buildHolidayMapFromList(list);
+                if (Object.keys(map).length === 0) return;
+                hkHolidayByDate = map;
+                try {
+                    localStorage.setItem(HK_HOLIDAY_CACHE_KEY_TC, JSON.stringify({ fetchedAt: Date.now(), list }));
+                } catch (_e) {
+                    
+                }
+            } catch (_e) {
+                
+            } finally {
+                hkHolidayRemoteLoadInProgress = false;
+            }
+        }
+
+        tryHydrateHkHolidaysFromCache();
         
 
         
@@ -78,23 +224,13 @@
             
             if (!selectedHolidayRegion) return null;
             const dateStr = formatDate(date);
-            
-            const mmdd = dateStr.slice(5);
-            let list = [];
+            let name = '';
             if (selectedHolidayRegion === 'hk') {
-                list = hkHolidays2025;
+                name = hkHolidayByDate[dateStr] || '';
             } else if (selectedHolidayRegion === 'us') {
-                list = usHolidays2025;
+                name = usHolidayByDate[dateStr] || '';
             }
-            
-            const match = list.find(h => {
-                
-                return h.date.slice(5) === mmdd;
-            });
-            if (match) {
-                
-                return { date: dateStr, name: match.name };
-            }
+            if (name) return { date: dateStr, name };
             return null;
         }
 
@@ -104,6 +240,13 @@
             
             if (typeof renderCalendar === 'function') {
                 renderCalendar();
+            }
+            if (selectedHolidayRegion === 'hk') {
+                refreshHkHolidaysFrom1823().then(() => {
+                    if (selectedHolidayRegion === 'hk' && typeof renderCalendar === 'function') {
+                        renderCalendar();
+                    }
+                }).catch(() => {});
             }
         }
         
