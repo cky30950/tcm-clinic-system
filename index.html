@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="zh-TW" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智慧中醫診所系統 | 專為中醫量身打造</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&amp;family=Noto+Sans+TC:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-jade: #2D5A4A;
+      --color-gold: #C9A962;
+      --color-cream: #F8F5F0;
+      --color-ink: #1A1A1A;
+      --color-mist: #E8E4DD;
+    }
+    
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+    
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+    
+    .font-serif {
+      font-family: 'Noto Serif TC', serif;
+    }
+    
+    .app-wrapper {
+      width: 100%;
+      min-height: 100%;
+      overflow-x: hidden;
+    }
+    
+    .gradient-jade {
+      background: linear-gradient(135deg, #2D5A4A 0%, #1E3D32 100%);
+    }
+    
+    .gradient-gold {
+      background: linear-gradient(135deg, #C9A962 0%, #B8944D 100%);
+    }
+    
+    .text-gradient {
+      background: linear-gradient(135deg, #C9A962 0%, #E8D5A3 50%, #C9A962 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .card-hover {
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .card-hover:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 25px 50px -12px rgba(45, 90, 74, 0.25);
+    }
+    
+    .feature-icon {
+      width: 64px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 16px;
+      font-size: 28px;
+    }
+    
+    .ink-wash {
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)'/%3E%3C/svg%3E");
+      opacity: 0.03;
+    }
+    
+    .bamboo-pattern {
+      background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0v60M0 30h60' stroke='%232D5A4A' stroke-width='0.5' fill='none' opacity='0.1'/%3E%3C/svg%3E");
+    }
+    
+    .scroll-indicator {
+      animation: bounce 2s infinite;
+    }
+    
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-10px); }
+      60% { transform: translateY(-5px); }
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .animate-fade-in {
+      animation: fadeInUp 0.8s ease-out forwards;
+    }
+    
+    .animate-delay-1 { animation-delay: 0.1s; }
+    .animate-delay-2 { animation-delay: 0.2s; }
+    .animate-delay-3 { animation-delay: 0.3s; }
+    .animate-delay-4 { animation-delay: 0.4s; }
+    
+    .pricing-card {
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .pricing-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #2D5A4A, #C9A962);
+    }
+    
+    .stat-number {
+      font-variant-numeric: tabular-nums;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: var(--color-cream);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: var(--color-jade);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: #1E3D32;
+    }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full">
+  <div class="app-wrapper" style="background-color: #F8F5F0;"><!-- Navigation -->
+   <nav class="fixed top-0 left-0 right-0 z-50 transition-all duration-300" id="navbar">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+     <div class="flex items-center justify-between h-16 lg:h-20">
+      <div class="flex items-center gap-3">
+       <div class="w-10 h-10 rounded-xl gradient-jade flex items-center justify-center"><span class="text-xl">☯</span>
+       </div><span class="font-serif text-lg font-semibold" style="color: #1A1A1A;">智慧中醫</span>
+      </div>
+      <div class="hidden md:flex items-center gap-8"><a href="#features" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1A1A1A;">功能特色</a> <a href="#tcm" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1A1A1A;">中醫特色</a> <a href="#security" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1A1A1A;">安全保障</a> <a href="#pricing" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1A1A1A;">方案價格</a> <button id="nav-cta-btn" class="px-5 py-2.5 rounded-full text-sm font-medium text-white transition-all hover:shadow-lg hover:scale-105" style="background-color: #2D5A4A;"> 立即體驗 </button>
+      </div><button class="md:hidden p-2" onclick="toggleMobileMenu()">
+       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+       </svg></button>
+     </div>
+    </div><!-- Mobile Menu -->
+    <div id="mobile-menu" class="hidden md:hidden absolute top-full left-0 right-0 shadow-lg" style="background-color: #F8F5F0;">
+     <div class="px-4 py-4 space-y-3"><a href="#features" class="block py-2 text-sm font-medium" style="color: #1A1A1A;">功能特色</a> <a href="#tcm" class="block py-2 text-sm font-medium" style="color: #1A1A1A;">中醫特色</a> <a href="#security" class="block py-2 text-sm font-medium" style="color: #1A1A1A;">安全保障</a> <a href="#pricing" class="block py-2 text-sm font-medium" style="color: #1A1A1A;">方案價格</a> <button class="w-full px-5 py-2.5 rounded-full text-sm font-medium text-white" style="background-color: #2D5A4A;">立即體驗</button>
+     </div>
+    </div>
+   </nav><!-- Hero Section -->
+   <section class="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
+    <div class="absolute inset-0 bamboo-pattern"></div>
+    <div class="absolute inset-0 ink-wash"></div><!-- Decorative Elements -->
+    <div class="absolute top-20 left-10 w-32 h-32 rounded-full opacity-10" style="background-color: #2D5A4A; filter: blur(60px);"></div>
+    <div class="absolute bottom-20 right-10 w-40 h-40 rounded-full opacity-10" style="background-color: #C9A962; filter: blur(80px);"></div>
+    <div class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+     <div class="animate-fade-in opacity-0" style="animation-delay: 0.1s;"><span class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-6" style="background-color: rgba(45, 90, 74, 0.1); color: #2D5A4A;"> <span>🌿</span> 專為中醫診所量身打造 </span>
+     </div>
+     <h1 id="hero-title" class="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 animate-fade-in opacity-0" style="color: #1A1A1A; animation-delay: 0.2s;">智慧中醫診所系統</h1>
+     <p id="hero-subtitle" class="text-lg sm:text-xl lg:text-2xl mb-4 animate-fade-in opacity-0" style="color: #666; animation-delay: 0.3s;">簡便 · 易用 · 高效</p>
+     <p class="text-base sm:text-lg max-w-3xl mx-auto mb-10 animate-fade-in opacity-0" style="color: #888; animation-delay: 0.4s;">將千年中醫智慧與現代科技完美結合，從「望聞問切」到「辯證論治」全面數位化<br>
+       讓您的診所管理效率提升 300%</p>
+     <div class="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in opacity-0" style="animation-delay: 0.5s;"><button id="hero-cta-btn" class="px-8 py-4 rounded-full text-lg font-semibold text-white transition-all hover:shadow-xl hover:scale-105" style="background-color: #2D5A4A;"> 免費試用 14 天 </button> <button class="px-8 py-4 rounded-full text-lg font-semibold transition-all hover:shadow-lg border-2" style="color: #2D5A4A; border-color: #2D5A4A; background: transparent;"> 預約演示 </button>
+     </div><!-- Stats -->
+     <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-16 animate-fade-in opacity-0" style="animation-delay: 0.6s;">
+      <div class="text-center">
+       <div class="stat-number text-3xl sm:text-4xl font-bold" style="color: #2D5A4A;">
+        500+
+       </div>
+       <div class="text-sm mt-1" style="color: #888;">
+        診所信賴使用
+       </div>
+      </div>
+      <div class="text-center">
+       <div class="stat-number text-3xl sm:text-4xl font-bold" style="color: #2D5A4A;">
+        10萬+
+       </div>
+       <div class="text-sm mt-1" style="color: #888;">
+        病歷記錄處理
+       </div>
+      </div>
+      <div class="text-center">
+       <div class="stat-number text-3xl sm:text-4xl font-bold" style="color: #2D5A4A;">
+        99.9%
+       </div>
+       <div class="text-sm mt-1" style="color: #888;">
+        系統穩定運行
+       </div>
+      </div>
+      <div class="text-center">
+       <div class="stat-number text-3xl sm:text-4xl font-bold" style="color: #2D5A4A;">
+        30%
+       </div>
+       <div class="text-sm mt-1" style="color: #888;">
+        看診時間節省
+       </div>
+      </div>
+     </div>
+    </div><!-- Scroll Indicator -->
+    <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 scroll-indicator">
+     <svg class="w-6 h-6" fill="none" stroke="#2D5A4A" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+     </svg>
+    </div>
+   </section><!-- Core Features Section -->
+   <section id="features" class="py-20 lg:py-32 relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+     <div class="text-center mb-16"><span class="inline-block px-4 py-2 rounded-full text-sm font-medium mb-4" style="background-color: rgba(201, 169, 98, 0.15); color: #C9A962;"> 完整功能模組 </span>
+      <h2 class="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-4" style="color: #1A1A1A;">診所營運的完美閉環</h2>
+      <p class="text-lg max-w-2xl mx-auto" style="color: #666;">從前台掛號到後台管理，一站式解決所有需求</p>
+     </div>
+     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8"><!-- Feature Cards -->
+      <div class="card-hover rounded-2xl p-6 lg:p-8" style="background-color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+       <div class="feature-icon mb-5" style="background-color: rgba(45, 90, 74, 0.1);">
+        📅
+       </div>
+       <h3 class="font-serif text-xl font-semibold mb-3" style="color: #1A1A1A;">線上預約掛號</h3>
+       <p class="text-sm leading-relaxed" style="color: #666;">病患可透過手機或電腦24小時線上預約，自由選擇醫師與看診時段，系統自動同步更新診所排程。</p>
+      </div>
+      <div class="card-hover rounded-2xl p-6 lg:p-8" style="background-color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+       <div class="feature-icon mb-5" style="background-color: rgba(201, 169, 98, 0.15);">
+        📋
+       </div>
+       <h3 class="font-serif text-xl font-semibold mb-3" style="color: #1A1A1A;">智慧問診系統</h3>
+       <p class="text-sm leading-relaxed" style="color: #666;">數位化「十問歌」，12步驟引導式問卷涵蓋寒熱、汗出、二便、睡眠等，候診時間即完成體質初評。</p>
+      </div>
+      <div class="card-hover rounded-2xl p-6 lg:p-8" style="background-color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+       <div class="feature-icon mb-5" style="background-color: rgba(45, 90, 74, 0.1);">
+        🗂️
+       </div>
+       <h3 class="font-serif text-xl font-semibold mb-3" style="color: #1A1A1A;">電子病歷管理</h3>
+       <p class="text-sm leading-relaxed" style="color: #666;">完整的病患資料庫，支援病歷搜尋、歷史記錄追蹤、診斷範本快速輸入，讓醫師專注於診療本身。</p>
+      </div>
+      <div class="card-hover rounded-2xl p-6 lg:p-8" style="background-color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+       <div class="feature-icon mb-5" style="background-color: rgba(201, 169, 98, 0.15);">
+        📊
+       </div>
+       <h3 class="font-serif text-xl font-semibold mb-3" style="color: #1A1A1A;">排程與報表</h3>
+       <p class="text-sm leading-relaxed" style="color: #666;">視覺化醫師排班管理、營收統計分析、病患來源追蹤，數據驅動的經營決策從此更加精準。</p>
+      </div>
+      <div class="card-hover rounded-2xl p-6 lg:p-8" style="background-color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+       <div class="feature-icon mb-5" style="background-color: rgba(45, 90, 74, 0.1);">
+        💊
+       </div>
+       <h3 class="font-serif text-xl font-semibold mb-3" style="color: #1A1A1A;">藥房庫存管理</h3>
+       <p class="text-sm leading-relaxed" style="color: #666;">中藥材進銷存追蹤、低庫存自動提醒、開方自動扣庫，讓藥房管理井井有條。</p>
+      </div>
+      <div class="card-hover rounded-2xl p-6 lg:p-8" style="background-color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+       <div class="feature-icon mb-5" style="background-color: rgba(201, 169, 98, 0.15);">
+        💬
+       </div>
+       <h3 class="font-serif text-xl font-semibold mb-3" style="color: #1A1A1A;">內部通訊模組</h3>
+       <p class="text-sm leading-relaxed" style="color: #666;">診所內部即時通訊、醫患線上諮詢、訊息記錄保存，溝通效率大幅提升。</p>
+      </div>
+     </div>
+    </div>
+   </section><!-- TCM Unique Features -->
+   <section id="tcm" class="py-20 lg:py-32 relative" style="background-color: #2D5A4A;">
+    <div class="absolute inset-0 opacity-5">
+     <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' viewBox=\'0 0 100 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Ccircle cx=\'50\' cy=\'50\' r=\'40\' stroke=\'white\' stroke-width=\'0.5\' fill=\'none\'/%3E%3Cpath d=\'M50 10 Q90 50 50 90 Q10 50 50 10\' stroke=\'white\' stroke-width=\'0.5\' fill=\'none\'/%3E%3C/svg%3E');"></div>
+    </div>
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+     <div class="text-center mb-16"><span class="inline-block px-4 py-2 rounded-full text-sm font-medium mb-4" style="background-color: rgba(201, 169, 98, 0.2); color: #C9A962;"> ☯ 中醫專屬功能 </span>
+      <h2 class="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 text-white">傳承千年智慧</h2>
+      <p class="text-lg max-w-2xl mx-auto" style="color: rgba(255,255,255,0.7);">市面唯一深度整合中醫專業知識的診所系統</p>
+     </div>
+     <div class="grid lg:grid-cols-2 gap-8 lg:gap-12"><!-- Herb Library -->
+      <div class="rounded-3xl p-8 lg:p-10" style="background-color: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);">
+       <div class="flex items-start gap-5 mb-6">
+        <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0" style="background-color: rgba(201, 169, 98, 0.2);">
+         🌿
+        </div>
+        <div>
+         <h3 class="font-serif text-2xl font-semibold text-white mb-2">數位化本草綱目</h3>
+         <p class="text-sm" style="color: rgba(255,255,255,0.6);">完整中藥材資料庫</p>
+        </div>
+       </div>
+       <ul class="space-y-4">
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);">內建數百種藥材的<strong class="text-white">性味歸經</strong>資料（如：甘微苦、入脾肺經）</span></li>
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);">詳載每味藥的<strong class="text-white">功效、主治、禁忌</strong>（十八反十九畏自動提醒）</span></li>
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);">內建<strong class="text-white">經典方劑範本</strong>（桂枝湯、六味地黃丸...），一鍵調用快速加減</span></li>
+       </ul>
+      </div><!-- Acupoint Map -->
+      <div class="rounded-3xl p-8 lg:p-10" style="background-color: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);">
+       <div class="flex items-start gap-5 mb-6">
+        <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0" style="background-color: rgba(201, 169, 98, 0.2);">
+         📍
+        </div>
+        <div>
+         <h3 class="font-serif text-2xl font-semibold text-white mb-2">互動式穴位地圖</h3>
+         <p class="text-sm" style="color: rgba(255,255,255,0.6);">針灸治療強力輔助</p>
+        </div>
+       </div>
+       <ul class="space-y-4">
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);">支援<strong class="text-white">數百個穴位</strong>的精確定位（百會、足三里、合谷...）</span></li>
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);">視覺化人體經絡圖，支援<strong class="text-white">放大鏡功能</strong>查看細節</span></li>
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);">自動<strong class="text-white">繁簡中文轉換</strong>，適合兩岸三地診所使用</span></li>
+       </ul>
+      </div><!-- Diagnosis Support -->
+      <div class="rounded-3xl p-8 lg:p-10" style="background-color: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);">
+       <div class="flex items-start gap-5 mb-6">
+        <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0" style="background-color: rgba(201, 169, 98, 0.2);">
+         🩺
+        </div>
+        <div>
+         <h3 class="font-serif text-2xl font-semibold text-white mb-2">辯證論治輔助</h3>
+         <p class="text-sm" style="color: rgba(255,255,255,0.6);">標準化診療流程</p>
+        </div>
+       </div>
+       <ul class="space-y-4">
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);">內建<strong class="text-white">診斷範本庫</strong>，涵蓋常見證型（肝鬱氣滯、脾腎陽虛...）</span></li>
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);">根據症狀輸入提供<strong class="text-white">智慧診斷建議</strong>，輔助醫師辯證</span></li>
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);">支援<strong class="text-white">脈象、舌象記錄</strong>，完整保存四診資料</span></li>
+       </ul>
+      </div><!-- Constitution Analysis -->
+      <div class="rounded-3xl p-8 lg:p-10" style="background-color: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);">
+       <div class="flex items-start gap-5 mb-6">
+        <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0" style="background-color: rgba(201, 169, 98, 0.2);">
+         ☯️
+        </div>
+        <div>
+         <h3 class="font-serif text-2xl font-semibold text-white mb-2">體質分析問卷</h3>
+         <p class="text-sm" style="color: rgba(255,255,255,0.6);">「問診」數位化</p>
+        </div>
+       </div>
+       <ul class="space-y-4">
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);"><strong class="text-white">寒熱辨別</strong>：怕冷/怕熱、手腳冰冷程度評估</span></li>
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);"><strong class="text-white">二便評估</strong>：小便顏色（淡黃/深黃/赤）、大便形狀分析</span></li>
+        <li class="flex items-start gap-3"><span style="color: #C9A962;">✓</span> <span style="color: rgba(255,255,255,0.85);"><strong class="text-white">汗出分析</strong>：自汗、盜汗判斷（腎陰虛/陽虛依據）</span></li>
+       </ul>
+      </div>
+     </div>
+    </div>
+   </section><!-- Security & Infrastructure -->
+   <section id="security" class="py-20 lg:py-32 relative" style="background-color: #F8F5F0;">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+     <div class="text-center mb-16"><span class="inline-block px-4 py-2 rounded-full text-sm font-medium mb-4" style="background-color: rgba(45, 90, 74, 0.1); color: #2D5A4A;"> 🔒 安全與技術 </span>
+      <h2 class="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-4" style="color: #1A1A1A;">企業級安全保障</h2>
+      <p class="text-lg max-w-2xl mx-auto" style="color: #666;">採用業界最高標準的安全架構，保護您的診所與病患資料</p>
+     </div>
+     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="text-center p-6 rounded-2xl" style="background-color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+       <div class="w-14 h-14 mx-auto mb-4 rounded-xl flex items-center justify-center text-2xl" style="background-color: rgba(45, 90, 74, 0.1);">
+        🛡️
+       </div>
+       <h4 class="font-semibold mb-2" style="color: #1A1A1A;">域名防火牆</h4>
+       <p class="text-sm" style="color: #666;">WAF 網站應用防火牆，阻擋惡意攻擊</p>
+      </div>
+      <div class="text-center p-6 rounded-2xl" style="background-color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+       <div class="w-14 h-14 mx-auto mb-4 rounded-xl flex items-center justify-center text-2xl" style="background-color: rgba(45, 90, 74, 0.1);">
+        🔐
+       </div>
+       <h4 class="font-semibold mb-2" style="color: #1A1A1A;">雲端加密儲存</h4>
+       <p class="text-sm" style="color: #666;">TLS/SSL 傳輸加密 + 靜態資料加密</p>
+      </div>
+      <div class="text-center p-6 rounded-2xl" style="background-color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+       <div class="w-14 h-14 mx-auto mb-4 rounded-xl flex items-center justify-center text-2xl" style="background-color: rgba(45, 90, 74, 0.1);">
+        👤
+       </div>
+       <h4 class="font-semibold mb-2" style="color: #1A1A1A;">身份認證機制</h4>
+       <p class="text-sm" style="color: #666;">多重驗證、憑證安全儲存</p>
+      </div>
+      <div class="text-center p-6 rounded-2xl" style="background-color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+       <div class="w-14 h-14 mx-auto mb-4 rounded-xl flex items-center justify-center text-2xl" style="background-color: rgba(45, 90, 74, 0.1);">
+        🗄️
+       </div>
+       <h4 class="font-semibold mb-2" style="color: #1A1A1A;">獨立資料庫</h4>
+       <p class="text-sm" style="color: #666;">每間診所獨立資料庫，提高保密性</p>
+      </div>
+     </div><!-- Additional Features -->
+     <div class="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="flex items-start gap-4 p-5 rounded-xl" style="background-color: white; box-shadow: 0 2px 10px rgba(0,0,0,0.03);"><span class="text-2xl">🌐</span>
+       <div>
+        <h5 class="font-semibold mb-1" style="color: #1A1A1A;">全球 CDN 網路</h5>
+        <p class="text-sm" style="color: #666;">內容快取至全球節點，存取速度極快</p>
+       </div>
+      </div>
+      <div class="flex items-start gap-4 p-5 rounded-xl" style="background-color: white; box-shadow: 0 2px 10px rgba(0,0,0,0.03);"><span class="text-2xl">📱</span>
+       <div>
+        <h5 class="font-semibold mb-1" style="color: #1A1A1A;">全平台支援</h5>
+        <p class="text-sm" style="color: #666;">電腦、平板、手機皆可流暢操作</p>
+       </div>
+      </div>
+      <div class="flex items-start gap-4 p-5 rounded-xl" style="background-color: white; box-shadow: 0 2px 10px rgba(0,0,0,0.03);"><span class="text-2xl">⚡</span>
+       <div>
+        <h5 class="font-semibold mb-1" style="color: #1A1A1A;">自動擴展</h5>
+        <p class="text-sm" style="color: #666;">流量高峰自動擴容，永遠高效能</p>
+       </div>
+      </div>
+      <div class="flex items-start gap-4 p-5 rounded-xl" style="background-color: white; box-shadow: 0 2px 10px rgba(0,0,0,0.03);"><span class="text-2xl">🔗</span>
+       <div>
+        <h5 class="font-semibold mb-1" style="color: #1A1A1A;">自訂域名</h5>
+        <p class="text-sm" style="color: #666;">使用您診所專屬的網址</p>
+       </div>
+      </div>
+      <div class="flex items-start gap-4 p-5 rounded-xl" style="background-color: white; box-shadow: 0 2px 10px rgba(0,0,0,0.03);"><span class="text-2xl">🔄</span>
+       <div>
+        <h5 class="font-semibold mb-1" style="color: #1A1A1A;">即時同步</h5>
+        <p class="text-sm" style="color: #666;">掛號列表即時更新，不漏接病患</p>
+       </div>
+      </div>
+      <div class="flex items-start gap-4 p-5 rounded-xl" style="background-color: white; box-shadow: 0 2px 10px rgba(0,0,0,0.03);"><span class="text-2xl">🎨</span>
+       <div>
+        <h5 class="font-semibold mb-1" style="color: #1A1A1A;">主頁設計</h5>
+        <p class="text-sm" style="color: #666;">包含專業診所形象網站設計</p>
+       </div>
+      </div>
+     </div>
+    </div>
+   </section><!-- Pricing Section -->
+   <section id="pricing" class="py-20 lg:py-32" style="background-color: #E8E4DD;">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+     <div class="text-center mb-16"><span class="inline-block px-4 py-2 rounded-full text-sm font-medium mb-4" style="background-color: rgba(201, 169, 98, 0.2); color: #B8944D;"> 💰 方案價格 </span>
+      <h2 class="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-4" style="color: #1A1A1A;">選擇適合您的方案</h2>
+      <p class="text-lg max-w-2xl mx-auto" style="color: #666;">靈活的定價方案，從小型診所到連鎖機構都能找到最佳選擇</p>
+     </div>
+     <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"><!-- Starter -->
+      <div class="pricing-card rounded-3xl p-8 bg-white">
+       <div class="text-center mb-8">
+        <h3 class="font-serif text-xl font-semibold mb-2" style="color: #1A1A1A;">入門方案</h3>
+        <p class="text-sm mb-4" style="color: #666;">適合小型診所起步</p>
+        <div class="flex items-baseline justify-center gap-1"><span class="text-4xl font-bold" style="color: #2D5A4A;">NT$2,500</span> <span class="text-sm" style="color: #888;">/月</span>
+        </div>
+       </div>
+       <ul class="space-y-4 mb-8">
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> 1 位醫師帳號</li>
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> 基礎病歷管理</li>
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> 線上預約掛號</li>
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> 藥材資料庫</li>
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> Email 支援</li>
+       </ul><button class="w-full py-3 rounded-full font-medium transition-all border-2 hover:shadow-lg" style="color: #2D5A4A; border-color: #2D5A4A;"> 開始試用 </button>
+      </div><!-- Professional -->
+      <div class="pricing-card rounded-3xl p-8 relative" style="background-color: #2D5A4A; transform: scale(1.05);">
+       <div class="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-semibold text-white" style="background-color: #C9A962;">
+        最受歡迎
+       </div>
+       <div class="text-center mb-8">
+        <h3 class="font-serif text-xl font-semibold mb-2 text-white">專業方案</h3>
+        <p class="text-sm mb-4" style="color: rgba(255,255,255,0.7);">適合成長中的診所</p>
+        <div class="flex items-baseline justify-center gap-1"><span class="text-4xl font-bold" style="color: #C9A962;">NT$5,800</span> <span class="text-sm" style="color: rgba(255,255,255,0.7);">/月</span>
+        </div>
+       </div>
+       <ul class="space-y-4 mb-8">
+        <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><span style="color: #C9A962;">✓</span> 最多 5 位醫師帳號</li>
+        <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><span style="color: #C9A962;">✓</span> 完整病歷管理</li>
+        <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><span style="color: #C9A962;">✓</span> 智慧問診系統</li>
+        <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><span style="color: #C9A962;">✓</span> 互動式穴位地圖</li>
+        <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><span style="color: #C9A962;">✓</span> 藥房庫存管理</li>
+        <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><span style="color: #C9A962;">✓</span> 營收報表分析</li>
+        <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><span style="color: #C9A962;">✓</span> 自訂域名</li>
+        <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><span style="color: #C9A962;">✓</span> 優先客服支援</li>
+       </ul><button class="w-full py-3 rounded-full font-medium text-white transition-all hover:shadow-lg" style="background-color: #C9A962;"> 立即升級 </button>
+      </div><!-- Enterprise -->
+      <div class="pricing-card rounded-3xl p-8 bg-white">
+       <div class="text-center mb-8">
+        <h3 class="font-serif text-xl font-semibold mb-2" style="color: #1A1A1A;">企業方案</h3>
+        <p class="text-sm mb-4" style="color: #666;">適合連鎖診所機構</p>
+        <div class="flex items-baseline justify-center gap-1"><span class="text-4xl font-bold" style="color: #2D5A4A;">洽詢</span>
+        </div>
+       </div>
+       <ul class="space-y-4 mb-8">
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> 無限醫師帳號</li>
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> 多院區管理</li>
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> 所有專業功能</li>
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> API 整合</li>
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> 專屬客戶經理</li>
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> 到府教育訓練</li>
+        <li class="flex items-center gap-3 text-sm" style="color: #666;"><span style="color: #2D5A4A;">✓</span> SLA 服務保證</li>
+       </ul><button class="w-full py-3 rounded-full font-medium transition-all border-2 hover:shadow-lg" style="color: #2D5A4A; border-color: #2D5A4A;"> 聯絡我們 </button>
+      </div>
+     </div>
+    </div>
+   </section><!-- CTA Section -->
+   <section class="py-20 lg:py-32 relative overflow-hidden" style="background-color: #1A1A1A;">
+    <div class="absolute inset-0 opacity-10">
+     <div class="absolute top-0 left-0 w-96 h-96 rounded-full" style="background-color: #2D5A4A; filter: blur(100px);"></div>
+     <div class="absolute bottom-0 right-0 w-96 h-96 rounded-full" style="background-color: #C9A962; filter: blur(100px);"></div>
+    </div>
+    <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+     <h2 class="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-6 text-white">準備好讓您的診所<br><span class="text-gradient">邁向數位化了嗎？</span></h2>
+     <p class="text-lg mb-10" style="color: rgba(255,255,255,0.7);">立即開始 14 天免費試用，無需綁定信用卡<br>
+       專人協助導入，讓您無痛轉型</p>
+     <div class="flex flex-col sm:flex-row gap-4 justify-center"><button id="final-cta-btn" class="px-10 py-4 rounded-full text-lg font-semibold text-white transition-all hover:shadow-xl hover:scale-105" style="background-color: #C9A962;"> 免費試用 14 天 </button> <button class="px-10 py-4 rounded-full text-lg font-semibold transition-all hover:shadow-lg border" style="color: white; border-color: rgba(255,255,255,0.3);"> 預約專人演示 </button>
+     </div>
+    </div>
+   </section><!-- Footer -->
+   <footer class="py-16" style="background-color: #0D0D0D;">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+     <div class="grid md:grid-cols-4 gap-10 mb-12">
+      <div>
+       <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-xl gradient-jade flex items-center justify-center"><span class="text-xl">☯</span>
+        </div><span class="font-serif text-lg font-semibold text-white">智慧中醫</span>
+       </div>
+       <p class="text-sm mb-4" style="color: rgba(255,255,255,0.5);">專為中醫診所量身打造的智慧管理系統<br>
+         簡便 · 易用 · 高效</p>
+      </div>
+      <div>
+       <h5 class="font-semibold text-white mb-4">產品功能</h5>
+       <ul class="space-y-2">
+        <li><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">線上預約</a></li>
+        <li><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">智慧問診</a></li>
+        <li><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">穴位地圖</a></li>
+        <li><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">藥材資料庫</a></li>
+       </ul>
+      </div>
+      <div>
+       <h5 class="font-semibold text-white mb-4">支援服務</h5>
+       <ul class="space-y-2">
+        <li><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">使用教學</a></li>
+        <li><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">常見問題</a></li>
+        <li><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">聯絡客服</a></li>
+        <li><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">API 文件</a></li>
+       </ul>
+      </div>
+      <div>
+       <h5 class="font-semibold text-white mb-4">聯絡我們</h5>
+       <ul class="space-y-2">
+        <li class="text-sm" style="color: rgba(255,255,255,0.5);"><span id="footer-phone">📞 +886-2-1234-5678</span></li>
+        <li class="text-sm" style="color: rgba(255,255,255,0.5);"><span id="footer-email">✉️ contact@tcmclinic.com</span></li>
+        <li class="text-sm" style="color: rgba(255,255,255,0.5);">📍 台北市信義區信義路五段7號</li>
+       </ul>
+      </div>
+     </div>
+     <div class="pt-8 border-t" style="border-color: rgba(255,255,255,0.1);">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+       <p class="text-sm" style="color: rgba(255,255,255,0.4);">© 2024 智慧中醫診所系統. All rights reserved.</p>
+       <div class="flex gap-6"><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.4);">隱私政策</a> <a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.4);">服務條款</a>
+       </div>
+      </div>
+     </div>
+    </div>
+   </footer>
+  </div>
+  <script>
+    // Default configuration
+    const defaultConfig = {
+      hero_title: '智慧中醫診所系統',
+      hero_subtitle: '簡便 · 易用 · 高效',
+      cta_button_text: '免費試用 14 天',
+      contact_phone: '+886-2-1234-5678',
+      contact_email: 'contact@tcmclinic.com',
+      primary_color: '#2D5A4A',
+      secondary_color: '#C9A962',
+      background_color: '#F8F5F0',
+      text_color: '#1A1A1A',
+      accent_color: '#E8E4DD',
+      font_family: 'Noto Sans TC',
+      font_size: 16
+    };
+
+    // Initialize Element SDK
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange: async (config) => {
+          // Update hero title
+          const heroTitle = document.getElementById('hero-title');
+          if (heroTitle) {
+            heroTitle.textContent = config.hero_title || defaultConfig.hero_title;
+          }
+          
+          // Update hero subtitle
+          const heroSubtitle = document.getElementById('hero-subtitle');
+          if (heroSubtitle) {
+            heroSubtitle.textContent = config.hero_subtitle || defaultConfig.hero_subtitle;
+          }
+          
+          // Update CTA buttons
+          const ctaButtons = [
+            document.getElementById('hero-cta-btn'),
+            document.getElementById('nav-cta-btn'),
+            document.getElementById('final-cta-btn')
+          ];
+          const ctaText = config.cta_button_text || defaultConfig.cta_button_text;
+          ctaButtons.forEach(btn => {
+            if (btn) btn.textContent = ctaText;
+          });
+          
+          // Update contact info in footer
+          const footerPhone = document.getElementById('footer-phone');
+          if (footerPhone) {
+            footerPhone.textContent = `📞 ${config.contact_phone || defaultConfig.contact_phone}`;
+          }
+          
+          const footerEmail = document.getElementById('footer-email');
+          if (footerEmail) {
+            footerEmail.textContent = `✉️ ${config.contact_email || defaultConfig.contact_email}`;
+          }
+          
+          // Apply colors
+          const primaryColor = config.primary_color || defaultConfig.primary_color;
+          const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
+          const bgColor = config.background_color || defaultConfig.background_color;
+          const textColor = config.text_color || defaultConfig.text_color;
+          
+          // Update CSS custom properties
+          document.documentElement.style.setProperty('--color-jade', primaryColor);
+          document.documentElement.style.setProperty('--color-gold', secondaryColor);
+          document.documentElement.style.setProperty('--color-cream', bgColor);
+          document.documentElement.style.setProperty('--color-ink', textColor);
+          
+          // Apply font
+          const fontFamily = config.font_family || defaultConfig.font_family;
+          const fontSize = config.font_size || defaultConfig.font_size;
+          document.body.style.fontFamily = `${fontFamily}, sans-serif`;
+          document.body.style.fontSize = `${fontSize}px`;
+        },
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            {
+              get: () => config.background_color || defaultConfig.background_color,
+              set: (value) => {
+                config.background_color = value;
+                window.elementSdk.setConfig({ background_color: value });
+              }
+            },
+            {
+              get: () => config.accent_color || defaultConfig.accent_color,
+              set: (value) => {
+                config.accent_color = value;
+                window.elementSdk.setConfig({ accent_color: value });
+              }
+            },
+            {
+              get: () => config.text_color || defaultConfig.text_color,
+              set: (value) => {
+                config.text_color = value;
+                window.elementSdk.setConfig({ text_color: value });
+              }
+            },
+            {
+              get: () => config.primary_color || defaultConfig.primary_color,
+              set: (value) => {
+                config.primary_color = value;
+                window.elementSdk.setConfig({ primary_color: value });
+              }
+            },
+            {
+              get: () => config.secondary_color || defaultConfig.secondary_color,
+              set: (value) => {
+                config.secondary_color = value;
+                window.elementSdk.setConfig({ secondary_color: value });
+              }
+            }
+          ],
+          borderables: [],
+          fontEditable: {
+            get: () => config.font_family || defaultConfig.font_family,
+            set: (value) => {
+              config.font_family = value;
+              window.elementSdk.setConfig({ font_family: value });
+            }
+          },
+          fontSizeable: {
+            get: () => config.font_size || defaultConfig.font_size,
+            set: (value) => {
+              config.font_size = value;
+              window.elementSdk.setConfig({ font_size: value });
+            }
+          }
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ['hero_title', config.hero_title || defaultConfig.hero_title],
+          ['hero_subtitle', config.hero_subtitle || defaultConfig.hero_subtitle],
+          ['cta_button_text', config.cta_button_text || defaultConfig.cta_button_text],
+          ['contact_phone', config.contact_phone || defaultConfig.contact_phone],
+          ['contact_email', config.contact_email || defaultConfig.contact_email]
+        ])
+      });
+    }
+
+    // Mobile menu toggle
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobile-menu');
+      menu.classList.toggle('hidden');
+    }
+
+    // Navbar scroll effect
+    let lastScroll = 0;
+    window.addEventListener('scroll', () => {
+      const navbar = document.getElementById('navbar');
+      const currentScroll = window.pageYOffset;
+      
+      if (currentScroll > 50) {
+        navbar.style.backgroundColor = 'rgba(248, 245, 240, 0.95)';
+        navbar.style.backdropFilter = 'blur(10px)';
+        navbar.style.boxShadow = '0 2px 20px rgba(0,0,0,0.05)';
+      } else {
+        navbar.style.backgroundColor = 'transparent';
+        navbar.style.backdropFilter = 'none';
+        navbar.style.boxShadow = 'none';
+      }
+      
+      lastScroll = currentScroll;
+    });
+
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+          // Close mobile menu if open
+          document.getElementById('mobile-menu').classList.add('hidden');
+        }
+      });
+    });
+
+    // Intersection Observer for animations
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity = '1';
+          entry.target.style.transform = 'translateY(0)';
+        }
+      });
+    }, observerOptions);
+
+    // Observe all cards
+    document.querySelectorAll('.card-hover').forEach(card => {
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(20px)';
+      card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+      observer.observe(card);
+    });
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd2e1adb34d04fa',t:'MTc3MDk3MDU2NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
