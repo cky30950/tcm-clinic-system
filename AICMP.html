@@ -34,12 +34,12 @@
 </footer>
 
 <script>
-    const API_KEY = 'AIzaSyBjTQKRSR4PrBB8qxfMl2kZmLk0VKfhff8'; // 👈 這裡貼上你的 API Key
-    const ENDPOINT_URL = 'https://asia-northeast1-prediction.googleapis.com/v1/projects/288929141034/locations/asia-northeast1/endpoints/mg-endpoint-2ca72caf-32d9-445b-882d-fc6e3f04bd02:predict';
-
     const chatContainer = document.getElementById('chat-container');
     const userInput = document.getElementById('user-input');
     const sendBtn = document.getElementById('send-btn');
+
+    // 🌟 1. 這裡請填入你部署成功後獲得的 Firebase Function 網址
+    const CLOUD_FUNCTION_URL = 'https://tcmassistant-xxxx-uc.a.run.app'; 
 
     function appendMessage(role, text) {
         const div = document.createElement('div');
@@ -49,50 +49,46 @@
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 
-async function askAI() {
-    const prompt = userInput.value.trim();
-    if (!prompt) return;
+    async function askAI() {
+        const prompt = userInput.value.trim();
+        if (!prompt) return;
 
-    appendMessage('user', prompt);
-    userInput.value = '';
-    sendBtn.disabled = true; // 防止重複點擊
+        // 顯示使用者訊息
+        appendMessage('user', prompt);
+        userInput.value = '';
+        sendBtn.disabled = true;
 
-    // 🌟 關鍵修改：換成你剛剛在終端機看到的 Firebase Function URL
-    const CLOUD_FUNCTION_URL = 'https://tcmassistant-xxxx-uc.a.run.app'; 
+        try {
+            // 🌟 2. 呼叫 Firebase Function 而不是直接呼叫 Vertex AI
+            const response = await fetch(CLOUD_FUNCTION_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: prompt })
+            });
 
-    try {
-        const response = await fetch(CLOUD_FUNCTION_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            // 我們把問題包裝成 JSON 傳給 Firebase
-            body: JSON.stringify({ prompt: prompt })
-        });
+            if (!response.ok) throw new Error('伺服器回應異常');
 
-        if (!response.ok) {
-            throw new Error('伺服器回應異常');
+            const data = await response.json();
+            
+            // 顯示 AI 回傳內容
+            if (data.answer) {
+                appendMessage('ai', data.answer);
+            } else {
+                appendMessage('ai', "【醫案解析中】請稍後再試。");
+            }
+        } catch (error) {
+            console.error("詳細錯誤：", error);
+            appendMessage('ai', "【連線失敗】目前無法聯繫後台醫官，請檢查網絡。");
+        } finally {
+            sendBtn.disabled = false;
         }
-
-        const data = await response.json();
-        
-        // 🌟 這裡要對應 Firebase Function 回傳的格式 { answer: "..." }
-        if (data.answer) {
-            appendMessage('ai', data.answer);
-        } else {
-            appendMessage('ai', "醫案解析中，請稍候再試。");
-        }
-
-    } catch (error) {
-        console.error("詳細錯誤：", error);
-        appendMessage('ai', "【連線失敗】請確認後台服務是否正常啟動。");
-    } finally {
-        sendBtn.disabled = false;
     }
-}
 
+    // 綁定按鈕點擊與 Enter 鍵
     sendBtn.addEventListener('click', askAI);
-    userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') askAI(); });
+    userInput.addEventListener('keypress', (e) => { 
+        if (e.key === 'Enter') askAI(); 
+    });
 </script>
 
 </body>
