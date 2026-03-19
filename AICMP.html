@@ -49,44 +49,47 @@
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 
-    async function askAI() {
-        const prompt = userInput.value.trim();
-        if (!prompt) return;
+async function askAI() {
+    const prompt = userInput.value.trim();
+    if (!prompt) return;
 
-        appendMessage('user', prompt);
-        userInput.value = '';
-        sendBtn.disabled = true;
+    appendMessage('user', prompt);
+    userInput.value = '';
+    sendBtn.disabled = true; // 防止重複點擊
 
-        const requestBody = {
-            "instances": [
-                {
-                    "@requestFormat": "chatCompletions",
-                    "messages": [
-                        { "role": "system", "content": "你是一位資深中醫師，請用專業的術語進行辨證論治。" },
-                        { "role": "user", "content": prompt }
-                    ]
-                }
-            ]
-        };
+    // 🌟 關鍵修改：換成你剛剛在終端機看到的 Firebase Function URL
+    const CLOUD_FUNCTION_URL = 'https://tcmassistant-xxxx-uc.a.run.app'; 
 
-        try {
-            const response = await fetch(`${ENDPOINT_URL}?key=${API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            });
+    try {
+        const response = await fetch(CLOUD_FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            // 我們把問題包裝成 JSON 傳給 Firebase
+            body: JSON.stringify({ prompt: prompt })
+        });
 
-            const data = await response.json();
-            // 這裡根據 Qwen 容器的回傳格式解析內容
-            const aiReply = data.predictions[0].choices[0].message.content;
-            appendMessage('ai', aiReply);
-        } catch (error) {
-            appendMessage('ai', "【醫案記錄出錯】請檢查網絡連接或 API 設定。");
-            console.error(error);
-        } finally {
-            sendBtn.disabled = false;
+        if (!response.ok) {
+            throw new Error('伺服器回應異常');
         }
+
+        const data = await response.json();
+        
+        // 🌟 這裡要對應 Firebase Function 回傳的格式 { answer: "..." }
+        if (data.answer) {
+            appendMessage('ai', data.answer);
+        } else {
+            appendMessage('ai', "醫案解析中，請稍候再試。");
+        }
+
+    } catch (error) {
+        console.error("詳細錯誤：", error);
+        appendMessage('ai', "【連線失敗】請確認後台服務是否正常啟動。");
+    } finally {
+        sendBtn.disabled = false;
     }
+}
 
     sendBtn.addEventListener('click', askAI);
     userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') askAI(); });
