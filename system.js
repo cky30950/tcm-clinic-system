@@ -9004,12 +9004,22 @@ async function showConsultationForm(appointment) {
             }
             try {
                 if (!currentConsultingAppointmentId) {
+                    try {
+                        if (consultationSymptomsDraftState && consultationSymptomsDraftState.key) {
+                            clearConsultationSymptomsDraft(consultationSymptomsDraftState.key);
+                        }
+                    } catch (_e) {}
                     closeConsultationForm();
                     return;
                 }
                 // 使用字串比較 ID，避免數字與字串不一致導致匹配失敗
                 const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
                 if (!appointment) {
+                    try {
+                        if (consultationSymptomsDraftState && consultationSymptomsDraftState.key) {
+                            clearConsultationSymptomsDraft(consultationSymptomsDraftState.key);
+                        }
+                    } catch (_e) {}
                     closeConsultationForm();
                     currentConsultingAppointmentId = null;
                     return;
@@ -9018,6 +9028,11 @@ async function showConsultationForm(appointment) {
                 const patientResult = await safeGetPatients(true);
                 if (!patientResult.success) {
                     showToast('無法讀取病人資料！', 'error');
+                    try {
+                        if (consultationSymptomsDraftState && consultationSymptomsDraftState.key) {
+                            clearConsultationSymptomsDraft(consultationSymptomsDraftState.key);
+                        }
+                    } catch (_e) {}
                     closeConsultationForm();
                     currentConsultingAppointmentId = null;
                     return;
@@ -9025,6 +9040,11 @@ async function showConsultationForm(appointment) {
                 const patient = patientResult.data.find(p => p.id === appointment.patientId);
                 if (!patient) {
                     showToast('找不到病人資料！', 'error');
+                    try {
+                        if (consultationSymptomsDraftState && consultationSymptomsDraftState.key) {
+                            clearConsultationSymptomsDraft(consultationSymptomsDraftState.key);
+                        }
+                    } catch (_e) {}
                     closeConsultationForm();
                     currentConsultingAppointmentId = null;
                     return;
@@ -9039,6 +9059,11 @@ async function showConsultationForm(appointment) {
                     const confirmMsg5 = lang5 === 'en' ? enMsg5 : zhMsg5;
                     const confirmedCancel = await showConfirmation(confirmMsg5, 'warning');
                     if (confirmedCancel) {
+                        try {
+                            if (consultationSymptomsDraftState && consultationSymptomsDraftState.key) {
+                                clearConsultationSymptomsDraft(consultationSymptomsDraftState.key);
+                            }
+                        } catch (_e) {}
                         // 將狀態改回候診中
                         appointment.status = 'waiting';
                         delete appointment.consultationStartTime;
@@ -9065,11 +9090,21 @@ async function showConsultationForm(appointment) {
                     // 如果是已完成的診症，只是關閉編輯模式
                     await revertPendingPackageChanges();
                     showToast('已退出病歷編輯模式', 'info');
+                    try {
+                        if (consultationSymptomsDraftState && consultationSymptomsDraftState.key) {
+                            clearConsultationSymptomsDraft(consultationSymptomsDraftState.key);
+                        }
+                    } catch (_e) {}
                     closeConsultationForm();
                     currentConsultingAppointmentId = null;
                 } else {
                     // 其他狀態直接關閉
                     await revertPendingPackageChanges();
+                    try {
+                        if (consultationSymptomsDraftState && consultationSymptomsDraftState.key) {
+                            clearConsultationSymptomsDraft(consultationSymptomsDraftState.key);
+                        }
+                    } catch (_e) {}
                     closeConsultationForm();
                     currentConsultingAppointmentId = null;
                 }
