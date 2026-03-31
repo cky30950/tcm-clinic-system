@@ -8518,6 +8518,153 @@ async function startConsultation(appointmentId) {
             }
         }
         
+let consultationSymptomsDraftState = {
+    key: null,
+    meta: null,
+    el: null,
+    handler: null,
+    saveSoon: null
+};
+
+function buildConsultationSymptomsDraftKey(appointment, patient) {
+    const pid = patient && (patient.id !== undefined && patient.id !== null) ? String(patient.id) : '';
+    const isEditing = appointment && appointment.status === 'completed' && appointment.consultationId;
+    if (isEditing) {
+        return `tcmDraft:consultation:symptoms:v1:pid:${pid}:cid:${String(appointment.consultationId)}`;
+    }
+    const apptId = appointment && (appointment.id !== undefined && appointment.id !== null) ? String(appointment.id) : (typeof currentConsultingAppointmentId !== 'undefined' && currentConsultingAppointmentId !== null ? String(currentConsultingAppointmentId) : '');
+    return `tcmDraft:consultation:symptoms:v1:pid:${pid}:aid:${String(apptId)}`;
+}
+
+function readConsultationSymptomsDraft(key) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (!obj || typeof obj !== 'object') return null;
+        return obj;
+    } catch (_e) {
+        return null;
+    }
+}
+
+function writeConsultationSymptomsDraft(key, next) {
+    try {
+        localStorage.setItem(key, JSON.stringify(next));
+        return true;
+    } catch (_e) {
+        return false;
+    }
+}
+
+function clearConsultationSymptomsDraft(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch (_e) {}
+}
+
+function persistConsultationSymptomsDraft(value) {
+    const key = consultationSymptomsDraftState && consultationSymptomsDraftState.key ? consultationSymptomsDraftState.key : null;
+    if (!key) return;
+    const now = Date.now();
+    const existing = readConsultationSymptomsDraft(key) || {};
+    const prevValue = typeof existing.prevValue === 'string' ? existing.prevValue : '';
+    const prevUpdatedAt = typeof existing.prevUpdatedAt === 'number' ? existing.prevUpdatedAt : 0;
+    const currValue = typeof existing.value === 'string' ? existing.value : '';
+    const currUpdatedAt = typeof existing.updatedAt === 'number' ? existing.updatedAt : 0;
+    const next = { ...existing };
+    if (typeof value !== 'string') value = '';
+    if (value !== currValue) {
+        const currHasText = currValue && currValue.trim();
+        const newHasText = value && value.trim();
+        if (currHasText && currValue !== value) {
+            next.prevValue = currValue;
+            next.prevUpdatedAt = currUpdatedAt || now;
+        } else if (!newHasText && prevValue && prevValue.trim()) {
+            next.prevValue = prevValue;
+            next.prevUpdatedAt = prevUpdatedAt || now;
+        }
+        next.value = value;
+        next.updatedAt = now;
+        if (consultationSymptomsDraftState.meta) {
+            next.meta = consultationSymptomsDraftState.meta;
+        }
+        writeConsultationSymptomsDraft(key, next);
+    }
+}
+
+function restoreConsultationSymptomsDraft(appointment, patient) {
+    const el = document.getElementById('formSymptoms');
+    if (!el) return;
+    const key = buildConsultationSymptomsDraftKey(appointment, patient);
+    consultationSymptomsDraftState.key = key;
+    consultationSymptomsDraftState.meta = {
+        appointmentId: appointment && appointment.id !== undefined && appointment.id !== null ? String(appointment.id) : (typeof currentConsultingAppointmentId !== 'undefined' ? String(currentConsultingAppointmentId) : ''),
+        consultationId: appointment && appointment.consultationId ? String(appointment.consultationId) : '',
+        patientId: patient && patient.id !== undefined && patient.id !== null ? String(patient.id) : '',
+        patientName: patient && patient.name ? String(patient.name) : '',
+        doctor: currentUserData && currentUserData.username ? String(currentUserData.username) : (currentUser ? String(currentUser) : '')
+    };
+    const draft = readConsultationSymptomsDraft(key);
+    if (!draft) return;
+    const rawValue = typeof draft.value === 'string' ? draft.value : '';
+    const rawPrevValue = typeof draft.prevValue === 'string' ? draft.prevValue : '';
+    const valueToRestore = (rawValue && rawValue.trim()) ? rawValue : ((rawPrevValue && rawPrevValue.trim()) ? rawPrevValue : '');
+    if (!valueToRestore) return;
+    const currentVal = el.value || '';
+    if (currentVal !== valueToRestore) {
+        el.value = valueToRestore;
+        showToast('已自動復原未儲存的主訴及現病史暫存內容', 'info');
+    }
+}
+
+function setupConsultationSymptomsDraftAutosave(appointment, patient) {
+    const el = document.getElementById('formSymptoms');
+    if (!el) return;
+    const key = buildConsultationSymptomsDraftKey(appointment, patient);
+    consultationSymptomsDraftState.key = key;
+    consultationSymptomsDraftState.el = el;
+    if (consultationSymptomsDraftState.handler) {
+        try {
+            el.removeEventListener('input', consultationSymptomsDraftState.handler);
+        } catch (_e) {}
+    }
+    consultationSymptomsDraftState.handler = debounce(() => {
+        try {
+            persistConsultationSymptomsDraft(el.value);
+        } catch (_e) {}
+    }, 400);
+    consultationSymptomsDraftState.saveSoon = debounce(() => {
+        try {
+            persistConsultationSymptomsDraft(el.value);
+        } catch (_e) {}
+    }, 50);
+    el.addEventListener('input', consultationSymptomsDraftState.handler);
+}
+
+function stopConsultationSymptomsDraftAutosave() {
+    try {
+        const el = consultationSymptomsDraftState && consultationSymptomsDraftState.el ? consultationSymptomsDraftState.el : null;
+        const handler = consultationSymptomsDraftState && consultationSymptomsDraftState.handler ? consultationSymptomsDraftState.handler : null;
+        if (el && handler) {
+            el.removeEventListener('input', handler);
+        }
+    } catch (_e) {}
+    if (consultationSymptomsDraftState) {
+        consultationSymptomsDraftState.el = null;
+        consultationSymptomsDraftState.handler = null;
+        consultationSymptomsDraftState.saveSoon = null;
+    }
+}
+
+function queueConsultationSymptomsDraftSave() {
+    try {
+        if (consultationSymptomsDraftState && typeof consultationSymptomsDraftState.saveSoon === 'function') {
+            consultationSymptomsDraftState.saveSoon();
+        }
+    } catch (_e) {}
+}
+
 // 修復診症表單顯示函數
 async function showConsultationForm(appointment) {
     try {
@@ -8716,6 +8863,11 @@ async function showConsultationForm(appointment) {
         } catch (err) {
             console.error('載入過往記錄時發生錯誤:', err);
         }
+
+        try {
+            restoreConsultationSymptomsDraft(appointment, patient);
+            setupConsultationSymptomsDraftAutosave(appointment, patient);
+        } catch (_e) {}
         
         document.getElementById('consultationForm').classList.remove('hidden');
         
@@ -8788,6 +8940,7 @@ async function showConsultationForm(appointment) {
         
         // 關閉診症表單
         async function closeConsultationForm() {
+            stopConsultationSymptomsDraftAutosave();
             // 在關閉表單前，如有暫存的套票使用變更且尚未保存，嘗試回復。
             try {
                 if (pendingPackageChanges && pendingPackageChanges.length > 0) {
@@ -9223,6 +9376,11 @@ async function saveConsultation() {
         }
 
         if (operationSuccess) {
+            try {
+                if (consultationSymptomsDraftState && consultationSymptomsDraftState.key) {
+                    clearConsultationSymptomsDraft(consultationSymptomsDraftState.key);
+                }
+            } catch (_e) {}
             // 保存成功時，先提交暫存的套票購買與使用
             await commitPendingPackagePurchases();
             // 提交暫存套票購買後，提交本地暫存的套票使用變更至資料庫
@@ -24738,6 +24896,7 @@ async function deleteMedicalRecord(recordId) {
         }
       }
 
+      queueConsultationSymptomsDraftSave();
       hideDiagnosisTemplateModal();
       showToast('已載入診斷模板', 'success');
     } catch (err) {
