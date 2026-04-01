@@ -1617,6 +1617,13 @@ async function fetchUsers(forceRefresh = false) {
                 const addBtn = document.getElementById('addClinicButton');
                 if (addBtn && !addBtn.dataset.bound) {
                     addBtn.addEventListener('click', async function() {
+                        try {
+                            const count = Array.isArray(clinicsList) ? clinicsList.length : 0;
+                            if (count >= 3) {
+                                showToast('診所數量已達上限（3），無法新增', 'error');
+                                return;
+                            }
+                        } catch (_e) {}
                         const created = await window.firebaseDataManager.addClinic({
                             chineseName: '新診所',
                             englishName: '',
@@ -1632,7 +1639,7 @@ async function fetchUsers(forceRefresh = false) {
                             setCurrentClinicId(created.id);
                             showToast('已新增診所', 'success');
                         } else {
-                            showToast('新增診所失敗', 'error');
+                            showToast((created && created.error) ? created.error : '新增診所失敗', 'error');
                         }
                     });
                     addBtn.dataset.bound = 'true';
@@ -17592,6 +17599,70 @@ let editingUserId = null;
 let currentUserFilter = 'all';
 let usersFromFirebase = []; // 儲存從 Firebase 讀取的用戶數據
 
+const clinicUserLimits = {
+    clinicAdmin: 3,
+    doctor: 5,
+    assistant: 5,
+    general: 5
+};
+
+function getClinicIdForUser(user, fallbackClinicId) {
+    try {
+        const cid = user && (user.clinicId !== undefined && user.clinicId !== null) ? String(user.clinicId) : '';
+        if (cid) return cid;
+    } catch (_e) {}
+    try {
+        const fb = fallbackClinicId !== undefined && fallbackClinicId !== null ? String(fallbackClinicId) : '';
+        return fb;
+    } catch (_e) {
+        return '';
+    }
+}
+
+function getClinicUserLimitGroup(position) {
+    const p = position ? String(position).trim() : '';
+    if (!p) return null;
+    if (p === '醫師') return 'doctor';
+    if (p === '護理師' || p === '助理') return 'assistant';
+    if (p === '用戶' || p === '一般用戶') return 'general';
+    if (p === '診所管理' || p.includes('管理')) return 'clinicAdmin';
+    return null;
+}
+
+function getClinicUserLimitLabel(group) {
+    if (group === 'doctor') return '醫師';
+    if (group === 'assistant') return '助理';
+    if (group === 'clinicAdmin') return '診所管理';
+    if (group === 'general') return '一般用戶';
+    return '';
+}
+
+function canActivateUserUnderClinicLimit(opts) {
+    const usersList = Array.isArray(opts && opts.users) ? opts.users : [];
+    const targetClinicId = opts && opts.clinicId !== undefined && opts.clinicId !== null ? String(opts.clinicId) : '';
+    const targetPosition = opts && opts.position !== undefined && opts.position !== null ? String(opts.position) : '';
+    const targetActive = !!(opts && opts.active);
+    const excludeUserId = opts && opts.excludeUserId ? String(opts.excludeUserId) : null;
+    if (!targetActive) return { ok: true };
+    const group = getClinicUserLimitGroup(targetPosition);
+    if (!group) return { ok: true };
+    const limit = clinicUserLimits[group];
+    if (!(limit > 0)) return { ok: true };
+    const count = usersList.filter(u => {
+        if (!u) return false;
+        if (excludeUserId && String(u.id) === excludeUserId) return false;
+        const isActive = u.active !== false;
+        if (!isActive) return false;
+        const cid = getClinicIdForUser(u, targetClinicId);
+        if (String(cid) !== String(targetClinicId)) return false;
+        return getClinicUserLimitGroup(u.position) === group;
+    }).length;
+    if (count >= limit) {
+        return { ok: false, group, label: getClinicUserLimitLabel(group), limit, count };
+    }
+    return { ok: true, group, label: getClinicUserLimitLabel(group), limit, count };
+}
+
 async function loadUserManagement() {
     await loadUsersFromFirebase();
     displayUsers();
@@ -17993,6 +18064,28 @@ async function saveUser() {
         }
     }
 
+    const currentUsersForLimit = usersFromFirebase.length > 0 ? usersFromFirebase : users;
+    const clinicIdForLimit = (() => {
+        if (editingUserId) {
+            const existing = currentUsersForLimit.find(u => u && String(u.id) === String(editingUserId));
+            if (existing && existing.clinicId !== undefined && existing.clinicId !== null && String(existing.clinicId)) {
+                return String(existing.clinicId);
+            }
+        }
+        return currentClinicId ? String(currentClinicId) : 'local-default';
+    })();
+    const limitCheck = canActivateUserUnderClinicLimit({
+        users: currentUsersForLimit,
+        clinicId: clinicIdForLimit,
+        position: position,
+        active: active,
+        excludeUserId: editingUserId ? String(editingUserId) : null
+    });
+    if (!limitCheck.ok) {
+        showToast(`此診所「${limitCheck.label}」人數已達上限（${limitCheck.count}/${limitCheck.limit}），無法新增/啟用。`, 'error');
+        return;
+    }
+
     // 顯示保存中狀態：在按鈕中顯示旋轉小圈並禁用按鈕
     // 透過 id 取得按鈕，以避免使用 onclick 選擇器時無法精確匹配
     const saveButton = document.getElementById('userSaveButton');
@@ -18008,7 +18101,8 @@ async function saveUser() {
                 email: email,
                 phone: phone,
                 uid: uid || '',
-                active: active
+                active: active,
+                clinicId: clinicIdForLimit
             };
 
             const result = await window.firebaseDataManager.updateUser(editingUserId, userData);
@@ -18094,6 +18188,7 @@ async function saveUser() {
                 phone: phone,
                 uid: newUid || '',
                 active: active,
+                clinicId: clinicIdForLimit,
                 lastLogin: null
             };
             const result = await window.firebaseDataManager.addUser(userData);
@@ -18149,6 +18244,22 @@ async function toggleUserStatus(id) {
     if (user.email && user.email.toLowerCase() === superAdminEmail) {
         showToast('主管理員帳號不可停用！', 'error');
         return;
+    }
+
+    if (!user.active) {
+        const currentUsersForLimit = usersFromFirebase.length > 0 ? usersFromFirebase : users;
+        const clinicIdForLimit = getClinicIdForUser(user, (currentClinicId ? String(currentClinicId) : 'local-default'));
+        const limitCheck = canActivateUserUnderClinicLimit({
+            users: currentUsersForLimit,
+            clinicId: clinicIdForLimit,
+            position: user.position,
+            active: true,
+            excludeUserId: String(id)
+        });
+        if (!limitCheck.ok) {
+            showToast(`此診所「${limitCheck.label}」人數已達上限（${limitCheck.count}/${limitCheck.limit}），無法啟用。`, 'error');
+            return;
+        }
     }
     
     const action = user.active ? '停用' : '啟用';
@@ -21079,6 +21190,15 @@ class FirebaseDataManager {
     async addClinic(clinicData) {
         if (!this.isReady) return { success: false };
         try {
+            try {
+                const snap = await window.firebase.getDocs(
+                    window.firebase.collection(window.firebase.db, 'clinics')
+                );
+                const count = (snap && typeof snap.size === 'number') ? snap.size : 0;
+                if (count >= 3) {
+                    return { success: false, error: '診所數量已達上限（3），無法新增' };
+                }
+            } catch (_eLimit) {}
             let dataToWrite;
             try {
                 const { id, ...rest } = clinicData || {};
