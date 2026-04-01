@@ -7650,10 +7650,49 @@ async function loadConsultationForEdit(consultationId) {
             
             // 載入收費項目
             selectedBillingItems = [];
-            if (consultation.billingItems) {
+            if (consultation.billingItemsStructured) {
+                let loadedFromStructured = false;
+                try {
+                    const parsedStructured = JSON.parse(consultation.billingItemsStructured);
+                    if (Array.isArray(parsedStructured) && parsedStructured.length > 0) {
+                        const mapped = parsedStructured.map(raw => {
+                            const idStr = raw && raw.id !== undefined && raw.id !== null ? String(raw.id) : '';
+                            const matched = Array.isArray(billingItems)
+                                ? billingItems.find(it => it && String(it.id) === idStr)
+                                : null;
+                            const category = (raw && raw.category) ? String(raw.category) : (matched && matched.category ? matched.category : 'other');
+                            return {
+                                id: idStr || (matched && matched.id ? String(matched.id) : ''),
+                                name: matched && matched.name ? matched.name : (raw && raw.name ? String(raw.name) : ''),
+                                category: matched && matched.category ? matched.category : category,
+                                price: matched ? (Number(matched.price) || 0) : (Number(raw && raw.price) || 0),
+                                unit: matched && matched.unit ? matched.unit : (raw && raw.unit ? String(raw.unit) : ''),
+                                description: matched && matched.description ? matched.description : (raw && raw.description ? String(raw.description) : ''),
+                                packageUses: matched ? (Number(matched.packageUses) || 0) : (Number(raw && raw.packageUses) || 0),
+                                validityDays: matched ? (Number(matched.validityDays) || 0) : (Number(raw && raw.validityDays) || 0),
+                                quantity: Math.max(1, parseInt(raw && raw.quantity, 10) || 1),
+                                includedInDiscount: raw && raw.includedInDiscount === false ? false : (category !== 'discount'),
+                                patientId: raw && raw.patientId ? String(raw.patientId) : '',
+                                packageRecordId: raw && raw.packageRecordId ? String(raw.packageRecordId) : '',
+                                isHistorical: !!(raw && raw.isHistorical)
+                            };
+                        }).filter(item => item && item.name);
+                        selectedBillingItems = mapped;
+                        loadedFromStructured = selectedBillingItems.length > 0;
+                    }
+                } catch (_e) {
+                    loadedFromStructured = false;
+                }
+                if (!loadedFromStructured && consultation.billingItems) {
+                    document.getElementById('formBillingItems').value = consultation.billingItems;
+                    parseBillingItemsFromText(consultation.billingItems);
+                }
+            } else if (consultation.billingItems) {
                 document.getElementById('formBillingItems').value = consultation.billingItems;
                 // 解析舊病歷中的收費項目
                 parseBillingItemsFromText(consultation.billingItems);
+            }
+            if (consultation.billingItems || consultation.billingItemsStructured) {
                 // 嘗試為舊病歷載入的套票使用項目補全 meta（patientId 和 packageRecordId），
                 // 優先使用診症記錄中的 patientId，若不存在再嘗試使用當前掛號（currentConsultingAppointmentId）推斷。
                 try {
@@ -9250,6 +9289,29 @@ async function saveConsultation() {
             restStartDate: document.getElementById('formRestStartDate').value,
             restEndDate: document.getElementById('formRestEndDate').value,
             billingItems: document.getElementById('formBillingItems').value.trim(),
+            billingItemsStructured: (() => {
+                try {
+                    const normalized = (Array.isArray(selectedBillingItems) ? selectedBillingItems : [])
+                        .map(item => ({
+                            id: item && item.id !== undefined && item.id !== null ? String(item.id) : '',
+                            name: item && item.name ? String(item.name) : '',
+                            category: item && item.category ? String(item.category) : 'other',
+                            price: Number(item && item.price) || 0,
+                            unit: item && item.unit ? String(item.unit) : '',
+                            description: item && item.description ? String(item.description) : '',
+                            quantity: Math.max(1, parseInt(item && item.quantity, 10) || 1),
+                            includedInDiscount: item && item.includedInDiscount === false ? false : true,
+                            packageUses: Number(item && item.packageUses) || 0,
+                            validityDays: Number(item && item.validityDays) || 0,
+                            patientId: item && item.patientId ? String(item.patientId) : '',
+                            packageRecordId: item && item.packageRecordId ? String(item.packageRecordId) : '',
+                            isHistorical: !!(item && item.isHistorical)
+                        }));
+                    return JSON.stringify(normalized);
+                } catch (_e) {
+                    return '[]';
+                }
+            })(),
             // date and doctor fields are assigned below depending on whether this is a new record or an edit
             status: 'completed'
         };
