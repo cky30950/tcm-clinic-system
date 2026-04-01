@@ -17663,6 +17663,27 @@ function canActivateUserUnderClinicLimit(opts) {
     return { ok: true, group, label: getClinicUserLimitLabel(group), limit, count };
 }
 
+function getPrimaryClinicNameForUser(user) {
+    try {
+        const cid = user && user.clinicId !== undefined && user.clinicId !== null ? String(user.clinicId).trim() : '';
+        if (!cid) return '-';
+        if (cid === 'local-default') return '預設診所';
+        if (Array.isArray(clinicsList)) {
+            const c = clinicsList.find(x => x && String(x.id) === cid);
+            if (c) {
+                try {
+                    if (typeof getClinicDisplayName === 'function') return getClinicDisplayName(c);
+                } catch (_e) {}
+                if (c.chineseName) return String(c.chineseName);
+                if (c.englishName) return String(c.englishName);
+            }
+        }
+        return cid;
+    } catch (_e) {
+        return '-';
+    }
+}
+
 async function loadUserManagement() {
     await loadUsersFromFirebase();
     displayUsers();
@@ -17695,7 +17716,7 @@ async function loadUsersFromFirebase() {
     // 顯示載入中
     tbody.innerHTML = `
         <tr>
-            <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+            <td colspan="8" class="px-4 py-8 text-center text-gray-500">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                 <div class="mt-2">載入中...</div>
             </td>
@@ -17776,7 +17797,7 @@ function displayUsers() {
     if (filteredUsers.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                <td colspan="8" class="px-4 py-8 text-center text-gray-500">
                     ${searchTerm ? '沒有找到符合條件的用戶' : '尚無用戶資料'}
                 </td>
             </tr>
@@ -17801,6 +17822,7 @@ function displayUsers() {
         const safeId = window.escapeHtml(String(user.id));
         const safeName = window.escapeHtml(user.name);
         const safePosition = window.escapeHtml(user.position || '未設定');
+        const safePrimaryClinic = window.escapeHtml(getPrimaryClinicNameForUser(user));
         const safeRegNumber = user.position === '醫師' ? window.escapeHtml(user.registrationNumber || '未設定') : '-';
         const safeEmail = window.escapeHtml(user.email || '未設定');
         const safeLastLogin = window.escapeHtml(lastLogin);
@@ -17827,6 +17849,7 @@ function displayUsers() {
         row.innerHTML = `
             <td class="px-4 py-3 text-sm text-gray-900">${safeName}</td>
             <td class="px-4 py-3 text-sm text-gray-600">${safePosition}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${safePrimaryClinic}</td>
             <td class="px-4 py-3 text-sm text-gray-600">${safeRegNumber}</td>
             <td class="px-4 py-3 text-sm text-gray-900">${safeEmail}</td>
             <td class="px-4 py-3">
