@@ -1025,6 +1025,7 @@ let patientConsultationsListeners = {};
 let currentPatientHistoryPatientId = null;
 let currentConsultationHistoryPatientId = null;
 const consultationHistoryPager = {
+    patientPagedCache: {},
     contexts: {
         patient: {
             getPatientId: () => currentPatientHistoryPatientId,
@@ -1053,6 +1054,127 @@ const consultationHistoryPager = {
             return dateA - dateB;
         });
     },
+    createEmptyPatientState(patientId) {
+        return {
+            patientId: String(patientId || ''),
+            totalCount: 0,
+            recordsByIndex: [],
+            descPageCache: {},
+            descPageCursors: {},
+            allLoaded: false,
+            mode: 'paged'
+        };
+    },
+    getCachedPatientState(patientId) {
+        const pid = String(patientId || '');
+        if (!pid) return null;
+        if (!this.patientPagedCache[pid]) {
+            this.patientPagedCache[pid] = this.createEmptyPatientState(pid);
+        }
+        return this.patientPagedCache[pid];
+    },
+    async ensurePatientState(patientId, forceRefresh = false) {
+        const pid = String(patientId || '');
+        if (!pid) return { success: false, state: null };
+        let state = this.getCachedPatientState(pid);
+        if (!state) return { success: false, state: null };
+        if (forceRefresh) {
+            state = this.createEmptyPatientState(pid);
+            this.patientPagedCache[pid] = state;
+        }
+        if (typeof state.totalCount === 'number' && state.totalCount > 0 && !forceRefresh) {
+            return { success: true, state };
+        }
+        if (state.mode === 'full' && Array.isArray(state.recordsByIndex) && !forceRefresh) {
+            state.totalCount = state.recordsByIndex.length;
+            return { success: true, state };
+        }
+        try {
+            await waitForFirebaseDb();
+            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+            const q = window.firebase.firestoreQuery(colRef, window.firebase.where('patientId', '==', pid));
+            const countSnap = await window.firebase.getCountFromServer(q);
+            const total = Number(countSnap && countSnap.data && countSnap.data().count) || 0;
+            state.totalCount = total;
+            state.recordsByIndex = new Array(total);
+            return { success: true, state };
+        } catch (error) {
+            console.warn('病歷分頁計數失敗，改用全量讀取模式:', error);
+            return await this.loadFullModeFallback(pid);
+        }
+    },
+    async loadFullModeFallback(patientId) {
+        const pid = String(patientId || '');
+        const state = this.getCachedPatientState(pid);
+        if (!state) return { success: false, state: null };
+        const consultationResult = await window.firebaseDataManager.getPatientConsultations(pid, true);
+        if (!consultationResult || !consultationResult.success) {
+            return { success: false, state };
+        }
+        const sorted = this.normalizeAndSortConsultations(consultationResult.data || []);
+        state.mode = 'full';
+        state.allLoaded = true;
+        state.totalCount = sorted.length;
+        state.recordsByIndex = sorted.slice();
+        state.descPageCache = {};
+        state.descPageCursors = {};
+        return { success: true, state };
+    },
+    async fetchDescPage(patientId, descPageNumber) {
+        const pid = String(patientId || '');
+        const pageNum = Number(descPageNumber) || 1;
+        const state = this.getCachedPatientState(pid);
+        if (!state || pageNum < 1) return { success: false };
+        if (state.mode === 'full') return { success: true };
+        if (state.descPageCache[pageNum]) return { success: true };
+        try {
+            await waitForFirebaseDb();
+            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+            for (let i = 1; i <= pageNum; i++) {
+                if (state.descPageCache[i]) continue;
+                const queryParts = [
+                    window.firebase.where('patientId', '==', pid),
+                    window.firebase.orderBy('date', 'desc'),
+                    window.firebase.limit(1)
+                ];
+                if (i > 1 && state.descPageCursors[i - 1]) {
+                    queryParts.push(window.firebase.startAfter(state.descPageCursors[i - 1]));
+                }
+                const q = window.firebase.firestoreQuery(colRef, ...queryParts);
+                const snapshot = await window.firebase.getDocs(q);
+                const docs = [];
+                snapshot.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
+                if (docs.length === 0) {
+                    state.descPageCache[i] = null;
+                    continue;
+                }
+                const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+                state.descPageCursors[i] = lastDoc;
+                state.descPageCache[i] = docs[0];
+                const uiIndex = state.totalCount - i;
+                if (uiIndex >= 0) {
+                    state.recordsByIndex[uiIndex] = docs[0];
+                }
+            }
+            return { success: true };
+        } catch (error) {
+            console.warn('病歷分頁讀取失敗，改用全量讀取模式:', error);
+            return await this.loadFullModeFallback(pid);
+        }
+    },
+    async ensureLoadedAtIndex(patientId, index) {
+        const pid = String(patientId || '');
+        const targetIndex = Number(index);
+        const stateResult = await this.ensurePatientState(pid, false);
+        if (!stateResult.success || !stateResult.state) return false;
+        const state = stateResult.state;
+        if (targetIndex < 0 || targetIndex >= state.totalCount) return false;
+        if (state.recordsByIndex[targetIndex]) return true;
+        if (state.mode === 'full') return !!state.recordsByIndex[targetIndex];
+        const descPageNumber = state.totalCount - targetIndex;
+        const pageResult = await this.fetchDescPage(pid, descPageNumber);
+        return !!(pageResult && pageResult.success && state.recordsByIndex[targetIndex]);
+    },
     setContextData(contextKey, patientId, list) {
         const ctx = this.contexts[contextKey];
         if (!ctx) return;
@@ -1064,30 +1186,57 @@ const consultationHistoryPager = {
     async loadForContext(contextKey, patientId) {
         const ctx = this.contexts[contextKey];
         if (!ctx) return { success: false, data: [] };
-        const consultationResult = await window.firebaseDataManager.getPatientConsultations(patientId);
-        if (!consultationResult || !consultationResult.success) {
+        const stateResult = await this.ensurePatientState(patientId, false);
+        if (!stateResult.success || !stateResult.state) {
             return { success: false, data: [] };
         }
-        this.setContextData(contextKey, patientId, consultationResult.data || []);
-        return { success: true, data: ctx.getConsultations() };
+        const state = stateResult.state;
+        ctx.setPatientId(String(patientId || ''));
+        ctx.setConsultations(state.recordsByIndex);
+        if (state.totalCount <= 0) {
+            ctx.setCurrentPage(0);
+            return { success: true, data: ctx.getConsultations(), totalCount: 0 };
+        }
+        const latestPage = state.totalCount - 1;
+        const loaded = await this.ensureLoadedAtIndex(patientId, latestPage);
+        if (!loaded) {
+            return { success: false, data: [] };
+        }
+        ctx.setCurrentPage(latestPage);
+        return { success: true, data: ctx.getConsultations(), totalCount: state.totalCount };
     },
     applyListenerList(patientId, list) {
         const pid = String(patientId || '');
+        const sorted = this.normalizeAndSortConsultations(list || []);
+        const state = this.getCachedPatientState(pid);
+        if (state) {
+            state.mode = 'full';
+            state.allLoaded = true;
+            state.totalCount = sorted.length;
+            state.recordsByIndex = sorted.slice();
+            state.descPageCache = {};
+            state.descPageCursors = {};
+        }
         const contexts = ['patient', 'consultation'];
         contexts.forEach((key) => {
             const ctx = this.contexts[key];
             if (!ctx) return;
             if (String(ctx.getPatientId() || '') !== pid) return;
-            this.setContextData(key, pid, list || []);
+            ctx.setConsultations(state ? state.recordsByIndex : sorted.slice());
+            ctx.setCurrentPage(Math.max(0, sorted.length - 1));
         });
     },
-    changePage(contextKey, direction) {
+    async changePage(contextKey, direction) {
         const ctx = this.contexts[contextKey];
         if (!ctx) return false;
         const list = ctx.getConsultations();
         const oldPage = Number(ctx.getCurrentPage()) || 0;
         const newPage = oldPage + direction;
         if (newPage < 0 || newPage >= list.length) return false;
+        const patientId = ctx.getPatientId();
+        if (!patientId) return false;
+        const loaded = await this.ensureLoadedAtIndex(patientId, newPage);
+        if (!loaded) return false;
         ctx.setCurrentPage(newPage);
         return true;
     },
@@ -5865,6 +6014,12 @@ async function deletePatientAssociatedData(patientId) {
             if (patientConsultationsCache && patientConsultationsCache[patientId]) {
                 delete patientConsultationsCache[patientId];
             }
+            try {
+                const pid = String(patientId || '');
+                if (pid && consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
+                    delete consultationHistoryPager.patientPagedCache[pid];
+                }
+            } catch (_e) {}
         } catch (err) {
             console.error('查詢或刪除診症記錄失敗:', err);
         }
@@ -9674,7 +9829,6 @@ if (!patient) {
             `;
             
             currentPatientHistoryPatientId = patientId;
-            try { attachPatientConsultationsListener(patientId); } catch (_e) {}
             // 顯示分頁病歷記錄
             displayPatientMedicalHistoryPage();
             
@@ -9715,6 +9869,14 @@ if (!patient) {
             const totalPages = currentPatientConsultations.length;
             const currentPageNumber = currentPatientHistoryPage + 1;
             const consultationNumber = currentPatientHistoryPage + 1;
+            if (!consultation) {
+                contentDiv.innerHTML = `
+                    <div class="text-center py-12 text-gray-500">
+                        <div class="text-lg font-medium mb-2">正在載入病歷...</div>
+                    </div>
+                `;
+                return;
+            }
 
             // Prepare dynamic translation segments.  We look up static labels
             // from the dictionary and build English phrases when needed.
@@ -10007,8 +10169,8 @@ if (!patient) {
             `;
         }
         
-        function changePatientHistoryPage(direction) {
-            if (consultationHistoryPager.changePage('patient', direction)) {
+        async function changePatientHistoryPage(direction) {
+            if (await consultationHistoryPager.changePage('patient', direction)) {
                 displayPatientMedicalHistoryPage();
             }
         }
@@ -10096,7 +10258,6 @@ async function viewPatientMedicalHistory(patientId) {
         `;
         
         currentConsultationHistoryPatientId = patientId;
-        try { attachPatientConsultationsListener(patientId); } catch (_e) {}
         // 顯示分頁病歷記錄
         displayConsultationMedicalHistoryPage();
         
@@ -10144,6 +10305,14 @@ function displayConsultationMedicalHistoryPage() {
     const totalPages = currentConsultationConsultations.length;
     const currentPageNumber = currentConsultationHistoryPage + 1;
     const consultationNumber = currentConsultationHistoryPage + 1;
+    if (!consultation) {
+        contentDiv.innerHTML = `
+            <div class="text-center py-12 text-gray-500">
+                <div class="text-lg font-medium mb-2">正在載入病歷...</div>
+            </div>
+        `;
+        return;
+    }
 
     // Build translated dynamic strings.  For Chinese we keep the original
     // formatting; for English we generate equivalent phrases.  The
@@ -10431,8 +10600,8 @@ function displayConsultationMedicalHistoryPage() {
     `;
 }
         
-        function changeConsultationHistoryPage(direction) {
-            if (consultationHistoryPager.changePage('consultation', direction)) {
+        async function changeConsultationHistoryPage(direction) {
+            if (await consultationHistoryPager.changePage('consultation', direction)) {
                 displayConsultationMedicalHistoryPage();
             }
         }
@@ -21614,13 +21783,29 @@ class FirebaseDataManager {
                 if (consultationData && consultationData.patientId) {
                     delete patientConsultationsCache[consultationData.patientId];
                     try { localStorage.removeItem('patientConsultations:' + String(consultationData.patientId)); } catch (_e) {}
+                    try {
+                        const pid = String(consultationData.patientId || '');
+                        if (pid && consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
+                            delete consultationHistoryPager.patientPagedCache[pid];
+                        }
+                    } catch (_e2) {}
                 } else {
                     // 如果缺少病人 ID，清除所有病人診症快取
                     patientConsultationsCache = {};
+                    try {
+                        if (consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
+                            consultationHistoryPager.patientPagedCache = {};
+                        }
+                    } catch (_e3) {}
                 }
             } catch (_err) {
                 // 若執行快取清理時發生錯誤，直接重置快取
                 patientConsultationsCache = {};
+                try {
+                    if (consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
+                        consultationHistoryPager.patientPagedCache = {};
+                    }
+                } catch (_e4) {}
             }
             return { success: true, id: docRef.id };
         } catch (error) {
@@ -22133,12 +22318,28 @@ class FirebaseDataManager {
                 if (consultationData && consultationData.patientId) {
                     delete patientConsultationsCache[consultationData.patientId];
                     try { localStorage.removeItem('patientConsultations:' + String(consultationData.patientId)); } catch (_e) {}
+                    try {
+                        const pid = String(consultationData.patientId || '');
+                        if (pid && consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
+                            delete consultationHistoryPager.patientPagedCache[pid];
+                        }
+                    } catch (_e2) {}
                 } else {
                     // 如果無法確定病人 ID，則清除所有病人診症快取
                     patientConsultationsCache = {};
+                    try {
+                        if (consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
+                            consultationHistoryPager.patientPagedCache = {};
+                        }
+                    } catch (_e3) {}
                 }
             } catch (_err) {
                 patientConsultationsCache = {};
+                try {
+                    if (consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
+                        consultationHistoryPager.patientPagedCache = {};
+                    }
+                } catch (_e4) {}
             }
             return { success: true };
         } catch (error) {
