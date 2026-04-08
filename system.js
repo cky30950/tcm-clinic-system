@@ -22369,6 +22369,25 @@ class FirebaseDataManager {
                 }
                 const row = await readOne(cursorDoc);
                 if (!row) {
+                    // 可能因舊資料缺少 date 欄位，導致 orderBy('date') 查不到；
+                    // 回退到原本查全病人病歷後在本地排序，避免直接報錯。
+                    const fallback = await this.getPatientConsultations(patientId, forceRefresh);
+                    if (fallback && fallback.success && Array.isArray(fallback.data) && fallback.data.length > idx) {
+                        const ordered = fallback.data.slice().sort((a, b) => {
+                            const da = parseConsultationDate(a.date);
+                            const db = parseConsultationDate(b.date);
+                            if (!da || isNaN(da.getTime())) return 1;
+                            if (!db || isNaN(db.getTime())) return -1;
+                            return db - da;
+                        });
+                        cache.totalCount = ordered.length;
+                        cache.byDescIndex = {};
+                        ordered.forEach((item, index) => {
+                            cache.byDescIndex[index] = item;
+                        });
+                        persistPatientConsultationsPagedCache(pid);
+                        return { success: true, data: ordered[idx] || null };
+                    }
                     return { success: false, data: null };
                 }
                 cache.byDescIndex[i] = row.data;
