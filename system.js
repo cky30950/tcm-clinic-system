@@ -1202,8 +1202,13 @@ const consultationHistoryPager = {
         if (!loaded) {
             return { success: false, data: [] };
         }
+        const latestState = this.getCachedPatientState(patientId);
+        if (latestState && Array.isArray(latestState.recordsByIndex)) {
+            // ensure UI context points to the newest cache reference after fallback/rebuild
+            ctx.setConsultations(latestState.recordsByIndex);
+        }
         ctx.setCurrentPage(latestPage);
-        return { success: true, data: ctx.getConsultations(), totalCount: state.totalCount };
+        return { success: true, data: ctx.getConsultations(), totalCount: latestState ? latestState.totalCount : state.totalCount };
     },
     applyListenerList(patientId, list) {
         const pid = String(patientId || '');
@@ -1237,6 +1242,10 @@ const consultationHistoryPager = {
         if (!patientId) return false;
         const loaded = await this.ensureLoadedAtIndex(patientId, newPage);
         if (!loaded) return false;
+        const latestState = this.getCachedPatientState(patientId);
+        if (latestState && Array.isArray(latestState.recordsByIndex)) {
+            ctx.setConsultations(latestState.recordsByIndex);
+        }
         ctx.setCurrentPage(newPage);
         return true;
     },
