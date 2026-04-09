@@ -9916,7 +9916,7 @@ if (!patient) {
                     </div>
                     
                     <div class="flex items-center space-x-2">
-                        <button onclick="changePatientHistoryPage(-1)" 
+                        <button onclick="changePatientHistoryPage(-1, event)" 
                                 ${currentPatientHistoryPage === 0 ? 'disabled' : ''}
                                 class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
                             ← ${prevLabel}
@@ -9924,7 +9924,7 @@ if (!patient) {
                         <span class="text-sm text-gray-600 px-2">
                             ${currentPageNumber} / ${totalPages}
                         </span>
-                        <button onclick="changePatientHistoryPage(1)" 
+                        <button onclick="changePatientHistoryPage(1, event)" 
                                 ${currentPatientHistoryPage === totalPages - 1 ? 'disabled' : ''}
                                 class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
                             ${nextLabel} →
@@ -10178,9 +10178,20 @@ if (!patient) {
             `;
         }
         
-        async function changePatientHistoryPage(direction) {
+        async function changePatientHistoryPage(direction, evt) {
+            let loadingButton = null;
+            try {
+                loadingButton = (evt && evt.currentTarget) ? evt.currentTarget : null;
+            } catch (_e) {}
+            if (loadingButton) {
+                setButtonLoading(loadingButton, '讀取中...');
+            }
             if (await consultationHistoryPager.changePage('patient', direction)) {
                 displayPatientMedicalHistoryPage();
+                return;
+            }
+            if (loadingButton) {
+                clearButtonLoading(loadingButton);
             }
         }
 
@@ -10358,7 +10369,7 @@ function displayConsultationMedicalHistoryPage() {
             </div>
             
             <div class="flex items-center space-x-2">
-                <button onclick="changeConsultationHistoryPage(-1)" 
+                <button onclick="changeConsultationHistoryPage(-1, event)" 
                         ${currentConsultationHistoryPage === 0 ? 'disabled' : ''}
                         class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
                     ← ${prevLabel}
@@ -10366,7 +10377,7 @@ function displayConsultationMedicalHistoryPage() {
                 <span class="text-sm text-gray-600 px-2">
                     ${currentPageNumber} / ${totalPages}
                 </span>
-                <button onclick="changeConsultationHistoryPage(1)" 
+                <button onclick="changeConsultationHistoryPage(1, event)" 
                         ${currentConsultationHistoryPage === totalPages - 1 ? 'disabled' : ''}
                         class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
                     ${nextLabel} →
@@ -10609,9 +10620,20 @@ function displayConsultationMedicalHistoryPage() {
     `;
 }
         
-        async function changeConsultationHistoryPage(direction) {
+        async function changeConsultationHistoryPage(direction, evt) {
+            let loadingButton = null;
+            try {
+                loadingButton = (evt && evt.currentTarget) ? evt.currentTarget : null;
+            } catch (_e) {}
+            if (loadingButton) {
+                setButtonLoading(loadingButton, '讀取中...');
+            }
             if (await consultationHistoryPager.changePage('consultation', direction)) {
                 displayConsultationMedicalHistoryPage();
+                return;
+            }
+            if (loadingButton) {
+                clearButtonLoading(loadingButton);
             }
         }
         
