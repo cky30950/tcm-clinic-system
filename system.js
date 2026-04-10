@@ -21184,40 +21184,45 @@ function formatPackageStatus(pkg) {
 async function createManualPatientPackage(patientId) {
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     const isEn = lang && lang.toLowerCase().startsWith('en');
-    const name = prompt(
-        isEn ? 'Enter package name:' : '請輸入套票名稱：',
-        ''
-    );
-    if (name === null) return;
-    const trimmedName = String(name || '').trim();
-    if (!trimmedName) {
-        showToast(isEn ? 'Please enter package name' : '請輸入套票名稱', 'warning');
+    try {
+        if (!Array.isArray(billingItems) || billingItems.length === 0) {
+            await initBillingItems();
+        }
+    } catch (_e) {}
+    const packageItems = (Array.isArray(billingItems) ? billingItems : [])
+        .filter(item => item && item.active !== false && item.category === 'package' && Number(item.packageUses) > 0 && Number(item.validityDays) > 0);
+    if (packageItems.length === 0) {
+        showToast(isEn ? 'No package items in billing settings' : '收費項目中沒有可用的套票項目', 'warning');
         return;
     }
-    const usesInput = prompt(
-        isEn ? 'Enter total uses:' : '請輸入套票總次數：',
-        '10'
-    );
-    if (usesInput === null) return;
-    const totalUses = parseInt(usesInput, 10);
-    if (!Number.isInteger(totalUses) || totalUses <= 0) {
-        showToast(isEn ? 'Invalid total uses' : '套票總次數格式不正確', 'warning');
+    const options = {};
+    packageItems.forEach(item => {
+        const label = `${item.name || ''} (${Number(item.packageUses) || 0}次 / ${Number(item.validityDays) || 0}天)`;
+        options[String(item.id)] = window.escapeHtml(label);
+    });
+    const pickResult = await Swal.fire({
+        title: isEn ? 'Select package item' : '選擇套票項目',
+        input: 'select',
+        inputOptions: options,
+        inputPlaceholder: isEn ? 'Please select' : '請選擇',
+        showCancelButton: true,
+        confirmButtonText: isEn ? 'Confirm' : '確定',
+        cancelButtonText: isEn ? 'Cancel' : '取消'
+    });
+    if (!pickResult || !pickResult.isConfirmed) {
         return;
     }
-    const validityInput = prompt(
-        isEn ? 'Enter validity days:' : '請輸入套票有效天數：',
-        '30'
-    );
-    if (validityInput === null) return;
-    const validityDays = parseInt(validityInput, 10);
-    if (!Number.isInteger(validityDays) || validityDays <= 0) {
-        showToast(isEn ? 'Invalid validity days' : '有效天數格式不正確', 'warning');
+    const selectedId = String(pickResult.value || '');
+    const selectedItem = packageItems.find(item => String(item.id) === selectedId);
+    if (!selectedItem) {
+        showToast(isEn ? 'Invalid package item' : '套票項目無效', 'warning');
         return;
     }
     const created = await purchasePackage(patientId, {
-        name: trimmedName,
-        packageUses: totalUses,
-        validityDays: validityDays
+        id: selectedItem.id,
+        name: selectedItem.name,
+        packageUses: Number(selectedItem.packageUses) || 0,
+        validityDays: Number(selectedItem.validityDays) || 0
     });
     if (!created) {
         showToast(isEn ? 'Failed to create package' : '新增套票失敗', 'error');
@@ -21239,16 +21244,16 @@ async function updatePatientPackageExpiry(patientId, packageRecordId) {
     }
     const exp = new Date(pkg.expiresAt);
     const defaultDate = Number.isNaN(exp.getTime()) ? '' : exp.toISOString().slice(0, 10);
-    const dateInput = prompt(
-        isEn ? 'Enter new expiry date (YYYY-MM-DD):' : '請輸入新到期日（YYYY-MM-DD）：',
-        defaultDate
-    );
-    if (dateInput === null) return;
-    const dateText = String(dateInput || '').trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
-        showToast(isEn ? 'Date format must be YYYY-MM-DD' : '日期格式需為 YYYY-MM-DD', 'warning');
-        return;
-    }
+    const dateResult = await Swal.fire({
+        title: isEn ? 'Update expiry date' : '修改套票有效期',
+        input: 'date',
+        inputValue: defaultDate,
+        showCancelButton: true,
+        confirmButtonText: isEn ? 'Update' : '更新',
+        cancelButtonText: isEn ? 'Cancel' : '取消'
+    });
+    if (!dateResult || !dateResult.isConfirmed) return;
+    const dateText = String(dateResult.value || '').trim();
     const newExp = new Date(`${dateText}T23:59:59`);
     if (Number.isNaN(newExp.getTime())) {
         showToast(isEn ? 'Invalid date' : '日期無效', 'warning');
@@ -21277,10 +21282,11 @@ async function deletePatientPackageRecord(patientId, packageRecordId) {
         showToast(isEn ? 'Package not found' : '找不到套票', 'warning');
         return;
     }
-    const ok = confirm(
+    const ok = await showConfirmation(
         isEn
-            ? `Delete package "${pkg.name || ''}"?`
-            : `確定要刪除套票「${pkg.name || ''}」嗎？`
+            ? `Delete package "${pkg.name || ''}"?\nThis action cannot be undone.`
+            : `確定要刪除套票「${pkg.name || ''}」嗎？\n此操作無法復原。`,
+        'warning'
     );
     if (!ok) return;
     const result = await window.firebaseDataManager.deletePatientPackage(packageRecordId, patientId);
