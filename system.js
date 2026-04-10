@@ -23979,13 +23979,44 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const switchBtn = document.getElementById('clinicSwitchButton');
             if (switchBtn && !switchBtn.dataset.bound) {
-                switchBtn.addEventListener('click', function () {
+                switchBtn.addEventListener('click', async function () {
                     try {
-                        const modal = document.getElementById('clinicSwitchModal');
-                        if (modal) {
-                            modal.classList.remove('hidden');
-                            try { if (typeof populateClinicSelectors === 'function') populateClinicSelectors(); } catch (_e) {}
+                        try { if (typeof populateClinicSelectors === 'function') populateClinicSelectors(); } catch (_e) {}
+                        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
+                        const isEn = lang && lang.toLowerCase().startsWith('en');
+                        const options = {};
+                        const availableClinics = Array.isArray(clinicsList) ? clinicsList : [];
+                        availableClinics.forEach(c => {
+                            if (!c || !c.id) return;
+                            options[String(c.id)] = window.escapeHtml(getClinicDisplayName(c));
+                        });
+                        if (Object.keys(options).length === 0) {
+                            showToast(isEn ? 'No clinic available' : '目前沒有可切換的診所', 'warning');
+                            return;
                         }
+                        const picked = await Swal.fire({
+                            title: isEn ? 'Switch clinic' : '切換診所',
+                            input: 'select',
+                            inputOptions: options,
+                            inputValue: currentClinicId ? String(currentClinicId) : '',
+                            inputPlaceholder: isEn ? 'Please select' : '請選擇',
+                            showCancelButton: true,
+                            confirmButtonText: isEn ? 'Next' : '下一步',
+                            cancelButtonText: isEn ? 'Cancel' : '取消'
+                        });
+                        if (!picked || !picked.isConfirmed) return;
+                        const targetClinicId = String(picked.value || '');
+                        if (!targetClinicId || String(targetClinicId) === String(currentClinicId || '')) {
+                            return;
+                        }
+                        const targetClinic = availableClinics.find(c => String(c.id) === targetClinicId);
+                        const targetName = targetClinic ? getClinicDisplayName(targetClinic) : targetClinicId;
+                        const confirmMsg = isEn
+                            ? `Switch to clinic "${targetName}"?`
+                            : `確定切換到診所「${targetName}」嗎？`;
+                        const ok = await showConfirmation(confirmMsg, 'question');
+                        if (!ok) return;
+                        await setCurrentClinicId(targetClinicId);
                     } catch (e) {
                         console.error('切換診所按鈕事件錯誤:', e);
                     }
