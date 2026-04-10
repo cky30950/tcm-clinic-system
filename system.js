@@ -7259,17 +7259,6 @@ async function selectPatientForRegistration(patientId) {
                 return;
             }
 
-            // 使用現有通知模組進行掛號確認
-            {
-                const lang = localStorage.getItem('lang') || 'zh';
-                const summaryTime = selectedTime.toLocaleString(lang === 'en' ? 'en-US' : 'zh-TW');
-                const zhConfirmMsg = `確定為 ${selectedPatientForRegistration.name} 掛號給 ${selectedDoctor.name} 醫師嗎？\n\n掛號時間：${summaryTime}`;
-                const enConfirmMsg = `Confirm registration for ${selectedPatientForRegistration.name} with Dr. ${selectedDoctor.name}?\n\nTime: ${summaryTime}`;
-                const confirmMsg = lang === 'en' ? enConfirmMsg : zhConfirmMsg;
-                const confirmed = await showConfirmation(confirmMsg, 'question');
-                if (!confirmed) return;
-            }
-
             // 在進入非同步處理前，為掛號按鈕顯示讀取圈。
             // 使用通用輔助函式以兼容事件與非事件觸發的情況。
             let loadingButton = getLoadingButtonFromEvent('button[onclick="confirmRegistration()"]');
@@ -24012,7 +24001,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             inputValue: currentClinicId ? String(currentClinicId) : '',
                             inputPlaceholder: isEn ? 'Please select' : '請選擇',
                             showCancelButton: true,
-                            confirmButtonText: isEn ? 'Next' : '下一步',
+                            confirmButtonText: isEn ? 'Switch' : '切換',
                             cancelButtonText: isEn ? 'Cancel' : '取消'
                         });
                         if (!picked || !picked.isConfirmed) return;
