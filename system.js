@@ -24009,13 +24009,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (!targetClinicId || String(targetClinicId) === String(currentClinicId || '')) {
                             return;
                         }
-                        const targetClinic = availableClinics.find(c => String(c.id) === targetClinicId);
-                        const targetName = targetClinic ? getClinicDisplayName(targetClinic) : targetClinicId;
-                        const confirmMsg = isEn
-                            ? `Switch to clinic "${targetName}"?`
-                            : `確定切換到診所「${targetName}」嗎？`;
-                        const ok = await showConfirmation(confirmMsg, 'question');
-                        if (!ok) return;
                         await setCurrentClinicId(targetClinicId);
                     } catch (e) {
                         console.error('切換診所按鈕事件錯誤:', e);
