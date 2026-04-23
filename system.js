@@ -8360,6 +8360,92 @@ function createAppointmentRow(appointment, patient, index) {
             return statusMap[status] || { text: '未知', class: 'bg-gray-100 text-gray-800' };
         }
         
+function closeAllPrescriptionProofDropdowns() {
+    try {
+        const menus = document.querySelectorAll('.prescription-proof-dropdown-menu');
+        menus.forEach(menu => menu.classList.add('hidden'));
+    } catch (_e) {}
+}
+
+function togglePrescriptionProofDropdown(event, dropdownId) {
+    if (event && typeof event.stopPropagation === 'function') {
+        event.stopPropagation();
+    }
+    const menu = document.getElementById(dropdownId);
+    if (!menu) return;
+    const shouldOpen = menu.classList.contains('hidden');
+    closeAllPrescriptionProofDropdowns();
+    if (shouldOpen) {
+        menu.classList.remove('hidden');
+    }
+}
+
+if (!window.__prescriptionProofDropdownBound) {
+    document.addEventListener('click', () => {
+        closeAllPrescriptionProofDropdowns();
+    });
+    window.__prescriptionProofDropdownBound = true;
+}
+
+function renderAppointmentProofDropdown(appointmentId) {
+    const normalizedId = String(appointmentId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const dropdownId = `prescription-proof-dropdown-appointment-${normalizedId}`;
+    return `
+        <div class="relative inline-block text-left">
+            <button type="button"
+                    onclick="togglePrescriptionProofDropdown(event, '${dropdownId}')"
+                    class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200 inline-flex items-center gap-1">
+                藥單證明
+                <span class="text-[10px]">▼</span>
+            </button>
+            <div id="${dropdownId}" class="prescription-proof-dropdown-menu hidden absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-50 py-1" onclick="event.stopPropagation()">
+                <button onclick="printPrescriptionInstructionsFromAppointment(${appointmentId}); closeAllPrescriptionProofDropdowns();"
+                        class="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-yellow-50 transition duration-150">
+                    藥單醫囑
+                </button>
+                <button onclick="printAttendanceCertificateFromAppointment(${appointmentId}); closeAllPrescriptionProofDropdowns();"
+                        class="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-yellow-50 transition duration-150">
+                    到診證明
+                </button>
+                <button onclick="printSickLeaveFromAppointment(${appointmentId}); closeAllPrescriptionProofDropdowns();"
+                        class="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-yellow-50 transition duration-150">
+                    病假證明
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function renderConsultationProofDropdown(consultationId) {
+    const normalizedId = String(consultationId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const dropdownId = `prescription-proof-dropdown-consultation-${normalizedId}`;
+    return `
+        <div class="relative inline-block text-left">
+            <button type="button"
+                    onclick="togglePrescriptionProofDropdown(event, '${dropdownId}')"
+                    class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded inline-flex items-center gap-1"
+                    style="transform: scale(0.75); transform-origin: left;">
+                藥單證明
+                <span class="text-[10px]">▼</span>
+            </button>
+            <div id="${dropdownId}" class="prescription-proof-dropdown-menu hidden absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-50 py-1" onclick="event.stopPropagation()">
+                <button onclick="printPrescriptionInstructions('${consultationId}'); closeAllPrescriptionProofDropdowns();"
+                        class="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 transition duration-150">
+                    藥單醫囑
+                </button>
+                <button onclick="printAttendanceCertificate('${consultationId}'); closeAllPrescriptionProofDropdowns();"
+                        class="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 transition duration-150">
+                    到診證明
+                </button>
+                <button onclick="printSickLeave('${consultationId}'); closeAllPrescriptionProofDropdowns();"
+                        class="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 transition duration-150">
+                    病假證明
+                </button>
+            </div>
+        </div>
+    `;
+}
+
 // 2. 修改 getOperationButtons 函數，確保使用正確的 patientId
 function getOperationButtons(appointment, patient = null) {
     const buttons = [];
@@ -8386,6 +8472,8 @@ function getOperationButtons(appointment, patient = null) {
     
     // 檢查當前用戶是否可以確認到達（管理員、護理師或該掛號的醫師）
     const canConfirmArrival = canManage || isAppointmentDoctor;
+    // 管理員與該掛號醫師可修改病歷
+    const canEditMedicalRecord = isAppointmentDoctor || (currentUserData && currentUserData.position === '診所管理');
     
     // 使用正確的 patientId（優先使用 Firebase ID）
     const patientId = patient ? patient.id : appointment.patientId;
@@ -8449,20 +8537,17 @@ function getOperationButtons(appointment, patient = null) {
         case 'completed':
             // 列印收據功能不受診症狀態限制
             buttons.push(`<button onclick="printReceiptFromAppointment(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">列印收據</button>`);
-            // 新增方藥醫囑列印功能，位於列印收據旁
-            buttons.push(`<button onclick="printPrescriptionInstructionsFromAppointment(${appointment.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">藥單醫囑</button>`);
-            buttons.push(`<button onclick="printAttendanceCertificateFromAppointment(${appointment.id})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">到診證明</button>`);
-            buttons.push(`<button onclick="printSickLeaveFromAppointment(${appointment.id})" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">病假證明</button>`);
+            buttons.push(renderAppointmentProofDropdown(appointment.id));
             
             if (isDisabled) {
-                if (isAppointmentDoctor) {
+                if (canEditMedicalRecord) {
                     buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs whitespace-nowrap cursor-not-allowed" ${disabledTooltip}>修改病歷</span>`);
                 }
                 if (canManage) {
                     buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs whitespace-nowrap cursor-not-allowed" ${disabledTooltip}>撤回診症</span>`);
                 }
             } else {
-                if (isAppointmentDoctor) {
+                if (canEditMedicalRecord) {
                     buttons.push(`<button onclick="editMedicalRecord(${appointment.id})" class="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">修改病歷</button>`);
                 }
                 if (canManage) {
@@ -10371,19 +10456,7 @@ if (!patient) {
                                         class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                                     列印收據
                                 </button>
-                                <!-- 新增藥單醫囑列印按鈕，放在收據右側 -->
-                                <button onclick="printPrescriptionInstructions('${consultation.id}')" 
-                                        class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
-                                    藥單醫囑
-                                </button>
-                                <button onclick="printAttendanceCertificate('${consultation.id}')" 
-                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
-                                    到診證明
-                                </button>
-                                <button onclick="printSickLeave('${consultation.id}')"
-                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
-                                    病假證明
-                                </button>
+                                ${renderConsultationProofDropdown(consultation.id)}
                                 ${(() => {
                                     // 檢查是否正在診症且為相同病人
                                     if (currentConsultingAppointmentId) {
@@ -10823,15 +10896,7 @@ function displayConsultationMedicalHistoryPage() {
                                 class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                             列印收據
                         </button>
-                        <!-- 新增藥單醫囑列印按鈕，放在收據右側 -->
-                        <button onclick="printPrescriptionInstructions('${consultation.id}')" 
-                                class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
-                            藥單醫囑
-                        </button>
-                        <button onclick="printAttendanceCertificate('${consultation.id}')" 
-                                class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
-                            到診證明
-                        </button>
+                        ${renderConsultationProofDropdown(consultation.id)}
                         ${(() => {
                             // 檢查是否正在診症且為相同病人
                             if (currentConsultingAppointmentId) {
