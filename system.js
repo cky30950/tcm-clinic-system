@@ -1922,6 +1922,8 @@ async function fetchUsers(forceRefresh = false) {
                         document.getElementById('clinicBusinessHours').value = clinicSettings.businessHours || '';
                         document.getElementById('clinicPhone').value = clinicSettings.phone || '';
                         document.getElementById('clinicAddress').value = clinicSettings.address || '';
+                        const thankYouInput = document.getElementById('clinicReceiptThankYouText');
+                        if (thankYouInput) thankYouInput.value = clinicSettings.receiptThankYouText || '';
                         updateClinicSettingsDisplay();
                         updateCurrentClinicDisplay();
                     });
@@ -11379,6 +11381,8 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             contactCounter: isEnglish ? 'If you have any questions, please contact the counter' : '如有疑問請洽櫃檯'
         };
         const clinicPrint = await resolveClinicSettingsByConsultation(consultation);
+        const receiptVisibility = mergeReceiptVisibilitySettings(clinicPrint && clinicPrint.receiptFieldVisibility).receipt;
+        const customThankYouText = (clinicPrint && clinicPrint.receiptThankYouText) ? String(clinicPrint.receiptThankYouText).trim() : '';
         // Construct receipt HTML with localized labels
         const printContent = `
             <!DOCTYPE html>
@@ -11551,22 +11555,29 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     
                     <!-- Basic Information -->
                     <div class="receipt-info">
+                        ${receiptVisibility.receiptNo ? `
                         <div class="info-row">
                             <span class="info-label">${TR.receiptNo}${colon}</span>
                             <span>R${consultation.id.toString().padStart(6, '0')}</span>
                         </div>
+                        ` : ''}
                         <div class="info-row">
                             <span class="info-label">${TR.patientName}${colon}</span>
                             <span>${patient.name}</span>
                         </div>
+                        ${receiptVisibility.medicalRecordNo ? `
                         <div class="info-row">
                             <span class="info-label">${TR.medicalRecordNo}${colon}</span>
                             <span>${consultation.medicalRecordNumber || consultation.id}</span>
                         </div>
+                        ` : ''}
+                        ${receiptVisibility.patientNumber ? `
                         <div class="info-row">
                             <span class="info-label">${TR.patientNumber}${colon}</span>
-                            <span>${patient.patientNumber}</span>
+                            <span>${patient.patientNumber || '-'}</span>
                         </div>
+                        ` : ''}
+                        ${receiptVisibility.consultationDate ? `
                         <div class="info-row">
                             <span class="info-label">${TR.consultationDate}${colon}</span>
                             <span>${consultationDate.toLocaleDateString(dateLocale, {
@@ -11575,6 +11586,8 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                 day: '2-digit'
                             })}</span>
                         </div>
+                        ` : ''}
+                        ${receiptVisibility.consultationTime ? `
                         <div class="info-row">
                             <span class="info-label">${TR.consultationTime}${colon}</span>
                             <span>${consultationDate.toLocaleTimeString(dateLocale, {
@@ -11582,6 +11595,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                 minute: '2-digit'
                             })}</span>
                         </div>
+                        ` : ''}
                         <div class="info-row">
                             <span class="info-label">${TR.doctorName}${colon}</span>
                             <span>${getDoctorDisplayName(consultation.doctor)}</span>
@@ -11780,7 +11794,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     
                     <!-- Thank You -->
                     <div class="thank-you">
-                        ${TR.thankYou}
+                        ${customThankYouText || TR.thankYou}
                     </div>
                     
                     <!-- Footer -->
@@ -13034,6 +13048,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         // 翻譯字典
         const PI = {
             title: isEnglish ? 'Prescription Instructions' : '藥單醫囑',
+            receiptNo: isEnglish ? 'Receipt No.' : '收據編號',
             patientName: isEnglish ? 'Patient Name' : '病人姓名',
             medicalRecordNo: isEnglish ? 'Medical Record No.' : '病歷編號',
             patientNo: isEnglish ? 'Patient No.' : '病人號碼',
@@ -13053,6 +13068,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             contact: isEnglish ? 'If you have any questions, please contact the front desk.' : '如有疑問請洽櫃檯'
         };
         const clinicPrint = await resolveClinicSettingsByConsultation(consultation);
+        const prescriptionVisibility = mergeReceiptVisibilitySettings(clinicPrint && clinicPrint.receiptFieldVisibility).prescription;
         // 構建列印內容
         const printContent = `
             <!DOCTYPE html>
@@ -13174,11 +13190,12 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     </div>
                     <div class="advice-title">${PI.title}</div>
                     <div class="patient-info">
+                        ${prescriptionVisibility.receiptNo ? `<div class="info-row"><span class="info-label">${PI.receiptNo}${colon}</span><span>R${consultation.id.toString().padStart(6, '0')}</span></div>` : ''}
                         <div class="info-row"><span class="info-label">${PI.patientName}${colon}</span><span>${patient.name}</span></div>
-                        <div class="info-row"><span class="info-label">${PI.medicalRecordNo}${colon}</span><span>${consultation.medicalRecordNumber || consultation.id}</span></div>
-                        ${patient.patientNumber ? `<div class="info-row"><span class="info-label">${PI.patientNo}${colon}</span><span>${patient.patientNumber}</span></div>` : ''}
-                        <div class="info-row"><span class="info-label">${PI.consultationDate}${colon}</span><span>${consultationDate.toLocaleDateString(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit' })}</span></div>
-                        <div class="info-row"><span class="info-label">${PI.consultationTime}${colon}</span><span>${consultationDate.toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}</span></div>
+                        ${prescriptionVisibility.medicalRecordNo ? `<div class="info-row"><span class="info-label">${PI.medicalRecordNo}${colon}</span><span>${consultation.medicalRecordNumber || consultation.id}</span></div>` : ''}
+                        ${prescriptionVisibility.patientNumber ? `<div class="info-row"><span class="info-label">${PI.patientNo}${colon}</span><span>${patient.patientNumber || '-'}</span></div>` : ''}
+                        ${prescriptionVisibility.consultationDate ? `<div class="info-row"><span class="info-label">${PI.consultationDate}${colon}</span><span>${consultationDate.toLocaleDateString(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit' })}</span></div>` : ''}
+                        ${prescriptionVisibility.consultationTime ? `<div class="info-row"><span class="info-label">${PI.consultationTime}${colon}</span><span>${consultationDate.toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}</span></div>` : ''}
                         <div class="info-row"><span class="info-label">${PI.doctor}${colon}</span><span>${getDoctorDisplayName(consultation.doctor)}</span></div>
                         ${(() => {
                             const regNumber = getDoctorRegistrationNumber(consultation.doctor);
@@ -14293,6 +14310,68 @@ async function initializeSystemAfterLogin() {
 
 
         // 診所設定管理功能
+        const RECEIPT_CUSTOM_FIELDS = ['receiptNo', 'medicalRecordNo', 'patientNumber', 'consultationDate', 'consultationTime'];
+
+        function getDefaultReceiptVisibilitySettings() {
+            return {
+                receipt: {
+                    receiptNo: true,
+                    medicalRecordNo: true,
+                    patientNumber: true,
+                    consultationDate: true,
+                    consultationTime: true
+                },
+                prescription: {
+                    receiptNo: false,
+                    medicalRecordNo: true,
+                    patientNumber: true,
+                    consultationDate: true,
+                    consultationTime: true
+                }
+            };
+        }
+
+        function mergeReceiptVisibilitySettings(rawSettings) {
+            const defaults = getDefaultReceiptVisibilitySettings();
+            const merged = {
+                receipt: { ...defaults.receipt },
+                prescription: { ...defaults.prescription }
+            };
+            ['receipt', 'prescription'].forEach((docType) => {
+                const source = rawSettings && rawSettings[docType];
+                if (!source || typeof source !== 'object') return;
+                RECEIPT_CUSTOM_FIELDS.forEach((field) => {
+                    if (typeof source[field] === 'boolean') merged[docType][field] = source[field];
+                });
+            });
+            return merged;
+        }
+
+        function getClinicReceiptVisibilitySettings() {
+            return mergeReceiptVisibilitySettings(clinicSettings && clinicSettings.receiptFieldVisibility);
+        }
+
+        function applyReceiptCustomizationUI() {
+            const settings = getClinicReceiptVisibilitySettings();
+            RECEIPT_CUSTOM_FIELDS.forEach((field) => {
+                const receiptEl = document.getElementById(`receiptField_${field}`);
+                const prescriptionEl = document.getElementById(`prescriptionField_${field}`);
+                if (receiptEl) receiptEl.checked = !!settings.receipt[field];
+                if (prescriptionEl) prescriptionEl.checked = !!settings.prescription[field];
+            });
+        }
+
+        function collectReceiptCustomizationUI() {
+            const settings = { receipt: {}, prescription: {} };
+            RECEIPT_CUSTOM_FIELDS.forEach((field) => {
+                const receiptEl = document.getElementById(`receiptField_${field}`);
+                const prescriptionEl = document.getElementById(`prescriptionField_${field}`);
+                settings.receipt[field] = !!(receiptEl && receiptEl.checked);
+                settings.prescription[field] = !!(prescriptionEl && prescriptionEl.checked);
+            });
+            return settings;
+        }
+
         function showClinicSettingsModal() {
             // 載入現有設定
             document.getElementById('clinicChineseName').value = clinicSettings.chineseName || '';
@@ -14300,6 +14379,8 @@ async function initializeSystemAfterLogin() {
             document.getElementById('clinicBusinessHours').value = clinicSettings.businessHours || '';
             document.getElementById('clinicPhone').value = clinicSettings.phone || '';
             document.getElementById('clinicAddress').value = clinicSettings.address || '';
+            const thankYouInput = document.getElementById('clinicReceiptThankYouText');
+            if (thankYouInput) thankYouInput.value = clinicSettings.receiptThankYouText || '';
             
             try { populateClinicSelectors(); } catch (_e) {}
             document.getElementById('clinicSettingsModal').classList.remove('hidden');
@@ -14315,6 +14396,8 @@ async function initializeSystemAfterLogin() {
             const businessHours = document.getElementById('clinicBusinessHours').value.trim();
             const phone = document.getElementById('clinicPhone').value.trim();
             const address = document.getElementById('clinicAddress').value.trim();
+            const thankYouInput = document.getElementById('clinicReceiptThankYouText');
+            const receiptThankYouText = thankYouInput ? thankYouInput.value.trim() : '';
             
             if (!chineseName) {
                 showToast('請輸入診所中文名稱！', 'error');
@@ -14326,6 +14409,7 @@ async function initializeSystemAfterLogin() {
             clinicSettings.businessHours = businessHours;
             clinicSettings.phone = phone;
             clinicSettings.address = address;
+            clinicSettings.receiptThankYouText = receiptThankYouText;
             clinicSettings.updatedAt = new Date().toISOString();
             try {
                 if (currentClinicId) {
@@ -14385,6 +14469,28 @@ async function initializeSystemAfterLogin() {
             }
             if (welcomeEnglishTitle) {
                 welcomeEnglishTitle.textContent = `Welcome to ${clinicSettings.englishName || 'Dr.Great Clinic'}`;
+            }
+            applyReceiptCustomizationUI();
+        }
+
+        async function saveReceiptCustomizationSettings() {
+            if (!currentClinicId) {
+                showToast('未選擇診所', 'error');
+                return;
+            }
+            try {
+                clinicSettings.receiptFieldVisibility = collectReceiptCustomizationUI();
+                clinicSettings.updatedAt = new Date().toISOString();
+                await window.firebaseDataManager.updateClinic(currentClinicId, {
+                    receiptFieldVisibility: clinicSettings.receiptFieldVisibility,
+                    updatedAt: clinicSettings.updatedAt
+                });
+                const listRes = await window.firebaseDataManager.getClinics();
+                clinicsList = listRes && listRes.success && Array.isArray(listRes.data) ? listRes.data : clinicsList;
+                showToast('收據自定義設定已儲存', 'success');
+            } catch (e) {
+                console.error('儲存收據自定義設定失敗:', e);
+                showToast('儲存收據自定義設定失敗', 'error');
             }
         }
 
@@ -25804,6 +25910,7 @@ async function deleteMedicalRecord(recordId) {
   window.deletePatientPackageRecord = deletePatientPackageRecord;
   window.saveBillingItem = saveBillingItem;
   window.saveClinicSettings = saveClinicSettings;
+  window.saveReceiptCustomizationSettings = saveReceiptCustomizationSettings;
   window.saveConsultation = saveConsultation;
   window.saveFormula = saveFormula;
   window.saveHerb = saveHerb;
