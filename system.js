@@ -8367,10 +8367,7 @@ function closeAllPrescriptionProofDropdowns() {
     } catch (_e) {}
 }
 
-function togglePrescriptionProofDropdown(event, dropdownId) {
-    if (event && typeof event.stopPropagation === 'function') {
-        event.stopPropagation();
-    }
+function togglePrescriptionProofDropdown(dropdownId) {
     const menu = document.getElementById(dropdownId);
     if (!menu) return;
     const shouldOpen = menu.classList.contains('hidden');
@@ -8381,7 +8378,11 @@ function togglePrescriptionProofDropdown(event, dropdownId) {
 }
 
 if (!window.__prescriptionProofDropdownBound) {
-    document.addEventListener('click', () => {
+    document.addEventListener('click', (e) => {
+        const target = e && e.target ? e.target : null;
+        if (target && typeof target.closest === 'function' && target.closest('.prescription-proof-dropdown-root')) {
+            return;
+        }
         closeAllPrescriptionProofDropdowns();
     });
     window.__prescriptionProofDropdownBound = true;
@@ -8391,14 +8392,14 @@ function renderAppointmentProofDropdown(appointmentId) {
     const normalizedId = String(appointmentId).replace(/[^a-zA-Z0-9_-]/g, '_');
     const dropdownId = `prescription-proof-dropdown-appointment-${normalizedId}`;
     return `
-        <div class="relative inline-block text-left">
+        <div class="prescription-proof-dropdown-root relative inline-block text-left">
             <button type="button"
-                    onclick="togglePrescriptionProofDropdown(event, '${dropdownId}')"
+                    onclick="togglePrescriptionProofDropdown('${dropdownId}')"
                     class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200 inline-flex items-center gap-1">
                 藥單證明
                 <span class="text-[10px]">▼</span>
             </button>
-            <div id="${dropdownId}" class="prescription-proof-dropdown-menu hidden absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-50 py-1" onclick="event.stopPropagation()">
+            <div id="${dropdownId}" class="prescription-proof-dropdown-menu hidden absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-[120] py-1">
                 <button onclick="printPrescriptionInstructionsFromAppointment(${appointmentId}); closeAllPrescriptionProofDropdowns();"
                         class="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-yellow-50 transition duration-150">
                     藥單醫囑
@@ -8420,15 +8421,15 @@ function renderConsultationProofDropdown(consultationId) {
     const normalizedId = String(consultationId).replace(/[^a-zA-Z0-9_-]/g, '_');
     const dropdownId = `prescription-proof-dropdown-consultation-${normalizedId}`;
     return `
-        <div class="relative inline-block text-left">
+        <div class="prescription-proof-dropdown-root relative inline-block text-left">
             <button type="button"
-                    onclick="togglePrescriptionProofDropdown(event, '${dropdownId}')"
+                    onclick="togglePrescriptionProofDropdown('${dropdownId}')"
                     class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded inline-flex items-center gap-1"
                     style="transform: scale(0.75); transform-origin: left;">
                 藥單證明
                 <span class="text-[10px]">▼</span>
             </button>
-            <div id="${dropdownId}" class="prescription-proof-dropdown-menu hidden absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-50 py-1" onclick="event.stopPropagation()">
+            <div id="${dropdownId}" class="prescription-proof-dropdown-menu hidden absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-[120] py-1">
                 <button onclick="printPrescriptionInstructions('${consultationId}'); closeAllPrescriptionProofDropdowns();"
                         class="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 transition duration-150">
                     藥單醫囑
@@ -10403,7 +10404,7 @@ if (!patient) {
                 ${calendarHtml}
                 
                 <!-- 當前病歷記錄 -->
-                <div class="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                <div class="border border-gray-200 rounded-lg overflow-visible shadow-sm">
                     <div class="bg-gradient-to-r from-gray-50 to-blue-50 px-6 py-4 border-b border-gray-200">
                         <div class="flex justify-between items-center">
                             <div class="flex flex-col space-y-1">
@@ -10852,7 +10853,7 @@ function displayConsultationMedicalHistoryPage() {
         ${calendarHtml}
         
         <!-- 當前病歷記錄 -->
-        <div class="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+        <div class="border border-gray-200 rounded-lg overflow-visible shadow-sm">
             <div class="bg-gradient-to-r from-gray-50 to-blue-50 px-6 py-4 border-b border-gray-200">
                 <div class="flex justify-between items-center">
                     <div class="flex flex-col space-y-1">
