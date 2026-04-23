@@ -13048,7 +13048,6 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         // 翻譯字典
         const PI = {
             title: isEnglish ? 'Prescription Instructions' : '藥單醫囑',
-            receiptNo: isEnglish ? 'Receipt No.' : '收據編號',
             patientName: isEnglish ? 'Patient Name' : '病人姓名',
             medicalRecordNo: isEnglish ? 'Medical Record No.' : '病歷編號',
             patientNo: isEnglish ? 'Patient No.' : '病人號碼',
@@ -13190,7 +13189,6 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     </div>
                     <div class="advice-title">${PI.title}</div>
                     <div class="patient-info">
-                        ${prescriptionVisibility.receiptNo ? `<div class="info-row"><span class="info-label">${PI.receiptNo}${colon}</span><span>R${consultation.id.toString().padStart(6, '0')}</span></div>` : ''}
                         <div class="info-row"><span class="info-label">${PI.patientName}${colon}</span><span>${patient.name}</span></div>
                         ${prescriptionVisibility.medicalRecordNo ? `<div class="info-row"><span class="info-label">${PI.medicalRecordNo}${colon}</span><span>${consultation.medicalRecordNumber || consultation.id}</span></div>` : ''}
                         ${prescriptionVisibility.patientNumber ? `<div class="info-row"><span class="info-label">${PI.patientNo}${colon}</span><span>${patient.patientNumber || '-'}</span></div>` : ''}
@@ -14311,6 +14309,7 @@ async function initializeSystemAfterLogin() {
 
         // 診所設定管理功能
         const RECEIPT_CUSTOM_FIELDS = ['receiptNo', 'medicalRecordNo', 'patientNumber', 'consultationDate', 'consultationTime'];
+        const PRESCRIPTION_CUSTOM_FIELDS = ['medicalRecordNo', 'patientNumber', 'consultationDate', 'consultationTime'];
 
         function getDefaultReceiptVisibilitySettings() {
             return {
@@ -14337,13 +14336,18 @@ async function initializeSystemAfterLogin() {
                 receipt: { ...defaults.receipt },
                 prescription: { ...defaults.prescription }
             };
-            ['receipt', 'prescription'].forEach((docType) => {
-                const source = rawSettings && rawSettings[docType];
-                if (!source || typeof source !== 'object') return;
+            const receiptSource = rawSettings && rawSettings.receipt;
+            if (receiptSource && typeof receiptSource === 'object') {
                 RECEIPT_CUSTOM_FIELDS.forEach((field) => {
-                    if (typeof source[field] === 'boolean') merged[docType][field] = source[field];
+                    if (typeof receiptSource[field] === 'boolean') merged.receipt[field] = receiptSource[field];
                 });
-            });
+            }
+            const prescriptionSource = rawSettings && rawSettings.prescription;
+            if (prescriptionSource && typeof prescriptionSource === 'object') {
+                PRESCRIPTION_CUSTOM_FIELDS.forEach((field) => {
+                    if (typeof prescriptionSource[field] === 'boolean') merged.prescription[field] = prescriptionSource[field];
+                });
+            }
             return merged;
         }
 
@@ -14355,8 +14359,10 @@ async function initializeSystemAfterLogin() {
             const settings = getClinicReceiptVisibilitySettings();
             RECEIPT_CUSTOM_FIELDS.forEach((field) => {
                 const receiptEl = document.getElementById(`receiptField_${field}`);
-                const prescriptionEl = document.getElementById(`prescriptionField_${field}`);
                 if (receiptEl) receiptEl.checked = !!settings.receipt[field];
+            });
+            PRESCRIPTION_CUSTOM_FIELDS.forEach((field) => {
+                const prescriptionEl = document.getElementById(`prescriptionField_${field}`);
                 if (prescriptionEl) prescriptionEl.checked = !!settings.prescription[field];
             });
         }
@@ -14365,10 +14371,13 @@ async function initializeSystemAfterLogin() {
             const settings = { receipt: {}, prescription: {} };
             RECEIPT_CUSTOM_FIELDS.forEach((field) => {
                 const receiptEl = document.getElementById(`receiptField_${field}`);
-                const prescriptionEl = document.getElementById(`prescriptionField_${field}`);
                 settings.receipt[field] = !!(receiptEl && receiptEl.checked);
+            });
+            PRESCRIPTION_CUSTOM_FIELDS.forEach((field) => {
+                const prescriptionEl = document.getElementById(`prescriptionField_${field}`);
                 settings.prescription[field] = !!(prescriptionEl && prescriptionEl.checked);
             });
+            settings.prescription.receiptNo = false;
             return settings;
         }
 
@@ -14413,7 +14422,15 @@ async function initializeSystemAfterLogin() {
             clinicSettings.updatedAt = new Date().toISOString();
             try {
                 if (currentClinicId) {
-                    await window.firebaseDataManager.updateClinic(currentClinicId, clinicSettings);
+                    await window.firebaseDataManager.updateClinic(currentClinicId, {
+                        chineseName,
+                        englishName,
+                        businessHours,
+                        phone,
+                        address,
+                        receiptThankYouText,
+                        updatedAt: clinicSettings.updatedAt
+                    });
                     const listRes = await window.firebaseDataManager.getClinics();
                     clinicsList = listRes && listRes.success && Array.isArray(listRes.data) ? listRes.data : clinicsList;
                     updateClinicSettingsDisplay();
@@ -22375,13 +22392,17 @@ class FirebaseDataManager {
             } catch (_e) {
                 dataToWrite = clinicData;
             }
-            await window.firebase.updateDoc(
-                window.firebase.doc(window.firebase.db, 'clinics', id),
-                {
-                    ...dataToWrite,
-                    updatedAt: new Date()
-                }
-            );
+            const clinicDocRef = window.firebase.doc(window.firebase.db, 'clinics', id);
+            const payload = {
+                ...dataToWrite,
+                updatedAt: new Date()
+            };
+            try {
+                await window.firebase.updateDoc(clinicDocRef, payload);
+            } catch (_updateErr) {
+                // 若文件尚未建立（例如 local-default 初始診所），改用 merge upsert。
+                await window.firebase.setDoc(clinicDocRef, payload, { merge: true });
+            }
             return { success: true };
         } catch (err) {
             return { success: false, error: err && err.message ? err.message : String(err) };
