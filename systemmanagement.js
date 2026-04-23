@@ -105,6 +105,11 @@ function updateClinicSettingsDisplay() {
     if (welcomeEnglishTitle) {
         welcomeEnglishTitle.textContent = `Welcome to ${clinicSettings.englishName || 'Dr.Great Clinic'}`;
     }
+    try {
+        if (typeof applyReceiptCustomizationUI === 'function') {
+            applyReceiptCustomizationUI();
+        }
+    } catch (_eApplyReceiptUI) {}
 }
 
 

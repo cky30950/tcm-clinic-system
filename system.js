@@ -5477,6 +5477,10 @@ async function logout() {
                 loadBillingManagement();
             } else if (sectionId === 'financialReports') {
                 loadFinancialReports();
+            } else if (sectionId === 'systemManagement') {
+                try {
+                    updateClinicSettingsDisplay();
+                } catch (_eUpdateClinicSettingsDisplay) {}
             } else if (sectionId === 'userManagement') {
                 loadUserManagement();
             } else if (sectionId === 'personalStatistics') {
