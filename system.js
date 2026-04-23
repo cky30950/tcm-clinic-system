@@ -22891,33 +22891,44 @@ class FirebaseDataManager {
             start.setHours(0, 0, 0, 0);
             end.setHours(23, 59, 59, 999);
             const pageSize = 100;
-            const parts = [];
-            if (completedOnly) parts.push(window.firebase.where('status', '==', 'completed'));
-            if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
-            if (clinicFilter) parts.push(window.firebase.where('clinicId', '==', clinicFilter));
-            parts.push(window.firebase.orderBy('date', 'asc'));
-            parts.push(window.firebase.where('date', '>=', start));
-            parts.push(window.firebase.where('date', '<=', end));
-            parts.push(window.firebase.limit(pageSize));
-            let q = window.firebase.firestoreQuery(colRef, ...parts);
-            let snap = await window.firebase.getDocs(q);
-            const list = [];
-            snap.forEach(d => list.push({ id: d.id, ...d.data() }));
-            let lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
-            while (snap.docs.length === pageSize && lastVisible) {
-                const nextParts = [];
-                if (completedOnly) nextParts.push(window.firebase.where('status', '==', 'completed'));
-                if (doctorFilter) nextParts.push(window.firebase.where('doctor', '==', doctorFilter));
-                if (clinicFilter) nextParts.push(window.firebase.where('clinicId', '==', clinicFilter));
-                nextParts.push(window.firebase.orderBy('date', 'asc'));
-                nextParts.push(window.firebase.where('date', '>=', start));
-                nextParts.push(window.firebase.where('date', '<=', end));
-                nextParts.push(window.firebase.startAfter(lastVisible));
-                nextParts.push(window.firebase.limit(pageSize));
-                q = window.firebase.firestoreQuery(colRef, ...nextParts);
-                snap = await window.firebase.getDocs(q);
+            const baseParts = [];
+            if (completedOnly) baseParts.push(window.firebase.where('status', '==', 'completed'));
+            if (doctorFilter) baseParts.push(window.firebase.where('doctor', '==', doctorFilter));
+            if (clinicFilter) baseParts.push(window.firebase.where('clinicId', '==', clinicFilter));
+            const runRangeQuery = async (fieldName, startValue, endValue) => {
+                const list = [];
+                let q = window.firebase.firestoreQuery(
+                    colRef,
+                    ...baseParts,
+                    window.firebase.orderBy(fieldName, 'asc'),
+                    window.firebase.where(fieldName, '>=', startValue),
+                    window.firebase.where(fieldName, '<=', endValue),
+                    window.firebase.limit(pageSize)
+                );
+                let snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
-                lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+                let lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+                while (snap.docs.length === pageSize && lastVisible) {
+                    q = window.firebase.firestoreQuery(
+                        colRef,
+                        ...baseParts,
+                        window.firebase.orderBy(fieldName, 'asc'),
+                        window.firebase.where(fieldName, '>=', startValue),
+                        window.firebase.where(fieldName, '<=', endValue),
+                        window.firebase.startAfter(lastVisible),
+                        window.firebase.limit(pageSize)
+                    );
+                    snap = await window.firebase.getDocs(q);
+                    snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+                    lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+                }
+                return list;
+            };
+            // 先以 date 查詢；若為 0 筆，可能是歷史資料 date 型別不一致，改用 createdAt 範圍補抓
+            // （仍維持條件查詢，不做全量掃描）
+            let list = await runRangeQuery('date', start, end);
+            if (list.length === 0) {
+                list = await runRangeQuery('createdAt', start, end);
             }
             return { success: true, data: list };
         } catch (error) {
