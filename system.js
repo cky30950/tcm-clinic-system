@@ -614,7 +614,7 @@ const CLINIC_ACTION_PERMISSION_OPTIONS = [
   { key: 'herbBatchInventory', label: '中藥庫：批量入庫' }
 ];
 
-const CLINIC_PERMISSION_POSITIONS = ['診所管理', '醫師', '護理師', '用戶'];
+const CLINIC_PERMISSION_POSITIONS = ['醫師', '護理師', '用戶'];
 
 function getDefaultSectionPermissionMap(position) {
   const pos = position && position.trim ? position.trim() : (position || '');
