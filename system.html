@@ -2048,17 +2048,17 @@
                     <div id="permissionManagementPanel" class="bg-gray-50 rounded-lg p-6 md:col-span-2 hidden">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
                             <h3 class="text-lg font-semibold">權限管理</h3>
-                            <div class="text-sm text-gray-600">可設定每位診所用戶的功能顯示與細節操作權限</div>
+                            <div class="text-sm text-gray-600">可設定各職位的功能顯示與細節操作權限</div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">選擇用戶</label>
-                                <select id="permissionUserSelect" onchange="onPermissionUserChanged()" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-                                    <option value="">請先選擇用戶</option>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">選擇職位</label>
+                                <select id="permissionPositionSelect" onchange="onPermissionPositionChanged()" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                                    <option value="">請先選擇職位</option>
                                 </select>
                             </div>
                             <div class="md:col-span-2 flex items-end">
-                                <div id="permissionUserHint" class="text-sm text-gray-600">請先選擇要設定權限的診所用戶</div>
+                                <div id="permissionPositionHint" class="text-sm text-gray-600">請先選擇要設定權限的職位</div>
                             </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2082,11 +2082,12 @@
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permAction_patientDelete" class="rounded border-gray-300">病人資料管理：刪除病人</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permAction_medicalRecordDelete" class="rounded border-gray-300">病歷管理：刪除病歷</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permAction_herbInventoryEdit" class="rounded border-gray-300">中藥庫：編輯庫存</label>
+                                    <label class="flex items-center gap-2"><input type="checkbox" id="permAction_herbBatchInventory" class="rounded border-gray-300">中藥庫：批量入庫</label>
                                 </div>
                             </div>
                         </div>
                         <div class="flex justify-end mt-4">
-                            <button onclick="saveSelectedUserPermissions()" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition duration-200">儲存權限設定</button>
+                            <button onclick="saveSelectedPositionPermissions()" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition duration-200">儲存權限設定</button>
                         </div>
                     </div>
                     <div class="bg-gray-50 rounded-lg p-6 md:col-span-2">

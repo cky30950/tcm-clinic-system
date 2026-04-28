@@ -610,10 +610,11 @@ const CLINIC_ACTION_PERMISSION_OPTIONS = [
   { key: 'patientEdit', label: '病人資料管理：編輯病人' },
   { key: 'patientDelete', label: '病人資料管理：刪除病人' },
   { key: 'medicalRecordDelete', label: '病歷管理：刪除病歷' },
-  { key: 'herbInventoryEdit', label: '中藥庫：編輯庫存' }
+  { key: 'herbInventoryEdit', label: '中藥庫：編輯庫存' },
+  { key: 'herbBatchInventory', label: '中藥庫：批量入庫' }
 ];
 
-let permissionUsersForSystemManagement = [];
+const CLINIC_PERMISSION_POSITIONS = ['診所管理', '醫師', '護理師', '用戶'];
 
 function getDefaultSectionPermissionMap(position) {
   const pos = position && position.trim ? position.trim() : (position || '');
@@ -634,17 +635,24 @@ function getDefaultActionPermissionMap(position) {
     patientEdit: !!sectionDefaults.patientManagement,
     patientDelete: !!(pos === '診所管理' || pos === '護理師' || pos === '醫師'),
     medicalRecordDelete: !!(roleList.includes('medicalRecordManagement') && (pos === '診所管理' || pos === '護理師' || pos === '醫師')),
-    herbInventoryEdit: !!sectionDefaults.herbLibrary
+    herbInventoryEdit: !!sectionDefaults.herbLibrary,
+    herbBatchInventory: !!sectionDefaults.herbLibrary
   };
 }
 
-function getEffectivePermissionSettingsForUser(user) {
-  const position = user && user.position ? user.position : '';
-  const sectionDefaults = getDefaultSectionPermissionMap(position);
-  const actionDefaults = getDefaultActionPermissionMap(position);
-  const stored = (user && user.permissionSettings && typeof user.permissionSettings === 'object') ? user.permissionSettings : {};
-  const storedSections = (stored.sections && typeof stored.sections === 'object') ? stored.sections : {};
-  const storedActions = (stored.actions && typeof stored.actions === 'object') ? stored.actions : {};
+function getClinicPositionPermissionSettingsMap() {
+  const raw = clinicSettings && clinicSettings.positionPermissionSettings;
+  return raw && typeof raw === 'object' ? raw : {};
+}
+
+function getEffectivePermissionSettingsForPosition(position) {
+  const pos = position ? String(position).trim() : '';
+  const sectionDefaults = getDefaultSectionPermissionMap(pos);
+  const actionDefaults = getDefaultActionPermissionMap(pos);
+  const allOverrides = getClinicPositionPermissionSettingsMap();
+  const posOverride = allOverrides[pos] && typeof allOverrides[pos] === 'object' ? allOverrides[pos] : {};
+  const storedSections = posOverride.sections && typeof posOverride.sections === 'object' ? posOverride.sections : {};
+  const storedActions = posOverride.actions && typeof posOverride.actions === 'object' ? posOverride.actions : {};
   const sections = {};
   const actions = {};
   CLINIC_SECTION_PERMISSION_OPTIONS.forEach(item => {
@@ -656,6 +664,19 @@ function getEffectivePermissionSettingsForUser(user) {
     else actions[item.key] = !!actionDefaults[item.key];
   });
   return { sections, actions };
+}
+
+function getOrderedMenuPermissions(menuItems) {
+  const userPosition = (currentUserData && currentUserData.position) || '';
+  const roleOrdered = ROLE_PERMISSIONS[userPosition] || [];
+  const ordered = roleOrdered.filter(id => !!menuItems[id] && hasAccessToSection(id));
+  const extras = Object.keys(menuItems).filter(id => !ordered.includes(id) && hasAccessToSection(id));
+  return ordered.concat(extras);
+}
+
+function getEffectivePermissionSettingsForUser(user) {
+  const position = user && user.position ? user.position : '';
+  return getEffectivePermissionSettingsForPosition(position);
 }
 
 function hasActionPermission(actionKey) {
@@ -3692,6 +3713,10 @@ async function saveInventoryChanges() {
     }
         
         function openBatchInventoryModal() {
+            if (!hasActionPermission('herbBatchInventory')) {
+                showToast('權限不足，無法使用中藥批量入庫', 'error');
+                return;
+            }
             try {
                 
                 if (typeof initHerbLibrary === 'function' && !herbLibraryLoaded) {
@@ -3994,6 +4019,10 @@ async function saveInventoryChanges() {
         }
 
         async function saveBatchInventory() {
+            if (!hasActionPermission('herbBatchInventory')) {
+                showToast('權限不足，無法使用中藥批量入庫', 'error');
+                return;
+            }
             
             const saveBtn = getLoadingButtonFromEvent('#batchInventoryModal button[onclick="saveBatchInventory()"]');
             setButtonLoading(saveBtn);
@@ -5462,7 +5491,7 @@ async function logout() {
             };
 
             
-            const permissions = Object.keys(menuItems).filter(sectionId => hasAccessToSection(sectionId));
+            const permissions = getOrderedMenuPermissions(menuItems);
 
             
             permissions.forEach(permission => {
@@ -18562,57 +18591,39 @@ async function loadUserManagement() {
 
 async function loadPermissionManagementPanel() {
     const panel = document.getElementById('permissionManagementPanel');
-    const userSelect = document.getElementById('permissionUserSelect');
-    const hint = document.getElementById('permissionUserHint');
-    if (!panel || !userSelect) return;
+    const positionSelect = document.getElementById('permissionPositionSelect');
+    const hint = document.getElementById('permissionPositionHint');
+    if (!panel || !positionSelect) return;
     if (!hasAccessToSection('userManagement')) {
         panel.classList.add('hidden');
         return;
     }
     panel.classList.remove('hidden');
-    const currentId = userSelect.value || '';
-    let sourceUsers = [];
-    try {
-        const data = await fetchUsers();
-        sourceUsers = Array.isArray(data) ? data : [];
-    } catch (_e) {
-        sourceUsers = (usersFromFirebase.length > 0 ? usersFromFirebase : users) || [];
-    }
-    const currentClinic = currentClinicId ? String(currentClinicId) : 'local-default';
-    permissionUsersForSystemManagement = sourceUsers.filter(user => {
-        if (!user) return false;
-        const isSuperAdmin = user.email && String(user.email).toLowerCase() === 'admin@clinic.com';
-        if (isSuperAdmin) return false;
-        const cid = getClinicIdForUser(user, currentClinic);
-        return String(cid) === String(currentClinic);
-    });
-    userSelect.innerHTML = '<option value="">請選擇用戶</option>';
-    permissionUsersForSystemManagement.forEach(user => {
+    const currentPos = positionSelect.value || '';
+    positionSelect.innerHTML = '<option value="">請選擇職位</option>';
+    CLINIC_PERMISSION_POSITIONS.forEach(pos => {
         const option = document.createElement('option');
-        option.value = String(user.id || '');
-        option.textContent = `${user.name || user.email || '未命名用戶'}（${user.position || '未設定職位'}）`;
-        userSelect.appendChild(option);
+        option.value = pos;
+        option.textContent = pos;
+        positionSelect.appendChild(option);
     });
-    if (currentId && permissionUsersForSystemManagement.some(u => String(u.id) === String(currentId))) {
-        userSelect.value = currentId;
+    if (currentPos && CLINIC_PERMISSION_POSITIONS.includes(currentPos)) {
+        positionSelect.value = currentPos;
     }
-    if (!userSelect.value && permissionUsersForSystemManagement.length > 0) {
-        userSelect.value = String(permissionUsersForSystemManagement[0].id);
+    if (!positionSelect.value && CLINIC_PERMISSION_POSITIONS.length > 0) {
+        positionSelect.value = CLINIC_PERMISSION_POSITIONS[0];
     }
-    if (hint && permissionUsersForSystemManagement.length === 0) {
-        hint.textContent = '目前診所沒有可設定權限的用戶';
-    }
-    onPermissionUserChanged();
+    if (hint) hint.textContent = '請選擇要設定權限的職位';
+    onPermissionPositionChanged();
 }
 
-function onPermissionUserChanged() {
-    const userSelect = document.getElementById('permissionUserSelect');
-    const hint = document.getElementById('permissionUserHint');
-    if (!userSelect) return;
-    const userId = userSelect.value;
-    const selectedUser = permissionUsersForSystemManagement.find(u => String(u.id) === String(userId));
-    if (!selectedUser) {
-        if (hint) hint.textContent = '請先選擇要設定權限的診所用戶';
+function onPermissionPositionChanged() {
+    const positionSelect = document.getElementById('permissionPositionSelect');
+    const hint = document.getElementById('permissionPositionHint');
+    if (!positionSelect) return;
+    const position = positionSelect.value ? String(positionSelect.value) : '';
+    if (!position) {
+        if (hint) hint.textContent = '請先選擇要設定權限的職位';
         CLINIC_SECTION_PERMISSION_OPTIONS.forEach(item => {
             const cb = document.getElementById(`permSection_${item.key}`);
             if (cb) cb.checked = false;
@@ -18623,7 +18634,7 @@ function onPermissionUserChanged() {
         });
         return;
     }
-    const settings = getEffectivePermissionSettingsForUser(selectedUser);
+    const settings = getEffectivePermissionSettingsForPosition(position);
     CLINIC_SECTION_PERMISSION_OPTIONS.forEach(item => {
         const cb = document.getElementById(`permSection_${item.key}`);
         if (cb) cb.checked = !!settings.sections[item.key];
@@ -18632,20 +18643,24 @@ function onPermissionUserChanged() {
         const cb = document.getElementById(`permAction_${item.key}`);
         if (cb) cb.checked = !!settings.actions[item.key];
     });
-    if (hint) hint.textContent = `目前設定對象：${selectedUser.name || selectedUser.email || '未命名用戶'}（${selectedUser.position || '未設定職位'}）`;
+    if (hint) hint.textContent = `目前設定職位：${position}`;
 }
 
-async function saveSelectedUserPermissions() {
+async function saveSelectedPositionPermissions() {
     if (!hasAccessToSection('userManagement')) {
         showToast('權限不足，無法執行此操作', 'error');
         return;
     }
-    const userSelect = document.getElementById('permissionUserSelect');
-    if (!userSelect || !userSelect.value) {
-        showToast('請先選擇要設定的用戶', 'error');
+    if (!currentClinicId) {
+        showToast('未選擇診所', 'error');
         return;
     }
-    const userId = String(userSelect.value);
+    const positionSelect = document.getElementById('permissionPositionSelect');
+    if (!positionSelect || !positionSelect.value) {
+        showToast('請先選擇要設定的職位', 'error');
+        return;
+    }
+    const position = String(positionSelect.value);
     const sections = {};
     const actions = {};
     CLINIC_SECTION_PERMISSION_OPTIONS.forEach(item => {
@@ -18657,33 +18672,33 @@ async function saveSelectedUserPermissions() {
         actions[item.key] = !!(cb && cb.checked);
     });
     try {
-        const payload = {
-            permissionSettings: {
+        const currentMap = getClinicPositionPermissionSettingsMap();
+        const nextMap = {
+            ...currentMap,
+            [position]: {
                 sections,
                 actions
             }
         };
-        const result = await window.firebaseDataManager.updateUser(userId, payload);
+        const payload = {
+            positionPermissionSettings: nextMap,
+            updatedAt: new Date().toISOString()
+        };
+        const result = await window.firebaseDataManager.updateClinic(currentClinicId, payload);
         if (!result || !result.success) {
             showToast('儲存權限設定失敗，請稍後再試', 'error');
             return;
         }
-        const applyPatchToList = (list) => {
-            if (!Array.isArray(list)) return;
-            const idx = list.findIndex(u => u && String(u.id) === userId);
-            if (idx >= 0) list[idx] = { ...list[idx], ...payload };
-        };
-        applyPatchToList(users);
-        applyPatchToList(usersFromFirebase);
-        applyPatchToList(permissionUsersForSystemManagement);
-        if (currentUserData && String(currentUserData.id) === userId) {
-            currentUserData = { ...currentUserData, ...payload };
+        clinicSettings.positionPermissionSettings = nextMap;
+        clinicSettings.updatedAt = payload.updatedAt;
+        if (Array.isArray(clinicsList)) {
+            clinicsList = clinicsList.map(c => (String(c.id) === String(currentClinicId) ? { ...c, ...payload } : c));
+            try { localStorage.setItem('clinics', JSON.stringify(clinicsList)); } catch (_e) {}
+        }
+        if (currentUserData && String(currentUserData.position || '') === position) {
             generateSidebarMenu();
             updateWelcomeCards();
         }
-        try {
-            localStorage.setItem('users', JSON.stringify(users));
-        } catch (_e) {}
         showToast('權限設定已儲存', 'success');
     } catch (error) {
         console.error('儲存權限設定失敗:', error);
@@ -26254,7 +26269,7 @@ async function deleteMedicalRecord(recordId) {
   window.saveFormula = saveFormula;
   window.saveHerb = saveHerb;
   window.savePatient = savePatient;
-  window.saveSelectedUserPermissions = saveSelectedUserPermissions;
+  window.saveSelectedPositionPermissions = saveSelectedPositionPermissions;
   window.saveUser = saveUser;
   window.searchBillingForConsultation = searchBillingForConsultation;
   window.searchHerbsForPrescription = searchHerbsForPrescription;
@@ -26266,7 +26281,7 @@ async function deleteMedicalRecord(recordId) {
   window.showAddPatientForm = showAddPatientForm;
   window.showAddUserForm = showAddUserForm;
   window.showClinicSettingsModal = showClinicSettingsModal;
-  window.onPermissionUserChanged = onPermissionUserChanged;
+  window.onPermissionPositionChanged = onPermissionPositionChanged;
   window.switchFinancialTab = switchFinancialTab;
   window.toggleRegistrationNumberField = toggleRegistrationNumberField;
   window.toggleSidebar = toggleSidebar;
