@@ -16879,10 +16879,11 @@ async function initializeSystemAfterLogin() {
                         <div class="space-y-3">
                             ${itemsHtml}
                         </div>
+                        ${itemsArray.length > 0 ? `
                         <div class="flex items-center justify-between text-xs text-gray-600 pt-1">
                             <span>總藥數：${sectionStats.totalSingleHerbCount} 味</span>
                             <span>總克數：${formatPrescriptionNumber(sectionStats.totalGrams)} 克</span>
-                        </div>
+                        </div>` : ''}
                     </div>
                 `;
                 return sectionContainer;
