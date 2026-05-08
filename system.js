@@ -7018,10 +7018,12 @@ async function loadInquiryOptions(patient) {
                     .toISOString()
                     .slice(0, 10);
                 picker.min = localMin;
-                
-                if (!picker.value) {
-                    picker.value = localMin;
-                }
+                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const localToday = new Date(startOfToday.getTime() - startOfToday.getTimezoneOffset() * 60000)
+                    .toISOString()
+                    .slice(0, 10);
+                // 每次進入診症系統都預設跳回今天
+                picker.value = localToday;
                 
                 if (!picker.dataset.bound) {
                     picker.addEventListener('change', function () {
@@ -7039,22 +7041,9 @@ async function loadInquiryOptions(patient) {
                     picker.dataset.bound = 'true';
                 }
 
-                const todayBtn = document.getElementById('appointmentTodayShortcut');
-                if (todayBtn && !todayBtn.dataset.bound) {
-                    todayBtn.addEventListener('click', function () {
-                        try {
-                            const today = new Date();
-                            const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                            const localToday = new Date(startOfToday.getTime() - startOfToday.getTimezoneOffset() * 60000)
-                                .toISOString()
-                                .slice(0, 10);
-                            picker.value = localToday;
-                            picker.dispatchEvent(new Event('change'));
-                        } catch (_err) {
-                            console.error('跳轉今日掛號列表失敗：', _err);
-                        }
-                    });
-                    todayBtn.dataset.bound = 'true';
+                // setup 在 subscribeToAppointments() 之後被呼叫，這裡再同步一次監聽日期為今天
+                if (typeof subscribeToAppointments === 'function') {
+                    subscribeToAppointments();
                 }
             } catch (err) {
                 console.error('初始化日期選擇器失敗：', err);
@@ -8385,6 +8374,10 @@ async function loadConsultationForEdit(consultationId) {
             if (reasonEl) {
                 reasonEl.value = '';
             }
+            const reasonContainer = document.getElementById('auditReasonContainer');
+            if (reasonContainer) {
+                reasonContainer.classList.remove('hidden');
+            }
             const auditBtn = document.getElementById('viewConsultationAuditTrailBtn');
             if (auditBtn) {
                 auditBtn.classList.remove('hidden');
@@ -9440,6 +9433,10 @@ async function showConsultationForm(appointment) {
         } else {
             // 新診症模式：使用空白表單
             clearConsultationForm();
+            const reasonContainer = document.getElementById('auditReasonContainer');
+            if (reasonContainer) {
+                reasonContainer.classList.add('hidden');
+            }
             const auditBtn = document.getElementById('viewConsultationAuditTrailBtn');
             if (auditBtn) {
                 auditBtn.classList.add('hidden');
@@ -9653,6 +9650,10 @@ async function showConsultationForm(appointment) {
             if (auditBtn) {
                 auditBtn.classList.add('hidden');
             }
+            const reasonContainer = document.getElementById('auditReasonContainer');
+            if (reasonContainer) {
+                reasonContainer.classList.add('hidden');
+            }
         }
 
         async function openConsultationAuditTrail() {
@@ -9707,18 +9708,116 @@ async function showConsultationForm(appointment) {
                     return d.toLocaleString('zh-TW', { hour12: false });
                 };
 
+                const getDisplayUserName = (editedBy) => {
+                    const username = String(editedBy || '').trim();
+                    if (!username) return '未知使用者';
+                    if (Array.isArray(users) && users.length > 0) {
+                        const matched = users.find(u => u && String(u.username || '') === username);
+                        if (matched && matched.name) return String(matched.name);
+                    }
+                    return username;
+                };
+
+                const fieldLabelMap = {
+                    symptoms: '主訴及現病史',
+                    tongue: '舌象',
+                    pulse: '脈象',
+                    diagnosis: '中醫診斷',
+                    syndrome: '證型診斷',
+                    acupunctureNotes: '針灸備註',
+                    prescription: '處方內容',
+                    prescriptionStructured: '處方結構資料',
+                    multiPrescriptions: '多處方內容',
+                    usage: '中藥服用方法',
+                    treatmentCourse: '療程',
+                    instructions: '醫囑及注意事項',
+                    followUpDate: '複診時間',
+                    visitTime: '到診時間',
+                    restStartDate: '建議休息開始日',
+                    restEndDate: '建議休息結束日',
+                    billingItems: '收費項目',
+                    billingItemsStructured: '收費結構資料',
+                    medicationDays: '服藥天數',
+                    medicationFrequency: '每日次數',
+                    status: '狀態',
+                    clinicId: '診所ID',
+                    clinicName: '診所名稱',
+                    doctor: '醫師帳號',
+                    date: '診症日期',
+                    updatedAt: '更新時間',
+                    updatedBy: '更新者'
+                };
+
+                const formatValue = (val) => {
+                    if (val === null || val === undefined || val === '') return '（空白）';
+                    if (Array.isArray(val)) {
+                        if (val.length === 0) return '（空白）';
+                        return val.map(v => formatValue(v)).join('、');
+                    }
+                    if (typeof val === 'object') {
+                        if (val && typeof val.toDate === 'function') {
+                            const d = val.toDate();
+                            return isNaN(d.getTime()) ? '（空白）' : d.toLocaleString('zh-TW', { hour12: false });
+                        }
+                        if (val && typeof val.seconds === 'number') {
+                            const d = new Date(val.seconds * 1000);
+                            return isNaN(d.getTime()) ? '（空白）' : d.toLocaleString('zh-TW', { hour12: false });
+                        }
+                        return JSON.stringify(val);
+                    }
+                    if (typeof val === 'string') {
+                        const trimmed = val.trim();
+                        if (!trimmed) return '（空白）';
+                        const parsedDate = parseConsultationDate(trimmed);
+                        if (parsedDate && !isNaN(parsedDate.getTime()) && /date|time|at/i.test(trimmed) === false) {
+                            return trimmed;
+                        }
+                        return trimmed;
+                    }
+                    return String(val);
+                };
+
+                const buildDiffRows = (beforeData, afterData, changedFields) => {
+                    const fields = Array.isArray(changedFields) && changedFields.length
+                        ? changedFields
+                        : Array.from(new Set([
+                            ...Object.keys(beforeData || {}),
+                            ...Object.keys(afterData || {})
+                        ])).filter((key) => JSON.stringify((beforeData || {})[key]) !== JSON.stringify((afterData || {})[key]));
+                    if (!fields.length) {
+                        return '<div class="text-xs text-gray-500">無可顯示的變更內容</div>';
+                    }
+                    return fields.map((field) => {
+                        const label = fieldLabelMap[field] || field;
+                        const beforeVal = formatValue(beforeData ? beforeData[field] : undefined);
+                        const afterVal = formatValue(afterData ? afterData[field] : undefined);
+                        return `
+                            <div class="border border-gray-200 rounded p-2 bg-white">
+                                <div class="text-xs font-semibold text-gray-700 mb-1">${escape(label)}</div>
+                                <div class="text-xs text-gray-600">修改前：${escape(beforeVal)}</div>
+                                <div class="text-xs text-gray-800 mt-1">修改後：${escape(afterVal)}</div>
+                            </div>
+                        `;
+                    }).join('');
+                };
+
                 listEl.innerHTML = logs.map((log, index) => {
+                    const beforeData = log && log.beforeData ? log.beforeData : {};
+                    const afterData = log && log.afterData ? log.afterData : {};
                     const changedFields = Array.isArray(log.changedFields) && log.changedFields.length
-                        ? log.changedFields.map(f => `<span class="inline-block bg-gray-100 text-gray-700 rounded px-2 py-0.5 text-xs mr-1 mb-1">${escape(f)}</span>`).join('')
+                        ? log.changedFields.map(f => {
+                            const label = fieldLabelMap[f] || f;
+                            return `<span class="inline-block bg-gray-100 text-gray-700 rounded px-2 py-0.5 text-xs mr-1 mb-1">${escape(label)}</span>`;
+                        }).join('')
                         : '<span class="text-xs text-gray-500">未提供欄位差異</span>';
-                    const beforeJson = escape(JSON.stringify(log.beforeData || {}, null, 2));
-                    const afterJson = escape(JSON.stringify(log.afterData || {}, null, 2));
+                    const detailRows = buildDiffRows(beforeData, afterData, log && log.changedFields ? log.changedFields : []);
                     const collapseId = `auditCollapse${index}`;
+                    const displayUser = getDisplayUserName(log && log.editedBy ? log.editedBy : '');
                     return `
                         <div class="border border-gray-200 rounded-lg p-4 mb-3">
                             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                                 <div class="text-sm text-gray-700">
-                                    <span class="font-semibold">${escape(log.editedBy || '未知使用者')}</span>
+                                    <span class="font-semibold">${escape(displayUser)}</span>
                                     <span class="text-gray-500 ml-2">${escape(formatTime(log.editedAt))}</span>
                                 </div>
                                 <button type="button" onclick="toggleAuditDetail('${collapseId}')" class="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">顯示詳情</button>
@@ -9728,15 +9827,8 @@ async function showConsultationForm(appointment) {
                                 <span class="text-gray-800">${escape(log.editReason || '未填寫')}</span>
                             </div>
                             <div class="mt-2">${changedFields}</div>
-                            <div id="${collapseId}" class="hidden mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
-                                <div>
-                                    <div class="text-xs font-semibold text-gray-600 mb-1">修改前</div>
-                                    <pre class="text-xs bg-gray-50 border border-gray-200 rounded p-2 overflow-auto max-h-64">${beforeJson}</pre>
-                                </div>
-                                <div>
-                                    <div class="text-xs font-semibold text-gray-600 mb-1">修改後</div>
-                                    <pre class="text-xs bg-gray-50 border border-gray-200 rounded p-2 overflow-auto max-h-64">${afterJson}</pre>
-                                </div>
+                            <div id="${collapseId}" class="hidden mt-3 grid grid-cols-1 gap-2">
+                                ${detailRows}
                             </div>
                         </div>
                     `;
