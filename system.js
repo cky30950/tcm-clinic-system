@@ -7013,7 +7013,7 @@ async function loadInquiryOptions(patient) {
                 if (!picker) return;
                 
                 const now = new Date();
-                const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
                 const localMin = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000)
                     .toISOString()
                     .slice(0, 10);
@@ -7037,6 +7037,24 @@ async function loadInquiryOptions(patient) {
                         }
                     });
                     picker.dataset.bound = 'true';
+                }
+
+                const todayBtn = document.getElementById('appointmentTodayShortcut');
+                if (todayBtn && !todayBtn.dataset.bound) {
+                    todayBtn.addEventListener('click', function () {
+                        try {
+                            const today = new Date();
+                            const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                            const localToday = new Date(startOfToday.getTime() - startOfToday.getTimezoneOffset() * 60000)
+                                .toISOString()
+                                .slice(0, 10);
+                            picker.value = localToday;
+                            picker.dispatchEvent(new Event('change'));
+                        } catch (_err) {
+                            console.error('跳轉今日掛號列表失敗：', _err);
+                        }
+                    });
+                    todayBtn.dataset.bound = 'true';
                 }
             } catch (err) {
                 console.error('初始化日期選擇器失敗：', err);
@@ -7642,23 +7660,25 @@ async function selectPatientForRegistration(patientId) {
             async function clearOldAppointments() {
                 /**
                  * 從 Firebase Realtime Database 讀取所有掛號記錄，
-                 * 將掛號時間早於今日 00:00:00 的記錄刪除。
+                 * 將掛號時間早於「昨日 00:00:00」的記錄刪除。
                  *
                  * 判斷邏輯：
-                 *  - 取得今天的開始時間（本地時間）
+                 *  - 取得昨天的開始時間（本地時間）
                  *  - 對每筆掛號紀錄解析其 appointmentTime
-                 *  - 若該時間早於今日，則將這筆資料從 Realtime Database 刪除
+                 *  - 若該時間早於昨天，則將這筆資料從 Realtime Database 刪除
                  *
                  * 此函式會同步更新本地的 appointments 陣列與 localStorage。
                  */
                 try {
-                    // 計算今日凌晨時間（本地時區）
+                    // 計算昨天凌晨時間（本地時區）
                     const now = new Date();
                     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const startOfYesterday = new Date(startOfToday);
+                    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
 
-                    // 使用查詢僅讀取過期掛號資料，以 appointmentTime 排序並設定結束條件為今日凌晨
+                    // 使用查詢僅讀取過期掛號資料，以 appointmentTime 排序並設定結束條件為昨天凌晨
                     // 轉換為 ISO 字串，方便與 Firebase 資料庫中的 ISO 格式日期比較
-                    const startIso = startOfToday.toISOString();
+                    const startIso = startOfYesterday.toISOString();
                     const expiredQuery = window.firebase.query(
                         window.firebase.ref(window.firebase.rtdb, 'appointments'),
                         window.firebase.orderByChild('appointmentTime'),
@@ -7685,8 +7705,8 @@ async function selectPatientForRegistration(patientId) {
                             idsToRemove.push(id);
                             continue;
                         }
-                        // 如果掛號時間在今日凌晨之前（昨天或更早），則刪除
-                        if (aptDate < startOfToday) {
+                        // 如果掛號時間在昨天凌晨之前（前天或更早），則刪除
+                        if (aptDate < startOfYesterday) {
                             idsToRemove.push(id);
                         }
                     }
@@ -7798,9 +7818,11 @@ async function loadTodayAppointments() {
     document.getElementById('todayTotal').textContent = todayAppointments.length;
     
     if (todayAppointments.length === 0) {
+        const isToday = targetDate.toDateString() === new Date().toDateString();
+        const dateText = isToday ? '今日' : '所選日期';
         const message = currentUserData && currentUserData.position === '醫師' 
-            ? '今日暫無掛給您的病人' 
-            : '今日暫無掛號記錄';
+            ? `${dateText}暫無掛給您的病人` 
+            : `${dateText}暫無掛號記錄`;
         tbody.innerHTML = `
             <tr>
                 <td colspan="7" class="px-4 py-8 text-center text-gray-500">
