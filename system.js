@@ -10865,10 +10865,12 @@ if (!patient) {
                                 })()}
                             </div>
                             <div class="flex flex-wrap justify-end gap-1">
+                                ${consultation.updatedAt ? `
                                 <button onclick="openConsultationAuditTrail('${consultation.id}', '${consultation.patientId || ''}')"
                                         class="text-amber-700 hover:text-amber-900 text-sm font-medium bg-amber-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                                     審核追蹤
                                 </button>
+                                ` : ''}
                                 <button onclick="printConsultationRecord('${consultation.id}')" 
                                         class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                                     列印收據
@@ -11321,10 +11323,12 @@ function displayConsultationMedicalHistoryPage() {
                         })()}
                     </div>
                     <div class="flex flex-wrap justify-end gap-1">
+                        ${consultation.updatedAt ? `
                         <button onclick="openConsultationAuditTrail('${consultation.id}', '${consultation.patientId || ''}')"
                                 class="text-amber-700 hover:text-amber-900 text-sm font-medium bg-amber-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                             審核追蹤
                         </button>
+                        ` : ''}
                         <button onclick="printConsultationRecord('${consultation.id}')" 
                                 class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
                             列印收據
@@ -26380,7 +26384,9 @@ function viewMedicalRecord(recordId, patientId) {
         detailHtml += '</div>'; // 關閉左側信息（兩行）
         // 右側按鈕
         detailHtml += '<div class="flex flex-wrap justify-end gap-1">';
-        detailHtml += `<button onclick="openConsultationAuditTrail('${rec.id}', '${rec.patientId || patientId || ''}')" class="text-amber-700 hover:text-amber-900 text-sm font-medium bg-amber-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">審核追蹤</button>`;
+        if (rec.updatedAt) {
+            detailHtml += `<button onclick="openConsultationAuditTrail('${rec.id}', '${rec.patientId || patientId || ''}')" class="text-amber-700 hover:text-amber-900 text-sm font-medium bg-amber-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">審核追蹤</button>`;
+        }
         detailHtml += `<button onclick="printConsultationRecord('${rec.id}')" class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">列印收據</button>`;
         detailHtml += `<button onclick="printPrescriptionInstructions('${rec.id}')" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium bg-yellow-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">藥單醫囑</button>`;
         detailHtml += `<button onclick="printAttendanceCertificate('${rec.id}')" class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">到診證明</button>`;
