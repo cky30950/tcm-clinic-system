@@ -9747,6 +9747,7 @@ async function showConsultationForm(appointment) {
                     updatedAt: '更新時間',
                     updatedBy: '更新者'
                 };
+                const hiddenAuditFields = new Set(['billingItemsStructured', 'updatedAt']);
 
                 const formatValue = (val) => {
                     if (val === null || val === undefined || val === '') return '（空白）';
@@ -9778,12 +9779,13 @@ async function showConsultationForm(appointment) {
                 };
 
                 const buildDiffRows = (beforeData, afterData, changedFields) => {
-                    const fields = Array.isArray(changedFields) && changedFields.length
+                    const fields = (Array.isArray(changedFields) && changedFields.length
                         ? changedFields
                         : Array.from(new Set([
                             ...Object.keys(beforeData || {}),
                             ...Object.keys(afterData || {})
-                        ])).filter((key) => JSON.stringify((beforeData || {})[key]) !== JSON.stringify((afterData || {})[key]));
+                        ])).filter((key) => JSON.stringify((beforeData || {})[key]) !== JSON.stringify((afterData || {})[key])))
+                        .filter((field) => !hiddenAuditFields.has(String(field)));
                     if (!fields.length) {
                         return '<div class="text-xs text-gray-500">無可顯示的變更內容</div>';
                     }
@@ -9804,13 +9806,15 @@ async function showConsultationForm(appointment) {
                 listEl.innerHTML = logs.map((log, index) => {
                     const beforeData = log && log.beforeData ? log.beforeData : {};
                     const afterData = log && log.afterData ? log.afterData : {};
-                    const changedFields = Array.isArray(log.changedFields) && log.changedFields.length
-                        ? log.changedFields.map(f => {
+                    const visibleChangedFields = (Array.isArray(log.changedFields) ? log.changedFields : [])
+                        .filter((field) => !hiddenAuditFields.has(String(field)));
+                    const changedFields = visibleChangedFields.length
+                        ? visibleChangedFields.map(f => {
                             const label = fieldLabelMap[f] || f;
                             return `<span class="inline-block bg-gray-100 text-gray-700 rounded px-2 py-0.5 text-xs mr-1 mb-1">${escape(label)}</span>`;
                         }).join('')
-                        : '<span class="text-xs text-gray-500">未提供欄位差異</span>';
-                    const detailRows = buildDiffRows(beforeData, afterData, log && log.changedFields ? log.changedFields : []);
+                        : '<span class="text-xs text-gray-500">無可顯示欄位差異</span>';
+                    const detailRows = buildDiffRows(beforeData, afterData, visibleChangedFields);
                     const collapseId = `auditCollapse${index}`;
                     const displayUser = getDisplayUserName(log && log.editedBy ? log.editedBy : '');
                     return `
