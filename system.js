@@ -2255,6 +2255,7 @@ async function fetchUsers(forceRefresh = false) {
                         document.getElementById('clinicAddress').value = clinicSettings.address || '';
                         const thankYouInput = document.getElementById('clinicReceiptThankYouText');
                         if (thankYouInput) thankYouInput.value = clinicSettings.receiptThankYouText || '';
+                        applyClinicHerbInventoryToggleUI(clinicSettings);
                         updateClinicSettingsDisplay();
                         updateCurrentClinicDisplay();
                     });
@@ -10693,51 +10694,50 @@ async function saveConsultation() {
             // 提交後清空暫存變更
             pendingPackageChanges = [];
             // 更新中藥庫存
-            try {
-                // 取得服藥天數與次數
-                const days = getTotalMedicationDays() || 1;
-                const freq = parseInt(document.getElementById('medicationFrequency') && document.getElementById('medicationFrequency').value) || 1;
-                // 決定要使用的診症 ID
-                let consultationIdForInv = null;
-                if (isEditing) {
-                    consultationIdForInv = appointment && appointment.consultationId;
-                } else {
-                    consultationIdForInv = typeof newConsultationIdForInventory !== 'undefined' ? newConsultationIdForInventory : null;
-                }
-                // 讀取先前消耗紀錄（僅編輯模式）
-                let prevLog = null;
-                if (isEditing && consultationIdForInv) {
-                    try {
-                        const logSnap = await window.firebase.get(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationIdForInv)));
-                        if (logSnap && logSnap.exists()) {
-                            prevLog = logSnap.val();
-                        }
-                    } catch (_err) {
-                        prevLog = null;
+            if (isClinicHerbInventoryEnabled()) {
+                try {
+                    // 決定要使用的診症 ID
+                    let consultationIdForInv = null;
+                    if (isEditing) {
+                        consultationIdForInv = appointment && appointment.consultationId;
+                    } else {
+                        consultationIdForInv = typeof newConsultationIdForInventory !== 'undefined' ? newConsultationIdForInventory : null;
                     }
-                    if (!prevLog) {
+                    // 讀取先前消耗紀錄（僅編輯模式）
+                    let prevLog = null;
+                    if (isEditing && consultationIdForInv) {
                         try {
-                            const ls = localStorage.getItem('inventoryLogs');
-                            if (ls) {
-                                const obj = JSON.parse(ls);
-                                prevLog = obj[String(consultationIdForInv)] || null;
+                            const logSnap = await window.firebase.get(window.firebase.ref(window.firebase.rtdb, 'inventoryLogs/' + String(consultationIdForInv)));
+                            if (logSnap && logSnap.exists()) {
+                                prevLog = logSnap.val();
                             }
-                        } catch (_e) {}
+                        } catch (_err) {
+                            prevLog = null;
+                        }
+                        if (!prevLog) {
+                            try {
+                                const ls = localStorage.getItem('inventoryLogs');
+                                if (ls) {
+                                    const obj = JSON.parse(ls);
+                                    prevLog = obj[String(consultationIdForInv)] || null;
+                                }
+                            } catch (_e) {}
+                        }
+                        if (!prevLog && typeof getPreviousInventoryLogFromHistory === 'function') {
+                            try { prevLog = await getPreviousInventoryLogFromHistory(consultationIdForInv); } catch (_e) {}
+                        }
                     }
-                    if (!prevLog && typeof getPreviousInventoryLogFromHistory === 'function') {
-                        try { prevLog = await getPreviousInventoryLogFromHistory(consultationIdForInv); } catch (_e) {}
+                    if (consultationIdForInv && typeof updateInventoryAfterConsultationMulti === 'function') {
+                        await updateInventoryAfterConsultationMulti(
+                            consultationIdForInv,
+                            Array.isArray(prescriptions) ? prescriptions : [],
+                            isEditing,
+                            prevLog
+                        );
                     }
+                } catch (invErr) {
+                    console.error('更新中藥庫存資料失敗:', invErr);
                 }
-                if (consultationIdForInv && typeof updateInventoryAfterConsultationMulti === 'function') {
-                    await updateInventoryAfterConsultationMulti(
-                        consultationIdForInv,
-                        Array.isArray(prescriptions) ? prescriptions : [],
-                        isEditing,
-                        prevLog
-                    );
-                }
-            } catch (invErr) {
-                console.error('更新中藥庫存資料失敗:', invErr);
             }
             // 完成後關閉診症表單並更新 UI
             closeConsultationForm();
@@ -15359,6 +15359,18 @@ async function initializeSystemAfterLogin() {
             return settings;
         }
 
+        function isClinicHerbInventoryEnabled(settingsObj = null) {
+            const source = settingsObj && typeof settingsObj === 'object' ? settingsObj : clinicSettings;
+            return !(source && source.herbInventoryEnabled === false);
+        }
+
+        function applyClinicHerbInventoryToggleUI(settingsObj = null) {
+            const toggleEl = document.getElementById('clinicHerbInventoryEnabled');
+            if (toggleEl) {
+                toggleEl.checked = isClinicHerbInventoryEnabled(settingsObj);
+            }
+        }
+
         function showClinicSettingsModal() {
             // 載入現有設定
             document.getElementById('clinicChineseName').value = clinicSettings.chineseName || '';
@@ -15368,6 +15380,7 @@ async function initializeSystemAfterLogin() {
             document.getElementById('clinicAddress').value = clinicSettings.address || '';
             const thankYouInput = document.getElementById('clinicReceiptThankYouText');
             if (thankYouInput) thankYouInput.value = clinicSettings.receiptThankYouText || '';
+            applyClinicHerbInventoryToggleUI();
             
             try { populateClinicSelectors(); } catch (_e) {}
             document.getElementById('clinicSettingsModal').classList.remove('hidden');
@@ -15385,6 +15398,8 @@ async function initializeSystemAfterLogin() {
             const address = document.getElementById('clinicAddress').value.trim();
             const thankYouInput = document.getElementById('clinicReceiptThankYouText');
             const receiptThankYouText = thankYouInput ? thankYouInput.value.trim() : '';
+            const herbInventoryEnabledEl = document.getElementById('clinicHerbInventoryEnabled');
+            const herbInventoryEnabled = !!(herbInventoryEnabledEl ? herbInventoryEnabledEl.checked : true);
             
             if (!chineseName) {
                 showToast('請輸入診所中文名稱！', 'error');
@@ -15397,6 +15412,7 @@ async function initializeSystemAfterLogin() {
             clinicSettings.phone = phone;
             clinicSettings.address = address;
             clinicSettings.receiptThankYouText = receiptThankYouText;
+            clinicSettings.herbInventoryEnabled = herbInventoryEnabled;
             clinicSettings.updatedAt = new Date().toISOString();
             try {
                 if (currentClinicId) {
@@ -15407,6 +15423,7 @@ async function initializeSystemAfterLogin() {
                         phone,
                         address,
                         receiptThankYouText,
+                        herbInventoryEnabled,
                         updatedAt: clinicSettings.updatedAt
                     });
                     const listRes = await window.firebaseDataManager.getClinics();
@@ -15466,6 +15483,17 @@ async function initializeSystemAfterLogin() {
                 welcomeEnglishTitle.textContent = `Welcome to ${clinicSettings.englishName || 'Dr.Great Clinic'}`;
             }
             applyReceiptCustomizationUI();
+            applyClinicHerbInventoryToggleUI();
+            try {
+                if (typeof updatePrescriptionDisplay === 'function') {
+                    updatePrescriptionDisplay();
+                }
+            } catch (_e) {}
+            try {
+                if (typeof searchHerbsForPrescription === 'function') {
+                    searchHerbsForPrescription();
+                }
+            } catch (_e) {}
         }
 
         async function saveReceiptCustomizationSettings() {
@@ -16990,6 +17018,7 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             
+            const showInventoryBalance = isClinicHerbInventoryEnabled();
             // 顯示搜索結果，移除劑量欄，並使用自訂 tooltip
             resultsList.innerHTML = matchedItems.map(item => {
                 // 根據當前介面語言決定名稱顯示。若為英文介面且存在英譯名稱，優先使用英譯名稱；否則使用中文名稱。
@@ -17043,6 +17072,9 @@ async function initializeSystemAfterLogin() {
                 const unitTranslated = (typeof window.t === 'function') ? window.t(rawUnitLabel) : rawUnitLabel;
                 const remainLabel = (typeof window.t === 'function') ? window.t('餘量：') : '餘量：';
                 const stockClass = qty <= thr ? 'text-red-600' : 'text-gray-600';
+                const stockHtml = showInventoryBalance
+                    ? `<div class="text-xs mt-1 ${stockClass}">${remainLabel} ${qtyDisplay}${unitTranslated}</div>`
+                    : '';
                 return `
                     <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" data-tooltip="${encoded}"
                          onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))"
@@ -17052,7 +17084,7 @@ async function initializeSystemAfterLogin() {
                             <div class="font-semibold text-gray-900 text-sm mb-1">${window.escapeHtml(displayName)}</div>
                             <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${typeLabel}</div>
                             ${item.effects ? `<div class="text-xs text-gray-600 mt-1">${window.escapeHtml(item.effects.substring(0, 30))}${item.effects.length > 30 ? '...' : ''}</div>` : ''}
-                            <div class="text-xs mt-1 ${stockClass}">${remainLabel} ${qtyDisplay}${unitTranslated}</div>
+                            ${stockHtml}
                         </div>
                     </div>
                 `;
@@ -17494,6 +17526,7 @@ async function initializeSystemAfterLogin() {
             const containerAll = document.getElementById('prescriptionsContainer');
             const hiddenTextarea = document.getElementById('formPrescription');
             if (!containerAll) return;
+            const showInventoryBalance = isClinicHerbInventoryEnabled();
             const formatPrescriptionNumber = (num) => {
                 const n = Number(num);
                 if (!Number.isFinite(n)) return '0';
@@ -17646,6 +17679,9 @@ async function initializeSystemAfterLogin() {
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         ${(() => {
+                                            if (!showInventoryBalance) {
+                                                return '';
+                                            }
                                             try {
                                                 // 依處方模式選擇對應庫存快取
                                                 const isSlice = section && section.mode === 'slice';
