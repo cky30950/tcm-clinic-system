@@ -2377,29 +2377,6 @@ async function fetchUsers(forceRefresh = false) {
                 }
             } catch (_e) {}
             try {
-                const editSel = document.getElementById('clinicSelectForEditing');
-                if (editSel) {
-                    editSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${getClinicDisplayName(c)}</option>`).join('');
-                    if (currentClinicId) editSel.value = currentClinicId;
-                    editSel.addEventListener('change', async function() {
-                        currentClinicId = this.value;
-                        localStorage.setItem('currentClinicId', currentClinicId);
-                        const cur = await window.firebaseDataManager.getClinicById(currentClinicId);
-                        clinicSettings = cur && cur.success && cur.data ? cur.data : {};
-                        document.getElementById('clinicChineseName').value = clinicSettings.chineseName || '';
-                        document.getElementById('clinicEnglishName').value = clinicSettings.englishName || '';
-                        document.getElementById('clinicBusinessHours').value = clinicSettings.businessHours || '';
-                        document.getElementById('clinicPhone').value = clinicSettings.phone || '';
-                        document.getElementById('clinicAddress').value = clinicSettings.address || '';
-                        const thankYouInput = document.getElementById('clinicReceiptThankYouText');
-                        if (thankYouInput) thankYouInput.value = clinicSettings.receiptThankYouText || '';
-                        applyClinicHerbInventoryToggleUI(clinicSettings);
-                        updateClinicSettingsDisplay();
-                        updateCurrentClinicDisplay();
-                    });
-                }
-            } catch (_e2) {}
-            try {
                 let currentSel = document.getElementById('currentClinicSelector');
                 if (currentSel) {
                     
@@ -2413,41 +2390,36 @@ async function fetchUsers(forceRefresh = false) {
                     if (currentClinicId) currentSel.value = currentClinicId;
                     
                 }
-            } catch (_e3) {}
+            } catch (_e2) {}
             try {
-                const addBtn = document.getElementById('addClinicButton');
-                if (addBtn && !addBtn.dataset.bound) {
-                    addBtn.addEventListener('click', async function() {
-                        try {
-                            const count = Array.isArray(clinicsList) ? clinicsList.length : 0;
-                            if (count >= 3) {
-                                showToast('診所數量已達上限（3），無法新增', 'error');
-                                return;
-                            }
-                        } catch (_e) {}
-                        const created = await window.firebaseDataManager.addClinic({
-                            chineseName: '新診所',
-                            englishName: '',
-                            businessHours: '',
-                            phone: '',
-                            address: '',
-                            createdAt: new Date()
-                        });
-                        if (created && created.success && created.id) {
-                            const listRes = await window.firebaseDataManager.getClinics();
-                            clinicsList = listRes && listRes.success && Array.isArray(listRes.data) ? listRes.data : [];
-                            populateClinicSelectors();
-                            setCurrentClinicId(created.id);
-                            showToast('已新增診所', 'success');
-                        } else {
-                            showToast((created && created.error) ? created.error : '新增診所失敗', 'error');
+                let systemSel = document.getElementById('systemManagementClinicSelector');
+                if (systemSel) {
+                    const parent = systemSel.parentNode;
+                    const cloned = systemSel.cloneNode(false);
+                    if (parent && cloned) {
+                        parent.replaceChild(cloned, systemSel);
+                        systemSel = cloned;
+                    }
+                    systemSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${getClinicDisplayName(c)}</option>`).join('');
+                    if (currentClinicId) systemSel.value = currentClinicId;
+                    systemSel.addEventListener('change', async function() {
+                        if (this.value && String(this.value) !== String(currentClinicId || '')) {
+                            await setCurrentClinicId(this.value);
                         }
                     });
-                    addBtn.dataset.bound = 'true';
                 }
             } catch (_e3) {}
             try {
-                const delBtn = document.getElementById('deleteClinicButton');
+                const addBtn = document.getElementById('systemAddClinicButton');
+                if (addBtn && !addBtn.dataset.bound) {
+                    addBtn.addEventListener('click', function() {
+                        showAddClinicModal();
+                    });
+                    addBtn.dataset.bound = 'true';
+                }
+            } catch (_e4) {}
+            try {
+                const delBtn = document.getElementById('systemDeleteClinicButton');
                 if (delBtn && !delBtn.dataset.bound) {
                     delBtn.addEventListener('click', async function() {
                         if (!currentClinicId || currentClinicId === 'local-default') {
@@ -2492,7 +2464,7 @@ async function fetchUsers(forceRefresh = false) {
                     });
                     delBtn.dataset.bound = 'true';
                 }
-            } catch (_e4) {}
+            } catch (_e5) {}
         }
         let _globalLoadingTotal = 0;
         let _globalLoadingCurrent = 0;
@@ -2540,6 +2512,10 @@ async function fetchUsers(forceRefresh = false) {
                         const sel = document.getElementById('currentClinicSelector');
                         if (sel && currentClinicId) sel.value = currentClinicId;
                     } catch (_eSel) {}
+                    try {
+                        const systemSel = document.getElementById('systemManagementClinicSelector');
+                        if (systemSel && currentClinicId) systemSel.value = currentClinicId;
+                    } catch (_eSystemSel) {}
                     return;
                 }
             } catch (_guardErr) {}
@@ -2631,6 +2607,10 @@ async function fetchUsers(forceRefresh = false) {
                 const currentSel = document.getElementById('currentClinicSelector');
                 if (currentSel && currentClinicId) currentSel.value = currentClinicId;
             } catch (_e) {}
+            try {
+                const systemSel = document.getElementById('systemManagementClinicSelector');
+                if (systemSel && currentClinicId) systemSel.value = currentClinicId;
+            } catch (_eSystemSel) {}
             try {
                 const switchBtn = document.getElementById('clinicSwitchButton');
                 if (switchBtn) {
@@ -15510,7 +15490,7 @@ async function initializeSystemAfterLogin() {
         }
 
         function applyClinicHerbInventoryToggleUI(settingsObj = null) {
-            const toggleEl = document.getElementById('clinicHerbInventoryEnabled');
+            const toggleEl = document.getElementById('systemManagementHerbInventoryEnabled');
             if (toggleEl) {
                 toggleEl.checked = isClinicHerbInventoryEnabled(settingsObj);
             }
@@ -15525,14 +15505,68 @@ async function initializeSystemAfterLogin() {
             document.getElementById('clinicAddress').value = clinicSettings.address || '';
             const thankYouInput = document.getElementById('clinicReceiptThankYouText');
             if (thankYouInput) thankYouInput.value = clinicSettings.receiptThankYouText || '';
-            applyClinicHerbInventoryToggleUI();
-            
-            try { populateClinicSelectors(); } catch (_e) {}
             document.getElementById('clinicSettingsModal').classList.remove('hidden');
         }
         
         function hideClinicSettingsModal() {
             document.getElementById('clinicSettingsModal').classList.add('hidden');
+        }
+
+        function showAddClinicModal() {
+            try {
+                const count = Array.isArray(clinicsList) ? clinicsList.length : 0;
+                if (count >= 3) {
+                    showToast('診所數量已達上限（3），無法新增', 'error');
+                    return;
+                }
+            } catch (_e) {}
+            ['addClinicChineseName', 'addClinicEnglishName', 'addClinicBusinessHours', 'addClinicPhone', 'addClinicAddress'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el && 'value' in el) el.value = '';
+            });
+            const modal = document.getElementById('addClinicModal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function hideAddClinicModal() {
+            const modal = document.getElementById('addClinicModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        async function saveNewClinic() {
+            const chineseName = String((document.getElementById('addClinicChineseName') || {}).value || '').trim();
+            const englishName = String((document.getElementById('addClinicEnglishName') || {}).value || '').trim();
+            const businessHours = String((document.getElementById('addClinicBusinessHours') || {}).value || '').trim();
+            const phone = String((document.getElementById('addClinicPhone') || {}).value || '').trim();
+            const address = String((document.getElementById('addClinicAddress') || {}).value || '').trim();
+            if (!chineseName) {
+                showToast('請輸入診所中文名稱！', 'error');
+                return;
+            }
+            try {
+                const created = await window.firebaseDataManager.addClinic({
+                    chineseName,
+                    englishName,
+                    businessHours,
+                    phone,
+                    address,
+                    herbInventoryEnabled: true,
+                    createdAt: new Date()
+                });
+                if (created && created.success && created.id) {
+                    const listRes = await window.firebaseDataManager.getClinics();
+                    clinicsList = listRes && listRes.success && Array.isArray(listRes.data) ? listRes.data : clinicsList;
+                    try { localStorage.setItem('clinics', JSON.stringify(clinicsList)); } catch (_e) {}
+                    hideAddClinicModal();
+                    await setCurrentClinicId(created.id);
+                    showToast('已新增診所', 'success');
+                } else {
+                    showToast((created && created.error) ? created.error : '新增診所失敗', 'error');
+                }
+            } catch (error) {
+                console.error('新增診所失敗:', error);
+                showToast('新增診所失敗', 'error');
+            }
         }
         
         async function saveClinicSettings() {
@@ -15543,8 +15577,6 @@ async function initializeSystemAfterLogin() {
             const address = document.getElementById('clinicAddress').value.trim();
             const thankYouInput = document.getElementById('clinicReceiptThankYouText');
             const receiptThankYouText = thankYouInput ? thankYouInput.value.trim() : '';
-            const herbInventoryEnabledEl = document.getElementById('clinicHerbInventoryEnabled');
-            const herbInventoryEnabled = !!(herbInventoryEnabledEl ? herbInventoryEnabledEl.checked : true);
             
             if (!chineseName) {
                 showToast('請輸入診所中文名稱！', 'error');
@@ -15557,7 +15589,6 @@ async function initializeSystemAfterLogin() {
             clinicSettings.phone = phone;
             clinicSettings.address = address;
             clinicSettings.receiptThankYouText = receiptThankYouText;
-            clinicSettings.herbInventoryEnabled = herbInventoryEnabled;
             clinicSettings.updatedAt = new Date().toISOString();
             try {
                 if (currentClinicId) {
@@ -15568,7 +15599,6 @@ async function initializeSystemAfterLogin() {
                         phone,
                         address,
                         receiptThankYouText,
-                        herbInventoryEnabled,
                         updatedAt: clinicSettings.updatedAt
                     });
                     const listRes = await window.firebaseDataManager.getClinics();
@@ -15585,17 +15615,57 @@ async function initializeSystemAfterLogin() {
                 showToast('更新診所資料失敗', 'error');
             }
         }
+
+        async function saveSystemManagementClinicOptions() {
+            if (!currentClinicId) {
+                showToast('未選擇診所', 'error');
+                return;
+            }
+            const toggleEl = document.getElementById('systemManagementHerbInventoryEnabled');
+            const herbInventoryEnabled = !!(toggleEl ? toggleEl.checked : true);
+            const payload = {
+                herbInventoryEnabled,
+                updatedAt: new Date().toISOString()
+            };
+            try {
+                const result = await window.firebaseDataManager.updateClinic(currentClinicId, payload);
+                if (!result || !result.success) {
+                    showToast('儲存中藥存庫設定失敗', 'error');
+                    return;
+                }
+                clinicSettings.herbInventoryEnabled = herbInventoryEnabled;
+                clinicSettings.updatedAt = payload.updatedAt;
+                if (Array.isArray(clinicsList)) {
+                    clinicsList = clinicsList.map(c => (String(c.id) === String(currentClinicId) ? { ...c, ...payload } : c));
+                    try { localStorage.setItem('clinics', JSON.stringify(clinicsList)); } catch (_e) {}
+                }
+                updateClinicSettingsDisplay();
+                showToast('中藥存庫設定已儲存', 'success');
+            } catch (error) {
+                console.error('儲存中藥存庫設定失敗:', error);
+                showToast('儲存中藥存庫設定失敗', 'error');
+            }
+        }
         
         function updateClinicSettingsDisplay() {
             // 更新系統管理頁面的診所設定顯示
             const chineseNameSpan = document.getElementById('displayChineseName');
             const englishNameSpan = document.getElementById('displayEnglishName');
+            const activeClinicName = getClinicDisplayName(clinicSettings || {}) || '名醫診所系統';
+            const permissionClinicNameEl = document.getElementById('permissionClinicName');
+            const receiptClinicNameEl = document.getElementById('receiptCustomizationClinicName');
             
             if (chineseNameSpan) {
                 chineseNameSpan.textContent = clinicSettings.chineseName || '名醫診所系統';
             }
             if (englishNameSpan) {
                 englishNameSpan.textContent = clinicSettings.englishName || 'Dr.Great Clinic';
+            }
+            if (permissionClinicNameEl) {
+                permissionClinicNameEl.textContent = activeClinicName;
+            }
+            if (receiptClinicNameEl) {
+                receiptClinicNameEl.textContent = activeClinicName;
             }
             
             // 更新登入頁面的診所名稱
@@ -15629,6 +15699,11 @@ async function initializeSystemAfterLogin() {
             }
             applyReceiptCustomizationUI();
             applyClinicHerbInventoryToggleUI();
+            try {
+                if (typeof loadPermissionManagementPanel === 'function') {
+                    loadPermissionManagementPanel();
+                }
+            } catch (_e) {}
             try {
                 if (typeof updatePrescriptionDisplay === 'function') {
                     updatePrescriptionDisplay();
@@ -27348,6 +27423,9 @@ async function deleteMedicalRecord(recordId) {
   // 向下相容：舊呼叫仍預設匯出 TXT
   window.exportFinancialReport = exportFinancialReportTxt;
   window.exportClinicBackup = exportClinicBackup;
+  window.hideAddClinicModal = hideAddClinicModal;
+  window.saveNewClinic = saveNewClinic;
+  window.saveSystemManagementClinicOptions = saveSystemManagementClinicOptions;
   window.triggerBackupImport = triggerBackupImport;
   window.handleBackupFile = handleBackupFile;
 

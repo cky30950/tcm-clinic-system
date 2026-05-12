@@ -2027,51 +2027,60 @@
                 <h2 class="text-2xl font-bold text-gray-800 mb-6"> <span class="text-3xl mr-3">⚙️</span>系統管理</h2>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-<div class="bg-gray-50 rounded-lg p-6">
-    <h3 class="text-lg font-semibold mb-4">資料備份與還原</h3>
-    
-    <p class="text-sm text-gray-600 mb-4">您可以匯出診所資料備份（包含所有功能資料，不含模板庫及穴位庫），或匯入之前的備份檔案。實時掛號及問診資料不包含在備份中。</p>
-    <div class="flex flex-col md:flex-row gap-4">
-        <button id="backupExportBtn" onclick="exportClinicBackup()" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition duration-200">
-            匯出備份
-        </button>
-        <button id="backupImportBtn" onclick="triggerBackupImport()" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200">
-            匯入備份
-        </button>
-        <input type="file" id="backupFileInput" accept=".json" class="hidden" onchange="handleBackupFile(this.files[0])">
-    </div>
-    
-    <div id="backupProgressContainer" class="hidden mt-4">
-        <div class="w-full bg-gray-200 rounded-full h-2.5">
-            <div id="backupProgressBar" class="bg-blue-600 h-2.5 rounded-full" style="width:0%"></div>
-        </div>
-        <div id="backupProgressText" class="mt-2 text-sm text-gray-700"></div>
-    </div>
-</div>
-
-                    <div class="bg-gray-50 rounded-lg p-6">
-                        <h3 class="text-lg font-semibold mb-4">診所設定</h3>
-                        <div class="space-y-3">
-                            <div class="text-center py-4" id="clinicSettingsDisplay">
-                                <div class="text-sm text-gray-700 mb-3">
-                                    
+                    <div class="bg-gray-50 rounded-lg p-6 md:col-span-2">
+                        <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                            <div>
+                                <h3 class="text-lg font-semibold mb-2">診所設定</h3>
+                                <p class="text-sm text-gray-600">以下設定會根據所選診所切換，權限管理、收據自定義與中藥存庫開關都會套用到目前選擇的診所。</p>
+                            </div>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <button id="systemAddClinicButton" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition duration-200">新增診所</button>
+                                <button id="systemDeleteClinicButton" class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition duration-200">刪除目前診所</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">選擇診所</label>
+                                <select id="systemManagementClinicSelector" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></select>
+                                <div class="space-y-2 text-sm text-gray-700" id="clinicSettingsDisplay">
                                     <div class="font-medium flex items-center space-x-1">
                                         <span>診所中文名稱：</span><span id="displayChineseName">名醫診所系統</span>
                                     </div>
-                                    <div class="text-gray-600 mt-1 flex items-center space-x-1">
+                                    <div class="text-gray-600 flex items-center space-x-1">
                                         <span>診所英文名稱：</span><span id="displayEnglishName">Dr.Great Clinic</span>
                                     </div>
                                 </div>
-                                <button onclick="showClinicSettingsModal()" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200">
-                                    診所資料修改
-                                </button>
+                                <div class="mt-4">
+                                    <button onclick="showClinicSettingsModal()" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200">
+                                        診所資料修改
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div>
+                                        <h4 class="font-semibold text-gray-800 mb-1">中藥存庫啟動</h4>
+                                        <p class="text-sm text-gray-600">目前選擇診所切換後會同步更新。關閉後，系統不會扣減中藥庫存，醫師開藥時也不會顯示中藥餘量。</p>
+                                    </div>
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="systemManagementHerbInventoryEnabled" class="sr-only peer" checked>
+                                        <div class="relative w-11 h-6 bg-gray-300 rounded-full peer peer-checked:bg-green-600 transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-5"></div>
+                                    </label>
+                                </div>
+                                <div class="mt-4 flex justify-end">
+                                    <button onclick="saveSystemManagementClinicOptions()" class="bg-amber-600 hover:bg-amber-700 text-white py-2 px-4 rounded-lg transition duration-200">
+                                        儲存中藥存庫設定
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                     <div id="permissionManagementPanel" class="bg-gray-50 rounded-lg p-6 md:col-span-2 hidden">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-                            <h3 class="text-lg font-semibold">權限管理</h3>
+                            <div>
+                                <h3 class="text-lg font-semibold">權限管理</h3>
+                                <div class="text-sm text-gray-600">目前診所：<span id="permissionClinicName">名醫診所系統</span></div>
+                            </div>
                             <div class="text-sm text-gray-600">可設定各職位的功能顯示與細節操作權限</div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -2115,7 +2124,12 @@
                         </div>
                     </div>
                     <div class="bg-gray-50 rounded-lg p-6 md:col-span-2">
-                        <h3 class="text-lg font-semibold mb-4">收據自定義設定</h3>
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                            <div>
+                                <h3 class="text-lg font-semibold">收據自定義設定</h3>
+                                <div class="text-sm text-gray-600">目前診所：<span id="receiptCustomizationClinicName">名醫診所系統</span></div>
+                            </div>
+                        </div>
                         <p class="text-sm text-gray-600 mb-4">以下設定會套用到目前選擇的診所，可分別控制「列印收據」與「藥單醫囑」欄位顯示。</p>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div class="bg-white border border-gray-200 rounded-lg p-4">
@@ -2196,6 +2210,26 @@
                             <button id="manageBillingBtn" onclick="window.open('https://billing.stripe.com/p/login/00w00l9Sk5I98irfdLcjS00', '_blank')" class="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition duration-200">
                                 管理訂閱/付款
                             </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-6 md:col-start-2">
+                        <h3 class="text-lg font-semibold mb-4">資料備份與還原</h3>
+                        <p class="text-sm text-gray-600 mb-4">您可以匯出目前診所資料備份（包含所有功能資料，不含模板庫及穴位庫），或匯入之前的備份檔案。實時掛號及問診資料不包含在備份中。</p>
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <button id="backupExportBtn" onclick="exportClinicBackup()" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition duration-200">
+                                匯出備份
+                            </button>
+                            <button id="backupImportBtn" onclick="triggerBackupImport()" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200">
+                                匯入備份
+                            </button>
+                            <input type="file" id="backupFileInput" accept=".json" class="hidden" onchange="handleBackupFile(this.files[0])">
+                        </div>
+                        <div id="backupProgressContainer" class="hidden mt-4">
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="backupProgressBar" class="bg-blue-600 h-2.5 rounded-full" style="width:0%"></div>
+                            </div>
+                            <div id="backupProgressText" class="mt-2 text-sm text-gray-700"></div>
                         </div>
                     </div>
 
@@ -2668,12 +2702,6 @@
             </div>
             
             <div class="p-6">
-                <div class="mb-4 flex items-center gap-3">
-                    <label class="text-sm text-gray-700">選擇診所</label>
-                    <select id="clinicSelectForEditing" class="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"></select>
-                    <button id="addClinicButton" class="ml-auto bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm">新增診所</button>
-                    <button id="deleteClinicButton" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm">刪除診所</button>
-                </div>
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">診所中文名稱 *</label>
@@ -2703,18 +2731,6 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">收據感謝語（列印收據底部）</label>
                         <textarea id="clinicReceiptThankYouText" placeholder="預設：謝謝您的光臨，祝您身體健康！" rows="2" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
                     </div>
-                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <label for="clinicHerbInventoryEnabled" class="block text-sm font-medium text-gray-700">中藥存庫啟動</label>
-                                <p class="mt-1 text-sm text-gray-600">關閉後，系統不會在完成診症時扣減中藥庫存，醫師開藥時也不會顯示中藥餘量。</p>
-                            </div>
-                            <label class="inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="clinicHerbInventoryEnabled" class="sr-only peer" checked>
-                                <div class="relative w-11 h-6 bg-gray-300 rounded-full peer peer-checked:bg-green-600 transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-5"></div>
-                            </label>
-                        </div>
-                    </div>
                 </div>
                 
                 <div class="flex justify-end space-x-4 mt-6 pt-4 border-t border-gray-200">
@@ -2723,6 +2739,45 @@
                     </button>
                     <button onclick="saveClinicSettings()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition duration-200">
                         儲存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="addClinicModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
+                <h3 class="text-xl font-bold text-gray-800">新增診所</h3>
+                <button onclick="hideAddClinicModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">診所中文名稱 *</label>
+                    <input type="text" id="addClinicChineseName" placeholder="請輸入診所中文名稱" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">診所英文名稱</label>
+                    <input type="text" id="addClinicEnglishName" placeholder="請輸入診所英文名稱" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">診所營業時間</label>
+                    <input type="text" id="addClinicBusinessHours" placeholder="例：週一至週五 09:00-18:00" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">診所電話</label>
+                    <input type="tel" id="addClinicPhone" placeholder="請輸入診所電話號碼" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">診所地址</label>
+                    <textarea id="addClinicAddress" placeholder="請輸入診所完整地址" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"></textarea>
+                </div>
+                <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
+                    <button onclick="hideAddClinicModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition duration-200">
+                        取消
+                    </button>
+                    <button onclick="saveNewClinic()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition duration-200">
+                        新增
                     </button>
                 </div>
             </div>
