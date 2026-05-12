@@ -1506,6 +1506,86 @@ const consultationHistoryPager = {
         const monthKey = `${Number(year)}-${String(Number(month) + 1).padStart(2, '0')}`;
         return state.monthDateIndexCache[monthKey] || {};
     },
+    async loadRecordsForDate(patientId, dateKey) {
+        const pid = String(patientId || '');
+        const key = String(dateKey || '').trim();
+        if (!pid || !/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+            return { success: false, indices: [] };
+        }
+        const stateResult = await this.ensurePatientState(pid, false);
+        if (!stateResult.success || !stateResult.state) {
+            return { success: false, indices: [] };
+        }
+        const state = stateResult.state;
+        if (state.mode === 'full') {
+            if (!state.dateIndexReady) {
+                this.rebuildDateIndexFromState(state);
+            }
+            return { success: true, indices: Array.isArray(state.dateIndexMap[key]) ? state.dateIndexMap[key].slice() : [] };
+        }
+        const existingIndices = [];
+        if (state.monthDateIndexCache) {
+            Object.values(state.monthDateIndexCache).forEach((monthMap) => {
+                const arr = monthMap && Array.isArray(monthMap[key]) ? monthMap[key] : null;
+                if (arr && arr.length > 0) {
+                    arr.forEach((idx) => {
+                        if (!existingIndices.includes(idx)) {
+                            existingIndices.push(idx);
+                        }
+                    });
+                }
+            });
+        }
+        if (existingIndices.length > 0 && existingIndices.every((idx) => !!state.recordsByIndex[idx])) {
+            existingIndices.sort((a, b) => a - b);
+            return { success: true, indices: existingIndices };
+        }
+        try {
+            await waitForFirebaseDb();
+            const [year, month, day] = key.split('-').map(v => parseInt(v, 10));
+            const dayStart = new Date(year, month - 1, day);
+            const nextDayStart = new Date(year, month - 1, day + 1);
+            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+            const countQuery = window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.where('patientId', '==', pid),
+                window.firebase.where('date', '<', dayStart)
+            );
+            const countSnap = await window.firebase.getCountFromServer(countQuery);
+            let ascOffset = Number(countSnap && countSnap.data && countSnap.data().count) || 0;
+            const dayQuery = window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.where('patientId', '==', pid),
+                window.firebase.where('date', '>=', dayStart),
+                window.firebase.where('date', '<', nextDayStart),
+                window.firebase.orderBy('date', 'asc')
+            );
+            const daySnap = await window.firebase.getDocs(dayQuery);
+            const loadedIndices = [];
+            daySnap.forEach((docSnap) => {
+                const rec = { id: docSnap.id, ...docSnap.data() };
+                const idx = ascOffset;
+                if (idx >= 0 && idx < state.totalCount) {
+                    state.recordsByIndex[idx] = rec;
+                    loadedIndices.push(idx);
+                }
+                ascOffset += 1;
+            });
+            loadedIndices.sort((a, b) => a - b);
+            const monthKey = key.slice(0, 7);
+            if (!state.monthDateIndexCache[monthKey]) {
+                state.monthDateIndexCache[monthKey] = {};
+            }
+            state.monthDateIndexCache[monthKey][key] = loadedIndices.slice();
+            if (state.dateIndexReady || state.mode === 'full') {
+                state.dateIndexMap[key] = loadedIndices.slice();
+            }
+            return { success: true, indices: loadedIndices };
+        } catch (error) {
+            console.warn('按日期載入病歷失敗，改用既有補讀模式:', error);
+            return { success: false, indices: [] };
+        }
+    },
     setContextData(contextKey, patientId, list) {
         const ctx = this.contexts[contextKey];
         if (!ctx) return;
@@ -10944,10 +11024,11 @@ async function saveConsultation() {
                     dateIndices = consultationHistoryPager.getMonthDateIndexMap(patientId, st.year, st.month)[dateKey];
                 }
                 if (!Array.isArray(dateIndices) || dateIndices.length === 0) return;
+                const dateLoadResult = await consultationHistoryPager.loadRecordsForDate(patientId, dateKey);
+                if (dateLoadResult && dateLoadResult.success && Array.isArray(dateLoadResult.indices) && dateLoadResult.indices.length > 0) {
+                    dateIndices = dateLoadResult.indices.slice();
+                }
                 if (dateIndices.length > 1) {
-                    for (const idx of dateIndices) {
-                        await consultationHistoryPager.ensureLoadedAtIndex(patientId, idx);
-                    }
                     const st = historyCalendarState[contextKey];
                     if (st) {
                         st.selectedDateKey = dateKey;
@@ -10969,7 +11050,13 @@ async function saveConsultation() {
             try {
                 const patientId = getHistoryCalendarContextPatientId(contextKey);
                 if (!patientId) return;
-                const loaded = await consultationHistoryPager.ensureLoadedAtIndex(patientId, targetIndex);
+                const st = historyCalendarState[contextKey];
+                if (st && st.selectedDateKey) {
+                    await consultationHistoryPager.loadRecordsForDate(patientId, st.selectedDateKey);
+                }
+                const state = consultationHistoryPager.getCachedPatientState(patientId);
+                const alreadyLoaded = !!(state && Array.isArray(state.recordsByIndex) && state.recordsByIndex[targetIndex]);
+                const loaded = alreadyLoaded ? true : await consultationHistoryPager.ensureLoadedAtIndex(patientId, targetIndex);
                 if (!loaded) return;
                 jumpToHistoryCalendarIndex(contextKey, patientId, targetIndex);
             } finally {
