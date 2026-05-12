@@ -2040,8 +2040,7 @@
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div class="bg-white border border-gray-200 rounded-lg p-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">選擇診所</label>
-                                <select id="systemManagementClinicSelector" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></select>
+                                <div class="text-sm text-gray-600 mb-4">目前診所：<span id="systemManagementClinicName">名醫診所系統</span></div>
                                 <div class="space-y-2 text-sm text-gray-700" id="clinicSettingsDisplay">
                                     <div class="font-medium flex items-center space-x-1">
                                         <span>診所中文名稱：</span><span id="displayChineseName">名醫診所系統</span>
@@ -2060,6 +2059,7 @@
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
                                         <h4 class="font-semibold text-gray-800 mb-1">中藥存庫啟動</h4>
+                                        <div class="text-sm text-gray-600 mb-1">目前診所：<span id="systemManagementHerbClinicName">名醫診所系統</span></div>
                                         <p class="text-sm text-gray-600">目前選擇診所切換後會同步更新。關閉後，系統不會扣減中藥庫存，醫師開藥時也不會顯示中藥餘量。</p>
                                     </div>
                                     <label class="inline-flex items-center cursor-pointer">
@@ -2771,6 +2771,10 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">診所地址</label>
                     <textarea id="addClinicAddress" placeholder="請輸入診所完整地址" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">收據感謝語（列印收據底部）</label>
+                    <textarea id="addClinicReceiptThankYouText" placeholder="預設：謝謝您的光臨，祝您身體健康！" rows="2" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"></textarea>
                 </div>
                 <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
                     <button onclick="hideAddClinicModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition duration-200">

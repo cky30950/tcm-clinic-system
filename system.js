@@ -15520,7 +15520,7 @@ async function initializeSystemAfterLogin() {
                     return;
                 }
             } catch (_e) {}
-            ['addClinicChineseName', 'addClinicEnglishName', 'addClinicBusinessHours', 'addClinicPhone', 'addClinicAddress'].forEach((id) => {
+            ['addClinicChineseName', 'addClinicEnglishName', 'addClinicBusinessHours', 'addClinicPhone', 'addClinicAddress', 'addClinicReceiptThankYouText'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el && 'value' in el) el.value = '';
             });
@@ -15539,6 +15539,7 @@ async function initializeSystemAfterLogin() {
             const businessHours = String((document.getElementById('addClinicBusinessHours') || {}).value || '').trim();
             const phone = String((document.getElementById('addClinicPhone') || {}).value || '').trim();
             const address = String((document.getElementById('addClinicAddress') || {}).value || '').trim();
+            const receiptThankYouText = String((document.getElementById('addClinicReceiptThankYouText') || {}).value || '').trim();
             if (!chineseName) {
                 showToast('請輸入診所中文名稱！', 'error');
                 return;
@@ -15550,6 +15551,7 @@ async function initializeSystemAfterLogin() {
                     businessHours,
                     phone,
                     address,
+                    receiptThankYouText,
                     herbInventoryEnabled: true,
                     createdAt: new Date()
                 });
@@ -15652,6 +15654,8 @@ async function initializeSystemAfterLogin() {
             const chineseNameSpan = document.getElementById('displayChineseName');
             const englishNameSpan = document.getElementById('displayEnglishName');
             const activeClinicName = getClinicDisplayName(clinicSettings || {}) || '名醫診所系統';
+            const systemManagementClinicNameEl = document.getElementById('systemManagementClinicName');
+            const herbClinicNameEl = document.getElementById('systemManagementHerbClinicName');
             const permissionClinicNameEl = document.getElementById('permissionClinicName');
             const receiptClinicNameEl = document.getElementById('receiptCustomizationClinicName');
             
@@ -15660,6 +15664,12 @@ async function initializeSystemAfterLogin() {
             }
             if (englishNameSpan) {
                 englishNameSpan.textContent = clinicSettings.englishName || 'Dr.Great Clinic';
+            }
+            if (systemManagementClinicNameEl) {
+                systemManagementClinicNameEl.textContent = activeClinicName;
+            }
+            if (herbClinicNameEl) {
+                herbClinicNameEl.textContent = activeClinicName;
             }
             if (permissionClinicNameEl) {
                 permissionClinicNameEl.textContent = activeClinicName;
@@ -15730,6 +15740,8 @@ async function initializeSystemAfterLogin() {
                 });
                 const listRes = await window.firebaseDataManager.getClinics();
                 clinicsList = listRes && listRes.success && Array.isArray(listRes.data) ? listRes.data : clinicsList;
+                try { localStorage.setItem('clinics', JSON.stringify(clinicsList)); } catch (_e) {}
+                updateClinicSettingsDisplay();
                 showToast('收據自定義設定已儲存', 'success');
             } catch (e) {
                 console.error('儲存收據自定義設定失敗:', e);
