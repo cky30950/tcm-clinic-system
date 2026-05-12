@@ -1739,6 +1739,16 @@ let patientPageCursors = {};
 let patientAscPagesCache = {};
 let patientAscPageCursors = {};
 
+function getNearestCachedSequentialAnchor(targetPage, pageCache, pageCursors) {
+    const pageNum = Number(targetPage) || 1;
+    for (let page = pageNum - 1; page >= 1; page--) {
+        if (!pageCache[page]) continue;
+        if (!Object.prototype.hasOwnProperty.call(pageCursors, page)) continue;
+        return { page, cursor: pageCursors[page] };
+    }
+    return { page: 0, cursor: null };
+}
+
 
 let patientsCountCache = null;
 
@@ -2087,49 +2097,65 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
     }
 
     
-    if (!forceRefresh && pageNumber > 1) {
-        const prevPage = pageNumber - 1;
-        
-        if (!patientPageCursors[prevPage] || !patientPagesCache[prevPage]) {
-            for (let i = 1; i < pageNumber; i++) {
-                if (!patientPagesCache[i]) {
-                    await fetchPatientsPage(i, forceRefresh);
-                }
-            }
-        }
-    }
-
     await waitForFirebaseDb();
     try {
         const pageSize = paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage
             ? paginationSettings.patientList.itemsPerPage
             : 10;
-        
-        let q = window.firebase.firestoreQuery(
-            window.firebase.collection(window.firebase.db, 'patients'),
-            window.firebase.orderBy('patientNumber', 'desc'),
-            window.firebase.limit(pageSize)
-        );
-        
-        if (pageNumber > 1) {
-            const prevCursor = patientPageCursors[pageNumber - 1];
-            if (prevCursor) {
-                q = window.firebase.firestoreQuery(q, window.firebase.startAfter(prevCursor));
+        const colRef = window.firebase.collection(window.firebase.db, 'patients');
+        const anchor = getNearestCachedSequentialAnchor(pageNumber, patientPagesCache, patientPageCursors);
+        let previousCursor = anchor.cursor;
+        let startPage = anchor.page > 0 ? anchor.page + 1 : 1;
+
+        if (pageNumber > 1 && anchor.page === 0 && patientPagesCache[1]) {
+            previousCursor = Object.prototype.hasOwnProperty.call(patientPageCursors, 1)
+                ? patientPageCursors[1]
+                : null;
+            startPage = 2;
+        }
+
+        for (let page = startPage; page <= pageNumber; page++) {
+            if (patientPagesCache[page]) {
+                previousCursor = Object.prototype.hasOwnProperty.call(patientPageCursors, page)
+                    ? patientPageCursors[page]
+                    : previousCursor;
+                continue;
             }
+
+            let q;
+            if (page === 1) {
+                q = window.firebase.firestoreQuery(
+                    colRef,
+                    window.firebase.orderBy('patientNumber', 'desc'),
+                    window.firebase.limit(pageSize)
+                );
+            } else {
+                if (!previousCursor) {
+                    patientPagesCache[page] = [];
+                    patientPageCursors[page] = null;
+                    continue;
+                }
+                q = window.firebase.firestoreQuery(
+                    colRef,
+                    window.firebase.orderBy('patientNumber', 'desc'),
+                    window.firebase.startAfter(previousCursor),
+                    window.firebase.limit(pageSize)
+                );
+            }
+
+            const snapshot = await window.firebase.getDocs(q);
+            const docs = [];
+            snapshot.forEach((doc) => {
+                docs.push({ id: doc.id, ...doc.data() });
+            });
+            patientPagesCache[page] = docs;
+            patientPageCursors[page] = snapshot.docs.length
+                ? snapshot.docs[snapshot.docs.length - 1]
+                : null;
+            previousCursor = patientPageCursors[page];
         }
-        const snapshot = await window.firebase.getDocs(q);
-        const docs = [];
-        snapshot.forEach((doc) => {
-            docs.push({ id: doc.id, ...doc.data() });
-        });
-        
-        if (docs.length > 0) {
-            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-            patientPageCursors[pageNumber] = lastDoc;
-        }
-        
-        patientPagesCache[pageNumber] = docs;
-        return docs;
+
+        return patientPagesCache[pageNumber] || [];
     } catch (error) {
         console.error('分頁讀取病人資料失敗:', error);
         return [];
@@ -2147,44 +2173,66 @@ async function fetchPatientsPageAsc(ascPageNumber = 1, forceRefresh = false) {
     if (!forceRefresh && patientAscPagesCache[ascPageNumber]) {
         return patientAscPagesCache[ascPageNumber];
     }
-    if (!forceRefresh && ascPageNumber > 1) {
-        const prevPage = ascPageNumber - 1;
-        if (!patientAscPageCursors[prevPage] || !patientAscPagesCache[prevPage]) {
-            for (let i = 1; i < ascPageNumber; i++) {
-                if (!patientAscPagesCache[i]) {
-                    await fetchPatientsPageAsc(i, forceRefresh);
-                }
-            }
-        }
-    }
     await waitForFirebaseDb();
     try {
         const pageSize = paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage
             ? paginationSettings.patientList.itemsPerPage
             : 10;
-        let q = window.firebase.firestoreQuery(
-            window.firebase.collection(window.firebase.db, 'patients'),
-            window.firebase.orderBy('patientNumber', 'asc'),
-            window.firebase.limit(pageSize)
-        );
-        if (ascPageNumber > 1) {
-            const prevCursor = patientAscPageCursors[ascPageNumber - 1];
-            if (prevCursor) {
-                q = window.firebase.firestoreQuery(q, window.firebase.startAfter(prevCursor));
+        const colRef = window.firebase.collection(window.firebase.db, 'patients');
+        const anchor = getNearestCachedSequentialAnchor(ascPageNumber, patientAscPagesCache, patientAscPageCursors);
+        let previousCursor = anchor.cursor;
+        let startPage = anchor.page > 0 ? anchor.page + 1 : 1;
+
+        if (ascPageNumber > 1 && anchor.page === 0 && patientAscPagesCache[1]) {
+            previousCursor = Object.prototype.hasOwnProperty.call(patientAscPageCursors, 1)
+                ? patientAscPageCursors[1]
+                : null;
+            startPage = 2;
+        }
+
+        for (let page = startPage; page <= ascPageNumber; page++) {
+            if (patientAscPagesCache[page]) {
+                previousCursor = Object.prototype.hasOwnProperty.call(patientAscPageCursors, page)
+                    ? patientAscPageCursors[page]
+                    : previousCursor;
+                continue;
             }
+
+            let q;
+            if (page === 1) {
+                q = window.firebase.firestoreQuery(
+                    colRef,
+                    window.firebase.orderBy('patientNumber', 'asc'),
+                    window.firebase.limit(pageSize)
+                );
+            } else {
+                if (!previousCursor) {
+                    patientAscPagesCache[page] = [];
+                    patientAscPageCursors[page] = null;
+                    continue;
+                }
+                q = window.firebase.firestoreQuery(
+                    colRef,
+                    window.firebase.orderBy('patientNumber', 'asc'),
+                    window.firebase.startAfter(previousCursor),
+                    window.firebase.limit(pageSize)
+                );
+            }
+
+            const snapshot = await window.firebase.getDocs(q);
+            const docs = [];
+            snapshot.forEach((doc) => {
+                docs.push({ id: doc.id, ...doc.data() });
+            });
+            docs.sort(comparePatientsByNumberDesc);
+            patientAscPagesCache[page] = docs;
+            patientAscPageCursors[page] = snapshot.docs.length
+                ? snapshot.docs[snapshot.docs.length - 1]
+                : null;
+            previousCursor = patientAscPageCursors[page];
         }
-        const snapshot = await window.firebase.getDocs(q);
-        const docs = [];
-        snapshot.forEach((doc) => {
-            docs.push({ id: doc.id, ...doc.data() });
-        });
-        if (docs.length > 0) {
-            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-            patientAscPageCursors[ascPageNumber] = lastDoc;
-        }
-        docs.sort(comparePatientsByNumberDesc);
-        patientAscPagesCache[ascPageNumber] = docs;
-        return docs;
+
+        return patientAscPagesCache[ascPageNumber] || [];
     } catch (error) {
         console.error('升序分頁讀取病人資料失敗:', error);
         return [];
@@ -6363,11 +6411,24 @@ async function loadPatientListFromFirebase() {
             
             
             const currentPage = (paginationSettings && paginationSettings.patientList && paginationSettings.patientList.currentPage) || 1;
-            
+
+            const localPatients = Array.isArray(patientCache) && patientCache.length > 0
+                ? patientCache.slice()
+                : (Array.isArray(patients) && patients.length > 0 ? patients.slice() : null);
+
+            if (Array.isArray(localPatients) && localPatients.length > 0) {
+                localPatients.sort(comparePatientsByNumberDesc);
+                const totalCount = localPatients.length;
+                const itemsPerPage = paginationSettings.patientList.itemsPerPage;
+                const safePage = Math.min(Math.max(currentPage, 1), Math.max(1, Math.ceil(totalCount / itemsPerPage)));
+                const startIdx = (safePage - 1) * itemsPerPage;
+                const pageItems = localPatients.slice(startIdx, startIdx + itemsPerPage);
+                renderPatientListPage(pageItems, totalCount, safePage);
+                return;
+            }
+
             const totalCount = await getPatientsCount();
-            
             const pageItems = await fetchPatientsPageOptimized(currentPage, false, totalCount);
-            
             renderPatientListPage(pageItems, totalCount, currentPage);
         }
     } catch (error) {
@@ -26262,6 +26323,8 @@ async function loadMedicalRecordManagement() {
         medicalRecordPageCursors = {};
         medicalRecordPageCache = {};
         medicalRecordSearchCache = {};
+        medicalRecordAscPageCursors = {};
+        medicalRecordAscPageCache = {};
         const searchInput = document.getElementById('searchMedicalRecord');
         if (searchInput) {
             searchInput.value = '';
@@ -26277,9 +26340,14 @@ async function loadMedicalRecordManagement() {
             searchInput.addEventListener('input', listener);
             searchInput._medicalRecordListener = listener;
         }
+        const cachedConsultations = Array.isArray(consultationCache) && consultationCache.length > 0
+            ? consultationCache
+            : (Array.isArray(consultations) && consultations.length > 0 ? consultations : null);
         const [countRes, patientsRes] = await Promise.all([
-            getConsultationsCount(),
-            safeGetPatients(true)
+            cachedConsultations ? Promise.resolve({ count: cachedConsultations.length }) : getConsultationsCount(),
+            (Array.isArray(patientCache) && patientCache.length > 0)
+                ? Promise.resolve({ success: true, data: patientCache })
+                : safeGetPatients(false)
         ]);
         medicalRecordTotalCount = (countRes && typeof countRes.count === 'number') ? countRes.count : 0;
         const patients = (patientsRes && patientsRes.success && Array.isArray(patientsRes.data)) ? patientsRes.data : [];
@@ -26317,6 +26385,10 @@ async function displayMedicalRecords(pageChange = false) {
     const itemsPerPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.itemsPerPage) ? paginationSettings.medicalRecordList.itemsPerPage : medicalRecordPageSize;
     let currentPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.currentPage) ? paginationSettings.medicalRecordList.currentPage : 1;
     let filtered = [];
+    const localMedicalRecords = !term && Array.isArray(consultationCache) && consultationCache.length > 0
+        ? consultationCache.slice()
+        : (!term && Array.isArray(consultations) && consultations.length > 0 ? consultations.slice() : null);
+    const useLocalMedicalRecords = Array.isArray(localMedicalRecords) && localMedicalRecords.length > 0;
     if (term) {
         let res = medicalRecordSearchCache[term] || null;
         if (!Array.isArray(res)) {
@@ -26325,8 +26397,11 @@ async function displayMedicalRecords(pageChange = false) {
         }
         medicalRecords = Array.isArray(res) ? res : [];
         filtered = medicalRecords;
+    } else if (useLocalMedicalRecords) {
+        medicalRecords = localMedicalRecords;
+        filtered = medicalRecords;
     } else {
-    const pageData = await fetchMedicalRecordPageOptimized(currentPage, itemsPerPage);
+        const pageData = await fetchMedicalRecordPageOptimized(currentPage, itemsPerPage);
         medicalRecords = Array.isArray(pageData) ? pageData : [];
         filtered = medicalRecords;
     }
@@ -26387,7 +26462,9 @@ async function displayMedicalRecords(pageChange = false) {
         }
         currentPage = 1;
     }
-    const totalItems = term ? filtered.length : (typeof medicalRecordTotalCount === 'number' ? medicalRecordTotalCount : filtered.length);
+    const totalItems = (term || useLocalMedicalRecords)
+        ? filtered.length
+        : (typeof medicalRecordTotalCount === 'number' ? medicalRecordTotalCount : filtered.length);
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     if (currentPage > totalPages) {
         currentPage = totalPages;
@@ -26396,7 +26473,9 @@ async function displayMedicalRecords(pageChange = false) {
         paginationSettings.medicalRecordList.currentPage = currentPage;
     }
     const startIdx = (currentPage - 1) * itemsPerPage;
-    const pageItems = term ? filtered.slice(startIdx, startIdx + itemsPerPage) : filtered;
+    const pageItems = (term || useLocalMedicalRecords)
+        ? filtered.slice(startIdx, startIdx + itemsPerPage)
+        : filtered;
     tbody.innerHTML = '';
     // 決定語言顯示
     let lang = 'zh';
@@ -26618,57 +26697,66 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             medicalRecordPageCursors[1] = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
             return arr;
         }
-        // 確保擁有上一頁游標，若沒有則逐頁計算
-        let prevPage = page - 1;
-        if (!medicalRecordPageCursors[prevPage]) {
-            for (let p = 1; p <= prevPage; p++) {
-                if (medicalRecordPageCache[p]) continue;
-                await fetchMedicalRecordPage(p, pageSize);
+        const anchor = getNearestCachedSequentialAnchor(page, medicalRecordPageCache, medicalRecordPageCursors);
+        let previousCursor = anchor.cursor;
+        let startPage = anchor.page > 0 ? anchor.page + 1 : 1;
+        if (page > 1 && anchor.page === 0 && medicalRecordPageCache[1]) {
+            previousCursor = Object.prototype.hasOwnProperty.call(medicalRecordPageCursors, 1)
+                ? medicalRecordPageCursors[1]
+                : null;
+            startPage = 2;
+        }
+        for (let pageIndex = startPage; pageIndex <= page; pageIndex++) {
+            if (medicalRecordPageCache[pageIndex]) {
+                previousCursor = Object.prototype.hasOwnProperty.call(medicalRecordPageCursors, pageIndex)
+                    ? medicalRecordPageCursors[pageIndex]
+                    : previousCursor;
+                continue;
             }
-        }
-        const last = medicalRecordPageCursors[prevPage];
-        if (!last) {
-            medicalRecordPageCache[page] = [];
-            medicalRecordPageCursors[page] = null;
-            return [];
-        }
-        q = window.firebase.firestoreQuery(
-            colRef,
-            window.firebase.orderBy('date', 'desc'),
-            window.firebase.startAfter(last),
-            window.firebase.limit(pageSize)
-        );
-        const snap2 = await window.firebase.getDocs(q);
-        const arr2 = [];
-        snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
-        try {
-            for (const r of arr2) {
-                if (r && typeof r.date === 'string') {
-                    const parsed = parseConsultationDate(r.date);
-                    if (parsed && !isNaN(parsed.getTime())) {
-                        try {
-                            await window.firebase.updateDoc(
-                                window.firebase.doc(window.firebase.db, 'consultations', r.id),
-                                { date: parsed }
-                            );
-                            r.date = parsed;
-                        } catch (_udErr2) {}
+            if (!previousCursor) {
+                medicalRecordPageCache[pageIndex] = [];
+                medicalRecordPageCursors[pageIndex] = null;
+                continue;
+            }
+            q = window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.orderBy('date', 'desc'),
+                window.firebase.startAfter(previousCursor),
+                window.firebase.limit(pageSize)
+            );
+            const snap2 = await window.firebase.getDocs(q);
+            const arr2 = [];
+            snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
+            try {
+                for (const r of arr2) {
+                    if (r && typeof r.date === 'string') {
+                        const parsed = parseConsultationDate(r.date);
+                        if (parsed && !isNaN(parsed.getTime())) {
+                            try {
+                                await window.firebase.updateDoc(
+                                    window.firebase.doc(window.firebase.db, 'consultations', r.id),
+                                    { date: parsed }
+                                );
+                                r.date = parsed;
+                            } catch (_udErr2) {}
+                        }
                     }
                 }
-            }
-        } catch (_normErr2) {}
-        try {
-            arr2.sort((a, b) => {
-                const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
-                const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
-                const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
-                const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
-                return tB - tA;
-            });
-        } catch (_e) {}
-        medicalRecordPageCache[page] = arr2;
-        medicalRecordPageCursors[page] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : medicalRecordPageCursors[prevPage];
-        return arr2;
+            } catch (_normErr2) {}
+            try {
+                arr2.sort((a, b) => {
+                    const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
+                    const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                    const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
+                    const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
+                    return tB - tA;
+                });
+            } catch (_e) {}
+            medicalRecordPageCache[pageIndex] = arr2;
+            medicalRecordPageCursors[pageIndex] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : null;
+            previousCursor = medicalRecordPageCursors[pageIndex];
+        }
+        return medicalRecordPageCache[page] || [];
     } catch (_err) {
         return [];
     }
@@ -26720,56 +26808,66 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             medicalRecordAscPageCursors[1] = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
             return arr;
         }
-        let prev = ascIndex - 1;
-        if (!medicalRecordAscPageCursors[prev]) {
-            for (let a = 1; a <= prev; a++) {
-                if (medicalRecordAscPageCache[a]) continue;
-                await fetchMedicalRecordPageAsc(a, pageSize);
+        const anchor = getNearestCachedSequentialAnchor(ascIndex, medicalRecordAscPageCache, medicalRecordAscPageCursors);
+        let previousCursor = anchor.cursor;
+        let startPage = anchor.page > 0 ? anchor.page + 1 : 1;
+        if (ascIndex > 1 && anchor.page === 0 && medicalRecordAscPageCache[1]) {
+            previousCursor = Object.prototype.hasOwnProperty.call(medicalRecordAscPageCursors, 1)
+                ? medicalRecordAscPageCursors[1]
+                : null;
+            startPage = 2;
+        }
+        for (let pageIndex = startPage; pageIndex <= ascIndex; pageIndex++) {
+            if (medicalRecordAscPageCache[pageIndex]) {
+                previousCursor = Object.prototype.hasOwnProperty.call(medicalRecordAscPageCursors, pageIndex)
+                    ? medicalRecordAscPageCursors[pageIndex]
+                    : previousCursor;
+                continue;
             }
-        }
-        const last = medicalRecordAscPageCursors[prev];
-        if (!last) {
-            medicalRecordAscPageCache[ascIndex] = [];
-            medicalRecordAscPageCursors[ascIndex] = null;
-            return [];
-        }
-        q = window.firebase.firestoreQuery(
-            colRef,
-            window.firebase.orderBy('date', 'asc'),
-            window.firebase.startAfter(last),
-            window.firebase.limit(pageSize)
-        );
-        const snap2 = await window.firebase.getDocs(q);
-        const arr2 = [];
-        snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
-        try {
-            for (const r of arr2) {
-                if (r && typeof r.date === 'string') {
-                    const parsed = parseConsultationDate(r.date);
-                    if (parsed && !isNaN(parsed.getTime())) {
-                        try {
-                            await window.firebase.updateDoc(
-                                window.firebase.doc(window.firebase.db, 'consultations', r.id),
-                                { date: parsed }
-                            );
-                            r.date = parsed;
-                        } catch (_udErr4) {}
+            if (!previousCursor) {
+                medicalRecordAscPageCache[pageIndex] = [];
+                medicalRecordAscPageCursors[pageIndex] = null;
+                continue;
+            }
+            q = window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.orderBy('date', 'asc'),
+                window.firebase.startAfter(previousCursor),
+                window.firebase.limit(pageSize)
+            );
+            const snap2 = await window.firebase.getDocs(q);
+            const arr2 = [];
+            snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
+            try {
+                for (const r of arr2) {
+                    if (r && typeof r.date === 'string') {
+                        const parsed = parseConsultationDate(r.date);
+                        if (parsed && !isNaN(parsed.getTime())) {
+                            try {
+                                await window.firebase.updateDoc(
+                                    window.firebase.doc(window.firebase.db, 'consultations', r.id),
+                                    { date: parsed }
+                                );
+                                r.date = parsed;
+                            } catch (_udErr4) {}
+                        }
                     }
                 }
-            }
-        } catch (_normErr4) {}
-        try {
-            arr2.sort((a, b) => {
-                const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
-                const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
-                const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
-                const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
-                return tB - tA;
-            });
-        } catch (_e) {}
-        medicalRecordAscPageCache[ascIndex] = arr2;
-        medicalRecordAscPageCursors[ascIndex] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : medicalRecordAscPageCursors[prev];
-        return arr2;
+            } catch (_normErr4) {}
+            try {
+                arr2.sort((a, b) => {
+                    const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
+                    const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+                    const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
+                    const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
+                    return tB - tA;
+                });
+            } catch (_e) {}
+            medicalRecordAscPageCache[pageIndex] = arr2;
+            medicalRecordAscPageCursors[pageIndex] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : null;
+            previousCursor = medicalRecordAscPageCursors[pageIndex];
+        }
+        return medicalRecordAscPageCache[ascIndex] || [];
     } catch (_err) {
         return [];
     }
