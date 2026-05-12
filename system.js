@@ -6135,6 +6135,164 @@ async function logout() {
         
         let editingPatientId = null;
         let filteredPatients = [];
+        const PATIENT_MEDICAL_PROFILE_SECTIONS = [
+            {
+                key: 'medicalConditions',
+                title: '疾病史',
+                noteId: 'patientMedicalConditionsNotes',
+                options: [
+                    { key: 'chronicDiseases', label: '慢性疾病' },
+                    { key: 'infectiousDiseases', label: '傳染病史' },
+                    { key: 'majorIllnesses', label: '重大病史' }
+                ]
+            },
+            {
+                key: 'surgicalHistory',
+                title: '手術與住院史',
+                noteId: 'patientSurgicalHistoryNotes',
+                options: [
+                    { key: 'surgeries', label: '手術項目' },
+                    { key: 'hospitalizations', label: '住院記錄' }
+                ]
+            },
+            {
+                key: 'allergies',
+                title: '過敏史',
+                noteId: 'patientAllergyNotes',
+                options: [
+                    { key: 'drugAllergies', label: '藥物過敏' },
+                    { key: 'foodEnvironmentalAllergies', label: '食物及環境過敏' }
+                ]
+            },
+            {
+                key: 'medications',
+                title: '用藥史',
+                noteId: 'patientMedicationNotes',
+                options: [
+                    { key: 'longTermMedications', label: '長期服用的藥物' },
+                    { key: 'supplementsOtc', label: '非處方藥與補充劑' }
+                ]
+            },
+            {
+                key: 'traumaHistory',
+                title: '外傷史',
+                noteId: 'patientTraumaHistoryNotes',
+                options: [
+                    { key: 'majorTrauma', label: '重大外傷' }
+                ]
+            }
+        ];
+
+        function normalizePatientMedicalProfile(profile) {
+            const normalized = {};
+            PATIENT_MEDICAL_PROFILE_SECTIONS.forEach(section => {
+                const sourceSection = profile && typeof profile === 'object' ? profile[section.key] : null;
+                const selected = Array.isArray(sourceSection && sourceSection.selected)
+                    ? sourceSection.selected.map(item => String(item))
+                    : [];
+                normalized[section.key] = {
+                    selected: selected.filter(key => section.options.some(option => option.key === key)),
+                    note: sourceSection && typeof sourceSection.note === 'string' ? sourceSection.note.trim() : ''
+                };
+            });
+            return normalized;
+        }
+
+        function hasPatientMedicalProfileContent(profile) {
+            return PATIENT_MEDICAL_PROFILE_SECTIONS.some(section => {
+                const current = profile && profile[section.key] ? profile[section.key] : {};
+                return (Array.isArray(current.selected) && current.selected.length > 0) || !!(current.note && String(current.note).trim());
+            });
+        }
+
+        function clearPatientMedicalProfileForm() {
+            document.querySelectorAll('.patient-history-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            PATIENT_MEDICAL_PROFILE_SECTIONS.forEach(section => {
+                const noteInput = document.getElementById(section.noteId);
+                if (noteInput) {
+                    noteInput.value = '';
+                }
+            });
+        }
+
+        function collectPatientMedicalProfileFromForm() {
+            const profile = {};
+            PATIENT_MEDICAL_PROFILE_SECTIONS.forEach(section => {
+                const selected = Array.from(
+                    document.querySelectorAll(`.patient-history-checkbox[data-section="${section.key}"]:checked`)
+                ).map(checkbox => checkbox.value);
+                const noteInput = document.getElementById(section.noteId);
+                profile[section.key] = {
+                    selected,
+                    note: noteInput ? noteInput.value.trim() : ''
+                };
+            });
+            return normalizePatientMedicalProfile(profile);
+        }
+
+        function populatePatientMedicalProfileForm(profile, fallbackPatient = {}) {
+            clearPatientMedicalProfileForm();
+            const normalizedProfile = normalizePatientMedicalProfile(profile);
+
+            PATIENT_MEDICAL_PROFILE_SECTIONS.forEach(section => {
+                const current = normalizedProfile[section.key];
+                const selectedSet = new Set(current.selected);
+                document.querySelectorAll(`.patient-history-checkbox[data-section="${section.key}"]`).forEach(checkbox => {
+                    checkbox.checked = selectedSet.has(checkbox.value);
+                });
+                const noteInput = document.getElementById(section.noteId);
+                if (noteInput) {
+                    noteInput.value = current.note || '';
+                }
+            });
+
+            if (hasPatientMedicalProfileContent(normalizedProfile)) {
+                return;
+            }
+
+            const allergyNotesInput = document.getElementById('patientAllergyNotes');
+            if (allergyNotesInput && fallbackPatient && fallbackPatient.allergies) {
+                allergyNotesInput.value = fallbackPatient.allergies;
+            }
+            const medicalConditionsNotesInput = document.getElementById('patientMedicalConditionsNotes');
+            if (medicalConditionsNotesInput && fallbackPatient && fallbackPatient.history) {
+                medicalConditionsNotesInput.value = fallbackPatient.history;
+            }
+        }
+
+        function formatPatientMedicalProfileSectionSummary(section, current) {
+            if (!current) return '';
+            const selectedLabels = section.options
+                .filter(option => Array.isArray(current.selected) && current.selected.includes(option.key))
+                .map(option => option.label);
+            const parts = [];
+            if (selectedLabels.length) {
+                parts.push(selectedLabels.join('、'));
+            }
+            if (current.note) {
+                parts.push(`備註：${current.note}`);
+            }
+            if (!parts.length) {
+                return '';
+            }
+            return `${section.title}：${parts.join('；')}`;
+        }
+
+        function buildPatientMedicalProfileLegacySummary(profile) {
+            const normalizedProfile = normalizePatientMedicalProfile(profile);
+            const allergySection = PATIENT_MEDICAL_PROFILE_SECTIONS.find(section => section.key === 'allergies');
+            const historySections = PATIENT_MEDICAL_PROFILE_SECTIONS.filter(section => section.key !== 'allergies');
+            const history = historySections
+                .map(section => formatPatientMedicalProfileSectionSummary(section, normalizedProfile[section.key]))
+                .filter(Boolean)
+                .join('｜');
+            const allergies = allergySection
+                ? formatPatientMedicalProfileSectionSummary(allergySection, normalizedProfile.allergies)
+                : '';
+            return { history, allergies };
+        }
         
         
         function updatePatientAge() {
@@ -6168,9 +6326,10 @@ async function logout() {
         }
 
         function clearPatientForm() {
-            ['patientName', 'patientAge', 'patientGender', 'patientPhone', 'patientIdCard', 'patientBirthDate', 'patientAddress', 'patientAllergies', 'patientHistory'].forEach(id => {
+            ['patientName', 'patientAge', 'patientGender', 'patientPhone', 'patientIdCard', 'patientBirthDate', 'patientAddress'].forEach(id => {
                 document.getElementById(id).value = '';
             });
+            clearPatientMedicalProfileForm();
         }
 
 async function savePatient() {
@@ -6182,6 +6341,8 @@ async function savePatient() {
         showToast('權限不足，無法新增病人', 'error');
         return;
     }
+    const medicalProfile = collectPatientMedicalProfileFromForm();
+    const medicalProfileSummary = buildPatientMedicalProfileLegacySummary(medicalProfile);
     const patient = {
         name: document.getElementById('patientName').value.trim(),
         age: document.getElementById('patientAge').value,
@@ -6190,8 +6351,9 @@ async function savePatient() {
         idCard: document.getElementById('patientIdCard').value.trim(),
         birthDate: document.getElementById('patientBirthDate').value,
         address: document.getElementById('patientAddress').value.trim(),
-        allergies: document.getElementById('patientAllergies').value.trim(),
-        history: document.getElementById('patientHistory').value.trim()
+        allergies: medicalProfileSummary.allergies,
+        history: medicalProfileSummary.history,
+        medicalProfile
     };
 
     
@@ -6644,8 +6806,7 @@ async function editPatient(id) {
         document.getElementById('patientIdCard').value = patient.idCard || '';
         document.getElementById('patientBirthDate').value = patient.birthDate || '';
         document.getElementById('patientAddress').value = patient.address || '';
-        document.getElementById('patientAllergies').value = patient.allergies || '';
-        document.getElementById('patientHistory').value = patient.history || '';
+        populatePatientMedicalProfileForm(patient.medicalProfile, patient);
         
         
         updatePatientAge();
