@@ -6643,6 +6643,87 @@ async function viewPatient(id) {
         
         let selectedPatientForRegistration = null;
         let currentConsultingAppointmentId = null;
+        let currentConsultationEditContext = null;
+
+function getConsultationDoctorUsername(consultation = null, appointment = null) {
+    if (appointment && appointment.appointmentDoctor) {
+        return String(appointment.appointmentDoctor).trim();
+    }
+    const doctorValue = consultation && consultation.doctor ? consultation.doctor : null;
+    if (!doctorValue) return '';
+    if (typeof doctorValue === 'string') {
+        return doctorValue.trim();
+    }
+    if (typeof doctorValue === 'object') {
+        return String(
+            doctorValue.username ||
+            doctorValue.email ||
+            doctorValue.name ||
+            doctorValue.displayName ||
+            doctorValue.fullName ||
+            ''
+        ).trim();
+    }
+    return '';
+}
+
+function canCurrentUserEditMedicalRecordEntry(consultation = null, appointment = null) {
+    const isAdminUser = currentUserData && currentUserData.position === '診所管理';
+    const doctorUsername = getConsultationDoctorUsername(consultation, appointment);
+    const isDoctorOwner = currentUserData &&
+        currentUserData.position === '醫師' &&
+        doctorUsername &&
+        currentUserData.username === doctorUsername;
+    return !!(isAdminUser || isDoctorOwner);
+}
+
+function getMedicalRecordEditWindowStatus(consultation = null, appointment = null) {
+    const baseRaw = (consultation && (consultation.date || consultation.createdAt)) ||
+        (appointment && (appointment.completedAt || appointment.appointmentTime)) ||
+        (consultation && consultation.updatedAt) ||
+        null;
+    const baseDate = parseConsultationDate(baseRaw);
+    if (!baseDate || isNaN(baseDate.getTime())) {
+        return {
+            allowed: false,
+            deadline: null,
+            reason: '找不到病歷完成時間，無法修改'
+        };
+    }
+    const deadline = new Date(baseDate);
+    deadline.setDate(deadline.getDate() + 7);
+    deadline.setHours(23, 59, 59, 999);
+    if (Date.now() > deadline.getTime()) {
+        return {
+            allowed: false,
+            deadline,
+            reason: `病歷只可於完成後一周內修改，已超過期限（截止：${deadline.toLocaleString('zh-TW', { hour12: false })}）`
+        };
+    }
+    return {
+        allowed: true,
+        deadline,
+        reason: ''
+    };
+}
+
+function buildDirectConsultationEditContext(consultation) {
+    const consultationId = consultation && consultation.id ? String(consultation.id) : '';
+    const patientId = consultation && consultation.patientId ? String(consultation.patientId) : '';
+    return {
+        id: `history-edit:${consultationId}`,
+        patientId,
+        patientName: consultation && consultation.patientName ? String(consultation.patientName) : '',
+        appointmentTime: (() => {
+            const parsed = parseConsultationDate(consultation && (consultation.date || consultation.createdAt || consultation.updatedAt));
+            return parsed && !isNaN(parsed.getTime()) ? parsed.toISOString() : new Date().toISOString();
+        })(),
+        status: 'completed',
+        consultationId,
+        appointmentDoctor: getConsultationDoctorUsername(consultation, null),
+        isDirectConsultationEdit: true
+    };
+}
 
 
 let inquiryOptionsData = {};
@@ -8706,6 +8787,7 @@ function getOperationButtons(appointment, patient = null) {
             buttons.push(`<button onclick="printPrescriptionInstructionsFromAppointment(${appointment.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">藥單醫囑</button>`);
             buttons.push(`<button onclick="printAttendanceCertificateFromAppointment(${appointment.id})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">到診證明</button>`);
             buttons.push(`<button onclick="printSickLeaveFromAppointment(${appointment.id})" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">病假證明</button>`);
+            const editWindowStatus = getMedicalRecordEditWindowStatus(null, appointment);
             
             if (isDisabled) {
                 if (canEditMedicalRecord) {
@@ -8716,7 +8798,11 @@ function getOperationButtons(appointment, patient = null) {
                 }
             } else {
                 if (canEditMedicalRecord) {
-                    buttons.push(`<button onclick="editMedicalRecord(${appointment.id})" class="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">修改病歷</button>`);
+                    if (editWindowStatus.allowed) {
+                        buttons.push(`<button onclick="editMedicalRecord(${appointment.id})" class="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">修改病歷</button>`);
+                    } else {
+                        buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs whitespace-nowrap cursor-not-allowed" title="${editWindowStatus.reason}">修改病歷</span>`);
+                    }
                 }
                 if (canManage) {
                     buttons.push(`<button onclick="withdrawConsultation(${appointment.id})" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">撤回診症</button>`);
@@ -9861,6 +9947,7 @@ async function showConsultationForm(appointment) {
             
             // 清理全域變數
             currentConsultingAppointmentId = null;
+            currentConsultationEditContext = null;
             
             // 清空處方和收費項目選擇
             clearActivePrescriptionItems();
@@ -10037,7 +10124,8 @@ async function saveConsultation() {
         return;
     }
     // 取得當前掛號資訊並判斷是否為編輯模式，供後續預處理和保存使用
-    const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId));
+    const appointment = appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId))
+        || currentConsultationEditContext;
     // 判斷是否為編輯模式：掛號狀態為已完成且存在 consultationId
     const isEditing = appointment && appointment.status === 'completed' && appointment.consultationId;
     const auditReason = (document.getElementById('formAuditReason') && document.getElementById('formAuditReason').value
@@ -10120,7 +10208,7 @@ async function saveConsultation() {
 
         // Assemble consultation data common to both new and edit operations
         const consultationData = {
-            appointmentId: currentConsultingAppointmentId,
+            appointmentId: appointment && !appointment.isDirectConsultationEdit ? currentConsultingAppointmentId : '',
             patientId: appointment.patientId,
             patientName: appointment.patientName,
             symptoms: symptoms,
@@ -10245,6 +10333,9 @@ async function saveConsultation() {
             }
             consultationData.date = existing && existing.date ? existing.date : new Date();
             consultationData.doctor = existing && existing.doctor ? existing.doctor : currentUser;
+            consultationData.appointmentId = existing && existing.appointmentId
+                ? existing.appointmentId
+                : (appointment && !appointment.isDirectConsultationEdit ? currentConsultingAppointmentId : '');
             // 若既有病歷未包含診所，則補上目前診所
             try {
                 consultationData.clinicId = (existing && existing.clinicId) ? existing.clinicId : (currentClinicId || null);
@@ -10263,7 +10354,7 @@ async function saveConsultation() {
                 try {
                     await window.firebaseDataManager.addConsultationAuditLog({
                         consultationId: String(appointment.consultationId),
-                        appointmentId: String(appointment.id || ''),
+                        appointmentId: String((existing && existing.appointmentId) || (appointment && !appointment.isDirectConsultationEdit ? appointment.id : '') || ''),
                         patientId: String(appointment.patientId || ''),
                         patientName: String(appointment.patientName || ''),
                         editedBy: currentUser || 'system',
@@ -10298,11 +10389,18 @@ async function saveConsultation() {
                     // ignore cache update errors
                 }
                 // 更新掛號資料中的主訴內容，確保掛號列表顯示最新的主訴
-                appointment.chiefComplaint = symptoms;
-                // 更新本地儲存的 appointments 陣列
-                localStorage.setItem('appointments', JSON.stringify(appointments));
-                // 同步更新到 Firebase
-                await window.firebaseDataManager.updateAppointment(String(appointment.id), appointment);
+                const linkedAppointment = appointment && !appointment.isDirectConsultationEdit
+                    ? appointment
+                    : (Array.isArray(appointments)
+                        ? appointments.find(apt => apt && String(apt.consultationId || '') === String(appointment.consultationId))
+                        : null);
+                if (linkedAppointment) {
+                    linkedAppointment.chiefComplaint = symptoms;
+                    // 更新本地儲存的 appointments 陣列
+                    localStorage.setItem('appointments', JSON.stringify(appointments));
+                    // 同步更新到 Firebase
+                    await window.firebaseDataManager.updateAppointment(String(linkedAppointment.id), linkedAppointment);
+                }
                 showToast('診症記錄已更新！', 'success');
             } else {
                 showToast('更新診症記錄失敗，請稍後再試', 'error');
@@ -10860,6 +10958,14 @@ if (!patient) {
                                 })()}
                             </div>
                             <div class="flex flex-wrap justify-end gap-1">
+                                ${(() => {
+                                    if (!canCurrentUserEditMedicalRecordEntry(consultation, null)) return '';
+                                    const editWindowStatus = getMedicalRecordEditWindowStatus(consultation, null);
+                                    if (editWindowStatus.allowed) {
+                                        return `<button onclick="editMedicalRecordByConsultationId('${consultation.id}')" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-sm font-medium" style="transform: scale(0.75); transform-origin: left;">修改病歷</button>`;
+                                    }
+                                    return `<span class="bg-gray-300 text-gray-500 px-3 py-2 rounded text-sm font-medium cursor-not-allowed" title="${editWindowStatus.reason}" style="transform: scale(0.75); transform-origin: left;">修改病歷</span>`;
+                                })()}
                                 ${consultation.updatedAt ? `
                                 <button onclick="openConsultationAuditTrail('${consultation.id}', '${consultation.patientId || ''}')"
                                         class="text-amber-700 hover:text-amber-900 text-sm font-medium bg-amber-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
@@ -11318,6 +11424,14 @@ function displayConsultationMedicalHistoryPage() {
                         })()}
                     </div>
                     <div class="flex flex-wrap justify-end gap-1">
+                        ${(() => {
+                            if (!canCurrentUserEditMedicalRecordEntry(consultation, null)) return '';
+                            const editWindowStatus = getMedicalRecordEditWindowStatus(consultation, null);
+                            if (editWindowStatus.allowed) {
+                                return `<button onclick="editMedicalRecordByConsultationId('${consultation.id}')" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-sm font-medium" style="transform: scale(0.75); transform-origin: left;">修改病歷</button>`;
+                            }
+                            return `<span class="bg-gray-300 text-gray-500 px-3 py-2 rounded text-sm font-medium cursor-not-allowed" title="${editWindowStatus.reason}" style="transform: scale(0.75); transform-origin: left;">修改病歷</span>`;
+                        })()}
                         ${consultation.updatedAt ? `
                         <button onclick="openConsultationAuditTrail('${consultation.id}', '${consultation.patientId || ''}')"
                                 class="text-amber-700 hover:text-amber-900 text-sm font-medium bg-amber-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">
@@ -14181,6 +14295,11 @@ async function editMedicalRecord(appointmentId) {
             }
             return;
         }
+        const editWindowStatus = getMedicalRecordEditWindowStatus(consultation, appointment);
+        if (!editWindowStatus.allowed) {
+            showToast(editWindowStatus.reason, 'warning');
+            return;
+        }
         // 檢查是否有其他病人正在診症中（僅限制同一醫師）
         let consultingAppointment = null;
         const isDoctorUser = currentUserData && currentUserData.position === '醫師';
@@ -14240,6 +14359,118 @@ async function editMedicalRecord(appointmentId) {
         showToast('讀取病人資料失敗', 'error');
     } finally {
         // 清除按鈕的讀取狀態
+        if (loadingButton) {
+            clearButtonLoading(loadingButton);
+        }
+    }
+}
+
+async function editMedicalRecordByConsultationId(consultationId) {
+    let loadingButton = null;
+    try {
+        if (typeof event !== 'undefined' && event && event.currentTarget) {
+            loadingButton = event.currentTarget;
+        }
+    } catch (_e) {}
+    if (loadingButton) {
+        setButtonLoading(loadingButton, '處理中...');
+    }
+    try {
+        const consultationIdStr = String(consultationId || '').trim();
+        if (!consultationIdStr) {
+            showToast('找不到病歷記錄！', 'error');
+            return;
+        }
+        const linkedAppointment = Array.isArray(appointments)
+            ? appointments.find(apt => apt && String(apt.consultationId || '') === consultationIdStr)
+            : null;
+        if (linkedAppointment) {
+            await editMedicalRecord(linkedAppointment.id);
+            return;
+        }
+
+        let consultation = null;
+        try {
+            const singleRes = await window.firebaseDataManager.getConsultationById(consultationIdStr);
+            if (singleRes && singleRes.success && singleRes.data) {
+                consultation = singleRes.data;
+            }
+        } catch (_err) {}
+        if (!consultation) {
+            const consResult = await window.firebaseDataManager.getConsultations();
+            if (consResult && consResult.success) {
+                consultations = consResult.data;
+                consultation = consResult.data.find(c => String(c.id) === consultationIdStr) || null;
+            }
+        }
+        if (!consultation) {
+            showToast('找不到病歷記錄！', 'error');
+            return;
+        }
+        if (!canCurrentUserEditMedicalRecordEntry(consultation, null)) {
+            showToast('您沒有修改病歷的權限！', 'error');
+            return;
+        }
+        const editWindowStatus = getMedicalRecordEditWindowStatus(consultation, null);
+        if (!editWindowStatus.allowed) {
+            showToast(editWindowStatus.reason, 'warning');
+            return;
+        }
+
+        const patientResult = await safeGetPatients(true);
+        if (!patientResult.success) {
+            showToast('無法讀取病人資料！', 'error');
+            return;
+        }
+        const patient = patientResult.data.find(p => String(p.id) === String(consultation.patientId));
+        if (!patient) {
+            showToast('找不到病人資料！', 'error');
+            return;
+        }
+
+        let consultingAppointment = null;
+        const isDoctorUser = currentUserData && currentUserData.position === '醫師';
+        if (isDoctorUser && Array.isArray(appointments)) {
+            consultingAppointment = appointments.find(apt =>
+                apt.status === 'consulting' &&
+                apt.appointmentDoctor === currentUserData.username &&
+                new Date(apt.appointmentTime).toDateString() === new Date().toDateString()
+            );
+        }
+        if (consultingAppointment) {
+            const consultingPatient = patientResult.data.find(p => p.id === consultingAppointment.patientId);
+            const consultingPatientName = consultingPatient ? consultingPatient.name : '未知病人';
+            const lang = localStorage.getItem('lang') || 'zh';
+            const zhMsg = `您目前正在為 ${consultingPatientName} 診症。\n\n是否要結束該病人的診症並開始修改 ${patient.name} 的病歷？\n\n注意：${consultingPatientName} 的狀態將改回候診中。`;
+            const enMsg = `You are currently consulting ${consultingPatientName}.\n\nDo you want to finish that patient's consultation and start editing ${patient.name}'s medical record?\n\nNote: ${consultingPatientName}'s status will revert to waiting.`;
+            const confirmEdit = await showConfirmation(lang === 'en' ? enMsg : zhMsg, 'warning');
+            if (!confirmEdit) {
+                return;
+            }
+            consultingAppointment.status = 'waiting';
+            delete consultingAppointment.consultationStartTime;
+            delete consultingAppointment.consultingDoctor;
+            if (String(currentConsultingAppointmentId) === String(consultingAppointment.id)) {
+                closeConsultationForm();
+            }
+            localStorage.setItem('appointments', JSON.stringify(appointments));
+            await window.firebaseDataManager.updateAppointment(String(consultingAppointment.id), consultingAppointment);
+        }
+
+        currentConsultationEditContext = buildDirectConsultationEditContext(consultation);
+        currentConsultingAppointmentId = currentConsultationEditContext.id;
+        await showConsultationForm(currentConsultationEditContext);
+        {
+            const lang = localStorage.getItem('lang') || 'zh';
+            const msg = lang === 'en'
+                ? `Entered medical record edit mode for ${patient.name}`
+                : `進入 ${patient.name} 的病歷編輯模式`;
+            showToast(msg, 'info');
+        }
+    } catch (error) {
+        console.error('從病歷記錄修改病歷失敗:', error);
+        showToast('開啟病歷編輯失敗', 'error');
+    } finally {
         if (loadingButton) {
             clearButtonLoading(loadingButton);
         }
@@ -26379,6 +26610,14 @@ function viewMedicalRecord(recordId, patientId) {
         detailHtml += '</div>'; // 關閉左側信息（兩行）
         // 右側按鈕
         detailHtml += '<div class="flex flex-wrap justify-end gap-1">';
+        if (canCurrentUserEditMedicalRecordEntry(rec, null)) {
+            const editWindowStatus = getMedicalRecordEditWindowStatus(rec, null);
+            if (editWindowStatus.allowed) {
+                detailHtml += `<button onclick="editMedicalRecordByConsultationId('${rec.id}')" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-sm font-medium" style="transform: scale(0.75); transform-origin: left;">修改病歷</button>`;
+            } else {
+                detailHtml += `<span class="bg-gray-300 text-gray-500 px-3 py-2 rounded text-sm font-medium cursor-not-allowed" title="${window.escapeHtml(editWindowStatus.reason)}" style="transform: scale(0.75); transform-origin: left;">修改病歷</span>`;
+            }
+        }
         if (rec.updatedAt) {
             detailHtml += `<button onclick="openConsultationAuditTrail('${rec.id}', '${rec.patientId || patientId || ''}')" class="text-amber-700 hover:text-amber-900 text-sm font-medium bg-amber-50 px-3 py-2 rounded" style="transform: scale(0.75); transform-origin: left;">審核追蹤</button>`;
         }
@@ -26765,6 +27004,8 @@ async function deleteMedicalRecord(recordId) {
   window.saveClinicSettings = saveClinicSettings;
   window.saveReceiptCustomizationSettings = saveReceiptCustomizationSettings;
   window.saveConsultation = saveConsultation;
+  window.editMedicalRecord = editMedicalRecord;
+  window.editMedicalRecordByConsultationId = editMedicalRecordByConsultationId;
   window.openConsultationAuditTrail = openConsultationAuditTrail;
   window.closeConsultationAuditTrail = closeConsultationAuditTrail;
   window.toggleAuditDetail = toggleAuditDetail;
