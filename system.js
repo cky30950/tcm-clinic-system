@@ -10468,6 +10468,37 @@ async function showConsultationForm(appointment) {
             // 滾動回頂部
             document.getElementById('consultationSystem').scrollIntoView({ behavior: 'smooth' });
         }
+
+        function prepareConsultationEditView() {
+            try {
+                const patientHistoryModal = document.getElementById('patientMedicalHistoryModal');
+                if (patientHistoryModal) {
+                    patientHistoryModal.classList.add('hidden');
+                }
+                const consultationHistoryModal = document.getElementById('medicalHistoryModal');
+                if (consultationHistoryModal) {
+                    consultationHistoryModal.classList.add('hidden');
+                }
+                const medicalRecordDetailModal = document.getElementById('medicalRecordDetailModal');
+                if (medicalRecordDetailModal) {
+                    medicalRecordDetailModal.classList.add('hidden');
+                }
+            } catch (_e) {}
+            try {
+                if (typeof showSection === 'function') {
+                    showSection('consultationSystem');
+                }
+            } catch (_e) {}
+        }
+
+        function scrollConsultationFormIntoView() {
+            try {
+                const formEl = document.getElementById('consultationForm');
+                if (formEl) {
+                    formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            } catch (_e) {}
+        }
         
         // 取消診症
         async function cancelConsultation() {
@@ -14853,9 +14884,11 @@ async function editMedicalRecord(appointmentId) {
                 return; // 用戶取消操作
             }
         }
-        // 設置為編輯模式
+        // 切換到診症系統，再進入病歷編輯模式
+        prepareConsultationEditView();
         currentConsultingAppointmentId = appointmentId;
-        showConsultationForm(appointment);
+        await showConsultationForm(appointment);
+        scrollConsultationFormIntoView();
         {
             const lang = localStorage.getItem('lang') || 'zh';
             const msg = lang === 'en'
@@ -14967,33 +15000,10 @@ async function editMedicalRecordByConsultationId(consultationId) {
         }
 
         currentConsultationEditContext = buildDirectConsultationEditContext(consultation);
-        try {
-            const patientHistoryModal = document.getElementById('patientMedicalHistoryModal');
-            if (patientHistoryModal) {
-                patientHistoryModal.classList.add('hidden');
-            }
-            const consultationHistoryModal = document.getElementById('medicalHistoryModal');
-            if (consultationHistoryModal) {
-                consultationHistoryModal.classList.add('hidden');
-            }
-            const medicalRecordDetailModal = document.getElementById('medicalRecordDetailModal');
-            if (medicalRecordDetailModal) {
-                medicalRecordDetailModal.classList.add('hidden');
-            }
-        } catch (_e) {}
-        try {
-            if (typeof showSection === 'function') {
-                showSection('consultationSystem');
-            }
-        } catch (_e) {}
+        prepareConsultationEditView();
         currentConsultingAppointmentId = currentConsultationEditContext.id;
         await showConsultationForm(currentConsultationEditContext);
-        try {
-            const formEl = document.getElementById('consultationForm');
-            if (formEl) {
-                formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        } catch (_e) {}
+        scrollConsultationFormIntoView();
         {
             const lang = localStorage.getItem('lang') || 'zh';
             const msg = lang === 'en'
