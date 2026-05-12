@@ -9444,6 +9444,12 @@ function queueConsultationSymptomsDraftSave() {
     } catch (_e) {}
 }
 
+function updateConsultationCancelButtonLabel(isEditingMode) {
+    const cancelButton = document.getElementById('consultationCancelButton');
+    if (!cancelButton) return;
+    cancelButton.textContent = isEditingMode ? '取消修改' : '取消診症';
+}
+
 // 修復診症表單顯示函數
 async function showConsultationForm(appointment) {
     try {
@@ -9504,6 +9510,8 @@ async function showConsultationForm(appointment) {
         renderPatientPackages(patient.id);
         
         // 檢查是否為編輯模式
+        const isEditingMode = appointment.status === 'completed' && appointment.consultationId;
+        updateConsultationCancelButtonLabel(!!isEditingMode);
         if (appointment.status === 'completed' && appointment.consultationId) {
             // 編輯模式：從 Firebase 載入現有診症記錄
             await loadConsultationForEdit(appointment.consultationId);
@@ -9932,6 +9940,7 @@ async function showConsultationForm(appointment) {
         // 關閉診症表單
         async function closeConsultationForm() {
             stopConsultationSymptomsDraftAutosave();
+            updateConsultationCancelButtonLabel(false);
             // 在關閉表單前，如有暫存的套票使用變更且尚未保存，嘗試回復。
             try {
                 if (pendingPackageChanges && pendingPackageChanges.length > 0) {
@@ -14458,8 +14467,29 @@ async function editMedicalRecordByConsultationId(consultationId) {
         }
 
         currentConsultationEditContext = buildDirectConsultationEditContext(consultation);
+        try {
+            const patientHistoryModal = document.getElementById('patientMedicalHistoryModal');
+            if (patientHistoryModal) {
+                patientHistoryModal.classList.add('hidden');
+            }
+            const consultationHistoryModal = document.getElementById('medicalHistoryModal');
+            if (consultationHistoryModal) {
+                consultationHistoryModal.classList.add('hidden');
+            }
+        } catch (_e) {}
+        try {
+            if (typeof showSection === 'function') {
+                showSection('consultationSystem');
+            }
+        } catch (_e) {}
         currentConsultingAppointmentId = currentConsultationEditContext.id;
         await showConsultationForm(currentConsultationEditContext);
+        try {
+            const formEl = document.getElementById('consultationForm');
+            if (formEl) {
+                formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        } catch (_e) {}
         {
             const lang = localStorage.getItem('lang') || 'zh';
             const msg = lang === 'en'
