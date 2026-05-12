@@ -1736,6 +1736,8 @@ const consultationHistoryPager = {
 
 let patientPagesCache = {};
 let patientPageCursors = {};
+let patientPageFirstDocs = {};
+let patientPageLastDocs = {};
 let patientAscPagesCache = {};
 let patientAscPageCursors = {};
 
@@ -2078,6 +2080,8 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
     if (forceRefresh) {
         patientPagesCache = {};
         patientPageCursors = {};
+        patientPageFirstDocs = {};
+        patientPageLastDocs = {};
         patientAscPagesCache = {};
         patientAscPageCursors = {};
     }
@@ -2141,6 +2145,8 @@ async function fetchPatientsPageAsc(ascPageNumber = 1, forceRefresh = false) {
     if (forceRefresh) {
         patientPagesCache = {};
         patientPageCursors = {};
+        patientPageFirstDocs = {};
+        patientPageLastDocs = {};
         patientAscPagesCache = {};
         patientAscPageCursors = {};
     }
@@ -2205,6 +2211,46 @@ function comparePatientsByNumberDesc(a, b) {
     return numB - numA;
 }
 
+function cachePatientPageWindow(pageNumber, pageDocs, pageSnapDocs) {
+    patientPagesCache[pageNumber] = pageDocs;
+    patientPageFirstDocs[pageNumber] = Array.isArray(pageSnapDocs) && pageSnapDocs.length > 0 ? pageSnapDocs[0] : null;
+    patientPageLastDocs[pageNumber] = Array.isArray(pageSnapDocs) && pageSnapDocs.length > 0 ? pageSnapDocs[pageSnapDocs.length - 1] : null;
+    if (patientPageLastDocs[pageNumber]) {
+        patientPageCursors[pageNumber] = patientPageLastDocs[pageNumber];
+    }
+}
+
+async function fetchPatientPageWindowDirect({ pageNumber, pageSize, totalItems, startAfterDoc = null, endBeforeDoc = null, useTail = false, windowCount = null }) {
+    await waitForFirebaseDb();
+    const totalPages = totalItems > 0 ? Math.ceil(totalItems / pageSize) : 1;
+    const resolvedWindowCount = typeof windowCount === 'number' && windowCount > 0
+        ? windowCount
+        : (useTail
+            ? Math.max(1, totalItems - ((pageNumber - 1) * pageSize))
+            : Math.min(totalItems, pageNumber * pageSize));
+    const queryParts = [
+        window.firebase.orderBy('patientNumber', 'desc')
+    ];
+    if (startAfterDoc) queryParts.push(window.firebase.startAfter(startAfterDoc));
+    if (endBeforeDoc) queryParts.push(window.firebase.endBefore(endBeforeDoc));
+    queryParts.push(useTail ? window.firebase.firestoreLimitToLast(resolvedWindowCount) : window.firebase.limit(resolvedWindowCount));
+    const q = window.firebase.firestoreQuery(
+        window.firebase.collection(window.firebase.db, 'patients'),
+        ...queryParts
+    );
+    const snapshot = await window.firebase.getDocs(q);
+    const rawSnapDocs = Array.isArray(snapshot.docs) ? snapshot.docs : [];
+    const rawDocs = rawSnapDocs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+    const pageItemCount = pageNumber === totalPages && (totalItems % pageSize) !== 0 ? (totalItems % pageSize) : pageSize;
+    const actualPageSize = Math.min(pageItemCount, rawDocs.length);
+    const startIndex = useTail ? 0 : Math.max(0, rawDocs.length - actualPageSize);
+    const endIndex = startIndex + actualPageSize;
+    const pageSnapDocs = rawSnapDocs.slice(startIndex, endIndex);
+    const pageDocs = rawDocs.slice(startIndex, endIndex).sort(comparePatientsByNumberDesc);
+    cachePatientPageWindow(pageNumber, pageDocs, pageSnapDocs);
+    return pageDocs;
+}
+
 async function fetchPatientsPageOptimized(pageNumber = 1, forceRefresh = false, knownTotalItems = null) {
     const pageSize = paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage
         ? paginationSettings.patientList.itemsPerPage
@@ -2215,13 +2261,57 @@ async function fetchPatientsPageOptimized(pageNumber = 1, forceRefresh = false, 
     const totalPages = totalItems > 0 ? Math.ceil(totalItems / pageSize) : 1;
     if (pageNumber < 1) pageNumber = 1;
     if (pageNumber > totalPages) pageNumber = totalPages;
-    const distanceFromStart = pageNumber - 1;
-    const distanceFromEnd = totalPages - pageNumber;
-    if (distanceFromEnd < distanceFromStart) {
-        const ascPageNumber = distanceFromEnd + 1;
-        return await fetchPatientsPageAsc(ascPageNumber, forceRefresh);
+    if (forceRefresh) {
+        patientPagesCache = {};
+        patientPageCursors = {};
+        patientPageFirstDocs = {};
+        patientPageLastDocs = {};
+        patientAscPagesCache = {};
+        patientAscPageCursors = {};
     }
-    return await fetchPatientsPage(pageNumber, forceRefresh);
+    if (patientPagesCache[pageNumber]) {
+        return patientPagesCache[pageNumber];
+    }
+    const candidates = [];
+    candidates.push({ type: 'start', distance: pageNumber, startAfterDoc: null, endBeforeDoc: null, useTail: false, windowCount: Math.min(totalItems, pageNumber * pageSize) });
+    candidates.push({ type: 'end', distance: totalPages - pageNumber + 1, startAfterDoc: null, endBeforeDoc: null, useTail: true, windowCount: Math.max(1, totalItems - ((pageNumber - 1) * pageSize)) });
+    Object.keys(patientPageLastDocs).forEach((key) => {
+        const cachedPage = Number(key);
+        if (cachedPage < pageNumber && patientPageLastDocs[cachedPage]) {
+            candidates.push({
+                type: 'forward',
+                distance: pageNumber - cachedPage,
+                startAfterDoc: patientPageLastDocs[cachedPage],
+                endBeforeDoc: null,
+                useTail: false,
+                windowCount: (pageNumber - cachedPage) * pageSize
+            });
+        }
+    });
+    Object.keys(patientPageFirstDocs).forEach((key) => {
+        const cachedPage = Number(key);
+        if (cachedPage > pageNumber && patientPageFirstDocs[cachedPage]) {
+            candidates.push({
+                type: 'backward',
+                distance: cachedPage - pageNumber,
+                startAfterDoc: null,
+                endBeforeDoc: patientPageFirstDocs[cachedPage],
+                useTail: true,
+                windowCount: (cachedPage - pageNumber) * pageSize
+            });
+        }
+    });
+    candidates.sort((a, b) => a.distance - b.distance);
+    const best = candidates[0];
+    return await fetchPatientPageWindowDirect({
+        pageNumber,
+        pageSize,
+        totalItems,
+        startAfterDoc: best.startAfterDoc,
+        endBeforeDoc: best.endBeforeDoc,
+        useTail: best.useTail,
+        windowCount: best.windowCount
+    });
 }
 
 
@@ -3160,6 +3250,8 @@ async function attachPatientListListener() {
                 patientCache = null;
                 patientPagesCache = {};
                 patientPageCursors = {};
+                patientPageFirstDocs = {};
+                patientPageLastDocs = {};
                 patientAscPagesCache = {};
                 patientAscPageCursors = {};
                 patientsCountCache = null;
@@ -22273,6 +22365,8 @@ async function importClinicBackup(data) {
         // 清空病人分頁快取，讓後續依使用者所在頁面再即時讀取，避免一次預切所有頁資料
         patientPagesCache = {};
         patientPageCursors = {};
+        patientPageFirstDocs = {};
+        patientPageLastDocs = {};
         patientAscPagesCache = {};
         patientAscPageCursors = {};
         // 重新計算中藥庫使用次數（若有相關函式）
@@ -26243,6 +26337,8 @@ let medicalRecordPatients = {};
 let medicalRecordPageSize = 10;
 let medicalRecordTotalCount = 0;
 let medicalRecordPageCursors = {}; // { pageNumber: lastDocSnapshot }
+let medicalRecordPageFirstDocs = {}; // { pageNumber: firstDocSnapshot }
+let medicalRecordPageLastDocs = {}; // { pageNumber: lastDocSnapshot }
 let medicalRecordPageCache = {};   // { pageNumber: Array<consultation> }
 let medicalRecordSearchCache = {}; // { term: Array<consultation> }
 let medicalRecordAscPageCursors = {}; // { ascIndex: lastDocSnapshot }
@@ -26261,6 +26357,8 @@ async function loadMedicalRecordManagement() {
         // 初始化分頁狀態
         medicalRecordPageCursors = {};
         medicalRecordPageCache = {};
+        medicalRecordPageFirstDocs = {};
+        medicalRecordPageLastDocs = {};
         medicalRecordSearchCache = {};
         const searchInput = document.getElementById('searchMedicalRecord');
         if (searchInput) {
@@ -26509,6 +26607,8 @@ async function displayMedicalRecords(pageChange = false) {
 function initializeMedicalRecordPagination() {
     medicalRecordPageCursors = {};
     medicalRecordPageCache = {};
+    medicalRecordPageFirstDocs = {};
+    medicalRecordPageLastDocs = {};
     medicalRecordAscPageCursors = {};
     medicalRecordAscPageCache = {};
 }
@@ -26674,6 +26774,56 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
     }
 }
 
+function cacheMedicalRecordPageWindow(pageNumber, pageDocs, pageSnapDocs) {
+    medicalRecordPageCache[pageNumber] = pageDocs;
+    medicalRecordPageFirstDocs[pageNumber] = Array.isArray(pageSnapDocs) && pageSnapDocs.length > 0 ? pageSnapDocs[0] : null;
+    medicalRecordPageLastDocs[pageNumber] = Array.isArray(pageSnapDocs) && pageSnapDocs.length > 0 ? pageSnapDocs[pageSnapDocs.length - 1] : null;
+    if (medicalRecordPageLastDocs[pageNumber]) {
+        medicalRecordPageCursors[pageNumber] = medicalRecordPageLastDocs[pageNumber];
+    }
+}
+
+function sortMedicalRecordPageDocsDesc(docs) {
+    return (Array.isArray(docs) ? docs.slice() : []).sort((a, b) => {
+        const A = parseConsultationDate(a.date || a.createdAt || a.updatedAt || null);
+        const B = parseConsultationDate(b.date || b.createdAt || b.updatedAt || null);
+        const tA = (A && !isNaN(A.getTime())) ? A.getTime() : 0;
+        const tB = (B && !isNaN(B.getTime())) ? B.getTime() : 0;
+        return tB - tA;
+    });
+}
+
+async function fetchMedicalRecordPageWindowDirect({ pageNumber, pageSize, totalItems, startAfterDoc = null, endBeforeDoc = null, useTail = false, windowCount = null }) {
+    await waitForFirebaseDb();
+    const totalPages = totalItems > 0 ? Math.ceil(totalItems / pageSize) : 1;
+    const resolvedWindowCount = typeof windowCount === 'number' && windowCount > 0
+        ? windowCount
+        : (useTail
+            ? Math.max(1, totalItems - ((pageNumber - 1) * pageSize))
+            : Math.min(totalItems, pageNumber * pageSize));
+    const queryParts = [
+        window.firebase.orderBy('date', 'desc')
+    ];
+    if (startAfterDoc) queryParts.push(window.firebase.startAfter(startAfterDoc));
+    if (endBeforeDoc) queryParts.push(window.firebase.endBefore(endBeforeDoc));
+    queryParts.push(useTail ? window.firebase.firestoreLimitToLast(resolvedWindowCount) : window.firebase.limit(resolvedWindowCount));
+    const q = window.firebase.firestoreQuery(
+        window.firebase.collection(window.firebase.db, 'consultations'),
+        ...queryParts
+    );
+    const snapshot = await window.firebase.getDocs(q);
+    const rawSnapDocs = Array.isArray(snapshot.docs) ? snapshot.docs : [];
+    const rawDocs = rawSnapDocs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+    const pageItemCount = pageNumber === totalPages && (totalItems % pageSize) !== 0 ? (totalItems % pageSize) : pageSize;
+    const actualPageSize = Math.min(pageItemCount, rawDocs.length);
+    const startIndex = useTail ? 0 : Math.max(0, rawDocs.length - actualPageSize);
+    const endIndex = startIndex + actualPageSize;
+    const pageSnapDocs = rawSnapDocs.slice(startIndex, endIndex);
+    const pageDocs = sortMedicalRecordPageDocsDesc(rawDocs.slice(startIndex, endIndex));
+    cacheMedicalRecordPageWindow(pageNumber, pageDocs, pageSnapDocs);
+    return pageDocs;
+}
+
 async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
     try {
         await waitForFirebaseDb();
@@ -26782,13 +26932,49 @@ async function fetchMedicalRecordPageOptimized(page = 1, pageSize = 10) {
         if (!totalPages) {
             return await fetchMedicalRecordPage(page, pageSize);
         }
-        const distStart = page - 1;
-        const distEnd = totalPages - page;
-        if (distEnd < distStart) {
-            const ascIndex = distEnd + 1;
-            return await fetchMedicalRecordPageAsc(ascIndex, pageSize);
+        if (medicalRecordPageCache[page]) {
+            return medicalRecordPageCache[page];
         }
-        return await fetchMedicalRecordPage(page, pageSize);
+        const candidates = [];
+        candidates.push({ type: 'start', distance: page, startAfterDoc: null, endBeforeDoc: null, useTail: false, windowCount: Math.min(totalItems, page * pageSize) });
+        candidates.push({ type: 'end', distance: totalPages - page + 1, startAfterDoc: null, endBeforeDoc: null, useTail: true, windowCount: Math.max(1, totalItems - ((page - 1) * pageSize)) });
+        Object.keys(medicalRecordPageLastDocs).forEach((key) => {
+            const cachedPage = Number(key);
+            if (cachedPage < page && medicalRecordPageLastDocs[cachedPage]) {
+                candidates.push({
+                    type: 'forward',
+                    distance: page - cachedPage,
+                    startAfterDoc: medicalRecordPageLastDocs[cachedPage],
+                    endBeforeDoc: null,
+                    useTail: false,
+                    windowCount: (page - cachedPage) * pageSize
+                });
+            }
+        });
+        Object.keys(medicalRecordPageFirstDocs).forEach((key) => {
+            const cachedPage = Number(key);
+            if (cachedPage > page && medicalRecordPageFirstDocs[cachedPage]) {
+                candidates.push({
+                    type: 'backward',
+                    distance: cachedPage - page,
+                    startAfterDoc: null,
+                    endBeforeDoc: medicalRecordPageFirstDocs[cachedPage],
+                    useTail: true,
+                    windowCount: (cachedPage - page) * pageSize
+                });
+            }
+        });
+        candidates.sort((a, b) => a.distance - b.distance);
+        const best = candidates[0];
+        return await fetchMedicalRecordPageWindowDirect({
+            pageNumber: page,
+            pageSize,
+            totalItems,
+            startAfterDoc: best.startAfterDoc,
+            endBeforeDoc: best.endBeforeDoc,
+            useTail: best.useTail,
+            windowCount: best.windowCount
+        });
     } catch (_e) {
         return await fetchMedicalRecordPage(page, pageSize);
     }
@@ -27387,6 +27573,8 @@ async function deleteMedicalRecord(recordId) {
         // 重新計算總數並清除頁面快取
         medicalRecordPageCache = {};
         medicalRecordPageCursors = {};
+        medicalRecordPageFirstDocs = {};
+        medicalRecordPageLastDocs = {};
         medicalRecordSearchCache = {};
         try {
             const countRes = await getConsultationsCount();
