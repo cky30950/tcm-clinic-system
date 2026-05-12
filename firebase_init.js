@@ -13,10 +13,8 @@ import {
   where,
   orderBy,
   limit,
-  limitToLast,
   getCountFromServer,
   startAfter,
-  endBefore,
   getDoc,
   
   initializeFirestore,
@@ -98,9 +96,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         where,
         orderBy,
         limit,
-        firestoreLimitToLast: limitToLast,
         startAfter,   
-        endBefore,
         getDoc,       
         getCountFromServer,
         
