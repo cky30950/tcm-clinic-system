@@ -14476,6 +14476,10 @@ async function editMedicalRecordByConsultationId(consultationId) {
             if (consultationHistoryModal) {
                 consultationHistoryModal.classList.add('hidden');
             }
+            const medicalRecordDetailModal = document.getElementById('medicalRecordDetailModal');
+            if (medicalRecordDetailModal) {
+                medicalRecordDetailModal.classList.add('hidden');
+            }
         } catch (_e) {}
         try {
             if (typeof showSection === 'function') {
