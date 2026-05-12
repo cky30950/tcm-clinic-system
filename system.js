@@ -1586,6 +1586,61 @@ const consultationHistoryPager = {
             return { success: false, indices: [] };
         }
     },
+    async loadAdjacentRecord(patientId, currentIndex, direction) {
+        const pid = String(patientId || '');
+        const fromIndex = Number(currentIndex);
+        const step = Number(direction);
+        if (!pid || !Number.isFinite(fromIndex) || ![ -1, 1 ].includes(step)) {
+            return false;
+        }
+        const stateResult = await this.ensurePatientState(pid, false);
+        if (!stateResult.success || !stateResult.state) {
+            return false;
+        }
+        const state = stateResult.state;
+        const targetIndex = fromIndex + step;
+        if (targetIndex < 0 || targetIndex >= state.totalCount) {
+            return false;
+        }
+        if (state.recordsByIndex[targetIndex]) {
+            return true;
+        }
+        if (!state.recordsByIndex[fromIndex]) {
+            const currentLoaded = await this.ensureLoadedAtIndex(pid, fromIndex);
+            if (!currentLoaded) return false;
+        }
+        const currentRecord = state.recordsByIndex[fromIndex];
+        const currentDate = parseConsultationDate(currentRecord && (currentRecord.date || currentRecord.createdAt || currentRecord.updatedAt));
+        if (!currentDate || isNaN(currentDate.getTime())) {
+            return false;
+        }
+        try {
+            await waitForFirebaseDb();
+            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+            const queryParts = [
+                window.firebase.where('patientId', '==', pid)
+            ];
+            if (step < 0) {
+                queryParts.push(window.firebase.where('date', '<', currentDate));
+                queryParts.push(window.firebase.orderBy('date', 'desc'));
+            } else {
+                queryParts.push(window.firebase.where('date', '>', currentDate));
+                queryParts.push(window.firebase.orderBy('date', 'asc'));
+            }
+            queryParts.push(window.firebase.limit(1));
+            const q = window.firebase.firestoreQuery(colRef, ...queryParts);
+            const snap = await window.firebase.getDocs(q);
+            if (!snap || !snap.docs || snap.docs.length === 0) {
+                return false;
+            }
+            const docSnap = snap.docs[0];
+            state.recordsByIndex[targetIndex] = { id: docSnap.id, ...docSnap.data() };
+            return true;
+        } catch (error) {
+            console.warn('讀取相鄰病歷失敗，改用既有補讀模式:', error);
+            return false;
+        }
+    },
     setContextData(contextKey, patientId, list) {
         const ctx = this.contexts[contextKey];
         if (!ctx) return;
@@ -1655,7 +1710,10 @@ const consultationHistoryPager = {
         if (newPage < 0 || newPage >= list.length) return false;
         const patientId = ctx.getPatientId();
         if (!patientId) return false;
-        const loaded = await this.ensureLoadedAtIndex(patientId, newPage);
+        let loaded = await this.loadAdjacentRecord(patientId, oldPage, direction);
+        if (!loaded) {
+            loaded = await this.ensureLoadedAtIndex(patientId, newPage);
+        }
         if (!loaded) return false;
         const latestState = this.getCachedPatientState(patientId);
         if (latestState && Array.isArray(latestState.recordsByIndex)) {
