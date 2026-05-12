@@ -1164,10 +1164,13 @@ const consultationHistoryPager = {
             recordsByIndex: [],
             descPageCache: {},
             descPageCursors: {},
+            ascPageCache: {},
+            ascPageCursors: {},
             allLoaded: false,
             mode: 'paged',
             dateIndexMap: {},
-            dateIndexReady: false
+            dateIndexReady: false,
+            monthDateIndexCache: {}
         };
     },
     dateToKey(dateObj) {
@@ -1294,6 +1297,48 @@ const consultationHistoryPager = {
             return await this.loadFullModeFallback(pid);
         }
     },
+    async fetchAscPage(patientId, ascPageNumber) {
+        const pid = String(patientId || '');
+        const pageNum = Number(ascPageNumber) || 1;
+        const state = this.getCachedPatientState(pid);
+        if (!state || pageNum < 1) return { success: false };
+        if (state.mode === 'full') return { success: true };
+        if (Object.prototype.hasOwnProperty.call(state.ascPageCache, pageNum)) return { success: true };
+        try {
+            await waitForFirebaseDb();
+            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+            for (let i = 1; i <= pageNum; i++) {
+                if (Object.prototype.hasOwnProperty.call(state.ascPageCache, i)) continue;
+                const queryParts = [
+                    window.firebase.where('patientId', '==', pid),
+                    window.firebase.orderBy('date', 'asc'),
+                    window.firebase.limit(1)
+                ];
+                if (i > 1 && state.ascPageCursors[i - 1]) {
+                    queryParts.push(window.firebase.startAfter(state.ascPageCursors[i - 1]));
+                }
+                const q = window.firebase.firestoreQuery(colRef, ...queryParts);
+                const snapshot = await window.firebase.getDocs(q);
+                const docs = [];
+                snapshot.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
+                if (docs.length === 0) {
+                    state.ascPageCache[i] = null;
+                    continue;
+                }
+                const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+                state.ascPageCursors[i] = lastDoc;
+                state.ascPageCache[i] = docs[0];
+                const uiIndex = i - 1;
+                if (uiIndex >= 0 && uiIndex < state.totalCount) {
+                    state.recordsByIndex[uiIndex] = docs[0];
+                }
+            }
+            return { success: true };
+        } catch (error) {
+            console.warn('病歷升序讀取失敗，改用全量讀取模式:', error);
+            return await this.loadFullModeFallback(pid);
+        }
+    },
     async ensureLoadedAtIndex(patientId, index) {
         const pid = String(patientId || '');
         const targetIndex = Number(index);
@@ -1303,9 +1348,92 @@ const consultationHistoryPager = {
         if (targetIndex < 0 || targetIndex >= state.totalCount) return false;
         if (state.recordsByIndex[targetIndex]) return true;
         if (state.mode === 'full') return !!state.recordsByIndex[targetIndex];
-        const descPageNumber = state.totalCount - targetIndex;
-        const pageResult = await this.fetchDescPage(pid, descPageNumber);
+        const distanceFromOldest = targetIndex;
+        const distanceFromNewest = Math.max(0, state.totalCount - 1 - targetIndex);
+        let pageResult;
+        if (distanceFromOldest < distanceFromNewest) {
+            const ascPageNumber = targetIndex + 1;
+            pageResult = await this.fetchAscPage(pid, ascPageNumber);
+        } else {
+            const descPageNumber = state.totalCount - targetIndex;
+            pageResult = await this.fetchDescPage(pid, descPageNumber);
+        }
         return !!(pageResult && pageResult.success && state.recordsByIndex[targetIndex]);
+    },
+    async ensureMonthDateIndex(patientId, year, month) {
+        const pid = String(patientId || '');
+        if (!pid) return false;
+        const targetYear = Number(year);
+        const targetMonth = Number(month);
+        if (!Number.isFinite(targetYear) || !Number.isFinite(targetMonth)) return false;
+        const stateResult = await this.ensurePatientState(pid, false);
+        if (!stateResult.success || !stateResult.state) return false;
+        const state = stateResult.state;
+        if (state.mode === 'full') {
+            this.rebuildDateIndexFromState(state);
+            const monthKey = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+            const monthMap = {};
+            Object.entries(state.dateIndexMap || {}).forEach(([dateKey, indices]) => {
+                if (String(dateKey).slice(0, 7) === monthKey) {
+                    monthMap[dateKey] = Array.isArray(indices) ? indices.slice() : [];
+                }
+            });
+            state.monthDateIndexCache[monthKey] = monthMap;
+            return true;
+        }
+        const monthKey = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+        if (state.monthDateIndexCache && state.monthDateIndexCache[monthKey]) {
+            return true;
+        }
+        try {
+            await waitForFirebaseDb();
+            const monthStart = new Date(targetYear, targetMonth, 1);
+            const nextMonthStart = new Date(targetYear, targetMonth + 1, 1);
+            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+            const countQuery = window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.where('patientId', '==', pid),
+                window.firebase.where('date', '<', monthStart)
+            );
+            const countSnap = await window.firebase.getCountFromServer(countQuery);
+            let ascOffset = Number(countSnap && countSnap.data && countSnap.data().count) || 0;
+            const monthQuery = window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.where('patientId', '==', pid),
+                window.firebase.where('date', '>=', monthStart),
+                window.firebase.where('date', '<', nextMonthStart),
+                window.firebase.orderBy('date', 'asc')
+            );
+            const monthSnap = await window.firebase.getDocs(monthQuery);
+            const monthMap = {};
+            monthSnap.forEach((docSnap) => {
+                const rec = { id: docSnap.id, ...docSnap.data() };
+                const key = this.getRecordDateKey(rec);
+                if (key) {
+                    if (!Array.isArray(monthMap[key])) {
+                        monthMap[key] = [];
+                    }
+                    monthMap[key].push(ascOffset);
+                }
+                ascOffset += 1;
+            });
+            state.monthDateIndexCache[monthKey] = monthMap;
+            return true;
+        } catch (error) {
+            console.warn('建立病歷月份索引失敗，改用全量讀取模式:', error);
+            const fallback = await this.loadFullModeFallback(pid);
+            if (!fallback.success || !fallback.state) return false;
+            const fallbackState = fallback.state;
+            this.rebuildDateIndexFromState(fallbackState);
+            const monthMap = {};
+            Object.entries(fallbackState.dateIndexMap || {}).forEach(([dateKey, indices]) => {
+                if (String(dateKey).slice(0, 7) === monthKey) {
+                    monthMap[dateKey] = Array.isArray(indices) ? indices.slice() : [];
+                }
+            });
+            fallbackState.monthDateIndexCache[monthKey] = monthMap;
+            return true;
+        }
     },
     async ensureDateIndex(patientId) {
         const pid = String(patientId || '');
@@ -1372,6 +1500,12 @@ const consultationHistoryPager = {
         const state = this.getCachedPatientState(patientId);
         return (state && state.dateIndexMap) ? state.dateIndexMap : {};
     },
+    getMonthDateIndexMap(patientId, year, month) {
+        const state = this.getCachedPatientState(patientId);
+        if (!state || !state.monthDateIndexCache) return {};
+        const monthKey = `${Number(year)}-${String(Number(month) + 1).padStart(2, '0')}`;
+        return state.monthDateIndexCache[monthKey] || {};
+    },
     setContextData(contextKey, patientId, list) {
         const ctx = this.contexts[contextKey];
         if (!ctx) return;
@@ -1418,6 +1552,9 @@ const consultationHistoryPager = {
             state.recordsByIndex = sorted.slice();
             state.descPageCache = {};
             state.descPageCursors = {};
+            state.ascPageCache = {};
+            state.ascPageCursors = {};
+            state.monthDateIndexCache = {};
             this.rebuildDateIndexFromState(state);
         }
         const contexts = ['patient', 'consultation'];
@@ -1461,6 +1598,8 @@ const consultationHistoryPager = {
 
 let patientPagesCache = {};
 let patientPageCursors = {};
+let patientAscPagesCache = {};
+let patientAscPageCursors = {};
 
 
 let patientsCountCache = null;
@@ -1723,7 +1862,7 @@ async function fetchDataWithCache(cache, fetchFunc, forceRefresh = false) {
 async function fetchPatients(forceRefresh = false, pageNumber = null) {
     
     if (pageNumber !== null && typeof pageNumber === 'number') {
-        return await fetchPatientsPage(pageNumber, forceRefresh);
+        return await fetchPatientsPageOptimized(pageNumber, forceRefresh);
     }
     
     
@@ -1801,6 +1940,8 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
     if (forceRefresh) {
         patientPagesCache = {};
         patientPageCursors = {};
+        patientAscPagesCache = {};
+        patientAscPageCursors = {};
     }
     
     if (!forceRefresh && patientPagesCache[pageNumber]) {
@@ -1855,6 +1996,94 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
         console.error('分頁讀取病人資料失敗:', error);
         return [];
     }
+}
+
+async function fetchPatientsPageAsc(ascPageNumber = 1, forceRefresh = false) {
+    if (ascPageNumber < 1) ascPageNumber = 1;
+    if (forceRefresh) {
+        patientPagesCache = {};
+        patientPageCursors = {};
+        patientAscPagesCache = {};
+        patientAscPageCursors = {};
+    }
+    if (!forceRefresh && patientAscPagesCache[ascPageNumber]) {
+        return patientAscPagesCache[ascPageNumber];
+    }
+    if (!forceRefresh && ascPageNumber > 1) {
+        const prevPage = ascPageNumber - 1;
+        if (!patientAscPageCursors[prevPage] || !patientAscPagesCache[prevPage]) {
+            for (let i = 1; i < ascPageNumber; i++) {
+                if (!patientAscPagesCache[i]) {
+                    await fetchPatientsPageAsc(i, forceRefresh);
+                }
+            }
+        }
+    }
+    await waitForFirebaseDb();
+    try {
+        const pageSize = paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage
+            ? paginationSettings.patientList.itemsPerPage
+            : 10;
+        let q = window.firebase.firestoreQuery(
+            window.firebase.collection(window.firebase.db, 'patients'),
+            window.firebase.orderBy('patientNumber', 'asc'),
+            window.firebase.limit(pageSize)
+        );
+        if (ascPageNumber > 1) {
+            const prevCursor = patientAscPageCursors[ascPageNumber - 1];
+            if (prevCursor) {
+                q = window.firebase.firestoreQuery(q, window.firebase.startAfter(prevCursor));
+            }
+        }
+        const snapshot = await window.firebase.getDocs(q);
+        const docs = [];
+        snapshot.forEach((doc) => {
+            docs.push({ id: doc.id, ...doc.data() });
+        });
+        if (docs.length > 0) {
+            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+            patientAscPageCursors[ascPageNumber] = lastDoc;
+        }
+        docs.sort(comparePatientsByNumberDesc);
+        patientAscPagesCache[ascPageNumber] = docs;
+        return docs;
+    } catch (error) {
+        console.error('升序分頁讀取病人資料失敗:', error);
+        return [];
+    }
+}
+
+function comparePatientsByNumberDesc(a, b) {
+    const numA = (() => {
+        const pn = a && a.patientNumber ? String(a.patientNumber) : '';
+        const match = pn.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 0;
+    })();
+    const numB = (() => {
+        const pn = b && b.patientNumber ? String(b.patientNumber) : '';
+        const match = pn.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 0;
+    })();
+    return numB - numA;
+}
+
+async function fetchPatientsPageOptimized(pageNumber = 1, forceRefresh = false, knownTotalItems = null) {
+    const pageSize = paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage
+        ? paginationSettings.patientList.itemsPerPage
+        : 10;
+    const totalItems = typeof knownTotalItems === 'number'
+        ? knownTotalItems
+        : await getPatientsCount(forceRefresh);
+    const totalPages = totalItems > 0 ? Math.ceil(totalItems / pageSize) : 1;
+    if (pageNumber < 1) pageNumber = 1;
+    if (pageNumber > totalPages) pageNumber = totalPages;
+    const distanceFromStart = pageNumber - 1;
+    const distanceFromEnd = totalPages - pageNumber;
+    if (distanceFromEnd < distanceFromStart) {
+        const ascPageNumber = distanceFromEnd + 1;
+        return await fetchPatientsPageAsc(ascPageNumber, forceRefresh);
+    }
+    return await fetchPatientsPage(pageNumber, forceRefresh);
 }
 
 
@@ -2812,6 +3041,8 @@ async function attachPatientListListener() {
                 patientCache = null;
                 patientPagesCache = {};
                 patientPageCursors = {};
+                patientAscPagesCache = {};
+                patientAscPageCursors = {};
                 patientsCountCache = null;
                 try {
                     
@@ -5926,6 +6157,12 @@ async function savePatient() {
         if (typeof patientPageCursors === 'object') {
             patientPageCursors = {};
         }
+        if (typeof patientAscPagesCache === 'object') {
+            patientAscPagesCache = {};
+        }
+        if (typeof patientAscPageCursors === 'object') {
+            patientAscPageCursors = {};
+        }
         
         patientsCountCache = null;
 
@@ -6000,19 +6237,7 @@ async function loadPatientListFromFirebase() {
             
             
             filteredPatients = filteredPatients.slice();
-            filteredPatients.sort((a, b) => {
-                const numA = (() => {
-                    const pn = a && a.patientNumber ? String(a.patientNumber) : '';
-                    const match = pn.match(/\d+/);
-                    return match ? parseInt(match[0], 10) : 0;
-                })();
-                const numB = (() => {
-                    const pn = b && b.patientNumber ? String(b.patientNumber) : '';
-                    const match = pn.match(/\d+/);
-                    return match ? parseInt(match[0], 10) : 0;
-                })();
-                return numB - numA;
-            });
+            filteredPatients.sort(comparePatientsByNumberDesc);
             patientListFiltered = filteredPatients;
             renderPatientListTable(false);
         } else {
@@ -6020,9 +6245,9 @@ async function loadPatientListFromFirebase() {
             
             const currentPage = (paginationSettings && paginationSettings.patientList && paginationSettings.patientList.currentPage) || 1;
             
-            const pageItems = await fetchPatientsPage(currentPage);
-            
             const totalCount = await getPatientsCount();
+            
+            const pageItems = await fetchPatientsPageOptimized(currentPage, false, totalCount);
             
             renderPatientListPage(pageItems, totalCount, currentPage);
         }
@@ -6074,19 +6299,7 @@ function renderPatientListTable(pageChange = false) {
     
     
     if (Array.isArray(patientListFiltered) && patientListFiltered.length > 1) {
-        patientListFiltered.sort((a, b) => {
-            const numA = (() => {
-                const pn = a && a.patientNumber ? String(a.patientNumber) : '';
-                const match = pn.match(/\d+/);
-                return match ? parseInt(match[0], 10) : 0;
-            })();
-            const numB = (() => {
-                const pn = b && b.patientNumber ? String(b.patientNumber) : '';
-                const match = pn.match(/\d+/);
-                return match ? parseInt(match[0], 10) : 0;
-            })();
-            return numB - numA;
-        });
+        patientListFiltered.sort(comparePatientsByNumberDesc);
     }
     const totalItems = patientListFiltered.length;
     const itemsPerPage = paginationSettings.patientList.itemsPerPage;
@@ -6209,19 +6422,7 @@ function renderPatientListPage(pageItems, totalItems, currentPage) {
     
     let sortedPageItems;
     if (Array.isArray(pageItems) && pageItems.length > 1) {
-        sortedPageItems = pageItems.slice().sort((a, b) => {
-            const numA = (() => {
-                const pn = a && a.patientNumber ? String(a.patientNumber) : '';
-                const match = pn.match(/\d+/);
-                return match ? parseInt(match[0], 10) : 0;
-            })();
-            const numB = (() => {
-                const pn = b && b.patientNumber ? String(b.patientNumber) : '';
-                const match = pn.match(/\d+/);
-                return match ? parseInt(match[0], 10) : 0;
-            })();
-            return numB - numA;
-        });
+        sortedPageItems = pageItems.slice().sort(comparePatientsByNumberDesc);
     } else {
         sortedPageItems = pageItems;
     }
@@ -6383,6 +6584,12 @@ async function deletePatient(id) {
                 }
                 if (typeof patientPageCursors === 'object') {
                     patientPageCursors = {};
+                }
+                if (typeof patientAscPagesCache === 'object') {
+                    patientAscPagesCache = {};
+                }
+                if (typeof patientAscPageCursors === 'object') {
+                    patientAscPageCursors = {};
                 }
                 patientsCountCache = null;
             
@@ -10618,10 +10825,10 @@ async function saveConsultation() {
             if (!st || !st.open) return '';
             const patientId = getHistoryCalendarContextPatientId(contextKey);
             if (!patientId) return '';
-            const dateMap = consultationHistoryPager.getDateIndexMap(patientId) || {};
             const year = Number(st.year);
             const month = Number(st.month);
             if (!Number.isFinite(year) || !Number.isFinite(month)) return '';
+            const dateMap = consultationHistoryPager.getMonthDateIndexMap(patientId, year, month) || {};
             const firstDay = new Date(year, month, 1);
             const startWeekday = firstDay.getDay();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -10686,7 +10893,9 @@ async function saveConsultation() {
                 }
                 const patientId = getHistoryCalendarContextPatientId(contextKey);
                 if (!patientId) return;
-                const ok = await consultationHistoryPager.ensureDateIndex(patientId);
+                const year = Number(st.year);
+                const month = Number(st.month);
+                const ok = await consultationHistoryPager.ensureMonthDateIndex(patientId, year, month);
                 if (!ok) {
                     showToast('無法建立病歷日曆索引', 'error');
                     return;
@@ -10697,13 +10906,17 @@ async function saveConsultation() {
                 if (btn) clearButtonLoading(btn);
             }
         }
-        function changeHistoryCalendarMonth(contextKey, delta) {
+        async function changeHistoryCalendarMonth(contextKey, delta) {
             const st = historyCalendarState[contextKey];
             if (!st) return;
             const d = new Date(st.year, st.month + delta, 1);
             st.year = d.getFullYear();
             st.month = d.getMonth();
             st.selectedDateKey = null;
+            const patientId = getHistoryCalendarContextPatientId(contextKey);
+            if (patientId) {
+                await consultationHistoryPager.ensureMonthDateIndex(patientId, st.year, st.month);
+            }
             renderHistoryCalendar(contextKey);
         }
         function jumpToHistoryCalendarIndex(contextKey, patientId, targetIndex) {
@@ -10723,11 +10936,12 @@ async function saveConsultation() {
             try {
                 const patientId = getHistoryCalendarContextPatientId(contextKey);
                 if (!patientId) return;
-                let dateIndices = consultationHistoryPager.getDateIndices(patientId, dateKey);
+                const st = historyCalendarState[contextKey];
+                let dateIndices = consultationHistoryPager.getMonthDateIndexMap(patientId, st.year, st.month)[dateKey];
                 if (!Array.isArray(dateIndices) || dateIndices.length === 0) {
-                    const indexed = await consultationHistoryPager.ensureDateIndex(patientId);
+                    const indexed = await consultationHistoryPager.ensureMonthDateIndex(patientId, st.year, st.month);
                     if (!indexed) return;
-                    dateIndices = consultationHistoryPager.getDateIndices(patientId, dateKey);
+                    dateIndices = consultationHistoryPager.getMonthDateIndexMap(patientId, st.year, st.month)[dateKey];
                 }
                 if (!Array.isArray(dateIndices) || dateIndices.length === 0) return;
                 if (dateIndices.length > 1) {
@@ -21800,46 +22014,11 @@ async function importClinicBackup(data) {
         }
         // 更新病人總數快取
         patientsCountCache = Array.isArray(patientCache) ? patientCache.length : 0;
-        // 重新產生病人分頁快取，使 fetchPatientsPage() 可以直接從快取取得資料
+        // 清空病人分頁快取，讓後續依使用者所在頁面再即時讀取，避免一次預切所有頁資料
         patientPagesCache = {};
         patientPageCursors = {};
-        // 取得每頁顯示數量
-        const perPage = (paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage)
-            ? paginationSettings.patientList.itemsPerPage
-            : 10;
-        if (Array.isArray(patientCache)) {
-            // 先依 createdAt 由新至舊排序，模擬 Firestore 預設排序
-            const sortedPatients = patientCache.slice().sort((a, b) => {
-                let dateA = 0;
-                let dateB = 0;
-                if (a && a.createdAt) {
-                    if (a.createdAt.seconds !== undefined) {
-                        dateA = a.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(a.createdAt);
-                        dateA = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                    }
-                }
-                if (b && b.createdAt) {
-                    if (b.createdAt.seconds !== undefined) {
-                        dateB = b.createdAt.seconds * 1000;
-                    } else {
-                        const d = new Date(b.createdAt);
-                        dateB = d instanceof Date && !isNaN(d) ? d.getTime() : 0;
-                    }
-                }
-                return dateB - dateA;
-            });
-            // 依每頁大小切分分頁快取
-            for (let i = 0; i < sortedPatients.length; i += perPage) {
-                const pageNum = Math.floor(i / perPage) + 1;
-                patientPagesCache[pageNum] = sortedPatients.slice(i, i + perPage);
-            }
-            // 若未產生任何頁面快取（例如無資料），確保至少有第一頁空陣列，避免 fetchPatientsPage 讀取 Firestore
-            if (!patientPagesCache[1]) {
-                patientPagesCache[1] = [];
-            }
-        }
+        patientAscPagesCache = {};
+        patientAscPageCursors = {};
         // 重新計算中藥庫使用次數（若有相關函式）
         if (typeof computeGlobalUsageCounts === 'function') {
             try { await computeGlobalUsageCounts(); } catch (_e) {}
