@@ -2245,6 +2245,120 @@ async function getPatientsCount(forceRefresh = false) {
     }
 }
 
+function readArrayCacheFromLocalStorage(key) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+    } catch (_err) {
+        return null;
+    }
+}
+
+function getCompletePatientCacheSnapshot(totalCount) {
+    if (typeof totalCount !== 'number' || totalCount < 0) return null;
+    const candidates = [];
+    if (Array.isArray(patientCache)) {
+        candidates.push(patientCache);
+    }
+    if (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.patientsCache)) {
+        candidates.push(window.firebaseDataManager.patientsCache);
+    }
+    const localPatients = readArrayCacheFromLocalStorage('patients');
+    if (Array.isArray(localPatients)) {
+        candidates.push(localPatients);
+    }
+
+    for (const source of candidates) {
+        if (!Array.isArray(source) || source.length !== totalCount) continue;
+        const normalized = source.map(item => {
+            const cloned = { ...(item || {}) };
+            if (cloned.id !== undefined && cloned.id !== null) {
+                cloned.id = String(cloned.id);
+            }
+            return cloned;
+        });
+        normalized.sort(comparePatientsByNumberDesc);
+        patientCache = normalized.slice();
+        return normalized;
+    }
+
+    return null;
+}
+
+function getPatientPageFromCompleteCache(pageNumber, totalCount, pageSize) {
+    const fullList = getCompletePatientCacheSnapshot(totalCount);
+    if (!Array.isArray(fullList)) return null;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const safePage = Math.min(Math.max(pageNumber, 1), totalPages);
+    const startIndex = (safePage - 1) * pageSize;
+    const pageItems = fullList.slice(startIndex, startIndex + pageSize);
+    patientPagesCache[safePage] = pageItems.slice();
+    return {
+        pageItems,
+        currentPage: safePage,
+        totalItems: totalCount
+    };
+}
+
+function compareMedicalRecordsByDateDesc(a, b) {
+    const dateA = parseConsultationDate((a && (a.date || a.createdAt || a.updatedAt)) || null);
+    const dateB = parseConsultationDate((b && (b.date || b.createdAt || b.updatedAt)) || null);
+    const timeA = dateA && !isNaN(dateA.getTime()) ? dateA.getTime() : 0;
+    const timeB = dateB && !isNaN(dateB.getTime()) ? dateB.getTime() : 0;
+    return timeB - timeA;
+}
+
+function getCompleteMedicalRecordCacheSnapshot(totalCount) {
+    if (typeof totalCount !== 'number' || totalCount < 0) return null;
+    const candidates = [];
+    if (Array.isArray(consultationCache)) {
+        candidates.push(consultationCache);
+    }
+    if (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.consultationsCache)) {
+        candidates.push(window.firebaseDataManager.consultationsCache);
+    }
+    const localConsultations = readArrayCacheFromLocalStorage('consultations');
+    if (Array.isArray(localConsultations)) {
+        candidates.push(localConsultations);
+    }
+
+    for (const source of candidates) {
+        if (!Array.isArray(source) || source.length !== totalCount) continue;
+        const normalized = source.map(item => {
+            const cloned = { ...(item || {}) };
+            if (cloned.id !== undefined && cloned.id !== null) {
+                cloned.id = String(cloned.id);
+            }
+            if (cloned.patientId !== undefined && cloned.patientId !== null) {
+                cloned.patientId = String(cloned.patientId);
+            }
+            return cloned;
+        });
+        normalized.sort(compareMedicalRecordsByDateDesc);
+        consultationCache = normalized.slice();
+        return normalized;
+    }
+
+    return null;
+}
+
+function getMedicalRecordPageFromCompleteCache(pageNumber, totalCount, pageSize) {
+    const fullList = getCompleteMedicalRecordCacheSnapshot(totalCount);
+    if (!Array.isArray(fullList)) return null;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const safePage = Math.min(Math.max(pageNumber, 1), totalPages);
+    const startIndex = (safePage - 1) * pageSize;
+    const pageItems = fullList.slice(startIndex, startIndex + pageSize);
+    medicalRecordPageCache[safePage] = pageItems.slice();
+    return {
+        pageItems,
+        currentPage: safePage,
+        totalItems: totalCount
+    };
+}
+
 
 async function fetchConsultations(forceRefresh = false) {
     consultationCache = await fetchDataWithCache(
@@ -6365,7 +6479,16 @@ async function loadPatientListFromFirebase() {
             const currentPage = (paginationSettings && paginationSettings.patientList && paginationSettings.patientList.currentPage) || 1;
             
             const totalCount = await getPatientsCount();
-            
+            const cachedPage = getPatientPageFromCompleteCache(
+                currentPage,
+                totalCount,
+                (paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage) || 10
+            );
+            if (cachedPage) {
+                renderPatientListPage(cachedPage.pageItems, cachedPage.totalItems, cachedPage.currentPage);
+                return;
+            }
+
             const pageItems = await fetchPatientsPageOptimized(currentPage, false, totalCount);
             
             renderPatientListPage(pageItems, totalCount, currentPage);
@@ -26326,9 +26449,16 @@ async function displayMedicalRecords(pageChange = false) {
         medicalRecords = Array.isArray(res) ? res : [];
         filtered = medicalRecords;
     } else {
-    const pageData = await fetchMedicalRecordPageOptimized(currentPage, itemsPerPage);
-        medicalRecords = Array.isArray(pageData) ? pageData : [];
-        filtered = medicalRecords;
+        const cachedPage = getMedicalRecordPageFromCompleteCache(currentPage, medicalRecordTotalCount, itemsPerPage);
+        if (cachedPage) {
+            currentPage = cachedPage.currentPage;
+            medicalRecords = Array.isArray(cachedPage.pageItems) ? cachedPage.pageItems : [];
+            filtered = medicalRecords;
+        } else {
+            const pageData = await fetchMedicalRecordPageOptimized(currentPage, itemsPerPage);
+            medicalRecords = Array.isArray(pageData) ? pageData : [];
+            filtered = medicalRecords;
+        }
     }
     if (term) {
         filtered = medicalRecords.filter(rec => {
