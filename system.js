@@ -1738,6 +1738,8 @@ let patientPagesCache = {};
 let patientPageCursors = {};
 let patientAscPagesCache = {};
 let patientAscPageCursors = {};
+let patientPageBoundaryTokens = {};
+let patientDirectPaginationSupport = null;
 
 
 let patientsCountCache = null;
@@ -2076,10 +2078,7 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
     if (pageNumber < 1) pageNumber = 1;
     
     if (forceRefresh) {
-        patientPagesCache = {};
-        patientPageCursors = {};
-        patientAscPagesCache = {};
-        patientAscPageCursors = {};
+        resetPatientPaginationCaches();
     }
     
     if (!forceRefresh && patientPagesCache[pageNumber]) {
@@ -2139,10 +2138,7 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
 async function fetchPatientsPageAsc(ascPageNumber = 1, forceRefresh = false) {
     if (ascPageNumber < 1) ascPageNumber = 1;
     if (forceRefresh) {
-        patientPagesCache = {};
-        patientPageCursors = {};
-        patientAscPagesCache = {};
-        patientAscPageCursors = {};
+        resetPatientPaginationCaches();
     }
     if (!forceRefresh && patientAscPagesCache[ascPageNumber]) {
         return patientAscPagesCache[ascPageNumber];
@@ -2205,6 +2201,135 @@ function comparePatientsByNumberDesc(a, b) {
     return numB - numA;
 }
 
+function resetPatientPaginationCaches() {
+    patientPagesCache = {};
+    patientPageCursors = {};
+    patientAscPagesCache = {};
+    patientAscPageCursors = {};
+    patientPageBoundaryTokens = {};
+    patientDirectPaginationSupport = null;
+}
+
+function getPatientPaginationCacheKey(pageNumber, pageSize) {
+    return `${pageSize}:${pageNumber}`;
+}
+
+function formatPatientNumberToken(value) {
+    const normalized = Math.max(0, Math.min(999999, Math.floor(Number(value) || 0)));
+    return `P${String(normalized).padStart(6, '0')}`;
+}
+
+async function countPatientsGreaterThanToken(token) {
+    await waitForFirebaseDb();
+    const colRef = window.firebase.collection(window.firebase.db, 'patients');
+    const q = window.firebase.firestoreQuery(
+        colRef,
+        window.firebase.where('patientNumber', '>', String(token || ''))
+    );
+    const countSnap = await window.firebase.getCountFromServer(q);
+    return Number(countSnap && countSnap.data && countSnap.data().count) || 0;
+}
+
+async function canUseDirectPatientPagination(forceRefresh = false, knownTotalItems = null) {
+    if (!forceRefresh && typeof patientDirectPaginationSupport === 'boolean') {
+        return patientDirectPaginationSupport;
+    }
+    try {
+        await waitForFirebaseDb();
+        const totalItems = typeof knownTotalItems === 'number'
+            ? knownTotalItems
+            : await getPatientsCount(forceRefresh);
+        if (totalItems === 0) {
+            patientDirectPaginationSupport = true;
+            return true;
+        }
+        const colRef = window.firebase.collection(window.firebase.db, 'patients');
+        const q = window.firebase.firestoreQuery(
+            colRef,
+            window.firebase.where('patientNumber', '>=', 'P000000')
+        );
+        const countSnap = await window.firebase.getCountFromServer(q);
+        const numberedCount = Number(countSnap && countSnap.data && countSnap.data().count) || 0;
+        patientDirectPaginationSupport = numberedCount === totalItems;
+        return patientDirectPaginationSupport;
+    } catch (_err) {
+        patientDirectPaginationSupport = false;
+        return false;
+    }
+}
+
+async function resolvePatientPageBoundaryToken(pageNumber, pageSize, totalItems) {
+    const targetSkip = Math.max(0, (Number(pageNumber) - 1) * Number(pageSize));
+    if (targetSkip <= 0 || totalItems <= 0) return null;
+    const cacheKey = getPatientPaginationCacheKey(pageNumber, pageSize);
+    if (patientPageBoundaryTokens[cacheKey]) {
+        return patientPageBoundaryTokens[cacheKey];
+    }
+    let low = 0;
+    let high = 999999;
+    let best = null;
+    while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        const token = formatPatientNumberToken(mid);
+        const countGreater = await countPatientsGreaterThanToken(token);
+        if (countGreater >= targetSkip) {
+            best = token;
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+    if (!best) return null;
+    patientPageBoundaryTokens[cacheKey] = best;
+    return best;
+}
+
+async function fetchPatientsPageDirect(pageNumber = 1, forceRefresh = false, knownTotalItems = null) {
+    if (pageNumber < 1) pageNumber = 1;
+    if (forceRefresh) {
+        resetPatientPaginationCaches();
+    }
+    const pageSize = paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage
+        ? paginationSettings.patientList.itemsPerPage
+        : 10;
+    const cacheKey = getPatientPaginationCacheKey(pageNumber, pageSize);
+    if (!forceRefresh && patientPagesCache[cacheKey]) {
+        return patientPagesCache[cacheKey];
+    }
+    const totalItems = typeof knownTotalItems === 'number'
+        ? knownTotalItems
+        : await getPatientsCount(forceRefresh);
+    const totalPages = totalItems > 0 ? Math.ceil(totalItems / pageSize) : 1;
+    if (pageNumber > totalPages) pageNumber = totalPages;
+    await waitForFirebaseDb();
+    const colRef = window.firebase.collection(window.firebase.db, 'patients');
+    let q;
+    if (pageNumber <= 1) {
+        q = window.firebase.firestoreQuery(
+            colRef,
+            window.firebase.orderBy('patientNumber', 'desc'),
+            window.firebase.limit(pageSize)
+        );
+    } else {
+        const boundaryToken = await resolvePatientPageBoundaryToken(pageNumber, pageSize, totalItems);
+        if (!boundaryToken) return [];
+        q = window.firebase.firestoreQuery(
+            colRef,
+            window.firebase.where('patientNumber', '<=', boundaryToken),
+            window.firebase.orderBy('patientNumber', 'desc'),
+            window.firebase.limit(pageSize)
+        );
+    }
+    const snapshot = await window.firebase.getDocs(q);
+    const docs = [];
+    snapshot.forEach((doc) => {
+        docs.push({ id: doc.id, ...doc.data() });
+    });
+    docs.sort(comparePatientsByNumberDesc);
+    patientPagesCache[cacheKey] = docs;
+    return docs;
+}
+
 async function fetchPatientsPageOptimized(pageNumber = 1, forceRefresh = false, knownTotalItems = null) {
     const pageSize = paginationSettings && paginationSettings.patientList && paginationSettings.patientList.itemsPerPage
         ? paginationSettings.patientList.itemsPerPage
@@ -2215,6 +2340,12 @@ async function fetchPatientsPageOptimized(pageNumber = 1, forceRefresh = false, 
     const totalPages = totalItems > 0 ? Math.ceil(totalItems / pageSize) : 1;
     if (pageNumber < 1) pageNumber = 1;
     if (pageNumber > totalPages) pageNumber = totalPages;
+    try {
+        const canDirectFetch = await canUseDirectPatientPagination(forceRefresh, totalItems);
+        if (canDirectFetch) {
+            return await fetchPatientsPageDirect(pageNumber, forceRefresh, totalItems);
+        }
+    } catch (_directErr) {}
     const distanceFromStart = pageNumber - 1;
     const distanceFromEnd = totalPages - pageNumber;
     if (distanceFromEnd < distanceFromStart) {
@@ -3158,10 +3289,7 @@ async function attachPatientListListener() {
             try {
                 
                 patientCache = null;
-                patientPagesCache = {};
-                patientPageCursors = {};
-                patientAscPagesCache = {};
-                patientAscPageCursors = {};
+                resetPatientPaginationCaches();
                 patientsCountCache = null;
                 try {
                     
@@ -6442,15 +6570,11 @@ async function savePatient() {
         
         if (typeof patientPagesCache === 'object') {
             patientPagesCache = {};
-        }
-        if (typeof patientPageCursors === 'object') {
             patientPageCursors = {};
-        }
-        if (typeof patientAscPagesCache === 'object') {
             patientAscPagesCache = {};
-        }
-        if (typeof patientAscPageCursors === 'object') {
             patientAscPageCursors = {};
+            patientPageBoundaryTokens = {};
+            patientDirectPaginationSupport = null;
         }
         
         patientsCountCache = null;
@@ -6869,15 +6993,11 @@ async function deletePatient(id) {
                 patientCache = null;
                 if (typeof patientPagesCache === 'object') {
                     patientPagesCache = {};
-                }
-                if (typeof patientPageCursors === 'object') {
                     patientPageCursors = {};
-                }
-                if (typeof patientAscPagesCache === 'object') {
                     patientAscPagesCache = {};
-                }
-                if (typeof patientAscPageCursors === 'object') {
                     patientAscPageCursors = {};
+                    patientPageBoundaryTokens = {};
+                    patientDirectPaginationSupport = null;
                 }
                 patientsCountCache = null;
             
@@ -22471,6 +22591,8 @@ async function importClinicBackup(data) {
         patientPageCursors = {};
         patientAscPagesCache = {};
         patientAscPageCursors = {};
+        patientPageBoundaryTokens = {};
+        patientDirectPaginationSupport = null;
         // 重新計算中藥庫使用次數（若有相關函式）
         if (typeof computeGlobalUsageCounts === 'function') {
             try { await computeGlobalUsageCounts(); } catch (_e) {}
@@ -26443,6 +26565,9 @@ let medicalRecordPageCache = {};   // { pageNumber: Array<consultation> }
 let medicalRecordSearchCache = {}; // { term: Array<consultation> }
 let medicalRecordAscPageCursors = {}; // { ascIndex: lastDocSnapshot }
 let medicalRecordAscPageCache = {};   // { ascIndex: Array<consultation> }
+let medicalRecordPageBoundaryTokens = {}; // { pageSize:pageNumber: MR token }
+let medicalRecordDirectPaginationSupport = null;
+let medicalRecordNumberRangeCache = null;
 let medicalRecordListListenerAttached = false;
 let medicalRecordListUnsubscribe = null;
 let medicalRecordRefreshInFlight = null;
@@ -26453,6 +26578,9 @@ function resetMedicalRecordManagementCaches() {
     medicalRecordSearchCache = {};
     medicalRecordAscPageCursors = {};
     medicalRecordAscPageCache = {};
+    medicalRecordPageBoundaryTokens = {};
+    medicalRecordDirectPaginationSupport = null;
+    medicalRecordNumberRangeCache = null;
 }
 
 function updateMedicalRecordPatientLookup(patients) {
@@ -26793,6 +26921,9 @@ function initializeMedicalRecordPagination() {
     medicalRecordPageCache = {};
     medicalRecordAscPageCursors = {};
     medicalRecordAscPageCache = {};
+    medicalRecordPageBoundaryTokens = {};
+    medicalRecordDirectPaginationSupport = null;
+    medicalRecordNumberRangeCache = null;
 }
 
 async function getConsultationsCount() {
@@ -27057,10 +27188,169 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
     }
 }
 
+function getMedicalRecordPaginationCacheKey(pageNumber, pageSize) {
+    return `${pageSize}:${pageNumber}`;
+}
+
+function parseMedicalRecordNumberToken(value) {
+    const match = String(value || '').trim().match(/^MR(\d{14})-(\d{4})$/);
+    if (!match) return null;
+    try {
+        return BigInt(`${match[1]}${match[2]}`);
+    } catch (_err) {
+        return null;
+    }
+}
+
+function formatMedicalRecordNumberToken(value) {
+    try {
+        const raw = BigInt(value).toString().padStart(18, '0');
+        return `MR${raw.slice(0, 14)}-${raw.slice(14)}`;
+    } catch (_err) {
+        return null;
+    }
+}
+
+async function countMedicalRecordsGreaterThanToken(token) {
+    await waitForFirebaseDb();
+    const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+    const q = window.firebase.firestoreQuery(
+        colRef,
+        window.firebase.where('medicalRecordNumber', '>', String(token || ''))
+    );
+    const countSnap = await window.firebase.getCountFromServer(q);
+    return Number(countSnap && countSnap.data && countSnap.data().count) || 0;
+}
+
+async function canUseDirectMedicalRecordPagination(forceRefresh = false, knownTotalItems = null) {
+    if (!forceRefresh && typeof medicalRecordDirectPaginationSupport === 'boolean' && medicalRecordNumberRangeCache) {
+        return medicalRecordDirectPaginationSupport;
+    }
+    try {
+        await waitForFirebaseDb();
+        const totalItems = typeof knownTotalItems === 'number'
+            ? knownTotalItems
+            : (typeof medicalRecordTotalCount === 'number' ? medicalRecordTotalCount : (await getConsultationsCount()).count);
+        if (totalItems === 0) {
+            medicalRecordDirectPaginationSupport = true;
+            medicalRecordNumberRangeCache = null;
+            return true;
+        }
+        const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+        const countQuery = window.firebase.firestoreQuery(
+            colRef,
+            window.firebase.where('medicalRecordNumber', '>=', 'MR00000000000000-0000')
+        );
+        const countSnap = await window.firebase.getCountFromServer(countQuery);
+        const numberedCount = Number(countSnap && countSnap.data && countSnap.data().count) || 0;
+        if (numberedCount !== totalItems) {
+            medicalRecordDirectPaginationSupport = false;
+            medicalRecordNumberRangeCache = null;
+            return false;
+        }
+        const [newestSnap, oldestSnap] = await Promise.all([
+            window.firebase.getDocs(window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.orderBy('medicalRecordNumber', 'desc'),
+                window.firebase.limit(1)
+            )),
+            window.firebase.getDocs(window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.orderBy('medicalRecordNumber', 'asc'),
+                window.firebase.limit(1)
+            ))
+        ]);
+        const newestDoc = newestSnap && newestSnap.docs && newestSnap.docs[0] ? newestSnap.docs[0].data() : null;
+        const oldestDoc = oldestSnap && oldestSnap.docs && oldestSnap.docs[0] ? oldestSnap.docs[0].data() : null;
+        const maxToken = parseMedicalRecordNumberToken(newestDoc && newestDoc.medicalRecordNumber);
+        const minToken = parseMedicalRecordNumberToken(oldestDoc && oldestDoc.medicalRecordNumber);
+        medicalRecordDirectPaginationSupport = !!(maxToken !== null && minToken !== null);
+        medicalRecordNumberRangeCache = medicalRecordDirectPaginationSupport ? { min: minToken, max: maxToken } : null;
+        return medicalRecordDirectPaginationSupport;
+    } catch (_err) {
+        medicalRecordDirectPaginationSupport = false;
+        medicalRecordNumberRangeCache = null;
+        return false;
+    }
+}
+
+async function resolveMedicalRecordPageBoundaryToken(pageNumber, pageSize, totalItems) {
+    const targetSkip = Math.max(0, (Number(pageNumber) - 1) * Number(pageSize));
+    if (targetSkip <= 0 || totalItems <= 0) return null;
+    const cacheKey = getMedicalRecordPaginationCacheKey(pageNumber, pageSize);
+    if (medicalRecordPageBoundaryTokens[cacheKey]) {
+        return medicalRecordPageBoundaryTokens[cacheKey];
+    }
+    if (!medicalRecordNumberRangeCache || medicalRecordNumberRangeCache.min === null || medicalRecordNumberRangeCache.max === null) {
+        return null;
+    }
+    let low = medicalRecordNumberRangeCache.min;
+    let high = medicalRecordNumberRangeCache.max;
+    let best = null;
+    while (low <= high) {
+        const mid = (low + high) / 2n;
+        const token = formatMedicalRecordNumberToken(mid);
+        if (!token) break;
+        const countGreater = await countMedicalRecordsGreaterThanToken(token);
+        if (countGreater >= targetSkip) {
+            best = token;
+            low = mid + 1n;
+        } else {
+            high = mid - 1n;
+        }
+    }
+    if (!best) return null;
+    medicalRecordPageBoundaryTokens[cacheKey] = best;
+    return best;
+}
+
+async function fetchMedicalRecordPageDirect(page = 1, pageSize = 10) {
+    if (page < 1) page = 1;
+    await waitForFirebaseDb();
+    const cacheKey = getMedicalRecordPaginationCacheKey(page, pageSize);
+    if (medicalRecordPageCache[cacheKey]) {
+        return medicalRecordPageCache[cacheKey];
+    }
+    const totalItems = typeof medicalRecordTotalCount === 'number'
+        ? medicalRecordTotalCount
+        : (await getConsultationsCount()).count;
+    const totalPages = totalItems > 0 ? Math.ceil(totalItems / pageSize) : 1;
+    if (page > totalPages) page = totalPages;
+    const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+    let q;
+    if (page <= 1) {
+        q = window.firebase.firestoreQuery(
+            colRef,
+            window.firebase.orderBy('medicalRecordNumber', 'desc'),
+            window.firebase.limit(pageSize)
+        );
+    } else {
+        const boundaryToken = await resolveMedicalRecordPageBoundaryToken(page, pageSize, totalItems);
+        if (!boundaryToken) return [];
+        q = window.firebase.firestoreQuery(
+            colRef,
+            window.firebase.where('medicalRecordNumber', '<=', boundaryToken),
+            window.firebase.orderBy('medicalRecordNumber', 'desc'),
+            window.firebase.limit(pageSize)
+        );
+    }
+    const snapshot = await window.firebase.getDocs(q);
+    const rows = [];
+    snapshot.forEach(d => rows.push({ id: d.id, ...d.data() }));
+    medicalRecordPageCache[cacheKey] = rows;
+    return rows;
+}
+
 async function fetchMedicalRecordPageOptimized(page = 1, pageSize = 10) {
     try {
         const totalItems = typeof medicalRecordTotalCount === 'number' ? medicalRecordTotalCount : null;
         const totalPages = totalItems ? Math.ceil(totalItems / pageSize) : null;
+        try {
+            const canDirectFetch = await canUseDirectMedicalRecordPagination(false, totalItems);
+            if (canDirectFetch) {
+                return await fetchMedicalRecordPageDirect(page, pageSize);
+            }
+        } catch (_directErr) {}
         if (!totalPages) {
             return await fetchMedicalRecordPage(page, pageSize);
         }
