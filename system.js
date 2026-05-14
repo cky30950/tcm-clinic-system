@@ -7172,7 +7172,57 @@ function canCurrentUserEditMedicalRecordEntry(consultation = null, appointment =
     return !!(isAdminUser || isDoctorOwner);
 }
 
+function isMedicalRecordInCurrentClinic(consultation = null, appointment = null) {
+    const activeClinicId = (() => {
+        try {
+            return localStorage.getItem('currentClinicId') || (typeof currentClinicId !== 'undefined' ? currentClinicId : '');
+        } catch (_e) {
+            return (typeof currentClinicId !== 'undefined' ? currentClinicId : '') || '';
+        }
+    })();
+
+    if (!activeClinicId || activeClinicId === 'local-default') {
+        return true;
+    }
+
+    const recordClinicId = consultation && consultation.clinicId
+        ? String(consultation.clinicId)
+        : (appointment && appointment.clinicId ? String(appointment.clinicId) : '');
+    if (recordClinicId) {
+        return String(recordClinicId) === String(activeClinicId);
+    }
+
+    const recordClinicName = (
+        (consultation && consultation.clinicName) ||
+        (appointment && appointment.clinicName) ||
+        ''
+    ).trim().toLowerCase();
+    if (!recordClinicName) {
+        return true;
+    }
+
+    const currentClinic = Array.isArray(clinicsList)
+        ? clinicsList.find(c => c && String(c.id) === String(activeClinicId))
+        : null;
+    const currentClinicNames = [
+        currentClinic && currentClinic.chineseName ? String(currentClinic.chineseName).trim().toLowerCase() : '',
+        currentClinic && currentClinic.englishName ? String(currentClinic.englishName).trim().toLowerCase() : '',
+        clinicSettings && clinicSettings.chineseName ? String(clinicSettings.chineseName).trim().toLowerCase() : '',
+        clinicSettings && clinicSettings.englishName ? String(clinicSettings.englishName).trim().toLowerCase() : ''
+    ].filter(Boolean);
+
+    return currentClinicNames.includes(recordClinicName);
+}
+
 function getMedicalRecordEditWindowStatus(consultation = null, appointment = null) {
+    if (!isMedicalRecordInCurrentClinic(consultation, appointment)) {
+        return {
+            allowed: false,
+            deadline: null,
+            reason: '不可在不同診所修改病歷'
+        };
+    }
+
     const baseRaw = (consultation && (consultation.date || consultation.createdAt)) ||
         (appointment && (appointment.completedAt || appointment.appointmentTime)) ||
         (consultation && consultation.updatedAt) ||
