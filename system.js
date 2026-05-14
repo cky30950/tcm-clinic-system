@@ -27349,7 +27349,7 @@ function viewMedicalRecord(recordId) {
                 detailHtml += `<div class="flex flex-wrap items-center gap-2">${row}</div>`;
             })();
         if (rec.updatedAt) {
-            detailHtml += '<span class="text-xs text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-100">已修改</span>';
+            detailHtml += '<span class="self-start inline-flex text-xs text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-100">已修改</span>';
         }
         detailHtml += '</div>'; // 關閉左側信息（兩行）
         // 右側按鈕
