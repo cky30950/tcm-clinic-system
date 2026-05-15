@@ -6166,18 +6166,34 @@ async function logout() {
                 title: '疾病史',
                 noteId: 'patientMedicalConditionsNotes',
                 options: [
-                    { key: 'chronicDiseases', label: '慢性疾病' },
-                    { key: 'infectiousDiseases', label: '傳染病史' },
-                    { key: 'majorIllnesses', label: '重大病史' }
+                    { key: 'hypertension', label: '高血壓' },
+                    { key: 'diabetes', label: '糖尿病' },
+                    { key: 'hyperlipidemia', label: '高脂血症' },
+                    { key: 'asthma', label: '哮喘' },
+                    { key: 'chronicKidneyDisease', label: '慢性腎病' },
+                    { key: 'hepatitis', label: '肝炎' },
+                    { key: 'tuberculosis', label: '肺結核' },
+                    { key: 'cancer', label: '癌症' },
+                    { key: 'stroke', label: '中風' },
+                    { key: 'myocardialInfarction', label: '心肌梗塞' }
                 ]
             },
             {
                 key: 'surgicalHistory',
-                title: '手術與住院史',
+                title: '手術與外傷史',
                 noteId: 'patientSurgicalHistoryNotes',
                 options: [
-                    { key: 'surgeries', label: '手術項目' },
-                    { key: 'hospitalizations', label: '住院記錄' }
+                    { key: 'pacemakerImplantation', label: '心律調節器植入手術' },
+                    { key: 'cardiacStentProcedure', label: '心臟金屬支架手術' },
+                    { key: 'polypectomy', label: '息肉切除術' },
+                    { key: 'jointReplacement', label: '人工關節手術' },
+                    { key: 'endoscopicHemostasis', label: '內視鏡止血術' },
+                    { key: 'dialysisFistulaAngioplasty', label: '洗腎瘻管成形術' },
+                    { key: 'endovascularThrombectomy', label: '血管內取栓術' },
+                    { key: 'vascularEmbolization', label: '血管栓塞術' },
+                    { key: 'fracture', label: '骨折' },
+                    { key: 'headTrauma', label: '頭部創傷' },
+                    { key: 'trafficAccident', label: '車禍' }
                 ]
             },
             {
@@ -6185,8 +6201,13 @@ async function logout() {
                 title: '過敏史',
                 noteId: 'patientAllergyNotes',
                 options: [
-                    { key: 'drugAllergies', label: '藥物過敏' },
-                    { key: 'foodEnvironmentalAllergies', label: '食物及環境過敏' }
+                    { key: 'g6pdDeficiency', label: '蠶豆症（G6PD 缺乏症）' },
+                    { key: 'seafoodAllergy', label: '海鮮過敏' },
+                    { key: 'nutsAllergy', label: '堅果' },
+                    { key: 'eggProteinAllergy', label: '蛋白質' },
+                    { key: 'glutenAllergy', label: '麩質' },
+                    { key: 'soyAllergy', label: '大豆' },
+                    { key: 'mangoAllergy', label: '芒果' }
                 ]
             },
             {
@@ -6194,30 +6215,47 @@ async function logout() {
                 title: '用藥史',
                 noteId: 'patientMedicationNotes',
                 options: [
-                    { key: 'longTermMedications', label: '長期服用的藥物' },
-                    { key: 'supplementsOtc', label: '非處方藥與補充劑' }
-                ]
-            },
-            {
-                key: 'traumaHistory',
-                title: '外傷史',
-                noteId: 'patientTraumaHistoryNotes',
-                options: [
-                    { key: 'majorTrauma', label: '重大外傷' }
+                    { key: 'antihypertensives', label: '降血壓藥' },
+                    { key: 'lipidLoweringAgents', label: '降血脂藥' },
+                    { key: 'antidiabeticAgents', label: '降血糖藥' },
+                    { key: 'anticoagulants', label: '抗凝血藥物' },
+                    { key: 'asthmaCopdMedications', label: '氣喘/COPD 藥物' },
+                    { key: 'antihistamines', label: '抗組織胺藥物' },
+                    { key: 'antidepressantsAnxiolytics', label: '抗抑鬱/焦慮藥' },
+                    { key: 'sleepingPills', label: '安眠藥' },
+                    { key: 'antiepileptics', label: '抗癲癇藥' },
+                    { key: 'parkinsonMedications', label: '帕金森氏症藥物' },
+                    { key: 'thyroidMedications', label: '甲狀腺藥物' },
+                    { key: 'osteoporosisMedications', label: '骨質疏鬆藥' },
+                    { key: 'goutPreventiveMedications', label: '痛風預防藥' },
+                    { key: 'gastricMedications', label: '胃藥' },
+                    { key: 'hormonalMedications', label: '荷爾蒙類藥物' },
+                    { key: 'immunosuppressants', label: '免疫抑制劑藥物' },
+                    { key: 'vitamins', label: '維他命' },
+                    { key: 'healthSupplements', label: '健康食品' },
+                    { key: 'chinesePatentMedicines', label: '中成藥' }
                 ]
             }
         ];
 
         function normalizePatientMedicalProfile(profile) {
             const normalized = {};
+            const legacyTraumaSection = profile && typeof profile === 'object' ? profile.traumaHistory : null;
             PATIENT_MEDICAL_PROFILE_SECTIONS.forEach(section => {
                 const sourceSection = profile && typeof profile === 'object' ? profile[section.key] : null;
                 const selected = Array.isArray(sourceSection && sourceSection.selected)
                     ? sourceSection.selected.map(item => String(item))
                     : [];
+                let note = sourceSection && typeof sourceSection.note === 'string' ? sourceSection.note.trim() : '';
+                if (section.key === 'surgicalHistory' && legacyTraumaSection && typeof legacyTraumaSection === 'object') {
+                    const legacyTraumaNote = typeof legacyTraumaSection.note === 'string' ? legacyTraumaSection.note.trim() : '';
+                    if (legacyTraumaNote) {
+                        note = note ? `${note}；外傷備註：${legacyTraumaNote}` : `外傷備註：${legacyTraumaNote}`;
+                    }
+                }
                 normalized[section.key] = {
                     selected: selected.filter(key => section.options.some(option => option.key === key)),
-                    note: sourceSection && typeof sourceSection.note === 'string' ? sourceSection.note.trim() : ''
+                    note
                 };
             });
             return normalized;
