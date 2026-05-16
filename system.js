@@ -6542,21 +6542,49 @@ async function savePatient() {
         
 async function generatePatientNumberFromFirebase() {
     try {
-        
-        const result = await safeGetPatients(true);
-        if (!result.success) {
-            return 'P000001'; 
+        await waitForFirebaseDb();
+        const formatPatientNumber = (num) => `P${String(num).padStart(6, '0')}`;
+        const parsePatientNumber = (value) => {
+            const raw = String(value || '').trim().toUpperCase();
+            if (!raw.startsWith('P')) return 0;
+            const parsed = parseInt(raw.slice(1), 10);
+            return Number.isFinite(parsed) ? parsed : 0;
+        };
+        const counterRef = window.firebase.doc(window.firebase.db, 'systemCounters', 'patientNumber');
+        let bootstrapMax = 0;
+        try {
+            const latestQuery = window.firebase.firestoreQuery(
+                window.firebase.collection(window.firebase.db, 'patients'),
+                window.firebase.orderBy('patientNumber', 'desc'),
+                window.firebase.limit(1)
+            );
+            const latestSnap = await window.firebase.getDocs(latestQuery);
+            latestSnap.forEach((docSnap) => {
+                const data = docSnap.data ? docSnap.data() : {};
+                bootstrapMax = Math.max(bootstrapMax, parsePatientNumber(data && data.patientNumber));
+            });
+        } catch (queryErr) {
+            console.warn('讀取最新病人編號失敗，回退至全量掃描初始化 counter:', queryErr);
+            const result = await safeGetPatients(true);
+            if (result && result.success && Array.isArray(result.data)) {
+                bootstrapMax = result.data.reduce((max, patient) => {
+                    return Math.max(max, parsePatientNumber(patient && patient.patientNumber));
+                }, 0);
+            }
         }
-
-        const existingNumbers = result.data
-            .map(p => p.patientNumber)
-            .filter(num => num && num.startsWith('P'))
-            .map(num => parseInt(num.substring(1)))
-            .filter(num => !isNaN(num));
-
-        const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-        const newNumber = maxNumber + 1;
-        return `P${newNumber.toString().padStart(6, '0')}`;
+        const nextNumber = await window.firebase.runTransaction(window.firebase.db, async (transaction) => {
+            const counterSnap = await transaction.get(counterRef);
+            const currentNumber = counterSnap && counterSnap.exists()
+                ? Math.max(bootstrapMax, Number(counterSnap.data().current) || 0)
+                : bootstrapMax;
+            const newNumber = currentNumber + 1;
+            transaction.set(counterRef, {
+                current: newNumber,
+                updatedAt: new Date()
+            }, { merge: true });
+            return newNumber;
+        });
+        return formatPatientNumber(nextNumber);
     } catch (error) {
         console.error('生成病人編號失敗:', error);
         return `P${Date.now().toString().slice(-6)}`; 
@@ -26477,11 +26505,29 @@ function resetMedicalRecordManagementCaches() {
 }
 
 function updateMedicalRecordPatientLookup(patients) {
-    medicalRecordPatients = {};
     (Array.isArray(patients) ? patients : []).forEach(p => {
         const name = p.name || p.patientName || p.fullName || p.displayName || p.chineseName || p.englishName || '';
         medicalRecordPatients[String(p.id).trim()] = name;
     });
+}
+
+async function ensureMedicalRecordPatientLookupForRecords(records) {
+    const list = Array.isArray(records) ? records : [];
+    if (!list.length) return;
+    const missingIds = Array.from(new Set(
+        list
+            .map(rec => rec && rec.patientId !== undefined && rec.patientId !== null ? String(rec.patientId).trim() : '')
+            .filter(id => id && !medicalRecordPatients[id])
+    ));
+    if (!missingIds.length) return;
+    const loadedPatients = await Promise.all(missingIds.map(async (id) => {
+        try {
+            return await getPatientByIdWithRefresh(id);
+        } catch (_e) {
+            return null;
+        }
+    }));
+    updateMedicalRecordPatientLookup(loadedPatients.filter(Boolean));
 }
 
 async function refreshMedicalRecordManagementData(preservePage = true) {
@@ -26498,12 +26544,8 @@ async function refreshMedicalRecordManagementData(preservePage = true) {
         try {
             localStorage.removeItem('consultations');
         } catch (_lsErr) {}
-        const [countRes, patientsRes] = await Promise.all([
-            getConsultationsCount(),
-            safeGetPatients(true)
-        ]);
+        const countRes = await getConsultationsCount();
         medicalRecordTotalCount = (countRes && typeof countRes.count === 'number') ? countRes.count : 0;
-        updateMedicalRecordPatientLookup((patientsRes && patientsRes.success && Array.isArray(patientsRes.data)) ? patientsRes.data : []);
         await displayMedicalRecords(preservePage);
     })();
     try {
@@ -26585,12 +26627,8 @@ async function loadMedicalRecordManagement() {
             searchInput.addEventListener('input', listener);
             searchInput._medicalRecordListener = listener;
         }
-        const [countRes, patientsRes] = await Promise.all([
-            getConsultationsCount(),
-            safeGetPatients(true)
-        ]);
+        const countRes = await getConsultationsCount();
         medicalRecordTotalCount = (countRes && typeof countRes.count === 'number') ? countRes.count : 0;
-        updateMedicalRecordPatientLookup((patientsRes && patientsRes.success && Array.isArray(patientsRes.data)) ? patientsRes.data : []);
         await displayMedicalRecords(false);
     } catch (error) {
         console.error('初始化病歷管理時發生錯誤:', error);
@@ -26627,10 +26665,12 @@ async function displayMedicalRecords(pageChange = false) {
             if (Array.isArray(res)) medicalRecordSearchCache[term] = res;
         }
         medicalRecords = Array.isArray(res) ? res : [];
+        await ensureMedicalRecordPatientLookupForRecords(medicalRecords);
         filtered = medicalRecords;
     } else {
-    const pageData = await fetchMedicalRecordPageOptimized(currentPage, itemsPerPage);
+        const pageData = await fetchMedicalRecordPageOptimized(currentPage, itemsPerPage);
         medicalRecords = Array.isArray(pageData) ? pageData : [];
+        await ensureMedicalRecordPatientLookupForRecords(medicalRecords);
         filtered = medicalRecords;
     }
     if (term) {
