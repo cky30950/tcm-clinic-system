@@ -11477,7 +11477,8 @@ if (!patient) {
                 prescription: 'border-yellow-200 bg-yellow-50 text-yellow-700 shadow-sm hover:-translate-y-0.5 hover:border-yellow-300 hover:bg-yellow-100 hover:shadow-md',
                 attendance: 'border-sky-200 bg-sky-50 text-sky-700 shadow-sm hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-100 hover:shadow-md',
                 sickLeave: 'border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-100 hover:shadow-md',
-                load: 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md'
+                load: 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md',
+                delete: 'border-red-200 bg-red-50 text-red-700 shadow-sm hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:shadow-md'
             };
 
             return `${baseClasses} ${variantClasses[variant] || 'border-gray-200 bg-white text-gray-700 shadow-sm hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-md'}`;
@@ -26716,8 +26717,10 @@ async function displayMedicalRecords(pageChange = false) {
                 }
             }
             const canDeleteMedicalRecord = hasActionPermission('medicalRecordDelete');
+            const viewButtonClasses = `${getMedicalHistoryActionButtonClasses('load')} mr-2`;
+            const deleteButtonClasses = getMedicalHistoryActionButtonClasses('delete');
             const deleteButtonHtml = canDeleteMedicalRecord
-                ? `<button class="text-red-600 hover:underline" onclick='confirmDeleteMedicalRecord(${JSON.stringify(recordId)}, ${JSON.stringify(patientName)}, this)'>${window.escapeHtml(deleteLabel)}</button>`
+                ? `<button type="button" class="${deleteButtonClasses}" onclick='confirmDeleteMedicalRecord(${JSON.stringify(recordId)}, ${JSON.stringify(patientName)}, this)'>${window.escapeHtml(deleteLabel)}</button>`
                 : '';
             tbody.innerHTML += `
                 <tr>
@@ -26728,7 +26731,7 @@ async function displayMedicalRecords(pageChange = false) {
                     <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(doctorName)}</td>
                     <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(dateStr)}</td>
                     <td class="px-4 py-2 whitespace-nowrap">
-                        <button class="text-blue-600 hover:underline mr-2" onclick='viewMedicalRecord(${JSON.stringify(recordId)}, this)'>${window.escapeHtml(viewLabel)}</button>
+                        <button type="button" class="${viewButtonClasses}" onclick='viewMedicalRecord(${JSON.stringify(recordId)}, this)'>${window.escapeHtml(viewLabel)}</button>
                         ${deleteButtonHtml}
                     </td>
                 </tr>
