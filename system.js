@@ -2989,8 +2989,17 @@ function generateMedicalRecordNumber() {
                 button.dataset.originalAlignItems = button.style.alignItems || '';
                 button.dataset.originalJustifyContent = button.style.justifyContent || '';
             }
+            if (!button.dataset.loadingDisplay) {
+                let computedDisplay = '';
+                try {
+                    computedDisplay = window.getComputedStyle(button).display || '';
+                } catch (_e) {}
+                button.dataset.loadingDisplay = computedDisplay && computedDisplay.indexOf('inline') === 0
+                    ? 'inline-flex'
+                    : 'flex';
+            }
             
-            button.style.display = 'flex';
+            button.style.display = button.dataset.loadingDisplay || 'flex';
             button.style.alignItems = 'center';
             button.style.justifyContent = 'center';
             
@@ -3029,6 +3038,9 @@ function generateMedicalRecordNumber() {
             if (button.dataset.originalDisplay !== undefined) {
                 button.style.display = button.dataset.originalDisplay;
                 delete button.dataset.originalDisplay;
+            }
+            if (button.dataset.loadingDisplay !== undefined) {
+                delete button.dataset.loadingDisplay;
             }
             if (button.dataset.originalAlignItems !== undefined) {
                 button.style.alignItems = button.dataset.originalAlignItems;
