@@ -2984,34 +2984,21 @@ function generateMedicalRecordNumber() {
             
             
             
-            if (!button.dataset.originalDisplay) {
-                button.dataset.originalDisplay = button.style.display || '';
-                button.dataset.originalAlignItems = button.style.alignItems || '';
-                button.dataset.originalJustifyContent = button.style.justifyContent || '';
-            }
-            if (!button.dataset.loadingDisplay) {
-                let computedDisplay = '';
-                try {
-                    computedDisplay = window.getComputedStyle(button).display || '';
-                } catch (_e) {}
-                button.dataset.loadingDisplay = computedDisplay && computedDisplay.indexOf('inline') === 0
-                    ? 'inline-flex'
-                    : 'flex';
+            if (!button.dataset.originalPosition) {
+                button.dataset.originalPosition = button.style.position || '';
+                button.dataset.originalOverflow = button.style.overflow || '';
             }
             
-            button.style.display = button.dataset.loadingDisplay || 'flex';
-            button.style.alignItems = 'center';
-            button.style.justifyContent = 'center';
+            button.style.position = 'relative';
+            button.style.overflow = 'hidden';
             
-            
-            
-            
-            
-            
-            
-            
-            
-            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>`;
+            const originalHtml = button.dataset.originalHtml || button.innerHTML;
+            button.innerHTML = `
+                <span class="invisible pointer-events-none">${originalHtml}</span>
+                <span class="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
+                    <span class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></span>
+                </span>
+            `;
         }
 
         
@@ -3035,20 +3022,13 @@ function generateMedicalRecordNumber() {
                 delete button.dataset.originalHeight;
             }
             
-            if (button.dataset.originalDisplay !== undefined) {
-                button.style.display = button.dataset.originalDisplay;
-                delete button.dataset.originalDisplay;
+            if (button.dataset.originalPosition !== undefined) {
+                button.style.position = button.dataset.originalPosition;
+                delete button.dataset.originalPosition;
             }
-            if (button.dataset.loadingDisplay !== undefined) {
-                delete button.dataset.loadingDisplay;
-            }
-            if (button.dataset.originalAlignItems !== undefined) {
-                button.style.alignItems = button.dataset.originalAlignItems;
-                delete button.dataset.originalAlignItems;
-            }
-            if (button.dataset.originalJustifyContent !== undefined) {
-                button.style.justifyContent = button.dataset.originalJustifyContent;
-                delete button.dataset.originalJustifyContent;
+            if (button.dataset.originalOverflow !== undefined) {
+                button.style.overflow = button.dataset.originalOverflow;
+                delete button.dataset.originalOverflow;
             }
             
             button.disabled = false;
