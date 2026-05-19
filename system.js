@@ -7342,6 +7342,11 @@ function renderConsultationPatientInfo(patient, appointment) {
             historyContainer.style.display = 'none';
         }
     }
+
+    const editHistoryButton = document.getElementById('consultationEditHistoryButton');
+    if (editHistoryButton) {
+        editHistoryButton.dataset.patientId = patient.id ? String(patient.id) : '';
+    }
 }
 
 async function refreshConsultationPatientInfoIfNeeded(patientId) {
@@ -7357,22 +7362,33 @@ async function refreshConsultationPatientInfoIfNeeded(patientId) {
 }
 
 async function openConsultationMedicalHistoryEditor() {
-    if (!hasActionPermission('patientEdit')) {
-        showToast('權限不足，無法編輯病人資料', 'error');
+    try {
+        if (!hasActionPermission('patientEdit')) {
+            showToast('權限不足，無法編輯病人資料', 'error');
+            return;
+        }
+        const editHistoryButton = document.getElementById('consultationEditHistoryButton');
+        const buttonPatientId = editHistoryButton && editHistoryButton.dataset
+            ? String(editHistoryButton.dataset.patientId || '').trim()
+            : '';
+        const appointment = getCurrentConsultationAppointment();
+        const patientId = buttonPatientId || (appointment && appointment.patientId ? String(appointment.patientId) : '');
+        if (!patientId) {
+            showToast('找不到目前診症病人資料', 'error');
+            return;
+        }
+        const patient = await getPatientByIdWithRefresh(patientId);
+        if (!patient) {
+            showToast('找不到病人資料', 'error');
+            return;
+        }
+        await editPatient(patient.id);
+        setPatientFormDisplayMode('history-only', patient);
+    } catch (error) {
+        console.error('開啟既住史修改視窗失敗:', error);
+        showToast('開啟既住史修改視窗失敗', 'error');
         return;
     }
-    const appointment = getCurrentConsultationAppointment();
-    if (!appointment || !appointment.patientId) {
-        showToast('找不到目前診症病人資料', 'error');
-        return;
-    }
-    const patient = await getPatientByIdWithRefresh(appointment.patientId);
-    if (!patient) {
-        showToast('找不到病人資料', 'error');
-        return;
-    }
-    await editPatient(patient.id);
-    setPatientFormDisplayMode('history-only', patient);
 }
 
 function getConsultationDoctorUsername(consultation = null, appointment = null) {
@@ -26327,6 +26343,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+        const consultationEditHistoryBtn = document.getElementById('consultationEditHistoryButton');
+        if (consultationEditHistoryBtn && !consultationEditHistoryBtn.dataset.bound) {
+            consultationEditHistoryBtn.addEventListener('click', function () {
+                try {
+                    openConsultationMedicalHistoryEditor();
+                } catch (e) {
+                    console.error('開啟既住史修改視窗按鈕錯誤:', e);
+                }
+            });
+            consultationEditHistoryBtn.dataset.bound = 'true';
+        }
 
         /**
          * 一次性移除頁面上所有內嵌的 onclick/onchange 事件處理器，改以透過
@@ -30937,8 +30964,10 @@ async function deleteAcupointCombination(id) {
               document.getElementById('herbsContent').classList.remove('hidden');
             } else if (tabId === 'acupoints') {
               document.getElementById('acupointsContent').classList.remove('hidden');
+            } else if (tabId === 'consultationSettings') {
+              document.getElementById('consultationSettingsContent').classList.remove('hidden');
             }
-            const tabButtons = ['herbsTab', 'acupointsTab'];
+            const tabButtons = ['herbsTab', 'acupointsTab', 'consultationSettingsTab'];
             tabButtons.forEach(buttonId => {
               const button = document.getElementById(buttonId);
               if (buttonId === tabId + 'Tab') {
