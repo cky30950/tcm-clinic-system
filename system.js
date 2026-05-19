@@ -6368,6 +6368,59 @@ async function logout() {
         }
         
         
+        let patientFormDisplayMode = 'full';
+
+        function setPatientFormDisplayMode(mode = 'full', patient = null) {
+            patientFormDisplayMode = mode === 'history-only' ? 'history-only' : 'full';
+            const basicInfoSection = document.getElementById('patientBasicInfoSection');
+            const summaryBox = document.getElementById('patientHistoryEditorSummary');
+            const formTitleEl = document.getElementById('formTitle');
+            const saveButtonTextEl = document.getElementById('saveButtonText');
+
+            if (basicInfoSection) {
+                basicInfoSection.classList.toggle('hidden', patientFormDisplayMode === 'history-only');
+            }
+
+            if (summaryBox) {
+                if (patientFormDisplayMode === 'history-only' && patient) {
+                    const safePatientNumber = window.escapeHtml(patient.patientNumber || '未設定');
+                    const safeName = window.escapeHtml(patient.name || '未命名病人');
+                    const safeAge = window.escapeHtml(formatAge(patient.birthDate));
+                    const safeGender = window.escapeHtml(patient.gender || '未知');
+                    summaryBox.innerHTML = `
+                        <div class="font-semibold text-blue-700 mb-1">正在修改既住史</div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div><span class="font-medium">病人：</span>${safeName}</div>
+                            <div><span class="font-medium">病人編號：</span>${safePatientNumber}</div>
+                            <div><span class="font-medium">年齡：</span>${safeAge}</div>
+                            <div><span class="font-medium">性別：</span>${safeGender}</div>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-500">此視窗只修改既住史及過敏史，基本病人資料維持不變。</div>
+                    `;
+                    summaryBox.classList.remove('hidden');
+                } else {
+                    summaryBox.innerHTML = '';
+                    summaryBox.classList.add('hidden');
+                }
+            }
+
+            if (formTitleEl) {
+                if (patientFormDisplayMode === 'history-only') {
+                    formTitleEl.textContent = '修改既住史';
+                } else {
+                    formTitleEl.textContent = editingPatientId ? '編輯病人資料' : '新增病人資料';
+                }
+            }
+
+            if (saveButtonTextEl) {
+                if (patientFormDisplayMode === 'history-only') {
+                    saveButtonTextEl.textContent = '更新既住史';
+                } else {
+                    saveButtonTextEl.textContent = editingPatientId ? '更新' : '儲存';
+                }
+            }
+        }
+
         function updatePatientAge() {
             const birthDate = document.getElementById('patientBirthDate').value;
             const ageInput = document.getElementById('patientAge');
@@ -6386,14 +6439,14 @@ async function logout() {
                 return;
             }
             editingPatientId = null;
-            document.getElementById('formTitle').textContent = '新增病人資料';
-            document.getElementById('saveButtonText').textContent = '儲存';
+            setPatientFormDisplayMode('full');
             document.getElementById('addPatientModal').classList.remove('hidden');
             clearPatientForm();
         }
 
         function hideAddPatientForm() {
             document.getElementById('addPatientModal').classList.add('hidden');
+            setPatientFormDisplayMode('full');
             clearPatientForm();
             editingPatientId = null;
         }
@@ -6480,7 +6533,7 @@ async function savePatient() {
             
             const result = await window.firebaseDataManager.updatePatient(editingPatientId, patient);
             if (result.success) {
-                showToast('病人資料已成功更新！', 'success');
+                showToast(patientFormDisplayMode === 'history-only' ? '既住史已成功更新！' : '病人資料已成功更新！', 'success');
             } else {
                 showToast('更新失敗，請稍後再試', 'error');
                 return;
@@ -6522,6 +6575,11 @@ async function savePatient() {
 
         
         await loadPatientListFromFirebase();
+        if (editingPatientId) {
+            try {
+                await refreshConsultationPatientInfoIfNeeded(editingPatientId);
+            } catch (_refreshErr) {}
+        }
         hideAddPatientForm();
         updateStatistics();
 
@@ -6897,8 +6955,7 @@ async function editPatient(id) {
         }
 
         editingPatientId = id;
-        document.getElementById('formTitle').textContent = '編輯病人資料';
-        document.getElementById('saveButtonText').textContent = '更新';
+        setPatientFormDisplayMode('full');
         
         
         document.getElementById('patientName').value = patient.name || '';
@@ -7232,6 +7289,91 @@ async function viewPatient(id) {
         let selectedPatientForRegistration = null;
         let currentConsultingAppointmentId = null;
         let currentConsultationEditContext = null;
+
+function getCurrentConsultationAppointment() {
+    if (!Array.isArray(appointments) || currentConsultingAppointmentId === null || currentConsultingAppointmentId === undefined) {
+        return null;
+    }
+    return appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId)) || null;
+}
+
+function renderConsultationPatientInfo(patient, appointment) {
+    if (!patient) return;
+    const patientNameEl = document.getElementById('formPatientName');
+    if (patientNameEl) {
+        patientNameEl.textContent = `${patient.name} (${patient.patientNumber || '未設定'})`;
+    }
+
+    const appointmentTimeEl = document.getElementById('formAppointmentTime');
+    if (appointmentTimeEl && appointment && appointment.appointmentTime) {
+        appointmentTimeEl.textContent = new Date(appointment.appointmentTime).toLocaleString('zh-TW');
+    }
+
+    const ageEl = document.getElementById('formPatientAge');
+    if (ageEl) {
+        ageEl.textContent = formatAge(patient.birthDate);
+    }
+
+    const genderEl = document.getElementById('formPatientGender');
+    if (genderEl) {
+        genderEl.textContent = patient.gender || '未知';
+    }
+
+    const allergiesContainer = document.getElementById('allergiesContainer');
+    const allergiesEl = document.getElementById('formPatientAllergies');
+    if (allergiesContainer && allergiesEl) {
+        if (patient.allergies) {
+            allergiesEl.textContent = patient.allergies;
+            allergiesContainer.style.display = '';
+        } else {
+            allergiesEl.textContent = '';
+            allergiesContainer.style.display = 'none';
+        }
+    }
+
+    const historyContainer = document.getElementById('historyContainer');
+    const historyEl = document.getElementById('formPatientHistory');
+    if (historyContainer && historyEl) {
+        if (patient.history) {
+            historyEl.textContent = patient.history;
+            historyContainer.style.display = '';
+        } else {
+            historyEl.textContent = '';
+            historyContainer.style.display = 'none';
+        }
+    }
+}
+
+async function refreshConsultationPatientInfoIfNeeded(patientId) {
+    const appointment = getCurrentConsultationAppointment();
+    if (!appointment || String(appointment.patientId) !== String(patientId)) {
+        return;
+    }
+    const patient = await getPatientByIdWithRefresh(patientId);
+    if (!patient) {
+        return;
+    }
+    renderConsultationPatientInfo(patient, appointment);
+}
+
+async function openConsultationMedicalHistoryEditor() {
+    if (!hasActionPermission('patientEdit')) {
+        showToast('權限不足，無法編輯病人資料', 'error');
+        return;
+    }
+    const appointment = getCurrentConsultationAppointment();
+    if (!appointment || !appointment.patientId) {
+        showToast('找不到目前診症病人資料', 'error');
+        return;
+    }
+    const patient = await getPatientByIdWithRefresh(appointment.patientId);
+    if (!patient) {
+        showToast('找不到病人資料', 'error');
+        return;
+    }
+    await editPatient(patient.id);
+    setPatientFormDisplayMode('history-only', patient);
+}
 
 function getConsultationDoctorUsername(consultation = null, appointment = null) {
     if (appointment && appointment.appointmentDoctor) {
@@ -10092,44 +10234,7 @@ async function showConsultationForm(appointment) {
         }
         
         // 設置病人資訊
-        // 顯示病人姓名與編號
-        document.getElementById('formPatientName').textContent = `${patient.name} (${patient.patientNumber})`;
-        // 顯示掛號時間
-        document.getElementById('formAppointmentTime').textContent = new Date(appointment.appointmentTime).toLocaleString('zh-TW');
-        // 顯示病人年齡，若沒有出生日期則顯示「未知」
-        const ageEl = document.getElementById('formPatientAge');
-        if (ageEl) {
-            ageEl.textContent = formatAge(patient.birthDate);
-        }
-        // 顯示病人性別，若沒有資料則顯示「未知」
-        const genderEl = document.getElementById('formPatientGender');
-        if (genderEl) {
-            genderEl.textContent = patient.gender || '未知';
-        }
-        // 顯示過敏史，如果有資料則填入並顯示容器，否則隱藏容器
-        const allergiesContainer = document.getElementById('allergiesContainer');
-        const allergiesEl = document.getElementById('formPatientAllergies');
-        if (allergiesContainer && allergiesEl) {
-            if (patient.allergies) {
-                allergiesEl.textContent = patient.allergies;
-                allergiesContainer.style.display = '';
-            } else {
-                allergiesEl.textContent = '';
-                allergiesContainer.style.display = 'none';
-            }
-        }
-        // 顯示病史及備註，如果有資料則填入並顯示容器，否則隱藏容器
-        const historyContainer = document.getElementById('historyContainer');
-        const historyEl = document.getElementById('formPatientHistory');
-        if (historyContainer && historyEl) {
-            if (patient.history) {
-                historyEl.textContent = patient.history;
-                historyContainer.style.display = '';
-            } else {
-                historyEl.textContent = '';
-                historyContainer.style.display = 'none';
-            }
-        }
+        renderConsultationPatientInfo(patient, appointment);
         // 渲染病人療程/套餐資訊
         renderPatientPackages(patient.id);
         
@@ -27767,6 +27872,7 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   window.showAddFormulaForm = showAddFormulaForm;
   window.showAddHerbForm = showAddHerbForm;
   window.showAddPatientForm = showAddPatientForm;
+  window.openConsultationMedicalHistoryEditor = openConsultationMedicalHistoryEditor;
   window.showAddUserForm = showAddUserForm;
   window.showClinicSettingsModal = showClinicSettingsModal;
   window.onPermissionPositionChanged = onPermissionPositionChanged;
