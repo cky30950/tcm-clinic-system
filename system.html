@@ -2589,31 +2589,99 @@
 
             
             <div id="acupointsContent" class="personal-tab-content hidden">
-              <div class="mb-6 space-y-4">
-                <div class="flex gap-4 flex-wrap">
-                  <button class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors" onclick="addNewAcupointCombination()">
-                    + 新增穴位組合
-                  </button>
-                  <button class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors" onclick="showCategoryModal('acupoints')">
-                    + 管理分類
-                  </button>
+              <div class="grid xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-6 items-start">
+                <div>
+                  <div class="mb-6 space-y-4">
+                    <div class="flex gap-4 flex-wrap">
+                      <button class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors" onclick="addNewAcupointCombination()">
+                        + 新增穴位組合
+                      </button>
+                      <button class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors" onclick="showCategoryModal('acupoints')">
+                        + 管理分類
+                      </button>
+                    </div>
+                    <div class="flex gap-4 flex-wrap">
+                      
+                      <input id="acupointComboSearchInput" type="text" placeholder="搜尋穴位組合名稱..." class="px-4 py-2 border-2 border-blue-200 rounded-lg focus:border-blue-400 focus:outline-none flex-1 min-w-64">
+                      <select id="acupointComboCategoryFilter" class="px-4 py-2 border-2 border-blue-200 rounded-lg focus:border-blue-400 focus:outline-none">
+                        <option>全部分類</option>
+                        <option>頭面部</option>
+                        <option>胸腹部</option>
+                        <option>四肢部</option>
+                        <option>背腰部</option>
+                        <option>內科疾病</option>
+                        <option>婦科疾病</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="grid md:grid-cols-2 gap-6" id="acupointCombinationsContainer">
+                    
+                  </div>
                 </div>
-                <div class="flex gap-4 flex-wrap">
-                  
-                  <input id="acupointComboSearchInput" type="text" placeholder="搜尋穴位組合名稱..." class="px-4 py-2 border-2 border-blue-200 rounded-lg focus:border-blue-400 focus:outline-none flex-1 min-w-64">
-                  <select id="acupointComboCategoryFilter" class="px-4 py-2 border-2 border-blue-200 rounded-lg focus:border-blue-400 focus:outline-none">
-                    <option>全部分類</option>
-                    <option>頭面部</option>
-                    <option>胸腹部</option>
-                    <option>四肢部</option>
-                    <option>背腰部</option>
-                    <option>內科疾病</option>
-                    <option>婦科疾病</option>
-                  </select>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm xl:sticky xl:top-4">
+                  <div class="flex items-center justify-between gap-3 mb-4">
+                    <h3 class="text-xl font-bold text-slate-800 flex items-center">
+                      <span class="text-2xl mr-2">🩺</span>
+                      診症設定
+                    </h3>
+                    <span class="text-xs text-slate-500 bg-white border border-slate-200 rounded-full px-2 py-1">新增診症自動帶入</span>
+                  </div>
+                  <p class="text-sm text-slate-600 mb-5">設定開處方時常用的預設值，之後打開診症表單會自動填入。</p>
+
+                  <div class="space-y-4">
+                    <div class="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2" for="personalDefaultMedicationDays">預設天數</label>
+                        <input id="personalDefaultMedicationDays" type="number" min="1" max="30" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例：5">
+                      </div>
+                      <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2" for="personalDefaultMedicationFrequency">預設次數</label>
+                        <input id="personalDefaultMedicationFrequency" type="number" min="1" max="6" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例：2">
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-semibold text-slate-700 mb-2" for="personalDefaultFollowUpDays">預設複診時間</label>
+                      <div class="flex items-center gap-3">
+                        <input id="personalDefaultFollowUpDays" type="number" min="0" max="365" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例：7">
+                        <span class="text-sm text-slate-500 whitespace-nowrap">天後</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-semibold text-slate-700 mb-2" for="personalDefaultUsage">預設中藥服用方法</label>
+                      <textarea id="personalDefaultUsage" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例：溫水化開，飯後服"></textarea>
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-semibold text-slate-700 mb-2" for="personalDefaultTreatmentCourse">預設療程</label>
+                      <input id="personalDefaultTreatmentCourse" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例：一周">
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-semibold text-slate-700 mb-2" for="personalDefaultInstructions">預設醫囑及注意事項</label>
+                      <textarea id="personalDefaultInstructions" rows="4" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例：注意休息，飲食清淡"></textarea>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-200">
+                      <label class="block text-sm font-semibold text-slate-700 mb-2" for="personalBillingItemSearch">預設收費項目</label>
+                      <div class="relative">
+                        <input id="personalBillingItemSearch" type="text" placeholder="搜尋收費項目名稱..." class="w-full border border-slate-300 rounded-lg px-3 py-2 pr-9 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <button type="button" onclick="clearPersonalBillingSearch()" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-sm">×</button>
+                      </div>
+                      <div id="personalBillingItemSearchResults" class="hidden mt-3">
+                        <div id="personalBillingItemSearchList" class="space-y-2 max-h-56 overflow-y-auto"></div>
+                      </div>
+                      <div class="mt-4 border border-slate-200 rounded-lg bg-white p-3">
+                        <div class="text-sm font-medium text-slate-700 mb-3">已選預設收費項目</div>
+                        <div id="personalDefaultBillingItems" class="space-y-2">
+                          <div class="text-sm text-slate-400 text-center py-3">尚未設定預設收費項目</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div class="grid md:grid-cols-2 gap-6" id="acupointCombinationsContainer">
-                
               </div>
             </div>
             </div>
