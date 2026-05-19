@@ -6459,7 +6459,10 @@ async function logout() {
         }
 
 async function savePatient() {
-    if (editingPatientId && !hasActionPermission('patientEdit')) {
+    const canEditPatientInCurrentMode = patientFormDisplayMode === 'history-only'
+        ? canEditConsultationPatientHistory()
+        : hasActionPermission('patientEdit');
+    if (editingPatientId && !canEditPatientInCurrentMode) {
         showToast('權限不足，無法編輯病人資料', 'error');
         return;
     }
@@ -7297,6 +7300,23 @@ function getCurrentConsultationAppointment() {
     return appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId)) || null;
 }
 
+function canEditConsultationPatientHistory() {
+    if (hasActionPermission('patientEdit')) {
+        return true;
+    }
+    const appointment = getCurrentConsultationAppointment();
+    if (!appointment || !currentUserData) {
+        return false;
+    }
+    if (currentUserData.position === '診所管理') {
+        return true;
+    }
+    if (hasAccessToSection('consultationSystem') && String(appointment.consultingDoctor || '') === String(currentUserData.username || '')) {
+        return true;
+    }
+    return false;
+}
+
 function renderConsultationPatientInfo(patient, appointment) {
     if (!patient) return;
     const patientNameEl = document.getElementById('formPatientName');
@@ -7346,6 +7366,7 @@ function renderConsultationPatientInfo(patient, appointment) {
     const editHistoryButton = document.getElementById('consultationEditHistoryButton');
     if (editHistoryButton) {
         editHistoryButton.dataset.patientId = patient.id ? String(patient.id) : '';
+        editHistoryButton.classList.toggle('hidden', !canEditConsultationPatientHistory());
     }
 }
 
@@ -7363,7 +7384,7 @@ async function refreshConsultationPatientInfoIfNeeded(patientId) {
 
 async function openConsultationMedicalHistoryEditor() {
     try {
-        if (!hasActionPermission('patientEdit')) {
+        if (!canEditConsultationPatientHistory()) {
             showToast('權限不足，無法編輯病人資料', 'error');
             return;
         }
@@ -26353,6 +26374,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             consultationEditHistoryBtn.dataset.bound = 'true';
+        }
+        if (!document.body.dataset.consultationHistoryDelegatedBound) {
+            document.addEventListener('click', function (ev) {
+                const trigger = ev && ev.target && ev.target.closest
+                    ? ev.target.closest('#consultationEditHistoryButton')
+                    : null;
+                if (!trigger) return;
+                try {
+                    openConsultationMedicalHistoryEditor();
+                } catch (e) {
+                    console.error('委派開啟既住史修改視窗按鈕錯誤:', e);
+                }
+            });
+            document.body.dataset.consultationHistoryDelegatedBound = 'true';
         }
 
         /**
