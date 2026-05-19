@@ -6065,6 +6065,10 @@ async function logout() {
                 } catch (_eLoadPermissionPanel) {}
             } else if (sectionId === 'userManagement') {
                 loadUserManagement();
+            } else if (sectionId === 'personalSettings') {
+                if (typeof renderDiagnosisSettingsForm === 'function') {
+                    renderDiagnosisSettingsForm();
+                }
             } else if (sectionId === 'personalStatistics') {
                 
                 if (typeof loadPersonalStatistics === 'function') {
@@ -6368,59 +6372,6 @@ async function logout() {
         }
         
         
-        let patientFormDisplayMode = 'full';
-
-        function setPatientFormDisplayMode(mode = 'full', patient = null) {
-            patientFormDisplayMode = mode === 'history-only' ? 'history-only' : 'full';
-            const basicInfoSection = document.getElementById('patientBasicInfoSection');
-            const summaryBox = document.getElementById('patientHistoryEditorSummary');
-            const formTitleEl = document.getElementById('formTitle');
-            const saveButtonTextEl = document.getElementById('saveButtonText');
-
-            if (basicInfoSection) {
-                basicInfoSection.classList.toggle('hidden', patientFormDisplayMode === 'history-only');
-            }
-
-            if (summaryBox) {
-                if (patientFormDisplayMode === 'history-only' && patient) {
-                    const safePatientNumber = window.escapeHtml(patient.patientNumber || '未設定');
-                    const safeName = window.escapeHtml(patient.name || '未命名病人');
-                    const safeAge = window.escapeHtml(formatAge(patient.birthDate));
-                    const safeGender = window.escapeHtml(patient.gender || '未知');
-                    summaryBox.innerHTML = `
-                        <div class="font-semibold text-blue-700 mb-1">正在修改既住史</div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <div><span class="font-medium">病人：</span>${safeName}</div>
-                            <div><span class="font-medium">病人編號：</span>${safePatientNumber}</div>
-                            <div><span class="font-medium">年齡：</span>${safeAge}</div>
-                            <div><span class="font-medium">性別：</span>${safeGender}</div>
-                        </div>
-                        <div class="mt-2 text-xs text-gray-500">此視窗只修改既住史及過敏史，基本病人資料維持不變。</div>
-                    `;
-                    summaryBox.classList.remove('hidden');
-                } else {
-                    summaryBox.innerHTML = '';
-                    summaryBox.classList.add('hidden');
-                }
-            }
-
-            if (formTitleEl) {
-                if (patientFormDisplayMode === 'history-only') {
-                    formTitleEl.textContent = '修改既住史';
-                } else {
-                    formTitleEl.textContent = editingPatientId ? '編輯病人資料' : '新增病人資料';
-                }
-            }
-
-            if (saveButtonTextEl) {
-                if (patientFormDisplayMode === 'history-only') {
-                    saveButtonTextEl.textContent = '更新既住史';
-                } else {
-                    saveButtonTextEl.textContent = editingPatientId ? '更新' : '儲存';
-                }
-            }
-        }
-
         function updatePatientAge() {
             const birthDate = document.getElementById('patientBirthDate').value;
             const ageInput = document.getElementById('patientAge');
@@ -6439,14 +6390,14 @@ async function logout() {
                 return;
             }
             editingPatientId = null;
-            setPatientFormDisplayMode('full');
+            document.getElementById('formTitle').textContent = '新增病人資料';
+            document.getElementById('saveButtonText').textContent = '儲存';
             document.getElementById('addPatientModal').classList.remove('hidden');
             clearPatientForm();
         }
 
         function hideAddPatientForm() {
             document.getElementById('addPatientModal').classList.add('hidden');
-            setPatientFormDisplayMode('full');
             clearPatientForm();
             editingPatientId = null;
         }
@@ -6459,10 +6410,7 @@ async function logout() {
         }
 
 async function savePatient() {
-    const canEditPatientInCurrentMode = patientFormDisplayMode === 'history-only'
-        ? canEditConsultationPatientHistory()
-        : hasActionPermission('patientEdit');
-    if (editingPatientId && !canEditPatientInCurrentMode) {
+    if (editingPatientId && !hasActionPermission('patientEdit')) {
         showToast('權限不足，無法編輯病人資料', 'error');
         return;
     }
@@ -6536,7 +6484,7 @@ async function savePatient() {
             
             const result = await window.firebaseDataManager.updatePatient(editingPatientId, patient);
             if (result.success) {
-                showToast(patientFormDisplayMode === 'history-only' ? '既住史已成功更新！' : '病人資料已成功更新！', 'success');
+                showToast('病人資料已成功更新！', 'success');
             } else {
                 showToast('更新失敗，請稍後再試', 'error');
                 return;
@@ -6578,11 +6526,6 @@ async function savePatient() {
 
         
         await loadPatientListFromFirebase();
-        if (editingPatientId) {
-            try {
-                await refreshConsultationPatientInfoIfNeeded(editingPatientId);
-            } catch (_refreshErr) {}
-        }
         hideAddPatientForm();
         updateStatistics();
 
@@ -6958,7 +6901,8 @@ async function editPatient(id) {
         }
 
         editingPatientId = id;
-        setPatientFormDisplayMode('full');
+        document.getElementById('formTitle').textContent = '編輯病人資料';
+        document.getElementById('saveButtonText').textContent = '更新';
         
         
         document.getElementById('patientName').value = patient.name || '';
@@ -7292,125 +7236,6 @@ async function viewPatient(id) {
         let selectedPatientForRegistration = null;
         let currentConsultingAppointmentId = null;
         let currentConsultationEditContext = null;
-
-function getCurrentConsultationAppointment() {
-    if (!Array.isArray(appointments) || currentConsultingAppointmentId === null || currentConsultingAppointmentId === undefined) {
-        return null;
-    }
-    return appointments.find(apt => apt && String(apt.id) === String(currentConsultingAppointmentId)) || null;
-}
-
-function canEditConsultationPatientHistory() {
-    if (hasActionPermission('patientEdit')) {
-        return true;
-    }
-    const appointment = getCurrentConsultationAppointment();
-    if (!appointment || !currentUserData) {
-        return false;
-    }
-    if (currentUserData.position === '診所管理') {
-        return true;
-    }
-    if (hasAccessToSection('consultationSystem') && String(appointment.consultingDoctor || '') === String(currentUserData.username || '')) {
-        return true;
-    }
-    return false;
-}
-
-function renderConsultationPatientInfo(patient, appointment) {
-    if (!patient) return;
-    const patientNameEl = document.getElementById('formPatientName');
-    if (patientNameEl) {
-        patientNameEl.textContent = `${patient.name} (${patient.patientNumber || '未設定'})`;
-    }
-
-    const appointmentTimeEl = document.getElementById('formAppointmentTime');
-    if (appointmentTimeEl && appointment && appointment.appointmentTime) {
-        appointmentTimeEl.textContent = new Date(appointment.appointmentTime).toLocaleString('zh-TW');
-    }
-
-    const ageEl = document.getElementById('formPatientAge');
-    if (ageEl) {
-        ageEl.textContent = formatAge(patient.birthDate);
-    }
-
-    const genderEl = document.getElementById('formPatientGender');
-    if (genderEl) {
-        genderEl.textContent = patient.gender || '未知';
-    }
-
-    const allergiesContainer = document.getElementById('allergiesContainer');
-    const allergiesEl = document.getElementById('formPatientAllergies');
-    if (allergiesContainer && allergiesEl) {
-        if (patient.allergies) {
-            allergiesEl.textContent = patient.allergies;
-            allergiesContainer.style.display = '';
-        } else {
-            allergiesEl.textContent = '';
-            allergiesContainer.style.display = 'none';
-        }
-    }
-
-    const historyContainer = document.getElementById('historyContainer');
-    const historyEl = document.getElementById('formPatientHistory');
-    if (historyContainer && historyEl) {
-        if (patient.history) {
-            historyEl.textContent = patient.history;
-            historyContainer.style.display = '';
-        } else {
-            historyEl.textContent = '';
-            historyContainer.style.display = 'none';
-        }
-    }
-
-    const editHistoryButton = document.getElementById('consultationEditHistoryButton');
-    if (editHistoryButton) {
-        editHistoryButton.dataset.patientId = patient.id ? String(patient.id) : '';
-        editHistoryButton.classList.toggle('hidden', !canEditConsultationPatientHistory());
-    }
-}
-
-async function refreshConsultationPatientInfoIfNeeded(patientId) {
-    const appointment = getCurrentConsultationAppointment();
-    if (!appointment || String(appointment.patientId) !== String(patientId)) {
-        return;
-    }
-    const patient = await getPatientByIdWithRefresh(patientId);
-    if (!patient) {
-        return;
-    }
-    renderConsultationPatientInfo(patient, appointment);
-}
-
-async function openConsultationMedicalHistoryEditor() {
-    try {
-        if (!canEditConsultationPatientHistory()) {
-            showToast('權限不足，無法編輯病人資料', 'error');
-            return;
-        }
-        const editHistoryButton = document.getElementById('consultationEditHistoryButton');
-        const buttonPatientId = editHistoryButton && editHistoryButton.dataset
-            ? String(editHistoryButton.dataset.patientId || '').trim()
-            : '';
-        const appointment = getCurrentConsultationAppointment();
-        const patientId = buttonPatientId || (appointment && appointment.patientId ? String(appointment.patientId) : '');
-        if (!patientId) {
-            showToast('找不到目前診症病人資料', 'error');
-            return;
-        }
-        const patient = await getPatientByIdWithRefresh(patientId);
-        if (!patient) {
-            showToast('找不到病人資料', 'error');
-            return;
-        }
-        await editPatient(patient.id);
-        setPatientFormDisplayMode('history-only', patient);
-    } catch (error) {
-        console.error('開啟既住史修改視窗失敗:', error);
-        showToast('開啟既住史修改視窗失敗', 'error');
-        return;
-    }
-}
 
 function getConsultationDoctorUsername(consultation = null, appointment = null) {
     if (appointment && appointment.appointmentDoctor) {
@@ -10271,7 +10096,44 @@ async function showConsultationForm(appointment) {
         }
         
         // 設置病人資訊
-        renderConsultationPatientInfo(patient, appointment);
+        // 顯示病人姓名與編號
+        document.getElementById('formPatientName').textContent = `${patient.name} (${patient.patientNumber})`;
+        // 顯示掛號時間
+        document.getElementById('formAppointmentTime').textContent = new Date(appointment.appointmentTime).toLocaleString('zh-TW');
+        // 顯示病人年齡，若沒有出生日期則顯示「未知」
+        const ageEl = document.getElementById('formPatientAge');
+        if (ageEl) {
+            ageEl.textContent = formatAge(patient.birthDate);
+        }
+        // 顯示病人性別，若沒有資料則顯示「未知」
+        const genderEl = document.getElementById('formPatientGender');
+        if (genderEl) {
+            genderEl.textContent = patient.gender || '未知';
+        }
+        // 顯示過敏史，如果有資料則填入並顯示容器，否則隱藏容器
+        const allergiesContainer = document.getElementById('allergiesContainer');
+        const allergiesEl = document.getElementById('formPatientAllergies');
+        if (allergiesContainer && allergiesEl) {
+            if (patient.allergies) {
+                allergiesEl.textContent = patient.allergies;
+                allergiesContainer.style.display = '';
+            } else {
+                allergiesEl.textContent = '';
+                allergiesContainer.style.display = 'none';
+            }
+        }
+        // 顯示病史及備註，如果有資料則填入並顯示容器，否則隱藏容器
+        const historyContainer = document.getElementById('historyContainer');
+        const historyEl = document.getElementById('formPatientHistory');
+        if (historyContainer && historyEl) {
+            if (patient.history) {
+                historyEl.textContent = patient.history;
+                historyContainer.style.display = '';
+            } else {
+                historyEl.textContent = '';
+                historyContainer.style.display = 'none';
+            }
+        }
         // 渲染病人療程/套餐資訊
         renderPatientPackages(patient.id);
         
@@ -10312,17 +10174,12 @@ async function showConsultationForm(appointment) {
             document.getElementById('formRestEndDate').value = endDateStr;
             updateRestPeriod();
 
-            const consultationDefaults = getPersonalConsultationSettings();
-            // 設置預設複診時間為診症當天的指定天數後，時間保持與到診時間一致
+            // 依個人診症設定填入預設複診時間
             try {
-                const followUp = new Date(now);
-                followUp.setDate(followUp.getDate() + consultationDefaults.followUpDays);
-                const fYear = followUp.getFullYear();
-                const fMonth = String(followUp.getMonth() + 1).padStart(2, '0');
-                const fDay = String(followUp.getDate()).padStart(2, '0');
-                const fHours = String(followUp.getHours()).padStart(2, '0');
-                const fMinutes = String(followUp.getMinutes()).padStart(2, '0');
-                document.getElementById('formFollowUpDate').value = `${fYear}-${fMonth}-${fDay}T${fHours}:${fMinutes}`;
+                const defaultFollowUpValue = buildDefaultFollowUpDate(now);
+                if (defaultFollowUpValue) {
+                    document.getElementById('formFollowUpDate').value = defaultFollowUpValue;
+                }
             } catch (_e) {
                 console.warn('無法設定預設複診時間', _e);
             }
@@ -10400,7 +10257,7 @@ async function showConsultationForm(appointment) {
             }
 
             // 自動添加預設診金收費項目
-            addDefaultConsultationFee(patient, consultationDefaults);
+            addDefaultConsultationFee(patient);
             
             // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
             const saveButtonTextElNew = document.getElementById('consultationSaveButtonText');
@@ -10462,19 +10319,19 @@ async function showConsultationForm(appointment) {
                 }
             });
             
-            const consultationDefaults = getPersonalConsultationSettings();
-            // 重置多處方狀態與每日次數為個人預設值
+            // 重置多處方狀態與每日次數為預設值
+            const diagnosisDefaults = getEffectiveDiagnosisSettings();
             prescriptions = [{
                 name: '處方',
                 items: [],
-                days: consultationDefaults.medicationDays,
-                freq: consultationDefaults.medicationFrequency,
+                days: diagnosisDefaults.defaultPrescriptionDays,
+                freq: diagnosisDefaults.defaultPrescriptionFrequency,
                 mode: (currentInventoryMode === 'slice' ? 'slice' : 'granule')
             }];
             activePrescriptionIndex = 0;
             selectedPrescriptionItems = prescriptions[0].items;
             const freqEl = document.getElementById('medicationFrequency');
-            if (freqEl) freqEl.value = String(consultationDefaults.medicationFrequency);
+            if (freqEl) freqEl.value = String(diagnosisDefaults.defaultPrescriptionFrequency);
             
             // 重置休息期間顯示
             const restEl = document.getElementById('restPeriodDisplay');
@@ -10483,13 +10340,13 @@ async function showConsultationForm(appointment) {
                 restEl.className = 'text-sm text-gray-500 font-medium';
             }
             
-            // 設置個人診症預設值
+            // 設置預設值
             const usageEl = document.getElementById('formUsage');
-            if (usageEl) usageEl.value = consultationDefaults.usage;
+            if (usageEl) usageEl.value = diagnosisDefaults.defaultUsage;
             const instrEl = document.getElementById('formInstructions');
-            if (instrEl) instrEl.value = consultationDefaults.instructions;
+            if (instrEl) instrEl.value = diagnosisDefaults.defaultInstructions;
             const courseEl = document.getElementById('formTreatmentCourse');
-            if (courseEl) courseEl.value = consultationDefaults.treatmentCourse;
+            if (courseEl) courseEl.value = diagnosisDefaults.defaultTreatmentCourse;
             
             // 清空處方項目
             clearActivePrescriptionItems();
@@ -19148,9 +19005,33 @@ async function searchBillingForConsultation() {
         }
         
         // 自動添加預設診金收費
-        function addDefaultConsultationFee(patient, consultationDefaults = null) {
-            void patient;
-            const resolvedDefaults = normalizePersonalConsultationSettings(consultationDefaults || getPersonalConsultationSettings());
+        function addDefaultConsultationFee(patient) {
+            const diagnosisDefaults = getEffectiveDiagnosisSettings();
+            const defaultBillingItemIds = Array.isArray(diagnosisDefaults.defaultBillingItemIds)
+                ? diagnosisDefaults.defaultBillingItemIds.map(id => String(id))
+                : [];
+            if (defaultBillingItemIds.length > 0 && Array.isArray(billingItems) && billingItems.length > 0) {
+                const configuredBillingItems = defaultBillingItemIds
+                    .map(itemId => billingItems.find(item => item && item.active && String(item.id) === itemId))
+                    .filter(Boolean)
+                    .map(item => ({
+                        id: item.id,
+                        name: item.name,
+                        category: item.category,
+                        price: item.price,
+                        unit: item.unit,
+                        description: item.description,
+                        quantity: 1,
+                        includedInDiscount: item.category !== 'discount' && item.category !== 'packageUse'
+                    }));
+                if (configuredBillingItems.length > 0) {
+                    selectedBillingItems = configuredBillingItems;
+                    const defaultDaysFromSettings = diagnosisDefaults.defaultPrescriptionDays;
+                    updateMedicineFeeByDays(defaultDaysFromSettings);
+                    updateBillingDisplay();
+                    return;
+                }
+            }
             // 尋找診金收費項目（優先尋找名稱包含「診金」的項目）
             let consultationFeeItem = billingItems.find(item => 
                 item.active && 
@@ -19166,44 +19047,35 @@ async function searchBillingForConsultation() {
             }
             
             // 如果找到診金項目，自動添加
-            selectedBillingItems = [];
             if (consultationFeeItem) {
-                const billingItem = createBillingSelectionItem({
-                    ...consultationFeeItem,
+                // 清空現有收費項目
+                selectedBillingItems = [];
+                
+                // 添加診金項目
+                const billingItem = {
+                    id: consultationFeeItem.id,
+                    name: consultationFeeItem.name,
+                    category: consultationFeeItem.category,
+                    price: consultationFeeItem.price,
+                    unit: consultationFeeItem.unit,
+                    description: consultationFeeItem.description,
+                    quantity: 1,
+                    // 預設診金可參與折扣
                     includedInDiscount: true
-                }, 1);
-                if (billingItem) {
-                    selectedBillingItems.push(billingItem);
-                }
-            }
-
-            const personalDefaultItems = Array.isArray(resolvedDefaults.defaultBillingItems)
-                ? resolvedDefaults.defaultBillingItems
-                : [];
-            personalDefaultItems.forEach(defaultItem => {
-                if (!defaultItem || defaultItem.id === undefined || defaultItem.id === null) return;
-                const itemId = String(defaultItem.id);
-                if (selectedBillingItems.some(item => String(item.id) === itemId)) {
-                    const existingItem = selectedBillingItems.find(item => String(item.id) === itemId);
-                    if (existingItem) {
-                        existingItem.quantity = clampPersonalSettingNumber(defaultItem.quantity, 1, 99, existingItem.quantity || 1);
-                    }
-                    return;
-                }
-                const matchedItem = billingItems.find(item => item && item.active && String(item.id) === itemId);
-                const nextItem = createBillingSelectionItem(matchedItem || defaultItem, defaultItem.quantity);
-                if (nextItem) {
-                    selectedBillingItems.push(nextItem);
-                }
-            });
-
-            updateMedicineFeeByDays(resolvedDefaults.medicationDays);
-
-            if (!consultationFeeItem && selectedBillingItems.length === 0) {
+                };
+                selectedBillingItems.push(billingItem);
+                
+                // 自動添加預設藥費（根據個人設定的預設天數）
+                const defaultDays = diagnosisDefaults.defaultPrescriptionDays;
+                updateMedicineFeeByDays(defaultDays);
+                
+                // 更新顯示
                 updateBillingDisplay();
-                return;
+            } else {
+                // 如果沒有找到任何診療費項目，只清空收費項目並更新顯示
+                selectedBillingItems = [];
+                updateBillingDisplay();
             }
-            updateBillingDisplay();
         }
         
 
@@ -26364,31 +26236,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
-        const consultationEditHistoryBtn = document.getElementById('consultationEditHistoryButton');
-        if (consultationEditHistoryBtn && !consultationEditHistoryBtn.dataset.bound) {
-            consultationEditHistoryBtn.addEventListener('click', function () {
-                try {
-                    openConsultationMedicalHistoryEditor();
-                } catch (e) {
-                    console.error('開啟既住史修改視窗按鈕錯誤:', e);
-                }
-            });
-            consultationEditHistoryBtn.dataset.bound = 'true';
-        }
-        if (!document.body.dataset.consultationHistoryDelegatedBound) {
-            document.addEventListener('click', function (ev) {
-                const trigger = ev && ev.target && ev.target.closest
-                    ? ev.target.closest('#consultationEditHistoryButton')
-                    : null;
-                if (!trigger) return;
-                try {
-                    openConsultationMedicalHistoryEditor();
-                } catch (e) {
-                    console.error('委派開啟既住史修改視窗按鈕錯誤:', e);
-                }
-            });
-            document.body.dataset.consultationHistoryDelegatedBound = 'true';
-        }
 
         /**
          * 一次性移除頁面上所有內嵌的 onclick/onchange 事件處理器，改以透過
@@ -27952,7 +27799,6 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   window.showAddFormulaForm = showAddFormulaForm;
   window.showAddHerbForm = showAddHerbForm;
   window.showAddPatientForm = showAddPatientForm;
-  window.openConsultationMedicalHistoryEditor = openConsultationMedicalHistoryEditor;
   window.showAddUserForm = showAddUserForm;
   window.showClinicSettingsModal = showClinicSettingsModal;
   window.onPermissionPositionChanged = onPermissionPositionChanged;
@@ -27977,11 +27823,8 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   // 將個人設置與慣用組合相關函式掛載至全域，讓 HTML 按鈕可以直接調用。
   window.loadPersonalSettings = loadPersonalSettings;
   window.updatePersonalSettings = updatePersonalSettings;
-  window.clearPersonalBillingSearch = clearPersonalBillingSearch;
-  window.addBillingItemToPersonalDefaults = addBillingItemToPersonalDefaults;
-  window.removePersonalDefaultBillingItem = removePersonalDefaultBillingItem;
-  window.updatePersonalDefaultBillingItemQuantity = updatePersonalDefaultBillingItemQuantity;
-  window.setPersonalDefaultBillingItemQuantity = setPersonalDefaultBillingItemQuantity;
+  window.renderDiagnosisSettingsForm = renderDiagnosisSettingsForm;
+  window.saveDiagnosisSettings = saveDiagnosisSettings;
   window.showHerbComboModal = showHerbComboModal;
   window.hideHerbComboModal = hideHerbComboModal;
   window.selectHerbCombo = selectHerbCombo;
@@ -29046,379 +28889,209 @@ function _oldSelectPrescriptionTemplate(id) {
           let acupointComboCategories = Array.isArray(categories.acupoints) ? [...categories.acupoints] : [];
           window.herbComboCategories = herbComboCategories;
           window.acupointComboCategories = acupointComboCategories;
-          const DEFAULT_PERSONAL_CONSULTATION_SETTINGS = Object.freeze({
-            medicationDays: 5,
-            medicationFrequency: 2,
-            followUpDays: 7,
-            usage: '溫水化開，飯後服',
-            treatmentCourse: '一周',
-            instructions: '注意休息，飲食清淡',
-            defaultBillingItems: []
-          });
-          let personalConsultationSettings = {
-            medicationDays: DEFAULT_PERSONAL_CONSULTATION_SETTINGS.medicationDays,
-            medicationFrequency: DEFAULT_PERSONAL_CONSULTATION_SETTINGS.medicationFrequency,
-            followUpDays: DEFAULT_PERSONAL_CONSULTATION_SETTINGS.followUpDays,
-            usage: DEFAULT_PERSONAL_CONSULTATION_SETTINGS.usage,
-            treatmentCourse: DEFAULT_PERSONAL_CONSULTATION_SETTINGS.treatmentCourse,
-            instructions: DEFAULT_PERSONAL_CONSULTATION_SETTINGS.instructions,
-            defaultBillingItems: []
-          };
-          let personalConsultationSettingsSaveTimer = null;
-
-        function clampPersonalSettingNumber(value, min, max, fallback) {
-          const parsed = parseInt(value, 10);
-          if (Number.isNaN(parsed)) return fallback;
-          return Math.min(max, Math.max(min, parsed));
-        }
-
-        function createBillingSelectionItem(sourceItem, quantity = 1) {
-          if (!sourceItem || sourceItem.id === undefined || sourceItem.id === null) {
-            return null;
+          function getDefaultDiagnosisSettings() {
+            return {
+              defaultPrescriptionDays: 5,
+              defaultPrescriptionFrequency: 2,
+              defaultFollowUpOffsetDays: 7,
+              defaultFollowUpTime: '',
+              defaultUsage: '溫水化開，飯後服',
+              defaultTreatmentCourse: '一周',
+              defaultInstructions: '注意休息，飲食清淡',
+              defaultBillingItemIds: []
+            };
           }
-          return {
-            id: String(sourceItem.id),
-            name: sourceItem.name ? String(sourceItem.name) : '',
-            category: sourceItem.category ? String(sourceItem.category) : 'other',
-            price: Number(sourceItem.price) || 0,
-            unit: sourceItem.unit ? String(sourceItem.unit) : '',
-            description: sourceItem.description ? String(sourceItem.description) : '',
-            quantity: clampPersonalSettingNumber(quantity, 1, 99, 1),
-            includedInDiscount: sourceItem.includedInDiscount !== false
-          };
-        }
 
-        function normalizePersonalDefaultBillingItem(rawItem) {
-          if (!rawItem || rawItem.id === undefined || rawItem.id === null) {
-            return null;
+          function normalizeDiagnosisSettings(raw) {
+            const defaults = getDefaultDiagnosisSettings();
+            const source = raw && typeof raw === 'object' ? raw : {};
+            const parseIntWithBounds = function(value, fallback, min, max) {
+              const parsed = parseInt(value, 10);
+              if (Number.isNaN(parsed)) return fallback;
+              return Math.min(max, Math.max(min, parsed));
+            };
+            const followUpTime = typeof source.defaultFollowUpTime === 'string' && /^\d{2}:\d{2}$/.test(source.defaultFollowUpTime.trim())
+              ? source.defaultFollowUpTime.trim()
+              : defaults.defaultFollowUpTime;
+            const billingIds = Array.isArray(source.defaultBillingItemIds)
+              ? Array.from(new Set(source.defaultBillingItemIds
+                  .map(id => String(id || '').trim())
+                  .filter(Boolean)))
+              : defaults.defaultBillingItemIds.slice();
+            return {
+              defaultPrescriptionDays: parseIntWithBounds(source.defaultPrescriptionDays, defaults.defaultPrescriptionDays, 1, 90),
+              defaultPrescriptionFrequency: parseIntWithBounds(source.defaultPrescriptionFrequency, defaults.defaultPrescriptionFrequency, 1, 10),
+              defaultFollowUpOffsetDays: parseIntWithBounds(source.defaultFollowUpOffsetDays, defaults.defaultFollowUpOffsetDays, 0, 365),
+              defaultFollowUpTime: followUpTime,
+              defaultUsage: typeof source.defaultUsage === 'string' ? source.defaultUsage : defaults.defaultUsage,
+              defaultTreatmentCourse: typeof source.defaultTreatmentCourse === 'string' ? source.defaultTreatmentCourse : defaults.defaultTreatmentCourse,
+              defaultInstructions: typeof source.defaultInstructions === 'string' ? source.defaultInstructions : defaults.defaultInstructions,
+              defaultBillingItemIds: billingIds
+            };
           }
-          const itemId = String(rawItem.id);
-          const matchedItem = Array.isArray(billingItems)
-            ? billingItems.find(item => item && String(item.id) === itemId)
-            : null;
-          const mergedItem = matchedItem || rawItem;
-          const normalized = createBillingSelectionItem(mergedItem, rawItem.quantity);
-          if (!normalized || normalized.category === 'packageUse') {
-            return null;
+
+          let diagnosisSettings = getDefaultDiagnosisSettings();
+          window.diagnosisSettings = diagnosisSettings;
+
+          function getEffectiveDiagnosisSettings() {
+            diagnosisSettings = normalizeDiagnosisSettings(diagnosisSettings);
+            window.diagnosisSettings = diagnosisSettings;
+            return diagnosisSettings;
           }
-          return normalized;
-        }
 
-        function normalizePersonalConsultationSettings(rawSettings) {
-          const source = rawSettings && typeof rawSettings === 'object' ? rawSettings : {};
-          const defaultBillingItemsSource = Array.isArray(source.defaultBillingItems)
-            ? source.defaultBillingItems
-            : (Array.isArray(source.billingItemDefaults)
-              ? source.billingItemDefaults
-              : (Array.isArray(source.billingItems) ? source.billingItems : []));
-          return {
-            medicationDays: clampPersonalSettingNumber(source.medicationDays, 1, 30, DEFAULT_PERSONAL_CONSULTATION_SETTINGS.medicationDays),
-            medicationFrequency: clampPersonalSettingNumber(source.medicationFrequency, 1, 6, DEFAULT_PERSONAL_CONSULTATION_SETTINGS.medicationFrequency),
-            followUpDays: clampPersonalSettingNumber(source.followUpDays, 0, 365, DEFAULT_PERSONAL_CONSULTATION_SETTINGS.followUpDays),
-            usage: typeof source.usage === 'string' ? source.usage : DEFAULT_PERSONAL_CONSULTATION_SETTINGS.usage,
-            treatmentCourse: typeof source.treatmentCourse === 'string' ? source.treatmentCourse : DEFAULT_PERSONAL_CONSULTATION_SETTINGS.treatmentCourse,
-            instructions: typeof source.instructions === 'string' ? source.instructions : DEFAULT_PERSONAL_CONSULTATION_SETTINGS.instructions,
-            defaultBillingItems: defaultBillingItemsSource
-              .map(normalizePersonalDefaultBillingItem)
-              .filter(Boolean)
-          };
-        }
-
-        function getPersonalConsultationSettings() {
-          personalConsultationSettings = normalizePersonalConsultationSettings(personalConsultationSettings);
-          return {
-            medicationDays: personalConsultationSettings.medicationDays,
-            medicationFrequency: personalConsultationSettings.medicationFrequency,
-            followUpDays: personalConsultationSettings.followUpDays,
-            usage: personalConsultationSettings.usage,
-            treatmentCourse: personalConsultationSettings.treatmentCourse,
-            instructions: personalConsultationSettings.instructions,
-            defaultBillingItems: Array.isArray(personalConsultationSettings.defaultBillingItems)
-              ? personalConsultationSettings.defaultBillingItems.map(item => ({ ...item }))
-              : []
-          };
-        }
-
-        function buildPersonalSettingsPayload() {
-          return {
-            herbCombinations: Array.isArray(herbCombinations) ? herbCombinations : [],
-            acupointCombinations: Array.isArray(acupointCombinations) ? acupointCombinations : [],
-            herbComboCategories: Array.isArray(herbComboCategories) ? herbComboCategories : [],
-            acupointComboCategories: Array.isArray(acupointComboCategories) ? acupointComboCategories : [],
-            consultationSettings: getPersonalConsultationSettings()
-          };
-        }
-
-        function syncCurrentUserPersonalSettings() {
-          try {
-            if (!currentUserData || typeof currentUserData !== 'object') return;
-            currentUserData.personalSettings = buildPersonalSettingsPayload();
-          } catch (_e) {}
-        }
-
-        function setInputValueIfIdle(element, value) {
-          if (!element) return;
-          const nextValue = value == null ? '' : String(value);
-          if (document.activeElement !== element) {
-            element.value = nextValue;
+          function formatDateTimeLocalValue(date) {
+            if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
           }
-        }
 
-        function renderPersonalDefaultBillingItems() {
-          const container = document.getElementById('personalDefaultBillingItems');
-          if (!container) return;
-          const settings = getPersonalConsultationSettings();
-          const items = Array.isArray(settings.defaultBillingItems) ? settings.defaultBillingItems : [];
-          if (items.length === 0) {
-            container.innerHTML = '<div class="text-sm text-slate-400 text-center py-3">尚未設定預設收費項目</div>';
-            return;
-          }
-          const categoryNames = {
-            consultation: '診療費',
-            medicine: '藥費',
-            treatment: '治療費',
-            other: '其他',
-            discount: '折扣',
-            package: '套票'
-          };
-          container.innerHTML = items.map(item => {
-            const safeName = window.escapeHtml(item.name || '未命名收費項目');
-            const safeCategory = window.escapeHtml(categoryNames[item.category] || '未分類');
-            const priceText = Number(item.price) ? `$${Number(item.price)}` : '$0';
-            return `
-              <div class="border border-slate-200 rounded-lg p-3">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <div class="font-semibold text-slate-800 break-words">${safeName}</div>
-                    <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span class="bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">${safeCategory}</span>
-                      <span>${priceText}${item.unit ? ` / ${window.escapeHtml(item.unit)}` : ''}</span>
-                    </div>
-                  </div>
-                  <button type="button" onclick="removePersonalDefaultBillingItem(${JSON.stringify(String(item.id))})" class="text-red-500 hover:text-red-600 text-sm whitespace-nowrap">移除</button>
-                </div>
-                <div class="mt-3 flex items-center gap-2">
-                  <span class="text-sm text-slate-600">數量</span>
-                  <button type="button" onclick="updatePersonalDefaultBillingItemQuantity(${JSON.stringify(String(item.id))}, -1)" class="w-7 h-7 rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300">-</button>
-                  <input type="number" min="1" max="99" value="${clampPersonalSettingNumber(item.quantity, 1, 99, 1)}" onchange="setPersonalDefaultBillingItemQuantity(${JSON.stringify(String(item.id))}, this.value)" class="w-16 border border-slate-300 rounded-lg px-2 py-1 text-center text-sm">
-                  <button type="button" onclick="updatePersonalDefaultBillingItemQuantity(${JSON.stringify(String(item.id))}, 1)" class="w-7 h-7 rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300">+</button>
-                </div>
-              </div>
-            `;
-          }).join('');
-        }
-
-        function renderPersonalConsultationSettings() {
-          const settings = getPersonalConsultationSettings();
-          setInputValueIfIdle(document.getElementById('personalDefaultMedicationDays'), settings.medicationDays);
-          setInputValueIfIdle(document.getElementById('personalDefaultMedicationFrequency'), settings.medicationFrequency);
-          setInputValueIfIdle(document.getElementById('personalDefaultFollowUpDays'), settings.followUpDays);
-          setInputValueIfIdle(document.getElementById('personalDefaultUsage'), settings.usage);
-          setInputValueIfIdle(document.getElementById('personalDefaultTreatmentCourse'), settings.treatmentCourse);
-          setInputValueIfIdle(document.getElementById('personalDefaultInstructions'), settings.instructions);
-          renderPersonalDefaultBillingItems();
-        }
-
-        function collectPersonalConsultationSettingsFromUI() {
-          personalConsultationSettings = normalizePersonalConsultationSettings({
-            ...personalConsultationSettings,
-            medicationDays: document.getElementById('personalDefaultMedicationDays')?.value,
-            medicationFrequency: document.getElementById('personalDefaultMedicationFrequency')?.value,
-            followUpDays: document.getElementById('personalDefaultFollowUpDays')?.value,
-            usage: document.getElementById('personalDefaultUsage')?.value ?? DEFAULT_PERSONAL_CONSULTATION_SETTINGS.usage,
-            treatmentCourse: document.getElementById('personalDefaultTreatmentCourse')?.value ?? DEFAULT_PERSONAL_CONSULTATION_SETTINGS.treatmentCourse,
-            instructions: document.getElementById('personalDefaultInstructions')?.value ?? DEFAULT_PERSONAL_CONSULTATION_SETTINGS.instructions
-          });
-          syncCurrentUserPersonalSettings();
-          return getPersonalConsultationSettings();
-        }
-
-        function queuePersonalSettingsSave() {
-          if (personalConsultationSettingsSaveTimer) {
-            clearTimeout(personalConsultationSettingsSaveTimer);
-          }
-          personalConsultationSettingsSaveTimer = setTimeout(() => {
-            personalConsultationSettingsSaveTimer = null;
-            updatePersonalSettings().catch((err) => console.error('更新診症設定失敗:', err));
-          }, 400);
-        }
-
-        function handlePersonalConsultationSettingsInput() {
-          collectPersonalConsultationSettingsFromUI();
-          renderPersonalConsultationSettings();
-          queuePersonalSettingsSave();
-        }
-
-        async function searchBillingForPersonalDefaults() {
-          const searchInput = document.getElementById('personalBillingItemSearch');
-          const resultsContainer = document.getElementById('personalBillingItemSearchResults');
-          const resultsList = document.getElementById('personalBillingItemSearchList');
-          if (!searchInput || !resultsContainer || !resultsList) return;
-          const searchTerm = String(searchInput.value || '').trim().toLowerCase();
-          if (!searchTerm) {
-            resultsContainer.classList.add('hidden');
-            resultsList.innerHTML = '';
-            return;
-          }
-          try {
-            if (typeof initBillingItems === 'function' && !billingItemsLoaded) {
-              await initBillingItems();
-            }
-          } catch (err) {
-            console.error('讀取收費項目資料失敗:', err);
-          }
-          const selectedIds = new Set(
-            (Array.isArray(personalConsultationSettings.defaultBillingItems) ? personalConsultationSettings.defaultBillingItems : [])
-              .map(item => String(item.id))
-          );
-          const categoryNames = {
-            consultation: '診療費',
-            medicine: '藥費',
-            treatment: '治療費',
-            other: '其他',
-            discount: '折扣',
-            package: '套票'
-          };
-          const matchedItems = (Array.isArray(billingItems) ? billingItems : [])
-            .filter(item => item && item.active && item.category !== 'packageUse')
-            .map(item => {
-              const name = String(item.name || '').toLowerCase();
-              const desc = String(item.description || '').toLowerCase();
-              if (!name.includes(searchTerm) && !desc.includes(searchTerm)) {
-                return null;
+          function buildDefaultFollowUpDate(baseDate) {
+            const settings = getEffectiveDiagnosisSettings();
+            const followUp = baseDate instanceof Date ? new Date(baseDate) : new Date();
+            if (Number.isNaN(followUp.getTime())) return '';
+            followUp.setDate(followUp.getDate() + settings.defaultFollowUpOffsetDays);
+            if (settings.defaultFollowUpTime) {
+              const timeParts = settings.defaultFollowUpTime.split(':');
+              const hours = parseInt(timeParts[0], 10);
+              const minutes = parseInt(timeParts[1], 10);
+              if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
+                followUp.setHours(hours, minutes, 0, 0);
               }
-              const score = name.startsWith(searchTerm) ? 0 : (name.includes(searchTerm) ? 1 : 2);
-              return { item, score };
-            })
-            .filter(Boolean)
-            .sort((a, b) => a.score - b.score)
-            .slice(0, 12)
-            .map(entry => entry.item);
-          if (matchedItems.length === 0) {
-            resultsList.innerHTML = '<div class="text-sm text-slate-400 text-center py-3">找不到符合條件的收費項目</div>';
-            resultsContainer.classList.remove('hidden');
-            return;
+            }
+            return formatDateTimeLocalValue(followUp);
           }
-          resultsList.innerHTML = matchedItems.map(item => {
-            const alreadySelected = selectedIds.has(String(item.id));
-            return `
-              <button type="button" onclick="addBillingItemToPersonalDefaults(${JSON.stringify(String(item.id))})" class="w-full text-left border border-slate-200 rounded-lg px-3 py-3 hover:bg-slate-50 transition ${alreadySelected ? 'opacity-60' : ''}" ${alreadySelected ? 'disabled' : ''}>
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <div class="font-semibold text-slate-800 break-words">${window.escapeHtml(item.name || '未命名收費項目')}</div>
-                    <div class="mt-1 text-xs text-slate-500">${window.escapeHtml(categoryNames[item.category] || '未分類')}${item.description ? ` · ${window.escapeHtml(item.description)}` : ''}</div>
-                  </div>
-                  <div class="text-sm font-bold text-green-600 whitespace-nowrap">$${Number(item.price) || 0}</div>
-                </div>
-              </button>
-            `;
-          }).join('');
-          resultsContainer.classList.remove('hidden');
-        }
 
-        function clearPersonalBillingSearch() {
-          const searchInput = document.getElementById('personalBillingItemSearch');
-          const resultsContainer = document.getElementById('personalBillingItemSearchResults');
-          const resultsList = document.getElementById('personalBillingItemSearchList');
-          if (searchInput) searchInput.value = '';
-          if (resultsList) resultsList.innerHTML = '';
-          if (resultsContainer) resultsContainer.classList.add('hidden');
-        }
-
-        function addBillingItemToPersonalDefaults(itemId) {
-          const idStr = String(itemId);
-          const sourceItem = Array.isArray(billingItems)
-            ? billingItems.find(item => item && String(item.id) === idStr && item.active && item.category !== 'packageUse')
-            : null;
-          if (!sourceItem) {
-            showToast('找不到可用的收費項目', 'warning');
-            return;
-          }
-          const settings = getPersonalConsultationSettings();
-          if (settings.defaultBillingItems.some(item => String(item.id) === idStr)) {
-            showToast('此收費項目已加入預設', 'warning');
-            return;
-          }
-          settings.defaultBillingItems.push(createBillingSelectionItem(sourceItem, 1));
-          personalConsultationSettings = normalizePersonalConsultationSettings(settings);
-          syncCurrentUserPersonalSettings();
-          renderPersonalConsultationSettings();
-          searchBillingForPersonalDefaults().catch((err) => console.error('更新預設收費搜尋結果失敗:', err));
-          queuePersonalSettingsSave();
-        }
-
-        function removePersonalDefaultBillingItem(itemId) {
-          const idStr = String(itemId);
-          const settings = getPersonalConsultationSettings();
-          settings.defaultBillingItems = settings.defaultBillingItems.filter(item => String(item.id) !== idStr);
-          personalConsultationSettings = normalizePersonalConsultationSettings(settings);
-          syncCurrentUserPersonalSettings();
-          renderPersonalConsultationSettings();
-          searchBillingForPersonalDefaults().catch((err) => console.error('更新預設收費搜尋結果失敗:', err));
-          queuePersonalSettingsSave();
-        }
-
-        function updatePersonalDefaultBillingItemQuantity(itemId, delta) {
-          const idStr = String(itemId);
-          const settings = getPersonalConsultationSettings();
-          settings.defaultBillingItems = settings.defaultBillingItems.map(item => {
-            if (String(item.id) !== idStr) return item;
-            return {
-              ...item,
-              quantity: clampPersonalSettingNumber((parseInt(item.quantity, 10) || 1) + delta, 1, 99, 1)
-            };
-          });
-          personalConsultationSettings = normalizePersonalConsultationSettings(settings);
-          syncCurrentUserPersonalSettings();
-          renderPersonalConsultationSettings();
-          queuePersonalSettingsSave();
-        }
-
-        function setPersonalDefaultBillingItemQuantity(itemId, value) {
-          const idStr = String(itemId);
-          const settings = getPersonalConsultationSettings();
-          settings.defaultBillingItems = settings.defaultBillingItems.map(item => {
-            if (String(item.id) !== idStr) return item;
-            return {
-              ...item,
-              quantity: clampPersonalSettingNumber(value, 1, 99, 1)
-            };
-          });
-          personalConsultationSettings = normalizePersonalConsultationSettings(settings);
-          syncCurrentUserPersonalSettings();
-          renderPersonalConsultationSettings();
-          queuePersonalSettingsSave();
-        }
-
-        function initializePersonalConsultationSettingsUI() {
-          const numberFieldIds = [
-            'personalDefaultMedicationDays',
-            'personalDefaultMedicationFrequency',
-            'personalDefaultFollowUpDays'
-          ];
-          numberFieldIds.forEach(id => {
-            const el = document.getElementById(id);
-            if (!el || el.dataset.personalSettingsBound === 'true') return;
-            el.dataset.personalSettingsBound = 'true';
-            el.addEventListener('change', handlePersonalConsultationSettingsInput);
-            el.addEventListener('blur', handlePersonalConsultationSettingsInput);
-          });
-          ['personalDefaultUsage', 'personalDefaultTreatmentCourse', 'personalDefaultInstructions'].forEach(id => {
-            const el = document.getElementById(id);
-            if (!el || el.dataset.personalSettingsBound === 'true') return;
-            el.dataset.personalSettingsBound = 'true';
-            el.addEventListener('input', handlePersonalConsultationSettingsInput);
-            el.addEventListener('change', handlePersonalConsultationSettingsInput);
-          });
-          const billingSearchEl = document.getElementById('personalBillingItemSearch');
-          if (billingSearchEl && billingSearchEl.dataset.personalSettingsBound !== 'true') {
-            billingSearchEl.dataset.personalSettingsBound = 'true';
-            billingSearchEl.addEventListener('input', function() {
-              searchBillingForPersonalDefaults().catch((err) => console.error('搜尋預設收費項目失敗:', err));
+          function getDiagnosisSettingsFromForm() {
+            const current = getEffectiveDiagnosisSettings();
+            const daysEl = document.getElementById('diagnosisDefaultDays');
+            const freqEl = document.getElementById('diagnosisDefaultFrequency');
+            const followUpDaysEl = document.getElementById('diagnosisDefaultFollowUpDays');
+            const followUpTimeEl = document.getElementById('diagnosisDefaultFollowUpTime');
+            const usageEl = document.getElementById('diagnosisDefaultUsage');
+            const courseEl = document.getElementById('diagnosisDefaultTreatmentCourse');
+            const instructionsEl = document.getElementById('diagnosisDefaultInstructions');
+            const billingCheckboxes = Array.from(document.querySelectorAll('input[name="diagnosisDefaultBillingItem"]'));
+            let selectedBillingItemIds = current.defaultBillingItemIds.slice();
+            if (billingCheckboxes.length > 0) {
+              const renderedIds = billingCheckboxes.map(box => String(box.value));
+              const preservedIds = current.defaultBillingItemIds.filter(id => !renderedIds.includes(String(id)));
+              const checkedIds = billingCheckboxes
+                .filter(box => box.checked)
+                .map(box => String(box.value));
+              selectedBillingItemIds = Array.from(new Set(preservedIds.concat(checkedIds)));
+            }
+            return normalizeDiagnosisSettings({
+              defaultPrescriptionDays: daysEl ? daysEl.value : current.defaultPrescriptionDays,
+              defaultPrescriptionFrequency: freqEl ? freqEl.value : current.defaultPrescriptionFrequency,
+              defaultFollowUpOffsetDays: followUpDaysEl ? followUpDaysEl.value : current.defaultFollowUpOffsetDays,
+              defaultFollowUpTime: followUpTimeEl ? followUpTimeEl.value : current.defaultFollowUpTime,
+              defaultUsage: usageEl ? usageEl.value : current.defaultUsage,
+              defaultTreatmentCourse: courseEl ? courseEl.value : current.defaultTreatmentCourse,
+              defaultInstructions: instructionsEl ? instructionsEl.value : current.defaultInstructions,
+              defaultBillingItemIds: selectedBillingItemIds
             });
           }
-          renderPersonalConsultationSettings();
-        }
+
+          function renderDiagnosisSettingsForm() {
+            try {
+              diagnosisSettings = getDiagnosisSettingsFromForm();
+            } catch (_e) {
+              diagnosisSettings = getEffectiveDiagnosisSettings();
+            }
+            window.diagnosisSettings = diagnosisSettings;
+            const settings = diagnosisSettings;
+            const daysEl = document.getElementById('diagnosisDefaultDays');
+            const freqEl = document.getElementById('diagnosisDefaultFrequency');
+            const followUpDaysEl = document.getElementById('diagnosisDefaultFollowUpDays');
+            const followUpTimeEl = document.getElementById('diagnosisDefaultFollowUpTime');
+            const usageEl = document.getElementById('diagnosisDefaultUsage');
+            const courseEl = document.getElementById('diagnosisDefaultTreatmentCourse');
+            const instructionsEl = document.getElementById('diagnosisDefaultInstructions');
+            const searchEl = document.getElementById('diagnosisBillingItemSearch');
+            const container = document.getElementById('diagnosisDefaultBillingItems');
+            if (daysEl) daysEl.value = settings.defaultPrescriptionDays;
+            if (freqEl) freqEl.value = settings.defaultPrescriptionFrequency;
+            if (followUpDaysEl) followUpDaysEl.value = settings.defaultFollowUpOffsetDays;
+            if (followUpTimeEl) followUpTimeEl.value = settings.defaultFollowUpTime;
+            if (usageEl) usageEl.value = settings.defaultUsage;
+            if (courseEl) courseEl.value = settings.defaultTreatmentCourse;
+            if (instructionsEl) instructionsEl.value = settings.defaultInstructions;
+            if (!container) return;
+            const keyword = searchEl && searchEl.value ? String(searchEl.value).trim().toLowerCase() : '';
+            const availableBillingItems = (typeof billingItems !== 'undefined' && Array.isArray(billingItems))
+              ? billingItems.filter(item => item && item.active)
+              : [];
+            if (availableBillingItems.length === 0) {
+              container.innerHTML = '<div class="text-sm text-gray-500 text-center py-6">未找到可用的收費項目</div>';
+              return;
+            }
+            const filteredItems = availableBillingItems
+              .filter(item => {
+                if (!keyword) return true;
+                const name = item.name ? String(item.name).toLowerCase() : '';
+                const description = item.description ? String(item.description).toLowerCase() : '';
+                return name.includes(keyword) || description.includes(keyword);
+              })
+              .sort((a, b) => {
+                const aName = a && a.name ? String(a.name) : '';
+                const bName = b && b.name ? String(b.name) : '';
+                return aName.localeCompare(bName, 'zh-Hant-HK', { sensitivity: 'base' });
+              });
+            const selectedIds = new Set(settings.defaultBillingItemIds.map(id => String(id)));
+            const categoryLabels = {
+              consultation: '診療費',
+              medicine: '藥費',
+              treatment: '治療費',
+              other: '其他',
+              discount: '折扣項目',
+              package: '套票項目',
+              packageUse: '套票使用'
+            };
+            if (filteredItems.length === 0) {
+              container.innerHTML = '<div class="text-sm text-gray-500 text-center py-6">找不到符合條件的收費項目</div>';
+              return;
+            }
+            const selectedCount = settings.defaultBillingItemIds.length;
+            const itemsHtml = filteredItems.map(item => {
+              const itemId = String(item.id);
+              const isChecked = selectedIds.has(itemId) ? 'checked' : '';
+              const safeName = window.escapeHtml ? window.escapeHtml(String(item.name || '')) : String(item.name || '');
+              const safeDescription = window.escapeHtml ? window.escapeHtml(String(item.description || '')) : String(item.description || '');
+              const categoryLabel = categoryLabels[item.category] || '未分類';
+              const safeCategory = window.escapeHtml ? window.escapeHtml(categoryLabel) : categoryLabel;
+              const priceText = item.category === 'discount' ? '' : `<span class="text-sm font-semibold text-amber-700">$${Number(item.price) || 0}</span>`;
+              const descriptionText = safeDescription ? `<div class="text-xs text-gray-500 mt-1">${safeDescription}</div>` : '';
+              return `
+                <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:border-amber-300 hover:bg-amber-50 transition-colors">
+                  <input type="checkbox" name="diagnosisDefaultBillingItem" value="${itemId}" ${isChecked} class="mt-1 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <span class="font-medium text-gray-800">${safeName}</span>
+                      ${priceText}
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">${safeCategory}${item.unit ? ` / ${window.escapeHtml ? window.escapeHtml(String(item.unit)) : String(item.unit)}` : ''}</div>
+                    ${descriptionText}
+                  </div>
+                </label>
+              `;
+            }).join('');
+            container.innerHTML = `
+              <div class="text-sm text-gray-500 px-1 pb-2">已選擇 ${selectedCount} 個預設收費項目</div>
+              ${itemsHtml}
+            `;
+          }
+
+          async function saveDiagnosisSettings() {
+            diagnosisSettings = getDiagnosisSettingsFromForm();
+            window.diagnosisSettings = diagnosisSettings;
+            await updatePersonalSettings();
+            renderDiagnosisSettingsForm();
+            showToast('診症設定已保存', 'success');
+          }
 
         /**
          * 同步個人慣用組合分類與全域分類。
@@ -30277,7 +29950,8 @@ async function deleteAcupointCombination(id) {
                   acupointComboCategories = [];
                   window.acupointComboCategories = [];
                 }
-                personalConsultationSettings = normalizePersonalConsultationSettings(personal.consultationSettings || {});
+                diagnosisSettings = normalizeDiagnosisSettings(personal.diagnosisSettings);
+                window.diagnosisSettings = diagnosisSettings;
               } else {
                 // 如果找不到用戶記錄或用戶沒有個人設置，則將相關資料清空
                 herbCombinations = [];
@@ -30286,7 +29960,8 @@ async function deleteAcupointCombination(id) {
                 acupointComboCategories = [];
                 window.herbComboCategories = [];
                 window.acupointComboCategories = [];
-                personalConsultationSettings = normalizePersonalConsultationSettings({});
+                diagnosisSettings = getDefaultDiagnosisSettings();
+                window.diagnosisSettings = diagnosisSettings;
               }
             } catch (error) {
               console.error('讀取個人設置失敗:', error);
@@ -30305,8 +29980,10 @@ async function deleteAcupointCombination(id) {
                     setupPersonalComboSearchAndFilter();
                   } catch (_e) {}
                 }
-                if (typeof initializePersonalConsultationSettingsUI === 'function') {
-                  initializePersonalConsultationSettingsUI();
+                if (typeof renderDiagnosisSettingsForm === 'function') {
+                  try {
+                    renderDiagnosisSettingsForm();
+                  } catch (_e) {}
                 }
               } catch (e) {
                 console.error('渲染個人設置失敗:', e);
@@ -30316,7 +29993,7 @@ async function deleteAcupointCombination(id) {
 
           /**
            * 將當前的個人設置保存至 Firestore。
-           * 包含慣用中藥組合和慣用穴位組合。
+           * 包含慣用中藥組合、穴位組合及診症預設設定。
            */
           async function updatePersonalSettings() {
             try {
@@ -30327,12 +30004,18 @@ async function deleteAcupointCombination(id) {
               await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'users', String(currentUserData.id)),
                 {
-                  personalSettings: buildPersonalSettingsPayload(),
+                  personalSettings: {
+                    herbCombinations: Array.isArray(herbCombinations) ? herbCombinations : [],
+                    acupointCombinations: Array.isArray(acupointCombinations) ? acupointCombinations : [],
+                    // 保存個人分類：中藥組合分類與穴位組合分類
+                    herbComboCategories: Array.isArray(herbComboCategories) ? herbComboCategories : [],
+                    acupointComboCategories: Array.isArray(acupointComboCategories) ? acupointComboCategories : [],
+                    diagnosisSettings: normalizeDiagnosisSettings(diagnosisSettings)
+                  },
                   updatedAt: new Date(),
                   updatedBy: currentUser || 'system'
                 }
               );
-              syncCurrentUserPersonalSettings();
             } catch (error) {
               console.error('更新個人設置至 Firestore 失敗:', error);
             }
@@ -30999,10 +30682,13 @@ async function deleteAcupointCombination(id) {
               document.getElementById('herbsContent').classList.remove('hidden');
             } else if (tabId === 'acupoints') {
               document.getElementById('acupointsContent').classList.remove('hidden');
-            } else if (tabId === 'consultationSettings') {
-              document.getElementById('consultationSettingsContent').classList.remove('hidden');
+            } else if (tabId === 'diagnosisSettings') {
+              document.getElementById('diagnosisSettingsContent').classList.remove('hidden');
+              if (typeof renderDiagnosisSettingsForm === 'function') {
+                renderDiagnosisSettingsForm();
+              }
             }
-            const tabButtons = ['herbsTab', 'acupointsTab', 'consultationSettingsTab'];
+            const tabButtons = ['herbsTab', 'acupointsTab', 'diagnosisSettingsTab'];
             tabButtons.forEach(buttonId => {
               const button = document.getElementById(buttonId);
               if (buttonId === tabId + 'Tab') {
@@ -32662,13 +32348,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } catch (_e) {
                 // 若初始化失敗，不影響後續流程
-            }
-            try {
-                if (typeof initializePersonalConsultationSettingsUI === 'function') {
-                    initializePersonalConsultationSettingsUI();
-                }
-            } catch (_e) {
-                console.error('初始化診症設定介面失敗:', _e);
             }
 
             // 監聽個人慣用藥方與穴位組合的搜尋與分類變更，以即時刷新列表
