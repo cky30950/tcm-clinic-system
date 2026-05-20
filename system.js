@@ -27830,6 +27830,8 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   window.updatePersonalSettings = updatePersonalSettings;
   window.renderDiagnosisSettingsForm = renderDiagnosisSettingsForm;
   window.saveDiagnosisSettings = saveDiagnosisSettings;
+  window.addDiagnosisDefaultBillingItem = addDiagnosisDefaultBillingItem;
+  window.removeDiagnosisDefaultBillingItem = removeDiagnosisDefaultBillingItem;
   window.showHerbComboModal = showHerbComboModal;
   window.hideHerbComboModal = hideHerbComboModal;
   window.selectHerbCombo = selectHerbCombo;
@@ -29018,16 +29020,6 @@ function _oldSelectPrescriptionTemplate(id) {
             const usageEl = document.getElementById('diagnosisDefaultUsage');
             const courseEl = document.getElementById('diagnosisDefaultTreatmentCourse');
             const instructionsEl = document.getElementById('diagnosisDefaultInstructions');
-            const billingCheckboxes = Array.from(document.querySelectorAll('input[name="diagnosisDefaultBillingItem"]'));
-            let selectedBillingItemIds = current.defaultBillingItemIds.slice();
-            if (billingCheckboxes.length > 0) {
-              const renderedIds = billingCheckboxes.map(box => String(box.value));
-              const preservedIds = current.defaultBillingItemIds.filter(id => !renderedIds.includes(String(id)));
-              const checkedIds = billingCheckboxes
-                .filter(box => box.checked)
-                .map(box => String(box.value));
-              selectedBillingItemIds = Array.from(new Set(preservedIds.concat(checkedIds)));
-            }
             return normalizeDiagnosisSettings({
               defaultPrescriptionDays: daysEl ? daysEl.value : current.defaultPrescriptionDays,
               defaultPrescriptionFrequency: freqEl ? freqEl.value : current.defaultPrescriptionFrequency,
@@ -29036,8 +29028,44 @@ function _oldSelectPrescriptionTemplate(id) {
               defaultUsage: usageEl ? usageEl.value : current.defaultUsage,
               defaultTreatmentCourse: courseEl ? courseEl.value : current.defaultTreatmentCourse,
               defaultInstructions: instructionsEl ? instructionsEl.value : current.defaultInstructions,
-              defaultBillingItemIds: selectedBillingItemIds
+              defaultBillingItemIds: current.defaultBillingItemIds
             });
+          }
+
+          function addDiagnosisDefaultBillingItem(itemId) {
+            const clinicKey = getDiagnosisSettingsClinicKey();
+            const itemIdStr = String(itemId || '').trim();
+            if (!itemIdStr) return;
+            diagnosisSettingsByClinic = normalizeDiagnosisSettingsMap(diagnosisSettingsByClinic);
+            const current = getDiagnosisSettingsFromForm();
+            const nextIds = current.defaultBillingItemIds.slice();
+            if (!nextIds.includes(itemIdStr)) {
+              nextIds.push(itemIdStr);
+            }
+            diagnosisSettings = normalizeDiagnosisSettings({
+              ...current,
+              defaultBillingItemIds: nextIds
+            });
+            diagnosisSettingsByClinic[clinicKey] = diagnosisSettings;
+            window.diagnosisSettingsByClinic = diagnosisSettingsByClinic;
+            window.diagnosisSettings = diagnosisSettings;
+            renderDiagnosisSettingsForm(true);
+          }
+
+          function removeDiagnosisDefaultBillingItem(itemId) {
+            const clinicKey = getDiagnosisSettingsClinicKey();
+            const itemIdStr = String(itemId || '').trim();
+            if (!itemIdStr) return;
+            diagnosisSettingsByClinic = normalizeDiagnosisSettingsMap(diagnosisSettingsByClinic);
+            const current = getDiagnosisSettingsFromForm();
+            diagnosisSettings = normalizeDiagnosisSettings({
+              ...current,
+              defaultBillingItemIds: current.defaultBillingItemIds.filter(id => String(id) !== itemIdStr)
+            });
+            diagnosisSettingsByClinic[clinicKey] = diagnosisSettings;
+            window.diagnosisSettingsByClinic = diagnosisSettingsByClinic;
+            window.diagnosisSettings = diagnosisSettings;
+            renderDiagnosisSettingsForm(true);
           }
 
           function renderDiagnosisSettingsForm(forceReloadFromClinic = false) {
@@ -29071,6 +29099,7 @@ function _oldSelectPrescriptionTemplate(id) {
             const courseEl = document.getElementById('diagnosisDefaultTreatmentCourse');
             const instructionsEl = document.getElementById('diagnosisDefaultInstructions');
             const searchEl = document.getElementById('diagnosisBillingItemSearch');
+            const selectedContainer = document.getElementById('diagnosisSelectedBillingItems');
             const container = document.getElementById('diagnosisDefaultBillingItems');
             if (daysEl) daysEl.value = settings.defaultPrescriptionDays;
             if (freqEl) freqEl.value = settings.defaultPrescriptionFrequency;
@@ -29079,16 +29108,75 @@ function _oldSelectPrescriptionTemplate(id) {
             if (usageEl) usageEl.value = settings.defaultUsage;
             if (courseEl) courseEl.value = settings.defaultTreatmentCourse;
             if (instructionsEl) instructionsEl.value = settings.defaultInstructions;
-            if (!container) return;
+            if (!container || !selectedContainer) return;
             const keyword = searchEl && searchEl.value ? String(searchEl.value).trim().toLowerCase() : '';
             const availableBillingItems = (typeof billingItems !== 'undefined' && Array.isArray(billingItems))
               ? billingItems.filter(item => item && item.active)
               : [];
             if (availableBillingItems.length === 0) {
+              selectedContainer.innerHTML = '<div class="text-sm text-gray-500 text-center py-4">尚未選擇預設收費項目</div>';
               container.innerHTML = '<div class="text-sm text-gray-500 text-center py-6">未找到可用的收費項目</div>';
               return;
             }
+            const categoryLabels = {
+              consultation: '診療費',
+              medicine: '藥費',
+              treatment: '治療費',
+              other: '其他',
+              discount: '折扣項目',
+              package: '套票項目',
+              packageUse: '套票使用'
+            };
+            const selectedIds = settings.defaultBillingItemIds.map(id => String(id));
+            const selectedIdSet = new Set(selectedIds);
+            const selectedItems = selectedIds
+              .map(id => availableBillingItems.find(item => String(item.id) === id))
+              .filter(Boolean);
+            const makeItemMeta = function(item) {
+              const categoryLabel = categoryLabels[item.category] || '未分類';
+              const safeCategory = window.escapeHtml ? window.escapeHtml(categoryLabel) : categoryLabel;
+              const unitText = item.unit ? ` / ${window.escapeHtml ? window.escapeHtml(String(item.unit)) : String(item.unit)}` : '';
+              const priceText = item.category === 'discount' ? '折扣項目' : `$${Number(item.price) || 0}`;
+              return { safeCategory, unitText, priceText };
+            };
+            if (selectedItems.length === 0) {
+              selectedContainer.innerHTML = `
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-sm font-medium text-gray-700">已選擇項目</div>
+                  <div class="text-xs text-gray-500">0 項</div>
+                </div>
+                <div class="text-sm text-gray-500 text-center py-4 border border-dashed border-gray-200 rounded-lg">尚未選擇預設收費項目</div>
+              `;
+            } else {
+              const selectedHtml = selectedItems.map(item => {
+                const itemId = String(item.id);
+                const safeName = window.escapeHtml ? window.escapeHtml(String(item.name || '')) : String(item.name || '');
+                const safeDescription = window.escapeHtml ? window.escapeHtml(String(item.description || '')) : String(item.description || '');
+                const meta = makeItemMeta(item);
+                return `
+                  <div class="flex items-start justify-between gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50">
+                    <div class="min-w-0 flex-1">
+                      <div class="font-medium text-gray-800">${safeName}</div>
+                      <div class="text-xs text-gray-500 mt-1">${meta.safeCategory}${meta.unitText}</div>
+                      ${safeDescription ? `<div class="text-xs text-gray-500 mt-1">${safeDescription}</div>` : ''}
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <span class="text-sm font-semibold text-amber-700">${meta.priceText}</span>
+                      <button type="button" onclick="removeDiagnosisDefaultBillingItem('${itemId}')" class="px-3 py-1.5 text-sm rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors">移除</button>
+                    </div>
+                  </div>
+                `;
+              }).join('');
+              selectedContainer.innerHTML = `
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-sm font-medium text-gray-700">已選擇項目</div>
+                  <div class="text-xs text-gray-500">${selectedItems.length} 項</div>
+                </div>
+                ${selectedHtml}
+              `;
+            }
             const filteredItems = availableBillingItems
+              .filter(item => !selectedIdSet.has(String(item.id)))
               .filter(item => {
                 if (!keyword) return true;
                 const name = item.name ? String(item.name).toLowerCase() : '';
@@ -29100,46 +29188,41 @@ function _oldSelectPrescriptionTemplate(id) {
                 const bName = b && b.name ? String(b.name) : '';
                 return aName.localeCompare(bName, 'zh-Hant-HK', { sensitivity: 'base' });
               });
-            const selectedIds = new Set(settings.defaultBillingItemIds.map(id => String(id)));
-            const categoryLabels = {
-              consultation: '診療費',
-              medicine: '藥費',
-              treatment: '治療費',
-              other: '其他',
-              discount: '折扣項目',
-              package: '套票項目',
-              packageUse: '套票使用'
-            };
             if (filteredItems.length === 0) {
-              container.innerHTML = '<div class="text-sm text-gray-500 text-center py-6">找不到符合條件的收費項目</div>';
+              container.innerHTML = `
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-sm font-medium text-gray-700">搜索結果</div>
+                  <div class="text-xs text-gray-500">${keyword ? '0 項' : '已全部加入'}</div>
+                </div>
+                <div class="text-sm text-gray-500 text-center py-6 border border-dashed border-gray-200 rounded-lg">${keyword ? '找不到符合條件的收費項目' : '所有可用收費項目已加入已選擇區'}</div>
+              `;
               return;
             }
-            const selectedCount = settings.defaultBillingItemIds.length;
             const itemsHtml = filteredItems.map(item => {
               const itemId = String(item.id);
-              const isChecked = selectedIds.has(itemId) ? 'checked' : '';
               const safeName = window.escapeHtml ? window.escapeHtml(String(item.name || '')) : String(item.name || '');
               const safeDescription = window.escapeHtml ? window.escapeHtml(String(item.description || '')) : String(item.description || '');
-              const categoryLabel = categoryLabels[item.category] || '未分類';
-              const safeCategory = window.escapeHtml ? window.escapeHtml(categoryLabel) : categoryLabel;
-              const priceText = item.category === 'discount' ? '' : `<span class="text-sm font-semibold text-amber-700">$${Number(item.price) || 0}</span>`;
+              const meta = makeItemMeta(item);
               const descriptionText = safeDescription ? `<div class="text-xs text-gray-500 mt-1">${safeDescription}</div>` : '';
               return `
-                <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:border-amber-300 hover:bg-amber-50 transition-colors">
-                  <input type="checkbox" name="diagnosisDefaultBillingItem" value="${itemId}" ${isChecked} class="mt-1 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                <div class="flex items-start justify-between gap-3 p-3 rounded-lg border border-gray-200 hover:border-amber-300 hover:bg-amber-50 transition-colors">
                   <div class="flex-1 min-w-0">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                       <span class="font-medium text-gray-800">${safeName}</span>
-                      ${priceText}
+                      <span class="text-sm font-semibold text-amber-700">${meta.priceText}</span>
                     </div>
-                    <div class="text-xs text-gray-500 mt-1">${safeCategory}${item.unit ? ` / ${window.escapeHtml ? window.escapeHtml(String(item.unit)) : String(item.unit)}` : ''}</div>
+                    <div class="text-xs text-gray-500 mt-1">${meta.safeCategory}${meta.unitText}</div>
                     ${descriptionText}
                   </div>
-                </label>
+                  <button type="button" onclick="addDiagnosisDefaultBillingItem('${itemId}')" class="px-3 py-1.5 text-sm rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors shrink-0">加入</button>
+                </div>
               `;
             }).join('');
             container.innerHTML = `
-              <div class="text-sm text-gray-500 px-1 pb-2">已選擇 ${selectedCount} 個預設收費項目</div>
+              <div class="flex items-center justify-between gap-3 px-1 pb-2">
+                <div class="text-sm font-medium text-gray-700">搜索結果</div>
+                <div class="text-xs text-gray-500">${filteredItems.length} 項</div>
+              </div>
               ${itemsHtml}
             `;
           }
