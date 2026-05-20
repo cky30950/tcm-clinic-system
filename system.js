@@ -25876,6 +25876,44 @@ class FirebaseDataManager {
                 console.error('更新病人套票彙總欄位失敗:', updateErr);
                 return { success: false, error: updateErr.message };
             }
+            try {
+                const pidStr = String(patientId);
+                const applyAggregatePatch = (list) => {
+                    if (!Array.isArray(list)) return list;
+                    return list.map((patient) => {
+                        if (!patient || String(patient.id) !== pidStr) {
+                            return patient;
+                        }
+                        return {
+                            ...patient,
+                            packageActiveCount: activeCount,
+                            packageRemainingUses: totalRemainingUses
+                        };
+                    });
+                };
+
+                if (Array.isArray(patientCache) && patientCache.length > 0) {
+                    patientCache = applyAggregatePatch(patientCache);
+                }
+
+                if (Array.isArray(this.patientsCache) && this.patientsCache.length > 0) {
+                    this.patientsCache = applyAggregatePatch(this.patientsCache);
+                }
+
+                try {
+                    const storedPatients = localStorage.getItem('patients');
+                    if (storedPatients) {
+                        const parsedPatients = JSON.parse(storedPatients);
+                        if (Array.isArray(parsedPatients)) {
+                            localStorage.setItem('patients', JSON.stringify(applyAggregatePatch(parsedPatients)));
+                        }
+                    }
+                } catch (storageErr) {
+                    console.warn('同步病人套票彙總到本地儲存失敗:', storageErr);
+                }
+            } catch (cacheSyncErr) {
+                console.warn('同步病人套票彙總快取失敗:', cacheSyncErr);
+            }
             return { success: true };
         } catch (err) {
             console.error('更新患者套票彙總欄位錯誤:', err);
