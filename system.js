@@ -11778,7 +11778,6 @@ if (!patient) {
                     ` : ''}
                 ${patient.allergies ? `
                     <div class="md:col-span-1 lg:col-span-2">
-                        <span class="font-medium text-red-600">過敏史：</span>
                         <span class="medical-field text-red-700 bg-red-50 px-2 py-1 rounded">${patient.allergies}</span>
                     </div>
                     ` : ''}
@@ -12285,7 +12284,6 @@ async function viewPatientMedicalHistory(patientId) {
                 ` : ''}
                 ${patient.allergies ? `
                 <div class="md:col-span-1 lg:col-span-2">
-                    <span class="font-medium text-red-600">過敏史：</span>
                     <span class="medical-field text-red-700 bg-red-50 px-2 py-1 rounded">${window.escapeHtml(patient.allergies)}</span>
                 </div>
                 ` : ''}
