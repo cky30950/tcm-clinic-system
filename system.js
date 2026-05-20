@@ -29178,7 +29178,7 @@ function _oldSelectPrescriptionTemplate(id) {
             const filteredItems = availableBillingItems
               .filter(item => !selectedIdSet.has(String(item.id)))
               .filter(item => {
-                if (!keyword) return true;
+                if (!keyword) return false;
                 const name = item.name ? String(item.name).toLowerCase() : '';
                 const description = item.description ? String(item.description).toLowerCase() : '';
                 return name.includes(keyword) || description.includes(keyword);
@@ -29188,13 +29188,23 @@ function _oldSelectPrescriptionTemplate(id) {
                 const bName = b && b.name ? String(b.name) : '';
                 return aName.localeCompare(bName, 'zh-Hant-HK', { sensitivity: 'base' });
               });
+            if (!keyword) {
+              container.innerHTML = `
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-sm font-medium text-gray-700">搜索結果</div>
+                  <div class="text-xs text-gray-500">未開始搜尋</div>
+                </div>
+                <div class="text-sm text-gray-500 text-center py-6 border border-dashed border-gray-200 rounded-lg">請先輸入收費項目名稱或描述進行搜尋</div>
+              `;
+              return;
+            }
             if (filteredItems.length === 0) {
               container.innerHTML = `
                 <div class="flex items-center justify-between gap-3">
                   <div class="text-sm font-medium text-gray-700">搜索結果</div>
-                  <div class="text-xs text-gray-500">${keyword ? '0 項' : '已全部加入'}</div>
+                  <div class="text-xs text-gray-500">0 項</div>
                 </div>
-                <div class="text-sm text-gray-500 text-center py-6 border border-dashed border-gray-200 rounded-lg">${keyword ? '找不到符合條件的收費項目' : '所有可用收費項目已加入已選擇區'}</div>
+                <div class="text-sm text-gray-500 text-center py-6 border border-dashed border-gray-200 rounded-lg">找不到符合條件的收費項目</div>
               `;
               return;
             }
