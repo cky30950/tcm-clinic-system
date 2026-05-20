@@ -2583,6 +2583,11 @@ async function fetchUsers(forceRefresh = false) {
             try { if (typeof computeGlobalUsageCounts === 'function') await computeGlobalUsageCounts(); } catch (_eUsage) {}
             try { if (typeof displayHerbLibrary === 'function') displayHerbLibrary(); } catch (_eDisp) {}
             try { if (typeof displayBillingItems === 'function') displayBillingItems(); } catch (_e6) {}
+            try {
+                if (typeof renderDiagnosisSettingsForm === 'function') {
+                    renderDiagnosisSettingsForm(true);
+                }
+            } catch (_eDiagnosisSettings) {}
             advanceGlobalLoading();
             try {
                 const modal = document.getElementById('inventoryHistoryModal');
@@ -6067,7 +6072,7 @@ async function logout() {
                 loadUserManagement();
             } else if (sectionId === 'personalSettings') {
                 if (typeof renderDiagnosisSettingsForm === 'function') {
-                    renderDiagnosisSettingsForm();
+                    renderDiagnosisSettingsForm(true);
                 }
             } else if (sectionId === 'personalStatistics') {
                 
@@ -28930,11 +28935,50 @@ function _oldSelectPrescriptionTemplate(id) {
             };
           }
 
+          function normalizeDiagnosisSettingsMap(rawMap) {
+            const source = rawMap && typeof rawMap === 'object' ? rawMap : {};
+            const normalized = {};
+            Object.keys(source).forEach(key => {
+              const clinicKey = String(key || '').trim();
+              if (!clinicKey) return;
+              normalized[clinicKey] = normalizeDiagnosisSettings(source[key]);
+            });
+            return normalized;
+          }
+
+          function getDiagnosisSettingsClinicKey(clinicId) {
+            const rawClinicId = clinicId !== undefined && clinicId !== null
+              ? clinicId
+              : (typeof currentClinicId !== 'undefined' ? currentClinicId : null);
+            return String(rawClinicId || 'local-default');
+          }
+
+          function getCurrentClinicDisplayNameForDiagnosisSettings() {
+            try {
+              const fromCurrent = getClinicDisplayName(clinicSettings);
+              if (fromCurrent) return fromCurrent;
+            } catch (_e) {}
+            try {
+              if (Array.isArray(clinicsList)) {
+                const matchedClinic = clinicsList.find(c => String(c && c.id) === getDiagnosisSettingsClinicKey());
+                const fromList = getClinicDisplayName(matchedClinic || {});
+                if (fromList) return fromList;
+              }
+            } catch (_e2) {}
+            return '未命名診所';
+          }
+
+          let diagnosisSettingsByClinic = {};
           let diagnosisSettings = getDefaultDiagnosisSettings();
+          window.diagnosisSettingsByClinic = diagnosisSettingsByClinic;
           window.diagnosisSettings = diagnosisSettings;
 
           function getEffectiveDiagnosisSettings() {
-            diagnosisSettings = normalizeDiagnosisSettings(diagnosisSettings);
+            const clinicKey = getDiagnosisSettingsClinicKey();
+            diagnosisSettingsByClinic = normalizeDiagnosisSettingsMap(diagnosisSettingsByClinic);
+            diagnosisSettings = normalizeDiagnosisSettings(diagnosisSettingsByClinic[clinicKey]);
+            diagnosisSettingsByClinic[clinicKey] = diagnosisSettings;
+            window.diagnosisSettingsByClinic = diagnosisSettingsByClinic;
             window.diagnosisSettings = diagnosisSettings;
             return diagnosisSettings;
           }
@@ -28996,12 +29040,27 @@ function _oldSelectPrescriptionTemplate(id) {
             });
           }
 
-          function renderDiagnosisSettingsForm() {
-            try {
-              diagnosisSettings = getDiagnosisSettingsFromForm();
-            } catch (_e) {
+          function renderDiagnosisSettingsForm(forceReloadFromClinic = false) {
+            const clinicKey = getDiagnosisSettingsClinicKey();
+            const panel = document.getElementById('diagnosisSettingsContent');
+            const clinicNameEl = document.getElementById('diagnosisSettingsClinicName');
+            if (clinicNameEl) {
+              clinicNameEl.textContent = getCurrentClinicDisplayNameForDiagnosisSettings();
+            }
+            const canReuseFormState = !forceReloadFromClinic && panel && panel.dataset.clinicKey === clinicKey;
+            if (canReuseFormState) {
+              try {
+                diagnosisSettings = getDiagnosisSettingsFromForm();
+                diagnosisSettingsByClinic = normalizeDiagnosisSettingsMap(diagnosisSettingsByClinic);
+                diagnosisSettingsByClinic[clinicKey] = diagnosisSettings;
+              } catch (_e) {
+                diagnosisSettings = getEffectiveDiagnosisSettings();
+              }
+            } else {
               diagnosisSettings = getEffectiveDiagnosisSettings();
             }
+            if (panel) panel.dataset.clinicKey = clinicKey;
+            window.diagnosisSettingsByClinic = diagnosisSettingsByClinic;
             window.diagnosisSettings = diagnosisSettings;
             const settings = diagnosisSettings;
             const daysEl = document.getElementById('diagnosisDefaultDays');
@@ -29086,11 +29145,15 @@ function _oldSelectPrescriptionTemplate(id) {
           }
 
           async function saveDiagnosisSettings() {
+            const clinicKey = getDiagnosisSettingsClinicKey();
+            diagnosisSettingsByClinic = normalizeDiagnosisSettingsMap(diagnosisSettingsByClinic);
             diagnosisSettings = getDiagnosisSettingsFromForm();
+            diagnosisSettingsByClinic[clinicKey] = diagnosisSettings;
+            window.diagnosisSettingsByClinic = diagnosisSettingsByClinic;
             window.diagnosisSettings = diagnosisSettings;
             await updatePersonalSettings();
-            renderDiagnosisSettingsForm();
-            showToast('診症設定已保存', 'success');
+            renderDiagnosisSettingsForm(true);
+            showToast(`診症設定已保存至「${getCurrentClinicDisplayNameForDiagnosisSettings()}」`, 'success');
           }
 
         /**
@@ -29950,7 +30013,14 @@ async function deleteAcupointCombination(id) {
                   acupointComboCategories = [];
                   window.acupointComboCategories = [];
                 }
-                diagnosisSettings = normalizeDiagnosisSettings(personal.diagnosisSettings);
+                diagnosisSettingsByClinic = normalizeDiagnosisSettingsMap(personal.diagnosisSettingsByClinic);
+                if ((!diagnosisSettingsByClinic || Object.keys(diagnosisSettingsByClinic).length === 0) && personal.diagnosisSettings) {
+                  diagnosisSettingsByClinic = {
+                    [getDiagnosisSettingsClinicKey()]: normalizeDiagnosisSettings(personal.diagnosisSettings)
+                  };
+                }
+                diagnosisSettings = normalizeDiagnosisSettings(diagnosisSettingsByClinic[getDiagnosisSettingsClinicKey()]);
+                window.diagnosisSettingsByClinic = diagnosisSettingsByClinic;
                 window.diagnosisSettings = diagnosisSettings;
               } else {
                 // 如果找不到用戶記錄或用戶沒有個人設置，則將相關資料清空
@@ -29960,6 +30030,8 @@ async function deleteAcupointCombination(id) {
                 acupointComboCategories = [];
                 window.herbComboCategories = [];
                 window.acupointComboCategories = [];
+                diagnosisSettingsByClinic = {};
+                window.diagnosisSettingsByClinic = diagnosisSettingsByClinic;
                 diagnosisSettings = getDefaultDiagnosisSettings();
                 window.diagnosisSettings = diagnosisSettings;
               }
@@ -29982,7 +30054,7 @@ async function deleteAcupointCombination(id) {
                 }
                 if (typeof renderDiagnosisSettingsForm === 'function') {
                   try {
-                    renderDiagnosisSettingsForm();
+                    renderDiagnosisSettingsForm(true);
                   } catch (_e) {}
                 }
               } catch (e) {
@@ -30010,6 +30082,7 @@ async function deleteAcupointCombination(id) {
                     // 保存個人分類：中藥組合分類與穴位組合分類
                     herbComboCategories: Array.isArray(herbComboCategories) ? herbComboCategories : [],
                     acupointComboCategories: Array.isArray(acupointComboCategories) ? acupointComboCategories : [],
+                    diagnosisSettingsByClinic: normalizeDiagnosisSettingsMap(diagnosisSettingsByClinic),
                     diagnosisSettings: normalizeDiagnosisSettings(diagnosisSettings)
                   },
                   updatedAt: new Date(),
@@ -30685,7 +30758,7 @@ async function deleteAcupointCombination(id) {
             } else if (tabId === 'diagnosisSettings') {
               document.getElementById('diagnosisSettingsContent').classList.remove('hidden');
               if (typeof renderDiagnosisSettingsForm === 'function') {
-                renderDiagnosisSettingsForm();
+                renderDiagnosisSettingsForm(true);
               }
             }
             const tabButtons = ['herbsTab', 'acupointsTab', 'diagnosisSettingsTab'];
