@@ -1666,8 +1666,8 @@ const consultationHistoryPager = {
         }
         const state = stateResult.state;
         ctx.setPatientId(String(patientId || ''));
-        ctx.setConsultations(state.recordsByIndex);
         if (state.totalCount <= 0) {
+            ctx.setConsultations(state.recordsByIndex);
             ctx.setCurrentPage(0);
             return { success: true, data: ctx.getConsultations(), totalCount: 0 };
         }
@@ -1677,12 +1677,13 @@ const consultationHistoryPager = {
             return { success: false, data: [] };
         }
         const latestState = this.getCachedPatientState(patientId);
-        if (latestState && Array.isArray(latestState.recordsByIndex)) {
-            // ensure UI context points to the newest cache reference after fallback/rebuild
-            ctx.setConsultations(latestState.recordsByIndex);
+        if (!latestState || !Array.isArray(latestState.recordsByIndex) || !latestState.recordsByIndex[latestPage]) {
+            console.warn('loadForContext: loaded data validation failed');
+            return { success: false, data: [] };
         }
+        ctx.setConsultations(latestState.recordsByIndex);
         ctx.setCurrentPage(latestPage);
-        return { success: true, data: ctx.getConsultations(), totalCount: latestState ? latestState.totalCount : state.totalCount };
+        return { success: true, data: ctx.getConsultations(), totalCount: latestState.totalCount };
     },
     applyListenerList(patientId, list) {
         const pid = String(patientId || '');
@@ -1724,9 +1725,11 @@ const consultationHistoryPager = {
         }
         if (!loaded) return false;
         const latestState = this.getCachedPatientState(patientId);
-        if (latestState && Array.isArray(latestState.recordsByIndex)) {
-            ctx.setConsultations(latestState.recordsByIndex);
+        if (!latestState || !Array.isArray(latestState.recordsByIndex) || !latestState.recordsByIndex[newPage]) {
+            console.warn('changePage: loaded data validation failed for index', newPage);
+            return false;
         }
+        ctx.setConsultations(latestState.recordsByIndex);
         ctx.setCurrentPage(newPage);
         return true;
     },
