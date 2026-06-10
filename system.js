@@ -1297,6 +1297,9 @@ const consultationHistoryPager = {
                 const uiIndex = state.totalCount - i;
                 if (uiIndex >= 0) {
                     state.recordsByIndex[uiIndex] = docs[0];
+                    // #region debug-point B:desc-page-fill
+                    fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"history-first-page-order",runId:"pre-fix",hypothesisId:"B",location:"system.js:fetchDescPage",msg:"[DEBUG] desc page cached",data:{patientId:pid,requestPage:pageNum,filledPage:i,uiIndex,totalCount:state.totalCount,recordId:docs[0]&&docs[0].id||"",sortDate:docs[0]&&docs[0].sortDate&&typeof docs[0].sortDate.toDate==="function"?docs[0].sortDate.toDate().toISOString():docs[0]&&docs[0].sortDate||null,date:docs[0]&&docs[0].date||null},ts:Date.now()})}).catch(()=>{});
+                    // #endregion
                 }
             }
             return { success: true };
@@ -1681,6 +1684,9 @@ const consultationHistoryPager = {
             console.warn('loadForContext: loaded data validation failed');
             return { success: false, data: [] };
         }
+        // #region debug-point A:load-for-context
+        fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"history-first-page-order",runId:"pre-fix",hypothesisId:"A",location:"system.js:loadForContext",msg:"[DEBUG] context loaded for first page",data:{contextKey,patientId:String(patientId||""),latestPage,totalCount:latestState.totalCount,firstIndexDate:latestState.recordsByIndex[0]&&latestState.recordsByIndex[0].date||null,firstIndexSortDate:latestState.recordsByIndex[0]&&latestState.recordsByIndex[0].sortDate&&typeof latestState.recordsByIndex[0].sortDate.toDate==="function"?latestState.recordsByIndex[0].sortDate.toDate().toISOString():latestState.recordsByIndex[0]&&latestState.recordsByIndex[0].sortDate||null,lastIndexDate:latestState.recordsByIndex[latestPage]&&latestState.recordsByIndex[latestPage].date||null,lastIndexSortDate:latestState.recordsByIndex[latestPage]&&latestState.recordsByIndex[latestPage].sortDate&&typeof latestState.recordsByIndex[latestPage].sortDate.toDate==="function"?latestState.recordsByIndex[latestPage].sortDate.toDate().toISOString():latestState.recordsByIndex[latestPage]&&latestState.recordsByIndex[latestPage].sortDate||null},ts:Date.now()})}).catch(()=>{});
+        // #endregion
         ctx.setConsultations(latestState.recordsByIndex);
         ctx.setCurrentPage(latestPage);
         return { success: true, data: ctx.getConsultations(), totalCount: latestState.totalCount };
@@ -11927,6 +11933,9 @@ if (!patient) {
                 `;
                 return;
             }
+            // #region debug-point C:patient-render
+            fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"history-first-page-order",runId:"pre-fix",hypothesisId:"C",location:"system.js:displayPatientMedicalHistoryPage",msg:"[DEBUG] patient history page render",data:{patientId:currentPatientHistoryPatientId||"",currentPatientHistoryPage,totalPages,consultationId:consultation&&consultation.id||"",date:consultation&&consultation.date||null,sortDate:consultation&&consultation.sortDate&&typeof consultation.sortDate.toDate==="function"?consultation.sortDate.toDate().toISOString():consultation&&consultation.sortDate||null},ts:Date.now()})}).catch(()=>{});
+            // #endregion
 
             // Prepare dynamic translation segments.  We look up static labels
             // from the dictionary and build English phrases when needed.
@@ -27031,6 +27040,13 @@ async function displayMedicalRecords(pageChange = false) {
     const term = rawTerm.toLowerCase();
     const itemsPerPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.itemsPerPage) ? paginationSettings.medicalRecordList.itemsPerPage : medicalRecordPageSize;
     let currentPage = (paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.currentPage) ? paginationSettings.medicalRecordList.currentPage : 1;
+    // 非翻頁重繪時，一律先回到第 1 頁，再依該頁碼抓資料，避免誤把舊頁內容顯示成第一頁。
+    if (!pageChange) {
+        currentPage = 1;
+        if (paginationSettings.medicalRecordList) {
+            paginationSettings.medicalRecordList.currentPage = 1;
+        }
+    }
     let filtered = [];
     if (term) {
         let res = medicalRecordSearchCache[term] || null;
@@ -27097,12 +27113,6 @@ async function displayMedicalRecords(pageChange = false) {
         });
     } catch (_sortErr) {
         // 忽略排序失敗
-    }
-    if (!pageChange) {
-        if (paginationSettings.medicalRecordList) {
-            paginationSettings.medicalRecordList.currentPage = 1;
-        }
-        currentPage = 1;
     }
     const totalItems = term ? filtered.length : (typeof medicalRecordTotalCount === 'number' ? medicalRecordTotalCount : filtered.length);
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
