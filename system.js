@@ -10283,15 +10283,35 @@ async function startConsultation(appointmentId) {
             }
         }
         
+const CONSULTATION_DRAFT_TEXT_FIELD_IDS = [
+    'formSymptoms',
+    'formTongue',
+    'formPulse',
+    'formDiagnosis',
+    'formSyndrome',
+    'formUsage',
+    'formTreatmentCourse',
+    'formInstructions'
+];
+
 let consultationSymptomsDraftState = {
     key: null,
     meta: null,
-    el: null,
-    handler: null,
+    listeners: [],
     saveSoon: null
 };
 
 function buildConsultationSymptomsDraftKey(appointment, patient) {
+    const pid = patient && (patient.id !== undefined && patient.id !== null) ? String(patient.id) : '';
+    const isEditing = appointment && appointment.status === 'completed' && appointment.consultationId;
+    if (isEditing) {
+        return `tcmDraft:consultation:form:v2:pid:${pid}:cid:${String(appointment.consultationId)}`;
+    }
+    const apptId = appointment && (appointment.id !== undefined && appointment.id !== null) ? String(appointment.id) : (typeof currentConsultingAppointmentId !== 'undefined' && currentConsultingAppointmentId !== null ? String(currentConsultingAppointmentId) : '');
+    return `tcmDraft:consultation:form:v2:pid:${pid}:aid:${String(apptId)}`;
+}
+
+function buildLegacyConsultationSymptomsDraftKey(appointment, patient) {
     const pid = patient && (patient.id !== undefined && patient.id !== null) ? String(patient.id) : '';
     const isEditing = appointment && appointment.status === 'completed' && appointment.consultationId;
     if (isEditing) {
@@ -10324,43 +10344,113 @@ function writeConsultationSymptomsDraft(key, next) {
 
 function clearConsultationSymptomsDraft(key) {
     try {
-        localStorage.removeItem(key);
+        if (key) {
+            localStorage.removeItem(key);
+        }
+        if (typeof key === 'string' && key.indexOf('tcmDraft:consultation:form:v2:') === 0) {
+            const legacyKey = key.replace('tcmDraft:consultation:form:v2:', 'tcmDraft:consultation:symptoms:v1:');
+            localStorage.removeItem(legacyKey);
+        }
     } catch (_e) {}
 }
 
-function persistConsultationSymptomsDraft(value) {
-    const key = consultationSymptomsDraftState && consultationSymptomsDraftState.key ? consultationSymptomsDraftState.key : null;
-    if (!key) return;
-    const now = Date.now();
-    const existing = readConsultationSymptomsDraft(key) || {};
-    const prevValue = typeof existing.prevValue === 'string' ? existing.prevValue : '';
-    const prevUpdatedAt = typeof existing.prevUpdatedAt === 'number' ? existing.prevUpdatedAt : 0;
-    const currValue = typeof existing.value === 'string' ? existing.value : '';
-    const currUpdatedAt = typeof existing.updatedAt === 'number' ? existing.updatedAt : 0;
-    const next = { ...existing };
-    if (typeof value !== 'string') value = '';
-    if (value !== currValue) {
-        const currHasText = currValue && currValue.trim();
-        const newHasText = value && value.trim();
-        if (currHasText && currValue !== value) {
-            next.prevValue = currValue;
-            next.prevUpdatedAt = currUpdatedAt || now;
-        } else if (!newHasText && prevValue && prevValue.trim()) {
-            next.prevValue = prevValue;
-            next.prevUpdatedAt = prevUpdatedAt || now;
-        }
-        next.value = value;
-        next.updatedAt = now;
-        if (consultationSymptomsDraftState.meta) {
-            next.meta = consultationSymptomsDraftState.meta;
-        }
-        writeConsultationSymptomsDraft(key, next);
+function getConsultationDraftHtmlText(html) {
+    try {
+        const temp = document.createElement('div');
+        temp.innerHTML = String(html || '');
+        return (temp.textContent || temp.innerText || '').replace(/\u00a0/g, ' ').trim();
+    } catch (_e) {
+        return String(html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     }
 }
 
+function normalizeConsultationDraftPrescriptionSections() {
+    if (!Array.isArray(prescriptions)) return [];
+    return prescriptions.map((section, index) => ({
+        name: section && section.name ? String(section.name) : (index === 0 ? '處方' : `處方${index + 1}`),
+        items: Array.isArray(section && section.items) ? JSON.parse(JSON.stringify(section.items)) : [],
+        days: Math.max(1, parseInt(section && section.days, 10) || 5),
+        freq: Math.max(1, parseInt(section && section.freq, 10) || 2),
+        mode: section && section.mode === 'slice' ? 'slice' : 'granule'
+    }));
+}
+
+function normalizeConsultationDraftBillingItems() {
+    return (Array.isArray(selectedBillingItems) ? selectedBillingItems : []).map(item => ({
+        id: item && item.id !== undefined && item.id !== null ? String(item.id) : '',
+        name: item && item.name ? String(item.name) : '',
+        category: item && item.category ? String(item.category) : 'other',
+        price: Number(item && item.price) || 0,
+        unit: item && item.unit ? String(item.unit) : '',
+        description: item && item.description ? String(item.description) : '',
+        quantity: Math.max(1, parseInt(item && item.quantity, 10) || 1),
+        includedInDiscount: item && item.includedInDiscount === false ? false : true,
+        packageUses: Number(item && item.packageUses) || 0,
+        validityDays: Number(item && item.validityDays) || 0,
+        patientId: item && item.patientId ? String(item.patientId) : '',
+        packageRecordId: item && item.packageRecordId ? String(item.packageRecordId) : '',
+        isHistorical: !!(item && item.isHistorical)
+    }));
+}
+
+function collectConsultationDraftPayload() {
+    const fields = {};
+    CONSULTATION_DRAFT_TEXT_FIELD_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        fields[id] = el && 'value' in el ? String(el.value || '') : '';
+    });
+    const acupunctureNotesEl = document.getElementById('formAcupunctureNotes');
+    const prescriptionTextEl = document.getElementById('formPrescription');
+    const billingTextEl = document.getElementById('formBillingItems');
+    return {
+        version: 2,
+        fields,
+        acupunctureNotesHtml: acupunctureNotesEl ? String(acupunctureNotesEl.innerHTML || '') : '',
+        prescription: prescriptionTextEl && 'value' in prescriptionTextEl ? String(prescriptionTextEl.value || '') : '',
+        multiPrescriptions: normalizeConsultationDraftPrescriptionSections(),
+        billingItems: billingTextEl && 'value' in billingTextEl ? String(billingTextEl.value || '') : '',
+        billingItemsStructured: normalizeConsultationDraftBillingItems(),
+        meta: consultationSymptomsDraftState.meta || null,
+        updatedAt: Date.now()
+    };
+}
+
+function hasMeaningfulConsultationDraft(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    const fields = payload.fields && typeof payload.fields === 'object' ? payload.fields : {};
+    if (Object.values(fields).some(value => String(value || '').trim())) {
+        return true;
+    }
+    if (getConsultationDraftHtmlText(payload.acupunctureNotesHtml || '')) {
+        return true;
+    }
+    if (String(payload.prescription || '').trim()) {
+        return true;
+    }
+    if (Array.isArray(payload.multiPrescriptions) && payload.multiPrescriptions.some(section => Array.isArray(section && section.items) && section.items.length > 0)) {
+        return true;
+    }
+    if (String(payload.billingItems || '').trim()) {
+        return true;
+    }
+    if (Array.isArray(payload.billingItemsStructured) && payload.billingItemsStructured.length > 0) {
+        return true;
+    }
+    return false;
+}
+
+function persistConsultationSymptomsDraft() {
+    const key = consultationSymptomsDraftState && consultationSymptomsDraftState.key ? consultationSymptomsDraftState.key : null;
+    if (!key) return;
+    const payload = collectConsultationDraftPayload();
+    if (!hasMeaningfulConsultationDraft(payload)) {
+        clearConsultationSymptomsDraft(key);
+        return;
+    }
+    writeConsultationSymptomsDraft(key, payload);
+}
+
 function restoreConsultationSymptomsDraft(appointment, patient) {
-    const el = document.getElementById('formSymptoms');
-    if (!el) return;
     const key = buildConsultationSymptomsDraftKey(appointment, patient);
     consultationSymptomsDraftState.key = key;
     consultationSymptomsDraftState.meta = {
@@ -10370,54 +10460,172 @@ function restoreConsultationSymptomsDraft(appointment, patient) {
         patientName: patient && patient.name ? String(patient.name) : '',
         doctor: currentUserData && currentUserData.username ? String(currentUserData.username) : (currentUser ? String(currentUser) : '')
     };
-    const draft = readConsultationSymptomsDraft(key);
+    let draft = readConsultationSymptomsDraft(key);
+    if (!draft) {
+        draft = readConsultationSymptomsDraft(buildLegacyConsultationSymptomsDraftKey(appointment, patient));
+    }
     if (!draft) return;
-    const rawValue = typeof draft.value === 'string' ? draft.value : '';
-    const rawPrevValue = typeof draft.prevValue === 'string' ? draft.prevValue : '';
-    const valueToRestore = (rawValue && rawValue.trim()) ? rawValue : ((rawPrevValue && rawPrevValue.trim()) ? rawPrevValue : '');
-    if (!valueToRestore) return;
-    const currentVal = el.value || '';
-    if (currentVal !== valueToRestore) {
-        el.value = valueToRestore;
-        showToast('已自動復原未儲存的主訴及現病史暫存內容', 'info');
+
+    let restored = false;
+    const isLegacySymptomsDraft = Object.prototype.hasOwnProperty.call(draft, 'value') || Object.prototype.hasOwnProperty.call(draft, 'prevValue');
+    if (isLegacySymptomsDraft) {
+        const symptomsEl = document.getElementById('formSymptoms');
+        if (!symptomsEl) return;
+        const rawValue = typeof draft.value === 'string' ? draft.value : '';
+        const rawPrevValue = typeof draft.prevValue === 'string' ? draft.prevValue : '';
+        const valueToRestore = (rawValue && rawValue.trim()) ? rawValue : ((rawPrevValue && rawPrevValue.trim()) ? rawPrevValue : '');
+        if (!valueToRestore) return;
+        if ((symptomsEl.value || '') !== valueToRestore) {
+            symptomsEl.value = valueToRestore;
+            restored = true;
+        }
+    } else {
+        const fields = draft.fields && typeof draft.fields === 'object' ? draft.fields : {};
+        CONSULTATION_DRAFT_TEXT_FIELD_IDS.forEach(id => {
+            if (!Object.prototype.hasOwnProperty.call(fields, id)) return;
+            const el = document.getElementById(id);
+            if (!el || !('value' in el)) return;
+            const nextValue = String(fields[id] || '');
+            if (String(el.value || '') !== nextValue) {
+                el.value = nextValue;
+                restored = true;
+            }
+        });
+
+        if (Object.prototype.hasOwnProperty.call(draft, 'acupunctureNotesHtml')) {
+            const acnEl = document.getElementById('formAcupunctureNotes');
+            const nextHtml = String(draft.acupunctureNotesHtml || '');
+            if (acnEl && String(acnEl.innerHTML || '') !== nextHtml) {
+                acnEl.innerHTML = nextHtml;
+                restored = true;
+                if (typeof initializeAcupointNotesSpans === 'function') {
+                    try {
+                        initializeAcupointNotesSpans();
+                    } catch (_e) {}
+                }
+            }
+        }
+
+        if (Object.prototype.hasOwnProperty.call(draft, 'multiPrescriptions')) {
+            const draftSections = Array.isArray(draft.multiPrescriptions) ? draft.multiPrescriptions : [];
+            if (draftSections.length > 0) {
+                prescriptions = draftSections.map((section, index) => ({
+                    name: section && section.name ? String(section.name) : (index === 0 ? '處方' : `處方${index + 1}`),
+                    items: Array.isArray(section && section.items) ? JSON.parse(JSON.stringify(section.items)) : [],
+                    days: Math.max(1, parseInt(section && section.days, 10) || 5),
+                    freq: Math.max(1, parseInt(section && section.freq, 10) || 2),
+                    mode: section && section.mode === 'slice' ? 'slice' : 'granule'
+                }));
+            } else {
+                const diagnosisDefaults = typeof getEffectiveDiagnosisSettings === 'function'
+                    ? getEffectiveDiagnosisSettings()
+                    : { defaultPrescriptionDays: 5, defaultPrescriptionFrequency: 2 };
+                prescriptions = [{
+                    name: '處方',
+                    items: [],
+                    days: diagnosisDefaults.defaultPrescriptionDays || 5,
+                    freq: diagnosisDefaults.defaultPrescriptionFrequency || 2,
+                    mode: (currentInventoryMode === 'slice' ? 'slice' : 'granule')
+                }];
+            }
+            activePrescriptionIndex = 0;
+            selectedPrescriptionItems = prescriptions[0] && Array.isArray(prescriptions[0].items) ? prescriptions[0].items : [];
+            try {
+                const initialMode = prescriptions[0] && prescriptions[0].mode === 'slice' ? 'slice' : 'granule';
+                changeInventoryType(initialMode);
+            } catch (_e) {}
+            if (typeof updatePrescriptionDisplay === 'function') {
+                updatePrescriptionDisplay();
+            }
+            restored = true;
+        } else if (Object.prototype.hasOwnProperty.call(draft, 'prescription')) {
+            const prescriptionEl = document.getElementById('formPrescription');
+            if (prescriptionEl && String(prescriptionEl.value || '') !== String(draft.prescription || '')) {
+                prescriptionEl.value = String(draft.prescription || '');
+                restored = true;
+            }
+        }
+
+        if (Object.prototype.hasOwnProperty.call(draft, 'billingItemsStructured')) {
+            selectedBillingItems = Array.isArray(draft.billingItemsStructured)
+                ? draft.billingItemsStructured.map(item => ({ ...item }))
+                : [];
+            if (typeof updateBillingDisplay === 'function') {
+                updateBillingDisplay();
+            }
+            restored = true;
+        } else if (Object.prototype.hasOwnProperty.call(draft, 'billingItems')) {
+            const billingEl = document.getElementById('formBillingItems');
+            if (billingEl && String(billingEl.value || '') !== String(draft.billingItems || '')) {
+                billingEl.value = String(draft.billingItems || '');
+                restored = true;
+            }
+        }
+    }
+
+    if (restored) {
+        showToast('已自動復原未儲存的診症暫存內容', 'info');
     }
 }
 
 function setupConsultationSymptomsDraftAutosave(appointment, patient) {
-    const el = document.getElementById('formSymptoms');
-    if (!el) return;
     const key = buildConsultationSymptomsDraftKey(appointment, patient);
     consultationSymptomsDraftState.key = key;
-    consultationSymptomsDraftState.el = el;
-    if (consultationSymptomsDraftState.handler) {
-        try {
-            el.removeEventListener('input', consultationSymptomsDraftState.handler);
-        } catch (_e) {}
+    consultationSymptomsDraftState.meta = {
+        appointmentId: appointment && appointment.id !== undefined && appointment.id !== null ? String(appointment.id) : (typeof currentConsultingAppointmentId !== 'undefined' ? String(currentConsultingAppointmentId) : ''),
+        consultationId: appointment && appointment.consultationId ? String(appointment.consultationId) : '',
+        patientId: patient && patient.id !== undefined && patient.id !== null ? String(patient.id) : '',
+        patientName: patient && patient.name ? String(patient.name) : '',
+        doctor: currentUserData && currentUserData.username ? String(currentUserData.username) : (currentUser ? String(currentUser) : '')
+    };
+    if (Array.isArray(consultationSymptomsDraftState.listeners) && consultationSymptomsDraftState.listeners.length > 0) {
+        consultationSymptomsDraftState.listeners.forEach(listener => {
+            try {
+                if (listener && listener.el && listener.eventName && listener.handler) {
+                    listener.el.removeEventListener(listener.eventName, listener.handler);
+                }
+            } catch (_e) {}
+        });
     }
-    consultationSymptomsDraftState.handler = debounce(() => {
+    consultationSymptomsDraftState.listeners = [];
+    const persistDraftDebounced = debounce(() => {
         try {
-            persistConsultationSymptomsDraft(el.value);
+            persistConsultationSymptomsDraft();
         } catch (_e) {}
     }, 400);
     consultationSymptomsDraftState.saveSoon = debounce(() => {
         try {
-            persistConsultationSymptomsDraft(el.value);
+            persistConsultationSymptomsDraft();
         } catch (_e) {}
     }, 50);
-    el.addEventListener('input', consultationSymptomsDraftState.handler);
+
+    CONSULTATION_DRAFT_TEXT_FIELD_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', persistDraftDebounced);
+        consultationSymptomsDraftState.listeners.push({ el, eventName: 'input', handler: persistDraftDebounced });
+    });
+
+    const acnEl = document.getElementById('formAcupunctureNotes');
+    if (acnEl) {
+        acnEl.addEventListener('input', persistDraftDebounced);
+        consultationSymptomsDraftState.listeners.push({ el: acnEl, eventName: 'input', handler: persistDraftDebounced });
+    }
 }
 
 function stopConsultationSymptomsDraftAutosave() {
     try {
-        const el = consultationSymptomsDraftState && consultationSymptomsDraftState.el ? consultationSymptomsDraftState.el : null;
-        const handler = consultationSymptomsDraftState && consultationSymptomsDraftState.handler ? consultationSymptomsDraftState.handler : null;
-        if (el && handler) {
-            el.removeEventListener('input', handler);
-        }
+        const listeners = consultationSymptomsDraftState && Array.isArray(consultationSymptomsDraftState.listeners)
+            ? consultationSymptomsDraftState.listeners
+            : [];
+        listeners.forEach(listener => {
+            if (listener && listener.el && listener.eventName && listener.handler) {
+                listener.el.removeEventListener(listener.eventName, listener.handler);
+            }
+        });
     } catch (_e) {}
     if (consultationSymptomsDraftState) {
-        consultationSymptomsDraftState.el = null;
-        consultationSymptomsDraftState.handler = null;
+        consultationSymptomsDraftState.listeners = [];
         consultationSymptomsDraftState.saveSoon = null;
     }
 }
@@ -18637,6 +18845,7 @@ async function initializeSystemAfterLogin() {
             } catch (_e) {
                 /* 忽略任何錯誤以避免影響其他功能 */
             }
+            queueConsultationSymptomsDraftSave();
         }
         
         // 依特定處方更新服藥天數
@@ -19166,6 +19375,7 @@ async function searchBillingForConsultation() {
                 `;
                 hiddenTextarea.value = '';
                 totalAmountSpan.textContent = '$0';
+                queueConsultationSymptomsDraftSave();
                 return;
             }
             
@@ -19406,6 +19616,7 @@ async function searchBillingForConsultation() {
             }
             billingText += `\n總費用：$${Math.round(totalAmount)}`;
             hiddenTextarea.value = billingText.trim();
+            queueConsultationSymptomsDraftSave();
         }
         
         // 更新收費項目數量
@@ -29784,6 +29995,7 @@ function _oldSelectPrescriptionTemplate(id) {
       } catch (fuErr) {
         console.warn('解析複診日期失敗：', fuErr);
       }
+      queueConsultationSymptomsDraftSave();
       hidePrescriptionTemplateModal();
       showToast('已載入醫囑模板', 'success');
     } catch (err) {
@@ -31525,6 +31737,7 @@ async function deleteAcupointCombination(id) {
                     }
                     notesEl.appendChild(document.createTextNode(prefix + combo.technique));
                   }
+                  queueConsultationSymptomsDraftSave();
                 } catch (_e) {
                   // fallback：若 addAcupointToNotes 執行失敗，則直接將文字插入
                   let noteStr = '';
@@ -31536,6 +31749,7 @@ async function deleteAcupointCombination(id) {
                     noteStr += '針法：' + combo.technique;
                   }
                   notesEl.innerText = noteStr;
+                  queueConsultationSymptomsDraftSave();
                 }
               }
               showToast('已載入常用穴位組合：' + combo.name, 'success');
@@ -33330,6 +33544,7 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
           parent.removeChild(span);
         }
         if (typeof hideTooltip === 'function') hideTooltip();
+        queueConsultationSymptomsDraftSave();
       });
       // 在處理插入前，紀錄當前滾動位置，以便插入後恢復滾動位置
       const scrollXBefore = window.pageXOffset || document.documentElement.scrollLeft || 0;
@@ -33400,6 +33615,7 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
         // 若瀏覽器不支援 scrollTo 的選項寫法，回退到簡單調用
         window.scrollTo(scrollXBefore, scrollYBefore);
       }
+      queueConsultationSymptomsDraftSave();
     } catch (err) {
       console.error('新增穴位到針灸備註時發生錯誤：', err);
     }
