@@ -1227,8 +1227,12 @@ const consultationHistoryPager = {
         }
         try {
             const patient = await getPatientByIdWithRefresh(pid);
-            if (patient && typeof patient.consultationCount === 'number' && patient.consultationCount >= 0) {
-                const total = Math.max(0, Number(patient.consultationCount) || 0);
+            const aggregateCount = patient && typeof patient.consultationCount === 'number' && patient.consultationCount >= 0
+                ? Math.max(0, Number(patient.consultationCount) || 0)
+                : null;
+            const hasReliableAggregate = aggregateCount !== null && aggregateCount > 0 && !!patient.latestConsultationAt;
+            if (hasReliableAggregate) {
+                const total = aggregateCount;
                 state.totalCount = total;
                 state.countReady = true;
                 state.recordsByIndex = new Array(total);
@@ -1254,6 +1258,14 @@ const consultationHistoryPager = {
             state.recordsByIndex = new Array(total);
             state.mode = 'paged';
             state.allLoaded = false;
+            try {
+                if (window.firebaseDataManager && typeof window.firebaseDataManager.applyPatientAggregateToCaches === 'function') {
+                    window.firebaseDataManager.applyPatientAggregateToCaches(pid, {
+                        consultationCount: total,
+                        ...(total === 0 ? { latestConsultationAt: null } : {})
+                    });
+                }
+            } catch (_aggregateCachePatchErr) {}
             return { success: true, state };
         } catch (error) {
             console.warn('病歷分頁初始化失敗，改用全量讀取模式:', error);
@@ -15521,10 +15533,19 @@ async function loadPatientConsultationSummary(patientId) {
 
     try {
         let patient = await getPatientByIdWithRefresh(patientId);
-
-        const totalConsultations = patient && typeof patient.consultationCount === 'number'
+        let totalConsultations = patient && typeof patient.consultationCount === 'number'
             ? Math.max(0, Number(patient.consultationCount) || 0)
             : 0;
+        try {
+            const stateResult = await consultationHistoryPager.ensurePatientState(patientId, false);
+            if (stateResult && stateResult.success && stateResult.state) {
+                totalConsultations = Math.max(0, Number(stateResult.state.totalCount) || 0);
+                patient = {
+                    ...(patient || {}),
+                    consultationCount: totalConsultations
+                };
+            }
+        } catch (_summaryCountErr) {}
 
         let latestConsultation = null;
         if (
