@@ -30154,6 +30154,11 @@ function _oldSelectPrescriptionTemplate(id) {
               if (Number.isNaN(parsed)) return fallback;
               return Math.min(max, Math.max(min, parsed));
             };
+            const getNonEmptyString = function(value, fallback) {
+              if (typeof value !== 'string') return fallback;
+              const trimmed = value.trim();
+              return trimmed !== '' ? trimmed : fallback;
+            };
             const followUpTime = typeof source.defaultFollowUpTime === 'string' && /^\d{2}:\d{2}$/.test(source.defaultFollowUpTime.trim())
               ? source.defaultFollowUpTime.trim()
               : defaults.defaultFollowUpTime;
@@ -30167,9 +30172,9 @@ function _oldSelectPrescriptionTemplate(id) {
               defaultPrescriptionFrequency: parseIntWithBounds(source.defaultPrescriptionFrequency, defaults.defaultPrescriptionFrequency, 1, 10),
               defaultFollowUpOffsetDays: parseIntWithBounds(source.defaultFollowUpOffsetDays, defaults.defaultFollowUpOffsetDays, 0, 365),
               defaultFollowUpTime: followUpTime,
-              defaultUsage: typeof source.defaultUsage === 'string' ? source.defaultUsage : defaults.defaultUsage,
-              defaultTreatmentCourse: typeof source.defaultTreatmentCourse === 'string' ? source.defaultTreatmentCourse : defaults.defaultTreatmentCourse,
-              defaultInstructions: typeof source.defaultInstructions === 'string' ? source.defaultInstructions : defaults.defaultInstructions,
+              defaultUsage: getNonEmptyString(source.defaultUsage, defaults.defaultUsage),
+              defaultTreatmentCourse: getNonEmptyString(source.defaultTreatmentCourse, defaults.defaultTreatmentCourse),
+              defaultInstructions: getNonEmptyString(source.defaultInstructions, defaults.defaultInstructions),
               defaultBillingItemIds: billingIds
             };
           }
