@@ -12966,6 +12966,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         const clinicPrint = await resolveClinicSettingsByConsultation(consultation);
         const receiptVisibility = mergeReceiptVisibilitySettings(clinicPrint && clinicPrint.receiptFieldVisibility).receipt;
         const customThankYouText = (clinicPrint && clinicPrint.receiptThankYouText) ? String(clinicPrint.receiptThankYouText).trim() : '';
+        const layout = getReceiptPrintLayoutConfig(getClinicReceiptPaperSize(clinicPrint), 'receipt');
         // Construct receipt HTML with localized labels
         const printContent = `
             <!DOCTYPE html>
@@ -12977,51 +12978,51 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     body { 
                         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif; 
                         margin: 0; 
-                        padding: 10px; 
+                        padding: ${layout.bodyPadding}; 
                         line-height: 1.3;
-                        font-size: 11px;
+                        font-size: ${layout.bodyFontSize};
                     }
                     .receipt-container {
-                        width: 148mm;
-                        height: 210mm;
+                        width: ${layout.containerWidth};
+                        height: ${layout.containerHeight};
                         margin: 0 auto;
                         border: 2px solid #000;
-                        padding: 8px;
+                        padding: ${layout.containerPadding};
                         background: white;
                         box-sizing: border-box;
                     }
                     .clinic-header {
                         text-align: center;
                         border-bottom: 2px double #000;
-                        padding-bottom: 10px;
-                        margin-bottom: 15px;
+                        padding-bottom: ${layout.clinicHeaderPaddingBottom};
+                        margin-bottom: ${layout.clinicHeaderMarginBottom};
                     }
                     .clinic-name {
-                        font-size: 14px;
+                        font-size: ${layout.clinicNameFont};
                         font-weight: bold;
                         margin-bottom: 2px;
                         letter-spacing: 1px;
                     }
                     .clinic-subtitle {
-                        font-size: 10px;
+                        font-size: ${layout.clinicSubtitleFont};
                         color: #666;
                         margin-bottom: 3px;
                     }
                     .receipt-title {
-                        font-size: 14px;
+                        font-size: ${layout.titleFont};
                         font-weight: bold;
                         text-align: center;
-                        margin: 6px 0;
+                        margin: ${layout.titleMargin} 0;
                         letter-spacing: 2px;
                     }
                     .receipt-info {
-                        margin-bottom: 10px;
+                        margin-bottom: ${layout.itemsMarginY};
                     }
                     .info-row {
                         display: flex;
                         justify-content: space-between;
-                        margin-bottom: 3px;
-                        font-size: 11px;
+                        margin-bottom: ${layout.infoRowMarginBottom};
+                        font-size: ${layout.infoFont};
                     }
                     .info-label {
                         font-weight: bold;
@@ -13029,76 +13030,76 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     .items-section {
                         border-top: 1px solid #000;
                         border-bottom: 1px solid #000;
-                        padding: 6px 0;
-                        margin: 8px 0;
+                        padding: ${layout.itemsPadding} 0;
+                        margin: ${layout.itemsMarginY} 0;
                     }
                     .items-title {
                         font-weight: bold;
                         text-align: center;
                         margin-bottom: 6px;
-                        font-size: 12px;
+                        font-size: ${layout.itemsTitleFont};
                     }
                     .items-table {
                         width: 100%;
-                        font-size: 10px;
+                        font-size: ${layout.itemsTableFont};
                     }
                     .items-table td {
-                        padding: 3px 5px;
+                        padding: ${layout.itemCellPadding};
                         border-bottom: 1px dotted #999;
                     }
                     .total-section {
                         text-align: right;
                         margin: 4px 0;
-                        font-size: 10px;
+                        font-size: ${layout.totalSectionFont};
                         font-weight: bold;
                     }
                     .total-amount {
-                        font-size: 10px;
+                        font-size: ${layout.totalAmountFont};
                         color: #000;
                         border: 1px solid #000;
-                        padding: 2px;
+                        padding: ${layout.totalAmountPadding};
                         display: inline-block;
-                        min-width: 50px;
+                        min-width: ${layout.totalAmountMinWidth};
                         text-align: center;
                     }
                     .prescription-section {
-                        margin: 8px 0;
+                        margin: ${layout.itemsMarginY} 0;
                         border-top: 1px dashed #666;
-                        padding-top: 6px;
+                        padding-top: ${layout.itemsPadding};
                     }
                     .prescription-title {
                         font-weight: bold;
                         margin-bottom: 4px;
-                        font-size: 11px;
+                        font-size: ${layout.sectionTitleFont};
                     }
                     .prescription-content {
                         background: #f9f9f9;
-                        padding: 4px;
+                        padding: ${layout.highlightPadding};
                         border: 1px solid #ddd;
-                        font-size: 10px;
+                        font-size: ${layout.sectionContentFont};
                         line-height: 1.2;
                     }
                     .footer-info {
-                        margin-top: 10px;
+                        margin-top: ${layout.footerMarginTop};
                         border-top: 1px dashed #666;
-                        padding-top: 6px;
-                        font-size: 9px;
+                        padding-top: ${layout.footerPaddingTop};
+                        font-size: ${layout.footerFont};
                         color: #666;
                     }
                     .footer-row {
                         display: flex;
                         justify-content: space-between;
-                        margin-bottom: 2px;
+                        margin-bottom: ${layout.footerRowMarginBottom};
                     }
                     .thank-you {
                         text-align: center;
-                        margin: 8px 0;
+                        margin: ${layout.thankYouMargin} 0;
                         font-weight: bold;
-                        font-size: 11px;
+                        font-size: ${layout.thankYouFont};
                     }
                     .diagnosis-section {
-                        margin: 6px 0;
-                        font-size: 10px;
+                        margin: ${layout.diagnosisMarginY} 0;
+                        font-size: ${layout.diagnosisFont};
                     }
                     .diagnosis-title {
                         font-weight: bold;
@@ -13107,19 +13108,19 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     }
                     @media print {
                         @page {
-                            size: A5;
-                            margin: 10mm;
+                            size: ${layout.paperSize};
+                            margin: ${layout.pageMargin};
                         }
                         body { 
                             margin: 0; 
                             padding: 0; 
-                            font-size: 11px;
+                            font-size: ${layout.printBodyFontSize};
                         }
                         .receipt-container { 
                             border: 2px solid #000;
                             width: 100%;
                             height: 100%;
-                            padding: 8mm;
+                            padding: ${layout.printPadding};
                         }
                     }
                 </style>
@@ -13222,7 +13223,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     
                     <!-- Total Amount -->
                     <div class="total-section">
-                        <div style="margin-bottom: 4px; font-size: 9px;">${TR.amountDue}${colon}</div>
+                        <div style="margin-bottom: 4px; font-size: ${layout.totalLabelFont};">${TR.amountDue}${colon}</div>
                         <div class="total-amount">HK$ ${totalAmount.toLocaleString()}</div>
                     </div>
                     
@@ -13354,14 +13355,14 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                             return result || consultation.prescription.replace(/\n/g, '<br>');
                         })()}</div>
                         ${medInfoLocalized ? `
-                        <div style="margin-top: 8px; font-size: 12px;">${medInfoLocalized}</div>
+                        <div style="margin-top: 8px; font-size: ${layout.sectionTitleFont};">${medInfoLocalized}</div>
                         ` : ''}
                     </div>
                     ` : ''}
                     
                     <!-- Instructions -->
                     ${consultation.instructions ? `
-                    <div style="margin: 6px 0; font-size: 10px; background: #fff3cd; padding: 6px; border: 1px solid #ffeaa7;">
+                    <div style="margin: 6px 0; font-size: ${layout.sectionContentFont}; background: #fff3cd; padding: ${layout.highlightPadding}; border: 1px solid #ffeaa7;">
                         <strong>${TR.instructions}${colon}</strong><br>
                         ${consultation.instructions}
                     </div>
@@ -13369,7 +13370,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     
                     <!-- Follow-up Reminder -->
                     ${consultation.followUpDate ? `
-                    <div style="margin: 10px 0; font-size: 12px; background: #e3f2fd; padding: 8px; border: 1px solid #90caf9;">
+                    <div style="margin: 10px 0; font-size: ${layout.sectionTitleFont}; background: #e3f2fd; padding: ${layout.highlightPadding}; border: 1px solid #90caf9;">
                         <strong>${TR.followUp}${colon}</strong><br>
                         ${new Date(consultation.followUpDate).toLocaleString(dateLocale)}
                     </div>
@@ -13400,7 +13401,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             </html>
         `;
         // Open a new window and print
-        const printWindow = window.open('', '_blank', 'width=500,height=700');
+        const printWindow = window.open('', '_blank', layout.windowFeatures);
         printWindow.document.write(printContent);
         printWindow.document.close();
         printWindow.focus();
@@ -13509,6 +13510,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
             watermark: isEnglish ? 'Arrival Certificate' : '到診證明'
         };
         const clinicPrint = await resolveClinicSettingsByConsultation(consultation);
+        const layout = getReceiptPrintLayoutConfig(getClinicReceiptPaperSize(clinicPrint), 'certificate');
         // Build certificate HTML
         const printContent = `
             <!DOCTYPE html>
@@ -13520,17 +13522,17 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                     body { 
                         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif; 
                         margin: 0; 
-                        padding: 8px; 
+                        padding: ${layout.bodyPadding}; 
                         line-height: 1.3;
-                        font-size: 10px;
+                        font-size: ${layout.bodyFontSize};
                         background: white;
                     }
                     .certificate-container {
-                        width: 148mm;
-                        height: 210mm;
+                        width: ${layout.containerWidth};
+                        height: ${layout.containerHeight};
                         margin: 0 auto;
                         border: 3px solid #000;
-                        padding: 8px;
+                        padding: ${layout.containerPadding};
                         background: white;
                         position: relative;
                         box-sizing: border-box;
@@ -13538,37 +13540,37 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                     .clinic-header {
                         text-align: center;
                         border-bottom: 2px solid #000;
-                        padding-bottom: 10px;
-                        margin-bottom: 15px;
+                        padding-bottom: ${layout.clinicHeaderPaddingBottom};
+                        margin-bottom: ${layout.clinicHeaderMarginBottom};
                     }
                     .clinic-name {
-                        font-size: 13px;
+                        font-size: ${layout.clinicNameFont};
                         font-weight: bold;
                         margin-bottom: 3px;
                         letter-spacing: 1px;
                     }
                     .clinic-subtitle {
-                        font-size: 10px;
+                        font-size: ${layout.clinicSubtitleFont};
                         color: #666;
                         margin-bottom: 4px;
                     }
                     .certificate-title {
-                        font-size: 16px;
+                        font-size: ${layout.titleFont};
                         font-weight: bold;
                         text-align: center;
-                        margin: 8px 0;
+                        margin: ${layout.titleMargin} 0;
                         letter-spacing: 3px;
                         color: #000;
                     }
                     .certificate-number {
                         text-align: right;
-                        font-size: 10px;
+                        font-size: ${layout.numberFont};
                         color: #666;
                         margin-bottom: 10px;
                     }
                     .content-section {
                         margin: 8px 0;
-                        font-size: 10px;
+                        font-size: ${layout.sectionFont};
                         line-height: 1.4;
                     }
                     .patient-info {
@@ -13581,33 +13583,33 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                     }
                     .info-label {
                         font-weight: bold;
-                        min-width: 80px;
+                        min-width: ${layout.infoLabelMinWidth};
                         display: inline-block;
-                        font-size: 10px;
+                        font-size: ${layout.sectionFont};
                     }
                     .info-value {
                         border-bottom: 1px solid #000;
-                        min-width: 120px;
-                        padding: 3px 6px;
+                        min-width: ${layout.infoValueMinWidth};
+                        padding: ${layout.infoValuePadding};
                         margin-left: 6px;
-                        font-size: 10px;
+                        font-size: ${layout.sectionFont};
                     }
                     .attendance-section {
                         margin: 8px 0;
                         background: #e3f2fd;
-                        padding: 6px;
+                        padding: ${layout.highlightPadding};
                         border: 2px solid #2196f3;
                         border-radius: 4px;
                         text-align: center;
                     }
                     .attendance-title {
-                        font-size: 11px;
+                        font-size: ${layout.sectionFont};
                         font-weight: bold;
                         color: #1976d2;
                         margin-bottom: 4px;
                     }
                     .attendance-details {
-                        font-size: 10px;
+                        font-size: ${layout.sectionFont};
                         line-height: 1.3;
                     }
                     .doctor-signature {
@@ -13621,25 +13623,25 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                     }
                     .signature-line {
                         border-bottom: 2px solid #000;
-                        width: 60px;
-                        height: 25px;
+                        width: ${layout.signatureWidth};
+                        height: ${layout.signatureHeight};
                         margin: 6px auto;
                         position: relative;
                     }
                     .signature-label {
-                        font-size: 9px;
+                        font-size: ${layout.signatureLabelFont};
                         color: #666;
                         margin-top: 3px;
                     }
                     .date-section {
                         text-align: right;
-                        font-size: 10px;
+                        font-size: ${layout.dateFont};
                     }
                     .footer-note {
                         margin-top: 15px;
                         padding-top: 8px;
                         border-top: 1px dashed #666;
-                        font-size: 8px;
+                        font-size: ${layout.footerFont};
                         color: #666;
                         text-align: center;
                     }
@@ -13648,7 +13650,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                         top: 50%;
                         left: 50%;
                         transform: translate(-50%, -50%) rotate(-45deg);
-                        font-size: 80px;
+                        font-size: ${layout.watermarkFont};
                         color: rgba(0, 0, 0, 0.05);
                         font-weight: bold;
                         z-index: 0;
@@ -13660,19 +13662,19 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                     }
                     @media print {
                         @page {
-                            size: A5;
-                            margin: 10mm;
+                            size: ${layout.paperSize};
+                            margin: ${layout.pageMargin};
                         }
                         body { 
                             margin: 0; 
                             padding: 0; 
-                            font-size: 11px;
+                            font-size: ${layout.printBodyFontSize};
                         }
                         .certificate-container { 
                             border: 3px solid #000;
                             width: 100%;
                             height: 100%;
-                            padding: 8mm;
+                            padding: ${layout.printPadding};
                         }
                     }
                 </style>
@@ -13759,7 +13761,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                                 ${(() => {
                                     const regNumber = getDoctorRegistrationNumber(consultation.doctor);
                                     return regNumber ? `
-                                        <div style="margin-top: 5px; font-size: 12px; color: #666;">
+                                        <div style="margin-top: 5px; font-size: ${layout.sectionFont}; color: #666;">
                                             ${TC.registrationNo}${colon}${regNumber}
                                         </div>
                                     ` : '';
@@ -13775,9 +13777,9 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                                         day: '2-digit'
                                     })}
                                 </div>
-                                <div style="border: 2px solid #000; padding: 15px; text-align: center; background: #f8f9fa;">
+                                <div style="border: 2px solid #000; padding: ${layout.sealPadding}; text-align: center; background: #f8f9fa;">
                                     <div style="font-weight: bold; margin-bottom: 5px;">${TC.clinicSeal}</div>
-                                    <div style="font-size: 12px; color: #666;">${TC.sealNote}</div>
+                                    <div style="font-size: ${layout.sealNoteFont}; color: #666;">${TC.sealNote}</div>
                                 </div>
                             </div>
                         </div>
@@ -13796,7 +13798,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
             </html>
         `;
         // Open a new window and print
-        const printWindow = window.open('', '_blank', 'width=700,height=900');
+        const printWindow = window.open('', '_blank', layout.windowFeatures);
         printWindow.document.write(printContent);
         printWindow.document.close();
         printWindow.focus();
@@ -13938,6 +13940,7 @@ async function printSickLeave(consultationId, consultationData = null) {
             watermark: isEnglish ? 'Sick Leave' : '病假證明'
         };
         const clinicPrint = await resolveClinicSettingsByConsultation(consultation);
+        const layout = getReceiptPrintLayoutConfig(getClinicReceiptPaperSize(clinicPrint), 'certificate');
         // 構建 HTML 內容
         const printContent = `
             <!DOCTYPE html>
@@ -13949,17 +13952,17 @@ async function printSickLeave(consultationId, consultationData = null) {
                     body {
                         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
                         margin: 0;
-                        padding: 8px;
+                        padding: ${layout.bodyPadding};
                         line-height: 1.3;
-                        font-size: 10px;
+                        font-size: ${layout.bodyFontSize};
                         background: white;
                     }
                     .certificate-container {
-                        width: 148mm;
-                        height: 210mm;
+                        width: ${layout.containerWidth};
+                        height: ${layout.containerHeight};
                         margin: 0 auto;
                         border: 3px solid #000;
-                        padding: 8px;
+                        padding: ${layout.containerPadding};
                         background: white;
                         position: relative;
                         box-sizing: border-box;
@@ -13967,37 +13970,37 @@ async function printSickLeave(consultationId, consultationData = null) {
                     .clinic-header {
                         text-align: center;
                         border-bottom: 2px solid #000;
-                        padding-bottom: 10px;
-                        margin-bottom: 15px;
+                        padding-bottom: ${layout.clinicHeaderPaddingBottom};
+                        margin-bottom: ${layout.clinicHeaderMarginBottom};
                     }
                     .clinic-name {
-                        font-size: 13px;
+                        font-size: ${layout.clinicNameFont};
                         font-weight: bold;
                         margin-bottom: 3px;
                         letter-spacing: 1px;
                     }
                     .clinic-subtitle {
-                        font-size: 10px;
+                        font-size: ${layout.clinicSubtitleFont};
                         color: #666;
                         margin-bottom: 4px;
                     }
                     .certificate-title {
-                        font-size: 16px;
+                        font-size: ${layout.titleFont};
                         font-weight: bold;
                         text-align: center;
-                        margin: 8px 0;
+                        margin: ${layout.titleMargin} 0;
                         letter-spacing: 3px;
                         color: #000;
                     }
                     .certificate-number {
                         text-align: right;
-                        font-size: 10px;
+                        font-size: ${layout.numberFont};
                         color: #666;
                         margin-bottom: 10px;
                     }
                     .content-section {
                         margin: 8px 0;
-                        font-size: 10px;
+                        font-size: ${layout.sectionFont};
                         line-height: 1.4;
                     }
                     .patient-info {
@@ -14010,31 +14013,31 @@ async function printSickLeave(consultationId, consultationData = null) {
                     }
                     .info-label {
                         font-weight: bold;
-                        min-width: 80px;
+                        min-width: ${layout.infoLabelMinWidth};
                         display: inline-block;
-                        font-size: 10px;
+                        font-size: ${layout.sectionFont};
                     }
                     .info-value {
                         border-bottom: 1px solid #000;
-                        min-width: 120px;
-                        padding: 3px 6px;
+                        min-width: ${layout.infoValueMinWidth};
+                        padding: ${layout.infoValuePadding};
                         margin-left: 6px;
-                        font-size: 10px;
+                        font-size: ${layout.sectionFont};
                     }
                     .diagnosis-section {
                         margin: 8px 0;
                         background: #f9f9f9;
-                        padding: 6px;
+                        padding: ${layout.highlightPadding};
                         border: 1px solid #ddd;
                         border-radius: 3px;
                     }
                     .rest-period {
                         margin: 8px 0;
-                        font-size: 11px;
+                        font-size: ${layout.sectionFont};
                         font-weight: bold;
                         text-align: center;
                         background: #fff3cd;
-                        padding: 6px;
+                        padding: ${layout.highlightPadding};
                         border: 2px solid #ffc107;
                         border-radius: 4px;
                     }
@@ -14049,25 +14052,25 @@ async function printSickLeave(consultationId, consultationData = null) {
                     }
                     .signature-line {
                         border-bottom: 2px solid #000;
-                        width: 60px;
-                        height: 25px;
+                        width: ${layout.signatureWidth};
+                        height: ${layout.signatureHeight};
                         margin: 6px auto;
                         position: relative;
                     }
                     .signature-label {
-                        font-size: 9px;
+                        font-size: ${layout.signatureLabelFont};
                         color: #666;
                         margin-top: 3px;
                     }
                     .date-section {
                         text-align: right;
-                        font-size: 10px;
+                        font-size: ${layout.dateFont};
                     }
                     .footer-note {
                         margin-top: 15px;
                         padding-top: 8px;
                         border-top: 1px dashed #666;
-                        font-size: 8px;
+                        font-size: ${layout.footerFont};
                         color: #666;
                         text-align: center;
                     }
@@ -14076,7 +14079,7 @@ async function printSickLeave(consultationId, consultationData = null) {
                         top: 50%;
                         left: 50%;
                         transform: translate(-50%, -50%) rotate(-45deg);
-                        font-size: 80px;
+                        font-size: ${layout.watermarkFont};
                         color: rgba(0, 0, 0, 0.05);
                         font-weight: bold;
                         z-index: 0;
@@ -14088,19 +14091,19 @@ async function printSickLeave(consultationId, consultationData = null) {
                     }
                     @media print {
                         @page {
-                            size: A5;
-                            margin: 10mm;
+                            size: ${layout.paperSize};
+                            margin: ${layout.pageMargin};
                         }
                         body {
                             margin: 0;
                             padding: 0;
-                            font-size: 11px;
+                            font-size: ${layout.printBodyFontSize};
                         }
                         .certificate-container {
                             border: 3px solid #000;
                             width: 100%;
                             height: 100%;
-                            padding: 8mm;
+                            padding: ${layout.printPadding};
                         }
                     }
                 </style>
@@ -14137,25 +14140,25 @@ async function printSickLeave(consultationId, consultationData = null) {
                                 <div style="margin-top: 10px; font-weight: bold;">${getDoctorDisplayName(consultation.doctor)}</div>
                                 ${(() => {
                                     const regNumber = getDoctorRegistrationNumber(consultation.doctor);
-                                    return regNumber ? `<div style="margin-top: 5px; font-size: 12px; color: #666;">${SL.registrationNo}${colon}${regNumber}</div>` : '';
+                                    return regNumber ? `<div style="margin-top: 5px; font-size: ${layout.sectionFont}; color: #666;">${SL.registrationNo}${colon}${regNumber}</div>` : '';
                                 })()}
                             </div>
                             <div class="date-section">
                                 <div style="margin-bottom: 20px;"><strong>${SL.issueDate}${colon}</strong><br>${new Date().toLocaleDateString(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit' })}</div>
-                                <div style="border: 2px solid #000; padding: 15px; text-align: center; background: #f8f9fa;"><div style="font-weight: bold; margin-bottom: 5px;">${SL.clinicSeal}</div><div style="font-size: 12px; color: #666;">${SL.sealNote}</div></div>
+                                <div style="border: 2px solid #000; padding: ${layout.sealPadding}; text-align: center; background: #f8f9fa;"><div style="font-weight: bold; margin-bottom: 5px;">${SL.clinicSeal}</div><div style="font-size: ${layout.sealNoteFont}; color: #666;">${SL.sealNote}</div></div>
                             </div>
                         </div>
                         <div class="footer-note">
                             <div>${SL.footerNote}</div>
                             <div>${SL.footerTel}${colon}${clinicPrint.phone || '(852) 2345-6789'} | ${SL.footerHours}${colon}${clinicPrint.businessHours || '週一至週五 09:00-18:00'}</div>
-                            <div style="margin-top: 10px; font-size: 10px;">${SL.issuedAt}${colon}${new Date().toLocaleString(dateLocale)}</div>
+                            <div style="margin-top: 10px; font-size: ${layout.sectionFont};">${SL.issuedAt}${colon}${new Date().toLocaleString(dateLocale)}</div>
                         </div>
                     </div>
                 </div>
             </body>
             </html>`;
         // 開啟新視窗並列印
-        const printWindow = window.open('', '_blank', 'width=700,height=900');
+        const printWindow = window.open('', '_blank', layout.windowFeatures);
         printWindow.document.write(printContent);
         printWindow.document.close();
         printWindow.focus();
@@ -14602,6 +14605,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
         };
         const clinicPrint = await resolveClinicSettingsByConsultation(consultation);
         const prescriptionVisibility = mergeReceiptVisibilitySettings(clinicPrint && clinicPrint.receiptFieldVisibility).prescription;
+        const layout = getReceiptPrintLayoutConfig(getClinicReceiptPaperSize(clinicPrint), 'advice');
         // 構建列印內容
         const printContent = `
             <!DOCTYPE html>
@@ -14613,82 +14617,82 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     body {
                         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
                         margin: 0;
-                        padding: 10px;
+                        padding: ${layout.bodyPadding};
                         line-height: 1.3;
-                        font-size: 11px;
+                        font-size: ${layout.bodyFontSize};
                     }
                     .advice-container {
-                        width: 148mm;
-                        height: 210mm;
+                        width: ${layout.containerWidth};
+                        height: ${layout.containerHeight};
                         margin: 0 auto;
                         border: 2px solid #000;
-                        padding: 8px;
+                        padding: ${layout.containerPadding};
                         background: white;
                         box-sizing: border-box;
                     }
                     .clinic-header {
                         text-align: center;
                         border-bottom: 2px double #000;
-                        padding-bottom: 10px;
-                        margin-bottom: 15px;
+                        padding-bottom: ${layout.clinicHeaderPaddingBottom};
+                        margin-bottom: ${layout.clinicHeaderMarginBottom};
                     }
                     .clinic-name {
-                        font-size: 14px;
+                        font-size: ${layout.clinicNameFont};
                         font-weight: bold;
                         margin-bottom: 2px;
                         letter-spacing: 1px;
                     }
                     .clinic-subtitle {
-                        font-size: 10px;
+                        font-size: ${layout.clinicSubtitleFont};
                         color: #666;
                         margin-bottom: 3px;
                     }
                     .advice-title {
-                        font-size: 14px;
+                        font-size: ${layout.titleFont};
                         font-weight: bold;
                         text-align: center;
-                        margin: 6px 0;
+                        margin: ${layout.titleMargin} 0;
                         letter-spacing: 2px;
                     }
                     .patient-info {
-                        margin-bottom: 10px;
-                        font-size: 11px;
+                        margin-bottom: ${layout.footerPaddingTop};
+                        font-size: ${layout.infoFont};
                     }
                     .info-row {
                         display: flex;
                         justify-content: space-between;
-                        margin-bottom: 3px;
-                        font-size: 11px;
+                        margin-bottom: ${layout.infoRowMarginBottom};
+                        font-size: ${layout.infoFont};
                     }
                     .info-label {
                         font-weight: bold;
                     }
                     .section-title {
                         font-weight: bold;
-                        margin-top: 10px;
-                        margin-bottom: 4px;
-                        font-size: 12px;
+                        margin-top: ${layout.sectionTitleMarginTop};
+                        margin-bottom: ${layout.sectionTitleMarginBottom};
+                        font-size: ${layout.sectionTitleFont};
                     }
                     .section-content {
                         background: #f9f9f9;
-                        padding: 4px;
+                        padding: ${layout.sectionContentPadding};
                         border: 1px solid #ddd;
-                        font-size: 10px;
+                        font-size: ${layout.sectionContentFont};
                         line-height: 1.3;
                         border-radius: 3px;
                     }
                     .thank-you {
                         text-align: center;
-                        margin: 12px 0;
-                        font-size: 11px;
+                        margin: ${layout.thankYouMargin} 0;
+                        font-size: ${layout.thankYouFont};
                         font-weight: bold;
                         color: #333;
                     }
                     .footer-info {
-                        margin-top: 10px;
+                        margin-top: ${layout.footerMarginTop};
                         border-top: 1px dashed #666;
-                        padding-top: 6px;
-                        font-size: 9px;
+                        padding-top: ${layout.footerPaddingTop};
+                        font-size: ${layout.footerFont};
                         color: #666;
                     }
                     .footer-row {
@@ -14698,18 +14702,18 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     }
                     @media print {
                         @page {
-                            size: A5;
-                            margin: 10mm;
+                            size: ${layout.paperSize};
+                            margin: ${layout.pageMargin};
                         }
                         body {
                             margin: 0;
                             padding: 0;
-                            font-size: 11px;
+                            font-size: ${layout.printBodyFontSize};
                         }
                         .advice-container {
                             width: 100%;
                             height: 100%;
-                            padding: 8mm;
+                            padding: ${layout.printPadding};
                         }
                     }
                 </style>
@@ -14749,7 +14753,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             </body>
             </html>`;
         // 開啟新視窗並列印
-        const printWindow = window.open('', '_blank', 'width=500,height=700');
+        const printWindow = window.open('', '_blank', layout.windowFeatures);
         printWindow.document.write(printContent);
         printWindow.document.close();
         printWindow.focus();
@@ -15893,6 +15897,125 @@ async function initializeSystemAfterLogin() {
         const RECEIPT_CUSTOM_FIELDS = ['receiptNo', 'medicalRecordNo', 'patientNumber', 'consultationDate', 'consultationTime'];
         const PRESCRIPTION_CUSTOM_FIELDS = ['medicalRecordNo', 'patientNumber', 'consultationDate', 'consultationTime'];
 
+        function normalizeReceiptPaperSize(rawPaperSize) {
+            return String(rawPaperSize || '').toUpperCase() === 'A4' ? 'A4' : 'A5';
+        }
+
+        function getClinicReceiptPaperSize(settingsObj = null) {
+            const source = settingsObj && typeof settingsObj === 'object' ? settingsObj : clinicSettings;
+            return normalizeReceiptPaperSize(source && source.receiptPaperSize);
+        }
+
+        function getReceiptPrintLayoutConfig(paperSize, layoutType = 'receipt') {
+            const normalizedPaperSize = normalizeReceiptPaperSize(paperSize);
+            const isA4 = normalizedPaperSize === 'A4';
+            const shared = {
+                paperSize: normalizedPaperSize,
+                containerWidth: isA4 ? '210mm' : '148mm',
+                containerHeight: isA4 ? '297mm' : '210mm',
+                pageMargin: isA4 ? '12mm' : '10mm',
+                windowFeatures: isA4 ? 'width=900,height=1200' : 'width=700,height=900'
+            };
+
+            if (layoutType === 'certificate') {
+                return {
+                    ...shared,
+                    bodyPadding: isA4 ? '12px' : '8px',
+                    bodyFontSize: isA4 ? '13px' : '10px',
+                    containerPadding: isA4 ? '12px' : '8px',
+                    clinicHeaderPaddingBottom: isA4 ? '14px' : '10px',
+                    clinicHeaderMarginBottom: isA4 ? '20px' : '15px',
+                    clinicNameFont: isA4 ? '18px' : '13px',
+                    clinicSubtitleFont: isA4 ? '12px' : '10px',
+                    titleFont: isA4 ? '24px' : '16px',
+                    titleMargin: isA4 ? '12px' : '8px',
+                    numberFont: isA4 ? '13px' : '10px',
+                    sectionFont: isA4 ? '13px' : '10px',
+                    infoLabelMinWidth: isA4 ? '110px' : '80px',
+                    infoValueMinWidth: isA4 ? '180px' : '120px',
+                    infoValuePadding: isA4 ? '5px 8px' : '3px 6px',
+                    highlightPadding: isA4 ? '10px' : '6px',
+                    signatureWidth: isA4 ? '100px' : '60px',
+                    signatureHeight: isA4 ? '40px' : '25px',
+                    signatureLabelFont: isA4 ? '11px' : '9px',
+                    watermarkFont: isA4 ? '120px' : '80px',
+                    footerFont: isA4 ? '10px' : '8px',
+                    dateFont: isA4 ? '13px' : '10px',
+                    printBodyFontSize: isA4 ? '13px' : '11px',
+                    printPadding: isA4 ? '12mm' : '8mm',
+                    sealPadding: isA4 ? '22px' : '15px',
+                    sealNoteFont: isA4 ? '13px' : '12px'
+                };
+            }
+
+            if (layoutType === 'advice') {
+                return {
+                    ...shared,
+                    bodyPadding: isA4 ? '14px' : '10px',
+                    bodyFontSize: isA4 ? '14px' : '11px',
+                    containerPadding: isA4 ? '14px' : '8px',
+                    clinicHeaderPaddingBottom: isA4 ? '14px' : '10px',
+                    clinicHeaderMarginBottom: isA4 ? '20px' : '15px',
+                    clinicNameFont: isA4 ? '18px' : '14px',
+                    clinicSubtitleFont: isA4 ? '12px' : '10px',
+                    titleFont: isA4 ? '20px' : '14px',
+                    titleMargin: isA4 ? '12px' : '6px',
+                    infoFont: isA4 ? '14px' : '11px',
+                    infoRowMarginBottom: isA4 ? '6px' : '3px',
+                    sectionTitleFont: isA4 ? '16px' : '12px',
+                    sectionTitleMarginTop: isA4 ? '14px' : '10px',
+                    sectionTitleMarginBottom: isA4 ? '6px' : '4px',
+                    sectionContentFont: isA4 ? '13px' : '10px',
+                    sectionContentPadding: isA4 ? '8px' : '4px',
+                    thankYouMargin: isA4 ? '16px' : '12px',
+                    thankYouFont: isA4 ? '15px' : '11px',
+                    footerMarginTop: isA4 ? '16px' : '10px',
+                    footerPaddingTop: isA4 ? '10px' : '6px',
+                    footerFont: isA4 ? '11px' : '9px',
+                    printBodyFontSize: isA4 ? '13px' : '11px',
+                    printPadding: isA4 ? '10mm' : '8mm'
+                };
+            }
+
+            return {
+                ...shared,
+                bodyPadding: isA4 ? '14px' : '10px',
+                bodyFontSize: isA4 ? '14px' : '11px',
+                containerPadding: isA4 ? '14px' : '8px',
+                clinicHeaderPaddingBottom: isA4 ? '14px' : '10px',
+                clinicHeaderMarginBottom: isA4 ? '20px' : '15px',
+                clinicNameFont: isA4 ? '18px' : '14px',
+                clinicSubtitleFont: isA4 ? '12px' : '10px',
+                titleFont: isA4 ? '20px' : '14px',
+                titleMargin: isA4 ? '12px' : '6px',
+                infoFont: isA4 ? '14px' : '11px',
+                infoRowMarginBottom: isA4 ? '6px' : '3px',
+                itemsPadding: isA4 ? '10px' : '6px',
+                itemsMarginY: isA4 ? '12px' : '8px',
+                itemsTitleFont: isA4 ? '16px' : '12px',
+                itemsTableFont: isA4 ? '13px' : '10px',
+                itemCellPadding: isA4 ? '5px 6px' : '3px 5px',
+                totalSectionFont: isA4 ? '13px' : '10px',
+                totalLabelFont: isA4 ? '12px' : '9px',
+                totalAmountFont: isA4 ? '16px' : '10px',
+                totalAmountPadding: isA4 ? '4px 8px' : '2px',
+                totalAmountMinWidth: isA4 ? '80px' : '50px',
+                sectionTitleFont: isA4 ? '14px' : '11px',
+                sectionContentFont: isA4 ? '13px' : '10px',
+                footerMarginTop: isA4 ? '16px' : '10px',
+                footerPaddingTop: isA4 ? '10px' : '6px',
+                footerFont: isA4 ? '11px' : '9px',
+                footerRowMarginBottom: isA4 ? '4px' : '2px',
+                thankYouMargin: isA4 ? '12px' : '8px',
+                thankYouFont: isA4 ? '15px' : '11px',
+                diagnosisMarginY: isA4 ? '10px' : '6px',
+                diagnosisFont: isA4 ? '13px' : '10px',
+                highlightPadding: isA4 ? '10px' : '6px',
+                printBodyFontSize: isA4 ? '13px' : '11px',
+                printPadding: isA4 ? '10mm' : '8mm'
+            };
+        }
+
         function getDefaultReceiptVisibilitySettings() {
             return {
                 receipt: {
@@ -15947,6 +16070,8 @@ async function initializeSystemAfterLogin() {
                 const prescriptionEl = document.getElementById(`prescriptionField_${field}`);
                 if (prescriptionEl) prescriptionEl.checked = !!settings.prescription[field];
             });
+            const paperSizeEl = document.getElementById('receiptPaperSizeSetting');
+            if (paperSizeEl) paperSizeEl.value = getClinicReceiptPaperSize();
         }
 
         function collectReceiptCustomizationUI() {
@@ -16031,6 +16156,7 @@ async function initializeSystemAfterLogin() {
                     phone,
                     address,
                     receiptThankYouText,
+                    receiptPaperSize: 'A5',
                     herbInventoryEnabled: true,
                     createdAt: new Date()
                 });
@@ -16216,10 +16342,14 @@ async function initializeSystemAfterLogin() {
                 return;
             }
             try {
+                const paperSizeEl = document.getElementById('receiptPaperSizeSetting');
+                const receiptPaperSize = normalizeReceiptPaperSize(paperSizeEl ? paperSizeEl.value : 'A5');
                 clinicSettings.receiptFieldVisibility = collectReceiptCustomizationUI();
+                clinicSettings.receiptPaperSize = receiptPaperSize;
                 clinicSettings.updatedAt = new Date().toISOString();
                 await window.firebaseDataManager.updateClinic(currentClinicId, {
                     receiptFieldVisibility: clinicSettings.receiptFieldVisibility,
+                    receiptPaperSize: clinicSettings.receiptPaperSize,
                     updatedAt: clinicSettings.updatedAt
                 });
                 const listRes = await window.firebaseDataManager.getClinics();
