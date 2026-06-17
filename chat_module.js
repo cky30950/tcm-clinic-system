@@ -508,6 +508,7 @@
             
           }
         }
+        this.markCurrentChannelAsRead();
       } else {
         this.chatPopup.classList.add('hidden');
       }
@@ -719,19 +720,7 @@
       this.privateChatId = null;
       this.channelLabel.textContent = '主頻道';
       this.listenToMessages('public');
-
-      
-      
-      
-      const ts = this.lastMessageTime['public'] || Date.now();
-      this.lastSeenTime['public'] = ts;
-      
-      if (typeof this.persistLastSeenTimes === 'function') {
-        this.persistLastSeenTimes();
-      }
-      if (typeof this.updateNewMessageIndicators === 'function') {
-        this.updateNewMessageIndicators();
-      }
+      this.markChannelAsRead('public');
     }
 
     
@@ -747,19 +736,7 @@
       
       this.channelLabel.textContent = userObj.name || userObj.username || '私人聊天';
       this.listenToMessages(chatId);
-
-      
-      
-      
-      const last = this.lastMessageTime[chatId] || Date.now();
-      this.lastSeenTime[chatId] = last;
-      
-      if (typeof this.persistLastSeenTimes === 'function') {
-        this.persistLastSeenTimes();
-      }
-      if (typeof this.updateNewMessageIndicators === 'function') {
-        this.updateNewMessageIndicators();
-      }
+      this.markChannelAsRead(chatId);
     }
 
     
@@ -795,8 +772,8 @@
         const messages = Object.values(data);
         
         messages.sort((a, b) => {
-          const ta = a.timestamp || 0;
-          const tb = b.timestamp || 0;
+          const ta = this.getMessageTimestamp(a);
+          const tb = this.getMessageTimestamp(b);
           return ta - tb;
         });
         
@@ -805,7 +782,7 @@
         let latestTs = 0;
         let latestMsg = null;
         messages.forEach((msg) => {
-          const ts = msg.timestamp || 0;
+          const ts = this.getMessageTimestamp(msg);
           if (ts > latestTs) {
             latestTs = ts;
             latestMsg = msg;
@@ -836,11 +813,7 @@
           
           const popupHidden = (this.chatPopup && this.chatPopup.classList.contains('hidden'));
           if (isCurrent && !popupHidden) {
-            this.lastSeenTime[channelId] = latestTs;
-            
-            if (typeof this.persistLastSeenTimes === 'function') {
-              this.persistLastSeenTimes();
-            }
+            this.markChannelAsRead(channelId);
           }
         } catch (_e) {
           
@@ -892,7 +865,7 @@
           header.appendChild(nameSpan);
         }
         const timeSpan = document.createElement('span');
-        timeSpan.textContent = this.formatTimestamp(msg.timestamp);
+        timeSpan.textContent = this.formatTimestamp(this.getMessageTimestamp(msg));
         header.appendChild(timeSpan);
         
         const bubble = document.createElement('div');
@@ -928,9 +901,72 @@
     }
 
     
+    getNumericTimestamp(value, fallback = 0) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === 'string') {
+        const parsed = parseInt(value, 10);
+        if (!isNaN(parsed)) {
+          return parsed;
+        }
+      }
+      return fallback;
+    }
+
+    
+    getMessageTimestamp(msg) {
+      if (!msg || typeof msg !== 'object') return 0;
+      const serverTimestamp = this.getNumericTimestamp(msg.timestamp, NaN);
+      if (!isNaN(serverTimestamp)) {
+        return serverTimestamp;
+      }
+      return this.getNumericTimestamp(msg.clientTimestamp, 0);
+    }
+
+    
+    getCurrentChannelId() {
+      if (this.currentChannel === 'public') {
+        return 'public';
+      }
+      if (this.currentChannel === 'private' && this.privateChatId) {
+        return this.privateChatId;
+      }
+      return null;
+    }
+
+    
+    markChannelAsRead(channelId) {
+      if (!channelId) return;
+      const latestTs = this.lastMessageTime[channelId] || 0;
+      if (!latestTs) {
+        if (typeof this.updateNewMessageIndicators === 'function') {
+          this.updateNewMessageIndicators();
+        }
+        return;
+      }
+      if ((this.lastSeenTime[channelId] || 0) < latestTs) {
+        this.lastSeenTime[channelId] = latestTs;
+        if (typeof this.persistLastSeenTimes === 'function') {
+          this.persistLastSeenTimes();
+        }
+      }
+      if (typeof this.updateNewMessageIndicators === 'function') {
+        this.updateNewMessageIndicators();
+      }
+    }
+
+    
+    markCurrentChannelAsRead() {
+      const channelId = this.getCurrentChannelId();
+      this.markChannelAsRead(channelId);
+    }
+
+    
     formatTimestamp(ts) {
       try {
-        const date = new Date(parseInt(ts, 10));
+        const normalized = this.getNumericTimestamp(ts, NaN);
+        const date = new Date(normalized);
         if (isNaN(date.getTime())) return '';
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -947,13 +983,16 @@
     sendMessage() {
       const text = (this.messageInput && this.messageInput.value) ? this.messageInput.value.trim() : '';
       if (!text) return;
-      const timestamp = Date.now();
+      const clientTimestamp = Date.now();
       const messageData = {
         senderId: this.currentUserUid,
         
         senderName: (this.currentUser && (this.currentUser.name || this.currentUser.username)) || '',
         text: text,
-        timestamp: timestamp
+        timestamp: (window.firebase && typeof window.firebase.serverTimestamp === 'function')
+          ? window.firebase.serverTimestamp()
+          : clientTimestamp,
+        clientTimestamp: clientTimestamp
       };
       let path;
       if (this.currentChannel === 'public') {
@@ -964,7 +1003,11 @@
         return;
       }
       
-      const msgRef = window.firebase.ref(window.firebase.rtdb, `${path}/${timestamp}`);
+      const channelId = (this.currentChannel === 'public') ? 'public' : this.privateChatId;
+      const baseRef = window.firebase.ref(window.firebase.rtdb, path);
+      const msgRef = (window.firebase && typeof window.firebase.push === 'function')
+        ? window.firebase.push(baseRef)
+        : window.firebase.ref(window.firebase.rtdb, `${path}/${clientTimestamp}`);
       window.firebase.set(msgRef, messageData).then(() => {
         
         this.messageInput.value = '';
@@ -972,20 +1015,22 @@
         this.sendButton.disabled = true;
         
         this.messageInput.style.height = 'auto';
-
-        
-        
-        
-        const channelId = (this.currentChannel === 'public') ? 'public' : this.privateChatId;
         if (channelId) {
-          this.lastSeenTime[channelId] = timestamp;
-          if (typeof this.updateNewMessageIndicators === 'function') {
-            this.updateNewMessageIndicators();
+          this.lastSeenTime[channelId] = clientTimestamp;
+          if ((this.lastMessageTime[channelId] || 0) < clientTimestamp) {
+            this.lastMessageTime[channelId] = clientTimestamp;
           }
-
-          
+          this.lastMessageInfo[channelId] = {
+            senderId: messageData.senderId || null,
+            senderName: messageData.senderName || '',
+            text: messageData.text || '',
+            timestamp: clientTimestamp
+          };
           if (typeof this.persistLastSeenTimes === 'function') {
             this.persistLastSeenTimes();
+          }
+          if (typeof this.updateNewMessageIndicators === 'function') {
+            this.updateNewMessageIndicators();
           }
         }
       }).catch((err) => {
@@ -1020,7 +1065,7 @@
           let latestMsg = null;
           snapshot.forEach((child) => {
             const msg = child.val() || {};
-            const ts = msg.timestamp || 0;
+            const ts = this.getMessageTimestamp(msg);
             if (ts > latest) {
               latest = ts;
               latestMsg = msg;
@@ -1065,7 +1110,7 @@
             let latestMsg = null;
             snapshot.forEach((child) => {
               const msg = child.val() || {};
-              const ts = msg.timestamp || 0;
+              const ts = this.getMessageTimestamp(msg);
               if (ts > latest) {
                 latest = ts;
                 latestMsg = msg;
@@ -1573,7 +1618,7 @@
      */
     playNotificationSound() {
       try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const AudioContext = window.AudioContext || window['webkitAudioContext'];
         if (!AudioContext) return;
         const ctx = new AudioContext();
         const oscillator = ctx.createOscillator();
