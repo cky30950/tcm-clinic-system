@@ -936,6 +936,65 @@
     }
 
     
+    getChannelPeerUid(channelId) {
+      if (!channelId || channelId === 'public') return null;
+      const ids = String(channelId).split('_');
+      if (ids.length < 2) return null;
+      return ids.find((id) => String(id) !== String(this.currentUserUid)) || null;
+    }
+
+    
+    buildSummaryPayload(channelId, messageData) {
+      const clientTimestamp = this.getNumericTimestamp(messageData && messageData.clientTimestamp, Date.now());
+      return {
+        channelId: channelId,
+        senderId: messageData && messageData.senderId ? messageData.senderId : null,
+        senderName: messageData && messageData.senderName ? messageData.senderName : '',
+        text: messageData && messageData.text ? messageData.text : '',
+        timestamp: (window.firebase && typeof window.firebase.serverTimestamp === 'function')
+          ? window.firebase.serverTimestamp()
+          : clientTimestamp,
+        clientTimestamp: clientTimestamp,
+        channelType: channelId === 'public' ? 'public' : 'private'
+      };
+    }
+
+    
+    appendSummaryUpdates(updates, channelId, messageData) {
+      if (!updates || !channelId || !messageData) return;
+      const summaryPayload = this.buildSummaryPayload(channelId, messageData);
+      if (channelId === 'public') {
+        updates['chat/summaries/public'] = summaryPayload;
+        return;
+      }
+
+      const peerUid = this.getChannelPeerUid(channelId);
+      if (!peerUid) return;
+      updates[`chat/userSummaries/${this.currentUserUid}/${channelId}`] = {
+        ...summaryPayload,
+        peerUid: peerUid
+      };
+      updates[`chat/userSummaries/${peerUid}/${channelId}`] = {
+        ...summaryPayload,
+        peerUid: this.currentUserUid
+      };
+    }
+
+    
+    applySummaryToChannel(channelId, summary) {
+      if (!channelId || !summary || typeof summary !== 'object') return;
+      const latestTs = this.getMessageTimestamp(summary);
+      if (!latestTs) return;
+      this.lastMessageTime[channelId] = latestTs;
+      this.lastMessageInfo[channelId] = {
+        senderId: summary.senderId || null,
+        senderName: summary.senderName || '',
+        text: summary.text || '',
+        timestamp: latestTs
+      };
+    }
+
+    
     markChannelAsRead(channelId) {
       if (!channelId) return;
       const latestTs = this.lastMessageTime[channelId] || 0;
@@ -1005,10 +1064,16 @@
       
       const channelId = (this.currentChannel === 'public') ? 'public' : this.privateChatId;
       const baseRef = window.firebase.ref(window.firebase.rtdb, path);
-      const msgRef = (window.firebase && typeof window.firebase.push === 'function')
+      const generatedRef = (window.firebase && typeof window.firebase.push === 'function')
         ? window.firebase.push(baseRef)
-        : window.firebase.ref(window.firebase.rtdb, `${path}/${clientTimestamp}`);
-      window.firebase.set(msgRef, messageData).then(() => {
+        : null;
+      const messageKey = generatedRef && generatedRef.key ? generatedRef.key : String(clientTimestamp);
+      const rootRef = window.firebase.ref(window.firebase.rtdb);
+      const updates = {
+        [`${path}/${messageKey}`]: messageData
+      };
+      this.appendSummaryUpdates(updates, channelId, messageData);
+      window.firebase.update(rootRef, updates).then(() => {
         
         this.messageInput.value = '';
         this.charCount.textContent = '0/500';
@@ -1056,92 +1121,107 @@
       this.channelListeners = {};
       
       try {
-        const publicRef = window.firebase.ref(window.firebase.rtdb, 'chat/messages/public');
-        
-        const publicQuery = window.firebase.query(publicRef, window.firebase.orderByChild('timestamp'), window.firebase.limitToLast(1));
+        const publicSummaryRef = window.firebase.ref(window.firebase.rtdb, 'chat/summaries/public');
         const publicCallback = (snapshot) => {
-          
-          let latest = 0;
-          let latestMsg = null;
-          snapshot.forEach((child) => {
-            const msg = child.val() || {};
-            const ts = this.getMessageTimestamp(msg);
-            if (ts > latest) {
-              latest = ts;
-              latestMsg = msg;
-            }
-          });
-          
-          this.lastMessageTime['public'] = latest;
-          
-          if (latestMsg) {
-            this.lastMessageInfo['public'] = {
-              senderId: latestMsg.senderId || null,
-              senderName: latestMsg.senderName || '',
-              text: latestMsg.text || '',
-              timestamp: latest
-            };
+          const summary = snapshot.val();
+          if (summary) {
+            this.applySummaryToChannel('public', summary);
           }
           if (typeof this.updateUserListOrder === 'function') {
             this.updateUserListOrder();
           }
         };
-        window.firebase.onValue(publicQuery, publicCallback);
-        this.channelListeners['public'] = { ref: publicQuery, callback: publicCallback };
+        window.firebase.onValue(publicSummaryRef, publicCallback);
+        this.channelListeners['public'] = { ref: publicSummaryRef, callback: publicCallback };
       } catch (err) {
-        console.error('ChatModule: Failed to attach last message listener for public', err);
+        console.error('ChatModule: Failed to attach public summary listener', err);
       }
       
       try {
-        const list = Array.isArray(this.usersList) ? this.usersList : [];
-        list.forEach((u) => {
-          if (!u) return;
-          const uid = u.uid || u.id;
-          if (!uid) return;
-          
-          if (String(uid) === String(this.currentUserUid) || String(uid) === String(this.currentUser && this.currentUser.id)) return;
-          const chatId = [String(this.currentUserUid), String(uid)].sort().join('_');
-          const path = `chat/private/${chatId}`;
-          const baseRef = window.firebase.ref(window.firebase.rtdb, path);
-          
-          const q = window.firebase.query(baseRef, window.firebase.orderByChild('timestamp'), window.firebase.limitToLast(1));
-          const cb = (snapshot) => {
-            let latest = 0;
-            let latestMsg = null;
-            snapshot.forEach((child) => {
-              const msg = child.val() || {};
-              const ts = this.getMessageTimestamp(msg);
-              if (ts > latest) {
-                latest = ts;
-                latestMsg = msg;
-              }
-            });
-            
-            this.lastMessageTime[chatId] = latest;
-            
-            if (latestMsg) {
-              this.lastMessageInfo[chatId] = {
-                senderId: latestMsg.senderId || null,
-                senderName: latestMsg.senderName || '',
-                text: latestMsg.text || '',
-                timestamp: latest
-              };
-            }
-            if (typeof this.updateUserListOrder === 'function') {
-              this.updateUserListOrder();
-            }
-          };
-          window.firebase.onValue(q, cb);
-          this.channelListeners[chatId] = { ref: q, callback: cb };
-        });
+        const summaryRef = window.firebase.ref(window.firebase.rtdb, `chat/userSummaries/${this.currentUserUid}`);
+        const summaryCallback = (snapshot) => {
+          const summaryMap = snapshot.val() || {};
+          Object.keys(summaryMap).forEach((channelId) => {
+            this.applySummaryToChannel(channelId, summaryMap[channelId]);
+          });
+          this.bootstrapMissingConversationSummaries(summaryMap);
+          if (typeof this.updateUserListOrder === 'function') {
+            this.updateUserListOrder();
+          }
+        };
+        window.firebase.onValue(summaryRef, summaryCallback);
+        this.channelListeners['userSummaries'] = { ref: summaryRef, callback: summaryCallback };
       } catch (err) {
-        console.error('ChatModule: Failed to attach last message listeners for private chats', err);
+        console.error('ChatModule: Failed to attach user summary listener', err);
       }
 
       
       
       if (typeof this.updateNewMessageIndicators === 'function') {
         this.updateNewMessageIndicators();
+      }
+    }
+
+    
+    bootstrapMissingConversationSummaries(summaryMap = {}) {
+      try {
+        const get = window.firebase && window.firebase.get;
+        const ref = window.firebase && window.firebase.ref;
+        const query = window.firebase && window.firebase.query;
+        const orderByChild = window.firebase && window.firebase.orderByChild;
+        const limitToLast = window.firebase && window.firebase.limitToLast;
+        const rtdb = window.firebase && window.firebase.rtdb;
+        if (!get || !ref || !query || !orderByChild || !limitToLast || !rtdb) {
+          return;
+        }
+
+        const tasks = [];
+        if (!summaryMap.public && !this.lastMessageInfo['public']) {
+          const publicRef = ref(rtdb, 'chat/messages/public');
+          const publicQuery = query(publicRef, orderByChild('timestamp'), limitToLast(1));
+          tasks.push(
+            get(publicQuery).then((snapshot) => {
+              snapshot.forEach((child) => {
+                this.applySummaryToChannel('public', child.val() || {});
+              });
+            }).catch((err) => {
+              console.error('ChatModule: Failed to bootstrap public summary', err);
+            })
+          );
+        }
+
+        const list = Array.isArray(this.usersList) ? this.usersList : [];
+        list.forEach((u) => {
+          if (!u) return;
+          const uid = u.uid || u.id;
+          if (!uid) return;
+          if (String(uid) === String(this.currentUserUid) || String(uid) === String(this.currentUser && this.currentUser.id)) return;
+
+          const chatId = [String(this.currentUserUid), String(uid)].sort().join('_');
+          if (summaryMap[chatId] || this.lastMessageInfo[chatId]) return;
+
+          const chatRef = ref(rtdb, `chat/private/${chatId}`);
+          const lastMessageQuery = query(chatRef, orderByChild('timestamp'), limitToLast(1));
+          tasks.push(
+            get(lastMessageQuery).then((snapshot) => {
+              snapshot.forEach((child) => {
+                this.applySummaryToChannel(chatId, child.val() || {});
+              });
+            }).catch((err) => {
+              console.error('ChatModule: Failed to bootstrap private summary', err);
+            })
+          );
+        });
+
+        if (tasks.length > 0) {
+          Promise.allSettled(tasks).then(() => {
+            if (typeof this.updateUserListOrder === 'function') {
+              this.updateUserListOrder();
+            }
+          });
+        }
+      } catch (err) {
+        console.error('ChatModule: Failed to bootstrap conversation summaries', err);
       }
     }
 

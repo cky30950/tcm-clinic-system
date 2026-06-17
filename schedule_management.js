@@ -105,8 +105,8 @@
             { date: '2025-12-25', name: 'Christmas Day' }
         ];
 
-        const HK_HOLIDAY_1823_TC_URL = 'https://www.1823.gov.hk/common/ical/tc.json';
-        const HK_HOLIDAY_CACHE_KEY_TC = 'hk_public_holidays_1823_tc_v1';
+        const HK_HOLIDAY_API_BASE_URL = 'https://date.nager.at/api/v3/PublicHolidays';
+        const HK_HOLIDAY_CACHE_KEY_PREFIX = 'hk_public_holidays_nager_v1_';
         const HK_HOLIDAY_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
         const US_HOLIDAY_API_BASE_URL = 'https://date.nager.at/api/v3/PublicHolidays';
         const US_HOLIDAY_CACHE_KEY_PREFIX = 'us_public_holidays_nager_v1_';
@@ -173,23 +173,15 @@
             return map;
         }
 
-        function parse1823HolidayJson(json) {
+        function parseHkHolidayJson(json) {
             try {
-                const vc = json && Array.isArray(json.vcalendar) ? json.vcalendar[0] : null;
-                const events = vc && Array.isArray(vc.vevent) ? vc.vevent : [];
+                if (!Array.isArray(json)) return [];
                 const out = [];
-                events.forEach(ev => {
-                    if (!ev) return;
-                    const raw = ev.dtstart && Array.isArray(ev.dtstart) ? ev.dtstart[0] : null;
-                    const name = ev.summary || '';
-                    if (!raw || typeof raw !== 'string') return;
-                    if (raw.length !== 8) return;
-                    const yyyy = raw.slice(0, 4);
-                    const mm = raw.slice(4, 6);
-                    const dd = raw.slice(6, 8);
-                    const date = `${yyyy}-${mm}-${dd}`;
+                json.forEach(item => {
+                    if (!item || typeof item.date !== 'string') return;
+                    const name = item.localName || item.name || '';
                     if (!name) return;
-                    out.push({ date, name });
+                    out.push({ date: item.date, name });
                 });
                 return out;
             } catch (_e) {
@@ -232,25 +224,32 @@
             return `${US_HOLIDAY_CACHE_KEY_PREFIX}${year}`;
         }
 
-        let hkHolidayByDate = buildHolidayMapFromList(hkHolidaysFallback);
+        const hkHolidayListsByYear = groupHolidayListByYear(hkHolidaysFallback);
+        let hkHolidayByDate = buildHolidayMapFromYearGroups(hkHolidayListsByYear);
         const usHolidayListsByYear = groupHolidayListByYear(usHolidaysFallback);
         let usHolidayByDate = buildHolidayMapFromYearGroups(usHolidayListsByYear);
-        let hkHolidayRemoteLoadInProgress = false;
+        const hkHolidayHydratedYears = new Set();
+        const hkHolidayRemoteLoadInProgressByYear = Object.create(null);
         const usHolidayHydratedYears = new Set();
         const usHolidayRemoteLoadInProgressByYear = Object.create(null);
 
-        function tryHydrateHkHolidaysFromCache() {
+        function getHkHolidayCacheKey(year) {
+            return `${HK_HOLIDAY_CACHE_KEY_PREFIX}${year}`;
+        }
+
+        function tryHydrateHkHolidaysFromCache(year) {
             try {
-                const raw = localStorage.getItem(HK_HOLIDAY_CACHE_KEY_TC);
+                const raw = localStorage.getItem(getHkHolidayCacheKey(year));
                 if (!raw) return false;
                 const cached = JSON.parse(raw);
                 if (!cached || !Array.isArray(cached.list)) return false;
                 if (cached.fetchedAt && Date.now() - cached.fetchedAt > HK_HOLIDAY_CACHE_MAX_AGE_MS) {
                     return false;
                 }
-                const map = buildHolidayMapFromList(cached.list);
-                if (Object.keys(map).length === 0) return false;
-                hkHolidayByDate = map;
+                const list = cached.list.filter(item => item && typeof item.date === 'string');
+                hkHolidayListsByYear[String(year)] = list;
+                hkHolidayByDate = buildHolidayMapFromYearGroups(hkHolidayListsByYear);
+                hkHolidayHydratedYears.add(String(year));
                 return true;
             } catch (_e) {
                 return false;
@@ -276,43 +275,36 @@
             }
         }
 
-        async function refreshHkHolidaysFrom1823({ force = false } = {}) {
-            if (hkHolidayRemoteLoadInProgress) return;
-            if (!force) {
-                try {
-                    const raw = localStorage.getItem(HK_HOLIDAY_CACHE_KEY_TC);
-                    if (raw) {
-                        const cached = JSON.parse(raw);
-                        if (cached && cached.fetchedAt && Date.now() - cached.fetchedAt <= HK_HOLIDAY_CACHE_MAX_AGE_MS) {
-                            return;
-                        }
-                    }
-                } catch (_e) {
-                    
-                }
-            }
+        async function refreshHkHolidaysForYear(year, { force = false } = {}) {
+            const yearKey = String(year);
+            if (hkHolidayRemoteLoadInProgressByYear[yearKey]) return;
+            if (!force && hkHolidayHydratedYears.has(yearKey)) return;
+            if (!force && tryHydrateHkHolidaysFromCache(yearKey)) return;
             if (!window.fetch) return;
-            hkHolidayRemoteLoadInProgress = true;
+            hkHolidayRemoteLoadInProgressByYear[yearKey] = true;
             try {
                 const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
                 const timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
-                const res = await fetch(HK_HOLIDAY_1823_TC_URL, { signal: controller ? controller.signal : undefined });
+                const res = await fetch(`${HK_HOLIDAY_API_BASE_URL}/${encodeURIComponent(yearKey)}/HK`, {
+                    signal: controller ? controller.signal : undefined
+                });
                 if (timeoutId) clearTimeout(timeoutId);
                 if (!res || !res.ok) return;
                 const json = await res.json();
-                const list = parse1823HolidayJson(json);
-                const map = buildHolidayMapFromList(list);
-                if (Object.keys(map).length === 0) return;
-                hkHolidayByDate = map;
+                const list = parseHkHolidayJson(json);
+                if (list.length === 0) return;
+                hkHolidayListsByYear[yearKey] = list;
+                hkHolidayByDate = buildHolidayMapFromYearGroups(hkHolidayListsByYear);
+                hkHolidayHydratedYears.add(yearKey);
                 try {
-                    localStorage.setItem(HK_HOLIDAY_CACHE_KEY_TC, JSON.stringify({ fetchedAt: Date.now(), list }));
+                    localStorage.setItem(getHkHolidayCacheKey(yearKey), JSON.stringify({ fetchedAt: Date.now(), list }));
                 } catch (_e) {
                     
                 }
             } catch (_e) {
                 
             } finally {
-                hkHolidayRemoteLoadInProgress = false;
+                hkHolidayRemoteLoadInProgressByYear[yearKey] = false;
             }
         }
 
@@ -351,7 +343,8 @@
 
         async function ensureHolidayDataForCurrentView({ force = false } = {}) {
             if (selectedHolidayRegion === 'hk') {
-                await refreshHkHolidaysFrom1823({ force });
+                const years = getVisibleHolidayYears();
+                await Promise.all(years.map(year => refreshHkHolidaysForYear(year, { force })));
                 return;
             }
             if (selectedHolidayRegion === 'us') {
@@ -359,8 +352,6 @@
                 await Promise.all(years.map(year => refreshUsHolidaysForYear(year, { force })));
             }
         }
-
-        tryHydrateHkHolidaysFromCache();
         
 
         
