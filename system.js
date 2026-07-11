@@ -7849,32 +7849,9 @@ function getMedicalRecordEditWindowStatus(consultation = null, appointment = nul
             reason: '不可在不同診所修改病歷'
         };
     }
-
-    const baseRaw = (consultation && (consultation.date || consultation.createdAt)) ||
-        (appointment && (appointment.completedAt || appointment.appointmentTime)) ||
-        (consultation && consultation.updatedAt) ||
-        null;
-    const baseDate = parseConsultationDate(baseRaw);
-    if (!baseDate || isNaN(baseDate.getTime())) {
-        return {
-            allowed: false,
-            deadline: null,
-            reason: '找不到病歷完成時間，無法修改'
-        };
-    }
-    const deadline = new Date(baseDate);
-    deadline.setDate(deadline.getDate() + 7);
-    deadline.setHours(23, 59, 59, 999);
-    if (Date.now() > deadline.getTime()) {
-        return {
-            allowed: false,
-            deadline,
-            reason: `病歷只可於完成後一周內修改，已超過期限（截止：${deadline.toLocaleString('zh-TW', { hour12: false })}）`
-        };
-    }
     return {
         allowed: true,
-        deadline,
+        deadline: null,
         reason: ''
     };
 }
