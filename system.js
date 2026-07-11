@@ -7849,9 +7849,32 @@ function getMedicalRecordEditWindowStatus(consultation = null, appointment = nul
             reason: '不可在不同診所修改病歷'
         };
     }
+
+    const baseRaw = (consultation && (consultation.date || consultation.createdAt)) ||
+        (appointment && (appointment.completedAt || appointment.appointmentTime)) ||
+        (consultation && consultation.updatedAt) ||
+        null;
+    const baseDate = parseConsultationDate(baseRaw);
+    if (!baseDate || isNaN(baseDate.getTime())) {
+        return {
+            allowed: false,
+            deadline: null,
+            reason: '找不到病歷完成時間，無法修改'
+        };
+    }
+    const deadline = new Date(baseDate);
+    deadline.setDate(deadline.getDate() + 7);
+    deadline.setHours(23, 59, 59, 999);
+    if (Date.now() > deadline.getTime()) {
+        return {
+            allowed: false,
+            deadline,
+            reason: `病歷只可於完成後一周內修改，已超過期限（截止：${deadline.toLocaleString('zh-TW', { hour12: false })}）`
+        };
+    }
     return {
         allowed: true,
-        deadline: null,
+        deadline,
         reason: ''
     };
 }
@@ -9418,13 +9441,6 @@ async function loadConsultationForEdit(consultationId) {
             document.getElementById('formTreatmentCourse').value = consultation.treatmentCourse || '';
             document.getElementById('formInstructions').value = consultation.instructions || '';
             document.getElementById('formFollowUpDate').value = consultation.followUpDate || '';
-            {
-                const consultationDateInput = document.getElementById('formConsultationDate');
-                if (consultationDateInput) {
-                    const consultationDate = parseConsultationDate(consultation.date || consultation.createdAt || null);
-                    consultationDateInput.value = consultationDate ? formatLocalDateTimeInputValue(consultationDate) : '';
-                }
-            }
 
             // 載入已保存的服藥天數與每日服藥次數，以避免預設值覆蓋原始資料
             try {
@@ -9453,7 +9469,12 @@ async function loadConsultationForEdit(consultationId) {
             if (consultation.visitTime) {
                 const visitTime = parseConsultationDate(consultation.visitTime);
                 if (visitTime) {
-                    document.getElementById('formVisitTime').value = formatLocalDateTimeInputValue(visitTime);
+                    const year = visitTime.getFullYear();
+                    const month = String(visitTime.getMonth() + 1).padStart(2, '0');
+                    const day = String(visitTime.getDate()).padStart(2, '0');
+                    const hours = String(visitTime.getHours()).padStart(2, '0');
+                    const minutes = String(visitTime.getMinutes()).padStart(2, '0');
+                    document.getElementById('formVisitTime').value = `${year}-${month}-${day}T${hours}:${minutes}`;
                 }
             }
             
@@ -10501,7 +10522,6 @@ const CONSULTATION_DRAFT_TEXT_FIELD_IDS = [
     'formPulse',
     'formDiagnosis',
     'formSyndrome',
-    'formConsultationDate',
     'formUsage',
     'formTreatmentCourse',
     'formInstructions'
@@ -10901,12 +10921,13 @@ async function showConsultationForm(appointment) {
             
             // 設置預設值
             const now = new Date();
-            const defaultConsultationDate = parseConsultationDate(appointment && appointment.appointmentTime) || now;
-            const consultationDateInput = document.getElementById('formConsultationDate');
-            if (consultationDateInput) {
-                consultationDateInput.value = formatLocalDateTimeInputValue(defaultConsultationDate);
-            }
-            document.getElementById('formVisitTime').value = formatLocalDateTimeInputValue(defaultConsultationDate);
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const localDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+            document.getElementById('formVisitTime').value = localDateTime;
             
             // 設置預設休息期間
             const startDate = new Date();
@@ -11046,7 +11067,7 @@ async function showConsultationForm(appointment) {
         
         // 清空診症表單
         function clearConsultationForm() {
-            ['formSymptoms', 'formTongue', 'formPulse', 'formCurrentHistory', 'formDiagnosis', 'formSyndrome', 'formAcupunctureNotes', 'formPrescription', 'formConsultationDate', 'formFollowUpDate', 'formVisitTime', 'formRestStartDate', 'formRestEndDate', 'formAuditReason'].forEach(id => {
+            ['formSymptoms', 'formTongue', 'formPulse', 'formCurrentHistory', 'formDiagnosis', 'formSyndrome', 'formAcupunctureNotes', 'formPrescription', 'formFollowUpDate', 'formVisitTime', 'formRestStartDate', 'formRestEndDate', 'formAuditReason'].forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 if (id === 'formAcupunctureNotes') {
@@ -11523,10 +11544,6 @@ async function saveConsultation() {
     
     const symptoms = document.getElementById('formSymptoms').value.trim();
     const diagnosis = document.getElementById('formDiagnosis').value.trim();
-    const consultationDateInputValue = (() => {
-        const consultationDateEl = document.getElementById('formConsultationDate');
-        return consultationDateEl ? String(consultationDateEl.value || '').trim() : '';
-    })();
     
     if (!symptoms || !diagnosis) {
         showToast('請填寫必填欄位：主訴、中醫診斷！', 'error');
@@ -11686,7 +11703,6 @@ async function saveConsultation() {
             // date and doctor fields are assigned below depending on whether this is a new record or an edit
             status: 'completed'
         };
-        const selectedConsultationDate = parseConsultationDate(consultationDateInputValue) || new Date();
         // 將服藥天數與每日次數存入診症資料，預設 0 代表未設定
         try {
             const totalDays = getTotalMedicationDays();
@@ -11737,7 +11753,7 @@ async function saveConsultation() {
             if (consResult && consResult.success && consResult.data) {
                 existing = consResult.data;
             }
-            consultationData.date = selectedConsultationDate;
+            consultationData.date = existing && existing.date ? existing.date : new Date();
             consultationData.doctor = existing && existing.doctor ? existing.doctor : currentUser;
             consultationData.appointmentId = existing && existing.appointmentId
                 ? existing.appointmentId
@@ -11817,7 +11833,7 @@ async function saveConsultation() {
             // New consultation: assign the current date and doctor
             // 為新的病歷產生一個唯一的病歷編號
             consultationData.medicalRecordNumber = generateMedicalRecordNumber();
-            consultationData.date = selectedConsultationDate;
+            consultationData.date = new Date();
             consultationData.doctor = currentUser;
             // 記錄診所資訊
             try {
