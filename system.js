@@ -1971,27 +1971,69 @@ async function commitPendingPackagePurchases() {
                 historySource: 'consultationBillingPurchase'
             });
             if (purchasedPackage) {
-                
+
+                // 將購買成功的套票記錄 ID 與餘下次數寫回原始套票購買項目，
+                // 讓收費列表中的「購買套票」列也能顯示餘下次數。
+                // 若使用者選擇立即使用第一次，下方會再以 useResult 更新為遞減後的次數。
+                try {
+                    if (item && typeof item === 'object') {
+                        item.packageRecordId = (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : (item.packageRecordId || '');
+                        const purchasedRemaining = (typeof purchasedPackage.remainingUses === 'number')
+                            ? purchasedPackage.remainingUses
+                            : (typeof purchasedPackage.totalUses === 'number' ? purchasedPackage.totalUses : undefined);
+                        if (purchasedRemaining !== undefined) {
+                            item.remainingUses = purchasedRemaining;
+                        }
+                        if (typeof purchasedPackage.totalUses === 'number') {
+                            item.totalUses = purchasedPackage.totalUses;
+                        }
+                    }
+                } catch (_e) {
+                    // 忽略寫回錯誤
+                }
+
                 if (confirmUse) {
                     try {
                         const useResult = await consumePackage(patientId, purchasedPackage.id, {
                             historySource: 'consultationBillingUse'
                         });
                         if (useResult && useResult.ok) {
-                            
+
+                            // 取得本次使用後的餘下次數（useResult.record.remainingUses 已是遞減後的值）
+                            const afterUseRemaining = (useResult.record && typeof useResult.record.remainingUses === 'number')
+                                ? useResult.record.remainingUses
+                                : undefined;
+                            const afterUseTotal = (useResult.record && typeof useResult.record.totalUses === 'number')
+                                ? useResult.record.totalUses
+                                : undefined;
+
+                            // 同步更新原始套票購買項目的餘下次數（已使用一次，故為總次數減 1）
+                            try {
+                                if (item && typeof item === 'object' && afterUseRemaining !== undefined) {
+                                    item.remainingUses = afterUseRemaining;
+                                    if (afterUseTotal !== undefined) {
+                                        item.totalUses = afterUseTotal;
+                                    }
+                                }
+                            } catch (_e) {
+                                // 忽略寫回錯誤
+                            }
+
                             if (usageItemId) {
                                 const idx = selectedBillingItems.findIndex(it => it && it.id === usageItemId);
                                 if (idx >= 0) {
-                                    
+
                                     const newId = `use-${purchasedPackage.id}-${Date.now()}-${Math.random()}`;
                                     selectedBillingItems[idx] = {
                                         ...selectedBillingItems[idx],
                                         id: newId,
                                         patientId: (patientId !== undefined && patientId !== null) ? String(patientId) : '',
-                                        packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : ''
+                                        packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : '',
+                                        remainingUses: afterUseRemaining !== undefined ? afterUseRemaining : selectedBillingItems[idx].remainingUses,
+                                        totalUses: afterUseTotal !== undefined ? afterUseTotal : selectedBillingItems[idx].totalUses
                                     };
                                 } else {
-                                    
+
                                     selectedBillingItems.push({
                                         id: `use-${purchasedPackage.id}-${Date.now()}-${Math.random()}`,
                                         name: `${item.name} (使用套票)`,
@@ -2002,11 +2044,13 @@ async function commitPendingPackagePurchases() {
                                         quantity: 1,
                                         includedInDiscount: false,
                                         patientId: (patientId !== undefined && patientId !== null) ? String(patientId) : '',
-                                        packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : ''
+                                        packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : '',
+                                        remainingUses: afterUseRemaining,
+                                        totalUses: afterUseTotal
                                     });
                                 }
                             } else {
-                                
+
                                 selectedBillingItems.push({
                                     id: `use-${purchasedPackage.id}-${Date.now()}-${Math.random()}`,
                                     name: `${item.name} (使用套票)`,
@@ -2017,7 +2061,9 @@ async function commitPendingPackagePurchases() {
                                     quantity: 1,
                                     includedInDiscount: false,
                                     patientId: (patientId !== undefined && patientId !== null) ? String(patientId) : '',
-                                    packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : ''
+                                    packageRecordId: (purchasedPackage && purchasedPackage.id) ? String(purchasedPackage.id) : '',
+                                    remainingUses: afterUseRemaining,
+                                    totalUses: afterUseTotal
                                 });
                             }
                             {
@@ -2059,10 +2105,12 @@ async function commitPendingPackagePurchases() {
             }
         }
         
+        // 重新整理所有套票使用/購買項目的餘下次數（購買/使用後其他列可能也需要更新）
+        try { await enrichPackageItemsWithRemainingUses(); } catch (_e) {}
         if (typeof updateBillingDisplay === 'function') {
             updateBillingDisplay();
         }
-        
+
         pendingPackagePurchases = [];
     } catch (err) {
         console.error('提交暫存套票購買時發生錯誤:', err);
@@ -9956,7 +10004,9 @@ async function loadConsultationForEdit(consultationId) {
                                 includedInDiscount: raw && raw.includedInDiscount === false ? false : (category !== 'discount'),
                                 patientId: raw && raw.patientId ? String(raw.patientId) : '',
                                 packageRecordId: raw && raw.packageRecordId ? String(raw.packageRecordId) : '',
-                                isHistorical: !!(raw && raw.isHistorical)
+                                isHistorical: !!(raw && raw.isHistorical),
+                                remainingUses: (raw && typeof raw.remainingUses === 'number' && !Number.isNaN(raw.remainingUses)) ? Number(raw.remainingUses) : undefined,
+                                totalUses: (raw && typeof raw.totalUses === 'number' && !Number.isNaN(raw.totalUses)) ? Number(raw.totalUses) : undefined
                             };
                         }).filter(item => item && item.name);
                         selectedBillingItems = mapped;
@@ -9991,6 +10041,12 @@ async function loadConsultationForEdit(consultationId) {
                     }
                 } catch (e) {
                     console.error('載入舊病歷時恢復套票 meta 失敗:', e);
+                }
+                // 補上套票使用/購買項目的餘下次數，以便收費列表顯示「餘下 X 次」徽章
+                try {
+                    await enrichPackageItemsWithRemainingUses();
+                } catch (e) {
+                    console.error('補充套票餘下次數失敗:', e);
                 }
                 // 更新顯示
                 updateBillingDisplay();
@@ -12094,7 +12150,9 @@ async function saveConsultation() {
                             validityDays: Number(item && item.validityDays) || 0,
                             patientId: item && item.patientId ? String(item.patientId) : '',
                             packageRecordId: item && item.packageRecordId ? String(item.packageRecordId) : '',
-                            isHistorical: !!(item && item.isHistorical)
+                            isHistorical: !!(item && item.isHistorical),
+                            remainingUses: (item && typeof item.remainingUses === 'number' && !Number.isNaN(item.remainingUses)) ? Number(item.remainingUses) : undefined,
+                            totalUses: (item && typeof item.totalUses === 'number' && !Number.isNaN(item.totalUses)) ? Number(item.totalUses) : undefined
                         }));
                     return JSON.stringify(normalized);
                 } catch (_e) {
@@ -12686,6 +12744,17 @@ if (!patient) {
             
             currentPatientHistoryPatientId = patientId;
             closeHistoryCalendar('patient');
+            // 預先為當前要顯示的診症記錄計算含「餘下套票次數」的收費項目文字，供 modal 顯示
+            try {
+                const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+                const isEnglish = !!(lang && String(lang).toLowerCase().startsWith('en'));
+                const currentCons = currentPatientConsultations[currentPatientHistoryPage];
+                if (currentCons) {
+                    await enrichConsultationBillingItemsDisplay(currentCons, patientId, isEnglish);
+                }
+            } catch (_e) {
+                // 忽略預先 enrich 失敗
+            }
             // 顯示分頁病歷記錄
             displayPatientMedicalHistoryPage();
             
@@ -12790,6 +12859,86 @@ if (!patient) {
             }
 
             return buttons.join('');
+        }
+
+        /**
+         * 將指定的診症記錄之 billingItems 文字加上「餘下 X 次」標註。
+         * - 對於包含「使用套票」的行，會根據 billingItemsStructured 中的 packageRecordId
+         *   查詢 patientPackagesList 取得即時 remainingUses 並附加標註。
+         * - 若查不到對應套票（例如已刪除），則 fallback 到 billingItemsStructured 中儲存的 remainingUses。
+         *
+         * @param {object} consultation 診症記錄物件
+         * @param {Array} patientPackagesList 病人套票清單（可選）
+         * @param {boolean} isEnglish 是否英文介面
+         * @returns {string} 帶有餘下次數標註的 billingItems 文字
+         */
+        function buildBillingItemsTextWithPackageRemaining(consultation, patientPackagesList, isEnglish) {
+            if (!consultation || !consultation.billingItems) return '';
+            // 從 billingItemsStructured 收集套票使用項目的 packageRecordId 與儲存時的 remainingUses
+            let packageUseRecords = [];
+            try {
+                if (consultation.billingItemsStructured) {
+                    const parsedItems = JSON.parse(consultation.billingItemsStructured);
+                    if (Array.isArray(parsedItems)) {
+                        parsedItems.forEach(item => {
+                            if (item && (item.category === 'packageUse' || (item.name && item.name.includes('使用套票')))) {
+                                const pkgRecordId = item.packageRecordId ? String(item.packageRecordId) : '';
+                                if (pkgRecordId) {
+                                    packageUseRecords.push({
+                                        packageRecordId: pkgRecordId,
+                                        name: item.name,
+                                        storedRemaining: (typeof item.remainingUses === 'number') ? item.remainingUses : undefined
+                                    });
+                                }
+                            }
+                        });
+                    }
+                }
+            } catch (_e) {
+                // 忽略解析錯誤
+            }
+            let packageUseIndex = 0;
+            const lines = String(consultation.billingItems).split('\n');
+            const enrichedLines = lines.map(line => {
+                if (line.includes('使用套票') && packageUseIndex < packageUseRecords.length) {
+                    const recordInfo = packageUseRecords[packageUseIndex];
+                    packageUseIndex++;
+                    let remaining;
+                    try {
+                        const pkg = (patientPackagesList || []).find(p => p && String(p.id) === String(recordInfo.packageRecordId));
+                        if (pkg && typeof pkg.remainingUses === 'number') {
+                            remaining = pkg.remainingUses;
+                        }
+                    } catch (_e) {}
+                    if (remaining === undefined && typeof recordInfo.storedRemaining === 'number') {
+                        remaining = recordInfo.storedRemaining;
+                    }
+                    if (remaining !== undefined) {
+                        const remainingLabel = isEnglish ? ` (Remaining: ${remaining})` : `（餘下 ${remaining} 次）`;
+                        return line + ' ' + remainingLabel;
+                    }
+                }
+                return line;
+            });
+            return enrichedLines.join('\n');
+        }
+
+        /**
+         * 非同步地為指定的診症記錄計算並寫入 billingItemsDisplay（含「餘下 X 次」標註）。
+         * 使用 getPatientPackages 取得病人套票清單（會走快取），並寫入 consultation.billingItemsDisplay。
+         *
+         * @param {object} consultation 診症記錄物件
+         * @param {string} patientId 病人 ID
+         * @param {boolean} isEnglish 是否英文介面
+         */
+        async function enrichConsultationBillingItemsDisplay(consultation, patientId, isEnglish) {
+            if (!consultation || !consultation.billingItems) return;
+            try {
+                const pkgs = (patientId ? await getPatientPackages(patientId, false) : []) || [];
+                consultation.billingItemsDisplay = buildBillingItemsTextWithPackageRemaining(consultation, pkgs, isEnglish);
+            } catch (_e) {
+                // 保留既有值
+            }
         }
 
         function displayPatientMedicalHistoryPage() {
@@ -13106,7 +13255,7 @@ if (!patient) {
                                 ${consultation.billingItems ? `
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">收費項目</span>
-                                    <div class="bg-green-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-green-400 whitespace-pre-line medical-field">${consultation.billingItems}</div>
+                                    <div class="bg-green-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-green-400 whitespace-pre-line medical-field">${consultation.billingItemsDisplay || consultation.billingItems}</div>
                                 </div>
                                 ` : ''}
                             </div>
@@ -13125,6 +13274,16 @@ if (!patient) {
                 setButtonLoading(loadingButton, '讀取中...');
             }
             if (await consultationHistoryPager.changePage('patient', direction)) {
+                // 預先為切換後要顯示的診症記錄計算含「餘下套票次數」的收費項目文字
+                try {
+                    const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+                    const isEnglish = !!(lang && String(lang).toLowerCase().startsWith('en'));
+                    const pid = currentPatientHistoryPatientId;
+                    const currentCons = currentPatientConsultations[currentPatientHistoryPage];
+                    if (currentCons && pid) {
+                        await enrichConsultationBillingItemsDisplay(currentCons, pid, isEnglish);
+                    }
+                } catch (_e) {}
                 displayPatientMedicalHistoryPage();
                 return;
             }
@@ -13217,6 +13376,17 @@ async function viewPatientMedicalHistory(patientId) {
         
         currentConsultationHistoryPatientId = patientId;
         closeHistoryCalendar('consultation');
+        // 預先為當前要顯示的診症記錄計算含「餘下套票次數」的收費項目文字，供 modal 顯示
+        try {
+            const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+            const isEnglish = !!(lang && String(lang).toLowerCase().startsWith('en'));
+            const currentCons = currentConsultationConsultations[currentConsultationHistoryPage];
+            if (currentCons) {
+                await enrichConsultationBillingItemsDisplay(currentCons, patientId, isEnglish);
+            }
+        } catch (_e) {
+            // 忽略預先 enrich 失敗
+        }
         // 顯示分頁病歷記錄
         displayConsultationMedicalHistoryPage();
         
@@ -13544,7 +13714,7 @@ function displayConsultationMedicalHistoryPage() {
                         ${consultation.billingItems ? `
                         <div>
                             <span class="text-sm font-semibold text-gray-700 block mb-2">收費項目</span>
-                            <div class="bg-green-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-green-400 whitespace-pre-line medical-field">${consultation.billingItems}</div>
+                            <div class="bg-green-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-green-400 whitespace-pre-line medical-field">${consultation.billingItemsDisplay || consultation.billingItems}</div>
                         </div>
                         ` : ''}
                     </div>
@@ -13563,6 +13733,16 @@ function displayConsultationMedicalHistoryPage() {
                 setButtonLoading(loadingButton, '讀取中...');
             }
             if (await consultationHistoryPager.changePage('consultation', direction)) {
+                // 預先為切換後要顯示的診症記錄計算含「餘下套票次數」的收費項目文字
+                try {
+                    const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+                    const isEnglish = !!(lang && String(lang).toLowerCase().startsWith('en'));
+                    const pid = currentConsultationHistoryPatientId;
+                    const currentCons = currentConsultationConsultations[currentConsultationHistoryPage];
+                    if (currentCons && pid) {
+                        await enrichConsultationBillingItemsDisplay(currentCons, pid, isEnglish);
+                    }
+                } catch (_e) {}
                 displayConsultationMedicalHistoryPage();
                 return;
             }
@@ -19978,6 +20158,21 @@ async function searchBillingForConsultation() {
                         const removeBtn = (isPackageUse || packageLocked)
                             ? ''
                             : `<button onclick="removeBillingItem(${originalIndex})" class="text-red-500 hover:text-red-700 font-bold text-lg px-2">×</button>`;
+                        // 餘下套票次數徽章：對於套票使用 (packageUse) 或套票購買 (package) 項目，
+                        // 當 item.remainingUses 為有效數字時顯示「餘下 X 次」徽章，方便使用者即時掌握套票剩餘次數。
+                        const hasRemainingUses = (isPackageUse || isPackageItem)
+                            && item.remainingUses !== undefined
+                            && item.remainingUses !== null
+                            && !Number.isNaN(Number(item.remainingUses));
+                        const remainingUsesValue = hasRemainingUses ? Number(item.remainingUses) : 0;
+                        // 依照當前語言決定徽章文字（中文預設／英文）
+                        const remainingBadgeLang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+                        const remainingBadgeText = (remainingBadgeLang && String(remainingBadgeLang).toLowerCase().startsWith('en'))
+                            ? `Remaining ${remainingUsesValue} uses`
+                            : `餘下 ${remainingUsesValue} 次`;
+                        const remainingBadge = hasRemainingUses
+                            ? `<span class="ml-2 text-xs text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">${remainingBadgeText}</span>`
+                            : '';
                         // 數量控制區：套票使用或鎖定的套票僅顯示次數；折扣項目不顯示數量；其他類型可增減數量
                         let quantityControls;
                         if (isDiscountItem) {
@@ -20020,7 +20215,7 @@ async function searchBillingForConsultation() {
                             <div class="flex items-center ${bgColor} border rounded-lg p-3">
                                 ${checkboxHtml}
                                 <div class="flex-1">
-                                    <div class="font-semibold text-gray-900">${item.name}</div>
+                                    <div class="font-semibold text-gray-900">${item.name}${remainingBadge}</div>
                                     <div class="text-xs text-gray-600">${categoryName}</div>
                                     <div class="text-sm font-medium ${item.category === 'discount' ? 'text-red-600' : 'text-green-600'}">
                                         ${(() => {
@@ -20866,6 +21061,13 @@ const consultationDate = (() => {
                     }
                 } catch (e) {
                     console.error('恢復套票使用 meta 錯誤:', e);
+                }
+
+                // 補上套票使用/購買項目的餘下次數，以便收費列表顯示「餘下 X 次」徽章
+                try {
+                    await enrichPackageItemsWithRemainingUses();
+                } catch (e) {
+                    console.error('補充套票餘下次數失敗:', e);
                 }
 
                 // 更新收費顯示
@@ -25729,7 +25931,10 @@ async function useOnePackage(patientId, packageRecordId) {
             includedInDiscount: false,
             // 以字串保存 patientId 及 packageRecordId，避免類型不一致導致匹配錯誤
             patientId: patientId !== undefined && patientId !== null ? String(patientId) : '',
-            packageRecordId: res.record && res.record.id ? String(res.record.id) : ''
+            packageRecordId: res.record && res.record.id ? String(res.record.id) : '',
+            // 餘下次數：consumePackageLocally 已回傳遞減後的 remainingUses，便於收費列表顯示「餘下 X 次」
+            remainingUses: (res.record && typeof res.record.remainingUses === 'number') ? res.record.remainingUses : undefined,
+            totalUses: (res.record && typeof res.record.totalUses === 'number') ? res.record.totalUses : undefined
         });
         // 記錄本次套票消耗，以便取消診症時回復。此處 delta 設為 -1 表示減少一次。
         try {
@@ -25741,6 +25946,8 @@ async function useOnePackage(patientId, packageRecordId) {
                 delta: -1
             });
         } catch (_e) {}
+        // 重新整理所有套票使用/購買項目的餘下次數（其他列可能也需要更新）
+        try { await enrichPackageItemsWithRemainingUses(); } catch (_e) {}
         updateBillingDisplay();
         await refreshPatientPackagesUI();
         {
@@ -25935,6 +26142,8 @@ async function undoPackageUse(patientId, packageRecordId, usageItemId) {
                     });
                 } catch (_e) {}
                 // 更新收費項目與套票列表顯示
+                // 先重新整理所有套票使用/購買項目的餘下次數（退回後其他列的剩餘次數需要遞增）
+                try { await enrichPackageItemsWithRemainingUses(); } catch (_e) {}
                 updateBillingDisplay();
                 await refreshPatientPackagesUI();
                 showToast('已取消本次套票使用，次數已退回', 'success');
@@ -25980,6 +26189,13 @@ async function restorePackageUseMeta(patientId) {
                     item.packageRecordId = (candidates[0] && candidates[0].id) ? String(candidates[0].id) : '';
                     // 找到對應的套票，取消歷史標記
                     item.isHistorical = false;
+                    // 同步補上餘下次數與總次數，以便收費列表顯示「餘下 X 次」徽章
+                    if (typeof candidates[0].remainingUses === 'number') {
+                        item.remainingUses = candidates[0].remainingUses;
+                    }
+                    if (typeof candidates[0].totalUses === 'number') {
+                        item.totalUses = candidates[0].totalUses;
+                    }
                 } else if (candidates.length > 1) {
                     // 如果有多個同名套票，選擇使用次數較多的那一個；若使用次數相同，則選擇購買時間較早的
                     candidates.sort((a, b) => {
@@ -26006,6 +26222,13 @@ async function restorePackageUseMeta(patientId) {
                     item.packageRecordId = (chosen && chosen.id) ? String(chosen.id) : '';
                     // 找到對應的套票，取消歷史標記
                     item.isHistorical = false;
+                    // 同步補上餘下次數與總次數，以便收費列表顯示「餘下 X 次」徽章
+                    if (chosen && typeof chosen.remainingUses === 'number') {
+                        item.remainingUses = chosen.remainingUses;
+                    }
+                    if (chosen && typeof chosen.totalUses === 'number') {
+                        item.totalUses = chosen.totalUses;
+                    }
                 } else {
                     // 找不到匹配的套票，保持歷史記錄狀態
                     item.isHistorical = true;
@@ -26018,6 +26241,99 @@ async function restorePackageUseMeta(patientId) {
 }
 // 將函式暴露到全域以便其他部分調用
 window.restorePackageUseMeta = restorePackageUseMeta;
+
+/**
+ * 為當前已選擇的收費項目中的套票使用 (packageUse) 與套票購買 (package) 項目
+ * 補上「餘下次數 (remainingUses)」與「總次數 (totalUses)」，以便收費列表顯示徽章。
+ *
+ * - 會根據當前掛號或項目自身的 patientId 取得病人套票清單。
+ * - 套用 pendingPackageChanges（同一診症內的暫存增減）計算有效剩餘次數。
+ * - 若找不到對應套票（例如已被刪除），保留 item 上既有的 remainingUses 作為 fallback。
+ *
+ * @returns {Promise<void>}
+ */
+async function enrichPackageItemsWithRemainingUses() {
+    try {
+        // 推斷當前病人 ID：優先使用 currentConsultingAppointmentId 對應的掛號
+        let patientId = null;
+        try {
+            if (typeof currentConsultingAppointmentId !== 'undefined' && Array.isArray(appointments)) {
+                const currAppt = appointments.find(appt => appt && String(appt.id) === String(currentConsultingAppointmentId));
+                if (currAppt && currAppt.patientId) {
+                    patientId = currAppt.patientId;
+                }
+            }
+        } catch (_e) {
+            // 忽略錯誤
+        }
+        // 若推斷不到，退而使用第一個套票使用/購買項目上的 patientId
+        if (!patientId && Array.isArray(selectedBillingItems)) {
+            const withPatient = selectedBillingItems.find(it => it && (it.category === 'packageUse' || it.category === 'package') && it.patientId);
+            if (withPatient && withPatient.patientId) {
+                patientId = withPatient.patientId;
+            }
+        }
+        if (!patientId) {
+            return;
+        }
+        // 取得病人套票（若剛剛 restorePackageUseMeta 已強制刷新過，這裡會走快取）
+        const packages = await getPatientPackages(patientId, false);
+        if (!Array.isArray(packages) || packages.length === 0) {
+            return;
+        }
+        // 建立 packageRecordId -> package 的查找表
+        const packageMap = new Map();
+        packages.forEach(p => {
+            if (p && p.id) {
+                packageMap.set(String(p.id), p);
+            }
+        });
+        // 逐項補上 remainingUses / totalUses
+        if (!Array.isArray(selectedBillingItems)) {
+            return;
+        }
+        selectedBillingItems.forEach(item => {
+            if (!item) return;
+            const isPackageUse = item.category === 'packageUse';
+            const isPackageItem = item.category === 'package';
+            if (!isPackageUse && !isPackageItem) return;
+            const rid = item.packageRecordId ? String(item.packageRecordId) : '';
+            if (!rid) return;
+            const pkg = packageMap.get(rid);
+            if (!pkg) {
+                // 找不到對應套票（可能已刪除），保留既有 remainingUses 作為 fallback
+                return;
+            }
+            // 套用 pendingPackageChanges 計算有效剩餘次數
+            let delta = 0;
+            try {
+                if (Array.isArray(pendingPackageChanges)) {
+                    delta = pendingPackageChanges
+                        .filter(change => change && typeof change.delta === 'number'
+                            && String(change.patientId) === String(patientId)
+                            && String(change.packageRecordId) === rid)
+                        .reduce((sum, change) => sum + change.delta, 0);
+                }
+            } catch (_e) {
+                delta = 0;
+            }
+            let effectiveRemaining = (typeof pkg.remainingUses === 'number' ? pkg.remainingUses : 0) + delta;
+            if (typeof pkg.totalUses === 'number') {
+                effectiveRemaining = Math.max(0, Math.min(pkg.totalUses, effectiveRemaining));
+            } else {
+                effectiveRemaining = Math.max(0, effectiveRemaining);
+            }
+            item.remainingUses = effectiveRemaining;
+            if (typeof pkg.totalUses === 'number') {
+                item.totalUses = pkg.totalUses;
+            }
+        });
+    } catch (error) {
+        console.error('enrichPackageItemsWithRemainingUses 錯誤:', error);
+    }
+}
+// 將函式暴露到全域以便其他部分調用
+window.enrichPackageItemsWithRemainingUses = enrichPackageItemsWithRemainingUses;
 // Firebase 數據管理系統
 class FirebaseDataManager {
     constructor() {
