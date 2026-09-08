@@ -13774,6 +13774,26 @@ async function printConsultationRecord(consultationId, consultationData = null) 
         const isEnglish = lang && lang.startsWith('en');
 
         // 為套票使用項目準備餘下次數資訊
+        // 解析結構化收費項目，依順序收集所有套票使用項目的 packageRecordId
+        let packageUseRecords = [];
+        try {
+            if (consultation.billingItemsStructured) {
+                const parsedItems = JSON.parse(consultation.billingItemsStructured);
+                if (Array.isArray(parsedItems)) {
+                    parsedItems.forEach(item => {
+                        if (item && (item.category === 'packageUse' || (item.name && item.name.includes('使用套票')))) {
+                            const pkgRecordId = item.packageRecordId ? String(item.packageRecordId) : '';
+                            if (pkgRecordId) {
+                                packageUseRecords.push({ packageRecordId: pkgRecordId, name: item.name });
+                            }
+                        }
+                    });
+                }
+            }
+        } catch (_e) {
+            // 忽略解析錯誤
+        }
+
         // 取得病人套票列表以查詢餘下次數
         let patientPackagesList = [];
         try {
@@ -13785,29 +13805,8 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             // 忽略套票查詢錯誤
         }
 
-        // 從套票使用項目的名稱中提取套票名稱，例如「推拿療程 (使用套票)」→「推拿療程」
-        function extractPackageName(billingLine) {
-            try {
-                // 先嘗試從整行中提取項目名稱（格式：項目名 x數量 = $金額）
-                const lineMatch = billingLine.match(/^(.+?)\s+x\d+\s+=\s+/);
-                const itemName = lineMatch ? lineMatch[1].trim() : billingLine;
-                // 移除「(使用套票)」或「（使用套票）」後綴
-                return itemName
-                    .replace(/\s*[\(（]\s*使用套票\s*[\)）]\s*/g, '')
-                    .replace(/\s*使用套票\s*/g, '')
-                    .trim();
-            } catch (_e) {
-                return '';
-            }
-        }
-
-        // 根據套票名稱從病人套票列表中查找餘下次數
-        function findRemainingUsesByName(pkgName) {
-            if (!pkgName || !Array.isArray(patientPackagesList) || patientPackagesList.length === 0) return null;
-            // 查找名稱相符且仍有餘次的套票
-            const matched = patientPackagesList.find(p => p && p.name === pkgName && typeof p.remainingUses === 'number');
-            return matched ? matched.remainingUses : null;
-        }
+        // 套票使用項目的比對指標（依順序對應文字行中的套票使用項目）
+        let packageUseIndex = 0;
 
         if (consultation.billingItems) {
             const lines = consultation.billingItems.split('\n');
@@ -13819,12 +13818,13 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     }
                     // 若為套票使用項目，附加餘下次數
                     let displayLine = line;
-                    if (line.includes('使用套票')) {
+                    if (line.includes('使用套票') && packageUseIndex < packageUseRecords.length) {
+                        const recordInfo = packageUseRecords[packageUseIndex];
+                        packageUseIndex++;
                         try {
-                            const pkgName = extractPackageName(line);
-                            const remaining = findRemainingUsesByName(pkgName);
-                            if (remaining !== null && remaining !== undefined) {
-                                const remainingLabel = isEnglish ? ` (Remaining: ${remaining})` : `（餘下 ${remaining} 次）`;
+                            const pkg = patientPackagesList.find(p => p && String(p.id) === String(recordInfo.packageRecordId));
+                            if (pkg && typeof pkg.remainingUses === 'number') {
+                                const remainingLabel = isEnglish ? ` (Remaining: ${pkg.remainingUses})` : `（餘下 ${pkg.remainingUses} 次）`;
                                 displayLine = line + ' ' + remainingLabel;
                             }
                         } catch (_e) {
