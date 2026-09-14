@@ -2563,6 +2563,10 @@ async function fetchUsers(forceRefresh = false) {
                 const addBtn = document.getElementById('systemAddClinicButton');
                 if (addBtn && !addBtn.dataset.bound) {
                     addBtn.addEventListener('click', function() {
+                        if (typeof window.isAdvancedVersion === 'function' && !window.isAdvancedVersion()) {
+                            showToast('「新增診所」為進階版系統專屬功能', 'error');
+                            return;
+                        }
                         showAddClinicModal();
                     });
                     addBtn.dataset.bound = 'true';
@@ -2572,6 +2576,10 @@ async function fetchUsers(forceRefresh = false) {
                 const delBtn = document.getElementById('systemDeleteClinicButton');
                 if (delBtn && !delBtn.dataset.bound) {
                     delBtn.addEventListener('click', async function() {
+                        if (typeof window.isAdvancedVersion === 'function' && !window.isAdvancedVersion()) {
+                            showToast('「刪除目前診所」為進階版系統專屬功能', 'error');
+                            return;
+                        }
                         if (!currentClinicId || currentClinicId === 'local-default') {
                             showToast('未選擇診所或此診所不可刪除', 'error');
                             return;
@@ -2632,6 +2640,53 @@ async function fetchUsers(forceRefresh = false) {
                     delBtn.dataset.bound = 'true';
                 }
             } catch (_e5) {}
+            // 依版本設定更新新增／刪除診所按鈕狀態
+            try { applyClinicVersionRestrictions(); } catch (_e6) {}
+        }
+        // 依據系統版本（普通版／進階版，設定見 version-config.js）處理診所按鈕：
+        // 普通版時將「新增診所」「刪除目前診所」按鈕反白，並標示為進階版專屬功能。
+        function applyClinicVersionRestrictions() {
+            const advanced = (typeof window.isAdvancedVersion === 'function') ? window.isAdvancedVersion() : true;
+            const maxClinics = (typeof window.getMaxClinics === 'function') ? window.getMaxClinics() : 3;
+            const lockTip = '此功能僅限「進階版」系統提供';
+            const buttonStyles = [
+                { id: 'systemAddClinicButton', colorClass: 'bg-green-600', hoverClass: 'hover:bg-green-700' },
+                { id: 'systemDeleteClinicButton', colorClass: 'bg-red-600', hoverClass: 'hover:bg-red-700' }
+            ];
+            buttonStyles.forEach(function(item) {
+                const btn = document.getElementById(item.id);
+                if (!btn) return;
+                if (advanced) {
+                    btn.classList.remove('bg-gray-400', 'opacity-60', 'cursor-not-allowed');
+                    btn.classList.add(item.colorClass, item.hoverClass);
+                    btn.removeAttribute('title');
+                    btn.setAttribute('aria-disabled', 'false');
+                } else {
+                    btn.classList.remove(item.colorClass, item.hoverClass);
+                    btn.classList.add('bg-gray-400', 'opacity-60', 'cursor-not-allowed');
+                    btn.setAttribute('title', lockTip);
+                    btn.setAttribute('aria-disabled', 'true');
+                }
+            });
+            // 普通版時於按鈕下方顯示進階版專屬標示；進階版時移除標示
+            let note = document.getElementById('clinicVersionRestrictionNote');
+            const addBtn = document.getElementById('systemAddClinicButton');
+            const buttonGroup = addBtn ? addBtn.parentNode : null;
+            if (!advanced) {
+                if (buttonGroup) buttonGroup.classList.add('flex-wrap');
+                if (!note && buttonGroup) {
+                    note = document.createElement('p');
+                    note.id = 'clinicVersionRestrictionNote';
+                    note.className = 'basis-full w-full text-xs text-amber-700 mt-1';
+                    buttonGroup.appendChild(note);
+                }
+                if (note) {
+                    note.textContent = '🔒 「新增診所 / 刪除目前診所」為進階版系統專屬功能（目前為普通版，僅可使用 ' + maxClinics + ' 間診所）';
+                }
+            } else if (note) {
+                if (buttonGroup) buttonGroup.classList.remove('flex-wrap');
+                note.parentNode.removeChild(note);
+            }
         }
         let _globalLoadingTotal = 0;
         let _globalLoadingCurrent = 0;
@@ -17072,9 +17127,14 @@ async function initializeSystemAfterLogin() {
 
         function showAddClinicModal() {
             try {
+                if (typeof window.isAdvancedVersion === 'function' && !window.isAdvancedVersion()) {
+                    showToast('「新增診所」為進階版系統專屬功能', 'error');
+                    return;
+                }
+                const clinicLimit = (typeof window.getMaxClinics === 'function') ? window.getMaxClinics() : 3;
                 const count = Array.isArray(clinicsList) ? clinicsList.length : 0;
-                if (count >= 3) {
-                    showToast('診所數量已達上限（3），無法新增', 'error');
+                if (count >= clinicLimit) {
+                    showToast('診所數量已達上限（' + clinicLimit + '），無法新增', 'error');
                     return;
                 }
             } catch (_e) {}
@@ -26452,8 +26512,10 @@ class FirebaseDataManager {
                     window.firebase.collection(window.firebase.db, 'clinics')
                 );
                 const count = (snap && typeof snap.size === 'number') ? snap.size : 0;
-                if (count >= 3) {
-                    return { success: false, error: '診所數量已達上限（3），無法新增' };
+                // 診所數量上限依版本設定（version-config.js）：進階版 5 間、普通版 1 間
+                const clinicLimit = (typeof window.getMaxClinics === 'function') ? window.getMaxClinics() : 3;
+                if (count >= clinicLimit) {
+                    return { success: false, error: '診所數量已達上限（' + clinicLimit + '），無法新增' };
                 }
             } catch (_eLimit) {}
             let dataToWrite;
