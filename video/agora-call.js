@@ -29,10 +29,17 @@
     /* ---------------- 樣式（只注入一次） ---------------- */
     var STYLE_ID = 'agora-call-style';
     var CSS = [
-        '.av-root{position:absolute;inset:0;display:flex;flex-direction:column;background:#0b1220;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;}',
+        '.av-root{position:absolute;inset:0;display:flex;flex-direction:column;background:#000;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;}',
         '.av-grid{flex:1;min-height:0;display:grid;gap:10px;padding:10px;grid-template-columns:1fr;grid-auto-rows:1fr;}',
+        // 焦點排版：主畫面用完整高度、不留邊距；影片以 contain 完整顯示鏡頭範圍
+        '.av-root.av-spotlight .av-grid{gap:0;padding:0;}',
+        '.av-root.av-spotlight .av-grid > .av-tile{border-radius:0;}',
+        '.av-root.av-spotlight .av-grid video{object-fit:contain;}',
+        // 醫師端：對方抵達前暫時隱藏本機滿版畫面，只留「連線中…」狀態列
+        '.av-root.av-spotlight .av-tile.av-local.av-local-hidden{display:none;}',
         '.av-pips{position:absolute;left:12px;right:12px;top:12px;bottom:88px;z-index:4;pointer-events:none;}',
-        '.av-tile.av-pip{position:absolute;top:0;right:0;width:clamp(96px,26%,210px);aspect-ratio:16/10;border:2px solid rgba(255,255,255,.45);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.5);pointer-events:auto;}',
+        // 本機小畫面固定為打直的 9:16 長方框（手機自拍視角），影像置中裁切填滿
+        '.av-tile.av-pip{position:absolute;top:0;right:0;width:clamp(84px,22%,140px);aspect-ratio:9/16;border:2px solid rgba(255,255,255,.45);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.5);pointer-events:auto;background:#000;}',
         '.av-tile.av-pip .av-namebar{display:none;}',
         '.av-tile.av-pip .av-avatar{width:42%;min-width:38px;max-width:64px;font-size:clamp(18px,3vw,28px);}',
         '.av-tile{position:relative;background:#111827;border-radius:12px;overflow:hidden;min-height:0;display:flex;align-items:center;justify-content:center;}',
@@ -140,6 +147,7 @@
             '</div>';
 
         var root = container.firstElementChild;
+        if (options.layout === 'spotlight') root.classList.add('av-spotlight');
         var grid = root.querySelector('.av-grid');
         var pipsLayer = root.querySelector('.av-pips');
         var statusEl = root.querySelector('.av-status');
@@ -310,6 +318,8 @@
             var remoteCount = Object.keys(tiles).length - (tiles.local ? 1 : 0);
             if (joined) {
                 if (remoteCount > 0) {
+                    // 對方已實際接通：顯示本機小畫面（解除加入初期的隱藏）
+                    if (tiles.local) tiles.local.classList.remove('av-local-hidden');
                     emitStatus('connected', '已連線（通話中 ' + (remoteCount + 1) + ' 人）');
                 } else {
                     emitStatus('waiting', options.waitingText || '已進入診間，等待對方加入…');
@@ -418,6 +428,10 @@
                 localVideo.play(localTile.querySelector('.av-media'), { mirror: true });
                 // 本地音軌不播放，避免自己聽到自己的回音
 
+                // 醫師端在對方實際接通前隱藏自己的滿版畫面（只顯示連線狀態），
+                // track 仍正常發布；evaluateConnection 偵測到對方後解除
+                if (options.hideLocalUntilPeer) localTile.classList.add('av-local-hidden');
+
                 return client.publish([localAudio, localVideo]);
             }).then(function () {
                 evaluateConnection();
@@ -444,20 +458,29 @@
         }
 
         function cleanupSdk() {
+            // 先停止接收斷線後才傳回的事件，避免收尾途中又觸發畫面更新
+            if (client) { try { client.removeAllListeners(); } catch (e) { /* ignore */ } }
+
+            // 立刻關閉音視頻軌道：馬上釋放鏡頭/麥克風（瀏覽器列號燈熄滅）
             var tracks = [localAudio, localVideo].filter(Boolean);
-            var leavePromise = client ? client.leave().catch(function (e) {
-                console.error('[AgoraCall] client.leave 失敗:', e);
-            }) : Promise.resolve();
             tracks.forEach(function (t) { try { t.close(); } catch (e) { /* ignore */ } });
             localAudio = null;
             localVideo = null;
-            return leavePromise.then(function () {
-                if (client) {
-                    client.removeAllListeners();
-                    client = null;
-                }
-                joined = false;
+
+            var clientRef = client;
+            client = null;
+            joined = false;
+
+            if (!clientRef) return Promise.resolve();
+
+            // 網路已斷時，SDK 的 leave（底層 WebSocket）可能數分鐘才逾時。
+            // 本機資源已全部釋放，故最多只等 5 秒即完成掛斷；leave 請求仍在背景繼續，
+            // 網路恢復時伺服器側頻道狀態一樣會清除（且對方端本來就會憑 peer 狀態判斷離線）。
+            var leavePromise = clientRef.leave().catch(function (e) {
+                console.warn('[AgoraCall] client.leave 失敗（多為網路已斷線，可忽略）:', e && e.message ? e.message : e);
             });
+            var guard = new Promise(function (resolve) { setTimeout(resolve, 5000); });
+            return Promise.race([leavePromise, guard]);
         }
 
         function leave() {
@@ -482,6 +505,8 @@
             join: join,
             leave: leave,
             destroy: destroy,
+            // join 前亦可呼叫，用於顯示「等待對方進入診間…」等狀態
+            setStatus: function (kind, text) { emitStatus(kind, text); },
             toggleMic: function () { micBtn.click(); },
             toggleCamera: function () { camBtn.click(); },
             isJoined: function () { return joined; }

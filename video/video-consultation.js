@@ -16,7 +16,17 @@
     'use strict';
 
     var callController = null;
-    var joinModeLabel = '';
+    // 雙方就緒信號控制代碼（VideoPresence），用於在加入 Agora 前等待病人
+    var presence = null;
+    // 面板是否處於開啟狀態（自動重返等待流程時用，避免與手動關閉競態）
+    var panelActive = false;
+    // 自動重返等待中（此時 Agora 的 onLeft 不應關閉面板）
+    var reattaching = false;
+    // 加入後遲遲未見病人的自動離開計時器
+    var aloneTimer = null;
+    var DOCTOR_ALONE_MS = 60000;
+    // 病人電子同意書記錄監聽取消函式
+    var consentUnwatch = null;
 
     function getConfig() {
         return window.AGORA_CONFIG || {};
@@ -81,11 +91,31 @@
 
     function getDoctorName() {
         try {
-            if (typeof currentUserData !== 'undefined' && currentUserData && currentUserData.username) {
-                return currentUserData.username;
+            if (typeof currentUserData !== 'undefined' && currentUserData) {
+                // 顯示用戶全名並加上「醫師」，例：陳大文醫師
+                var fullName = String(currentUserData.name || currentUserData.username || '').trim();
+                if (fullName) {
+                    return /醫師$/.test(fullName) ? fullName : fullName + '醫師';
+                }
             }
         } catch (e) { /* ignore */ }
         return '醫師';
+    }
+
+    // 視訊診症僅限職位為「醫師」者使用（護理師／診所管理／用戶皆無此功能）
+    function isDoctorUser() {
+        try {
+            if (typeof currentUserData !== 'undefined' && currentUserData) {
+                return String(currentUserData.position || '').trim() === '醫師';
+            }
+        } catch (e) { /* ignore */ }
+        return false;
+    }
+
+    // 依當前登入角色顯示／隱藏診症記錄標題列的「視訊診症」按鈕
+    function syncVideoEntryVisibility() {
+        var btn = document.getElementById('videoConsultBtn');
+        if (btn) btn.classList.toggle('hidden', !isDoctorUser());
     }
 
     function showSetupGuide() {
@@ -100,11 +130,6 @@
         } else {
             notify(message, 'error');
         }
-    }
-
-    function setHeaderStatus(suffix) {
-        var status = document.getElementById('videoConsultStatus');
-        if (status) status.textContent = joinModeLabel + (suffix ? '　·　' + suffix : '');
     }
 
     // 切換「診症資料在左、視訊畫面在右（各佔一半）」的嵌入版面
@@ -147,6 +172,9 @@
         var stage = document.getElementById('videoConsultStage');
         if (!stage) return;
 
+        // 重新進入等待流程前，先結束舊的就緒監聽
+        clearPresence();
+
         callController = window.AgoraCall.create(stage, {
             appId: cfg.APP_ID,
             channel: channel,
@@ -155,26 +183,133 @@
             remoteName: patientName || '病人',
             // 對方畫面佔滿、自己畫面縮小於右上角
             layout: 'spotlight',
-            waitingText: '已就緒，等待病人加入…',
-            onStatus: function (kind, text) {
-                setHeaderStatus(text);
+            // 醫師只在病人已進入頻道後才加入，加入後數秒內會隱藏自己的滿版畫面
+            hideLocalUntilPeer: true,
+            waitingText: '正在與病人連線…',
+            onStatus: function (kind) {
+                // 病人影像送達 → 取消自動離開計時
+                if (kind === 'connected') clearAloneTimer();
             },
             onError: function (message) {
+                clearAloneTimer();
                 notify(message, 'error');
             },
             onLeft: function () {
+                // 自動重返等待流程造成的 leave，不關面板
+                if (reattaching) return;
                 // 醫師按下掛斷鈕 → 關閉右側視訊面板、還原診症資料版面
                 window.closeVideoConsultation(true);
             }
         });
 
-        callController.join().catch(function () {
-            // 錯誤已透過 onError 提示；面板保持開啟以便醫師重試或關閉
+        panelActive = true;
+
+        // 醫師與病人皆在頻道外免費等待：病人發出新鮮心跳（已通過鏡頭檢查）
+        // 後，由醫師先加入 Agora，並以 markJoined 通知病人加入。
+        callController.setStatus('connecting', '等待病人進入診間…');
+
+        function joinNow() {
+            // 等待期間若已關閉面板則不再加入
+            if (!callController || !panelActive) return;
+            callController.join().then(function () {
+                if (!panelActive) return;
+                // 醫師已在頻道：通知病人加入
+                if (presence && typeof presence.markJoined === 'function') {
+                    presence.markJoined();
+                }
+                // 60 秒仍未看到病人則自動離開並重返等待
+                armAloneTimer(channel, patientName, doctorName);
+            }).catch(function () {
+                // 錯誤已透過 onError 提示；面板保持開啟以便醫師重試或關閉
+            });
+        }
+
+        if (window.VideoPresence) {
+            // 不設逾時：病人不來，醫師就一直免費等下去；
+            // 醫師只要求病人心跳新鮮（病人已完成鏡頭授權），不要求 joined
+            presence = window.VideoPresence.waitPeer('doctor', channel);
+            presence.ready.then(joinNow).catch(function () {
+                // 只有信號服務故障才退回直接加入（極罕見；避免完全無法看診）
+                notify('就緒檢查服務暫不可用，已直接進入診間', 'info');
+                joinNow();
+            });
+        } else {
+            joinNow();
+        }
+    }
+
+    function armAloneTimer(channel, patientName, doctorName) {
+        clearAloneTimer();
+        aloneTimer = setTimeout(function () {
+            beginReattach(channel, patientName, doctorName);
+        }, DOCTOR_ALONE_MS);
+    }
+
+    function clearAloneTimer() {
+        if (aloneTimer) {
+            clearTimeout(aloneTimer);
+            aloneTimer = null;
+        }
+    }
+
+    // 加入後遲遲未見病人（對方加入後當機／斷線）：離開頻道停止計費，
+    // 並自動回到「等待病人進入診間」，病人重新進入時會再次自動接通
+    function beginReattach(channel, patientName, doctorName) {
+        if (!panelActive || !callController || reattaching) return;
+        reattaching = true;
+        clearAloneTimer();
+        var old = callController;
+        callController = null;
+        notify('尚未偵測到病人，已暫時離開頻道，等待病人重新進入…', 'info');
+        old.leave().then(function () {
+            reattaching = false;
+            if (!panelActive) return;
+            createCall(channel, patientName, doctorName);
+        }, function () {
+            reattaching = false;
+            if (!panelActive) return;
+            createCall(channel, patientName, doctorName);
         });
+    }
+
+    function clearPresence() {
+        if (presence) {
+            try { presence.leave(); } catch (e) { /* ignore */ }
+            presence = null;
+        }
+    }
+
+    function setConsentBadge(signed) {
+        var badge = document.getElementById('videoConsultConsent');
+        if (badge) badge.classList.toggle('hidden', !signed);
+    }
+
+    // 監聽病人是否已簽電子同意書（病人同意後才會開始心跳，故未簽時
+    // 醫師只會停在等待狀態；此標記供醫師即時確認與事後查核）
+    function startConsentWatch(channel) {
+        stopConsentWatch();
+        setConsentBadge(false);
+        if (window.VideoConsent) {
+            consentUnwatch = window.VideoConsent.watchConsent(channel, setConsentBadge);
+        }
+    }
+
+    function stopConsentWatch() {
+        if (consentUnwatch) {
+            try { consentUnwatch(); } catch (e) { /* ignore */ }
+            consentUnwatch = null;
+        }
+        setConsentBadge(false);
     }
 
     window.openVideoConsultation = async function () {
         try {
+            // 權限閘門：非醫師不得開啟（按鈕亦已隱藏，此處擋住控制台或殘留入口）
+            if (!isDoctorUser()) {
+                notify('視訊診症僅限醫師帳號使用', 'error');
+                return;
+            }
+
             // 已在通訊中再次點擊 → 直接關閉視訊（按鈕這時顯示為「關閉視訊」）
             if (callController) {
                 window.closeVideoConsultation();
@@ -202,26 +337,21 @@
             var patientName = await resolvePatientName(appointment);
             var doctorName = getDoctorName();
 
-            var subtitle = document.getElementById('videoConsultSubtitle');
-            var status = document.getElementById('videoConsultStatus');
+            // 頻道名稱顯示在「視訊診症」標題右側；
+            // 病人名已見於病歷、醫師名已見於視訊畫面，此處不再重複顯示
+            var channelEl = document.getElementById('videoConsultChannel');
+            if (channelEl) channelEl.textContent = '頻道：' + channel;
 
-            if (subtitle) {
-                subtitle.textContent = (patientName ? ('病人：' + patientName + '　') : '') +
-                    '頻道：' + channel +
-                    (doctorName ? ('　醫師：' + doctorName) : '');
-            }
-            joinModeLabel = cfg.TOKEN_URL ? 'Token 認證模式' : '測試模式（無 Token）';
-            if (status) status.textContent = joinModeLabel + '　·　連線中…';
-
-            // 更新病人「進入診間」連結
+            // 將病人診間連結寫入隱藏欄位，供「診間連結」按鈕複製
             var roomUrl = buildRoomUrl(appointment.id);
-            var roomLink = document.getElementById('videoConsultRoomLink');
             var roomUrlInput = document.getElementById('videoConsultRoomUrl');
-            if (roomLink) roomLink.href = roomUrl;
             if (roomUrlInput) roomUrlInput.value = roomUrl;
 
             // 顯示右半側視訊面板，診症資料順移至左半側
             setEmbeddedVideoUI(true);
+
+            // 監聽病人同意書簽署狀態（標題列顯示「已簽同意書」）
+            startConsentWatch(channel);
 
             createCall(channel, patientName, doctorName);
         } catch (error) {
@@ -235,7 +365,11 @@
         var stage = document.getElementById('videoConsultStage');
 
         var finish = function () {
+            panelActive = false;
+            clearAloneTimer();
             callController = null;
+            clearPresence();
+            stopConsentWatch();
             if (stage) stage.innerHTML = '';
             // 隱藏右半側面板，診症資料恢復滿版
             setEmbeddedVideoUI(false);
@@ -255,9 +389,33 @@
         }
     };
 
-    // 綁定「複製連結」按鈕
+    // 以非同步剪貼簿 API 為主，舊瀏覽器／非安全來源用暫存 textarea 備援
+    function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text);
+        }
+        return new Promise(function (resolve, reject) {
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'fixed';
+                ta.style.top = '-9999px';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                var ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                ok ? resolve() : reject(new Error('execCommand failed'));
+            } catch (e) {
+                reject(e);
+            }
+        });
+    }
+
+    // 綁定面板頂部「診間連結」按鈕：點擊複製病人診間網址
     function initCopyRoomUrlButton() {
-        var btn = document.getElementById('copyRoomUrlBtn');
+        var btn = document.getElementById('roomLinkBtn');
         if (!btn) return;
         btn.addEventListener('click', async function () {
             var input = document.getElementById('videoConsultRoomUrl');
@@ -267,27 +425,35 @@
                 return;
             }
             try {
-                if (navigator.clipboard && window.isSecureContext) {
-                    await navigator.clipboard.writeText(text);
-                } else {
-                    // 舊瀏覽器／非安全來源的備援方式
-                    input.removeAttribute('readonly');
-                    input.select();
-                    document.execCommand('copy');
-                    input.setAttribute('readonly', 'readonly');
-                    input.blur();
-                }
+                await copyText(text);
                 notify('已複製病人診間連結，可直接傳送給病人', 'success');
             } catch (error) {
-                input.select();
-                notify('複製失敗，請手動選取網址複製', 'error');
+                notify('複製失敗，請稍後再試', 'error');
             }
         });
     }
 
+    function initRoleGate() {
+        syncVideoEntryVisibility();
+        // 診症表單展開時（使用者登入後才進入診症）再次同步，
+        // 避免自動登入較慢導致按鈕狀態未更新
+        var form = document.getElementById('consultationForm');
+        if (form && !form._videoRoleObserved) {
+            form._videoRoleObserved = true;
+            var observer = new MutationObserver(function () {
+                if (!form.classList.contains('hidden')) syncVideoEntryVisibility();
+            });
+            observer.observe(form, { attributes: true, attributeFilter: ['class'] });
+        }
+    }
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initCopyRoomUrlButton);
+        document.addEventListener('DOMContentLoaded', function () {
+            initCopyRoomUrlButton();
+            initRoleGate();
+        });
     } else {
         initCopyRoomUrlButton();
+        initRoleGate();
     }
 })();
