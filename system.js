@@ -5995,6 +5995,22 @@ async function attemptMainLogin() {
             console.error('初始化聊天模組失敗:', chatErr);
         }
 
+        // 啟用 FCM 推播（詢問授權、註冊 token；Safari 未授權時顯示鈴鐺引導）
+        try {
+            if (window.FCMClient && typeof window.FCMClient.initAfterLogin === 'function') {
+                window.FCMClient.initAfterLogin(currentUserData);
+            }
+        } catch (fcmErr) {
+            console.warn('FCM 推播初始化失敗:', fcmErr);
+        }
+
+        // 推播通知點擊帶 ?videoAlert=<掛號編號>：提示醫師直接進入視訊診症
+        try {
+            await handleVideoAlertDeepLink();
+        } catch (deepLinkErr) {
+            console.warn('處理視訊通知連結失敗:', deepLinkErr);
+        }
+
         showToast('登入成功！', 'success');
 
     } catch (error) {
@@ -6152,7 +6168,16 @@ async function logout() {
         } catch (chatErr) {
             console.error('銷毀聊天模組失敗:', chatErr);
         }
-        
+
+        // 登出前移除本機 FCM token 與 Firestore 推播記錄
+        try {
+            if (window.FCMClient && typeof window.FCMClient.handleLogout === 'function') {
+                await window.FCMClient.handleLogout();
+            }
+        } catch (fcmErr) {
+            console.warn('清除推播 token 失敗:', fcmErr);
+        }
+
         if (window.firebase && window.firebase.auth) {
             await window.firebase.signOut(window.firebase.auth);
         }
@@ -8037,6 +8062,107 @@ function getRegistrationDoctorMeta(doctorValue) {
     };
 }
 
+// ── FCM 推播輔助（僅在有啟用 FCMClient 時作用，失敗不影響既有流程）──
+
+// 篩選在職、具 Firebase uid（有推播 token 前提）的職員 uid 清單
+function getActiveStaffUids(predicate) {
+    if (!Array.isArray(users)) return [];
+    return users
+        .filter((u) => u && u.active !== false && u.uid &&
+            (typeof predicate === 'function' ? predicate(u) : true))
+        .map((u) => u.uid);
+}
+
+// 病人確認到達（候診中）→ 推播給該掛號醫師；回傳 eventId 供站內通知去重
+function sendWaitingPush(appointment, patientName) {
+    if (!appointment || !window.FCMClient || isGeneralRegistrationAppointment(appointment)) return '';
+    const doctorUsername = String(appointment.appointmentDoctor || '').trim();
+    if (!doctorUsername) return '';
+    const uids = getActiveStaffUids(
+        (u) => u.position === '醫師' && String(u.username || '').trim() === doctorUsername
+    );
+    if (uids.length === 0) return '';
+    const name = patientName || '病人';
+    const eventId = `apt-waiting:${appointment.id}:${appointment.arrivedAt || ''}`;
+    window.FCMClient.sendPush(
+        { uids },
+        '病人候診通知',
+        `病人 ${name} 已進入候診中，請準備診症。`,
+        { event: 'appointment_waiting', appointmentId: String(appointment.id), patientName: name },
+        eventId
+    ).catch(() => {});
+    return eventId;
+}
+
+// 診症完成 → 推播給護理師／診所管理／診所助理；回傳 eventId 供站內通知去重
+function sendCompletedPush(appointment, patientName) {
+    if (!appointment || !window.FCMClient) return '';
+    const uids = getActiveStaffUids((u) =>
+        ['護理師', '診所管理', '診所助理'].includes(u.position));
+    if (uids.length === 0) return '';
+    const name = patientName || '病人';
+    const eventId = `apt-completed:${appointment.id}`;
+    window.FCMClient.sendPush(
+        { uids },
+        '診症完成通知',
+        `病人 ${name} 已完成診症，可進行後續處理。`,
+        { event: 'appointment_completed', appointmentId: String(appointment.id), patientName: name },
+        eventId
+    ).catch(() => {});
+    return eventId;
+}
+
+// 推播通知點擊連結 system.html?videoAlert=<掛號編號>：
+// 醫師登入後確認即可直接進入診症並開啟視訊面板（參數單次有效）
+async function handleVideoAlertDeepLink() {
+    const params = new URLSearchParams(window.location.search);
+    const aptId = params.get('videoAlert');
+    if (!aptId) return;
+    try {
+        window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+    } catch (_e) {}
+
+    if (!currentUserData || currentUserData.position !== '醫師') return;
+
+    const appointment = await getLatestAppointmentById(String(aptId)).catch(() => null);
+    if (!appointment) {
+        showToast('找不到該視訊診症對應的掛號記錄，請從今日掛號手動進入。', 'info');
+        return;
+    }
+    if (!canDoctorViewAppointment(appointment, currentUserData.username)) {
+        showToast('此視訊邀請不屬於您負責的掛號。', 'warning');
+        return;
+    }
+
+    const patientName = appointment.patientName || '';
+    const result = await Swal.fire({
+        icon: 'info',
+        title: '病人正在視訊診間等候',
+        html: patientName
+            ? `病人 <b>${patientName}</b> 已進入診間等候，是否立即開始診症並開啟視訊？`
+            : '病人已進入診間等候，是否立即開始診症並開啟視訊？',
+        showCancelButton: true,
+        confirmButtonText: '立即開啟視訊',
+        cancelButtonText: '稍後',
+        focusConfirm: false
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+        if (['waiting', 'registered'].includes(appointment.status)) {
+            await startConsultation(String(aptId));
+        } else if (appointment.status === 'consulting') {
+            currentConsultingAppointmentId = String(aptId);
+        }
+        if (typeof window.openVideoConsultation === 'function') {
+            await window.openVideoConsultation();
+        }
+    } catch (err) {
+        console.error('開啟視訊診症 deep link 失敗:', err);
+        showToast('開啟視訊診症失敗，請手動進入掛號後再試。', 'error');
+    }
+}
+
 function getConsultationDoctorUsername(consultation = null, appointment = null) {
     if (appointment && isGeneralRegistrationAppointment(appointment)) {
         return String(appointment.consultingDoctor || '').trim();
@@ -9684,6 +9810,13 @@ function subscribeToAppointments() {
                         if (patientName) {
                             // 顯示提示並播放音效
                             {
+                                // FCM 推播給該診醫師（含本機離線／其他裝置）；
+                                // 本機即將顯示同名站內通知，先登記去重，避免前景重複 toast
+                                let _waitingEventId = '';
+                                try { _waitingEventId = sendWaitingPush(apt, patientName); } catch (_e) {}
+                                if (_waitingEventId && window.FCMClient) {
+                                    window.FCMClient.markEventSeen(_waitingEventId);
+                                }
                                 // Notify that the patient has entered the waiting state, with translation
                                 const lang = localStorage.getItem('lang') || 'zh';
                                 const zhMsg = `病人 ${patientName} 已進入候診中，請準備診症。`;
@@ -9729,6 +9862,12 @@ function subscribeToAppointments() {
                         }
                     }
                     if (patientName) {
+                        // FCM 推播給護理師／助理（含離線裝置）；登記去重避免前景重複 toast
+                        let _completedEventId = '';
+                        try { _completedEventId = sendCompletedPush(apt, patientName); } catch (_e) {}
+                        if (_completedEventId && window.FCMClient) {
+                            window.FCMClient.markEventSeen(_completedEventId);
+                        }
                         const lang = localStorage.getItem('lang') || 'zh';
                         const zhMsg = `病人 ${patientName} 已完成診症，可進行後續處理。`;
                         const enMsg = `Patient ${patientName}'s consultation has been completed. Please proceed with follow-up.`;
@@ -13044,6 +13183,8 @@ if (!patient) {
             const recordNumberLabel = dict['病歷編號：'] || '病歷編號：';
             const clinicLabel = dict['診所：'] || '診所：';
             const hideDoctorInfo = shouldHideGeneralRegistrationDoctorInfo(consultation, null);
+            // 沒有開藥的已完成病歷，不顯示處方內容與服用方法欄位
+            const hasPrescribedMedication = consultationHasPrescription(consultation);
             const generalRegistrationBadge = isGeneralRegistrationConsultation(consultation)
                 ? `<span class="text-sm text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-100 shadow-sm">${window.escapeHtml(getGeneralRegistrationSourceLabel(String(lang).toLowerCase().startsWith('en')))}</span>`
                 : '';
@@ -13190,6 +13331,7 @@ if (!patient) {
                             </div>
                             
                             <div class="space-y-4">
+                                ${hasPrescribedMedication ? `
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">處方內容</span>
                                     ${(() => {
@@ -13267,6 +13409,7 @@ if (!patient) {
                                         </div>
                                     `;
                                 })()}
+                                ` : ''}
                                 
                                 ${consultation.treatmentCourse ? `
                                 <div>
@@ -13491,6 +13634,8 @@ async function displayConsultationMedicalHistoryPage() {
     const recordNumberLabel = dict['病歷編號：'] || '病歷編號：';
     const clinicLabel = dict['診所：'] || '診所：';
     const hideDoctorInfo = shouldHideGeneralRegistrationDoctorInfo(consultation, null);
+    // 沒有開藥的已完成病歷，不顯示處方內容與服用方法欄位
+    const hasPrescribedMedication = consultationHasPrescription(consultation);
     const generalRegistrationBadge = isGeneralRegistrationConsultation(consultation)
         ? `<span class="text-sm text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-100 shadow-sm">${window.escapeHtml(getGeneralRegistrationSourceLabel(String(lang).toLowerCase().startsWith('en')))}</span>`
         : '';
@@ -13632,6 +13777,7 @@ async function displayConsultationMedicalHistoryPage() {
                             </div>
                             
                             <div class="space-y-4">
+                                ${hasPrescribedMedication ? `
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">處方內容</span>
                                     ${(() => {
@@ -13665,9 +13811,11 @@ async function displayConsultationMedicalHistoryPage() {
                                         return `<div class="bg-yellow-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-yellow-400 medical-field">${html}</div>`;
                                     })()}
                                 </div>
+                                ` : ''}
                                 
                                 ${(() => {
-                                    let showBlock = !!consultation.prescription || !!consultation.multiPrescriptions || !!consultation.usage;
+                                    // 沒有開藥的病歷連同服用方法欄位一併隱藏
+                                    let showBlock = hasPrescribedMedication;
                                     if (!showBlock) return '';
                                     let medInfoHtml = '';
                                     try {
@@ -15468,6 +15616,41 @@ async function printSickLeave(consultationId, consultationData = null) {
     }
 }
 
+/**
+ * 判斷已完成病歷是否實際有開立藥物（處方）。
+ * 依次檢查多處方結構、舊版結構化處方與舊版文字處方；
+ * 只有空白處方區塊或完全無處方資料時視為「沒有開藥」
+ * （例如只做針灸、單純醫囑回診的病歷）。
+ * 診症記錄畫面與藥單醫囑列印皆以此決定是否顯示處方內容／服用方法（服藥資訊）欄位。
+ */
+function consultationHasPrescription(consultation) {
+    if (!consultation) return false;
+    const hasNamedItems = (arr) => Array.isArray(arr) &&
+        arr.some(it => it && String(it.name || '').trim() !== '');
+    // 1. 多處方完整結構：任一處方區塊含有具名藥材／方劑項目
+    if (consultation.multiPrescriptions) {
+        try {
+            const mp = JSON.parse(consultation.multiPrescriptions);
+            if (Array.isArray(mp) && mp.some(sec => sec && hasNamedItems(sec.items))) {
+                return true;
+            }
+        } catch (_e) { /* 解析失敗則繼續檢查其他來源 */ }
+    }
+    // 2. 舊版結構化處方
+    if (consultation.prescriptionStructured) {
+        try {
+            if (hasNamedItems(JSON.parse(consultation.prescriptionStructured))) {
+                return true;
+            }
+        } catch (_e) { /* 忽略解析錯誤 */ }
+    }
+    // 3. 舊版文字處方
+    if (typeof consultation.prescription === 'string' && consultation.prescription.trim() !== '') {
+        return true;
+    }
+    return false;
+}
+
 // 新增：從掛號記錄列印方藥醫囑
 async function printPrescriptionInstructionsFromAppointment(appointmentId) {
     const appointment = appointments.find(apt => apt && String(apt.id) === String(appointmentId));
@@ -15790,6 +15973,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             // 無處方內容
             prescriptionHtml = '無記錄';
         }
+        // 是否實際有開立藥物：沒有開藥時，藥單醫囑不顯示處方內容與服藥資訊欄位
+        const hasPrescribedMedication = consultationHasPrescription(consultation);
         // 語言設定
         const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
         const isEnglish = lang === 'en';
@@ -15856,9 +16041,10 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             if (consultation.usage) {
                 medInfoHtml += `<strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${consultation.usage}`;
             }
-            if (!consultation.prescription || (typeof consultation.prescription === 'string' && consultation.prescription.trim() === '')) {
-                medInfoHtml = '';
-            }
+        }
+        // 沒有開藥時，服藥資訊（服藥天數／每日次數／服用方法）整段不顯示
+        if (!hasPrescribedMedication) {
+            medInfoHtml = '';
         }
         // 醫囑及注意事項
         const instructionsHtml = consultation.instructions ? consultation.instructions.replace(/\n/g, '<br>') : '';
@@ -16037,8 +16223,8 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         })()}
                         ${consultation.diagnosis ? `<div class="info-row"><span class="info-label">${PI.diagnosis}${colon}</span><span>${consultation.diagnosis}</span></div>` : ''}
                     </div>
-                    <div class="section-title">${PI.prescriptionContent}</div>
-                    <div class="section-content">${prescriptionHtml}</div>
+                    ${hasPrescribedMedication ? `<div class="section-title">${PI.prescriptionContent}</div>
+                    <div class="section-content">${prescriptionHtml}</div>` : ''}
                     ${medInfoHtml ? `<div class="section-title">${PI.medicationInfo}</div><div class="section-content">${medInfoHtml}</div>` : ''}
                     ${instructionsHtml ? `<div class="section-title">${PI.instructions}</div><div class="section-content">${instructionsHtml}</div>` : ''}
                     ${followUpHtml ? `<div class="section-title">${PI.followUp}</div><div class="section-content">${followUpHtml}</div>` : ''}
@@ -30831,7 +31017,8 @@ async function viewMedicalRecord(recordId, buttonEl = null) {
         detailHtml += '</div>'; // 左欄結束
         // 右欄：處方與用法
         detailHtml += '<div class="space-y-4">';
-        // 處方內容
+        // 處方內容與服用方法：沒有開藥的病歷不顯示這兩個欄位
+        if (consultationHasPrescription(rec)) {
         detailHtml += '<div>';
         detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">處方內容</span>';
         (function () {
@@ -30907,6 +31094,7 @@ async function viewMedicalRecord(recordId, buttonEl = null) {
             detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${medInfoHtml || '無記錄'}</div>`;
             detailHtml += '</div>';
         })();
+        }
         // 療程
         if (rec.treatmentCourse) {
             detailHtml += '<div>';
