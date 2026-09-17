@@ -3364,18 +3364,19 @@ async function attachPatientListListener() {
         
         if (patientListListenerAttached) return;
         
-        const colRef = window.firebase.collection(window.firebase.db, 'patients');
-        let q;
-        try {
-            
-            q = window.firebase.firestoreQuery(colRef, window.firebase.orderBy('createdAt', 'desc'));
-        } catch (_e) {
-            
-            q = colRef;
-        }
+        // 監聽 patientsMeta/lastChange 單一文檔，而非整個 patients 集合。
+        // 任何病人 CRUD 操作都會先 touchPatientsMeta 更新此文檔，
+        // 因此 onSnapshot 能精準觸發且讀取量恒定（初始 1 次 + 每次變更 1 次）。
+        let isInitialSnapshot = true;
+        const metaDocRef = window.firebase.doc(window.firebase.db, 'patientsMeta', 'lastChange');
         
-        patientListUnsubscribe = window.firebase.onSnapshot(q, (snapshot) => {
+        patientListUnsubscribe = window.firebase.onSnapshot(metaDocRef, (snapshot) => {
             try {
+                // 忽略第一次回調（監聽器建立時的初始狀態，不一定有文檔存在）
+                if (isInitialSnapshot) {
+                    isInitialSnapshot = false;
+                    return;
+                }
                 
                 patientCache = null;
                 patientPagesCache = {};
@@ -3423,6 +3424,32 @@ function detachPatientListListener() {
         }
         patientListListenerAttached = false;
         patientListUnsubscribe = null;
+    }
+}
+
+/**
+ * 更新 patientsMeta/lastChange 文檔，用於觸發跨裝置即時更新通知。
+ * 病人 CRUD 操作都應調用此函數，onSnapshot 只監聽這一個文檔，
+ * 確保讀取量恒定（初始 1 次 + 每次變更 1 次），且無論病人是否在
+ * 監聽範圍內都能觸發通知。
+ *
+ * @param {string} operation 操作類型：'create' | 'update' | 'delete'
+ * @param {string} patientId 病人文檔 ID（可選）
+ */
+async function touchPatientsMeta(operation, patientId) {
+    try {
+        await waitForFirebaseDb();
+        await window.firebase.setDoc(
+            window.firebase.doc(window.firebase.db, 'patientsMeta', 'lastChange'),
+            {
+                timestamp: new Date(),
+                operation: operation || 'update',
+                patientId: patientId || null
+            },
+            { merge: true }
+        );
+    } catch (_e) {
+        // metadata 寫入失敗不影響主要操作，靜默處理
     }
 }
 
@@ -5168,6 +5195,13 @@ async function recordInventoryHistory(type, entries, extra = {}) {
             }
             stopBillingItemsRealtimeSync();
             billingItemsRealtimeClinicId = clinicId;
+
+            // 追蹤兩個 onSnapshot 的首次回調
+            let globalFirstResolve = null;
+            let clinicFirstResolve = null;
+            const globalFirstPromise = new Promise(res => { globalFirstResolve = res; });
+            const clinicFirstPromise = new Promise(res => { clinicFirstResolve = res; });
+
             billingItemsGlobalUnsubscribe = window.firebase.onSnapshot(
                 window.firebase.collection(window.firebase.db, 'globalBillingItems'),
                 (snap) => {
@@ -5178,9 +5212,11 @@ async function recordInventoryHistory(type, entries, extra = {}) {
                     });
                     billingItemsGlobalMap = next;
                     mergeBillingItemsFromRealtime();
+                    if (globalFirstResolve) { const r = globalFirstResolve; globalFirstResolve = null; r(); }
                 },
                 (error) => {
                     console.error('監聽全域收費項目失敗:', error);
+                    if (globalFirstResolve) { const r = globalFirstResolve; globalFirstResolve = null; r(); }
                 }
             );
             billingItemsClinicUnsubscribe = window.firebase.onSnapshot(
@@ -5193,11 +5229,20 @@ async function recordInventoryHistory(type, entries, extra = {}) {
                     });
                     billingItemsClinicMap = next;
                     mergeBillingItemsFromRealtime();
+                    if (clinicFirstResolve) { const r = clinicFirstResolve; clinicFirstResolve = null; r(); }
                 },
                 (error) => {
                     console.error('監聽診所收費項目失敗:', error);
+                    if (clinicFirstResolve) { const r = clinicFirstResolve; clinicFirstResolve = null; r(); }
                 }
             );
+
+            // 等待兩個 onSnapshot 都至少回調一次，確保 billingItems 已初始化。
+            // 加上超時保護，避免網路問題導致永久掛起。
+            await Promise.race([
+                Promise.all([globalFirstPromise, clinicFirstPromise]),
+                new Promise(res => setTimeout(res, 5000))
+            ]);
         }
         async function initBillingItems(forceRefresh = false) {
             
@@ -5229,34 +5274,10 @@ async function recordInventoryHistory(type, entries, extra = {}) {
             
             await waitForFirebaseDb();
             try {
+                // ensureBillingItemsRealtimeSync() 會等待兩個 onSnapshot 首次回調，
+                // mergeBillingItemsFromRealtime() 在回調中自動設定 billingItems 與 billingItemsLoaded。
+                // 不再需要額外的 getDocs——onSnapshot 本身就會返回完整集合。
                 await ensureBillingItemsRealtimeSync();
-                
-                const clinicId = localStorage.getItem('currentClinicId') || (typeof currentClinicId !== 'undefined' ? currentClinicId : 'local-default');
-                const clinicSnap = await window.firebase.getDocs(
-                    window.firebase.collection(window.firebase.db, 'clinics', clinicId, 'billingItems')
-                );
-                const globalSnap = await window.firebase.getDocs(
-                    window.firebase.collection(window.firebase.db, 'globalBillingItems')
-                );
-                const byId = new Map();
-                
-                globalSnap.forEach(docSnap => {
-                    const data = { id: docSnap.id, ...docSnap.data(), shared: true };
-                    byId.set(String(data.id), data);
-                });
-                
-                clinicSnap.forEach(docSnap => {
-                    const data = { id: docSnap.id, ...docSnap.data(), shared: !!docSnap.data().shared };
-                    byId.set(String(data.id), data);
-                });
-                billingItems = Array.from(byId.values());
-                billingItemsLoaded = true;
-                
-                try {
-                    localStorage.setItem(getClinicScopedStorageKey('billingItems'), JSON.stringify(billingItems));
-                } catch (lsErr) {
-                    console.warn('保存收費項目到本地失敗:', lsErr);
-                }
             } catch (error) {
                 console.error('讀取/初始化收費項目資料失敗:', error);
             }
@@ -9651,34 +9672,19 @@ function subscribeToAppointments() {
             }
             // 如果有需要通知的掛號並且目前使用者是醫師
             if (toNotify.length > 0 && currentUserData && currentUserData.position === '醫師') {
-                let patientsList = null;
                 for (const apt of toNotify) {
                     // 僅通知該醫師所屬的掛號
                     if (canDoctorViewAppointment(apt, currentUserData.username)) {
-                        // 優先使用掛號物件中的病人姓名
+                        // 優先使用掛號物件中的病人姓名；缺失時用單筆查詢替代載入整個病人列表
                         let patientName = '';
                         if (apt.patientName) {
                             patientName = apt.patientName;
                         } else {
-                            // 僅當缺少 patientName 時才讀取一次完整病人列表
-                            if (!patientsList) {
-                                try {
-                                    patientsList = await fetchPatients();
-                                } catch (fetchErr) {
-                                    console.error('讀取病人資料以取得姓名時發生錯誤:', fetchErr);
-                                }
-                            }
-                            if (Array.isArray(patientsList)) {
-                                let patient = patientsList.find(p => p && p.id === apt.patientId);
-                                // 若未找到，嘗試跨裝置刷新取得病人資料
-                                if (!patient) {
-                                    try {
-                                        patient = await getPatientByIdWithRefresh(apt.patientId);
-                                    } catch (_e) {
-                                        patient = null;
-                                    }
-                                }
+                            try {
+                                const patient = await getPatientByIdWithRefresh(apt.patientId);
                                 patientName = patient ? patient.name : '';
+                            } catch (_e) {
+                                patientName = '';
                             }
                         }
                         if (patientName) {
@@ -9699,33 +9705,17 @@ function subscribeToAppointments() {
 
             // 如果有診症完成通知，且目前使用者為護理師、診所管理或診所助理，則提示並播放音效
             if (completedNotify.length > 0 && currentUserData && currentUserData.position && ['護理師', '診所管理', '診所助理'].includes(currentUserData.position)) {
-                let patientsList2 = null;
                 for (const apt of completedNotify) {
-                    // 僅通知該完成事件
-                    // 優先使用掛號物件中的病人姓名
+                    // 優先使用掛號物件中的病人姓名；缺失時用單筆查詢替代載入整個病人列表
                     let patientName = '';
                     if (apt.patientName) {
                         patientName = apt.patientName;
                     } else {
-                        // 僅當缺少 patientName 時才讀取一次完整病人列表
-                        if (!patientsList2) {
-                            try {
-                                patientsList2 = await fetchPatients();
-                            } catch (fetchErr) {
-                                console.error('讀取病人資料以取得姓名時發生錯誤:', fetchErr);
-                            }
-                        }
-                        if (Array.isArray(patientsList2)) {
-                            let patient = patientsList2.find(p => p && p.id === apt.patientId);
-                            // 若未找到，嘗試跨裝置刷新取得病人資料
-                            if (!patient) {
-                                try {
-                                    patient = await getPatientByIdWithRefresh(apt.patientId);
-                                } catch (_e) {
-                                    patient = null;
-                                }
-                            }
+                        try {
+                            const patient = await getPatientByIdWithRefresh(apt.patientId);
                             patientName = patient ? patient.name : '';
+                        } catch (_e) {
+                            patientName = '';
                         }
                     }
                     if (patientName) {
@@ -26499,6 +26489,8 @@ class FirebaseDataManager {
                 aggregatePatch
             );
             this.applyPatientAggregateToCaches(pid, aggregatePatch);
+            // 通知其他裝置病人列表有變更
+            touchPatientsMeta('update', pid).catch(() => {});
 
             return {
                 success: true,
@@ -26650,6 +26642,8 @@ class FirebaseDataManager {
             );
             
             console.log('病人數據已添加到 Firebase:', docRef.id);
+            // 通知其他裝置病人列表有變更
+            touchPatientsMeta('create', docRef.id).catch(() => {});
             // 新增病人後清除緩存並移除本地存檔，讓下一次讀取時重新載入
             this.patientsCache = null;
             this.patientsCacheSource = 'none';
@@ -26748,6 +26742,8 @@ class FirebaseDataManager {
                     updatedBy: currentUser || 'system'
                 }
             );
+            // 通知其他裝置病人列表有變更
+            touchPatientsMeta('update', patientId).catch(() => {});
             // 更新病人資料後清除緩存並移除本地存檔，讓下一次讀取時重新載入
             this.patientsCache = null;
             this.patientsCacheSource = 'none';
@@ -26769,6 +26765,8 @@ class FirebaseDataManager {
             await window.firebase.deleteDoc(
                 window.firebase.doc(window.firebase.db, 'patients', patientId)
             );
+            // 通知其他裝置病人列表有變更
+            touchPatientsMeta('delete', patientId).catch(() => {});
             // 刪除病人後清除緩存並移除本地存檔
             this.patientsCache = null;
             this.patientsCacheSource = 'none';
@@ -28926,6 +28924,8 @@ class FirebaseDataManager {
                     updatedAt: new Date(),
                     updatedBy: currentUser || 'system'
                 });
+                // 通知其他裝置病人列表有變更
+                touchPatientsMeta('update', patientId).catch(() => {});
             } catch (updateErr) {
                 console.error('更新病人套票彙總欄位失敗:', updateErr);
                 return { success: false, error: updateErr.message };
