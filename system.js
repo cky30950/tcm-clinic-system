@@ -24298,7 +24298,15 @@ async function syncCloudBackup(forceBaseline) {
         });
         if (progressBar) progressBar.style.width = '100%';
         if (progressText) {
-            const summary = `同步完成（${result.status === 'partial' ? '部分成功' : '成功'}），本次 Firestore 讀取 ${result.firestoreReads} 次，備份檔：${result.exportFileName}`;
+            let compressionInfo = '';
+            if (result.exportBytes > 0 && result.exportBytesUncompressed > 0) {
+                const mb = (bytes) => bytes >= 1048576
+                    ? (bytes / 1048576).toFixed(2) + ' MB'
+                    : Math.max(1, Math.round(bytes / 1024)) + ' KB';
+                const ratio = Math.round((1 - result.exportBytes / result.exportBytesUncompressed) * 100);
+                compressionInfo = `，壓縮後 ${mb(result.exportBytes)}（原 ${mb(result.exportBytesUncompressed)}，縮減 ${ratio}%）`;
+            }
+            const summary = `同步完成（${result.status === 'partial' ? '部分成功' : '成功'}），本次 Firestore 讀取 ${result.firestoreReads} 次${compressionInfo}，備份檔：${result.exportFileName}`;
             progressText.textContent = summary;
         }
         showToast(result.status === 'partial'
@@ -24349,7 +24357,7 @@ async function exportClinicBackupFromCloud() {
         const disposition = response.headers.get('Content-Disposition') || '';
         const nameMatch = disposition.match(/filename="?([^"]+)"?/);
         const fileName = nameMatch ? nameMatch[1]
-            : `clinic_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+            : `clinic_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json.gz`;
 
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -24416,8 +24424,32 @@ function triggerBackupImport() {
 }
 
 /**
+ * 讀取並解析備份檔：支援舊版 .json 與雲端下載的 .json.gz（gzip）。
+ * gzip 使用瀏覽器原生 DecompressionStream 解壓，零依賴。
+ * @param {File} file
+ * @returns {Promise<Object>}
+ */
+async function parseBackupFileJson(file) {
+    const name = (file.name || '').toLowerCase();
+    const looksGzip = name.endsWith('.gz')
+        || file.type === 'application/gzip'
+        || file.type === 'application/x-gzip';
+
+    if (!looksGzip) {
+        return JSON.parse(await file.text());
+    }
+
+    if (typeof DecompressionStream === 'undefined') {
+        throw new Error('目前瀏覽器不支援 gzip 解壓，請使用新版 Chrome／Edge／Safari');
+    }
+    const decompressed = file.stream().pipeThrough(new DecompressionStream('gzip'));
+    const text = await new Response(decompressed).text();
+    return JSON.parse(text);
+}
+
+/**
  * 處理使用者選擇的備份檔案，解析後進行匯入。
- * @param {File} file 使用者選擇的 JSON 檔案
+ * @param {File} file 使用者選擇的 JSON／JSON.GZ 檔案
  */
 async function handleBackupFile(file) {
     if (!file) return;
@@ -24481,6 +24513,26 @@ async function importClinicBackup(data) {
         totalSteps = arguments[2];
     }
     await ensureFirebaseReady();
+    // 備份 JSON 往返後 Firestore Timestamp 一律變成 {seconds,nanoseconds} 普通物件，
+    // 直接寫回會成為 map 欄位，破壞 orderBy('sortDate'/'date' 等) 嘅排序。
+    // 遞迴還原成 Date，SDK 寫入時自動轉回 Timestamp。
+    function reviveBackupTimestamps(value) {
+        if (value === null || value === undefined) return value;
+        if (Array.isArray(value)) return value.map(reviveBackupTimestamps);
+        if (value instanceof Date) return value;
+        if (typeof value === 'object') {
+            if (typeof value.seconds === 'number' && typeof value.nanoseconds === 'number') {
+                const d = new Date(value.seconds * 1000 + value.nanoseconds / 1000000);
+                if (!isNaN(d.getTime())) return d;
+            }
+            const out = {};
+            for (const key of Object.keys(value)) {
+                out[key] = reviveBackupTimestamps(value[key]);
+            }
+            return out;
+        }
+        return value;
+    }
     // helper：清空並覆寫集合資料
     /**
      * 將集合資料替換為指定項目，僅刪除不在 items 中的文件，並使用批次寫入以減少網路往返。
@@ -24545,6 +24597,8 @@ async function importClinicBackup(data) {
                     } catch (_omitErr) {
                         dataToWrite = item;
                     }
+                    // 還原所有 Timestamp 欄位型別（重點：consultations.sortDate）
+                    dataToWrite = reviveBackupTimestamps(dataToWrite);
                     // 備份檔內 updatedAt 經 JSON 往返後只餘 {seconds,nanoseconds} 普通物件，
                     // 直接寫回會破壞增量備份的 Timestamp 查詢；交由 writeBatch 攔截器
                     // 補上真正的 Firestore serverTimestamp
