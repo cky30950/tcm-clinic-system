@@ -5348,6 +5348,8 @@ async function recordInventoryHistory(type, entries, extra = {}) {
             billingItemsGlobalMap = new Map();
             billingItemsClinicMap = new Map();
         }
+        // 掛載全域：logout() 位於外層作用域，需經 window 呼叫清理
+        window.__stopBillingItemsRealtimeSync = stopBillingItemsRealtimeSync;
         function mergeBillingItemsFromRealtime() {
             const byId = new Map();
             billingItemsGlobalMap.forEach((value, key) => byId.set(String(key), value));
@@ -6512,7 +6514,16 @@ async function logout() {
         } catch (chatErr) {
             console.error('銷毀聊天模組失敗:', chatErr);
         }
-        
+
+        // 先移除收費項目 Firestore 監聽器，避免登出後規則拒絕存取報錯
+        try {
+            if (typeof window.__stopBillingItemsRealtimeSync === 'function') {
+                window.__stopBillingItemsRealtimeSync();
+            }
+        } catch (billingErr) {
+            console.error('移除收費項目監聽器失敗:', billingErr);
+        }
+
         if (window.firebase && window.firebase.auth) {
             await window.firebase.signOut(window.firebase.auth);
         }
@@ -10046,6 +10057,60 @@ function subscribeToAppointments() {
                 // 更新狀態紀錄
                 window.previousAppointmentStatuses[apt.id] = apt.status;
             }
+
+            // ---- 推播通知：不論觀看者角色皆觸發，由後端依訂閱事件篩選收件人；失敗僅警告 ----
+            if (toNotify.length > 0 && window.TCMPwa && typeof window.TCMPwa.notify === 'function') {
+                for (const apt of toNotify) {
+                    // general registration（無指定醫師）不推，後端亦會擋
+                    if (!apt.appointmentDoctor) continue;
+                    let patientName = apt.patientName || '';
+                    if (!patientName) {
+                        try {
+                            const patient = await getPatientByIdWithRefresh(apt.patientId);
+                            patientName = patient ? patient.name : '';
+                        } catch (_e) {
+                            patientName = '';
+                        }
+                    }
+                    try {
+                        await window.TCMPwa.notify({
+                            kind: 'appointment',
+                            event: 'appointment_waiting',
+                            appointmentId: apt.id,
+                            patientName: patientName,
+                            appointmentDoctor: apt.appointmentDoctor,
+                            statusAt: apt.arrivedAt || ''
+                        });
+                    } catch (pushErr) {
+                        console.warn('候診推播失敗:', pushErr);
+                    }
+                }
+            }
+            if (completedNotify.length > 0 && window.TCMPwa && typeof window.TCMPwa.notify === 'function') {
+                for (const apt of completedNotify) {
+                    let patientName = apt.patientName || '';
+                    if (!patientName) {
+                        try {
+                            const patient = await getPatientByIdWithRefresh(apt.patientId);
+                            patientName = patient ? patient.name : '';
+                        } catch (_e) {
+                            patientName = '';
+                        }
+                    }
+                    try {
+                        await window.TCMPwa.notify({
+                            kind: 'appointment',
+                            event: 'appointment_completed',
+                            appointmentId: apt.id,
+                            patientName: patientName,
+                            statusAt: apt.completedAt || ''
+                        });
+                    } catch (pushErr) {
+                        console.warn('診症完成推播失敗:', pushErr);
+                    }
+                }
+            }
+
             // 如果有需要通知的掛號並且目前使用者是醫師
             if (toNotify.length > 0 && currentUserData && currentUserData.position === '醫師') {
                 for (const apt of toNotify) {
@@ -11232,6 +11297,7 @@ async function startConsultation(appointmentId) {
             const confirmedSwitch = await showConfirmation(confirmMsg2, 'warning');
             if (confirmedSwitch) {
                 consultingAppointment.status = 'waiting';
+                consultingAppointment.arrivedAt = new Date().toISOString();
                 delete consultingAppointment.consultationStartTime;
                 delete consultingAppointment.consultingDoctor;
                 if (String(currentConsultingAppointmentId) === String(consultingAppointment.id)) {
@@ -12319,6 +12385,7 @@ async function showConsultationForm(appointment) {
                         } catch (_e) {}
                         // 將狀態改回候診中
                         appointment.status = 'waiting';
+                        appointment.arrivedAt = new Date().toISOString();
                         delete appointment.consultationStartTime;
                         delete appointment.consultingDoctor;
                         // 保存狀態變更
@@ -16906,6 +16973,7 @@ async function editMedicalRecord(appointmentId) {
             if (confirmEdit) {
                 // 結束當前診症的病人
                 consultingAppointment.status = 'waiting';
+                consultingAppointment.arrivedAt = new Date().toISOString();
                 delete consultingAppointment.consultationStartTime;
                 delete consultingAppointment.consultingDoctor;
                 // 關閉可能開啟的診症表單
@@ -17021,6 +17089,7 @@ async function editMedicalRecordByConsultationId(consultationId) {
                 return;
             }
             consultingAppointment.status = 'waiting';
+            consultingAppointment.arrivedAt = new Date().toISOString();
             delete consultingAppointment.consultationStartTime;
             delete consultingAppointment.consultingDoctor;
             if (String(currentConsultingAppointmentId) === String(consultingAppointment.id)) {
