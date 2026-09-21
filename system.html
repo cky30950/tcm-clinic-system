@@ -1234,13 +1234,15 @@
                                         <label class="block text-sm font-semibold text-gray-700">主訴及現病史 *</label>
                                         
                                         
-                                        <button
-                                            type="button"
-                                            onclick="openDiagnosisTemplate(event)"
-                                            class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200"
-                                        >
-                                            🔍 載入診斷模板
-                                        </button>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onclick="openDiagnosisTemplate(event)"
+                                                class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200"
+                                            >
+                                                🔍 載入診斷模板
+                                            </button>
+                                        </div>
                                     </div>
                                     
                                     <textarea id="formSymptoms" placeholder="病人主要不適症狀、發病時間、症狀特點、治療經過等..." rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
@@ -3103,7 +3105,6 @@
           </div>
         </div>
 
-        
         <div id="categoryModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
           <div class="bg-white rounded-xl p-8 max-w-md w-full mx-4">
             <div class="flex justify-between items-center mb-6">
