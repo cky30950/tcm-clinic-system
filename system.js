@@ -5668,7 +5668,18 @@ async function callAdminClaimsApi(path, payload) {
     let data = null;
     try { data = await res.json(); } catch (_e) {}
     if (!res.ok) {
-        throw new Error((data && data.message) || ('HTTP ' + res.status));
+        // 後端錯誤訊息理應是字串；物件型態時先序列化，避免出現 Error: [object Object]
+        let message = data && data.message;
+        if (message && typeof message === 'object') {
+            try { message = JSON.stringify(message); } catch (_e2) { message = ''; }
+        }
+        message = message ? String(message) : '';
+        // 附上 Google 上游原始錯誤（EMAIL_EXISTS／權限不足等），方便診斷
+        const upstream = data && data.upstreamMessage ? String(data.upstreamMessage) : '';
+        if (upstream && message.indexOf(upstream) === -1) {
+            message = message ? (message + '（' + upstream + '）') : upstream;
+        }
+        throw new Error(message || ('HTTP ' + res.status));
     }
     return data || {};
 }
