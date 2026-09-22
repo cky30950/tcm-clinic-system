@@ -57,10 +57,12 @@ export class IdentityClient {
     }
 
     /**
-     * 更新帳號。可同時設定 custom claims 及／或撤銷 refresh token。
+     * 更新帳號。可同時設定 custom claims、停用／啟用帳號及／或撤銷 refresh token。
      * @param {string} localId Firebase Auth uid
      * @param {object} options
      * @param {string} [options.customAttributes] JSON 字串（claims，總大小 ≤ 1000 bytes）
+     * @param {boolean} [options.disableUser] true＝停用 Auth 帳號（封存/離職），
+     *   false＝重新啟用（復職）；undefined＝不變更
      * @param {number} [options.validSince] Unix 秒；設定後早於此時間簽發的
      *   refresh token／工作階段失效（ID token 在到期前仍有效，故另以 active claim 阻擋）
      */
@@ -69,6 +71,9 @@ export class IdentityClient {
         const body = { localId: String(localId) };
         if (typeof options.customAttributes === 'string') {
             body.customAttributes = options.customAttributes;
+        }
+        if (typeof options.disableUser === 'boolean') {
+            body.disableUser = options.disableUser;
         }
         if (options.validSince) {
             // API 要求字串形態的 Unix 秒
