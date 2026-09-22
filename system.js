@@ -5643,6 +5643,67 @@ async function removeAuthorizedUserIndex(uid) {
     return true;
 }
 
+/* ============================================================
+ * Custom Claims 同步（經 Cloudflare Pages Function 以 Service Account 寫入）
+ * ------------------------------------------------------------
+ * users 文件是授權事實來源；新增/編輯/啟用/停用/刪除用戶後，
+ * 由下列函式通知後端把身份同步到 Firebase Auth custom claims 與
+ * userAuthIndex 索引。客戶端無權直接寫這兩處（見 firestore.rules）。
+ * ============================================================ */
+
+async function callAdminClaimsApi(path, payload) {
+    await waitForFirebase();
+    const fbUser = window.firebase.auth && window.firebase.auth.currentUser;
+    if (!fbUser) throw new Error('未登入，無法同步用戶授權');
+    // 強制刷新，確保管理員自身的 admin claims 為最新（例如 bootstrap 後）
+    const token = await fbUser.getIdToken(true);
+    const res = await fetch('/api/admin/' + path, {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload || {})
+    });
+    let data = null;
+    try { data = await res.json(); } catch (_e) {}
+    if (!res.ok) {
+        throw new Error((data && data.message) || ('HTTP ' + res.status));
+    }
+    return data || {};
+}
+
+// 由後端以 SA 建立 Auth 帳號（避免 createUserWithEmailAndPassword 搶走管理員工作階段）
+async function createStaffAuthAccount({ email, password, displayName }) {
+    const data = await callAdminClaimsApi('accounts/create', { email, password, displayName });
+    if (!data || !data.uid) throw new Error('建立帳號時伺服器未回傳 uid');
+    return data;
+}
+
+// users 文件變更後同步 claims；forceRevoke 用於停用（即時撤銷 refresh token）
+async function syncStaffClaims(user, options) {
+    const uid = user && user.uid ? String(user.uid) : '';
+    const userId = user && user.id ? String(user.id) : '';
+    if (!uid || !userId) {
+        console.warn('同步 claims 跳過：缺少 uid/userId', user);
+        return { ok: false, skipped: true };
+    }
+    const forceRevoke = !!(options && options.forceRevoke);
+    return callAdminClaimsApi('claims/sync', { targetUid: uid, userId, forceRevoke });
+}
+
+// 刪除用戶後，一併移除授權索引並刪除 Auth 帳號
+async function deleteStaffAuthAccount(uid) {
+    if (!uid) return { ok: false, skipped: true };
+    return callAdminClaimsApi('claims/delete', { targetUid: String(uid) });
+}
+
+// 一次性批量同步所有現有用戶（首次部署/修復用）；回傳 {synced, orphaned, ...}
+async function bootstrapAllUserClaims() {
+    return callAdminClaimsApi('claims/bootstrap', {});
+}
+window.adminClaimsBootstrap = bootstrapAllUserClaims;
+
 async function fetchLegacyAuthorizedUserByUidOrEmail(uid, email) {
     await waitForFirebaseDb();
     const colRef = window.firebase.collection(window.firebase.db, 'users');
@@ -6176,6 +6237,10 @@ async function attemptMainLogin() {
 
         console.log('Firebase 登入成功:', userCredential.user.email);
 
+        // 標記本機 IndexedDB 即將可能寫入診所／病人資料（後續會讀 users 等文件），
+        // 供「未登入開頁守衛」判斷需否清除；正常登出清除成功後會撤銷此標記。
+        try { localStorage.setItem(IDB_PHI_MARKER, '1'); } catch (_e) {}
+
         
         const firebaseUser = userCredential.user;
         const uid = firebaseUser.uid;
@@ -6199,6 +6264,18 @@ async function attemptMainLogin() {
             window.currentUserClaims = {};
         }
 
+        // Custom claims 閘門：ID Token 已標示 staff 但 active=false（帳號被停用）→ 即時拒絕。
+        // 後端停用時另會撤銷 refresh token，已簽發的 ID Token 最遲一小時後失效。
+        if (window.currentUserClaims
+            && window.currentUserClaims.staff === true
+            && window.currentUserClaims.active === false) {
+            showToast('您的帳號已被停用，請聯繫管理員', 'error');
+            await window.firebase.signOut(window.firebase.auth);
+            // 已讀取過 users 等文件：完整清掃（localStorage＋IndexedDB）後重新整理
+            wipeDeviceDataAndReload(1000);
+            return;
+        }
+
         let matchingUser = await fetchAuthorizedUserByUidOrEmail(uid, firebaseUser && firebaseUser.email);
         if (matchingUser && uid && (!matchingUser.uid || matchingUser.uid !== uid)) {
             matchingUser.uid = uid;
@@ -6220,8 +6297,8 @@ async function attemptMainLogin() {
             if (!matchingUser.active) {
                 showToast('您的帳號已被停用，請聯繫管理員', 'error');
                 await window.firebase.signOut(window.firebase.auth);
-                // 拒絕登入一併清掃本機殘留的前一使用者個資快取
-                try { clearLocalClinicData(); } catch (_e) {}
+                // 拒絕登入一併完整清掃（localStorage＋IndexedDB）後重新整理
+                wipeDeviceDataAndReload(1000);
                 return;
             }
 
@@ -6259,8 +6336,8 @@ async function attemptMainLogin() {
             } catch (e) {
                 console.error('登出 Firebase 失敗:', e);
             }
-            // 拒絕登入一併清掃本機殘留的前一使用者個資快取
-            try { clearLocalClinicData(); } catch (_e) {}
+            // 拒絕登入一併完整清掃（localStorage＋IndexedDB）後重新整理
+            wipeDeviceDataAndReload(1000);
             return;
         }
 
@@ -6570,23 +6647,117 @@ function clearLocalClinicData() {
     } catch (error) {
         console.warn('清理本機診所資料快取失敗:', error);
     }
-    // Firestore SDK 離線快取（IndexedDB persistentLocalCache）可能留存曾讀取的
-    // 病人文件；需在所有 onSnapshot 監聽器拆除後呼叫，否則 SDK 會以
-    // failed-precondition 拒絕——此處盡力而為，失敗僅記錄不影響登出。
-    try {
-        const fb = window.firebase;
-        if (fb && fb.db && typeof fb.clearIndexedDbPersistence === 'function') {
-            fb.clearIndexedDbPersistence(fb.db).catch(function (err) {
-                console.warn('清除 Firestore 離線快取失敗（仍有監聽器作用中）:',
-                    err && err.code ? err.code : err);
-            });
-        }
-    } catch (idbErr) {
-        console.warn('啟動 Firestore 離線快取清除失敗:', idbErr);
-    }
+    // Firestore SDK 的 IndexedDB 離線快取需「terminate 實例後」才能清除，
+    // 無法在一般清掃中一併處理，統一由 shutdownFirestoreAndWipePersistence()
+    // 於登出／未登入開頁守衛中執行。
     return removed;
 }
 window.clearLocalClinicData = clearLocalClinicData;
+
+// ============================================================
+// Firestore IndexedDB 離線快取清除（PHI 防護）
+// ------------------------------------------------------------
+// Firestore 以 persistentLocalCache 持久化，曾讀取的病人／病歷文件會留存
+// IndexedDB。SDK 規定 clearIndexedDbPersistence 只能在 terminate() 之後
+// 呼叫，而終止後的實例無法復用——呼叫端必須重新整理頁面取得新實例。
+// IDB_PHI_MARKER：登入成功後標記「本機快取可能含個資」，清除成功才撤銷；
+// 供前一使用者直接關分頁沒登出時，「未登入開頁守衛」判斷需否補清。
+// ============================================================
+const IDB_PHI_MARKER = 'firestoreIdbMayContainPhi';
+const IDB_WIPE_ATTEMPTED = 'firestoreIdbWipeAttempted';
+const FIRESTORE_SHUTDOWN_TIMEOUT_MS = 5000;
+
+function detachAllKnownFirestoreListeners() {
+    // 病人清單 metadata 監聽
+    try {
+        if (typeof detachPatientListListener === 'function') {
+            detachPatientListListener();
+        }
+    } catch (_e) {}
+    // 單一病人病歷監聽（依病人 ID 掛載的多個實例）
+    try {
+        if (typeof patientConsultationsListeners === 'object' && patientConsultationsListeners) {
+            Object.keys(patientConsultationsListeners).forEach(function (pid) {
+                const unsub = patientConsultationsListeners[pid];
+                try { if (typeof unsub === 'function') unsub(); } catch (_e) {}
+                delete patientConsultationsListeners[pid];
+            });
+        }
+    } catch (_e) {}
+    // 病歷管理頁列表監聽
+    try {
+        if (typeof medicalRecordListUnsubscribe === 'function') {
+            medicalRecordListUnsubscribe();
+            medicalRecordListUnsubscribe = null;
+        }
+    } catch (_e) {}
+}
+
+/**
+ * 先拆除所有已知 onSnapshot 監聽，再 terminate Firestore 實例並清除
+ * IndexedDB 離線快取。terminate／清除均設逾時，避免他分頁占用時永久懸浮。
+ * @returns {Promise<boolean>} 僅在 terminate 與清除都成功時回 true；
+ *   失敗（如其他分頁仍開著導致刪除被擋／逾時）回 false，呼叫端應保留
+ *   PHI 標記，留待下次開頁再清。
+ */
+async function shutdownFirestoreAndWipePersistence() {
+    const fb = window.firebase;
+    if (!fb || !fb.db) return false;
+
+    detachAllKnownFirestoreListeners();
+
+    let termOk = false;
+    try {
+        if (typeof fb.terminate === 'function') {
+            await Promise.race([
+                fb.terminate(fb.db),
+                new Promise(function (resolve) { setTimeout(resolve, FIRESTORE_SHUTDOWN_TIMEOUT_MS); })
+            ]);
+            termOk = true;
+        }
+    } catch (termErr) {
+        console.warn('終止 Firestore 實例失敗:', termErr && termErr.code ? termErr.code : termErr);
+    }
+    if (!termOk) return false;
+
+    try {
+        if (typeof fb.clearIndexedDbPersistence !== 'function') return false;
+        let cleared = false;
+        await Promise.race([
+            fb.clearIndexedDbPersistence(fb.db).then(function () { cleared = true; }),
+            new Promise(function (resolve) { setTimeout(resolve, FIRESTORE_SHUTDOWN_TIMEOUT_MS); })
+        ]);
+        if (!cleared) {
+            console.warn('清除 Firestore 離線快取逾時（可能有其他分頁仍開啟中）');
+            return false;
+        }
+        return true;
+    } catch (clearErr) {
+        console.warn('清除 Firestore 離線快取失敗（可能有其他分頁仍開啟中）:',
+            clearErr && clearErr.code ? clearErr.code : clearErr);
+        return false;
+    }
+}
+window.shutdownFirestoreAndWipePersistence = shutdownFirestoreAndWipePersistence;
+
+function reloadPageSoon(delayMs) {
+    setTimeout(function () { window.location.reload(); }, typeof delayMs === 'number' ? delayMs : 800);
+}
+
+/**
+ * 登出／登入被拒後的完整本機清掃：localStorage 業務鍵 + Firestore IndexedDB，
+ * 完成（或逾時）後重新整理頁面取得全新 Firestore 實例。
+ */
+async function wipeDeviceDataAndReload(delayMs) {
+    try { clearLocalClinicData(); } catch (_e) {}
+    let cleared = false;
+    try { cleared = await shutdownFirestoreAndWipePersistence(); } catch (_e) {}
+    if (cleared) {
+        try { localStorage.removeItem(IDB_PHI_MARKER); } catch (_e) {}
+    }
+    reloadPageSoon(delayMs);
+}
+window.wipeDeviceDataAndReload = wipeDeviceDataAndReload;
 
 async function logout() {
     try {
@@ -6654,6 +6825,18 @@ async function logout() {
             console.warn('登出清理本機快取失敗:', cacheErr);
         }
 
+        // Firestore 實例終止並清除 IndexedDB 離線快取（SDK 僅允許 terminate 後
+        // 清除）；實例終止後無法復用，顯示登出提示後重新整理頁面取得新實例。
+        let firestoreWiped = false;
+        try {
+            firestoreWiped = await shutdownFirestoreAndWipePersistence();
+        } catch (fsErr) {
+            console.warn('Firestore 終止／清快取失敗:', fsErr);
+        }
+        if (firestoreWiped) {
+            try { localStorage.removeItem(IDB_PHI_MARKER); } catch (_e) {}
+        }
+
         document.getElementById('loginPage').classList.remove('hidden');
         document.getElementById('mainSystem').classList.add('hidden');
         
@@ -6699,7 +6882,9 @@ async function logout() {
         document.getElementById('mainLoginPassword').value = '';
         
         showToast('已成功登出', 'success');
-        
+        // Firestore 已 terminate，短暫停留顯示提示後重新整理至乾淨的登入頁
+        reloadPageSoon(1000);
+
     } catch (error) {
         console.error('登出錯誤:', error);
         showToast('登出時發生錯誤', 'error');
@@ -22572,9 +22757,13 @@ async function saveUser() {
                 phone: phone,
                 uid: existingUserRecord.uid || '',
                 active: active,
-                clinicId: clinicIdForLimit,
-                permissionSettings: (existingUserRecord && existingUserRecord.permissionSettings) ? existingUserRecord.permissionSettings : undefined
+                clinicId: clinicIdForLimit
             };
+            // 保留已有的權限設定；沒有的用戶不帶此欄位（Firestore 不接受 undefined）
+            if (existingUserRecord.permissionSettings !== undefined
+                && existingUserRecord.permissionSettings !== null) {
+                userData.permissionSettings = existingUserRecord.permissionSettings;
+            }
 
             const result = await window.firebaseDataManager.updateUser(editingUserId, userData);
             
@@ -22600,7 +22789,22 @@ async function saveUser() {
                     document.getElementById('userRole').textContent = `當前用戶：${getUserDisplayName(currentUserData)}`;
                     document.getElementById('sidebarUserRole').textContent = `當前用戶：${getUserDisplayName(currentUserData)}`;
                 }
-                
+
+                // 同步授權到 custom claims（職位/診所/啟用狀態變更即時反映到 ID Token）
+                if (existingUserRecord.uid) {
+                    try {
+                        await syncStaffClaims(
+                            { id: editingUserId, uid: existingUserRecord.uid },
+                            { forceRevoke: userData.active === false }
+                        );
+                    } catch (claimsErr) {
+                        console.error('同步用戶授權 claims 失敗:', claimsErr);
+                        showToast('用戶資料已更新，但授權同步失敗：請重試或執行 adminClaimsBootstrap() 修復', 'error');
+                    }
+                } else {
+                    console.warn('用戶缺少 Auth uid，無法同步 claims:', editingUserId);
+                }
+
                 showToast('用戶資料已成功更新！', 'success');
             } else {
                 showToast('更新用戶資料失敗，請稍後再試', 'error');
@@ -22628,19 +22832,11 @@ async function saveUser() {
                     return;
                 }
                 try {
-                    // 使用 Firebase Auth 創建新帳號
-                    const userCredential = await window.firebase.createUserWithEmailAndPassword(window.firebase.auth, email, password);
-                    if (userCredential && userCredential.user) {
-                        newUid = userCredential.user.uid;
-                        // 更新顯示名稱
-                        if (window.firebase.updateProfile && typeof window.firebase.updateProfile === 'function') {
-                            try {
-                                await window.firebase.updateProfile(userCredential.user, { displayName: name });
-                            } catch (_err) {
-                                console.error('更新新用戶顯示名稱失敗:', _err);
-                            }
-                        }
-                    }
+                    // 經後端 Service Account 建立 Auth 帳號：
+                    // 不可用客戶端 createUserWithEmailAndPassword，否則管理員的
+                    // 瀏覽器工作階段會被切換成新帳號（無 admin claims，後續寫入全被拒）
+                    const created = await createStaffAuthAccount({ email, password, displayName: name });
+                    newUid = created.uid;
                 } catch (authErr) {
                     console.error('建立 Firebase 帳號失敗:', authErr);
                     showToast('建立 Firebase 帳號失敗：' + (authErr && authErr.message ? authErr.message : ''), 'error');
@@ -22672,6 +22868,17 @@ async function saveUser() {
                 };
                 users.push(newUser);
                 usersFromFirebase.push(newUser);
+
+                // 同步授權到 custom claims 與 userAuthIndex（後端 SA 寫入）
+                if (newUid) {
+                    try {
+                        await syncStaffClaims({ id: result.id, uid: newUid }, { forceRevoke: !userData.active });
+                    } catch (claimsErr) {
+                        console.error('同步新用戶授權 claims 失敗:', claimsErr);
+                        showToast('用戶已建立，但授權同步失敗：請重新編輯此用戶並儲存，或執行 adminClaimsBootstrap() 修復', 'error');
+                    }
+                }
+
                 showToast('用戶已成功新增！', 'success');
             } else {
                 showToast('新增用戶失敗，請稍後再試', 'error');
@@ -22764,7 +22971,21 @@ async function toggleUserStatus(id) {
                 if (firebaseUserIndex !== -1) {
                     usersFromFirebase[firebaseUserIndex].active = !user.active;
                 }
-                
+
+                // 同步 claims：停用时 active=false 並撤銷 refresh token；
+                // 啟用時恢復 active=true
+                if (user.uid) {
+                    try {
+                        await syncStaffClaims(
+                            { id, uid: user.uid },
+                            { forceRevoke: user.active === true }
+                        );
+                    } catch (claimsErr) {
+                        console.error('同步用戶啟用狀態 claims 失敗:', claimsErr);
+                        showToast('帳號狀態已更新，但授權同步失敗：請重試或執行 adminClaimsBootstrap() 修復', 'error');
+                    }
+                }
+
                 localStorage.setItem('users', JSON.stringify(users));
                 displayUsers();
                 {
@@ -22853,6 +23074,18 @@ async function deleteUser(id) {
 
                 localStorage.setItem('users', JSON.stringify(users));
                 displayUsers();
+
+                // 後端一併清除授權索引並刪除 Auth 帳號（舊流程只刪 Firestore 文件，
+                // 殘留 Auth 帳號仍可登入）
+                if (user.uid) {
+                    try {
+                        await deleteStaffAuthAccount(user.uid);
+                    } catch (claimsErr) {
+                        console.error('刪除 Auth 帳號失敗:', claimsErr);
+                        showToast('用戶文件已刪除，但 Auth 帳號刪除失敗：請於系統管理頁重試或手動處理', 'error');
+                    }
+                }
+
                 {
                     const lang = localStorage.getItem('lang') || 'zh';
                     const zhMsg = `用戶「${user.name}」已刪除！`;
@@ -24752,7 +24985,28 @@ async function exportClinicBackupFromCloud() {
             if (done) return;
             done = true;
             if (!user) {
+                // 前一使用者直接關分頁沒走登出時，IndexedDB 仍可能殘留病人文件。
+                // 僅在帶有 PHI 標記時執行 terminate＋清除，並以 sessionStorage
+                // 確保每個分頁工作階段最多補清一次（避免他分頁占用時反覆重新整理）。
+                let mayContainPhi = false;
+                try { mayContainPhi = localStorage.getItem(IDB_PHI_MARKER) === '1'; } catch (_e) {}
                 try { clearLocalClinicData(); } catch (_e) {}
+                if (mayContainPhi) {
+                    let wipeTried = false;
+                    try {
+                        wipeTried = sessionStorage.getItem(IDB_WIPE_ATTEMPTED) === '1';
+                        if (!wipeTried) sessionStorage.setItem(IDB_WIPE_ATTEMPTED, '1');
+                    } catch (_e) {}
+                    if (!wipeTried) {
+                        shutdownFirestoreAndWipePersistence().then(function (cleared) {
+                            if (cleared) {
+                                try { localStorage.removeItem(IDB_PHI_MARKER); } catch (_e) {}
+                            }
+                            // 實例已 terminate，無論成敗都需重新整理取得可用實例
+                            window.location.reload();
+                        });
+                    }
+                }
             }
         });
         return true;
@@ -29278,14 +29532,9 @@ class FirebaseDataManager {
                 }
             );
 
-            if (dataToWrite && dataToWrite.uid) {
-                try {
-                    await upsertAuthorizedUserIndex({ id: docRef.id, ...dataToWrite }, dataToWrite.uid);
-                } catch (indexErr) {
-                    console.warn('新增用戶後建立授權索引失敗:', indexErr);
-                }
-            }
-            
+            // 授權索引 userAuthIndex 與 custom claims 統一由後端
+            // /api/admin/claims/sync 以 Service Account 寫入（客戶端已被 Rules 拒絕）
+
             console.log('用戶數據已添加到 Firebase:', docRef.id);
             // 新增用戶後清除快取並移除本地存檔
             this.usersCache = null;
@@ -29456,18 +29705,8 @@ class FirebaseDataManager {
                     updatedBy: currentUser || 'system'
                 }
             );
-            const mergedUser = {
-                ...(existingUser || {}),
-                ...(dataToWrite || {}),
-                id: userId
-            };
-            if (mergedUser.uid) {
-                try {
-                    await upsertAuthorizedUserIndex(mergedUser, mergedUser.uid);
-                } catch (indexErr) {
-                    console.warn('更新授權用戶索引失敗:', indexErr);
-                }
-            }
+            // 授權索引與 custom claims 由後端 /api/admin/claims/sync 維護，
+            // 此處不再做客戶端索引寫入（Rules 已拒絕）
             // 更新用戶後清除用戶緩存並移除本地存檔
             this.usersCache = null;
             try {
@@ -29497,13 +29736,7 @@ class FirebaseDataManager {
             await window.firebase.deleteDoc(
                 window.firebase.doc(window.firebase.db, 'users', userId)
             );
-            if (existingUser && existingUser.uid) {
-                try {
-                    await removeAuthorizedUserIndex(existingUser.uid);
-                } catch (indexErr) {
-                    console.warn('刪除授權用戶索引失敗:', indexErr);
-                }
-            }
+            // userAuthIndex 與 Auth 帳號由後端 /api/admin/claims/delete 一併清除
             // 刪除用戶後清除緩存並移除本地存檔
             this.usersCache = null;
             try {
