@@ -429,7 +429,30 @@
 
     /* ----------------------------------------------------------
      * 圖片本端處理（canvas 原圖；不再產生獨立縮圖）
+     * 一律盡量輸出 WebP 以節省 R2 容量；舊瀏覽器不支援時回退 JPEG/PNG
      * ---------------------------------------------------------- */
+
+    // WebP 輸出品質（對照片相當於 JPEG q0.9 左右的視覺品質，檔案約小 25-35%）
+    var WEBP_QUALITY = 0.85;
+    var webpSupportCached = null; // null=未探測；true/false=探測結果
+
+    /** 探測目前瀏覽器 canvas 是否能真正輸出 image/webp（舊 Safari 會靜默回退成 PNG） */
+    function supportsWebP() {
+        if (webpSupportCached !== null) return Promise.resolve(webpSupportCached);
+        return new Promise(function (resolve) {
+            try {
+                var c = document.createElement('canvas');
+                c.width = 1; c.height = 1;
+                c.toBlob(function (blob) {
+                    webpSupportCached = !!(blob && blob.type === 'image/webp');
+                    resolve(webpSupportCached);
+                }, 'image/webp', WEBP_QUALITY);
+            } catch (_e) {
+                webpSupportCached = false;
+                resolve(false);
+            }
+        });
+    }
 
     function loadImageElement(fileOrUrl) {
         return new Promise(function (resolve, reject) {
@@ -506,7 +529,10 @@
     }
 
     /**
-     * 產出原圖（≤2048，JPEG；含透明的 PNG 保留 PNG）。
+     * 產出原圖（≤2048）。
+     * 優先 WebP（含透明通道，照片與截圖皆可，體積最小）；
+     * PNG 來源（多為文字檢驗報告截圖）會同時比一次無損 PNG 輸出，取體積較小者；
+     * 瀏覽器不支援 WebP 時回退：含透明的 PNG 保留 PNG，其餘 JPEG q0.9。
      * 不再產生獨立縮圖：列表縮圖位置以原圖靠 CSS 縮放顯示。
      * @returns {Promise<{original:Blob, contentType:string, width:number, height:number}>}
      */
@@ -519,21 +545,41 @@
             throw new Error('檔案超過大小上限（' + Math.round(maxBytes / 1024 / 1024) + 'MB）');
         }
         var source = await decodeSource(file);
-        var hasAlpha = sourceHasAlpha(source, inType);
-        // PNG 有 alpha 才保留 PNG；其餘（含 GIF/WebP）一律 JPEG
-        var contentType = (inType === 'image/png' && hasAlpha) ? 'image/png' : 'image/jpeg';
-        var original = await drawResized(source, 2048, contentType, 0.9);
-        if (typeof source.close === 'function') {
-            try { source.close(); } catch (_e) {}
+        var encoded;
+        var contentType;
+        try {
+            if (await supportsWebP()) {
+                var webpResult = await drawResized(source, 2048, 'image/webp', WEBP_QUALITY);
+                encoded = webpResult;
+                contentType = 'image/webp';
+                // PNG 來源常為文字／表單截圖，無損 PNG 偶爾比有損 WebP 更小：
+                // 同尺寸再壓一次 PNG，兩相比較取較小者，確保「只省不浪費」。
+                if (inType === 'image/png') {
+                    var pngResult = await drawResized(source, 2048, 'image/png');
+                    if (pngResult.blob.size < webpResult.blob.size) {
+                        encoded = pngResult;
+                        contentType = 'image/png';
+                    }
+                }
+            } else {
+                // 舊瀏覽器回退：PNG 有 alpha 才保留 PNG；其餘（含 GIF/WebP 來源）一律 JPEG
+                var hasAlpha = sourceHasAlpha(source, inType);
+                contentType = (inType === 'image/png' && hasAlpha) ? 'image/png' : 'image/jpeg';
+                encoded = await drawResized(source, 2048, contentType, 0.9);
+            }
+        } finally {
+            if (typeof source.close === 'function') {
+                try { source.close(); } catch (_e) {}
+            }
         }
-        if (original.blob.size > maxBytes) {
+        if (encoded.blob.size > maxBytes) {
             throw new Error('壓縮後圖片仍超過大小上限（' + Math.round(maxBytes / 1024 / 1024) + 'MB）');
         }
         return {
-            original: original.blob,
+            original: encoded.blob,
             contentType: contentType,
-            width: original.width,
-            height: original.height
+            width: encoded.width,
+            height: encoded.height
         };
     }
 
@@ -693,27 +739,46 @@
      * Gallery Modal
      * ---------------------------------------------------------- */
 
+    // 診症中「醫學報告」入口（visit＋all）：判斷附件是否屬於本次診症
+    // （已儲存＝consultationId 相符；未儲存＝無 consultationId 且 sessionId 相符）
+    function isCurrentVisitDoc(d) {
+        if (!gallery || gallery.scope !== 'visit') return false;
+        if (gallery.consultationId) {
+            return String(d.consultationId || '') === String(gallery.consultationId);
+        }
+        return !d.consultationId && String(d.sessionId || '') === String(gallery.sessionId);
+    }
+
     function galleryVisibleDocs() {
         var docs = patientCache[gallery.patientId] || [];
         var list = docs.slice();
         if (gallery.scope === 'visit') {
-            if (gallery.consultationId) {
-                list = list.filter(function (d) {
-                    return String(d.consultationId || '') === String(gallery.consultationId);
+            if (gallery.category === 'all') {
+                // 「醫學報告」入口：過往記錄一律不含舌象（舌象由「舌象圖片」按鈕專管）；
+                // 舊分類 'other' 亦歸入醫學報告。
+                // 可切換檢視：全部（本次優先）｜本次診症｜過往醫學報告
+                var reports = list.filter(function (d) { return d.category !== 'tongue'; });
+                var current = reports.filter(isCurrentVisitDoc);
+                var view = gallery.reportView || 'all';
+                if (view === 'current') return current;
+                var currentIds = {};
+                current.forEach(function (d) {
+                    currentIds[String(d.fileId || d.id)] = true;
                 });
-            } else {
-                list = list.filter(function (d) {
-                    return !d.consultationId && String(d.sessionId || '') === String(gallery.sessionId);
+                var history = reports.filter(function (d) {
+                    return !currentIds[String(d.fileId || d.id)];
                 });
+                if (view === 'history') return history;
+                // 全部：本次診症排在最前，其餘過往報告在後
+                return current.concat(history);
             }
+            // 舌象入口（保留原行為）：只看本次診次的舌象
+            return list.filter(isCurrentVisitDoc).filter(function (d) {
+                return d.category === 'tongue';
+            });
         }
         if (gallery.category === 'tongue') {
             list = list.filter(function (d) { return d.category === 'tongue'; });
-        }
-        if (gallery.scope === 'visit' && gallery.category === 'all') {
-            // 過往記錄的「醫學報告」不含舌象（舌象由「舌象圖片」按鈕專管）；
-            // 舊分類 'other' 亦歸入醫學報告
-            list = list.filter(function (d) { return d.category !== 'tongue'; });
         }
         if (gallery.scope === 'patient' && gallery.category === 'all' && gallery.filter !== 'all') {
             // 病人層級綜合入口的下拉篩選：舌象圖片／醫學報告（舊分類 'other' 歸入醫學報告）
@@ -729,8 +794,16 @@
     function cardHtml(doc) {
         var meta = CATEGORY_META[doc.category] || CATEGORY_META.report;
         var thumbSrc = publicUrl(doc.thumbKey);
+        // 診症中「醫學報告」檢視過往報告時，縮圖可能來自不同診次；
+        // Lightbox 需以「該病人所有醫學報告」為一組，故 visit 用 'all'，
+        // 點任一張都能在全部報告間滑動檢視。
+        var mixedVisitView = gallery.scope === 'visit'
+            && gallery.category === 'all'
+            && (gallery.reportView || 'all') !== 'current';
         var visitAttr = gallery.scope === 'visit'
-            ? (gallery.consultationId || 'session:' + gallery.sessionId)
+            ? (mixedVisitView
+                ? 'all'
+                : (gallery.consultationId || 'session:' + gallery.sessionId))
             : 'all';
         var kindAttr;
         if (gallery.category === 'tongue') {
@@ -749,6 +822,13 @@
             visitLabel = doc.consultationId
                 ? tt('診症') + ' ' + (doc.consultationDate || '')
                 : '<span class="text-amber-600">' + tt('未歸檔診症') + '</span>';
+        } else if (mixedVisitView) {
+            // 本次／過往一目了然：本次掛藍色標記，過往顯示所屬診症日期
+            visitLabel = isCurrentVisitDoc(doc)
+                ? '<span class="text-blue-700">■ ' + tt('本次診症') + '</span>'
+                : (doc.consultationId
+                    ? tt('診症') + ' ' + (doc.consultationDate || '')
+                    : '<span class="text-amber-600">' + tt('未歸檔診症') + '</span>');
         }
         var delBtn = canDelete(doc)
             ? '<button type="button" data-ma-delete="' + esc(doc.fileId || doc.id) + '" ' +
@@ -795,12 +875,30 @@
             '</div>';
     }
 
-    // 僅病人層級「醫學報告及舌象圖片」提供下拉選單，
-    // 可按「舌象圖片／醫學報告」兩類篩選；其餘入口只顯示單一類型，無需選單。
+    // 病人層級「醫學報告及舌象圖片」提供「舌象圖片／醫學報告」分類下拉；
+    // 診症中「醫學報告」入口提供「全部／本次診症／過往醫學報告」檢視下拉。
     // 選單置於上傳按鈕列最右側（maFilterSlot，ml-auto 推到右上角）
     function renderFilters() {
         var el = document.getElementById('maFilterSlot');
         if (!el) return;
+        if (gallery.scope === 'visit' && gallery.category === 'all') {
+            el.innerHTML =
+                '<label for="maReportViewSelect" class="text-sm font-medium text-gray-700 whitespace-nowrap">' + tt('顯示') + '</label>' +
+                '<select id="maReportViewSelect" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">' +
+                    '<option value="all">' + tt('全部') + '</option>' +
+                    '<option value="current">' + tt('本次診症') + '</option>' +
+                    '<option value="history">' + tt('過往醫學報告') + '</option>' +
+                '</select>';
+            var viewSel = document.getElementById('maReportViewSelect');
+            if (viewSel) {
+                viewSel.value = gallery.reportView || 'all';
+                viewSel.addEventListener('change', function () {
+                    gallery.reportView = viewSel.value;
+                    renderGrid();
+                });
+            }
+            return;
+        }
         if (gallery.scope !== 'patient' || gallery.category !== 'all') {
             el.innerHTML = '';
             return;
@@ -1015,6 +1113,8 @@
             category: category,
             // 病人層級「醫學報告及舌象圖片」的下拉篩選：all | tongue | report
             filter: 'all',
+            // 診症中「醫學報告」入口的檢視範圍：all（本次+過往）| current | history
+            reportView: 'all',
             patientId: ctx.patientId,
             patientName: ctx.patientName,
             // 列表過濾用：僅 visit scope 限定診次
@@ -1038,7 +1138,8 @@
         document.getElementById('maSubtitle').textContent =
             (ctx.patientName ? ctx.patientName + '　' : '') +
             (scope === 'visit'
-                ? (gallery.consultationId ? tt('本次診症附件') : tt('本次診症（尚未儲存）'))
+                ? ((gallery.consultationId ? tt('本次診症附件') : tt('本次診症（尚未儲存）')) +
+                    (category === 'all' ? '·' + tt('可查看過往報告') : ''))
                 : tt('所有歷史附件'));
 
         renderUploadBar();
