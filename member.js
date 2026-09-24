@@ -1,43 +1,10 @@
 /* ============================================================
- * member.js — 病人會員查詢（獨立頁，不依賴 firebase_init.js）
+ * member.js — 病人會員查詢（無需登入、不發 SMS）
  * ------------------------------------------------------------
- * Firebase Phone Auth 登入後，唯讀查詢同電話病人的：
- * 錢包餘額、有效套票、最近 20 筆交易。不顯示任何病歷。
+ * 輸入於診所登記的香港手機號碼 → POST /api/member/lookup
+ * 由 Service Account 查詢並回傳：儲值餘額、有效套票、最近交易。
+ * 頁面不直接連接 Firestore，不顯示任何病歷。
  * ============================================================ */
-
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import {
-    getAuth,
-    RecaptchaVerifier,
-    signInWithPhoneNumber,
-    signOut,
-    onAuthStateChanged
-} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-import {
-    getFirestore,
-    collection,
-    query,
-    where,
-    orderBy,
-    limit,
-    getDocs,
-    getDoc,
-    doc
-} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-
-const firebaseConfig = {
-    apiKey: 'AIzaSyCx_BLIWVKZs0vJa5TwL6zoycJexY_5nXU',
-    authDomain: 'system-1e90a.firebaseapp.com',
-    projectId: 'system-1e90a',
-    storageBucket: 'system-1e90a.firebasestorage.app',
-    messagingSenderId: '80947900109',
-    appId: '1:80947900109:web:b6cd62bb2f1e07971a4384'
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-auth.languageCode = 'zh-HK';
-const db = getFirestore(app);
 
 /* ---------------- i18n ---------------- */
 
@@ -45,22 +12,24 @@ const I18N = {
     zh: {
         clinicName: '名醫中醫診所',
         authTitle: '會員查詢',
-        authSub: '請以登記之手機號碼登入，查看儲值餘額、套票及交易記錄。',
+        authSub: '輸入於診所登記之手機號碼，即可查閱儲值餘額、套票及交易記錄。',
         phoneLabel: '手機號碼',
-        phoneHint: '未登記之手機號碼將無法查閱任何資料。',
-        codeLabel: '驗證碼',
-        sendCode: '發送驗證碼',
-        verifyCode: '驗證並登入',
+        phoneHint: '請輸入於診所登記之手機號碼。',
+        lookup: '查詢',
+        looking: '查詢中…',
+        errCaptcha: '請先完成人機驗證',
+        captchaNotSet: '人機驗證尚未設定，請聯絡診所職員',
+        captchaFailed: '人機驗證無法完成，請重新整理頁面或稍後再試',
+        captchaLoading: '人機驗證載入中…',
         totalBalance: '儲值總餘額 (HKD)',
         principal: '本金餘額',
         bonus: '贈送餘額',
         packages: '有效套票',
         transactions: '最近交易',
-        signOut: '登出',
+        back: '返回',
         noPackages: '目前沒有有效套票',
         noTransactions: '暫無交易記錄',
         noAccount: '未找到儲值帳戶',
-        loading: '載入中…',
         uses: '餘次',
         noExpiry: '無有效期',
         txTopup: '儲值充值',
@@ -69,33 +38,32 @@ const I18N = {
         txAdjust: '人工調整',
         txStatus: '狀態變更',
         errPhone: '請輸入有效香港手機號碼（8 位數）',
-        errCode: '請輸入 6 位驗證碼',
-        errSms: '驗證碼無法發送，請稍後重試',
-        errVerify: '驗證失敗，請檢查驗證碼是否正確',
         errNoPatient: '系統中沒有以此手機登記的病人記錄。',
-        errLoad: '資料載入失敗，請重新整理後再試',
+        errLoad: '查詢失敗，請稍後再試',
         patientLabel: '病人',
         langToggle: 'English'
     },
     en: {
         clinicName: 'MING YI Chinese Medicine Clinic',
         authTitle: 'Member Portal',
-        authSub: 'Sign in with your registered mobile number to view your stored-value balance, packages and transactions.',
+        authSub: 'Enter your mobile number registered with the clinic to view your stored-value balance, packages and transactions.',
         phoneLabel: 'Mobile number',
-        phoneHint: 'Numbers not registered with the clinic cannot view any data.',
-        codeLabel: 'Verification code',
-        sendCode: 'Send code',
-        verifyCode: 'Verify & sign in',
+        phoneHint: 'Enter the number registered with the clinic.',
+        lookup: 'Look up',
+        looking: 'Looking up…',
+        errCaptcha: 'Please complete the human verification',
+        captchaNotSet: 'Human verification is not configured. Please contact the clinic.',
+        captchaFailed: 'Human verification could not be completed. Please refresh the page or try again later.',
+        captchaLoading: 'Loading human verification…',
         totalBalance: 'Total balance (HKD)',
         principal: 'Principal',
         bonus: 'Bonus',
         packages: 'Active packages',
         transactions: 'Recent transactions',
-        signOut: 'Sign out',
+        back: 'Back',
         noPackages: 'No active packages',
         noTransactions: 'No transactions yet',
         noAccount: 'No stored-value account found',
-        loading: 'Loading…',
         uses: 'uses left',
         noExpiry: 'No expiry',
         txTopup: 'Top-up',
@@ -104,11 +72,8 @@ const I18N = {
         txAdjust: 'Manual adjustment',
         txStatus: 'Status change',
         errPhone: 'Please enter a valid Hong Kong mobile number (8 digits)',
-        errCode: 'Please enter the 6-digit code',
-        errSms: 'Could not send the code, please try again later',
-        errVerify: 'Verification failed, please check the code',
         errNoPatient: 'No patient record is registered with this mobile number.',
-        errLoad: 'Failed to load data, please refresh and try again',
+        errLoad: 'Lookup failed, please try again later',
         patientLabel: 'Patient',
         langToggle: '中文'
     }
@@ -131,8 +96,7 @@ function applyStaticI18n() {
         el.textContent = t(el.getAttribute('data-i18n'));
     });
     document.documentElement.lang = lang === 'en' ? 'en' : 'zh-HK';
-    const toggle = document.getElementById('langToggle');
-    if (toggle) toggle.textContent = t('langToggle');
+    document.getElementById('langToggle').textContent = t('langToggle');
 }
 
 document.getElementById('langToggle').addEventListener('click', () => {
@@ -164,11 +128,9 @@ function money(n) {
 
 function toDate(ts) {
     if (!ts) return null;
-    if (typeof ts.toDate === 'function') {
-        try { return ts.toDate(); } catch (_e) {}
-    }
     if (typeof ts.seconds === 'number') return new Date(ts.seconds * 1000);
-    return null;
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? null : d;
 }
 
 function formatDate(ts) {
@@ -196,174 +158,166 @@ function formatDateTime(ts) {
     }
 }
 
-/* ---------------- Phone auth ---------------- */
+/* ---------------- Turnstile 人機驗證 ---------------- */
 
-let recaptchaVerifier = null;
-let confirmationResult = null;
+let widgetId = null;
+let turnstileToken = '';
+let captchaErrors = 0;
 
-function getRecaptcha() {
-    if (!recaptchaVerifier) {
-        recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha', {
-            size: 'normal'
-        });
-        recaptchaVerifier.render().catch(() => {});
-    }
-    return recaptchaVerifier;
+function loadTurnstileScript() {
+    if (window.turnstile) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        s.async = true;
+        s.defer = true;
+        s.onload = () => window.turnstile.ready(resolve);
+        s.onerror = () => reject(new Error('TURNSTILE_SCRIPT_FAILED'));
+        document.head.appendChild(s);
+    });
 }
 
-// 將用戶輸入統一轉成 E.164：+852 + 8 位數
-function normalizeHkPhone(raw) {
-    const digits = String(raw || '').replace(/\D/g, '');
+function setLookupEnabled() {
+    $('lookupBtn').disabled = !turnstileToken;
+}
+
+function showTurnstileNote(key) {
+    const note = $('turnstileNote');
+    note.textContent = t(key);
+    note.classList.remove('hidden');
+}
+
+function resetTurnstile() {
+    turnstileToken = '';
+    setLookupEnabled();
+    if (widgetId !== null && window.turnstile) {
+        try {
+            window.turnstile.reset(widgetId);
+        } catch (_e) {}
+    }
+}
+
+async function initTurnstile() {
+    try {
+        const [cfg] = await Promise.all([
+            fetch('/api/member/config').then((r) => r.json()),
+            loadTurnstileScript()
+        ]);
+        const siteKey = cfg && cfg.siteKey ? String(cfg.siteKey) : '';
+        if (!siteKey) {
+            showTurnstileNote('captchaNotSet');
+            return;
+        }
+        captchaErrors = 0;
+        widgetId = window.turnstile.render('#turnstileWidget', {
+            sitekey: siteKey,
+            language: lang === 'en' ? 'en' : 'zh-HK',
+            callback: (tok) => {
+                captchaErrors = 0;
+                turnstileToken = String(tok || '');
+                setLookupEnabled();
+            },
+            'expired-callback': () => resetTurnstile(),
+            'timeout-callback': () => resetTurnstile(),
+            'error-callback': () => {
+                // 官方建議：前 2 次回 false 交由 Turnstile 自動重試；
+                // 持續失敗才顯示持久訊息並回 true（不再 console 報錯）。
+                captchaErrors++;
+                if (captchaErrors <= 2) return false;
+                showTurnstileNote('captchaFailed');
+                return true;
+            }
+        });
+    } catch (err) {
+        console.error('turnstile init failed:', err);
+        showTurnstileNote('captchaNotSet');
+    }
+}
+
+/* ---------------- 查詢 ---------------- */
+
+let patientEntries = [];
+let activePatientIndex = 0;
+
+async function lookup() {
+    clearAuthMsg();
+    if (!turnstileToken) {
+        showAuthMsg('errCaptcha');
+        return;
+    }
+    const phone = $('phoneInput').value;
+    const digits = String(phone || '').replace(/\D/g, '');
     let local8 = '';
     if (digits.length === 8) {
         local8 = digits;
     } else if (digits.length === 11 && digits.indexOf('852') === 0) {
         local8 = digits.slice(3);
-    } else if (digits.length === 12 && digits.indexOf('8520') === 0) {
-        // 用戶誤多加一個 0
-        local8 = digits.slice(4);
     }
-    if (!/^[5-9]\d{7}$/.test(local8)) return '';
-    return '+852' + local8;
-}
-
-$('sendCodeBtn').addEventListener('click', async () => {
-    clearAuthMsg();
-    const e164 = normalizeHkPhone($('phoneInput').value);
-    if (!e164) {
+    if (!/^[5-9]\d{7}$/.test(local8)) {
         showAuthMsg('errPhone');
         return;
     }
-    const btn = $('sendCodeBtn');
+
+    const btn = $('lookupBtn');
     btn.disabled = true;
+    btn.textContent = t('looking');
     try {
-        confirmationResult = await signInWithPhoneNumber(auth, e164, getRecaptcha());
-        $('phoneStep').classList.add('hidden');
-        $('codeStep').classList.remove('hidden');
-        $('sendCodeBtn').classList.add('hidden');
-        $('verifyBtn').classList.remove('hidden');
-        $('codeInput').focus();
-    } catch (err) {
-        console.error('signInWithPhoneNumber error:', err);
-        showAuthMsg('errSms');
-        // reCAPTCHA 可能已消耗，重置以便重試
-        if (recaptchaVerifier) {
-            try { await recaptchaVerifier.clear(); } catch (_e) {}
-            recaptchaVerifier = null;
+        const res = await fetch('/api/member/lookup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: local8, turnstileToken: turnstileToken })
+        });
+        let data;
+        try {
+            data = await res.json();
+        } catch (_e) {
+            data = null;
         }
+        if (!res.ok) {
+            showAuthMsg((data && data.message) || 'errLoad');
+            return;
+        }
+        patientEntries = (data && Array.isArray(data.patients)) ? data.patients : [];
+        activePatientIndex = 0;
+        if (!patientEntries.length) {
+            showAuthMsg('errNoPatient', 'info');
+            return;
+        }
+        renderAll();
+        $('authView').classList.add('hidden');
+        $('dataView').classList.remove('hidden');
+    } catch (err) {
+        console.error('lookup error:', err);
+        showAuthMsg('errLoad');
     } finally {
-        btn.disabled = false;
+        btn.textContent = t('lookup');
+        // Turnstile token 單次有效，每次嘗試後重置並等下一個 token
+        resetTurnstile();
     }
+}
+
+$('lookupBtn').addEventListener('click', lookup);
+$('phoneInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') lookup();
 });
 
-$('verifyBtn').addEventListener('click', async () => {
-    clearAuthMsg();
-    const code = String($('codeInput').value || '').replace(/\D/g, '');
-    if (code.length !== 6) {
-        showAuthMsg('errCode');
-        return;
-    }
-    const btn = $ ('verifyBtn');
-    btn.disabled = true;
-    try {
-        await confirmationResult.confirm(code);
-        // onAuthStateChanged 會接手轉換到資料頁
-    } catch (err) {
-        console.error('confirm code error:', err);
-        showAuthMsg('errVerify');
-        btn.disabled = false;
-    }
+$('backBtn').addEventListener('click', () => {
+    $('dataView').classList.add('hidden');
+    $('authView').classList.remove('hidden');
+    resetTurnstile();
 });
-
-/* ---------------- 資料載入 ---------------- */
-
-// 病人文件電話可能存成 91234567 / 85291234567 / +85291234567
-function phoneVariants(e164) {
-    const with852 = e164.slice(1);     // 85291234567
-    const local8 = with852.slice(3);      // 91234567
-    return [local8, with852, e164, '+' + with852];
-}
-
-async function findPatientsByPhone(e164) {
-    const variants = phoneVariants(e164);
-    const results = await Promise.allSettled(
-        variants.map((v) =>
-            getDocs(query(collection(db, 'patients'), where('phone', '==', v)))
-        )
-    );
-    const byId = new Map();
-    results.forEach((r) => {
-        if (r.status !== 'fulfilled') return;
-        r.value.forEach((snap) => {
-            byId.set(snap.id, { id: snap.id, ...snap.data() });
-        });
-    });
-    return Array.from(byId.values());
-}
-
-async function loadPatientBundle(patientId) {
-    const bundle = { account: null, packages: [], transactions: [] };
-
-    // 帳戶（文件 ID = patientId）
-    try {
-        const accSnap = await getDoc(doc(db, 'patientWalletAccounts', patientId));
-        if (accSnap.exists()) bundle.account = accSnap.data();
-    } catch (err) {
-        console.warn('wallet account read failed:', err);
-    }
-
-    // 有效套票
-    try {
-        const pkgSnap = await getDocs(
-            query(collection(db, 'patientPackages'), where('patientId', '==', patientId))
-        );
-        pkgSnap.forEach((s) => {
-            const d = s.data();
-            const remaining = Number(d.remainingUses);
-            const expiresAt = d.expiresAt ? toDate(d.expiresAt) : null;
-            const notExpired = !expiresAt || expiresAt.getTime() >= Date.now();
-            if (remaining > 0 && notExpired) {
-                bundle.packages.push({ id: s.id, ...d });
-            }
-        });
-    } catch (err) {
-        console.warn('packages read failed:', err);
-    }
-
-    // 最近 20 筆交易
-    try {
-        const txSnap = await getDocs(
-            query(
-                collection(db, 'patientWalletTransactions'),
-                where('patientId', '==', patientId),
-                orderBy('at', 'desc'),
-                limit(20)
-            )
-        );
-        txSnap.forEach((s) => {
-            bundle.transactions.push(s.data());
-        });
-    } catch (err) {
-        console.warn('transactions read failed:', err);
-    }
-
-    return bundle;
-}
 
 /* ---------------- 渲染 ---------------- */
 
-let patientBundles = [];   // [{patient, bundle}]
-let activePatientIndex = 0;
-
 function renderPatientTabs() {
     const tabsEl = $('patientTabs');
-    if (patientBundles.length <= 1) {
+    if (patientEntries.length <= 1) {
         tabsEl.innerHTML = '';
         return;
     }
-    tabsEl.innerHTML = patientBundles.map((entry, i) => {
+    tabsEl.innerHTML = patientEntries.map((entry, i) => {
         const active = i === activePatientIndex ? ' active' : '';
-        const label = `${t('patientLabel')}: ${entry.patient.name || entry.patient.id}`;
+        const label = `${t('patientLabel')}: ${entry.name || entry.patientId}`;
         return `<button class="tab${active}" data-patient-idx="${i}" type="button">${label}</button>`;
     }).join('');
     tabsEl.querySelectorAll('[data-patient-idx]').forEach((btn) => {
@@ -375,8 +329,8 @@ function renderPatientTabs() {
 }
 
 function renderBalance() {
-    const entry = patientBundles[activePatientIndex];
-    const acc = entry && entry.bundle ? entry.bundle.account : null;
+    const entry = patientEntries[activePatientIndex];
+    const acc = entry && entry.account;
     const balance = acc ? Number(acc.balance) : 0;
     const bonus = acc ? Number(acc.bonusBalance) : 0;
     $('heroTotal').textContent = money(balance + bonus);
@@ -386,18 +340,16 @@ function renderBalance() {
 
 function renderPackages() {
     const ul = $('packageList');
-    const packages = patientBundles[activePatientIndex].bundle.packages;
+    const packages = patientEntries[activePatientIndex].packages || [];
     if (!packages.length) {
         ul.innerHTML = `<li class="empty">${t('noPackages')}</li>`;
         return;
     }
     ul.innerHTML = packages.map((p) => {
-        const name = p.name || p.packageName || '';
+        const name = p.name || '';
         const remaining = Number(p.remainingUses);
         const total = Number(p.totalUses);
-        const expiry = p.expiresAt
-            ? formatDate(p.expiresAt)
-            : t('noExpiry');
+        const expiry = p.expiresAt ? formatDate(p.expiresAt) : t('noExpiry');
         return `
             <li>
                 <div class="row">
@@ -422,7 +374,7 @@ function txTypeLabel(type) {
 
 function renderTransactions() {
     const ul = $('txList');
-    const txs = patientBundles[activePatientIndex].bundle.transactions;
+    const txs = patientEntries[activePatientIndex].transactions || [];
     if (!txs.length) {
         ul.innerHTML = `<li class="empty">${t('noTransactions')}</li>`;
         return;
@@ -453,71 +405,5 @@ function renderAll() {
     renderTransactions();
 }
 
-/* ---------------- 視圖切換 ---------------- */
-
-async function showDataView(user) {
-    $('authView').classList.add('hidden');
-    $('dataView').classList.remove('hidden');
-
-    const phone = user.phoneNumber;
-    patientBundles = [];
-    activePatientIndex = 0;
-    $('heroTotal').textContent = t('loading');
-
-    let patients;
-    try {
-        patients = await findPatientsByPhone(phone);
-    } catch (err) {
-        console.error('findPatients error:', err);
-        $('heroTotal').textContent = money(0);
-        $('packageList').innerHTML = `<li class="empty">${t('errLoad')}</li>`;
-        $('txList').innerHTML = '';
-        return;
-    }
-
-    if (!patients.length) {
-        $('heroTotal').textContent = money(0);
-        $('packageList').innerHTML = `<li class="empty">${t('errNoPatient')}</li>`;
-        $('txList').innerHTML = '';
-        return;
-    }
-
-    patientBundles = await Promise.all(
-        patients.map(async (patient) => ({
-            patient: patient,
-            bundle: await loadPatientBundle(patient.id)
-        }))
-    );
-    renderAll();
-}
-
-function showAuthView() {
-    $('dataView').classList.add('hidden');
-    $('authView').classList.remove('hidden');
-    // 重置登入表單
-    confirmationResult = null;
-    $('phoneStep').classList.remove('hidden');
-    $('codeStep').classList.add('hidden');
-    $('sendCodeBtn').classList.remove('hidden');
-    $('verifyBtn').classList.add('hidden');
-    $('codeInput').value = '';
-    clearAuthMsg();
-}
-
-$('signOutBtn').addEventListener('click', async () => {
-    try {
-        await signOut(auth);
-    } catch (err) {
-        console.error('sign out error:', err);
-    }
-});
-
-onAuthStateChanged(auth, (user) => {
-    if (user && user.phoneNumber) {
-        showDataView(user);
-    } else {
-        showAuthView();
-    }
-});
-
 applyStaticI18n();
+initTurnstile();

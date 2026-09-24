@@ -114,7 +114,9 @@
         .msg.error { display: block; color: var(--danger); }
         .msg.info { display: block; color: var(--warn); background: var(--warn-bg); border: 1px solid #fde68a; padding: 10px 12px; border-radius: 10px; }
 
-        #recaptcha { margin: 6px 0 2px; min-height: 78px; }
+        .turnstile-box { margin: 4px 0 14px; min-height: 65px; display: flex; flex-direction: column; }
+        #turnstileWidget { min-height: 65px; }
+        #turnstileWidget iframe { width: 100%; }
 
         /* 資料頁 */
         .balance-hero {
@@ -191,29 +193,25 @@
         <button class="lang-btn" id="langToggle" type="button">English</button>
     </div>
 
-    <!-- 登入：手機驗證 -->
+    <!-- 輸入電話查詢（無需驗證碼） -->
     <div id="authView">
         <div class="card">
             <h1 data-i18n="authTitle">會員查詢</h1>
-            <p class="sub" data-i18n="authSub">請以登記之手機號碼登入，查看儲值餘額、套票及交易記錄。</p>
+            <p class="sub" data-i18n="authSub">輸入於診所登記之手機號碼，即可查閱儲值餘額、套票及交易記錄。</p>
 
-            <div class="field" id="phoneStep">
+            <div class="field">
                 <label for="phoneInput" data-i18n="phoneLabel">手機號碼</label>
                 <input type="tel" id="phoneInput" inputmode="tel" autocomplete="tel"
-                       placeholder="+852 9123 4567" value="+852 ">
-                <p class="hint" data-i18n="phoneHint">未登記之手機號碼將無法查閱任何資料。</p>
+                       placeholder="9123 4567">
+                <p class="hint" data-i18n="phoneHint">請輸入於診所登記之手機號碼。</p>
             </div>
 
-            <div class="field hidden" id="codeStep">
-                <label for="codeInput" data-i18n="codeLabel">驗證碼</label>
-                <input type="text" id="codeInput" inputmode="numeric" autocomplete="one-time-code"
-                       maxlength="6" placeholder="123456">
+            <div class="turnstile-box" id="turnstileBox">
+                <div id="turnstileWidget"></div>
+                <p class="hint hidden" id="turnstileNote"></p>
             </div>
 
-            <div id="recaptcha"></div>
-
-            <button class="btn" id="sendCodeBtn" type="button" data-i18n="sendCode">發送驗證碼</button>
-            <button class="btn hidden" id="verifyBtn" type="button" data-i18n="verifyCode">驗證並登入</button>
+            <button class="btn" id="lookupBtn" type="button" data-i18n="lookup" disabled>查詢</button>
 
             <div class="msg" id="authMsg"></div>
         </div>
@@ -249,7 +247,7 @@
         </div>
 
         <div class="footer-actions">
-            <button class="btn ghost" id="signOutBtn" type="button" data-i18n="signOut">登出</button>
+            <button class="btn ghost" id="backBtn" type="button" data-i18n="back">返回</button>
         </div>
     </div>
 </div>
