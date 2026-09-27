@@ -17877,7 +17877,8 @@ function buildPackageWalletCombinedSection() {
     } catch (_e) {}
 
     let selectorHtml = '';
-    if (clinicRows.length > 0) {
+    // 僅在有多於一間診所時才顯示診所選單；單一診所直接隱藏
+    if (clinicRows.length > 1) {
         const lang = (localStorage.getItem('lang') || 'zh').toLowerCase();
         const options = clinicRows.map(c => {
             const name = lang.startsWith('en')
