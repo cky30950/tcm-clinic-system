@@ -57,7 +57,27 @@
         pushStatusOff: { zh: '未開啟', en: 'Disabled' },
         pushStatusWorking: { zh: '設定中…', en: 'Working…' },
         pushTestSent: { zh: '測試通知已送出，請查看通知', en: 'Test notification sent. Please check your notifications.' },
+        pushTestHealing: {
+            zh: '偵測到此裝置的舊推播訂閱已失效，正在自動重建訂閱並重新測試…',
+            en: 'This device\'s old push subscription is invalid. Rebuilding the subscription and retesting automatically…'
+        },
+        pushTestHealedSent: {
+            zh: '舊訂閱已失效，已自動重建完成 ✓ 新訂閱的測試通知已送出，請查看通知。',
+            en: 'The old subscription was invalid and has been rebuilt automatically ✓ A test notification was sent via the new subscription. Please check your notifications.'
+        },
+        pushTestHealFailed: {
+            zh: '舊訂閱已失效，但自動重建失敗，請把推播開關關閉再重新開啟一次。',
+            en: 'The old subscription was invalid but automatic rebuilding failed. Please turn notifications off and back on once.'
+        },
         pushTestFailed: { zh: '測試通知無法送達，訂閱可能已失效，請重新開啟通知。', en: 'Test notification could not be delivered. The subscription may have expired; please re-enable notifications.' },
+        pushTestNotShown: {
+            zh: '伺服器已成功把測試通知送達此裝置，但本機沒有實際顯示通知（Windows 最常見是系統通知總開關關閉或專注輔助開啟）。若您確定有看到通知，可忽略此訊息；否則請依下方指引檢查。',
+            en: 'The server delivered the test notification to this device, but it was not displayed locally (on Windows this is usually the OS notifications master switch or Focus assist). If you did see it, you can ignore this; otherwise follow the steps below.'
+        },
+        pushTestDisplayError: {
+            zh: '測試通知已送達，但瀏覽器無法顯示（',
+            en: 'Test notification arrived but the browser could not display it ('
+        },
         pushFailed: { zh: '通知設定失敗：', en: 'Failed to configure notifications: ' },
         pushLoginNeeded: { zh: '請先登入後再設定通知', en: 'Please log in to configure notifications.' },
         pushNoSubscription: { zh: '此裝置尚未開啟推播訂閱，請先開啟開關。', en: 'This device has no push subscription yet. Please turn on the toggle first.' },
@@ -105,8 +125,10 @@
     var PREFS_KEY = 'pushEventPrefs';
 
     // 「此裝置推播應保持開啟」標記：
-    // 最後一個系統分頁關閉時 SW 會自動退訂（使用者要求關頁後不再收廣播），
-    // 重開頁面時依此標記自動恢復訂閱；手動關閉開關或登出時移除。
+    // SW 原在最後分頁關閉時自動退訂、重開時依此標記恢復；現行 SW 已改為
+    // 不退訂（關頁時僅靜默不顯示），此標記保留作訂閱因任何因素遺失時
+    // （如瀏覽器資料清理、舊版 SW 曾退訂）的自動恢復依據；
+    // 手動關閉開關或登出時移除。
     var ENABLED_MARKER_KEY = 'pushDeviceEnabled';
 
     function markPushEnabled() {
@@ -198,11 +220,13 @@
 
     var registration = null;
     var refreshing = false;
-    var updateConfirmed = false;
+    // 頁面載入時是否已受某個 SW 控制：用於區分「首次安裝」與「更新換代」
+    var hadControllerAtLoad = false;
 
     async function registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
         try {
+            hadControllerAtLoad = !!navigator.serviceWorker.controller;
             registration = await navigator.serviceWorker.register('/sw.js');
             trackUpdates(registration);
         } catch (err) {
@@ -210,28 +234,43 @@
         }
     }
 
+    function reloadOnceForUpdate() {
+        if (refreshing) return;
+        // 首次安裝（載入時沒有舊控制器）不需重載
+        if (!hadControllerAtLoad) {
+            hadControllerAtLoad = true;
+            return;
+        }
+        refreshing = true;
+        location.reload();
+    }
+
     function trackUpdates(reg) {
+        // 新 SW 經 install skipWaiting → activate claim 後觸發：
+        // 受舊 SW 控制的分頁重載一次，載入與新 SW 配套的 HTML/JS
+        // （舊版 shell 快取已於 activate 時依 CACHE_VERSION 清空）。
+        navigator.serviceWorker.addEventListener('controllerchange', reloadOnceForUpdate);
+
+        // 雙保險：activate 主動廣播（部分時序 controllerchange 早於監聽綁定）
+        try {
+            navigator.serviceWorker.addEventListener('message', function (event) {
+                var d = event.data;
+                if (d && d.type === 'TCM_SW_UPDATED') reloadOnceForUpdate();
+            });
+        } catch (_e) {}
+
+        // 後援：若極端情況下 skipWaiting 未生效、新 worker 停在 waiting，
+        // 仍顯示更新橫幅提供手動重啟入口
         reg.addEventListener('updatefound', function () {
             var newWorker = reg.installing;
             if (!newWorker) return;
             newWorker.addEventListener('statechange', function () {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                if (newWorker.state === 'installed'
+                    && navigator.serviceWorker.controller
+                    && reg.waiting === newWorker) {
                     promptUpdate(newWorker);
                 }
             });
-        });
-
-        // 頁面載入當下若已有 waiting worker（他頁已下載新版本），直接提示
-        if (reg.waiting && navigator.serviceWorker.controller) {
-            promptUpdate(reg.waiting);
-        }
-
-        // 控制器換代：僅在使用者於本頁確認更新後才自動重整，
-        // 避免首次安裝 activate claim 時造成頁面無故重整
-        navigator.serviceWorker.addEventListener('controllerchange', function () {
-            if (!updateConfirmed || refreshing) return;
-            refreshing = true;
-            location.reload();
         });
     }
 
@@ -245,9 +284,8 @@
             'padding:14px 20px;border-radius:14px;font-size:14px;font-weight:600;' +
             'box-shadow:0 14px 30px -10px rgba(184,98,31,.7);max-width:320px';
         el.addEventListener('click', function () {
-            updateConfirmed = true;
-            worker.postMessage({ type: 'SKIP_WAITING' });
-            // controllerchange 後會自動 reload
+            try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch (_e) {}
+            // 新 SW 激活後 controllerchange／TCM_SW_UPDATED 會自動觸發重載
         });
         document.body.appendChild(el);
     }
@@ -629,27 +667,167 @@
         }
     }
 
-    async function sendTest() {
-        try {
-            const endpoint = await getCurrentEndpoint();
-            if (!endpoint) {
-                message(t('pushNoSubscription'), { type: 'warning' });
-                return;
+    // 等待 SW 在本機實際顯示測試通知後回報。
+    // resolve：ack 物件＝有回報；null＝逾時未顯示；undefined＝SW 通訊不可用
+    function waitForLocalPushAck(timeoutMs) {
+        return new Promise(function (resolve) {
+            var done = false;
+            var timer = setTimeout(function () { cleanup(); resolve(null); }, timeoutMs);
+            function cleanup() {
+                if (done) return;
+                done = true;
+                clearTimeout(timer);
+                try { navigator.serviceWorker.removeEventListener('message', onMsg); } catch (_e) {}
             }
-            var result = await apiCall('/test', {
+            function onMsg(event) {
+                var d = event.data;
+                if (d && d.type === 'tcm-push-ack' && d.manual) {
+                    cleanup();
+                    resolve(d);
+                }
+            }
+            try {
+                navigator.serviceWorker.addEventListener('message', onMsg);
+            } catch (_e) {
+                clearTimeout(timer);
+                resolve(undefined);
+            }
+        });
+    }
+
+    function localNotifyGuide() {
+        var parts = [t('pushDeniedSiteHowto')];
+        var osGuide = osNotifyGuide();
+        if (osGuide) parts.push(osGuide);
+        return parts.join('\n');
+    }
+
+    // 單次測試派送：先掛本機顯示回報等待（推送可能比 API 回應更早到達）
+    async function attemptTest(endpoint) {
+        const ackPromise = waitForLocalPushAck(20000);
+        let result;
+        try {
+            result = await apiCall('/test', {
                 method: 'POST',
                 body: JSON.stringify({ endpoint: endpoint })
             });
-            if (result.delivered) {
-                message(t('pushTestSent'), { type: 'success' });
-            } else {
+        } catch (err) {
+            result = {
+                delivered: false,
+                status: err.status || 0,
+                reason: err.message || String(err)
+            };
+        }
+        return { result, ackPromise };
+    }
+
+    // 端點已死（404/410）或與現行 VAPID 金鑰不符（403）：
+    // 必須在本機 unsubscribe 後重新 subscribe 取得「全新 FCM 端點」，
+    // 只把舊端點重新 upsert 回伺服器不會讓它復活。
+    async function forceResubscribe(oldEndpoint) {
+        const reg = await navigator.serviceWorker.ready;
+        const oldSub = await reg.pushManager.getSubscription();
+        if (oldSub) {
+            try { await oldSub.unsubscribe(); } catch (_e) {}
+        }
+        if (oldEndpoint) {
+            try {
+                await apiCall('/unsubscribe', {
+                    method: 'POST',
+                    body: JSON.stringify({ endpoint: oldEndpoint })
+                });
+            } catch (_e) {}
+        }
+        const vapid = await getVapidConfig();
+        const newSub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: decodeVapidKey(vapid)
+        });
+        await pushSubscriptionUpsert(newSub);
+        markPushEnabled();
+        setToggle(true, true);
+        setStatus('pushStatusOn');
+        postClientOpenToSW();
+        return newSub.endpoint;
+    }
+
+    async function sendTest() {
+        try {
+            // 站點通知權限前置檢查（Windows 上可能被使用者或系統重設）
+            if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+                message(localNotifyGuide(), { type: 'warning' });
+                return;
+            }
+            let endpoint = await getCurrentEndpoint();
+            if (!endpoint) {
+                message(t('pushNoSubscription') + '\n' + localNotifyGuide(), { type: 'warning' });
+                return;
+            }
+
+            let healed = false;
+            let outcome = await attemptTest(endpoint);
+
+            // 404/410＝推送服務端端點已失效；403＝端點與現行 VAPID 金鑰不符
+            if (!outcome.result.delivered
+                && [403, 404, 410].includes(Number(outcome.result.status))) {
+                message(t('pushTestHealing'), { type: 'info' });
+                try {
+                    endpoint = await forceResubscribe(endpoint);
+                } catch (healErr) {
+                    console.warn('自動重建推播訂閱失敗:', healErr);
+                    message(
+                        t('pushTestHealFailed') + ' (' + (healErr.message || healErr) + ')',
+                        { type: 'warning' }
+                    );
+                    return;
+                }
+                healed = true;
+                outcome = await attemptTest(endpoint);
+            }
+
+            const result = outcome.result;
+            if (!result.delivered) {
                 console.warn('測試通知未送達，伺服器回應：', result);
-                const code = result.status ? '（HTTP ' + result.status + '）' : '';
-                // 直接把推送服務（Apple）的 reason 顯示在畫面，免接電腦查 console
+                // status 0＝連自家 API 都失敗（網路／Function 錯誤）
+                if (!result.status) {
+                    message(t('pushFailed') + extractReason(result.reason), { type: 'error' });
+                    return;
+                }
+                const code = '（HTTP ' + result.status + '）';
+                // 直接把推送服務（FCM/Apple）的 reason 顯示在畫面，免接電腦查 console
                 const reason = extractReason(result.reason);
                 const detail = reason ? code + ' [' + reason + ']' : code;
                 message(t('pushTestFailed') + detail, { type: 'warning' });
                 await syncPushState();
+                return;
+            }
+
+            // 伺服器已送達：進一步區分「本機有顯示」與「OS 層級靜默封鎖」。
+            // ack 帶 swVersion：toast 顯示版本即可證明此機跑的是新引擎，
+            // 若逾時收不到 ack，幾乎可斷定此機仍在跑舊版 SW。
+            const ack = await outcome.ackPromise;
+            const engineTag = (ack && ack.swVersion) ? '（引擎 ' + ack.swVersion + '）' : '';
+            const successMsg = (healed ? t('pushTestHealedSent') : t('pushTestSent')) + engineTag;
+            if (ack === undefined) {
+                // 無法與 SW 通訊：退回舊行為，只提示已送出
+                message(successMsg, { type: 'success' });
+            } else if (ack && ack.ok) {
+                message(successMsg, { type: 'success' });
+            } else if (ack && !ack.ok) {
+                message(
+                    t('pushTestDisplayError') + (ack.reason || 'unknown') + ')\n'
+                    + localNotifyGuide(),
+                    { type: 'warning' }
+                );
+            } else {
+                // 送達成功但逾時未收到引擎回報：舊版 SW 或作業系統層級封鎖。
+                // 若剛部署新版，請重新整理頁面（載入時會自動完成引擎更新）。
+                message(
+                    t('pushTestNotShown') + '\n'
+                    + '若您剛完成部署，請把此分頁重新整理一次，等待頁面自動更新後再測試。\n'
+                    + localNotifyGuide(),
+                    { type: 'warning' }
+                );
             }
         } catch (err) {
             message(t('pushFailed') + (err.message || ''), { type: 'error' });
@@ -727,8 +905,8 @@
                 setToggle(true, true);
                 setStatus('pushStatusOn');
             } else if (isPushEnabledMarked() && Notification.permission === 'granted') {
-                // 最後一個分頁關閉時 SW 已自動退訂；標記仍在＝使用者希望保持開啟，
-                // 靜默恢復訂閱（不彈任何權限提示）
+                // 訂閱因任何因素不存在（瀏覽器資料清理、舊版 SW 曾於關頁時退訂）：
+                // 標記仍在＝使用者希望保持開啟，靜默恢復訂閱（不彈任何權限提示）
                 restorePushSubscription();
             } else {
                 setToggle(false, true);
@@ -745,7 +923,7 @@
     var restoringPush = false;
 
     /**
-     * 靜默重新建立推播訂閱（分頁關閉期間 SW 已退訂，重開頁面自動恢復）。
+     * 靜默重新建立推播訂閱（訂閱不存在但啟用標記仍在時）。
      * 不彈任何提示；失敗則清除標記並回到未開啟狀態，避免每次載入重試循環。
      */
     async function restorePushSubscription() {
@@ -978,22 +1156,57 @@
     }
 
     // 系統各模組（掛號／聊天）觸發推播：失敗僅警告，不影響主流程
+    function delay(ms) {
+        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    }
+
+    function isRetryableNotifyStatus(status) {
+        return status === 408 || status === 425 || status === 429 || status >= 500;
+    }
+
+    // 單次派送。keepalive：發送後立即關分頁／導航時請求仍會完成
+    async function notifyFetchOnce(user, payload) {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/push/notify', {
+            method: 'POST',
+            keepalive: true,
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        let data = null;
+        try { data = await res.json(); } catch (_e) {}
+        return { ok: res.ok, status: res.status, data: data };
+    }
+
     async function notifyPushEvent(payload) {
         if (!payload || typeof payload !== 'object') return { skipped: true };
         // 注意：此處不可檢查 isPushSupported()。
         // 此呼叫是請後端通知「他人的裝置」，與發送者本機能否收推播無關：
         // iPhone 直接用 Safari（未加入主畫面）時 PushManager 不存在、本機不能收，
         // 但仍必須觸發 /notify，否則電腦同事永遠收不到 iPhone 發出的訊息廣播。
-        if (!currentAuthUser()) return { skipped: true };
-        try {
-            return await apiCall('/notify', {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-        } catch (err) {
-            console.warn('觸發推播失敗:', err);
-            return { skipped: true, error: err && err.message };
+        const user = currentAuthUser();
+        if (!user) return { skipped: true };
+        // 最多 3 次（含首次）。後端以 dedupKey 冪等去重，
+        // 即使回應丟失後重試也不會造成重複推播。
+        let lastErr = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const r = await notifyFetchOnce(user, payload);
+                if (r.ok) return r.data || { notified: true };
+                lastErr = new Error((r.data && r.data.message) || ('HTTP ' + r.status));
+                lastErr.status = r.status;
+                if (!isRetryableNotifyStatus(r.status)) break;
+            } catch (err) {
+                // 網路錯誤（含冷啟動逾時）可重試
+                lastErr = err;
+            }
+            if (attempt < 2) await delay(attempt === 0 ? 600 : 1600);
         }
+        console.warn('觸發推播失敗:', lastErr);
+        return { skipped: true, error: lastErr && lastErr.message };
     }
 
     // 依深層網址開啟聊天（?chat=open&c=public 或 &u=recipientUid）
@@ -1030,16 +1243,31 @@
         openChatFromUrl(window.location.href);
     }
 
-    // 已開啟分頁被聚焦時，SW 以 postMessage 傳入目標網址
+    // 已開啟分頁被聚焦時，SW 以 postMessage 傳入目標網址；
+    // 亦負責回應 SW 在推送當下發出的焦點狀態詢問（tcm-view-ping）
     function listenDeepLinkMessages() {
         try {
             navigator.serviceWorker.addEventListener('message', function (event) {
                 var data = event.data;
+                if (data && data.type === 'tcm-view-ping') {
+                    replyViewPing(data.nonce);
+                    return;
+                }
                 if (data && data.type === 'tcm-deep-link' && data.url) {
                     openChatFromUrl(data.url);
                 }
             });
         } catch (_e) {}
+    }
+
+    // 回報本頁目前是否可見且聚焦（SW 用以決定推送要不要彈橫幅）
+    function replyViewPing(nonce) {
+        postToSW({
+            type: 'tcm-view-pong',
+            nonce: nonce,
+            visible: document.visibilityState === 'visible',
+            focused: document.hasFocus()
+        });
     }
 
     // 監聽 #loginPage 顯示狀態：performLogin 隱藏（登入完成）或登出時重新顯示，
@@ -1053,12 +1281,26 @@
         } catch (_e) {}
     }
 
-    /* ---------- 分頁開關生命週期：最後一個分頁關閉即退訂 ---------- */
+    /* ---------- 分頁生命週期與觀看狀態回報 ---------- */
 
-    // 通知 SW「本分頁仍開著」：取消它可能正在等待的關頁退訂計時。
-    // 頁面剛載入、從 bfcache 恢復、SW 換代控制本分頁時都要告知。
+    // 通知 SW「本分頁仍開著」。頁面剛載入、從 bfcache 恢復、
+    // SW 換代控制本分頁時都要告知。
     function postClientOpenToSW() {
         postToSW({ type: 'TCM_CLIENT_OPEN' });
+        postViewState();
+    }
+
+    // 可見且聚焦狀態：供 SW 判斷使用者是否正在觀看系統。
+    // 注意 visibilityState 在桌面「視窗被其他 App 遮住但沒最小化」時
+    // 仍為 visible，必須輔以 hasFocus()。
+    function postViewState() {
+        try {
+            postToSW({
+                type: 'TCM_VIEW_STATE',
+                visible: document.visibilityState === 'visible',
+                focused: document.hasFocus()
+            });
+        } catch (_e) {}
     }
 
     function postToSW(msg) {
@@ -1078,17 +1320,20 @@
     function bindClientLifecycle() {
         if (!('serviceWorker' in navigator)) return;
 
-        // 真正關閉分頁／視窗／結束瀏覽器時才觸發；
-        // 僅切到背景或鎖屏（手機常見）不觸發，否則 iPhone PWA 背景推播會失效。
-        window.addEventListener('pagehide', function (event) {
-            if (event.persisted) return; // 進入 bfcache：分頁仍活著
-            postToSW({ type: 'TCM_CLIENT_CLOSING' });
+        // 焦點／可見變化即時回報：切到其他 App、切分頁、最小化都涵蓋
+        ['focus', 'blur'].forEach(function (evt) {
+            window.addEventListener(evt, postViewState);
         });
+        document.addEventListener('visibilitychange', postViewState);
 
         window.addEventListener('pageshow', function (event) {
             postClientOpenToSW();
             if (event.persisted) syncPushState(); // 從 bfcache 恢復
         });
+
+        // 定期心跳：SW 端對超過 90 秒未續報的狀態不予採信，
+        // 推送當下會再以 ping 即時確認。
+        setInterval(postViewState, 30000);
 
         // SW 更新換代控制本分頁時，新 SW 不知道本分頁存在，主動告知
         navigator.serviceWorker.addEventListener('controllerchange', function () {

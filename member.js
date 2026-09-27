@@ -10,7 +10,7 @@
 
 const I18N = {
     zh: {
-        clinicName: '名醫中醫診所',
+        clinicName: '名醫診所系統',
         authTitle: '會員查詢',
         authSub: '輸入於診所登記之手機號碼，即可查閱儲值餘額、套票及交易記錄。',
         phoneLabel: '手機號碼',
@@ -27,6 +27,8 @@ const I18N = {
         packages: '有效套票',
         transactions: '最近交易',
         back: '返回',
+        prevPage: '上一頁',
+        nextPage: '下一頁',
         noPackages: '目前沒有有效套票',
         noTransactions: '暫無交易記錄',
         noAccount: '未找到儲值帳戶',
@@ -37,14 +39,16 @@ const I18N = {
         txRefund: '退款',
         txAdjust: '人工調整',
         txStatus: '狀態變更',
-        errPhone: '請輸入有效香港手機號碼（8 位數）',
-        errNoPatient: '系統中沒有以此手機登記的病人記錄。',
+        errPhone: '請輸入於診所登記的電話號碼',
+        errNoPatient: '系統中沒有以此電話登記的病人記錄。',
         errLoad: '查詢失敗，請稍後再試',
         patientLabel: '病人',
+        selectClinic: '選擇診所',
+        unassigned: '未分組',
         langToggle: 'English'
     },
     en: {
-        clinicName: 'MING YI Chinese Medicine Clinic',
+        clinicName: 'Dr.Great Clinic System',
         authTitle: 'Member Portal',
         authSub: 'Enter your mobile number registered with the clinic to view your stored-value balance, packages and transactions.',
         phoneLabel: 'Mobile number',
@@ -61,6 +65,8 @@ const I18N = {
         packages: 'Active packages',
         transactions: 'Recent transactions',
         back: 'Back',
+        prevPage: 'Previous',
+        nextPage: 'Next',
         noPackages: 'No active packages',
         noTransactions: 'No transactions yet',
         noAccount: 'No stored-value account found',
@@ -71,10 +77,12 @@ const I18N = {
         txRefund: 'Refund',
         txAdjust: 'Manual adjustment',
         txStatus: 'Status change',
-        errPhone: 'Please enter a valid Hong Kong mobile number (8 digits)',
-        errNoPatient: 'No patient record is registered with this mobile number.',
+        errPhone: 'Please enter the phone number registered with the clinic',
+        errNoPatient: 'No patient record is registered with this phone number.',
         errLoad: 'Lookup failed, please try again later',
         patientLabel: 'Patient',
+        selectClinic: 'Select clinic',
+        unassigned: 'Unassigned',
         langToggle: '中文'
     }
 };
@@ -103,6 +111,10 @@ document.getElementById('langToggle').addEventListener('click', () => {
     lang = lang === 'zh' ? 'en' : 'zh';
     try { localStorage.setItem('memberLang', lang); } catch (_e) {}
     applyStaticI18n();
+    // 診所選項名稱隨語言更新（資料頁可見時）
+    if (!$('dataView').classList.contains('hidden')) {
+        renderClinicSelector();
+    }
 });
 
 /* ---------------- UI helpers ---------------- */
@@ -169,9 +181,9 @@ function loadTurnstileScript() {
     return new Promise((resolve, reject) => {
         const s = document.createElement('script');
         s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-        s.async = true;
-        s.defer = true;
-        s.onload = () => window.turnstile.ready(resolve);
+        // 官方規定：使用 turnstile.ready() 時不可加 async/defer；
+        // 這裡以 onload 判斷載入完成，故不需要 ready()。
+        s.onload = () => resolve();
         s.onerror = () => reject(new Error('TURNSTILE_SCRIPT_FAILED'));
         document.head.appendChild(s);
     });
@@ -238,6 +250,27 @@ async function initTurnstile() {
 
 let patientEntries = [];
 let activePatientIndex = 0;
+let activeClinicIndex = 0;
+let txPage = 1;
+const TX_PAGE_SIZE = 10;
+
+function activeEntry() {
+    return patientEntries[activePatientIndex] || null;
+}
+
+function activeClinic() {
+    const e = activeEntry();
+    const cs = e && Array.isArray(e.clinics) ? e.clinics : [];
+    return cs[activeClinicIndex] || cs[0] || null;
+}
+
+function clinicDisplayName(c) {
+    if (!c) return '';
+    if (!c.clinicId) return t('unassigned');
+    const n = c.clinicName
+        && (c.clinicName[lang] || c.clinicName.zh || c.clinicName.en);
+    return n || c.clinicId;
+}
 
 async function lookup() {
     clearAuthMsg();
@@ -245,15 +278,10 @@ async function lookup() {
         showAuthMsg('errCaptcha');
         return;
     }
-    const phone = $('phoneInput').value;
-    const digits = String(phone || '').replace(/\D/g, '');
-    let local8 = '';
-    if (digits.length === 8) {
-        local8 = digits;
-    } else if (digits.length === 11 && digits.indexOf('852') === 0) {
-        local8 = digits.slice(3);
-    }
-    if (!/^[5-9]\d{7}$/.test(local8)) {
+    const rawPhone = String($('phoneInput').value || '').trim();
+    const digits = rawPhone.replace(/\D/g, '');
+    // 不限制位數，只要輸入了電話號碼即可，比對由後端依登記電話處理
+    if (digits.length < 4) {
         showAuthMsg('errPhone');
         return;
     }
@@ -265,7 +293,7 @@ async function lookup() {
         const res = await fetch('/api/member/lookup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: local8, turnstileToken: turnstileToken })
+            body: JSON.stringify({ phone: rawPhone, turnstileToken: turnstileToken })
         });
         let data;
         try {
@@ -301,6 +329,14 @@ $('phoneInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') lookup();
 });
 
+$('clinicSelect').addEventListener('change', (e) => {
+    activeClinicIndex = Number(e.target.value) || 0;
+    txPage = 1;
+    renderBalance();
+    renderPackages();
+    renderTransactions();
+});
+
 $('backBtn').addEventListener('click', () => {
     $('dataView').classList.add('hidden');
     $('authView').classList.remove('hidden');
@@ -328,11 +364,26 @@ function renderPatientTabs() {
     });
 }
 
+function renderClinicSelector() {
+    const card = $('clinicSelectCard');
+    const sel = $('clinicSelect');
+    const e = activeEntry();
+    const cs = e && Array.isArray(e.clinics) ? e.clinics : [];
+    if (cs.length <= 1) {
+        card.classList.add('hidden');
+        return;
+    }
+    card.classList.remove('hidden');
+    if (activeClinicIndex >= cs.length) activeClinicIndex = 0;
+    sel.innerHTML = cs.map((c, i) =>
+        `<option value="${i}">${clinicDisplayName(c)}</option>`).join('');
+    sel.value = String(activeClinicIndex);
+}
+
 function renderBalance() {
-    const entry = patientEntries[activePatientIndex];
-    const acc = entry && entry.account;
-    const balance = acc ? Number(acc.balance) : 0;
-    const bonus = acc ? Number(acc.bonusBalance) : 0;
+    const c = activeClinic();
+    const balance = c ? Number(c.balance) : 0;
+    const bonus = c ? Number(c.bonusBalance) : 0;
     $('heroTotal').textContent = money(balance + bonus);
     $('heroBalance').textContent = money(balance);
     $('heroBonus').textContent = money(bonus);
@@ -340,7 +391,8 @@ function renderBalance() {
 
 function renderPackages() {
     const ul = $('packageList');
-    const packages = patientEntries[activePatientIndex].packages || [];
+    const c = activeClinic();
+    const packages = c && c.packages ? c.packages : [];
     if (!packages.length) {
         ul.innerHTML = `<li class="empty">${t('noPackages')}</li>`;
         return;
@@ -374,12 +426,22 @@ function txTypeLabel(type) {
 
 function renderTransactions() {
     const ul = $('txList');
-    const txs = patientEntries[activePatientIndex].transactions || [];
+    const pager = $('txPager');
+    const c = activeClinic();
+    const txs = c && c.transactions ? c.transactions : [];
     if (!txs.length) {
         ul.innerHTML = `<li class="empty">${t('noTransactions')}</li>`;
+        if (pager) pager.classList.add('hidden');
         return;
     }
-    ul.innerHTML = txs.map((tx) => {
+
+    const totalPages = Math.ceil(txs.length / TX_PAGE_SIZE);
+    if (txPage > totalPages) txPage = totalPages;
+    if (txPage < 1) txPage = 1;
+    const start = (txPage - 1) * TX_PAGE_SIZE;
+    const pageTxs = txs.slice(start, start + TX_PAGE_SIZE);
+
+    ul.innerHTML = pageTxs.map((tx) => {
         const amount = Number(tx.amount) || 0;
         const isNeg = amount < 0;
         const cls = isNeg ? 'amt-neg' : 'amt-pos';
@@ -396,10 +458,42 @@ function renderTransactions() {
                 <div class="meta">${meta}</div>
             </li>`;
     }).join('');
+
+    if (pager) {
+        if (totalPages > 1) {
+            const pageInfo = lang === 'en'
+                ? `Page ${txPage} / ${totalPages}`
+                : `第 ${txPage} / ${totalPages} 頁`;
+            pager.innerHTML = `
+                <div class="pager-btns">
+                    <button type="button" id="txPrevBtn" ${txPage <= 1 ? 'disabled' : ''}>${t('prevPage')}</button>
+                    <button type="button" id="txNextBtn" ${txPage >= totalPages ? 'disabled' : ''}>${t('nextPage')}</button>
+                </div>
+                <span class="page-info">${pageInfo}`;
+            $('txPrevBtn').addEventListener('click', () => goToTxPage(txPage - 1));
+            $('txNextBtn').addEventListener('click', () => goToTxPage(txPage + 1));
+            pager.classList.remove('hidden');
+        } else {
+            pager.classList.add('hidden');
+        }
+    }
+}
+
+function goToTxPage(p) {
+    const c = activeClinic();
+    const txs = c && c.transactions ? c.transactions : [];
+    const totalPages = Math.ceil(txs.length / TX_PAGE_SIZE);
+    const next = Math.max(1, Math.min(totalPages, Number(p)));
+    if (next === txPage) return;
+    txPage = next;
+    renderTransactions();
 }
 
 function renderAll() {
+    txPage = 1;
+    activeClinicIndex = 0;
     renderPatientTabs();
+    renderClinicSelector();
     renderBalance();
     renderPackages();
     renderTransactions();

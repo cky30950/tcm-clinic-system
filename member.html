@@ -74,6 +74,16 @@
         .sub { font-size: 14px; color: var(--muted); margin: 0 0 18px; }
 
         label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+        select {
+            width: 100%;
+            padding: 11px 12px;
+            font-size: 15px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #fff;
+            color: var(--ink);
+        }
+        select:focus { outline: 2px solid rgba(13,148,136,0.35); border-color: var(--brand); }
         input[type="tel"], input[type="text"] {
             width: 100%;
             padding: 12px 14px;
@@ -175,6 +185,16 @@
 
         .empty { font-size: 13px; color: var(--muted); text-align: center; padding: 18px 0; }
 
+        .pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; font-size: 13px; }
+        .pager.hidden { display: none; }
+        .pager .pager-btns { display: flex; gap: 4px; }
+        .pager button {
+            border: 1px solid var(--line); background: #fff; color: var(--brand-dark);
+            border-radius: 6px; padding: 4px 10px; font-size: 13px; cursor: pointer;
+        }
+        .pager button:disabled { color: #bbb; cursor: default; }
+        .pager .page-info { color: var(--muted); white-space: nowrap; }
+
         .footer-actions { margin-top: 20px; }
         .hidden { display: none !important; }
 
@@ -188,7 +208,7 @@
     <div class="topbar">
         <div class="brand">
             <img src="/images/myLogo.png" alt="">
-            <span data-i18n="clinicName">名醫中醫診所</span>
+            <span data-i18n="clinicName">名醫診所系統</span>
         </div>
         <button class="lang-btn" id="langToggle" type="button">English</button>
     </div>
@@ -219,6 +239,10 @@
 
     <!-- 資料頁 -->
     <div id="dataView" class="hidden">
+        <div class="card" id="clinicSelectCard">
+            <label for="clinicSelect" data-i18n="selectClinic">選擇診所</label>
+            <select id="clinicSelect"></select>
+        </div>
         <div class="balance-hero">
             <div class="label" data-i18n="totalBalance">儲值總餘額 (HKD)</div>
             <div class="amount" id="heroTotal">$0.00</div>
@@ -244,6 +268,7 @@
         <div class="card">
             <h2>📋 <span data-i18n="transactions">最近交易</span></h2>
             <ul class="list" id="txList"></ul>
+            <div class="pager hidden" id="txPager"></div>
         </div>
 
         <div class="footer-actions">
