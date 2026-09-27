@@ -87,7 +87,10 @@ const MAX_PATIENTS = 10;
 const LIMIT_PACKAGES = 50;
 const LIMIT_TRANSACTIONS = 100;   // 舊制帳戶餘額推算可能少算極早期流水；
                                   // 新制帳戶餘額以帳戶文件為準，不受影響
-const LIMIT_CONSULTATIONS = 50;
+// 套票診所歸屬舉證用：舊套票無 clinicId 才需翻病歷，每頁 100 份、
+// 單一病人最多掃 1000 份（活躍病人舊寫法只取最早 50 份會算錯診所）
+const CONS_EVIDENCE_PAGE = 100;
+const CONS_EVIDENCE_MAX = 1000;
 const CLINIC_CACHE_TTL_MS = 5 * 60 * 1000;
 let clinicCache = null; // { at, ids, nameMap }
 
@@ -196,9 +199,12 @@ async function fetchRtdbAppointment(rtdbUrl, token, appointmentId) {
 }
 
 // 批次（並行）讀取文件，回傳 Map(id → data)；失敗或缺件跳過。
+// cap 預設不限：呼叫端掌握 ID 數量（本端點均受其他 LIMIT 約束），
+// 避免「ID 有 80 個但靜默只對照 50 個」造成的歸屬錯算。
 async function fetchDocMap(client, collectionId, ids, opts = {}) {
-    const cap = opts.cap || 50;
-    const uniq = Array.from(new Set((ids || []).filter(Boolean))).slice(0, cap);
+    const cap = opts.cap || 0;
+    const uniq0 = Array.from(new Set((ids || []).filter(Boolean)));
+    const uniq = cap > 0 ? uniq0.slice(0, cap) : uniq0;
     const docs = await Promise.all(uniq.map(async (id) => {
         try {
             const d = await client.getDocument(`${collectionId}/${encodeURIComponent(id)}`);
@@ -210,9 +216,58 @@ async function fetchDocMap(client, collectionId, ids, opts = {}) {
     return new Map(docs.filter(Boolean));
 }
 
+// 為「無 clinicId 的舊套票」翻閱診症記錄舉證診所。
+// 游標分頁掃描（patientId == + __name__ 排序，已有複合索引），
+// 每掃完一頁就從 financialSummaryItems 提取 packageRecordId→clinicId，
+// 所有待舉證套票都找到（或掃到上限）即停止。
+// 回傳 { pkgClinicMap, scanned, truncated }。
+async function fetchPackageClinicEvidence(client, patientId, neededPkgIds) {
+    const pkgClinicMap = new Map();
+    if (!neededPkgIds.size) {
+        return { pkgClinicMap, scanned: 0, truncated: false };
+    }
+    const unresolved = new Set(neededPkgIds);
+    const orderBy = [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }];
+    const where = eqFilter('patientId', { stringValue: patientId });
+    let cursor = null;
+    let scanned = 0;
+    let truncated = false;
+    while (unresolved.size && scanned < CONS_EVIDENCE_MAX) {
+        const pageSize = Math.min(CONS_EVIDENCE_PAGE, CONS_EVIDENCE_MAX - scanned);
+        const res = await client.queryCollection({
+            collectionId: 'consultations',
+            where,
+            orderBy,
+            startAt: cursor || undefined,
+            limit: pageSize,
+            maxDocs: pageSize
+        });
+        const batch = res.docs || [];
+        if (!batch.length) break;
+        scanned += batch.length;
+        batch.forEach((d) => {
+            const c = d.data || {};
+            if (!c.clinicId) return;
+            const items = Array.isArray(c.financialSummaryItems)
+                ? c.financialSummaryItems : [];
+            items.forEach((it) => {
+                const pid = it && it.packageRecordId ? String(it.packageRecordId) : '';
+                if (pid && unresolved.has(pid) && !pkgClinicMap.has(pid)) {
+                    pkgClinicMap.set(pid, String(c.clinicId));
+                    unresolved.delete(pid);
+                }
+            });
+        });
+        if (!res.truncated || !res.nextCursor) break;
+        cursor = res.nextCursor;
+    }
+    if (unresolved.size) truncated = scanned >= CONS_EVIDENCE_MAX;
+    return { pkgClinicMap, scanned, truncated };
+}
+
 async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clinicIds) {
     const patientId = patientDoc.id;
-    const [pkgPage, txPage, consPage, accountDocs] = await Promise.all([
+    const [pkgPage, txPage, accountDocs] = await Promise.all([
         // 每診所獨立帳戶：平行讀取各診所的複合 ID 帳戶文件
         Promise.all((clinicIds || []).map(async (cid) => {
             try {
@@ -236,13 +291,6 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
             where: eqFilter('patientId', { stringValue: patientId }),
             orderBy: [{ field: { fieldPath: 'at' }, direction: 'DESCENDING' }],
             limit: LIMIT_TRANSACTIONS
-        }),
-        // 病人的診症記錄：用於把套票按使用診所歸組
-        client.queryCollection({
-            collectionId: 'consultations',
-            where: eqFilter('patientId', { stringValue: patientId }),
-            orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
-            limit: LIMIT_CONSULTATIONS
         })
     ]);
 
@@ -254,17 +302,19 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
     const consultationIds = legacyTxs
         .map((tx) => tx.consultationId)
         .filter((id) => id);
-    const appointmentIds = legacyTxs
+    const appointmentIds = Array.from(new Set(legacyTxs
         .map((tx) => tx.appointmentId)
-        .filter((id) => id);
+        .filter((id) => id)));
 
+    // 舊制流水數量受 LIMIT_TRANSACTIONS 約束（≤100），ID 全數對照、
+    // 不做 50 筆靜默截斷，否則交易診所歸屬會被算錯
     const [consMap, apptDataList] = await Promise.all([
         fetchDocMap(client, 'consultations', consultationIds),
-        Promise.all(Array.from(new Set(appointmentIds)).slice(0, 50)
-            .map((id) => fetchRtdbAppointment(client.rtdbUrl, token, id)))
+        Promise.all(appointmentIds.map((id) =>
+            fetchRtdbAppointment(client.rtdbUrl, token, id)))
     ]);
     const apptMap = new Map();
-    Array.from(new Set(appointmentIds)).slice(0, 50).forEach((id, i) => {
+    appointmentIds.forEach((id, i) => {
         if (apptDataList[i]) apptMap.set(id, apptDataList[i]);
     });
 
@@ -299,19 +349,16 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
     }
 
     // ── 2. 套票 → 診所歸屬（記錄欄位 clinicId 為準；舊套票依使用記錄推斷）──
-    const pkgClinicMap = new Map();
-    consPage.docs.forEach((d) => {
-        const c = d.data || {};
-        if (!c.clinicId) return;
-        const items = Array.isArray(c.financialSummaryItems)
-            ? c.financialSummaryItems : [];
-        items.forEach((it) => {
-            if (it && it.packageRecordId
-                && !pkgClinicMap.has(String(it.packageRecordId))) {
-                pkgClinicMap.set(String(it.packageRecordId), String(c.clinicId));
-            }
+    // 只需為「本身無 clinicId」的舊套票翻診症單舉證；分頁掃到全部尋獲
+    // 或上限為止，不再靜默只看最早 50 份病歷
+    const neededPkgIds = pkgPage.docs
+        .map((d) => d.id)
+        .filter((id) => {
+            const doc = pkgPage.docs.find((x) => x.id === id);
+            return doc && !doc.data.clinicId;
         });
-    });
+    const evidence = await fetchPackageClinicEvidence(client, patientId, neededPkgIds);
+    const pkgClinicMap = evidence.pkgClinicMap;
 
     // ── 3. 僅保留有效套票並歸組 ──
     const nowMs = Date.now();
@@ -381,6 +428,9 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
                 } else {
                     g.derivedBalance += Number(tx.amount) || 0;
                 }
+                break;
+            case 'statusChange':
+                // 凍結／關閉／復用不涉金額變動，餘額不變
                 break;
             default:
                 break;

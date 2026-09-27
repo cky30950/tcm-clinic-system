@@ -15,6 +15,17 @@ import {
     FirestoreClient,
     jsObjectToFirestoreFields
 } from '../../backup/lib/firestore.js';
+import {
+    WalletError,
+    round2,
+    requireMoney2,
+    splitPayment,
+    computeRefund,
+    resolveIdempotentReplay
+} from './wallet-core.js';
+
+// 供端點與 http.js 沿用既有引用路徑（實作已移至 wallet-core.js 便於單元測試）
+export { WalletError };
 
 const FS_BASE = 'https://firestore.googleapis.com/v1';
 const AUTO_ID_ALPHABET =
@@ -36,48 +47,16 @@ export function isLegacyAccountDocId(docId) {
         && docId.indexOf(ACCOUNT_ID_SEPARATOR) === -1;
 }
 
-export class WalletError extends Error {
-    constructor(status, code, message) {
-        super(message);
-        this.status = status;
-        this.code = code;
-    }
-}
-
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function round2(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return 0;
-    return Math.round(n * 100) / 100;
-}
-
-/**
- * 金額欄位把關：必須為數字且最多兩位小數。
- * round2 會把 100.999 靜默捨成 101.00，客戶端（或腳本）誤傳三位小數
- * 時應明確拒收，避免實際入帳金額與操作人預期不一致。
- * 用 epsilon 容忍二進位浮點誤差（例 1.11*100＝110.999…）。
- * @param {*} rawValue 原始輸入
- * @param {string} label 錯誤訊息用欄位名稱
- * @returns {number}
- */
-function requireMoney2(rawValue, label) {
-    const n = Number(rawValue);
-    if (!Number.isFinite(n)) {
-        throw new WalletError(400, 'INVALID_AMOUNT', `${label}必須為有效數字`);
-    }
-    const cents = n * 100;
-    if (Math.abs(cents - Math.round(cents)) > 1e-6) {
-        throw new WalletError(400, 'TOO_MANY_DECIMALS',
-            `${label}最多只可兩位小數（最小單位 HK$0.01）`);
-    }
-    return round2(n);
-}
-
 // 充值收款方式白名單（櫃台實際收現渠道）
 const TOPUP_PAYMENT_METHODS = ['cash', 'fps', 'eps', 'card', 'cheque', 'other'];
+
+// 冪等記錄保留天數：供 Firestore TTL 政策（expiresAt 欄位）自動清除。
+// 需長於備份保留期（2 個月），確保還原備份後重放防護仍有效。
+const WALLET_IDEMPOTENCY_TTL_DAYS = 180;
 
 function normalizePaymentMethod(raw) {
     const m = String(raw || '').trim().toLowerCase();
@@ -296,19 +275,8 @@ async function runIdempotentTransaction(env, idemKey, scope, resolveExtraDocs, b
         // 冪等命中：比對請求指紋；一致才回傳原結果，不再提交
         if (idemFields && idemFields.result) {
             await rollback(transaction);
-            const oldFp = idemFields.fingerprint
-                ? (idemFields.fingerprint.stringValue || '')
-                : '';
-            // 舊記錄無指紋欄位（功能上線前建立）時維持寬鬆，只比對新記錄
-            if (fingerprintHash && oldFp && oldFp !== fingerprintHash) {
-                throw new WalletError(409, 'IDEMPOTENCY_KEY_CONFLICT',
-                    '相同的請求識別鍵帶有不同的請求參數，請重新產生 idempotencyKey 後再試');
-            }
-            try {
-                return JSON.parse(idemFields.result.stringValue || '{}');
-            } catch (_e) {
-                return { ok: true, idempotent: true };
-            }
+            const replay = resolveIdempotentReplay(idemFields, fingerprintHash);
+            return replay.result;
         }
 
         let built;
@@ -319,11 +287,23 @@ async function runIdempotentTransaction(env, idemKey, scope, resolveExtraDocs, b
             throw error;
         }
 
-        // 冪等記錄寫在最後，內存處理結果
+        // 冪等記錄寫在最後，內存處理結果。
+        // updatedAt：備份系統增量同步用（與交易流水一致）。
+        // expiresAt：Firestore TTL 政策依此 Timestamp 自動清除（只增不刪
+        //   會無限膨脹）；保留 180 天，涵蓋重放視窗與備份還原週期（2 個月），
+        //   還原備份後進行中的 pay/topup 鍵仍在，避免重複扣款／重複入帳。
+        //   TTL 政策需一次性以 gcloud 啟用：
+        //   gcloud firestore fields ttls update expiresAt \
+        //     --collection-group=walletIdempotency --enable-ttl
+        const nowDate = new Date();
+        const expiresAt = new Date(nowDate.getTime()
+            + WALLET_IDEMPOTENCY_TTL_DAYS * 86400000);
         const result = built.result;
         const idemWriteFields = {
             result: { stringValue: JSON.stringify(result) },
-            at: { stringValue: new Date().toISOString() }
+            at: { stringValue: nowDate.toISOString() },
+            updatedAt: { stringValue: nowDate.toISOString() },
+            expiresAt: { timestampValue: expiresAt.toISOString() }
         };
         if (fingerprintHash) idemWriteFields.fingerprint = { stringValue: fingerprintHash };
         const writes = (built.writes || []).concat([{
@@ -682,25 +662,20 @@ export async function walletPayment(env, claims, params) {
                 throw new WalletError(402, 'WALLET_NOT_ACTIVE',
                     `儲值帳戶已${status === 'frozen' ? '凍結' : '關閉'}，無法付款`);
             }
-            const bal = round2(rawNumber(accFields, 'balance'));
-            const bbal = round2(rawNumber(accFields, 'bonusBalance'));
-            if (round2(bal + bbal) < amount) {
-                throw new WalletError(402, 'INSUFFICIENT_FUNDS',
-                    `儲值餘額不足（可用 HK$${round2(bal + bbal).toFixed(2)}）`);
-            }
-
-            // 扣款順序：依診所配置 deductBonusFirst（#12，UI 開關不再是裝飾品）
-            let fromBonus;
-            let fromBalance;
-            if (deductBonusFirst) {
-                fromBonus = round2(Math.min(bbal, amount));
-                fromBalance = round2(amount - fromBonus);
-            } else {
-                fromBalance = round2(Math.min(bal, amount));
-                fromBonus = round2(amount - fromBalance);
-            }
-            const newBalance = round2(bal - fromBalance);
-            const newBonus = round2(bbal - fromBonus);
+            // 扣款順序與餘額檢查：依診所配置 deductBonusFirst（#12，
+            // UI 開關不再是裝飾品）；純邏輯見 wallet-core.js（有單元測試）
+            const split = splitPayment(
+                amount,
+                rawNumber(accFields, 'balance'),
+                rawNumber(accFields, 'bonusBalance'),
+                deductBonusFirst
+            );
+            const {
+                fromBalance,
+                fromBonus,
+                newBalance,
+                newBonus
+            } = split;
             const at = new Date().toISOString();
 
             const accountObj = {
@@ -833,7 +808,6 @@ export async function walletRefund(env, claims, params) {
     });
     paidBalance = round2(paidBalance);
     paidBonus = round2(paidBonus);
-    const totalPaid = round2(paidBalance + paidBonus);
 
     // 聚合文件建立前的歷史退款：作為首次建立時的初始累計值
     let seedRefundedBalance = 0;
@@ -900,36 +874,23 @@ export async function walletRefund(env, claims, params) {
                 alreadyBonus = seedRefundedBonus;
                 refundCount = seedRefundCount;
             }
-            const alreadyTotal = round2(alreadyBalance + alreadyBonus);
-            const remainingTotal = round2(totalPaid - alreadyTotal);
-            if (remainingTotal <= 0) {
-                throw new WalletError(400, 'REFUND_ALREADY_COMPLETE',
-                    `此診症單的儲值付款 HK$${totalPaid.toFixed(2)} 已全額退款`);
-            }
-            // 未指定金額＝退還全部剩餘可退金額
-            const refundWant = want > 0 ? want : remainingTotal;
-            if (refundWant <= 0) {
-                throw new WalletError(400, 'INVALID_AMOUNT', '退款金額必須大於 0');
-            }
-            if (refundWant > remainingTotal) {
-                throw new WalletError(400, 'REFUND_EXCEEDS_PAYMENT',
-                    `退款金額不可超過尚可退款 HK$${remainingTotal.toFixed(2)}`
-                    + `（原付款 HK$${totalPaid.toFixed(2)}`
-                    + `，已退 HK$${alreadyTotal.toFixed(2)}）`);
-            }
-
-            // ── 按原付款比例拆分本金/贈額，並以各組件剩餘可退額夾緊，
-            //    避免多次部分退款的捨入誤差累計導致超退 ──
-            const remainBonus = round2(paidBonus - alreadyBonus);
-            const remainBalance = round2(paidBalance - alreadyBalance);
-            let refundBonus = round2(paidBonus * (refundWant / totalPaid));
-            if (refundBonus > remainBonus) refundBonus = remainBonus;
-            if (refundBonus < 0) refundBonus = 0;
-            let refundBalance = round2(refundWant - refundBonus);
-            if (refundBalance > remainBalance) {
-                refundBalance = remainBalance;
-                refundBonus = round2(refundWant - refundBalance);
-            }
+            // 累計上限把關＋按原付款比例拆分（純邏輯見 wallet-core.js，
+            // 有多次部分退款捨入夾緊的單元測試）
+            const refundPlan = computeRefund({
+                paidBalance,
+                paidBonus,
+                alreadyBalance,
+                alreadyBonus,
+                want: want > 0 ? want : undefined
+            });
+            const {
+                refundWant,
+                refundBalance,
+                refundBonus,
+                newRefundedBalance,
+                newRefundedBonus,
+                totalRefunded
+            } = refundPlan;
 
             const newBalance = round2(rawNumber(accFields, 'balance') + refundBalance);
             const newBonus = round2(rawNumber(accFields, 'bonusBalance') + refundBonus);
@@ -971,8 +932,8 @@ export async function walletRefund(env, claims, params) {
                 consultationId,
                 clinicId,
                 patientId,
-                refundedBalance: round2(alreadyBalance + refundBalance),
-                refundedBonus: round2(alreadyBonus + refundBonus),
+                refundedBalance: newRefundedBalance,
+                refundedBonus: newRefundedBonus,
                 refundCount: refundCount + 1,
                 updatedAt: at
             };
@@ -989,7 +950,7 @@ export async function walletRefund(env, claims, params) {
                     bonusBalance: newBonus,
                     refundedBalance: refundBalance,
                     refundedBonus: refundBonus,
-                    totalRefunded: round2(alreadyTotal + refundWant),
+                    totalRefunded,
                     txId: txBuilt.txId
                 }
             };
@@ -1126,6 +1087,8 @@ export async function walletSetStatus(env, claims, params) {
                 throw new WalletError(400, 'BALANCE_REMAINING',
                     '帳戶仍有餘額，請先退款或調整後再關閉');
             }
+            // 審計用：記錄狀態轉換的來源狀態（無欄位的舊帳戶視為 active）
+            const fromStatus = rawString(accFields, 'status', 'active');
             const at = new Date().toISOString();
 
             const accountObj = {
@@ -1140,17 +1103,21 @@ export async function walletSetStatus(env, claims, params) {
                 updatedAt: at
             };
 
+            // 獨立 statusChange 類型（不再借用 adjust/amount:0），
+            // 審計時可與金額調整明確區分；金額欄位固定 0、不涉金額變動
             const txRecord = Object.assign(
                 baseTxRecord(patientId, clinicId, claims, params.idempotencyKey, at),
                 {
-                    type: 'adjust',
+                    type: 'statusChange',
                     amount: 0,
-                    appliesTo: 'mixed',
+                    appliesTo: 'none',
+                    fromStatus,
+                    toStatus: status,
                     deltaBalance: 0,
                     deltaBonus: 0,
                     balanceAfter: balance,
                     bonusBalanceAfter: bonusBalance,
-                    note: (`帳戶狀態變更為 ${status}` +
+                    note: (`帳戶狀態由 ${fromStatus} 變更為 ${status}` +
                         (params.note ? `：${String(params.note).trim()}` : '')).slice(0, 300)
                 }
             );
@@ -1161,7 +1128,7 @@ export async function walletSetStatus(env, claims, params) {
                     { update: { name, fields: jsObjectToFirestoreFields(accountObj) } },
                     txBuilt.write
                 ],
-                result: { ok: true, status, balance, bonusBalance }
+                result: { ok: true, status, fromStatus, balance, bonusBalance }
             };
         },
         `status|${patientId}|${status}`

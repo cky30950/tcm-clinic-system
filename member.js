@@ -416,10 +416,11 @@ function renderPackages() {
 function txTypeLabel(type) {
     const map = {
         topup: 'txTopup',
+        topupBonus: 'txTopup',
         payment: 'txPayment',
         refund: 'txRefund',
         adjust: 'txAdjust',
-        status: 'txStatus'
+        statusChange: 'txStatus'
     };
     return t(map[type] || 'txAdjust');
 }
@@ -449,11 +450,15 @@ function renderTransactions() {
         const at = formatDateTime(tx.at);
         const note = tx.note ? String(tx.note) : '';
         const meta = [at, note].filter(Boolean).join(' · ');
+        // 狀態變更不涉金額，顯示「—」而非 +HK$0.00
+        const amountHtml = (tx.type === 'statusChange' || amount === 0)
+            ? '<span class="amt-zero">—</span>'
+            : `<span class="${cls}">${sign}${money(Math.abs(amount))}</span>`;
         return `
             <li>
                 <div class="row">
                     <span class="name">${txTypeLabel(tx.type)}</span>
-                    <span class="${cls}">${sign}${money(Math.abs(amount))}</span>
+                    ${amountHtml}
                 </div>
                 <div class="meta">${meta}</div>
             </li>`;
