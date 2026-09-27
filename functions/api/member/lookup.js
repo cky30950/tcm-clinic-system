@@ -298,7 +298,7 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
         return ''; // 無法歸屬 → 未分組
     }
 
-    // ── 2. 套票 → 診所歸屬（依使用記錄）──
+    // ── 2. 套票 → 診所歸屬（記錄欄位 clinicId 為準；舊套票依使用記錄推斷）──
     const pkgClinicMap = new Map();
     consPage.docs.forEach((d) => {
         const c = d.data || {};
@@ -324,7 +324,10 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
             return expMs === null ? true : expMs >= nowMs;
         })
         .map((p) => ({
-            clinicId: pkgClinicMap.has(p.id) ? pkgClinicMap.get(p.id) : '',
+            // 新制：套票記錄自帶 clinicId；舊記錄無標注時才退回使用記錄推斷
+            clinicId: p.data.clinicId
+                ? String(p.data.clinicId)
+                : (pkgClinicMap.has(p.id) ? pkgClinicMap.get(p.id) : ''),
             name: p.data.name || p.data.packageName || '',
             totalUses: Number(p.data.totalUses) || 0,
             remainingUses: Number(p.data.remainingUses) || 0,
