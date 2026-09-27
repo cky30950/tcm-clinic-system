@@ -226,12 +226,10 @@
             }
         }
 
-        /* Turnstile 人機驗證（僅最後一頁顯示） */
+        /* Turnstile 人機驗證（位於提交前確認視窗內） */
         .turnstile-box {
-            margin: 12px 0 4px;
-            display: none;
+            margin: 4px 0;
         }
-        .turnstile-box.show { display: block; }
         #turnstileWidget { min-height: 65px; }
         #turnstileNote { margin-top: 6px; }
     </style>
@@ -1075,11 +1073,6 @@
                 </div>
 
 
-                <div class="turnstile-box" id="turnstileBox">
-                    <div id="turnstileWidget"></div>
-                    <p class="text-sm text-red-600 hidden" id="turnstileNote"></p>
-                </div>
-
                 <div class="nav-buttons flex justify-between mt-8 pt-6 border-t border-gray-200">
                     <button type="button" id="prevBtn" class="btn-secondary px-6 py-4 text-white rounded-xl font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center" disabled>
                         上一步
@@ -1114,6 +1107,47 @@
                     <a href="index.html" class="btn-secondary px-8 py-4 text-white rounded-xl font-semibold text-lg flex items-center">
                         返回首頁
                     </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 提交前確認訊息（最後一頁通過人機驗證後彈出） -->
+        <div id="submitConfirmModal" class="modal-backdrop fixed inset-0 hidden items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="submitConfirmTitle">
+            <div class="bg-white rounded-2xl p-6 sm:p-8 max-w-lg w-full shadow-2xl">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                    </div>
+                    <h2 id="submitConfirmTitle" class="text-2xl font-bold text-gray-800 mb-2">確認提交預診資料？</h2>
+                    <p class="text-gray-600">請確認您填寫的所有資料均正確無誤。提交後預診資料會即時送交診所，屆時將未能自行修改。</p>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 text-sm text-blue-800">
+                    <p class="font-semibold mb-2">提交前請再細心檢查：</p>
+                    <ul class="space-y-1 text-blue-700">
+                        <li>• 姓名、性別及不適部位是否正確</li>
+                        <li>• 各項必填問題已如實填寫</li>
+                        <li>• 病史、用藥及過敏史並無遺漏（首次就診）</li>
+                    </ul>
+                </div>
+
+                <!-- 人機驗證（僅確認視窗內顯示，通過後才可提交） -->
+                <div class="mb-2">
+                    <p class="text-sm font-medium text-gray-700 mb-1">請先完成人機驗證：</p>
+                    <div class="turnstile-box" id="turnstileBox">
+                        <div id="turnstileWidget" class="flex justify-center"></div>
+                        <p class="text-sm text-red-600 hidden mt-1" id="turnstileNote"></p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row justify-center gap-3 mt-4">
+                    <button type="button" id="cancelSubmitBtn" class="btn-secondary px-6 py-3 text-white rounded-xl font-semibold text-lg">
+                        返回檢查
+                    </button>
+                    <button type="button" id="confirmSubmitBtn" class="btn-success px-6 py-3 text-white rounded-xl font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        確認提交
+                    </button>
                 </div>
             </div>
         </div>
@@ -1209,7 +1243,6 @@
             setupBodyPartSelector();
             setupInteractiveElements();
             updateVisibleSections();
-            initTurnstile();
         });
 
         /* ---------------- Turnstile 人機驗證 ---------------- */
@@ -1217,6 +1250,8 @@
         let tsWidgetId = null;
         let turnstileToken = '';
         let tsErrors = 0;
+        let tsInitStarted = false;
+        let turnstileErrorText = '';
 
         function loadTurnstileScript() {
             if (window.turnstile) return Promise.resolve();
@@ -1232,21 +1267,30 @@
         }
 
         function showTurnstileNote(text) {
+            turnstileErrorText = String(text || '');
             const note = document.getElementById('turnstileNote');
             if (!note) return;
-            note.textContent = text;
+            note.textContent = turnstileErrorText;
             note.classList.remove('hidden');
         }
 
         function clearTurnstileNote() {
+            turnstileErrorText = '';
             const note = document.getElementById('turnstileNote');
             if (!note) return;
             note.textContent = '';
             note.classList.add('hidden');
         }
 
+        // 確認提交按鈕必須在取得人機驗證 token 後才可點擊
+        function updateConfirmButton() {
+            const btn = document.getElementById('confirmSubmitBtn');
+            if (btn) btn.disabled = !turnstileToken;
+        }
+
         function resetTurnstile() {
             turnstileToken = '';
+            updateConfirmButton();
             clearTurnstileNote();
             if (tsWidgetId !== null && window.turnstile) {
                 try {
@@ -1256,6 +1300,11 @@
         }
 
         async function initTurnstile() {
+            // 只在確認視窗首次打開時渲染（容器必須可見，否則
+            // Turnstile 測量不到尺寸，flexible／正常模式都會報
+            // "No available adapters" 而無法顯示）
+            if (tsInitStarted) return;
+            tsInitStarted = true;
             try {
                 // 與會員查詢頁共用同一公開設定端點（只回傳 site key）
                 const [cfg] = await Promise.all([
@@ -1270,12 +1319,13 @@
                 tsErrors = 0;
                 tsWidgetId = window.turnstile.render('#turnstileWidget', {
                     sitekey: siteKey,
-                    language: 'zh-HK',
-                    size: 'flexible',
+                    // Turnstile 不支援 zh-HK，會 fallback 到 zh-TW
+                    language: 'zh-TW',
                     callback: (tok) => {
                         tsErrors = 0;
                         turnstileToken = String(tok || '');
                         clearTurnstileNote();
+                        updateConfirmButton();
                     },
                     'expired-callback': () => resetTurnstile(),
                     'timeout-callback': () => resetTurnstile(),
@@ -1591,7 +1641,6 @@
             const prevBtn = document.getElementById('prevBtn');
             const nextBtn = document.getElementById('nextBtn');
             const submitBtn = document.getElementById('submitBtn');
-            const turnstileBox = document.getElementById('turnstileBox');
 
             prevBtn.disabled = currentIndex === 1;
 
@@ -1599,13 +1648,10 @@
                 nextBtn.style.display = 'none';
                 submitBtn.style.display = 'flex';
                 submitBtn.classList.remove('hidden');
-                // 最後一頁才顯示人機驗證
-                if (turnstileBox) turnstileBox.classList.add('show');
             } else {
                 nextBtn.style.display = 'flex';
                 submitBtn.style.display = 'none';
                 submitBtn.classList.add('hidden');
-                if (turnstileBox) turnstileBox.classList.remove('show');
             }
             
             // Scroll to top
@@ -2028,8 +2074,17 @@
                 results.allergies = medicalProfileSummary.allergies;
             }
 
-            // 必須通過人機驗證才可遞交
+            // 先彈出確認視窗（人機驗證位於視窗內），病人完成驗證並
+            // 確認無誤後才真正遞交預診資料
+            if (!submitConfirmed) {
+                showSubmitConfirm();
+                return;
+            }
+            submitConfirmed = false;
+
+            // 雙重保險：確認按鈕已強制通過驗證才可點擊
             if (!turnstileToken) {
+                showSubmitConfirm();
                 showTurnstileNote('請先完成人機驗證');
                 return;
             }
@@ -2042,17 +2097,68 @@
 
             try {
                 const ok = await submitInquiry(results);
-                if (!ok) return; // 錯誤訊息已顯示於驗證區
+                if (!ok) {
+                    // 錯誤訊息顯示於視窗驗證區：重置 token 後重開視窗讓病人重試
+                    const msg = turnstileErrorText || '遞交失敗，請稍後再試';
+                    resetTurnstile();
+                    showTurnstileNote(msg);
+                    showSubmitConfirm();
+                    return;
+                }
                 displayResults(results);
+                resetTurnstile();
             } catch (err) {
                 console.error('submit error:', err);
+                resetTurnstile();
                 showTurnstileNote('遞交失敗，請稍後再試');
+                showSubmitConfirm();
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
-                // Turnstile token 單次有效，每次嘗試後重置並等下一個 token
-                resetTurnstile();
             }
+        });
+
+        /* ---------------- 提交前確認彈窗 ---------------- */
+
+        let submitConfirmed = false;
+
+        function showSubmitConfirm() {
+            const modal = document.getElementById('submitConfirmModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // 視窗可見後才（首次）渲染 Turnstile；同步確認按鈕狀態
+            updateConfirmButton();
+            initTurnstile();
+        }
+
+        function hideSubmitConfirm() {
+            const modal = document.getElementById('submitConfirmModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // 病人完成人機驗證並確認無誤：關閉彈窗後重新觸發表單提交
+        document.getElementById('confirmSubmitBtn').addEventListener('click', function() {
+            if (!turnstileToken) {
+                showTurnstileNote('請先完成人機驗證');
+                return;
+            }
+            hideSubmitConfirm();
+            submitConfirmed = true;
+            document.getElementById('diagnosisForm').requestSubmit();
+        });
+
+        // 返回檢查：關閉彈窗，停留於最後一頁繼續修改
+        document.getElementById('cancelSubmitBtn').addEventListener('click', hideSubmitConfirm);
+
+        // 點擊彈窗以外的遮罩範圍可取消
+        document.getElementById('submitConfirmModal').addEventListener('click', function(e) {
+            if (e.target === this) hideSubmitConfirm();
+        });
+
+        // 按 Esc 可取消
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') hideSubmitConfirm();
         });
 
         function displayResults(results) {
