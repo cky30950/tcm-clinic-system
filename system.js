@@ -32047,119 +32047,41 @@ class FirebaseDataManager {
     /**
      * 清除過期的問診資料。
      *
-     * 此函式會遍歷 `inquiries` 集合，並刪除那些
-     * `createdAt` 發生在今日 00:00 之前（即昨天或更早）的問診紀錄。
-     * 若某筆記錄缺少 `createdAt` 欄位，則會改用 `expireAt` 作為判斷依據。
-     * 因為系統設計與 Realtime Database 的掛號清理邏輯一致，
-     * 只保留今天及未來的資料，所有舊資料將被移除。
+     * Security Rules 規定 `inquiries` 客戶端一律不可寫入/刪除
+     * （allow create, update, delete: if false），舊式直接 deleteDoc
+     * 會回報 Missing or insufficient permissions。改為呼叫
+     * POST /api/inquiry/cleanup，由 Pages Function 驗證職員身份後
+     * 以 Service Account 刪除 createdAt／expireAt 早於香港時間今日
+     * 00:00 的文件（只保留今天及未來的資料）。
      *
-     * @returns {Promise<{success: boolean, deletedCount?: number}>}
+     * @returns {Promise<{success: boolean, deletedCount?: number, error?: string}>}
      */
     async clearOldInquiries() {
         if (!this.isReady) return { success: false };
         try {
-            const now = new Date();
-            // 計算今日凌晨時間（本地時區）。任何發生在此時間之前的紀錄將被視為過期。
-            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const inquiriesRef = window.firebase.collection(window.firebase.db, 'inquiries');
+            const fbUser = window.firebase && window.firebase.auth && window.firebase.auth.currentUser;
+            if (!fbUser) return { success: false };
 
-            // 儲存待刪除文件的 ID，避免重複處理
-            const idsToDelete = new Set();
-            const docsToDelete = [];
-
-            /*
-             * Firestore 支援條件查詢。如果 Firebase 提供 or 查詢，我們只執行一次查詢，
-             * 以 createdAt 或 expireAt 早於今日凌晨的文件作為刪除對象，減少讀取次數。
-             * 若環境中不支援 or 查詢，將回退到分別查詢 createdAt 與 expireAt 的方式。
-             */
-            try {
-                let fetchedDocs = [];
-                if (window.firebase && typeof window.firebase.or === 'function') {
-                    // 使用 or 條件一次查詢兩種過期條件
-                    const combinedQuery = window.firebase.firestoreQuery(
-                        inquiriesRef,
-                        window.firebase.or(
-                            window.firebase.where('createdAt', '<', startOfToday),
-                            window.firebase.where('expireAt', '<', startOfToday)
-                        )
-                    );
-                    const snapshot = await window.firebase.getDocs(combinedQuery);
-                    snapshot.forEach((doc) => {
-                        fetchedDocs.push(doc);
-                    });
-                } else {
-                    // 環境不支援 or，回退至原本的兩次查詢
-                    try {
-                        const qCreated = window.firebase.firestoreQuery(
-                            inquiriesRef,
-                            window.firebase.where('createdAt', '<', startOfToday)
-                        );
-                        const snapshotCreated = await window.firebase.getDocs(qCreated);
-                        snapshotCreated.forEach((doc) => {
-                            fetchedDocs.push(doc);
-                        });
-                    } catch (err) {
-                        console.warn('查詢過期 createdAt 問診資料失敗:', err);
-                    }
-                    try {
-                        const qExpire = window.firebase.firestoreQuery(
-                            inquiriesRef,
-                            window.firebase.where('expireAt', '<', startOfToday)
-                        );
-                        const snapshotExpire = await window.firebase.getDocs(qExpire);
-                        snapshotExpire.forEach((doc) => {
-                            fetchedDocs.push(doc);
-                        });
-                    } catch (err) {
-                        console.warn('查詢過期 expireAt 問診資料失敗:', err);
-                    }
-                }
-                fetchedDocs.forEach((doc) => {
-                    docsToDelete.push(doc);
-                });
-            } catch (err) {
-                console.warn('查詢過期問診資料失敗:', err);
-            }
-
-            const deletions = [];
-            // 驗證並彙整需要刪除的文件
-            docsToDelete.forEach((doc) => {
-                // 避免同一文件被重複加入
-                if (idsToDelete.has(doc.id)) return;
-                const data = doc.data();
-                let createdDate = null;
-                if (data.createdAt) {
-                    if (data.createdAt.seconds !== undefined) {
-                        createdDate = new Date(data.createdAt.seconds * 1000);
-                    } else {
-                        createdDate = new Date(data.createdAt);
-                    }
-                }
-                let targetDate = createdDate;
-                if (!targetDate && data.expireAt) {
-                    if (data.expireAt.seconds !== undefined) {
-                        targetDate = new Date(data.expireAt.seconds * 1000);
-                    } else {
-                        targetDate = new Date(data.expireAt);
-                    }
-                }
-                // 如果目標日期存在且早於今日凌晨，則加入刪除佇列
-                if (targetDate && targetDate < startOfToday) {
-                    idsToDelete.add(doc.id);
-                    deletions.push(
-                        window.firebase.deleteDoc(
-                            window.firebase.doc(window.firebase.db, 'inquiries', doc.id)
-                        )
-                    );
-                }
+            const token = await fbUser.getIdToken();
+            const response = await fetch('/api/inquiry/cleanup', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
             });
 
-            let count = 0;
-            if (deletions.length > 0) {
-                await Promise.all(deletions);
-                count = deletions.length;
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (_e) {
+                data = null;
             }
-            return { success: true, deletedCount: count };
+            if (!response.ok) {
+                throw new Error((data && data.message) || ('HTTP ' + response.status));
+            }
+            return { success: true, deletedCount: (data && data.deletedCount) || 0 };
         } catch (error) {
             console.error('清除過期問診資料失敗:', error);
             return { success: false, error: error.message };
