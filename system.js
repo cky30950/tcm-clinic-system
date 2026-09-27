@@ -25186,12 +25186,104 @@ async function restoreUser(id) {
             }).join('');
         }
 
+        // #13 待收款追蹤：查詢 paymentStatus=='unpaid' 的診症單
+        // （單欄位相等查詢，使用自動索引，無需複合索引），再於客戶端
+        // 按報表日期範圍與診所篩選。
+        let lastWalletFinQuery = null;
+        async function loadWalletReceivables(startDate, endDate, clinicFilter) {
+            const fb = window.firebase;
+            const q = fb.firestoreQuery(
+                fb.collection(fb.db, 'consultations'),
+                fb.where('paymentStatus', '==', 'unpaid'),
+                fb.limit(300)
+            );
+            const snap = await fb.getDocs(q);
+            const start = new Date(startDate);
+            const end = new Date(endDate + 'T23:59:59.999Z');
+            const rows = [];
+            snap.forEach((d) => {
+                const c = Object.assign({ id: d.id }, d.data() || {});
+                const dt = new Date(c.date);
+                if (!Number.isFinite(dt.getTime()) || dt < start || dt > end) return;
+                if (clinicFilter && String(c.clinicId || '') !== String(clinicFilter)) return;
+                rows.push(c);
+            });
+            rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+            return rows;
+        }
+
+        function renderWalletReceivables(rows) {
+            const body = document.getElementById('financialReceivablesBody');
+            const countEl = document.getElementById('financialReceivablesCount');
+            if (!body) return;
+            if (countEl) countEl.textContent = String(rows.length);
+            if (!rows.length) {
+                body.innerHTML = `
+                    <tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">
+                        本期沒有待收款診症單
+                    </td></tr>`;
+                return;
+            }
+            const MAX_ROWS = 100;
+            const shown = rows.slice(0, MAX_ROWS);
+            const esc = (s) => window.escapeHtml ? window.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
+            body.innerHTML = shown.map((c) => {
+                const amount = Math.round((Number(c.pendingAmount) || 0) * 100) / 100;
+                let dateText = String(c.date || '').slice(0, 10);
+                try { dateText = new Date(c.date).toLocaleDateString('zh-HK'); } catch (_e) {}
+                const clinic = (Array.isArray(clinicsList)
+                    ? clinicsList.find((x) => String(x.id) === String(c.clinicId))
+                    : null) || null;
+                const clinicText = clinic ? getClinicDisplayName(clinic) : (c.clinicId || '—');
+                const note = c.walletPaySkipped
+                    ? '已改用其他方式，待核銷'
+                    : '儲值扣款失敗';
+                const cidAttr = esc(c.id);
+                return `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">${dateText}</td>
+                    <td class="px-4 py-3 text-sm text-gray-900">${esc(c.patientName || '未知病人')}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${esc(clinicText)}</td>
+                    <td class="px-4 py-3 text-sm text-red-600 text-right font-medium">HK$${amount.toFixed(2)}</td>
+                    <td class="px-4 py-3 text-sm text-gray-500">${note}</td>
+                    <td class="px-4 py-3 text-sm text-center">
+                        <button type="button" data-receivable-id="${cidAttr}"
+                            class="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded">
+                            標記已收款
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('') + (rows.length > MAX_ROWS ? `
+                <tr><td colspan="6" class="px-4 py-3 text-center text-xs text-gray-500">
+                    只顯示最近 ${MAX_ROWS} 筆，尚有 ${rows.length - MAX_ROWS} 筆（可縮短報表期間查看）
+                </td></tr>` : '');
+            body.querySelectorAll('button[data-receivable-id]').forEach((btn) => {
+                btn.addEventListener('click', () => markWalletReceivablePaid(
+                    btn.getAttribute('data-receivable-id')));
+            });
+        }
+
         async function refreshWalletFinancialSection(startDate, endDate, clinicFilter, forceRefresh) {
+            lastWalletFinQuery = { startDate, endDate, clinicFilter };
             try {
                 const raw = await getWalletFinRaw(
                     startDate, endDate, !!forceRefresh, clinicFilter);
                 const stats = calculateWalletFinancialStats(raw, clinicFilter);
                 updateWalletFinSection(stats);
+                // 待收款獨立查詢失敗不影響儲值主統計
+                try {
+                    const receivables = await loadWalletReceivables(startDate, endDate, clinicFilter);
+                    renderWalletReceivables(receivables);
+                } catch (recvError) {
+                    console.error('載入待收款清單失敗:', recvError);
+                    const recvBody = document.getElementById('financialReceivablesBody');
+                    if (recvBody) {
+                        recvBody.innerHTML = `
+                            <tr><td colspan="6" class="px-4 py-6 text-center text-red-500">
+                                暫時無法載入待收款清單，請稍後再按「更新報表」
+                            </td></tr>`;
+                    }
+                }
                 return stats;
             } catch (error) {
                 console.error('載入會員儲值財務資料失敗:', error);
@@ -25205,6 +25297,38 @@ async function restoreUser(id) {
                 return null;
             }
         }
+
+        // 待收款核銷：員工確認已以現金／其他方式收到款項
+        async function markWalletReceivablePaid(consultationId) {
+            if (!consultationId) return;
+            const confirmed = await showConfirmation(
+                '確認此診症單已全數收款（現金／其他方式）？\n確認後將自待收款清單移除。',
+                'question'
+            );
+            if (!confirmed) return;
+            try {
+                await window.firebaseDataManager.updateConsultation(
+                    String(consultationId),
+                    {
+                        paymentStatus: 'external_paid',
+                        pendingAmount: 0,
+                        externalPaidAt: new Date().toISOString()
+                    }
+                );
+                showToast('已標記為收款完成', 'success');
+                if (lastWalletFinQuery) {
+                    await refreshWalletFinancialSection(
+                        lastWalletFinQuery.startDate,
+                        lastWalletFinQuery.endDate,
+                        lastWalletFinQuery.clinicFilter,
+                        true
+                    );
+                }
+            } catch (error) {
+                showToast('標記失敗：' + (error && error.message ? error.message : '未知錯誤'), 'error');
+            }
+        }
+        window.markWalletReceivablePaid = markWalletReceivablePaid;
 
         // 切換財務標籤
         function switchFinancialTab(tabType) {
@@ -33793,6 +33917,15 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
     refund: '退款',
     adjust: '調整'
   };
+  // 充值收款方式（與後端 TOPUP_PAYMENT_METHODS 白名單一致）
+  const WALLET_METHOD_LABELS = {
+    cash: '現金',
+    fps: '轉數快',
+    eps: 'EPS',
+    card: '信用卡',
+    cheque: '支票',
+    other: '其他'
+  };
   const WALLET_STATUS_LABELS = {
     active: '運作中',
     frozen: '已凍結',
@@ -33802,6 +33935,15 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   function walletRound2(value) {
     const n = Number(value);
     return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+  }
+
+  // 金額位數把關：必須為有限數字且最多兩位小數（與後端 requireMoney2 對應，
+  // epsilon 容忍 1.11*100＝110.999… 之類的浮點誤差）
+  function walletIsMoney2(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return false;
+    const cents = n * 100;
+    return Math.abs(cents - Math.round(cents)) <= 1e-6;
   }
 
   function newIdempotencyKey(prefix) {
@@ -33828,7 +33970,11 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
     let data = null;
     try { data = await res.json(); } catch (_e) {}
     if (!res.ok) {
-      throw new Error((data && data.message) || ('HTTP ' + res.status));
+      // 保留後端錯誤碼（如 WALLET_ALREADY_PAID），讓呼叫端可區分語意
+      const err = new Error((data && data.message) || ('HTTP ' + res.status));
+      err.status = res.status;
+      if (data && data.error) err.code = data.error;
+      throw err;
     }
     return data || {};
   }
@@ -34017,7 +34163,16 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       const snap = await window.firebase.getDocs(q);
       const accounts = [];
       snap.forEach((d) => accounts.push(d.data()));
-      accounts.sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+      // updatedAt 為 ISO 字串，Number() 會得到 NaN 令排序失效；
+      // 統一用時間戳比較（兼容 Firestore Timestamp 物件與數字）
+      const walletTs = (v) => {
+        if (v == null) return 0;
+        if (typeof v === 'number') return v;
+        if (typeof v === 'object' && v.seconds != null) return Number(v.seconds) * 1000;
+        const t = Date.parse(v);
+        return Number.isFinite(t) ? t : 0;
+      };
+      accounts.sort((a, b) => walletTs(b.updatedAt) - walletTs(a.updatedAt));
       const withBalance = accounts.filter((a) =>
         walletRound2(a.balance) + walletRound2(a.bonusBalance) > 0
       );
@@ -34331,10 +34486,16 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
     try {
       atText = new Date(tx.at).toLocaleString('zh-HK', { hour12: false });
     } catch (_e) { atText = tx.at || ''; }
+    // 充值流水標注實際收款渠道（舊記錄無欄位時不顯示）
+    let typeText = WALLET_TYPE_LABELS[tx.type] || tx.type;
+    if (tx.type === 'topup' && tx.paymentMethod) {
+      const methodLabel = WALLET_METHOD_LABELS[tx.paymentMethod] || tx.paymentMethod;
+      typeText += `（${methodLabel}）`;
+    }
     return `
       <tr class="border-t border-gray-100">
         <td class="px-3 py-1.5 text-gray-600 whitespace-nowrap">${window.escapeHtml(atText)}</td>
-        <td class="px-3 py-1.5 text-gray-800">${window.escapeHtml(WALLET_TYPE_LABELS[tx.type] || tx.type)}</td>
+        <td class="px-3 py-1.5 text-gray-800">${window.escapeHtml(typeText)}</td>
         <td class="px-3 py-1.5 text-right font-medium ${isPayment ? 'text-red-600' : 'text-green-600'}">
           ${isPayment ? '-' : ''}HK$${Math.abs(amount).toFixed(2)}
         </td>
@@ -34437,9 +34598,16 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       showToast('請輸入有效的充值金額', 'error');
       return;
     }
-    // 提交前彈窗二次確認（病人、金額、贈送額）
+    if (!walletIsMoney2(amount)) {
+      showToast('金額最多只可兩位小數（最小 HK$0.01）', 'error');
+      return;
+    }
+    const methodSelect = document.getElementById('walletTopupMethod');
+    const paymentMethod = methodSelect ? methodSelect.value : 'cash';
+    const methodLabel = WALLET_METHOD_LABELS[paymentMethod] || paymentMethod;
+    // 提交前彈窗二次確認（病人、收款方式、金額、贈送額）
     const patientName = (walletLastPatientInfo && walletLastPatientInfo.name) || '未知病人';
-    let confirmMsg = `確認為病人「${patientName}」充值 HK$${walletRound2(amount).toFixed(2)}？`;
+    let confirmMsg = `確認以「${methodLabel}」為病人「${patientName}」充值 HK$${walletRound2(amount).toFixed(2)}？`;
     try {
       const cfg = await getWalletMembershipConfig();
       const bonusAmount = walletBonusFor(cfg, amount);
@@ -34453,10 +34621,12 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       const result = await walletApi('topup', {
         patientId: walletSelectedPatientId,
         amount,
+        paymentMethod,
         idempotencyKey: newIdempotencyKey('topup')
       });
       invalidateWalletAccount(walletSelectedPatientId);
       amountInput.value = '';
+      if (methodSelect) methodSelect.value = 'cash';
       document.getElementById('walletTopupHint').textContent = '';
       showToast(
         `充值成功${result.bonusAmount > 0 ? `，贈送 HK$${walletRound2(result.bonusAmount).toFixed(2)}` : ''}`,
@@ -34548,7 +34718,14 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       note: document.getElementById('walletRefundNote').value,
       idempotencyKey: newIdempotencyKey('refund')
     };
-    if (amountRaw !== '') payload.amount = Number(amountRaw);
+    if (amountRaw !== '') {
+      const refundAmount = Number(amountRaw);
+      if (!walletIsMoney2(refundAmount)) {
+        showToast('退款金額最多只可兩位小數（最小 HK$0.01）', 'error');
+        return;
+      }
+      payload.amount = refundAmount;
+    }
     try {
       await walletApi('refund', payload);
       invalidateWalletAccount(walletSelectedPatientId);
@@ -34592,11 +34769,17 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       showToast('必須填寫調整原因', 'error');
       return;
     }
+    const deltaBalance = Number(document.getElementById('walletAdjustBalance').value) || 0;
+    const deltaBonus = Number(document.getElementById('walletAdjustBonus').value) || 0;
+    if (!walletIsMoney2(deltaBalance) || !walletIsMoney2(deltaBonus)) {
+      showToast('調整金額最多只可兩位小數（最小 HK$0.01）', 'error');
+      return;
+    }
     try {
       await walletApi('adjust', {
         patientId: walletSelectedPatientId,
-        deltaBalance: Number(document.getElementById('walletAdjustBalance').value) || 0,
-        deltaBonus: Number(document.getElementById('walletAdjustBonus').value) || 0,
+        deltaBalance,
+        deltaBonus,
         reason,
         idempotencyKey: newIdempotencyKey('adjust')
       });
@@ -35118,7 +35301,11 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
         // 支付後餘額快照，與套票餘次快照一樣固定寫入診症記錄
         walletPrincipalAfter: principalAfter,
         walletBonusAfter: bonusAfter,
-        walletBalanceAfter: walletRound2(principalAfter + bonusAfter)
+        walletBalanceAfter: walletRound2(principalAfter + bonusAfter),
+        // #13 收款狀態：儲值扣款成功，關閉待收款追蹤
+        paymentStatus: 'wallet_paid',
+        pendingAmount: 0,
+        walletPaidAt: new Date().toISOString()
       });
       consultWallet.paid = true;
       consultWallet.pendingPay = false;
@@ -35127,9 +35314,32 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       return true;
     } catch (err) {
       const msg = (err && err.message) ? err.message : '未知錯誤';
+      // 後端冪等防護指出此診症單先前已扣過款：視同已收款，補齊狀態
+      if (err && err.code === 'WALLET_ALREADY_PAID') {
+        try {
+          await window.firebaseDataManager.updateConsultation(consultationId, {
+            paymentStatus: 'wallet_paid',
+            pendingAmount: 0,
+            walletPaidAt: new Date().toISOString()
+          });
+        } catch (_markErr) { /* 標記失敗不阻擋流程 */ }
+        consultWallet.paid = true;
+        consultWallet.pendingPay = false;
+        showWalletPayMessage('此診症單先前已以儲值餘額支付', false);
+        return true;
+      }
+      // #13 病歷已保存但款項未收：標記待收款，供財報「待收款追蹤」核銷。
+      // 標記失敗不影響原本的重試／改收流程。
+      try {
+        await window.firebaseDataManager.updateConsultation(consultationId, {
+          paymentStatus: 'unpaid',
+          pendingAmount: walletRound2(amount),
+          walletPayFailedAt: new Date().toISOString()
+        });
+      } catch (_markErr) { /* 略過 */ }
       showWalletPayMessage(
         '⚠️ 儲值扣款失敗：' + escapeHtml(msg) +
-        '（病歷已保存）。' +
+        '（病歷已保存，已列入待收款追蹤）。' +
         '<div class="mt-2">' +
         '<button type="button" onclick="retryConsultationWalletPayment()" ' +
         'class="mr-2 px-3 py-1 text-xs bg-teal-600 text-white rounded">重試扣款</button>' +
@@ -35157,10 +35367,27 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
     }
   }
 
-  function cancelConsultationWalletPayment() {
+  async function cancelConsultationWalletPayment() {
     consultWallet.pendingPay = false;
+    // 員工確定改以現場渠道收款：同樣列入待收款追蹤，
+    // 收款後於財報「待收款追蹤」按「標記已收款」核銷
+    try {
+      const owed = walletRound2(readConsultationTotal());
+      if (consultWallet.consultationId && owed > 0) {
+        await window.firebaseDataManager.updateConsultation(
+          String(consultWallet.consultationId),
+          {
+            paymentStatus: 'unpaid',
+            pendingAmount: owed,
+            walletPayFailedAt: new Date().toISOString(),
+            walletPaySkipped: true
+          }
+        );
+      }
+    } catch (_markErr) { /* 標記失敗不阻擋提示流程 */ }
     showWalletPayMessage(
-      '已取消儲值扣款，請以現金／其他方式向病人收款，事後可於會員錢包人工調整。',
+      '已取消儲值扣款，請以現金／其他方式向病人收款，並於財報「待收款追蹤」核銷；' +
+      '如需調整儲值帳戶，可於會員錢包人工調整。',
       false
     );
     const cb = document.getElementById('useWalletPayment');

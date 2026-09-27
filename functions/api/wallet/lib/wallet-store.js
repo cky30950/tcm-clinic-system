@@ -54,6 +54,36 @@ function round2(value) {
     return Math.round(n * 100) / 100;
 }
 
+/**
+ * 金額欄位把關：必須為數字且最多兩位小數。
+ * round2 會把 100.999 靜默捨成 101.00，客戶端（或腳本）誤傳三位小數
+ * 時應明確拒收，避免實際入帳金額與操作人預期不一致。
+ * 用 epsilon 容忍二進位浮點誤差（例 1.11*100＝110.999…）。
+ * @param {*} rawValue 原始輸入
+ * @param {string} label 錯誤訊息用欄位名稱
+ * @returns {number}
+ */
+function requireMoney2(rawValue, label) {
+    const n = Number(rawValue);
+    if (!Number.isFinite(n)) {
+        throw new WalletError(400, 'INVALID_AMOUNT', `${label}必須為有效數字`);
+    }
+    const cents = n * 100;
+    if (Math.abs(cents - Math.round(cents)) > 1e-6) {
+        throw new WalletError(400, 'TOO_MANY_DECIMALS',
+            `${label}最多只可兩位小數（最小單位 HK$0.01）`);
+    }
+    return round2(n);
+}
+
+// 充值收款方式白名單（櫃台實際收現渠道）
+const TOPUP_PAYMENT_METHODS = ['cash', 'fps', 'eps', 'card', 'cheque', 'other'];
+
+function normalizePaymentMethod(raw) {
+    const m = String(raw || '').trim().toLowerCase();
+    return TOPUP_PAYMENT_METHODS.includes(m) ? m : 'cash';
+}
+
 async function sha256Hex(text) {
     const digest = await crypto.subtle.digest(
         'SHA-256',
@@ -431,15 +461,17 @@ function newTxWrite(docsBase, record) {
 
 /**
  * 充值。贈送額由伺服器依該診所配置級距計算，客戶端不可指定。
- * @param {object} params {clinicId, patientId, amount, appointmentId?, note?, idempotencyKey}
+ * @param {object} params {clinicId, patientId, amount, paymentMethod?,
+ *   appointmentId?, note?, idempotencyKey}
  */
 export async function walletTopup(env, claims, params) {
     const clinicId = requireClinicId(params.clinicId);
     const patientId = String(params.patientId);
-    const amount = round2(params.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const amount = requireMoney2(params.amount, '充值金額');
+    if (amount <= 0) {
         throw new WalletError(400, 'INVALID_AMOUNT', '充值金額必須大於 0');
     }
+    const paymentMethod = normalizePaymentMethod(params.paymentMethod);
     const config = await getMembershipConfig(env, clinicId);
     const bonusAmount = config.enabled
         ? round2(calcTopupBonus(config, amount))
@@ -491,6 +523,7 @@ export async function walletTopup(env, claims, params) {
                     type: 'topup',
                     amount,
                     appliesTo: 'balance',
+                    paymentMethod,
                     balanceAfter: balance,
                     bonusBalanceAfter: bonusBalance
                 }
@@ -527,12 +560,13 @@ export async function walletTopup(env, claims, params) {
                     balance,
                     bonusBalance,
                     bonusAmount,
+                    paymentMethod,
                     txId: txWrites[0] ? txWrites[0].txId : ''
                 }
             };
         },
-        // 指紋：同鍵但金額不同（贈額為伺服器派生，一併寫入）＝異常重放
-        `topup|${patientId}|${amount}|${bonusAmount}`
+        // 指紋：同鍵但金額／收款方式不同（贈額為伺服器派生，一併寫入）＝異常重放
+        `topup|${patientId}|${amount}|${bonusAmount}|${paymentMethod}`
     );
 }
 
@@ -553,8 +587,8 @@ export async function walletTopup(env, claims, params) {
 export async function walletPayment(env, claims, params) {
     const clinicId = requireClinicId(params.clinicId);
     const patientId = String(params.patientId);
-    const amount = round2(params.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const amount = requireMoney2(params.amount, '付款金額');
+    if (amount <= 0) {
         throw new WalletError(400, 'INVALID_AMOUNT', '付款金額必須大於 0');
     }
     const consultationId = String(params.consultationId || '');
@@ -626,6 +660,11 @@ export async function walletPayment(env, claims, params) {
         }
     }
 
+    // #12 扣款順序依診所會員配置 deductBonusFirst：
+    // true（預設）先扣贈送額；false 先扣本金。配置缺失時維持歷史行為。
+    const membershipConfig = await getMembershipConfig(env, clinicId);
+    const deductBonusFirst = membershipConfig.deductBonusFirst !== false;
+
     return runIdempotentTransaction(
         env,
         idemKey,
@@ -650,9 +689,16 @@ export async function walletPayment(env, claims, params) {
                     `儲值餘額不足（可用 HK$${round2(bal + bbal).toFixed(2)}）`);
             }
 
-            // 扣款順序：先贈送額後本金
-            const fromBonus = round2(Math.min(bbal, amount));
-            const fromBalance = round2(amount - fromBonus);
+            // 扣款順序：依診所配置 deductBonusFirst（#12，UI 開關不再是裝飾品）
+            let fromBonus;
+            let fromBalance;
+            if (deductBonusFirst) {
+                fromBonus = round2(Math.min(bbal, amount));
+                fromBalance = round2(amount - fromBonus);
+            } else {
+                fromBalance = round2(Math.min(bal, amount));
+                fromBonus = round2(amount - fromBalance);
+            }
             const newBalance = round2(bal - fromBalance);
             const newBonus = round2(bbal - fromBonus);
             const at = new Date().toISOString();
@@ -803,7 +849,7 @@ export async function walletRefund(env, claims, params) {
 
     // amount 未指定＝交易內按剩餘可退金額全額退
     const want = params.amount !== undefined && params.amount !== null
-        ? round2(params.amount)
+        ? requireMoney2(params.amount, '退款金額')
         : 0;
     if (want < 0) throw new WalletError(400, 'INVALID_AMOUNT', '退款金額必須大於 0');
 
@@ -820,6 +866,15 @@ export async function walletRefund(env, claims, params) {
             const accFields = byName.get(name);
             if (!accFields) {
                 throw new WalletError(404, 'WALLET_NOT_FOUND', '找不到儲值帳戶');
+            }
+            // #17 退款會把金額回補進帳戶：凍結帳戶暫停一切收支；
+            // 關閉帳戶再退款入帳會造成「已關閉卻有餘額」的矛盾狀態。
+            // 管理員需先復用帳戶，退款後再重新凍結／關閉。
+            const accStatus = rawString(accFields, 'status', 'active');
+            if (accStatus !== 'active') {
+                throw new WalletError(409, 'WALLET_NOT_ACTIVE',
+                    `儲值帳戶已${accStatus === 'frozen' ? '凍結' : '關閉'}，`
+                    + '無法退款入帳；請先復用帳戶後再辦理退款');
             }
 
             // ── 已退款累計（聚合文件為權威來源；缺件時以歷史流水種子）──
@@ -879,12 +934,11 @@ export async function walletRefund(env, claims, params) {
             const newBalance = round2(rawNumber(accFields, 'balance') + refundBalance);
             const newBonus = round2(rawNumber(accFields, 'bonusBalance') + refundBonus);
             const at = new Date().toISOString();
-            const status = rawString(accFields, 'status', 'active');
 
             const accountObj = {
                 patientId,
                 clinicId,
-                status,
+                status: accStatus,
                 balance: newBalance,
                 bonusBalance: newBonus,
                 currency: rawString(accFields, 'currency', 'HKD'),
@@ -954,8 +1008,12 @@ export async function walletRefund(env, claims, params) {
 export async function walletAdjust(env, claims, params) {
     const clinicId = requireClinicId(params.clinicId);
     const patientId = String(params.patientId);
-    const deltaBalance = round2(params.deltaBalance);
-    const deltaBonus = round2(params.deltaBonus);
+    const deltaBalance = params.deltaBalance !== undefined && params.deltaBalance !== null
+        ? requireMoney2(params.deltaBalance, '本金調整金額')
+        : 0;
+    const deltaBonus = params.deltaBonus !== undefined && params.deltaBonus !== null
+        ? requireMoney2(params.deltaBonus, '贈送額調整金額')
+        : 0;
     if (deltaBalance === 0 && deltaBonus === 0) {
         throw new WalletError(400, 'NO_CHANGE', '調整金額不得全部為 0');
     }
@@ -1195,7 +1253,8 @@ function migrationApplyTx(group, tx) {
  *   tx.clinicId（新制）> 診症單 clinicId > 掛號單 clinicId
  *   > topupBonus 跟隨同 idempotencyKey 的 topup。
  * 無法歸屬者記為未分組餘額回報，需人工以「調整」處置；
- * 已標記 walletMigratedAt 的舊文件跳過，不重複遷移。
+ * 已標記 walletMigratedAt 的舊文件跳過。即使上次執行在標記舊文件前
+ * 中斷，複合帳戶上的 legacyMigratedFrom 戳記也會阻止結存重複加總。
  *
  * @param {object} opts {dryRun?: boolean}
  * @returns {Promise<object>} 遷移報告
@@ -1223,6 +1282,8 @@ export async function walletMigrateLegacy(env, claims, opts = {}) {
         migrated: [],
         unassigned: [],
         skipped: [],
+        // 已計入過遷移結存、本次未重複入帳的複合帳戶（防重複入帳）
+        creditSkipped: [],
         unknownClinic: [],
         capped: false
     };
@@ -1333,13 +1394,27 @@ export async function walletMigrateLegacy(env, claims, opts = {}) {
             const existing = await client.getDocument(
                 `patientWalletAccounts/${encodeURIComponent(compositeId)}`
             );
-            // 新制帳戶可能已於部署後、遷移前啟用：把舊制結存「加回」一次
+            const existingData = existing && existing.data ? existing.data : null;
+            // 防重複入帳：複合帳戶若已帶有本病人的遷移戳記，代表先前
+            // 執行（可能中途失敗、舊文件尚未標記 walletMigratedAt）已把
+            // 舊制結存計入，本次不得再加一次。
+            const alreadyCredited = existingData
+                && String(existingData.legacyMigratedFrom || '') === patientId;
+            if (alreadyCredited) {
+                report.creditSkipped.push({ patientId, clinicId: cid });
+                assignedCids.push(cid);
+                assignedBalance = round2(assignedBalance + g.balance);
+                assignedBonus = round2(assignedBonus + g.bonus);
+                continue;
+            }
+            // 新制帳戶可能已於部署後、遷移前啟用：把舊制結存「加回」一次。
+            // 寫入遷移戳記，確保即使舊文件標記前中斷，重跑也不會重複加總。
             const finalBalance = round2(
-                (existing && existing.data ? Number(existing.data.balance) || 0 : 0)
+                (existingData ? Number(existingData.balance) || 0 : 0)
                 + g.balance
             );
             const finalBonus = round2(
-                (existing && existing.data ? Number(existing.data.bonusBalance) || 0 : 0)
+                (existingData ? Number(existingData.bonusBalance) || 0 : 0)
                 + g.bonus
             );
             const at = new Date().toISOString();
@@ -1352,7 +1427,13 @@ export async function walletMigrateLegacy(env, claims, opts = {}) {
                 currency: String(legacy.currency || 'HKD'),
                 createdAt: String(legacy.createdAt || g.earliestAt || at),
                 createdBy: String(legacy.createdBy || operatorName(claims)),
-                updatedAt: at
+                updatedAt: at,
+                // 遷移來源證據：本帳戶已吸收舊制 {patientId} 帳戶中
+                // 歸屬此診所的結存（金額快照一併保存供核對）
+                legacyMigratedFrom: patientId,
+                legacyMigratedAt: at,
+                legacyMigratedBalance: g.balance,
+                legacyMigratedBonus: g.bonus
             };
             if (!dryRun) {
                 await client.patchDocument(
@@ -1408,5 +1489,6 @@ export async function walletMigrateLegacy(env, claims, opts = {}) {
     }
 
     report.totalMigrated = report.migrated.length;
+    report.totalCreditSkipped = report.creditSkipped.length;
     return report;
 }
