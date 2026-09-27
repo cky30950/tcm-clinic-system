@@ -17864,7 +17864,7 @@ async function editMedicalRecordByConsultationId(consultationId) {
  * 頂部為診所選單，下方依次為套票情況與會員儲值餘額兩個子區。
  * 選單預設值由呼叫端在插入 DOM 後設定。
  */
-function buildPackageWalletCombinedSection() {
+function buildPackageWalletCombinedSection(patientId) {
     // 診所清單：記憶體全域為主，退回 localStorage 快取
     let clinicRows = [];
     try {
@@ -17905,15 +17905,27 @@ function buildPackageWalletCombinedSection() {
             ${selectorHtml}
             <!-- 套票情況子區 -->
             <div class="mb-5">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex flex-wrap items-center gap-3 mb-3">
+                    <!-- 左側：圖標＋標題，徽章緊貼標題右旁 -->
                     <div class="flex items-center gap-2">
                         <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/>
                         </svg>
                         <h3 class="text-base font-semibold text-purple-800">套票情況</h3>
+                        <div class="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                            <span id="patientPackageActiveCountBadge">…</span> 個可用
+                        </div>
                     </div>
-                    <div class="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
-                        <span id="patientPackageActiveCountBadge">…</span> 個可用
+                    <!-- 右上角：套票記錄＋新增套票（點擊時以當前診所操作） -->
+                    <div class="ml-auto flex items-center gap-2">
+                        <button id="packageHistoryHeaderBtn" type="button"
+                            class="px-3 py-1.5 text-sm rounded bg-violet-600 text-white hover:bg-violet-700">
+                            套票記錄
+                        </button>
+                        <button id="addPackageHeaderBtn" type="button"
+                            class="px-3 py-1.5 text-sm rounded bg-purple-600 text-white hover:bg-purple-700">
+                            新增套票
+                        </button>
                     </div>
                 </div>
                 <div id="packageStatusContent">
@@ -17957,6 +17969,31 @@ function bindPatientDetailClinicSelector(patientId) {
         await renderPackageStatusSection(patientId, false, cid);
         await renderPatientWalletStatus(patientId, cid);
     });
+}
+
+/**
+ * 綁定套票情況標題列右上角按鈕；點擊時一律以面板目前選取的診所操作，
+ * 故切換診所選單後無需重建按鈕。
+ * @param {string} patientId 病人 ID
+ */
+function bindPackageHeaderButtons(patientId) {
+    const activeClinic = () => String(
+        (patientDetailClinicState.patientId === String(patientId)
+            && patientDetailClinicState.clinicId)
+        || currentPackageClinicId() || ''
+    );
+    const historyBtn = document.getElementById('packageHistoryHeaderBtn');
+    if (historyBtn) {
+        historyBtn.addEventListener('click', function() {
+            showPatientPackageHistory(patientId, activeClinic());
+        });
+    }
+    const addBtn = document.getElementById('addPackageHeaderBtn');
+    if (addBtn) {
+        addBtn.addEventListener('click', function() {
+            createManualPatientPackage(patientId, activeClinic());
+        });
+    }
 }
 
 // 載入病人診療記錄摘要
@@ -18033,10 +18070,11 @@ async function loadPatientConsultationSummary(patientId) {
                     </div>
                 </div>
             `;
-            summaryContainer.innerHTML = statsRowHtml + buildPackageWalletCombinedSection();
+            summaryContainer.innerHTML = statsRowHtml + buildPackageWalletCombinedSection(patientId);
             const clinicSelector = document.getElementById('patientDetailClinicSelector');
             if (clinicSelector && selectedClinicId) clinicSelector.value = selectedClinicId;
             bindPatientDetailClinicSelector(patientId);
+            bindPackageHeaderButtons(patientId);
             // 渲染指定診所的套票分頁與內容
             await renderPackageStatusSection(patientId, false, selectedClinicId);
             // 載入指定診所的會員儲值餘額（失敗時自行降級顯示，不影響套票區塊）
@@ -18072,10 +18110,11 @@ async function loadPatientConsultationSummary(patientId) {
                 </div>
             </div>
         `;
-        summaryContainer.innerHTML = statsRowHtml + buildPackageWalletCombinedSection();
+        summaryContainer.innerHTML = statsRowHtml + buildPackageWalletCombinedSection(patientId);
         const clinicSelector = document.getElementById('patientDetailClinicSelector');
         if (clinicSelector && selectedClinicId) clinicSelector.value = selectedClinicId;
         bindPatientDetailClinicSelector(patientId);
+        bindPackageHeaderButtons(patientId);
         // 渲染指定診所的套票分頁與內容
         await renderPackageStatusSection(patientId, false, selectedClinicId);
         // 載入指定診所的會員儲值餘額（失敗時自行降級顯示，不影響套票區塊）
@@ -28340,32 +28379,14 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
         // 若無套票資料，顯示提示文字並隱藏分頁控制
         if (!Array.isArray(pkgs) || pkgs.length === 0) {
             contentEl.innerHTML = `
-                <div class="space-y-3">
-                    <div class="flex justify-end gap-2">
-                        <button
-                            type="button"
-                            onclick="showPatientPackageHistory('${patientId}', '${targetClinicId}')"
-                            class="px-3 py-1.5 text-sm rounded bg-violet-600 text-white hover:bg-violet-700"
-                        >
-                            套票記錄
-                        </button>
-                        <button
-                            type="button"
-                            onclick="createManualPatientPackage('${patientId}', '${targetClinicId}')"
-                            class="px-3 py-1.5 text-sm rounded bg-purple-600 text-white hover:bg-purple-700"
-                        >
-                            新增套票
-                        </button>
+                <div class="bg-blue-50 border-blue-200 border rounded-lg p-3 text-center">
+                    <div class="text-blue-400 mb-1">
+                        <svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                        </svg>
                     </div>
-                    <div class="bg-blue-50 border-blue-200 border rounded-lg p-3 text-center">
-                        <div class="text-blue-400 mb-1">
-                            <svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
-                            </svg>
-                        </div>
-                        <div class="text-sm font-medium text-blue-700">尚未購買套票</div>
-                        <div class="text-xs text-blue-600 mt-1">可於診療時購買套票享優惠</div>
-                    </div>
+                    <div class="text-sm font-medium text-blue-700">尚未購買套票</div>
+                    <div class="text-xs text-blue-600 mt-1">可於診療時購買套票享優惠</div>
                 </div>
             `;
             // 移除分頁容器
@@ -28421,24 +28442,6 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
         let htmlParts = [];
         // 使用一個垂直容器，依序渲染有效與失效套票
         htmlParts.push('<div class="space-y-4">');
-        htmlParts.push(`
-            <div class="flex justify-end gap-2">
-                <button
-                    type="button"
-                    onclick="showPatientPackageHistory('${patientId}', '${targetClinicId}')"
-                    class="px-3 py-1.5 text-sm rounded bg-violet-600 text-white hover:bg-violet-700"
-                >
-                    套票記錄
-                </button>
-                <button
-                    type="button"
-                    onclick="createManualPatientPackage('${patientId}', '${targetClinicId}')"
-                    class="px-3 py-1.5 text-sm rounded bg-purple-600 text-white hover:bg-purple-700"
-                >
-                    新增套票
-                </button>
-            </div>
-        `);
         // 有效套票列表
         if (pageValid.length > 0) {
             htmlParts.push('<div class="font-medium text-gray-700 mb-2">有效套票</div>');
