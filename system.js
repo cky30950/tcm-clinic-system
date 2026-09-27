@@ -17912,6 +17912,28 @@ async function loadPatientConsultationSummary(patientId) {
             ? Math.max(0, Number(patient.packageActiveCount) || 0)
             : 0;
 
+        // 病人詳情中的「會員儲值餘額」區塊；內容由 renderPatientWalletStatus 動態載入
+        const walletStatusSectionHtml = `
+                <!-- 會員儲值餘額區域 -->
+                <div class="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg p-4 border border-teal-200 mt-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-teal-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                            </svg>
+                            <h3 class="text-lg font-semibold text-teal-800">會員儲值餘額</h3>
+                        </div>
+                        <div id="patientWalletStatusBadge" class="text-xs text-teal-700 bg-white px-2 py-1 rounded-full">讀取中…</div>
+                    </div>
+                    <!-- 使用動態渲染的儲值餘額區塊，初始顯示載入中動畫 -->
+                    <div id="patientWalletBalanceContent">
+                        <div class="text-center py-4">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                            <div class="mt-2 text-sm">載入儲值餘額中...</div>
+                        </div>
+                    </div>
+                </div>`;
+
         if (totalConsultations === 0) {
             summaryContainer.innerHTML = `
                 <!-- 第一行：基本統計資訊 -->
@@ -17953,11 +17975,14 @@ async function loadPatientConsultationSummary(patientId) {
                         </div>
                     </div>
                 </div>
+                ${walletStatusSectionHtml}
 
                 <!-- 無診療記錄時不顯示提示文字 -->
             `;
             // 透過 renderPackageStatusSection 在診療摘要中渲染套票分頁與內容
             await renderPackageStatusSection(patientId);
+            // 載入會員儲值餘額（失敗時自行降級顯示，不影響套票區塊）
+            await renderPatientWalletStatus(patientId);
             return;
         }
 
@@ -18012,9 +18037,12 @@ async function loadPatientConsultationSummary(patientId) {
                     </div>
                 </div>
             </div>
+            ${walletStatusSectionHtml}
         `;
         // 透過 renderPackageStatusSection 在診療摘要中渲染套票分頁與內容
         await renderPackageStatusSection(patientId);
+        // 載入會員儲值餘額（失敗時自行降級顯示，不影響套票區塊）
+        await renderPatientWalletStatus(patientId);
 
     } catch (error) {
         console.error('載入診療記錄摘要錯誤:', error);
@@ -28049,6 +28077,92 @@ async function renderPackageStatusSection(patientId, pageChange = false) {
             paginEl.classList.add('hidden');
         }
     }
+}
+
+/**
+ * 渲染病人詳細資料中的「會員儲值餘額」區塊。
+ *
+ * 與 renderPackageStatusSection 對應：經 SDK 讀取病人於「目前選取診所」
+ * 的儲值帳戶（patientWalletAccounts/{clinicId}__{patientId}），
+ * 優先使用 session 快取（錢包操作後快取會主動失效）。
+ * 帳戶不存在時顯示「未開戶」；讀取失敗（例如尚未選取診所）則靜默降級，
+ * 不影響同頁套票區塊的運作。
+ *
+ * @param {string} patientId 病人 ID
+ */
+async function renderPatientWalletStatus(patientId) {
+    const contentEl = document.getElementById('patientWalletBalanceContent');
+    if (!contentEl) return;
+    const badgeEl = document.getElementById('patientWalletStatusBadge');
+    const setBadge = (text, extraClass) => {
+        if (!badgeEl) return;
+        badgeEl.textContent = text;
+        badgeEl.className = 'text-xs px-2 py-1 rounded-full '
+            + (extraClass || 'text-teal-700 bg-white');
+    };
+    // 與錢包管理頁一致的帳戶狀態標籤
+    const statusLabels = { active: '運作中', frozen: '已凍結', closed: '已關閉' };
+
+    let account = null;
+    try {
+        if (typeof window.getWalletAccount !== 'function') {
+            setBadge('—', 'text-gray-500 bg-white');
+            contentEl.innerHTML = '<div class="text-sm text-gray-500 text-center py-2">—</div>';
+            return;
+        }
+        account = await window.getWalletAccount(patientId, false);
+    } catch (error) {
+        console.warn('載入病人儲值帳戶失敗:', error);
+        setBadge('—', 'text-gray-500 bg-white');
+        contentEl.innerHTML = '<div class="text-sm text-gray-500 text-center py-2">無法載入儲值餘額</div>';
+        return;
+    }
+
+    // 尚未開立儲值帳戶（一般會員從未充值）
+    if (!account) {
+        setBadge('未開戶', 'text-gray-500 bg-white');
+        contentEl.innerHTML = `
+            <div class="bg-white/60 border border-teal-100 rounded-lg p-3 text-center">
+                <div class="text-sm font-medium text-teal-700">尚未開立儲值帳戶</div>
+                <div class="text-xs text-gray-500 mt-1">可於會員儲值管理中為病人充值開戶</div>
+            </div>
+        `;
+        return;
+    }
+
+    const round2 = typeof window.walletRound2 === 'function'
+        ? window.walletRound2
+        : (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const principal = round2(account.balance);
+    const bonus = round2(account.bonusBalance);
+    const total = round2(principal + bonus);
+    const status = String(account.status || 'active');
+    setBadge(
+        statusLabels[status] || status,
+        status === 'active'
+            ? 'text-teal-700 bg-white'
+            : (status === 'frozen'
+                ? 'text-orange-700 bg-orange-100'
+                : 'text-gray-600 bg-gray-200')
+    );
+    const totalClass = status === 'active' ? 'text-teal-700' : 'text-gray-500';
+
+    contentEl.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="bg-white/70 border border-teal-100 rounded-lg p-3 text-center">
+                <div class="text-xl font-bold ${totalClass}">HK$${total.toFixed(2)}</div>
+                <div class="text-xs text-gray-500 mt-0.5">可用餘額</div>
+            </div>
+            <div class="bg-white/70 border border-teal-100 rounded-lg p-3 text-center">
+                <div class="text-lg font-semibold text-gray-800">HK$${principal.toFixed(2)}</div>
+                <div class="text-xs text-gray-500 mt-0.5">本金</div>
+            </div>
+            <div class="bg-white/70 border border-teal-100 rounded-lg p-3 text-center">
+                <div class="text-lg font-semibold text-gray-800">HK$${bonus.toFixed(2)}</div>
+                <div class="text-xs text-gray-500 mt-0.5">贈送額</div>
+            </div>
+        </div>
+    `;
 }
 
 async function refreshPatientPackagesUI() {
