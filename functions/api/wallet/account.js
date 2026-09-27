@@ -22,7 +22,7 @@ export const onRequestOptions = () => optionsResponse();
 export async function onRequestGet(context) {
     const { request, env } = context;
     try {
-        await requireStaff(request, env);
+        const claims = await requireStaff(request, env);
         const url = new URL(request.url);
         const patientId = String(url.searchParams.get('patientId') || '').trim();
         if (!/^[A-Za-z0-9_-]{10,40}$/.test(patientId)) {
@@ -53,13 +53,14 @@ export async function onRequestGet(context) {
                 }
             },
             orderBy: [{ field: { fieldPath: 'at' }, direction: 'DESCENDING' }],
-            limit: 100
+            limit: 300
         });
-        // 只回傳本診所流水（新制帶 clinicId；舊制無欄位者不從此端點回傳）
+        // 跨診所病人的最近 300 筆中可能混有大量他診流水，
+        // 故取回較大筆數再於本診所內取最近 50 筆（不新增複合索引）。
         const transactions = txRes.docs
-            .map((d) => d.data)
+            .map((d) => Object.assign({ id: d.id }, d.data))
             .filter((tx) => tx && String(tx.clinicId || '') === String(clinicId))
-            .slice(0, 20);
+            .slice(0, 50);
 
         return jsonResponse({
             clinicId,

@@ -24909,24 +24909,45 @@ async function restoreUser(id) {
             };
         }
 
-        // 依日期範圍讀取錢包流水（單欄位 at 範圍查詢，使用自動索引）
+        // 依日期範圍讀取錢包流水。
+        // 繫結單一診所的員工（custom claims 帶 clinicId）即使介面選了
+        // 「全部診所」，也強制只讀自己診所的資料——跨診所隔離由 Rules
+        // 把關，客戶端這裡先收斂查詢範圍；無 clinicId 的超管才看全部。
         async function loadWalletFinRaw(startDate, endDate, clinicFilter) {
             const fb = window.firebase;
-            const cid = clinicFilter ? String(clinicFilter) : '';
+            const claimCid = (window.currentUserClaims && window.currentUserClaims.clinicId)
+                ? String(window.currentUserClaims.clinicId) : '';
+            const cid = clinicFilter ? String(clinicFilter) : claimCid;
             const { startIso, endIso } = walletFinRangeIso(startDate, endDate);
-            const txQ = fb.firestoreQuery(
-                fb.collection(fb.db, 'patientWalletTransactions'),
-                fb.where('at', '>=', startIso),
-                fb.where('at', '<=', endIso),
-                fb.orderBy('at', 'desc'),
-                fb.limit(500)
-            );
-            const txSnap = await fb.getDocs(txQ);
             const txs = [];
-            txSnap.forEach((d) => txs.push(Object.assign({ id: d.id }, d.data())));
+            if (cid) {
+                // 診所範圍：clinicId 相等 + at 範圍（需 (clinicId, at)
+                // 複合索引，見 firestore.indexes.json）；統計只按日期聚合，
+                // 不需要 orderBy
+                const txQ = fb.firestoreQuery(
+                    fb.collection(fb.db, 'patientWalletTransactions'),
+                    fb.where('clinicId', '==', cid),
+                    fb.where('at', '>=', startIso),
+                    fb.where('at', '<=', endIso),
+                    fb.limit(500)
+                );
+                const txSnap = await fb.getDocs(txQ);
+                txSnap.forEach((d) => txs.push(Object.assign({ id: d.id }, d.data())));
+            } else {
+                // 超管總覽：單欄位 at 範圍查詢，使用自動索引
+                const txQ = fb.firestoreQuery(
+                    fb.collection(fb.db, 'patientWalletTransactions'),
+                    fb.where('at', '>=', startIso),
+                    fb.where('at', '<=', endIso),
+                    fb.orderBy('at', 'desc'),
+                    fb.limit(500)
+                );
+                const txSnap = await fb.getDocs(txQ);
+                txSnap.forEach((d) => txs.push(Object.assign({ id: d.id }, d.data())));
+            }
 
             // 帳戶：財務報表的診所篩選在這裡一併套用（單欄位 where，
-            // 不需複合索引）；全部診所總覽才退回 updatedAt 排序查詢
+            // 不需複合索引）；全部診所總覽（僅超管）才退回 updatedAt 排序查詢
             const accounts = [];
             if (cid) {
                 const accQ = fb.firestoreQuery(
@@ -33888,26 +33909,28 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
 
   /**
    * 載入病人在指定診所的近期流水。
-   * 以 patientId 單欄位查詢（沿用既有索引）取回較大筆數，
-   * 客戶端過濾 clinicId，避免新增複合索引。
+   * 走 SA 端點 /api/wallet/account：SDK 直接查 patientWalletTransactions
+   * 會跨診所取回該病人全部流水，在員工跨診所隔離規則下會被整筆查詢
+   * 拒絕，故由後端以診所維度過濾後回傳（最近 50 筆）。
    */
   async function loadWalletTransactions(patientId, clinicId = '') {
+    await waitForFirebase();
+    const fbUser = window.firebase.auth && window.firebase.auth.currentUser;
+    if (!fbUser) throw new Error('未登入，無法讀取儲值記錄');
     const cid = clinicId || currentWalletClinicId();
-    const q = window.firebase.firestoreQuery(
-      window.firebase.collection(window.firebase.db, 'patientWalletTransactions'),
-      window.firebase.where('patientId', '==', patientId),
-      window.firebase.orderBy('at', 'desc'),
-      window.firebase.limit(100)
-    );
-    const snap = await window.firebase.getDocs(q);
-    const out = [];
-    snap.forEach((d) => {
-      const data = d.data() || {};
-      if (String(data.clinicId || '') === String(cid)) {
-        out.push(Object.assign({ id: d.id }, data));
-      }
+    const qs = '?patientId=' + encodeURIComponent(String(patientId))
+      + '&clinicId=' + encodeURIComponent(String(cid));
+    const token = await fbUser.getIdToken();
+    const res = await fetch('/api/wallet/account' + qs, {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token }
     });
-    return out.slice(0, 50);
+    let data = null;
+    try { data = await res.json(); } catch (_e) {}
+    if (!res.ok) {
+      throw new Error((data && data.message) || ('HTTP ' + res.status));
+    }
+    return Array.isArray(data && data.transactions) ? data.transactions : [];
   }
 
   // ── 管理區塊 ──
@@ -34059,23 +34082,24 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
 
       const cid = currentWalletClinicId();
       const ids = found.map((p) => String(p.id));
-      // where in 每批最多 10 個，批量取帳戶，避免逐個讀取；
-      // 同一位病人在不同診所各有一帳戶，故取回後須比對 clinicId
+      // 帳戶文件 ID 即為「診所__病人」複合鍵，直接以 getDoc 逐筆讀取
+      // （分兩批並行）。不可用 where('patientId','in',...)：那會跨診所
+      // 取回文件，在員工跨診所隔離規則下整個查詢會被拒絕。
       const accMap = new Map();
+      const getOne = async (pid) => {
+        try {
+          const snap = await window.firebase.getDoc(
+            window.firebase.doc(
+              window.firebase.db,
+              'patientWalletAccounts',
+              walletAccountDocId(cid, pid)
+            )
+          );
+          if (snap && snap.exists()) accMap.set(pid, snap.data());
+        } catch (_e) { /* 無帳戶或無權限＝視為無帳戶 */ }
+      };
       for (let i = 0; i < ids.length; i += 10) {
-        const chunk = ids.slice(i, i + 10);
-        const q = window.firebase.firestoreQuery(
-          window.firebase.collection(window.firebase.db, 'patientWalletAccounts'),
-          window.firebase.where('patientId', 'in', chunk),
-          window.firebase.limit(50)
-        );
-        const snap = await window.firebase.getDocs(q);
-        snap.forEach((d) => {
-          const a = d.data();
-          if (String(a.clinicId || '') === String(cid)) {
-            accMap.set(String(a.patientId), a);
-          }
-        });
+        await Promise.all(ids.slice(i, i + 10).map(getOne));
       }
       walletCurrentEntries = found.map((p) => {
         const id = String(p.id);
@@ -35028,8 +35052,9 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       };
     }
 
-    // 新診症：有效會員自動帶入會員折扣項目
-    if (!isEdit) applyAutoMembershipDiscount();
+    // 新診症：僅「有效會員」（儲值帳戶 active 且有餘額）自動帶入折扣；
+    // 未開戶、凍結/關閉或零餘額者皆不套用（available 已含 active 檢查）
+    if (!isEdit && available > 0) applyAutoMembershipDiscount();
   }
 
   function applyAutoMembershipDiscount() {
@@ -35071,17 +35096,21 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       return true;
     }
     try {
+      // 冪等鍵由後端強制為 pay:{consultationId}，客戶端不必也不可指定
       const res = await walletApi('payment', {
         clinicId: clinicId || undefined,
         patientId: patientId,
         amount: amount,
-        consultationId: consultationId,
-        idempotencyKey: 'pay:' + consultationId
+        consultationId: consultationId
       });
+      // 實收金額以伺服器回傳為準（與診症單帳單核對過）；
+      // 舊版冪等記錄可能沒有 chargedAmount，退回前端金額
+      const chargedAmount = (res && Number(res.chargedAmount) > 0)
+        ? walletRound2(res.chargedAmount) : amount;
       const principalAfter = walletRound2(res && res.balance);
       const bonusAfter = walletRound2(res && res.bonusBalance);
       await window.firebaseDataManager.updateConsultation(consultationId, {
-        walletPaid: amount,
+        walletPaid: chargedAmount,
         walletTxId: (res && res.txId) ? String(res.txId) : '',
         // 支付後餘額快照，與套票餘次快照一樣固定寫入診症記錄
         walletPrincipalAfter: principalAfter,
@@ -35091,7 +35120,7 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       consultWallet.paid = true;
       consultWallet.pendingPay = false;
       invalidateWalletAccount(patientId, clinicId);
-      showWalletPayMessage('已以儲值餘額支付 HK$' + amount.toFixed(2), false);
+      showWalletPayMessage('已以儲值餘額支付 HK$' + chargedAmount.toFixed(2), false);
       return true;
     } catch (err) {
       const msg = (err && err.message) ? err.message : '未知錯誤';
