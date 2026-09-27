@@ -39,6 +39,15 @@
         { "fieldPath": "patientId", "order": "ASCENDING" },
         { "fieldPath": "__name__", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "patientPackageHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "patientId", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "operatedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

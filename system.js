@@ -7346,14 +7346,15 @@ async function logout() {
                     loadPersonalStatistics();
                 }
             } else if (sectionId === 'accountSecurity') {
-                
+
                 if (typeof loadAccountSecurity === 'function') {
                     loadAccountSecurity();
                 }
             }
         }
+        // 暴露給外層作用域（病人詳情面板跳轉會員儲值用）
+        window.showSection = showSection;
 
-        
         function hideAllSections() {
             
             
@@ -17863,7 +17864,7 @@ async function editMedicalRecordByConsultationId(consultationId) {
  * 頂部為診所選單，下方依次為套票情況與會員儲值餘額兩個子區。
  * 選單預設值由呼叫端在插入 DOM 後設定。
  */
-function buildPackageWalletCombinedSection() {
+function buildPackageWalletCombinedSection(patientId) {
     // 診所清單：記憶體全域為主，退回 localStorage 快取
     let clinicRows = [];
     try {
@@ -17876,7 +17877,8 @@ function buildPackageWalletCombinedSection() {
     } catch (_e) {}
 
     let selectorHtml = '';
-    if (clinicRows.length > 0) {
+    // 僅在有多於一間診所時才顯示診所選單；單一診所直接隱藏
+    if (clinicRows.length > 1) {
         const lang = (localStorage.getItem('lang') || 'zh').toLowerCase();
         const options = clinicRows.map(c => {
             const name = lang.startsWith('en')
@@ -17903,15 +17905,27 @@ function buildPackageWalletCombinedSection() {
             ${selectorHtml}
             <!-- 套票情況子區 -->
             <div class="mb-5">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex flex-wrap items-center gap-3 mb-3">
+                    <!-- 左側：圖標＋標題，徽章緊貼標題右旁 -->
                     <div class="flex items-center gap-2">
                         <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/>
                         </svg>
                         <h3 class="text-base font-semibold text-purple-800">套票情況</h3>
+                        <div class="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                            <span id="patientPackageActiveCountBadge">…</span> 個可用
+                        </div>
                     </div>
-                    <div class="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
-                        <span id="patientPackageActiveCountBadge">…</span> 個可用
+                    <!-- 右上角：套票記錄＋新增套票（點擊時以當前診所操作） -->
+                    <div class="ml-auto flex items-center gap-2">
+                        <button id="packageHistoryHeaderBtn" type="button"
+                            class="px-3 py-1.5 text-sm rounded bg-violet-600 text-white hover:bg-violet-700">
+                            套票記錄
+                        </button>
+                        <button id="addPackageHeaderBtn" type="button"
+                            class="px-3 py-1.5 text-sm rounded bg-purple-600 text-white hover:bg-purple-700">
+                            新增套票
+                        </button>
                     </div>
                 </div>
                 <div id="packageStatusContent">
@@ -17955,6 +17969,31 @@ function bindPatientDetailClinicSelector(patientId) {
         await renderPackageStatusSection(patientId, false, cid);
         await renderPatientWalletStatus(patientId, cid);
     });
+}
+
+/**
+ * 綁定套票情況標題列右上角按鈕；點擊時一律以面板目前選取的診所操作，
+ * 故切換診所選單後無需重建按鈕。
+ * @param {string} patientId 病人 ID
+ */
+function bindPackageHeaderButtons(patientId) {
+    const activeClinic = () => String(
+        (patientDetailClinicState.patientId === String(patientId)
+            && patientDetailClinicState.clinicId)
+        || currentPackageClinicId() || ''
+    );
+    const historyBtn = document.getElementById('packageHistoryHeaderBtn');
+    if (historyBtn) {
+        historyBtn.addEventListener('click', function() {
+            showPatientPackageHistory(patientId, activeClinic());
+        });
+    }
+    const addBtn = document.getElementById('addPackageHeaderBtn');
+    if (addBtn) {
+        addBtn.addEventListener('click', function() {
+            createManualPatientPackage(patientId, activeClinic());
+        });
+    }
 }
 
 // 載入病人診療記錄摘要
@@ -18031,10 +18070,11 @@ async function loadPatientConsultationSummary(patientId) {
                     </div>
                 </div>
             `;
-            summaryContainer.innerHTML = statsRowHtml + buildPackageWalletCombinedSection();
+            summaryContainer.innerHTML = statsRowHtml + buildPackageWalletCombinedSection(patientId);
             const clinicSelector = document.getElementById('patientDetailClinicSelector');
             if (clinicSelector && selectedClinicId) clinicSelector.value = selectedClinicId;
             bindPatientDetailClinicSelector(patientId);
+            bindPackageHeaderButtons(patientId);
             // 渲染指定診所的套票分頁與內容
             await renderPackageStatusSection(patientId, false, selectedClinicId);
             // 載入指定診所的會員儲值餘額（失敗時自行降級顯示，不影響套票區塊）
@@ -18070,10 +18110,11 @@ async function loadPatientConsultationSummary(patientId) {
                 </div>
             </div>
         `;
-        summaryContainer.innerHTML = statsRowHtml + buildPackageWalletCombinedSection();
+        summaryContainer.innerHTML = statsRowHtml + buildPackageWalletCombinedSection(patientId);
         const clinicSelector = document.getElementById('patientDetailClinicSelector');
         if (clinicSelector && selectedClinicId) clinicSelector.value = selectedClinicId;
         bindPatientDetailClinicSelector(patientId);
+        bindPackageHeaderButtons(patientId);
         // 渲染指定診所的套票分頁與內容
         await renderPackageStatusSection(patientId, false, selectedClinicId);
         // 載入指定診所的會員儲值餘額（失敗時自行降級顯示，不影響套票區塊）
@@ -27108,7 +27149,21 @@ async function ensurePatientPackagesClinicScoped(patientId) {
         allPackages = await getPatientPackages(patientId, true, '*');
         missing = allPackages.filter(pkg => pkg && !pkg.clinicId);
     }
-    if (missing.length === 0) return;
+    if (missing.length === 0) {
+        // 套票均已標注：仍確認歷史流水是否需要補標（記憶體標記命中時零成本）
+        const pkgClinicMap0 = new Map();
+        allPackages.forEach(p => {
+            if (p && p.clinicId) pkgClinicMap0.set(String(p.id), String(p.clinicId));
+        });
+        await ensurePatientPackageHistoryClinicScoped(patientId, pkgClinicMap0, null);
+        return;
+    }
+
+    // 套票 packageId → 已標注診所（先以快取中已知者預填）
+    const pkgClinicById = new Map();
+    allPackages.forEach(p => {
+        if (p && p.clinicId) pkgClinicById.set(String(p.id), String(p.clinicId));
+    });
 
     // 讀取病人診症記錄作為歸屬證據（單一 where 查詢，限量由系統規模自然收斂）
     let consultations = [];
@@ -27187,7 +27242,53 @@ async function ensurePatientPackagesClinicScoped(patientId) {
             const list = result.success ? result.data : [];
             patientPackagesCache[patientId] = list;
             localStorage.setItem(`patientPackages_${patientId}`, JSON.stringify(list));
+            // 以補標後的套票建立 packageId → clinicId 映射，供歷史流水補標
+            list.forEach(p => {
+                if (p && p.clinicId) pkgClinicById.set(String(p.id), String(p.clinicId));
+            });
         } catch (_e) {}
+    }
+
+    // 同步為歷史流水補上診所（失敗不阻擋套票遷移結果）
+    await ensurePatientPackageHistoryClinicScoped(patientId, pkgClinicById, useEvidence);
+}
+
+/**
+ * 歷史流水診所補標：為缺 clinicId 的 patientPackageHistory 文件補上歸屬。
+ * 判據：① 所屬套票（packageId → 套票 clinicId）；② 診症使用證據。
+ * 以 session 內記憶體標記避免每次開面板都查一次空集合。
+ */
+const historyClinicBackfillDone = new Set();
+async function ensurePatientPackageHistoryClinicScoped(patientId, pkgClinicMap, useEvidenceMap) {
+    const pid = String(patientId || '');
+    if (!pid || historyClinicBackfillDone.has(pid)) return;
+    historyClinicBackfillDone.add(pid);
+    try {
+        // 兩個相等過濾可由自動單欄索引服務，無需複合索引
+        const q = window.firebase.firestoreQuery(
+            window.firebase.collection(window.firebase.db, 'patientPackageHistory'),
+            window.firebase.where('patientId', '==', pid),
+            window.firebase.where('clinicId', '==', '')
+        );
+        const snap = await window.firebase.getDocs(q);
+        const tasks = [];
+        snap.forEach((docSnap) => {
+            const d = docSnap.data() || {};
+            let cid = pkgClinicMap && pkgClinicMap.get(String(d.packageId || ''))
+                ? pkgClinicMap.get(String(d.packageId || ''))
+                : '';
+            if (!cid && useEvidenceMap && useEvidenceMap.has(String(d.packageId || ''))) {
+                cid = useEvidenceMap.get(String(d.packageId || ''));
+            }
+            if (cid) {
+                tasks.push(window.firebase.updateDoc(docSnap.ref, { clinicId: String(cid) }));
+            }
+        });
+        await Promise.all(tasks);
+    } catch (error) {
+        // 補標失敗不影響主流程；移除標記以便日後重試
+        historyClinicBackfillDone.delete(pid);
+        console.warn('補標套票歷史診所失敗:', error);
     }
 }
 
@@ -27279,6 +27380,7 @@ function getPackageHistoryOperatorDisplayName(username) {
 
 const patientPackageHistoryViewState = {
     patientId: '',
+    clinicId: '',
     currentPage: 1,
     pageSize: 30,
     totalCount: 0,
@@ -27482,23 +27584,58 @@ function buildLegacyPatientPackageHistoryEntries(pkgs) {
     });
 }
 
-function invalidatePatientPackageHistoryCaches(patientId = '') {
+function invalidatePatientPackageHistoryCaches(patientId = '', clinicId = '') {
     const pid = String(patientId || '');
+    const cid = String(clinicId || '');
     if (window.firebaseDataManager && typeof window.firebaseDataManager.resetPatientPackageHistoryPagination === 'function') {
         try {
-            window.firebaseDataManager.resetPatientPackageHistoryPagination(pid);
+            window.firebaseDataManager.resetPatientPackageHistoryPagination(pid, cid);
         } catch (error) {
             console.warn('重置套票記錄分頁快取失敗:', error);
         }
     }
     if (!pid || patientPackageHistoryViewState.patientId === pid) {
         patientPackageHistoryViewState.patientId = pid;
+        patientPackageHistoryViewState.clinicId = cid;
         patientPackageHistoryViewState.currentPage = 1;
         patientPackageHistoryViewState.totalCount = 0;
         patientPackageHistoryViewState.totalPages = 1;
         patientPackageHistoryViewState.legacyEntries = null;
         patientPackageHistoryViewState.usingLegacy = false;
     }
+}
+
+/**
+ * 解析套票記錄彈窗要顯示的診所：
+ * 顯式傳入 → 病人詳情面板目前選擇的診所 → 目前 UI 診所。
+ */
+function resolvePackageHistoryClinicId(patientId, clinicId) {
+    const explicit = String(clinicId || '');
+    if (explicit) return explicit;
+    if (patientDetailClinicState.patientId === String(patientId || '')
+        && patientDetailClinicState.clinicId) {
+        return patientDetailClinicState.clinicId;
+    }
+    return currentPackageClinicId();
+}
+
+/**
+ * 取得診所顯示名稱（供彈窗副標題用）；找不到時回傳空字串。
+ */
+function getClinicNameById(clinicId) {
+    const cid = String(clinicId || '');
+    if (!cid) return '';
+    let rows = [];
+    try {
+        if (typeof clinicsList !== 'undefined' && Array.isArray(clinicsList)) {
+            rows = clinicsList;
+        } else {
+            const stored = JSON.parse(localStorage.getItem('clinics') || 'null');
+            if (Array.isArray(stored)) rows = stored;
+        }
+    } catch (_e) {}
+    const c = rows.find(x => x && String(x.id) === cid);
+    return c ? getClinicDisplayName(c) : '';
 }
 
 async function recordPatientPackageHistory(record) {
@@ -27588,10 +27725,15 @@ async function loadPatientPackageHistoryPage(patientId, pageNumber = 1, options 
     const { isEn } = getPatientPackageHistoryLocaleState();
     const listEl = document.getElementById('patientPackageHistoryList');
     if (!listEl) return;
-    const shouldReset = !!options.reset || patientPackageHistoryViewState.patientId !== pid;
+    // 彈窗固定顯示單一診所；診所維度由 options.clinicId 或既有狀態帶入
+    const targetCid = String(options.clinicId || patientPackageHistoryViewState.clinicId || '');
+    const shouldReset = !!options.reset
+        || patientPackageHistoryViewState.patientId !== pid
+        || (targetCid && patientPackageHistoryViewState.clinicId !== targetCid);
     if (shouldReset) {
-        invalidatePatientPackageHistoryCaches(pid);
+        invalidatePatientPackageHistoryCaches(pid, targetCid);
         patientPackageHistoryViewState.patientId = pid;
+        patientPackageHistoryViewState.clinicId = targetCid;
         patientPackageHistoryViewState.pageSize = 30;
     }
     listEl.innerHTML = `<div class="py-8 text-center text-sm text-gray-500">${isEn ? 'Loading package records...' : '載入套票記錄中...'}</div>`;
@@ -27600,15 +27742,15 @@ async function loadPatientPackageHistoryPage(patientId, pageNumber = 1, options 
         if (shouldReset || patientPackageHistoryViewState.legacyEntries === null) {
             let totalCount = 0;
             if (window.firebaseDataManager && typeof window.firebaseDataManager.getPatientPackageHistoryCount === 'function') {
-                const countResult = await window.firebaseDataManager.getPatientPackageHistoryCount(pid, shouldReset);
+                const countResult = await window.firebaseDataManager.getPatientPackageHistoryCount(pid, shouldReset, targetCid);
                 if (countResult && countResult.success) {
                     totalCount = Math.max(0, Number(countResult.count) || 0);
                 }
             }
             patientPackageHistoryViewState.totalCount = totalCount;
             if (totalCount <= 0) {
-                // 審計彈窗為病人級（跨診所），故讀全部套票
-                const packages = await getPatientPackages(pid, false, '*');
+                // 此診所無審計記錄時，退回該診所套票自帶的舊版記錄
+                const packages = await getPatientPackages(pid, false, targetCid);
                 const legacyEntries = buildLegacyPatientPackageHistoryEntries(packages);
                 patientPackageHistoryViewState.legacyEntries = legacyEntries;
                 patientPackageHistoryViewState.usingLegacy = legacyEntries.length > 0;
@@ -27625,7 +27767,7 @@ async function loadPatientPackageHistoryPage(patientId, pageNumber = 1, options 
             const startIndex = (pageNumber - 1) * patientPackageHistoryViewState.pageSize;
             pageEntries = patientPackageHistoryViewState.legacyEntries.slice(startIndex, startIndex + patientPackageHistoryViewState.pageSize);
         } else if (window.firebaseDataManager && typeof window.firebaseDataManager.getPatientPackageHistoryPage === 'function') {
-            const pageResult = await window.firebaseDataManager.getPatientPackageHistoryPage(pid, pageNumber, patientPackageHistoryViewState.pageSize, shouldReset && pageNumber === 1);
+            const pageResult = await window.firebaseDataManager.getPatientPackageHistoryPage(pid, pageNumber, patientPackageHistoryViewState.pageSize, shouldReset && pageNumber === 1, targetCid);
             if (!pageResult || !pageResult.success) {
                 throw new Error(pageResult && pageResult.error ? pageResult.error : '讀取套票記錄失敗');
             }
@@ -28149,9 +28291,12 @@ async function renderPatientPackages(patientId) {
     }
 }
 
-async function showPatientPackageHistory(patientId) {
+async function showPatientPackageHistory(patientId, clinicId = '') {
     const { isEn } = getPatientPackageHistoryLocaleState();
-    const loadingButton = getLoadingButtonFromEvent(`button[onclick="showPatientPackageHistory('${patientId}')"]`);
+    // 彈窗只顯示該診所的套票記錄
+    const targetCid = resolvePackageHistoryClinicId(patientId, clinicId);
+    const clinicName = getClinicNameById(targetCid);
+    const loadingButton = getLoadingButtonFromEvent(`button[onclick^="showPatientPackageHistory('${patientId}'"]`);
     let loadingReleased = false;
     const releaseLoadingButton = () => {
         if (!loadingReleased && loadingButton) {
@@ -28162,11 +28307,14 @@ async function showPatientPackageHistory(patientId) {
     if (loadingButton) {
         setButtonLoading(loadingButton, isEn ? 'Loading...' : '讀取中...');
     }
+    const subtitleHtml = clinicName
+        ? `${isEn ? 'Package Records' : '套票記錄'} · ${window.escapeHtml(clinicName)}`
+        : (isEn ? 'Package Records' : '套票記錄');
     await Swal.fire({
         titleText: String(isEn ? 'Package Records' : '套票記錄'),
         html: `
             <div class="text-left">
-                <div class="mb-3 text-sm text-gray-600">${isEn ? 'Package Records' : '套票記錄'}</div>
+                <div class="mb-3 text-sm text-gray-600">${subtitleHtml}</div>
                 <div id="patientPackageHistoryList" class="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
                     <div class="py-8 text-center text-sm text-gray-500">${isEn ? 'Loading package records...' : '載入套票記錄中...'}</div>
                 </div>
@@ -28189,18 +28337,18 @@ async function showPatientPackageHistory(patientId) {
             if (prevBtn) {
                 prevBtn.addEventListener('click', function() {
                     if (patientPackageHistoryViewState.currentPage > 1) {
-                        loadPatientPackageHistoryPage(patientId, patientPackageHistoryViewState.currentPage - 1);
+                        loadPatientPackageHistoryPage(patientId, patientPackageHistoryViewState.currentPage - 1, { clinicId: targetCid });
                     }
                 });
             }
             if (nextBtn) {
                 nextBtn.addEventListener('click', function() {
                     if (patientPackageHistoryViewState.currentPage < patientPackageHistoryViewState.totalPages) {
-                        loadPatientPackageHistoryPage(patientId, patientPackageHistoryViewState.currentPage + 1);
+                        loadPatientPackageHistoryPage(patientId, patientPackageHistoryViewState.currentPage + 1, { clinicId: targetCid });
                     }
                 });
             }
-            loadPatientPackageHistoryPage(patientId, 1, { reset: true }).finally(releaseLoadingButton);
+            loadPatientPackageHistoryPage(patientId, 1, { reset: true, clinicId: targetCid }).finally(releaseLoadingButton);
         }
     });
     releaseLoadingButton();
@@ -28231,32 +28379,14 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
         // 若無套票資料，顯示提示文字並隱藏分頁控制
         if (!Array.isArray(pkgs) || pkgs.length === 0) {
             contentEl.innerHTML = `
-                <div class="space-y-3">
-                    <div class="flex justify-end gap-2">
-                        <button
-                            type="button"
-                            onclick="showPatientPackageHistory('${patientId}')"
-                            class="px-3 py-1.5 text-sm rounded bg-violet-600 text-white hover:bg-violet-700"
-                        >
-                            套票記錄
-                        </button>
-                        <button
-                            type="button"
-                            onclick="createManualPatientPackage('${patientId}', '${targetClinicId}')"
-                            class="px-3 py-1.5 text-sm rounded bg-purple-600 text-white hover:bg-purple-700"
-                        >
-                            新增套票
-                        </button>
+                <div class="bg-blue-50 border-blue-200 border rounded-lg p-3 text-center">
+                    <div class="text-blue-400 mb-1">
+                        <svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                        </svg>
                     </div>
-                    <div class="bg-blue-50 border-blue-200 border rounded-lg p-3 text-center">
-                        <div class="text-blue-400 mb-1">
-                            <svg class="w-6 h-6 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
-                            </svg>
-                        </div>
-                        <div class="text-sm font-medium text-blue-700">尚未購買套票</div>
-                        <div class="text-xs text-blue-600 mt-1">可於診療時購買套票享優惠</div>
-                    </div>
+                    <div class="text-sm font-medium text-blue-700">尚未購買套票</div>
+                    <div class="text-xs text-blue-600 mt-1">可於診療時購買套票享優惠</div>
                 </div>
             `;
             // 移除分頁容器
@@ -28312,24 +28442,6 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
         let htmlParts = [];
         // 使用一個垂直容器，依序渲染有效與失效套票
         htmlParts.push('<div class="space-y-4">');
-        htmlParts.push(`
-            <div class="flex justify-end gap-2">
-                <button
-                    type="button"
-                    onclick="showPatientPackageHistory('${patientId}')"
-                    class="px-3 py-1.5 text-sm rounded bg-violet-600 text-white hover:bg-violet-700"
-                >
-                    套票記錄
-                </button>
-                <button
-                    type="button"
-                    onclick="createManualPatientPackage('${patientId}', '${targetClinicId}')"
-                    class="px-3 py-1.5 text-sm rounded bg-purple-600 text-white hover:bg-purple-700"
-                >
-                    新增套票
-                </button>
-            </div>
-        `);
         // 有效套票列表
         if (pageValid.length > 0) {
             htmlParts.push('<div class="font-medium text-gray-700 mb-2">有效套票</div>');
@@ -28521,6 +28633,18 @@ async function renderPatientWalletStatus(patientId, clinicId = '') {
     );
     const totalClass = status === 'active' ? 'text-teal-700' : 'text-gray-500';
 
+    // 近期交易（最近 10 筆）；失敗時只顯示餘額，不影響主資訊
+    let recentTxs = [];
+    let recentTxsFailed = false;
+    try {
+        if (typeof window.getRecentWalletTransactions === 'function') {
+            recentTxs = await window.getRecentWalletTransactions(patientId, clinicId, 10);
+        }
+    } catch (txError) {
+        console.warn('載入近期儲值交易失敗:', txError);
+        recentTxsFailed = true;
+    }
+
     contentEl.innerHTML = `
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div class="bg-white/70 border border-teal-100 rounded-lg p-3 text-center">
@@ -28536,7 +28660,95 @@ async function renderPatientWalletStatus(patientId, clinicId = '') {
                 <div class="text-xs text-gray-500 mt-0.5">贈送額</div>
             </div>
         </div>
+        ${renderPatientRecentWalletTxsHtml(recentTxs, recentTxsFailed, patientId)}
     `;
+}
+
+// 近期交易類型標籤（與錢包管理頁一致；此處為面板專用精簡對照）
+const patientWalletTxTypeLabels = {
+    topup: '充值',
+    topupBonus: '充值贈送',
+    payment: '看診付款',
+    refund: '退款',
+    adjust: '調整'
+};
+
+/**
+ * 建構病人詳情中「近10次交易」子區塊 HTML。
+ * @param {Array} txs 交易流水（已按時間倒序）
+ * @param {boolean} failed 讀取是否失敗
+ * @param {string} patientId 病人 ID（用於跳轉按鈕）
+ */
+function renderPatientRecentWalletTxsHtml(txs, failed, patientId) {
+    const pidAttr = window.escapeHtml(String(patientId || ''));
+    const rows = Array.isArray(txs) ? txs.slice(0, 10) : [];
+    let bodyHtml = '';
+    if (failed) {
+        bodyHtml = '<div class="text-center text-xs text-gray-400 py-3">無法載入近期交易</div>';
+    } else if (rows.length === 0) {
+        bodyHtml = '<div class="text-center text-xs text-gray-400 py-3">尚無交易記錄</div>';
+    } else {
+        bodyHtml = rows.map(tx => {
+            const amount = typeof window.walletRound2 === 'function'
+                ? window.walletRound2(tx.amount)
+                : Math.round((Number(tx.amount) || 0) * 100) / 100;
+            const isPayment = tx.type === 'payment' || amount < 0;
+            let atText = '';
+            try {
+                atText = new Date(tx.at).toLocaleString('zh-HK', { hour12: false });
+            } catch (_e) { atText = tx.at || ''; }
+            const typeText = patientWalletTxTypeLabels[tx.type] || tx.type;
+            return `
+                <div class="flex items-center justify-between gap-3 py-1.5 border-t border-gray-100 first:border-t-0">
+                    <div class="min-w-0">
+                        <div class="text-xs text-gray-700 truncate">${window.escapeHtml(typeText)}</div>
+                        <div class="text-[11px] text-gray-400 whitespace-nowrap">${window.escapeHtml(atText)}</div>
+                    </div>
+                    <div class="text-xs font-medium whitespace-nowrap ${isPayment ? 'text-red-600' : 'text-green-600'}">
+                        ${isPayment ? '-' : ''}HK$${Math.abs(amount).toFixed(2)}
+                    </div>
+                </div>`;
+        }).join('');
+    }
+    return `
+        <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50/60 p-3">
+            <div class="mb-1 text-xs font-medium text-gray-600">近期交易（最近 10 次）</div>
+            ${bodyHtml}
+            <div class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 pt-2">
+                <span class="text-[11px] text-gray-400">僅顯示最近 10 次，其他交易紀錄請至會員儲值查看</span>
+                <button type="button"
+                    onclick="openWalletManagementForPatient('${pidAttr}')"
+                    class="px-2.5 py-1 text-[11px] rounded bg-teal-600 text-white hover:bg-teal-700 whitespace-nowrap">
+                    前往會員儲值
+                </button>
+            </div>
+        </div>`;
+}
+
+/**
+ * 跳轉至「會員儲值」並自動選取該病人（供病人詳情面板查看完整交易）。
+ * @param {string} patientId 病人 ID
+ */
+function openWalletManagementForPatient(patientId) {
+    const pid = String(patientId || '');
+    if (!pid) return;
+    try {
+        // 先關閉病人詳情彈窗，再切換至會員儲值區
+        if (typeof window.closePatientDetail === 'function') {
+            window.closePatientDetail();
+        } else {
+            const modal = document.getElementById('patientDetailModal');
+            if (modal) modal.classList.add('hidden');
+        }
+        if (typeof window.showSection === 'function') {
+            window.showSection('walletManagement');
+        }
+        if (typeof window.selectWalletPatient === 'function') {
+            window.selectWalletPatient(pid);
+        }
+    } catch (error) {
+        console.error('開啟會員儲值失敗:', error);
+    }
 }
 
 async function refreshPatientPackagesUI() {
@@ -31486,11 +31698,25 @@ class FirebaseDataManager {
         }
     }
 
-    resetPatientPackageHistoryPagination(patientId = '') {
+    resetPatientPackageHistoryPagination(patientId = '', clinicId = '') {
         const pid = String(patientId || '');
+        const cid = String(clinicId || '');
         if (pid) {
-            delete this.patientPackageHistoryPagination[pid];
-            delete this.patientPackageHistoryCountCache[pid];
+            if (cid) {
+                // 只清除指定診所的分頁／數量快取
+                const scopedKey = `${pid}__${cid}`;
+                delete this.patientPackageHistoryPagination[scopedKey];
+                delete this.patientPackageHistoryCountCache[scopedKey];
+                return;
+            }
+            // 未指定診所：清除該病人所有診所維度的快取（含舊制無後綴鍵）
+            const prefix = `${pid}__`;
+            Object.keys(this.patientPackageHistoryPagination).forEach((k) => {
+                if (k === pid || k.indexOf(prefix) === 0) delete this.patientPackageHistoryPagination[k];
+            });
+            Object.keys(this.patientPackageHistoryCountCache).forEach((k) => {
+                if (k === pid || k.indexOf(prefix) === 0) delete this.patientPackageHistoryCountCache[k];
+            });
             return;
         }
         this.patientPackageHistoryPagination = {};
@@ -31525,21 +31751,26 @@ class FirebaseDataManager {
         }
     }
 
-    async getPatientPackageHistoryCount(patientId, forceRefresh = false) {
+    async getPatientPackageHistoryCount(patientId, forceRefresh = false, clinicId = '') {
         if (!this.isReady) return { success: false, count: 0 };
         const pid = String(patientId || '');
         if (!pid) return { success: true, count: 0 };
-        if (!forceRefresh && Object.prototype.hasOwnProperty.call(this.patientPackageHistoryCountCache, pid)) {
-            return { success: true, count: this.patientPackageHistoryCountCache[pid] };
+        const cid = String(clinicId || '');
+        // 快取鍵帶診所維度，避免跨診所共用數量
+        const cacheKey = cid ? `${pid}__${cid}` : pid;
+        if (!forceRefresh && Object.prototype.hasOwnProperty.call(this.patientPackageHistoryCountCache, cacheKey)) {
+            return { success: true, count: this.patientPackageHistoryCountCache[cacheKey] };
         }
         try {
+            const constraints = [window.firebase.where('patientId', '==', pid)];
+            if (cid) constraints.push(window.firebase.where('clinicId', '==', cid));
             const q = window.firebase.firestoreQuery(
                 window.firebase.collection(window.firebase.db, 'patientPackageHistory'),
-                window.firebase.where('patientId', '==', pid)
+                ...constraints
             );
             const snap = await window.firebase.getCountFromServer(q);
             const count = snap && typeof snap.data === 'function' ? (Number(snap.data().count) || 0) : 0;
-            this.patientPackageHistoryCountCache[pid] = count;
+            this.patientPackageHistoryCountCache[cacheKey] = count;
             return { success: true, count };
         } catch (error) {
             console.error('讀取套票記錄數量失敗:', error);
@@ -31547,21 +31778,24 @@ class FirebaseDataManager {
         }
     }
 
-    async getPatientPackageHistoryPage(patientId, pageNumber = 1, pageSize = 30, forceRefresh = false) {
+    async getPatientPackageHistoryPage(patientId, pageNumber = 1, pageSize = 30, forceRefresh = false, clinicId = '') {
         if (!this.isReady) return { success: false, data: [] };
         const pid = String(patientId || '');
         const targetPage = Math.max(1, Number(pageNumber) || 1);
         const size = Math.max(1, Number(pageSize) || 30);
         if (!pid) return { success: true, data: [], hasMore: false };
-        if (forceRefresh || !this.patientPackageHistoryPagination[pid] || this.patientPackageHistoryPagination[pid].pageSize !== size) {
-            this.patientPackageHistoryPagination[pid] = {
+        const cid = String(clinicId || '');
+        // 分頁狀態依「病人＋診所」分開保存
+        const stateKey = cid ? `${pid}__${cid}` : pid;
+        if (forceRefresh || !this.patientPackageHistoryPagination[stateKey] || this.patientPackageHistoryPagination[stateKey].pageSize !== size) {
+            this.patientPackageHistoryPagination[stateKey] = {
                 pageSize: size,
                 pages: {},
                 lastVisibleByPage: {},
                 hasMoreByPage: {}
             };
         }
-        const state = this.patientPackageHistoryPagination[pid];
+        const state = this.patientPackageHistoryPagination[stateKey];
         if (state.pages[targetPage]) {
             return {
                 success: true,
@@ -31571,10 +31805,12 @@ class FirebaseDataManager {
         }
         try {
             let q = null;
+            const baseConstraints = [window.firebase.where('patientId', '==', pid)];
+            if (cid) baseConstraints.push(window.firebase.where('clinicId', '==', cid));
             if (targetPage === 1) {
                 q = window.firebase.firestoreQuery(
                     window.firebase.collection(window.firebase.db, 'patientPackageHistory'),
-                    window.firebase.where('patientId', '==', pid),
+                    ...baseConstraints,
                     window.firebase.orderBy('operatedAt', 'desc'),
                     window.firebase.limit(size)
                 );
@@ -31585,7 +31821,7 @@ class FirebaseDataManager {
                 }
                 q = window.firebase.firestoreQuery(
                     window.firebase.collection(window.firebase.db, 'patientPackageHistory'),
-                    window.firebase.where('patientId', '==', pid),
+                    ...baseConstraints,
                     window.firebase.orderBy('operatedAt', 'desc'),
                     window.firebase.startAfter(prevCursor),
                     window.firebase.limit(size)
@@ -34293,13 +34529,18 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
    * 會跨診所取回該病人全部流水，在員工跨診所隔離規則下會被整筆查詢
    * 拒絕，故由後端以診所維度過濾後回傳（最近 50 筆）。
    */
-  async function loadWalletTransactions(patientId, clinicId = '') {
+  async function loadWalletTransactions(patientId, clinicId = '', limit = 0) {
     await waitForFirebase();
     const fbUser = window.firebase.auth && window.firebase.auth.currentUser;
     if (!fbUser) throw new Error('未登入，無法讀取儲值記錄');
     const cid = clinicId || currentWalletClinicId();
-    const qs = '?patientId=' + encodeURIComponent(String(patientId))
+    let qs = '?patientId=' + encodeURIComponent(String(patientId))
       + '&clinicId=' + encodeURIComponent(String(cid));
+    // 顯式限制筆數（病人詳情面板僅需最近 10 筆，縮減回傳量）
+    const n = Number.parseInt(limit, 10);
+    if (Number.isFinite(n) && n > 0) {
+      qs += '&limit=' + encodeURIComponent(String(Math.min(50, Math.max(1, n))));
+    }
     const token = await fbUser.getIdToken();
     const res = await fetch('/api/wallet/account' + qs, {
       method: 'GET',
@@ -35316,6 +35557,9 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   window.runWalletLegacyMigration = runWalletLegacyMigration;
   window.selectWalletPatient = selectWalletPatient;
   window.getWalletAccount = getWalletAccount;
+  // 病人詳情面板用：取指定診所最近 N 筆交易（預設 10）
+  window.getRecentWalletTransactions = (patientId, clinicId, limit = 10) =>
+    loadWalletTransactions(patientId, clinicId || '', limit);
   window.walletRound2 = walletRound2;
   window.submitWalletTopup = submitWalletTopup;
   window.submitWalletRefund = submitWalletRefund;
@@ -35648,6 +35892,7 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   window.updatePatientPackageExpiry = updatePatientPackageExpiry;
   window.updatePatientPackageRemainingUses = updatePatientPackageRemainingUses;
   window.deletePatientPackageRecord = deletePatientPackageRecord;
+  window.openWalletManagementForPatient = openWalletManagementForPatient;
   window.saveBillingItem = saveBillingItem;
   window.saveClinicSettings = saveClinicSettings;
   window.saveReceiptCustomizationSettings = saveReceiptCustomizationSettings;

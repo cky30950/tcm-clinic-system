@@ -39,6 +39,13 @@ export async function onRequestGet(context) {
             env.FIREBASE_RTDB_URL || ''
         );
         const clinicId = resolveClinicId(claims, url.searchParams);
+        // 可選筆數限制（病人詳情面板只需最近 10 筆）；預設 50，上限 50
+        const parsedLimit = Number.parseInt(url.searchParams.get('limit') || '', 10);
+        const txLimit = Number.isFinite(parsedLimit)
+            ? Math.min(50, Math.max(1, parsedLimit))
+            : 50;
+        // 跨診所病人需保留足夠取回筆數再過濾，故實際查詢量取兩者較大值
+        const fetchLimit = Math.max(txLimit, 300);
         const account = await client.getDocument(
             `patientWalletAccounts/${
                 encodeURIComponent(walletAccountDocId(clinicId, patientId))}`
@@ -53,14 +60,14 @@ export async function onRequestGet(context) {
                 }
             },
             orderBy: [{ field: { fieldPath: 'at' }, direction: 'DESCENDING' }],
-            limit: 300
+            limit: fetchLimit
         });
-        // 跨診所病人的最近 300 筆中可能混有大量他診流水，
-        // 故取回較大筆數再於本診所內取最近 50 筆（不新增複合索引）。
+        // 跨診所病人的取回筆數中可能混有他診流水，
+        // 故過濾本診所後只取最近 txLimit 筆（不新增複合索引）。
         const transactions = txRes.docs
             .map((d) => Object.assign({ id: d.id }, d.data))
             .filter((tx) => tx && String(tx.clinicId || '') === String(clinicId))
-            .slice(0, 50);
+            .slice(0, txLimit);
 
         return jsonResponse({
             clinicId,
