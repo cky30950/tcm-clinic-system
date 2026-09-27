@@ -1,11 +1,13 @@
 /* ============================================================
  * POST /api/wallet/payment
  * ------------------------------------------------------------
- * 員工以病人儲值餘額支付診症帳單。冪等鍵建議 pay:{consultationId}。
- * 請求：{ patientId, amount, consultationId, appointmentId?,
- *         idempotencyKey }
- * 回應：{ ok, balance, bonusBalance, fromBalance, fromBonus, txId }
- * 餘額不足回 402 INSUFFICIENT_FUNDS。
+ * 員工以病人儲值餘額支付診症帳單。
+ * 冪等鍵由伺服器強制為 pay:{consultationId}，客戶端無需傳送；
+ * 金額須與診症單 billingItemsStructured 重算的應收總額一致。
+ * 請求：{ patientId, amount, consultationId, appointmentId? }
+ * 回應：{ ok, chargedAmount, balance, bonusBalance,
+ *         fromBalance, fromBonus, txId }
+ * 餘額不足回 402 INSUFFICIENT_FUNDS；重複扣款回 409 WALLET_ALREADY_PAID。
  * ============================================================ */
 
 import { walletPayment } from './lib/wallet-store.js';
@@ -13,7 +15,6 @@ import {
     requireStaff,
     readJsonBody,
     parsePatientId,
-    parseIdempotencyKey,
     resolveClinicId,
     jsonResponse,
     optionsResponse,
@@ -28,7 +29,6 @@ export async function onRequestPost(context) {
         const claims = await requireStaff(request, env);
         const body = await readJsonBody(request);
         const patientId = parsePatientId(body);
-        const idempotencyKey = parseIdempotencyKey(body);
         const amount = Number(body.amount);
         if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) {
             return jsonResponse({
@@ -49,8 +49,7 @@ export async function onRequestPost(context) {
             patientId,
             amount,
             consultationId,
-            appointmentId: body.appointmentId ? String(body.appointmentId) : '',
-            idempotencyKey
+            appointmentId: body.appointmentId ? String(body.appointmentId) : ''
         });
         return jsonResponse(result);
     } catch (error) {

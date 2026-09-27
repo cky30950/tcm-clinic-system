@@ -2026,8 +2026,18 @@
                     <div id="walletTopupArea" class="border border-gray-200 rounded-lg px-3 py-2 mb-3 shrink-0">
                         <div class="flex flex-col md:flex-row gap-2 md:items-center">
                             <h3 class="text-sm font-semibold text-gray-800 whitespace-nowrap">儲值充值</h3>
+                            <div class="w-full md:w-36">
+                                <select id="walletTopupMethod" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                    <option value="cash">現金</option>
+                                    <option value="fps">轉數快 FPS</option>
+                                    <option value="eps">EPS</option>
+                                    <option value="card">信用卡</option>
+                                    <option value="cheque">支票</option>
+                                    <option value="other">其他</option>
+                                </select>
+                            </div>
                             <div class="w-full md:w-40">
-                                <input type="number" id="walletTopupAmount" placeholder="金額 HK$" min="1" step="0.01" class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                <input type="number" id="walletTopupAmount" placeholder="金額 HK$" min="0.01" step="0.01" class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent">
                             </div>
                             <div class="text-xs text-gray-600 flex-1" id="walletTopupHint"></div>
                             <button onclick="submitWalletTopup()" class="bg-green-600 hover:bg-green-700 text-white px-5 py-1.5 rounded-lg text-sm transition duration-200 whitespace-nowrap">確認充值</button>
@@ -2516,6 +2526,28 @@
                                         </tr>
                                     </thead>
                                     <tbody id="financialWalletDailyBody" class="divide-y divide-gray-200">
+                                        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">請點擊「更新報表」來載入資料</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <h4 class="text-sm font-semibold text-gray-800 mt-6 mb-2 flex items-center gap-2">
+                                <span>待收款追蹤</span>
+                                <span id="financialReceivablesCount" class="text-xs font-normal bg-red-100 text-red-700 rounded-full px-2 py-0.5">0</span>
+                            </h4>
+                            <p class="text-xs text-gray-500 mb-2">病歷已保存但儲值扣款失敗（或已改其他方式）的診症單；實際收到款項後請按「標記已收款」核銷。僅列出報表期間內記錄。</p>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">日期</th>
+                                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">病人</th>
+                                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">診所</th>
+                                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">應收金額</th>
+                                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">備註</th>
+                                            <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="financialReceivablesBody" class="divide-y divide-gray-200">
                                         <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">請點擊「更新報表」來載入資料</td></tr>
                                     </tbody>
                                 </table>

@@ -2,8 +2,10 @@
  * POST /api/wallet/topup
  * ------------------------------------------------------------
  * 員工為病人儲值充值。贈送額由伺服器依診所配置的級距計算。
- * 請求：{ patientId, amount, appointmentId?, note?, idempotencyKey }
- * 回應：{ ok, balance, bonusBalance, bonusAmount, txId }
+ * 請求：{ patientId, amount, paymentMethod?, appointmentId?, note?,
+ *         idempotencyKey }
+ * paymentMethod 白名單：cash/fps/eps/card/cheque/other（預設 cash）。
+ * 回應：{ ok, balance, bonusBalance, bonusAmount, paymentMethod, txId }
  * ============================================================ */
 
 import { walletTopup } from './lib/wallet-store.js';
@@ -39,6 +41,7 @@ export async function onRequestPost(context) {
             clinicId,
             patientId,
             amount,
+            paymentMethod: body.paymentMethod ? String(body.paymentMethod) : 'cash',
             appointmentId: body.appointmentId ? String(body.appointmentId) : '',
             note: body.note ? String(body.note) : '',
             idempotencyKey

@@ -54,6 +54,36 @@ function round2(value) {
     return Math.round(n * 100) / 100;
 }
 
+/**
+ * 金額欄位把關：必須為數字且最多兩位小數。
+ * round2 會把 100.999 靜默捨成 101.00，客戶端（或腳本）誤傳三位小數
+ * 時應明確拒收，避免實際入帳金額與操作人預期不一致。
+ * 用 epsilon 容忍二進位浮點誤差（例 1.11*100＝110.999…）。
+ * @param {*} rawValue 原始輸入
+ * @param {string} label 錯誤訊息用欄位名稱
+ * @returns {number}
+ */
+function requireMoney2(rawValue, label) {
+    const n = Number(rawValue);
+    if (!Number.isFinite(n)) {
+        throw new WalletError(400, 'INVALID_AMOUNT', `${label}必須為有效數字`);
+    }
+    const cents = n * 100;
+    if (Math.abs(cents - Math.round(cents)) > 1e-6) {
+        throw new WalletError(400, 'TOO_MANY_DECIMALS',
+            `${label}最多只可兩位小數（最小單位 HK$0.01）`);
+    }
+    return round2(n);
+}
+
+// 充值收款方式白名單（櫃台實際收現渠道）
+const TOPUP_PAYMENT_METHODS = ['cash', 'fps', 'eps', 'card', 'cheque', 'other'];
+
+function normalizePaymentMethod(raw) {
+    const m = String(raw || '').trim().toLowerCase();
+    return TOPUP_PAYMENT_METHODS.includes(m) ? m : 'cash';
+}
+
 async function sha256Hex(text) {
     const digest = await crypto.subtle.digest(
         'SHA-256',
@@ -179,7 +209,7 @@ function calcTopupBonus(config, amount) {
  *   => {writes: Array, result: object}
  * @returns {Promise<object>} result
  */
-async function runIdempotentTransaction(env, idemKey, scope, resolveExtraDocs, build) {
+async function runIdempotentTransaction(env, idemKey, scope, resolveExtraDocs, build, fingerprint = '') {
     if (!idemKey || typeof idemKey !== 'string') {
         throw new WalletError(400, 'MISSING_IDEMPOTENCY_KEY', '缺少 idempotencyKey');
     }
@@ -197,6 +227,11 @@ async function runIdempotentTransaction(env, idemKey, scope, resolveExtraDocs, b
     };
     const idemName =
         `${docsBase}/walletIdempotency/${await sha256Hex(`wallet:${scope}:${idemKey}`)}`;
+    // 請求指紋：同一把冪等鍵若以不同參數（金額／病人／診症單）重放，
+    // 視為用戶端錯誤，回 409 而非靜默回傳第一次的結果。
+    const fingerprintHash = fingerprint
+        ? await sha256Hex(`fp:${scope}:${fingerprint}`)
+        : '';
     const extraDocNames = typeof resolveExtraDocs === 'function'
         ? [].concat(resolveExtraDocs({ docsBase, projectId: pid }) || [])
         : [];
@@ -258,9 +293,17 @@ async function runIdempotentTransaction(env, idemKey, scope, resolveExtraDocs, b
         }
         idemFields = byName.get(idemName);
 
-        // 冪等命中：回傳原結果，不再提交
+        // 冪等命中：比對請求指紋；一致才回傳原結果，不再提交
         if (idemFields && idemFields.result) {
             await rollback(transaction);
+            const oldFp = idemFields.fingerprint
+                ? (idemFields.fingerprint.stringValue || '')
+                : '';
+            // 舊記錄無指紋欄位（功能上線前建立）時維持寬鬆，只比對新記錄
+            if (fingerprintHash && oldFp && oldFp !== fingerprintHash) {
+                throw new WalletError(409, 'IDEMPOTENCY_KEY_CONFLICT',
+                    '相同的請求識別鍵帶有不同的請求參數，請重新產生 idempotencyKey 後再試');
+            }
             try {
                 return JSON.parse(idemFields.result.stringValue || '{}');
             } catch (_e) {
@@ -278,13 +321,15 @@ async function runIdempotentTransaction(env, idemKey, scope, resolveExtraDocs, b
 
         // 冪等記錄寫在最後，內存處理結果
         const result = built.result;
+        const idemWriteFields = {
+            result: { stringValue: JSON.stringify(result) },
+            at: { stringValue: new Date().toISOString() }
+        };
+        if (fingerprintHash) idemWriteFields.fingerprint = { stringValue: fingerprintHash };
         const writes = (built.writes || []).concat([{
             update: {
                 name: idemName,
-                fields: {
-                    result: { stringValue: JSON.stringify(result) },
-                    at: { stringValue: new Date().toISOString() }
-                }
+                fields: idemWriteFields
             }
         }]);
 
@@ -331,19 +376,77 @@ function accountDocName(docsBase, clinicId, patientId) {
         encodeURIComponent(walletAccountDocId(clinicId, patientId))}`;
 }
 
+// 診症單退款累計文件（文件 ID = consultationId）：
+// 於退款交易內讀寫，記錄已退款的本金/贈額，防止重複退款與超額退款。
+function refundAggDocName(docsBase, consultationId) {
+    return `${docsBase}/walletConsultationRefunds/${
+        encodeURIComponent(consultationId)}`;
+}
+
 // ── 診所歸屬核對 ──
+
+/**
+ * 讀取診症單完整資料。病歷不存在時回傳 null。
+ */
+async function fetchConsultationDoc(client, consultationId) {
+    const doc = await client.getDocument(
+        `consultations/${encodeURIComponent(consultationId)}`
+    );
+    return doc && doc.data ? doc.data : null;
+}
 
 /**
  * 讀取診症單所屬診所。病歷不存在（異常場景）時回傳空字串，
  * 由呼叫端決定是否容錯（以端點解析出的 clinicId 為準）。
  */
 async function fetchConsultationClinic(client, consultationId) {
-    const cons = await client.getDocument(
-        `consultations/${encodeURIComponent(consultationId)}`
-    );
-    return cons && cons.data && cons.data.clinicId
-        ? String(cons.data.clinicId)
-        : '';
+    const data = await fetchConsultationDoc(client, consultationId);
+    return data && data.clinicId ? String(data.clinicId) : '';
+}
+
+/**
+ * 以診症單 billingItemsStructured 重算應收總額（公式與前端
+ * updateBillingDisplay 完全一致）：非折扣項目 price×quantity 合計；
+ * 0<price<1 的折扣項目按「可折扣小計」比例折抵，其餘（含負數）為
+ * 定額折扣逐項相加。
+ * @returns {number|null} 總額；無結構化資料或無法解析時回傳 null
+ */
+function consultationBillingTotal(consData) {
+    const raw = consData && consData.billingItemsStructured;
+    if (typeof raw !== 'string' || !raw.trim()) return null;
+    let items;
+    try {
+        items = JSON.parse(raw);
+    } catch (_e) {
+        return null;
+    }
+    if (!Array.isArray(items)) return null;
+    if (!items.length) return 0;
+
+    const hasDiscount = items.some((it) => it && it.category === 'discount');
+    let subtotalAll = 0;
+    let subtotalForDiscount = 0;
+    items.forEach((it) => {
+        if (!it || it.category === 'discount') return;
+        const line = (Number(it.price) || 0) * (Number(it.quantity) || 0);
+        subtotalAll += line;
+        // undefined 視為可折扣（與前端一致）
+        if (!hasDiscount || it.includedInDiscount !== false) {
+            subtotalForDiscount += line;
+        }
+    });
+    let total = subtotalAll;
+    items.forEach((it) => {
+        if (!it || it.category !== 'discount') return;
+        const price = Number(it.price) || 0;
+        const qty = Number(it.quantity) || 0;
+        if (price > 0 && price < 1) {
+            total -= subtotalForDiscount * (1 - price) * qty;
+        } else {
+            total += price * qty;
+        }
+    });
+    return round2(total);
 }
 
 function newTxWrite(docsBase, record) {
@@ -358,15 +461,17 @@ function newTxWrite(docsBase, record) {
 
 /**
  * 充值。贈送額由伺服器依該診所配置級距計算，客戶端不可指定。
- * @param {object} params {clinicId, patientId, amount, appointmentId?, note?, idempotencyKey}
+ * @param {object} params {clinicId, patientId, amount, paymentMethod?,
+ *   appointmentId?, note?, idempotencyKey}
  */
 export async function walletTopup(env, claims, params) {
     const clinicId = requireClinicId(params.clinicId);
     const patientId = String(params.patientId);
-    const amount = round2(params.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const amount = requireMoney2(params.amount, '充值金額');
+    if (amount <= 0) {
         throw new WalletError(400, 'INVALID_AMOUNT', '充值金額必須大於 0');
     }
+    const paymentMethod = normalizePaymentMethod(params.paymentMethod);
     const config = await getMembershipConfig(env, clinicId);
     const bonusAmount = config.enabled
         ? round2(calcTopupBonus(config, amount))
@@ -382,6 +487,15 @@ export async function walletTopup(env, claims, params) {
             const accFields = byName.get(name);
             const at = new Date().toISOString();
             const existed = !!accFields;
+            // 已關閉帳戶拒絕充值（需先由管理員復用）；凍結帳戶可入帳，
+            // 但充值不得改變其凍結狀態
+            const existingStatus = existed
+                ? rawString(accFields, 'status', 'active')
+                : 'active';
+            if (existingStatus === 'closed') {
+                throw new WalletError(400, 'WALLET_CLOSED',
+                    '儲值帳戶已關閉，無法充值；請先聯絡管理員復用帳戶');
+            }
             const balance = round2(rawNumber(accFields, 'balance') + amount);
             const bonusBalance =
                 round2(rawNumber(accFields, 'bonusBalance') + bonusAmount);
@@ -389,7 +503,7 @@ export async function walletTopup(env, claims, params) {
             const accountObj = {
                 patientId,
                 clinicId,
-                status: 'active',
+                status: existingStatus,
                 balance,
                 bonusBalance,
                 currency: 'HKD',
@@ -409,6 +523,7 @@ export async function walletTopup(env, claims, params) {
                     type: 'topup',
                     amount,
                     appliesTo: 'balance',
+                    paymentMethod,
                     balanceAfter: balance,
                     bonusBalanceAfter: bonusBalance
                 }
@@ -445,48 +560,114 @@ export async function walletTopup(env, claims, params) {
                     balance,
                     bonusBalance,
                     bonusAmount,
+                    paymentMethod,
                     txId: txWrites[0] ? txWrites[0].txId : ''
                 }
             };
-        }
+        },
+        // 指紋：同鍵但金額／收款方式不同（贈額為伺服器派生，一併寫入）＝異常重放
+        `topup|${patientId}|${amount}|${bonusAmount}|${paymentMethod}`
     );
 }
 
 // ── 操作：扣款（看診付款）──
 
 /**
- * @param {object} params {clinicId, patientId, amount, consultationId, appointmentId?, idempotencyKey}
- *   建議冪等鍵：pay:{consultationId}
+ * 扣款（看診付款）。
+ *
+ * 伺服器把關（不信任 client 傳入的鍵與金額）：
+ *  1. 冪等鍵強制為 pay:{consultationId}，客戶端傳入者一律覆寫，
+ *     同一診症單永遠最多只能有一筆成功的 payment；
+ *  2. 診症單必須存在，病人與診所均須與扣款帳戶一致；
+ *  3. 扣款金額必須與診症單 billingItemsStructured 重算的應收總額一致；
+ *  4. 備份還原等導致冪等記錄缺失、但已有 payment 流水時，拒絕重複扣款。
+ *
+ * @param {object} params {clinicId, patientId, amount, consultationId, appointmentId?, idempotencyKey?}
  */
 export async function walletPayment(env, claims, params) {
     const clinicId = requireClinicId(params.clinicId);
     const patientId = String(params.patientId);
-    const amount = round2(params.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const amount = requireMoney2(params.amount, '付款金額');
+    if (amount <= 0) {
         throw new WalletError(400, 'INVALID_AMOUNT', '付款金額必須大於 0');
     }
     const consultationId = String(params.consultationId || '');
     if (!consultationId) {
         throw new WalletError(400, 'MISSING_CONSULTATION', '缺少 consultationId');
     }
+    const idemKey = `pay:${consultationId}`;
 
-    // 交易外核對：診症單所屬診所必須與扣款帳戶診所一致，
-    // 防止在 A 診所看診卻扣到 B 診所的儲值帳戶。
     const auth0 = await getAccessToken(env);
     const client0 = new FirestoreClient(
         auth0.token,
         auth0.projectId,
         env.FIREBASE_RTDB_URL || ''
     );
-    const consClinic = await fetchConsultationClinic(client0, consultationId);
-    if (consClinic && consClinic !== clinicId) {
+
+    // ── 診症單核對：存在、診所一致、病人一致、金額與帳單一致 ──
+    const consData = await fetchConsultationDoc(client0, consultationId);
+    if (!consData) {
+        throw new WalletError(404, 'CONSULTATION_NOT_FOUND',
+            '找不到診症記錄，無法扣款');
+    }
+    if (consData.clinicId && String(consData.clinicId) !== clinicId) {
         throw new WalletError(400, 'CLINIC_MISMATCH',
             '診症單所屬診所與儲值帳戶診所不一致，無法扣款');
     }
+    if (consData.patientId && String(consData.patientId) !== patientId) {
+        throw new WalletError(400, 'PATIENT_MISMATCH',
+            '診症記錄的病人與儲值帳戶病人不一致，無法扣款');
+    }
+    const billedTotal = consultationBillingTotal(consData);
+    if (billedTotal === null) {
+        throw new WalletError(400, 'BILLING_TOTAL_UNAVAILABLE',
+            '無法讀取此診症單的收費總額，請重新打開並儲存病歷後再以儲值扣款');
+    }
+    if (round2(billedTotal) !== amount) {
+        throw new WalletError(400, 'AMOUNT_MISMATCH',
+            `扣款金額 HK$${amount.toFixed(2)} 與診症單應收`
+            + ` HK$${round2(billedTotal).toFixed(2)} 不一致，請重新整理後再試`);
+    }
+
+    // ── 防重複扣款：僅在冪等記錄不存在時檢查歷史 payment 流水 ──
+    // 正常重送會在下方交易內直接命中冪等記錄回原結果，不會走到這裡。
+    // 此檢查主要覆蓋「備份還原不含 walletIdempotency」等異常場景。
+    const priorIdem = await client0.getDocument(
+        `walletIdempotency/${await sha256Hex(`wallet:${clinicId}:${idemKey}`)}`
+    );
+    if (!priorIdem || !priorIdem.data || !priorIdem.data.result) {
+        const found = await client0.queryCollection({
+            collectionId: 'patientWalletTransactions',
+            where: {
+                fieldFilter: {
+                    field: { fieldPath: 'consultationId' },
+                    op: 'EQUAL',
+                    value: { stringValue: consultationId }
+                }
+            },
+            limit: 50
+        });
+        const alreadyPaid = (found.docs || []).some((d) => {
+            if (!d.data || d.data.type !== 'payment') return false;
+            const txClinic = d.data.clinicId ? String(d.data.clinicId) : '';
+            if (txClinic) return txClinic === clinicId;
+            // 舊制無 clinicId 流水：診症單屬本診所（或診症單缺診所欄位）才採計
+            return !consData.clinicId || String(consData.clinicId) === clinicId;
+        });
+        if (alreadyPaid) {
+            throw new WalletError(409, 'WALLET_ALREADY_PAID',
+                '此診症單已完成儲值扣款，不可重複扣款；如需退回請使用退款功能');
+        }
+    }
+
+    // #12 扣款順序依診所會員配置 deductBonusFirst：
+    // true（預設）先扣贈送額；false 先扣本金。配置缺失時維持歷史行為。
+    const membershipConfig = await getMembershipConfig(env, clinicId);
+    const deductBonusFirst = membershipConfig.deductBonusFirst !== false;
 
     return runIdempotentTransaction(
         env,
-        params.idempotencyKey,
+        idemKey,
         clinicId,
         ({ docsBase }) => [accountDocName(docsBase, clinicId, patientId)],
         ({ byName, docsBase }) => {
@@ -508,9 +689,16 @@ export async function walletPayment(env, claims, params) {
                     `儲值餘額不足（可用 HK$${round2(bal + bbal).toFixed(2)}）`);
             }
 
-            // 扣款順序：先贈送額後本金
-            const fromBonus = round2(Math.min(bbal, amount));
-            const fromBalance = round2(amount - fromBonus);
+            // 扣款順序：依診所配置 deductBonusFirst（#12，UI 開關不再是裝飾品）
+            let fromBonus;
+            let fromBalance;
+            if (deductBonusFirst) {
+                fromBonus = round2(Math.min(bbal, amount));
+                fromBalance = round2(amount - fromBonus);
+            } else {
+                fromBalance = round2(Math.min(bal, amount));
+                fromBonus = round2(amount - fromBalance);
+            }
             const newBalance = round2(bal - fromBalance);
             const newBonus = round2(bbal - fromBonus);
             const at = new Date().toISOString();
@@ -531,7 +719,7 @@ export async function walletPayment(env, claims, params) {
                 ? 'mixed'
                 : (fromBalance > 0 ? 'balance' : 'bonus');
             const txRecord = Object.assign(
-                baseTxRecord(patientId, clinicId, claims, params.idempotencyKey, at),
+                baseTxRecord(patientId, clinicId, claims, idemKey, at),
                 {
                     type: 'payment',
                     amount: -amount,
@@ -555,6 +743,7 @@ export async function walletPayment(env, claims, params) {
                 ],
                 result: {
                     ok: true,
+                    chargedAmount: amount,
                     balance: newBalance,
                     bonusBalance: newBonus,
                     fromBalance,
@@ -562,7 +751,9 @@ export async function walletPayment(env, claims, params) {
                     txId: txBuilt.txId
                 }
             };
-        }
+        },
+        // 指紋：同鍵（同診症單）但金額／病人不同＝異常重放
+        `pay|${patientId}|${consultationId}|${amount}`
     );
 }
 
@@ -571,6 +762,12 @@ export async function walletPayment(env, claims, params) {
 /**
  * 全額或部分退還某診症單的儲值付款。
  * 需管理員；按原 payment 流水的本金/贈額比例回補。
+ *
+ * 防超退：walletConsultationRefunds/{consultationId} 聚合文件於交易內
+ * 讀取並遞增，平行退款請求在 409 重試後會重新讀到最新累計值而被正確
+ * 拒絕；冪等重送則由 walletIdempotency 直接回原結果，不重複入帳。
+ * 聚合文件建立前的歷史退款，首次執行時以流水查詢結果作為初始值。
+ *
  * @param {object} params {clinicId, patientId, consultationId, amount?, note?, idempotencyKey}
  */
 export async function walletRefund(env, claims, params) {
@@ -581,7 +778,7 @@ export async function walletRefund(env, claims, params) {
         throw new WalletError(400, 'MISSING_CONSULTATION', '缺少 consultationId');
     }
 
-    // 交易外查詢原付款流水（單欄位查詢，不需複合索引）
+    // 交易外查詢原付款與歷史退款流水（單欄位查詢，不需複合索引）
     const auth = await getAccessToken(env);
     const client = new FirestoreClient(
         auth.token,
@@ -607,17 +804,26 @@ export async function walletRefund(env, claims, params) {
         },
         limit: 50
     });
-    // 只採計本診所的付款流水；舊制流水（無 clinicId）僅在診症單明確
+    // 只採計本診所的付款/退款流水；舊制流水（無 clinicId）僅在診症單明確
     // 屬於本診所（或診症單缺診所欄位）時採計，避免跨診所誤退。
-    const payments = found.docs.filter((d) => {
-        if (!d.data || d.data.type !== 'payment') return false;
+    const sameClinicRows = found.docs.filter((d) => {
+        if (!d.data) return false;
+        if (d.data.type !== 'payment' && d.data.type !== 'refund') return false;
         const txClinic = d.data.clinicId ? String(d.data.clinicId) : '';
         if (txClinic) return txClinic === clinicId;
         return !consClinic || consClinic === clinicId;
     });
+    const payments = sameClinicRows.filter((d) => d.data.type === 'payment');
     if (!payments.length) {
         throw new WalletError(404, 'PAYMENT_NOT_FOUND',
             '找不到此診症單於本診所的儲值付款記錄');
+    }
+    // 退款病人必須與原付款病人一致，防止退錯帳戶
+    const mismatchedPayment = payments.find((d) =>
+        d.data.patientId && String(d.data.patientId) !== patientId);
+    if (mismatchedPayment) {
+        throw new WalletError(400, 'PATIENT_MISMATCH',
+            '退款病人與原儲值付款病人不一致，無法退款');
     }
     let paidBalance = 0;
     let paidBonus = 0;
@@ -629,38 +835,110 @@ export async function walletRefund(env, claims, params) {
     paidBonus = round2(paidBonus);
     const totalPaid = round2(paidBalance + paidBonus);
 
-    let want = params.amount !== undefined && params.amount !== null
-        ? round2(params.amount)
-        : totalPaid;
-    if (want <= 0) throw new WalletError(400, 'INVALID_AMOUNT', '退款金額必須大於 0');
-    if (want > totalPaid) {
-        throw new WalletError(400, 'REFUND_EXCEEDS_PAYMENT',
-            `退款金額不可超過原付款 HK$${totalPaid.toFixed(2)}`);
-    }
-    const scale = totalPaid > 0 ? want / totalPaid : 0;
-    const refundBonus = round2(paidBonus * scale);
-    const refundBalance = round2(want - refundBonus);
+    // 聚合文件建立前的歷史退款：作為首次建立時的初始累計值
+    let seedRefundedBalance = 0;
+    let seedRefundedBonus = 0;
+    let seedRefundCount = 0;
+    sameClinicRows.filter((d) => d.data.type === 'refund').forEach((d) => {
+        seedRefundedBalance += Number(d.data.fromBalance) || 0;
+        seedRefundedBonus += Number(d.data.fromBonus) || 0;
+        seedRefundCount += 1;
+    });
+    seedRefundedBalance = round2(seedRefundedBalance);
+    seedRefundedBonus = round2(seedRefundedBonus);
+
+    // amount 未指定＝交易內按剩餘可退金額全額退
+    const want = params.amount !== undefined && params.amount !== null
+        ? requireMoney2(params.amount, '退款金額')
+        : 0;
+    if (want < 0) throw new WalletError(400, 'INVALID_AMOUNT', '退款金額必須大於 0');
 
     return runIdempotentTransaction(
         env,
         params.idempotencyKey,
         clinicId,
-        ({ docsBase }) => [accountDocName(docsBase, clinicId, patientId)],
+        ({ docsBase }) => [
+            accountDocName(docsBase, clinicId, patientId),
+            refundAggDocName(docsBase, consultationId)
+        ],
         ({ byName, docsBase }) => {
             const name = accountDocName(docsBase, clinicId, patientId);
             const accFields = byName.get(name);
             if (!accFields) {
                 throw new WalletError(404, 'WALLET_NOT_FOUND', '找不到儲值帳戶');
             }
+            // #17 退款會把金額回補進帳戶：凍結帳戶暫停一切收支；
+            // 關閉帳戶再退款入帳會造成「已關閉卻有餘額」的矛盾狀態。
+            // 管理員需先復用帳戶，退款後再重新凍結／關閉。
+            const accStatus = rawString(accFields, 'status', 'active');
+            if (accStatus !== 'active') {
+                throw new WalletError(409, 'WALLET_NOT_ACTIVE',
+                    `儲值帳戶已${accStatus === 'frozen' ? '凍結' : '關閉'}，`
+                    + '無法退款入帳；請先復用帳戶後再辦理退款');
+            }
+
+            // ── 已退款累計（聚合文件為權威來源；缺件時以歷史流水種子）──
+            const aggName = refundAggDocName(docsBase, consultationId);
+            const aggFields = byName.get(aggName);
+            let alreadyBalance;
+            let alreadyBonus;
+            let refundCount;
+            if (aggFields) {
+                // 防護：聚合文件必須屬於同一病人與診所
+                const aggPatient = rawString(aggFields, 'patientId');
+                const aggClinic = rawString(aggFields, 'clinicId');
+                if ((aggPatient && aggPatient !== patientId)
+                    || (aggClinic && aggClinic !== clinicId)) {
+                    throw new WalletError(400, 'REFUND_STATE_MISMATCH',
+                        '退款記錄與原付款的病人或診所不一致，無法退款');
+                }
+                alreadyBalance = round2(rawNumber(aggFields, 'refundedBalance'));
+                alreadyBonus = round2(rawNumber(aggFields, 'refundedBonus'));
+                refundCount = Number(rawNumber(aggFields, 'refundCount')) || 0;
+            } else {
+                alreadyBalance = seedRefundedBalance;
+                alreadyBonus = seedRefundedBonus;
+                refundCount = seedRefundCount;
+            }
+            const alreadyTotal = round2(alreadyBalance + alreadyBonus);
+            const remainingTotal = round2(totalPaid - alreadyTotal);
+            if (remainingTotal <= 0) {
+                throw new WalletError(400, 'REFUND_ALREADY_COMPLETE',
+                    `此診症單的儲值付款 HK$${totalPaid.toFixed(2)} 已全額退款`);
+            }
+            // 未指定金額＝退還全部剩餘可退金額
+            const refundWant = want > 0 ? want : remainingTotal;
+            if (refundWant <= 0) {
+                throw new WalletError(400, 'INVALID_AMOUNT', '退款金額必須大於 0');
+            }
+            if (refundWant > remainingTotal) {
+                throw new WalletError(400, 'REFUND_EXCEEDS_PAYMENT',
+                    `退款金額不可超過尚可退款 HK$${remainingTotal.toFixed(2)}`
+                    + `（原付款 HK$${totalPaid.toFixed(2)}`
+                    + `，已退 HK$${alreadyTotal.toFixed(2)}）`);
+            }
+
+            // ── 按原付款比例拆分本金/贈額，並以各組件剩餘可退額夾緊，
+            //    避免多次部分退款的捨入誤差累計導致超退 ──
+            const remainBonus = round2(paidBonus - alreadyBonus);
+            const remainBalance = round2(paidBalance - alreadyBalance);
+            let refundBonus = round2(paidBonus * (refundWant / totalPaid));
+            if (refundBonus > remainBonus) refundBonus = remainBonus;
+            if (refundBonus < 0) refundBonus = 0;
+            let refundBalance = round2(refundWant - refundBonus);
+            if (refundBalance > remainBalance) {
+                refundBalance = remainBalance;
+                refundBonus = round2(refundWant - refundBalance);
+            }
+
             const newBalance = round2(rawNumber(accFields, 'balance') + refundBalance);
             const newBonus = round2(rawNumber(accFields, 'bonusBalance') + refundBonus);
             const at = new Date().toISOString();
-            const status = rawString(accFields, 'status', 'active');
 
             const accountObj = {
                 patientId,
                 clinicId,
-                status,
+                status: accStatus,
                 balance: newBalance,
                 bonusBalance: newBonus,
                 currency: rawString(accFields, 'currency', 'HKD'),
@@ -673,7 +951,7 @@ export async function walletRefund(env, claims, params) {
                 baseTxRecord(patientId, clinicId, claims, params.idempotencyKey, at),
                 {
                     type: 'refund',
-                    amount: want,
+                    amount: refundWant,
                     appliesTo: refundBalance > 0 && refundBonus > 0
                         ? 'mixed'
                         : (refundBalance > 0 ? 'balance' : 'bonus'),
@@ -687,10 +965,23 @@ export async function walletRefund(env, claims, params) {
             if (params.note) txRecord.note = String(params.note).slice(0, 300);
             const txBuilt = newTxWrite(docsBase, txRecord);
 
+            // 退款累計聚合文件（REST commit 的 update 寫入具 upsert 語意，
+            // 文件不存在時會自動建立），與帳戶/流水同交易提交
+            const aggObj = {
+                consultationId,
+                clinicId,
+                patientId,
+                refundedBalance: round2(alreadyBalance + refundBalance),
+                refundedBonus: round2(alreadyBonus + refundBonus),
+                refundCount: refundCount + 1,
+                updatedAt: at
+            };
+
             return {
                 writes: [
                     { update: { name, fields: jsObjectToFirestoreFields(accountObj) } },
-                    txBuilt.write
+                    txBuilt.write,
+                    { update: { name: aggName, fields: jsObjectToFirestoreFields(aggObj) } }
                 ],
                 result: {
                     ok: true,
@@ -698,10 +989,13 @@ export async function walletRefund(env, claims, params) {
                     bonusBalance: newBonus,
                     refundedBalance: refundBalance,
                     refundedBonus: refundBonus,
+                    totalRefunded: round2(alreadyTotal + refundWant),
                     txId: txBuilt.txId
                 }
             };
-        }
+        },
+        // 指紋：want=0 代表全額退（交易內按剩餘可退額決定）
+        `refund|${patientId}|${consultationId}|${want}`
     );
 }
 
@@ -714,8 +1008,12 @@ export async function walletRefund(env, claims, params) {
 export async function walletAdjust(env, claims, params) {
     const clinicId = requireClinicId(params.clinicId);
     const patientId = String(params.patientId);
-    const deltaBalance = round2(params.deltaBalance);
-    const deltaBonus = round2(params.deltaBonus);
+    const deltaBalance = params.deltaBalance !== undefined && params.deltaBalance !== null
+        ? requireMoney2(params.deltaBalance, '本金調整金額')
+        : 0;
+    const deltaBonus = params.deltaBonus !== undefined && params.deltaBonus !== null
+        ? requireMoney2(params.deltaBonus, '贈送額調整金額')
+        : 0;
     if (deltaBalance === 0 && deltaBonus === 0) {
         throw new WalletError(400, 'NO_CHANGE', '調整金額不得全部為 0');
     }
@@ -789,7 +1087,8 @@ export async function walletAdjust(env, claims, params) {
                     txId: txBuilt.txId
                 }
             };
-        }
+        },
+        `adjust|${patientId}|${deltaBalance}|${deltaBonus}`
     );
 }
 
@@ -864,7 +1163,8 @@ export async function walletSetStatus(env, claims, params) {
                 ],
                 result: { ok: true, status, balance, bonusBalance }
             };
-        }
+        },
+        `status|${patientId}|${status}`
     );
 }
 
@@ -953,7 +1253,8 @@ function migrationApplyTx(group, tx) {
  *   tx.clinicId（新制）> 診症單 clinicId > 掛號單 clinicId
  *   > topupBonus 跟隨同 idempotencyKey 的 topup。
  * 無法歸屬者記為未分組餘額回報，需人工以「調整」處置；
- * 已標記 walletMigratedAt 的舊文件跳過，不重複遷移。
+ * 已標記 walletMigratedAt 的舊文件跳過。即使上次執行在標記舊文件前
+ * 中斷，複合帳戶上的 legacyMigratedFrom 戳記也會阻止結存重複加總。
  *
  * @param {object} opts {dryRun?: boolean}
  * @returns {Promise<object>} 遷移報告
@@ -981,6 +1282,8 @@ export async function walletMigrateLegacy(env, claims, opts = {}) {
         migrated: [],
         unassigned: [],
         skipped: [],
+        // 已計入過遷移結存、本次未重複入帳的複合帳戶（防重複入帳）
+        creditSkipped: [],
         unknownClinic: [],
         capped: false
     };
@@ -1091,13 +1394,27 @@ export async function walletMigrateLegacy(env, claims, opts = {}) {
             const existing = await client.getDocument(
                 `patientWalletAccounts/${encodeURIComponent(compositeId)}`
             );
-            // 新制帳戶可能已於部署後、遷移前啟用：把舊制結存「加回」一次
+            const existingData = existing && existing.data ? existing.data : null;
+            // 防重複入帳：複合帳戶若已帶有本病人的遷移戳記，代表先前
+            // 執行（可能中途失敗、舊文件尚未標記 walletMigratedAt）已把
+            // 舊制結存計入，本次不得再加一次。
+            const alreadyCredited = existingData
+                && String(existingData.legacyMigratedFrom || '') === patientId;
+            if (alreadyCredited) {
+                report.creditSkipped.push({ patientId, clinicId: cid });
+                assignedCids.push(cid);
+                assignedBalance = round2(assignedBalance + g.balance);
+                assignedBonus = round2(assignedBonus + g.bonus);
+                continue;
+            }
+            // 新制帳戶可能已於部署後、遷移前啟用：把舊制結存「加回」一次。
+            // 寫入遷移戳記，確保即使舊文件標記前中斷，重跑也不會重複加總。
             const finalBalance = round2(
-                (existing && existing.data ? Number(existing.data.balance) || 0 : 0)
+                (existingData ? Number(existingData.balance) || 0 : 0)
                 + g.balance
             );
             const finalBonus = round2(
-                (existing && existing.data ? Number(existing.data.bonusBalance) || 0 : 0)
+                (existingData ? Number(existingData.bonusBalance) || 0 : 0)
                 + g.bonus
             );
             const at = new Date().toISOString();
@@ -1110,7 +1427,13 @@ export async function walletMigrateLegacy(env, claims, opts = {}) {
                 currency: String(legacy.currency || 'HKD'),
                 createdAt: String(legacy.createdAt || g.earliestAt || at),
                 createdBy: String(legacy.createdBy || operatorName(claims)),
-                updatedAt: at
+                updatedAt: at,
+                // 遷移來源證據：本帳戶已吸收舊制 {patientId} 帳戶中
+                // 歸屬此診所的結存（金額快照一併保存供核對）
+                legacyMigratedFrom: patientId,
+                legacyMigratedAt: at,
+                legacyMigratedBalance: g.balance,
+                legacyMigratedBonus: g.bonus
             };
             if (!dryRun) {
                 await client.patchDocument(
@@ -1166,5 +1489,6 @@ export async function walletMigrateLegacy(env, claims, opts = {}) {
     }
 
     report.totalMigrated = report.migrated.length;
+    report.totalCreditSkipped = report.creditSkipped.length;
     return report;
 }
