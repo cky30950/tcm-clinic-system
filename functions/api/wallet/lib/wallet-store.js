@@ -54,9 +54,18 @@ function sleep(ms) {
 // 充值收款方式白名單（櫃台實際收現渠道）
 const TOPUP_PAYMENT_METHODS = ['cash', 'fps', 'eps', 'card', 'cheque', 'other'];
 
-// 冪等記錄保留天數：供 Firestore TTL 政策（expiresAt 欄位）自動清除。
-// 需長於備份保留期（2 個月），確保還原備份後重放防護仍有效。
+// 冪等記錄保留天數：寫入 expiresAt（建立時間 +180 天）。
+// 專案使用 Spark 免費計劃，Firestore 原生 TTL 刪除需啟用計費，
+// 故改由 purgeExpiredIdempotency() 以 Service Account 順手清理
+//（只消耗每日免費讀／刪配額，診所用量下成本為 0）。
+// 保留期需長於備份保留期（2 個月），確保還原備份後重放防護仍有效。
 const WALLET_IDEMPOTENCY_TTL_DAYS = 180;
+
+// ── 過期冪等記錄清理（免費計劃替代 TTL 政策）──
+const IDEMPOTENCY_PURGE_BATCH = 100;     // 每次最多刪除筆數
+const IDEMPOTENCY_PURGE_INTERVAL_MS = 24 * 3600 * 1000; // 每個 isolate 每日最多跑一次
+let lastIdempotencyPurgeAt = 0;
+let idempotencyPurgeInFlight = false;
 
 function normalizePaymentMethod(raw) {
     const m = String(raw || '').trim().toLowerCase();
@@ -289,12 +298,10 @@ async function runIdempotentTransaction(env, idemKey, scope, resolveExtraDocs, b
 
         // 冪等記錄寫在最後，內存處理結果。
         // updatedAt：備份系統增量同步用（與交易流水一致）。
-        // expiresAt：Firestore TTL 政策依此 Timestamp 自動清除（只增不刪
-        //   會無限膨脹）；保留 180 天，涵蓋重放視窗與備份還原週期（2 個月），
+        // expiresAt：Timestamp（建立日 +180 天），供 purgeExpiredIdempotency
+        //   查詢並批量刪除（免費計劃不能用 Firestore 原生 TTL，其 TTL 刪除
+        //   需啟用計費）；保留 180 天涵蓋重放視窗與備份還原週期（2 個月），
         //   還原備份後進行中的 pay/topup 鍵仍在，避免重複扣款／重複入帳。
-        //   TTL 政策需一次性以 gcloud 啟用：
-        //   gcloud firestore fields ttls update expiresAt \
-        //     --collection-group=walletIdempotency --enable-ttl
         const nowDate = new Date();
         const expiresAt = new Date(nowDate.getTime()
             + WALLET_IDEMPOTENCY_TTL_DAYS * 86400000);
@@ -328,9 +335,112 @@ async function runIdempotentTransaction(env, idemKey, scope, resolveExtraDocs, b
                 `交易提交失敗 (HTTP ${commitRes.status}): ${text.slice(0, 150)}`);
         }
 
+        // 交易成功後順手觸發過期清理（不 await、不影響回應延遲；
+        // 每個 isolate 24 小時內最多執行一次，失敗一律靜默）
+        void scheduleIdempotencyPurge(env);
+
         return result;
     }
     throw new WalletError(500, 'WALLET_TX_BUSY', '系統忙碌中，請重試');
+}
+
+/**
+ * 節流觸發過期冪等記錄清理。只在間隔到期且無其他清理進行時執行；
+ * 任何錯誤都吞掉（清理失敗不應影響錢包操作）。
+ */
+function scheduleIdempotencyPurge(env) {
+    const now = Date.now();
+    if (idempotencyPurgeInFlight
+        || (now - lastIdempotencyPurgeAt) < IDEMPOTENCY_PURGE_INTERVAL_MS) {
+        return null;
+    }
+    lastIdempotencyPurgeAt = now;
+    idempotencyPurgeInFlight = true;
+    return purgeExpiredIdempotency(env)
+        .catch((error) => {
+            console.warn('清理過期冪等記錄失敗（不影響操作）:',
+                error && error.message ? error.message : error);
+        })
+        .finally(() => { idempotencyPurgeInFlight = false; });
+}
+
+/**
+ * 查詢過期的 walletIdempotency 文件並批量刪除。
+ * 涵蓋兩代記錄：
+ *  1. 新記錄：expiresAt（Timestamp）<= now
+ *  2. 舊記錄（無 expiresAt）：at 為 ISO 字串，按字串字典序即時間序，
+ *     查 at <= (now - 180 天)
+ * 單欄位範圍查詢＋批次 commit delete：
+ *  - 索引：兩欄位皆有 Firestore 預設單欄位索引，免建複合索引
+ *  - 配額：每次 2 次查詢（僅回傳到期文件）＋N 次刪除，並由 24 小時節流
+ *    限制頻率，遠低於免費計劃 5 萬讀／2 萬刪的每日配額
+ * @returns {Promise<number>} 實際刪除筆數
+ */
+export async function purgeExpiredIdempotency(env) {
+    const access = await getAccessToken(env);
+    const pid = access.projectId;
+    const docsUrl =
+        `${FS_BASE}/projects/${pid}/databases/(default)/documents`;
+    const headers = {
+        'Authorization': `Bearer ${access.token}`,
+        'Content-Type': 'application/json'
+    };
+    const nowIso = new Date().toISOString();
+    const cutoffIso = new Date(Date.now()
+        - WALLET_IDEMPOTENCY_TTL_DAYS * 86400000).toISOString();
+
+    const queries = [
+        {
+            // 新記錄：Timestamp 欄位
+            fieldPath: 'expiresAt',
+            op: 'LESS_THAN_OR_EQUAL',
+            value: { timestampValue: nowIso }
+        },
+        {
+            // 舊記錄：ISO 字串欄位（字典序＝時間序）
+            fieldPath: 'at',
+            op: 'LESS_THAN_OR_EQUAL',
+            value: { stringValue: cutoffIso }
+        }
+    ];
+
+    const names = new Set();
+    for (const filter of queries) {
+        const queryRes = await fetch(`${docsUrl}:runQuery`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                structuredQuery: {
+                    from: [{ collectionId: 'walletIdempotency' }],
+                    where: { fieldFilter: filter },
+                    orderBy: [
+                        { field: { fieldPath: filter.fieldPath }, direction: 'ASCENDING' }
+                    ],
+                    limit: IDEMPOTENCY_PURGE_BATCH
+                }
+            })
+        });
+        if (!queryRes.ok) {
+            throw new Error(`查詢過期冪等記錄失敗 HTTP ${queryRes.status}`);
+        }
+        const rows = await queryRes.json();
+        (Array.isArray(rows) ? rows : []).forEach((r) => {
+            if (r && r.document && r.document.name) names.add(r.document.name);
+        });
+    }
+    if (!names.size) return 0;
+
+    const commitRes = await fetch(`${docsUrl}:commit`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+            writes: Array.from(names).map((name) => ({ delete: name }))
+        })
+    });
+    if (!commitRes.ok) {
+        throw new Error(`批量刪除過期冪等記錄失敗 HTTP ${commitRes.status}`);
+    }
+    return names.size;
 }
 
 // ── 流水文件建構 ──
