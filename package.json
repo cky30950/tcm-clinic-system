@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "description": "Dependencies for Cloudflare Pages Functions (Web Push).",
+  "scripts": {
+    "test": "node --test functions/api/wallet/lib/wallet-core.test.js"
+  },
   "dependencies": {
     "@block65/webcrypto-web-push": "^2.0.0"
   }

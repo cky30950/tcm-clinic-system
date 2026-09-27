@@ -144,6 +144,9 @@ export class FirestoreClient {
             orderBy = [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
             startAt = null,
             limit: pageLimit = PAGE_SIZE,
+            // 明確文件總量上限：達標即停止翻頁並回傳 truncated:true，
+            // 讓呼叫端知道資料被截斷，而非靜默只取前 N 筆
+            maxDocs = 0,
             onDoc = null
         } = options;
 
@@ -157,10 +160,14 @@ export class FirestoreClient {
 
         // 安全上限，避免異常狀況下無限翻頁（300 × 2000 = 60 萬筆）
         for (let page = 0; page < 2000; page++) {
+            // 最後一頁只取到 maxDocs 所需數量，游標才能精確接續
+            const effectiveLimit = maxDocs > 0
+                ? Math.min(pageLimit, maxDocs - collected.length)
+                : pageLimit;
             const structuredQuery = {
                 from: [{ collectionId }],
                 orderBy,
-                limit: pageLimit
+                limit: effectiveLimit
             };
             if (where) structuredQuery.where = where;
             if (cursor) structuredQuery.startAt = cursor;
@@ -177,14 +184,17 @@ export class FirestoreClient {
                 collected.push(doc);
             }
 
-            if (pageDocs.length < pageLimit) {
-                return { docs: collected, nextCursor: null, readTime: lastReadTime };
+            if (pageDocs.length < effectiveLimit) {
+                return { docs: collected, nextCursor: null, readTime: lastReadTime, truncated: false };
             }
 
             const last = pageDocs[pageDocs.length - 1];
             cursor = this._buildOrderCursor(orderBy, last);
             if (!cursor) {
-                return { docs: collected, nextCursor: null, readTime: lastReadTime };
+                return { docs: collected, nextCursor: null, readTime: lastReadTime, truncated: false };
+            }
+            if (maxDocs > 0 && collected.length >= maxDocs) {
+                return { docs: collected, nextCursor: cursor, readTime: lastReadTime, truncated: true };
             }
         }
         throw new Error(`查詢 ${collectionId} 超過分頁安全上限`);

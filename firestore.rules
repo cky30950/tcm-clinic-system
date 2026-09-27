@@ -67,44 +67,15 @@ service cloud.firestore {
            .hasOnly(['lastLogin', 'personalSettings', 'updatedAt', 'updatedBy']);
     }
 
-    // ============================================================
-    // 會員查詢（Firebase Phone Auth 病人，無 staff claim）
-    // ------------------------------------------------------------
-    // 病人以手機號碼登入後，唯讀查詢「自己電話對應」的資料。
-    // 比對前統一正規化：去除空格、橫線、括號、加號，
-    // 容許職員建檔時電話格式差異（如 +852 9xxx xxxx）。
-    // ============================================================
-    function normalizedPhone(raw) {
-      return string(raw).replace('[ \t\r\n()+ -]', '');
-    }
-    // 去除香港國碼：Firebase Phone Auth 之手機號為 +8529xxx（正規化後 8529xxx），
-    // 職員建檔時多存 8 位本地號；統一轉成本地格式比對。
-    function localPhone(raw) {
-      let p = normalizedPhone(raw);
-      return p.matches('852[0-9]{8}') ? p.replace('852', '') : p;
-    }
-    function isPhoneUser() {
-      return isSignedIn()
-        && request.auth.token.phone_number != null
-        && request.auth.token.staff != true;
-    }
-    function patientPath(patientId) {
-      return /databases/$(database)/documents/patients/$(patientId);
-    }
-    function patientPhoneNumber(patientId) {
-      return get(patientPath(patientId)).data.phone;
-    }
-    // 手機登入者是否為該病人文件的持有人
-    function ownsPatientId(patientId) {
-      return isPhoneUser()
-        && localPhone(patientPhoneNumber(patientId))
-           == localPhone(request.auth.token.phone_number);
-    }
-    // 以流水/套票文件上的 patientId 判斷持有人
-    function ownsResourcePatient() {
-      return isPhoneUser()
-        && localPhone(patientPhoneNumber(resource.data.patientId))
-           == localPhone(request.auth.token.phone_number);
+    // 錢包集合的員工讀取把關
+    // 【暫時政策 2026-09】員工診所對應表尚未整理完成，過渡期內所有
+    // 活躍員工均可讀全部診所的錢包資料。日後收回跨診所權限時，把此函式
+    // 恢復為「帶 clinicId claim 者僅可讀 resource.data.clinicId 相符的
+    // 文件、無 claim 超管可讀全部」的比對版本即可。
+    // 注意：get 一個「不存在」的文件時 resource 為 null（員工探測病人
+    // 是否已開戶屬正常路徑，snapshot 不含任何欄位，不構成外洩）。
+    function walletStaffRead() {
+      return resource == null || isActiveStaff() || isActiveByIndex();
     }
 
     // ============================================================
@@ -227,22 +198,20 @@ service cloud.firestore {
     // ============================================================
 
     // 儲值帳戶（每診所獨立，文件 ID = {clinicId}__{patientId}）：
-    //  - 員工可讀；帳戶本人（手機驗證）可取自己的帳戶
-    //    （病人 ID 存於文件欄位，故以資源上的 patientId 核對電話）
+    //  - 僅活躍員工可讀（過渡期暫不做跨診所限制，見 walletStaffRead）
     //  - 寫入一律拒絕——所有進出均由 Pages Function 以 SA 交易處理，
     //    客戶端不可直接改餘額
     //  - 舊制全域帳戶（文件 ID = patientId）同適用本規則
     match /patientWalletAccounts/{accountId} {
-      allow get: if canAccess() || ownsResourcePatient();
-      allow list: if canAccess();
+      allow get, list: if walletStaffRead();
       allow write: if false;
     }
 
     // 錢包流水（只加不刪）：
-    //  - 員工可讀；本人可讀自己的流水（逐文件以 patientId 核對電話）
+    //  - 僅活躍員工可讀（過渡期暫不做跨診所限制，見 walletStaffRead）
     //  - 寫入一律拒絕，僅 SA 端點可建立
     match /patientWalletTransactions/{txId} {
-      allow read: if canAccess() || ownsResourcePatient();
+      allow read: if walletStaffRead();
       allow write: if false;
     }
 
@@ -251,24 +220,20 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // 病人文件：
-    //  - 員工可讀寫
-    //  - 手機登入者可取自己的文件，並可以電話查詢（list 逐文件比對，
-    //    查詢他人文件時規則拒絕故不會外洩）
-    match /patients/{patientId} {
-      allow get: if canAccess() || ownsPatientId(patientId);
-      allow list: if canAccess()
-        || (isPhoneUser()
-            && localPhone(resource.data.phone)
-               == localPhone(request.auth.token.phone_number));
-      allow write: if canAccess();
+    // 診症單退款累計（防重複／超額退款）：僅 SA 於退款交易內讀寫，
+    // 客戶端任何操作拒絕；退款明細仍可由 patientWalletTransactions 查閱
+    match /walletConsultationRefunds/{consultationId} {
+      allow read, write: if false;
     }
 
-    // 次數套票：員工可讀寫；本人可讀自己電話對應的套票
+    // 病人文件：僅員工可讀寫
+    match /patients/{patientId} {
+      allow read, write: if canAccess();
+    }
+
+    // 次數套票：僅員工可讀寫
     match /patientPackages/{packageId} {
-      allow get: if canAccess() || ownsResourcePatient();
-      allow list: if canAccess() || ownsResourcePatient();
-      allow write: if canAccess();
+      allow read, write: if canAccess();
     }
 
     // ============================================================
@@ -294,6 +259,7 @@ service cloud.firestore {
         && collectionId != 'patientWalletAccounts'
         && collectionId != 'patientWalletTransactions'
         && collectionId != 'walletIdempotency'
+        && collectionId != 'walletConsultationRefunds'
         && collectionId != 'patients'
         && collectionId != 'patientPackages';
     }

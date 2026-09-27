@@ -24985,67 +24985,93 @@ async function restoreUser(id) {
             };
         }
 
-        // 依日期範圍讀取錢包流水。
-        // 【暫時政策 2026-09】過渡期內所有員工可看全部診所，診所範圍
+        // Firestore 游標分頁抓取：寫死 limit(300/500) 在規模變大時會靜默
+        // 漏掉超出頁面的資料，這裡用 startAfter 文件游標翻到用盡為止。
+        // 約束中可含 orderBy；游標一律以最後一份文件快照定位
+        // （未指定 orderBy 時 Firestore 隱含 __name__ 排序，同樣有效）。
+        // 回傳 { docs, truncated }；truncated=true 代表觸及 maxDocs 安全上限。
+        async function walletFetchAllDocs(collectionName, constraints, opts = {}) {
+            const fb = window.firebase;
+            const pageSize = opts.pageSize || 300;
+            const maxDocs = opts.maxDocs || 10000;
+            const col = fb.collection(fb.db, collectionName);
+            const docs = [];
+            let lastDoc = null;
+            let truncated = false;
+            // 防呆：無約束的全表掃描極危險，強制呼叫端明確給條件
+            if (!Array.isArray(constraints) || !constraints.length) {
+                throw new Error('walletFetchAllDocs 必須帶查詢條件');
+            }
+            while (docs.length < maxDocs) {
+                const remaining = Math.min(pageSize, maxDocs - docs.length);
+                const qs = constraints.slice();
+                if (lastDoc) qs.push(fb.startAfter(lastDoc));
+                qs.push(fb.limit(remaining));
+                const snap = await fb.getDocs(fb.firestoreQuery(col, ...qs));
+                const batch = snap.docs || [];
+                if (!batch.length) break;
+                docs.push(...batch);
+                lastDoc = batch[batch.length - 1];
+                if (batch.length < remaining) break;
+                if (docs.length >= maxDocs) {
+                    truncated = true;
+                    break;
+                }
+            }
+            return { docs, truncated };
+        }
+
         // 完全依介面篩選（clinicFilter 為空＝全部診所總覽）；日後收回
         // 跨診所權限時，繫結員工須再強制 cid = claim 的 clinicId。
         async function loadWalletFinRaw(startDate, endDate, clinicFilter) {
             const fb = window.firebase;
             const cid = clinicFilter ? String(clinicFilter) : '';
             const { startIso, endIso } = walletFinRangeIso(startDate, endDate);
-            const txs = [];
+            const warnings = [];
+            let txResult;
             if (cid) {
                 // 診所範圍：clinicId 相等 + at 範圍（需 (clinicId, at)
                 // 複合索引，見 firestore.indexes.json）；統計只按日期聚合，
                 // 不需要 orderBy
-                const txQ = fb.firestoreQuery(
-                    fb.collection(fb.db, 'patientWalletTransactions'),
+                txResult = await walletFetchAllDocs('patientWalletTransactions', [
                     fb.where('clinicId', '==', cid),
                     fb.where('at', '>=', startIso),
-                    fb.where('at', '<=', endIso),
-                    fb.limit(500)
-                );
-                const txSnap = await fb.getDocs(txQ);
-                txSnap.forEach((d) => txs.push(Object.assign({ id: d.id }, d.data())));
+                    fb.where('at', '<=', endIso)
+                ], { pageSize: 300, maxDocs: 10000 });
             } else {
                 // 全部診所總覽：單欄位 at 範圍查詢，使用自動索引
-                const txQ = fb.firestoreQuery(
-                    fb.collection(fb.db, 'patientWalletTransactions'),
+                txResult = await walletFetchAllDocs('patientWalletTransactions', [
                     fb.where('at', '>=', startIso),
                     fb.where('at', '<=', endIso),
-                    fb.orderBy('at', 'desc'),
-                    fb.limit(500)
-                );
-                const txSnap = await fb.getDocs(txQ);
-                txSnap.forEach((d) => txs.push(Object.assign({ id: d.id }, d.data())));
+                    fb.orderBy('at', 'desc')
+                ], { pageSize: 300, maxDocs: 10000 });
             }
+            if (txResult.truncated) {
+                warnings.push('儲值流水超過一萬筆，僅統計最近部分，請縮短報表期間');
+            }
+            const txs = txResult.docs.map((d) =>
+                Object.assign({ id: d.id }, d.data()));
 
             // 帳戶：財務報表的診所篩選在這裡一併套用（單欄位 where，
             // 不需複合索引）；全部診所總覽才退回 updatedAt 排序查詢
-            const accounts = [];
+            let accResult;
             if (cid) {
-                const accQ = fb.firestoreQuery(
-                    fb.collection(fb.db, 'patientWalletAccounts'),
-                    fb.where('clinicId', '==', cid),
-                    fb.limit(500)
-                );
-                const accSnap = await fb.getDocs(accQ);
-                accSnap.forEach((d) => accounts.push(d.data()));
+                accResult = await walletFetchAllDocs('patientWalletAccounts', [
+                    fb.where('clinicId', '==', cid)
+                ], { pageSize: 300, maxDocs: 10000 });
             } else {
-                const accQ = fb.firestoreQuery(
-                    fb.collection(fb.db, 'patientWalletAccounts'),
-                    fb.orderBy('updatedAt', 'desc'),
-                    fb.limit(300)
-                );
-                const accSnap = await fb.getDocs(accQ);
-                accSnap.forEach((d) => {
-                    const a = d.data();
-                    // 已遷移的舊制全域帳戶其結存已轉到複合帳戶，跳過避免重複計
-                    if (a && a.walletMigratedAt) return;
-                    accounts.push(a);
-                });
+                accResult = await walletFetchAllDocs('patientWalletAccounts', [
+                    fb.orderBy('updatedAt', 'desc')
+                ], { pageSize: 300, maxDocs: 10000 });
             }
-            return { txs, accounts };
+            if (accResult.truncated) {
+                warnings.push('儲值帳戶超過一萬個，期末餘額僅含部分帳戶');
+            }
+            // 已遷移的舊制全域帳戶其結存已轉到複合帳戶，跳過避免重複計
+            const accounts = accResult.docs
+                .map((d) => d.data())
+                .filter((a) => !(cid === '' && a && a.walletMigratedAt));
+            return { txs, accounts, warnings };
         }
 
         async function getWalletFinRaw(startDate, endDate, forceRefresh, clinicFilter) {
@@ -25268,16 +25294,14 @@ async function restoreUser(id) {
         let lastWalletFinQuery = null;
         async function loadWalletReceivables(startDate, endDate, clinicFilter) {
             const fb = window.firebase;
-            const q = fb.firestoreQuery(
-                fb.collection(fb.db, 'consultations'),
-                fb.where('paymentStatus', '==', 'unpaid'),
-                fb.limit(300)
-            );
-            const snap = await fb.getDocs(q);
+            // 單欄位相等查詢（自動索引），游標分頁抓全後再做客戶端篩選
+            const { docs, truncated } = await walletFetchAllDocs('consultations', [
+                fb.where('paymentStatus', '==', 'unpaid')
+            ], { pageSize: 300, maxDocs: 5000 });
             const start = new Date(startDate);
             const end = new Date(endDate + 'T23:59:59.999Z');
             const rows = [];
-            snap.forEach((d) => {
+            docs.forEach((d) => {
                 const c = Object.assign({ id: d.id }, d.data() || {});
                 const dt = new Date(c.date);
                 if (!Number.isFinite(dt.getTime()) || dt < start || dt > end) return;
@@ -25285,7 +25309,7 @@ async function restoreUser(id) {
                 rows.push(c);
             });
             rows.sort((a, b) => new Date(b.date) - new Date(a.date));
-            return rows;
+            return { rows, truncated };
         }
 
         function renderWalletReceivables(rows) {
@@ -25346,10 +25370,16 @@ async function restoreUser(id) {
                     startDate, endDate, !!forceRefresh, clinicFilter);
                 const stats = calculateWalletFinancialStats(raw, clinicFilter);
                 updateWalletFinSection(stats);
+                if (Array.isArray(raw.warnings) && raw.warnings.length) {
+                    raw.warnings.forEach((w) => showToast(w, 'error'));
+                }
                 // 待收款獨立查詢失敗不影響儲值主統計
                 try {
-                    const receivables = await loadWalletReceivables(startDate, endDate, clinicFilter);
-                    renderWalletReceivables(receivables);
+                    const recvResult = await loadWalletReceivables(startDate, endDate, clinicFilter);
+                    renderWalletReceivables(recvResult.rows);
+                    if (recvResult.truncated) {
+                        showToast('待收款記錄超過五千筆，僅顯示部分，請縮短報表期間', 'error');
+                    }
                 } catch (recvError) {
                     console.error('載入待收款清單失敗:', recvError);
                     const recvBody = document.getElementById('financialReceivablesBody');
@@ -32047,119 +32077,41 @@ class FirebaseDataManager {
     /**
      * 清除過期的問診資料。
      *
-     * 此函式會遍歷 `inquiries` 集合，並刪除那些
-     * `createdAt` 發生在今日 00:00 之前（即昨天或更早）的問診紀錄。
-     * 若某筆記錄缺少 `createdAt` 欄位，則會改用 `expireAt` 作為判斷依據。
-     * 因為系統設計與 Realtime Database 的掛號清理邏輯一致，
-     * 只保留今天及未來的資料，所有舊資料將被移除。
+     * Security Rules 規定 `inquiries` 客戶端一律不可寫入/刪除
+     * （allow create, update, delete: if false），舊式直接 deleteDoc
+     * 會回報 Missing or insufficient permissions。改為呼叫
+     * POST /api/inquiry/cleanup，由 Pages Function 驗證職員身份後
+     * 以 Service Account 刪除 createdAt／expireAt 早於香港時間今日
+     * 00:00 的文件（只保留今天及未來的資料）。
      *
-     * @returns {Promise<{success: boolean, deletedCount?: number}>}
+     * @returns {Promise<{success: boolean, deletedCount?: number, error?: string}>}
      */
     async clearOldInquiries() {
         if (!this.isReady) return { success: false };
         try {
-            const now = new Date();
-            // 計算今日凌晨時間（本地時區）。任何發生在此時間之前的紀錄將被視為過期。
-            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const inquiriesRef = window.firebase.collection(window.firebase.db, 'inquiries');
+            const fbUser = window.firebase && window.firebase.auth && window.firebase.auth.currentUser;
+            if (!fbUser) return { success: false };
 
-            // 儲存待刪除文件的 ID，避免重複處理
-            const idsToDelete = new Set();
-            const docsToDelete = [];
-
-            /*
-             * Firestore 支援條件查詢。如果 Firebase 提供 or 查詢，我們只執行一次查詢，
-             * 以 createdAt 或 expireAt 早於今日凌晨的文件作為刪除對象，減少讀取次數。
-             * 若環境中不支援 or 查詢，將回退到分別查詢 createdAt 與 expireAt 的方式。
-             */
-            try {
-                let fetchedDocs = [];
-                if (window.firebase && typeof window.firebase.or === 'function') {
-                    // 使用 or 條件一次查詢兩種過期條件
-                    const combinedQuery = window.firebase.firestoreQuery(
-                        inquiriesRef,
-                        window.firebase.or(
-                            window.firebase.where('createdAt', '<', startOfToday),
-                            window.firebase.where('expireAt', '<', startOfToday)
-                        )
-                    );
-                    const snapshot = await window.firebase.getDocs(combinedQuery);
-                    snapshot.forEach((doc) => {
-                        fetchedDocs.push(doc);
-                    });
-                } else {
-                    // 環境不支援 or，回退至原本的兩次查詢
-                    try {
-                        const qCreated = window.firebase.firestoreQuery(
-                            inquiriesRef,
-                            window.firebase.where('createdAt', '<', startOfToday)
-                        );
-                        const snapshotCreated = await window.firebase.getDocs(qCreated);
-                        snapshotCreated.forEach((doc) => {
-                            fetchedDocs.push(doc);
-                        });
-                    } catch (err) {
-                        console.warn('查詢過期 createdAt 問診資料失敗:', err);
-                    }
-                    try {
-                        const qExpire = window.firebase.firestoreQuery(
-                            inquiriesRef,
-                            window.firebase.where('expireAt', '<', startOfToday)
-                        );
-                        const snapshotExpire = await window.firebase.getDocs(qExpire);
-                        snapshotExpire.forEach((doc) => {
-                            fetchedDocs.push(doc);
-                        });
-                    } catch (err) {
-                        console.warn('查詢過期 expireAt 問診資料失敗:', err);
-                    }
-                }
-                fetchedDocs.forEach((doc) => {
-                    docsToDelete.push(doc);
-                });
-            } catch (err) {
-                console.warn('查詢過期問診資料失敗:', err);
-            }
-
-            const deletions = [];
-            // 驗證並彙整需要刪除的文件
-            docsToDelete.forEach((doc) => {
-                // 避免同一文件被重複加入
-                if (idsToDelete.has(doc.id)) return;
-                const data = doc.data();
-                let createdDate = null;
-                if (data.createdAt) {
-                    if (data.createdAt.seconds !== undefined) {
-                        createdDate = new Date(data.createdAt.seconds * 1000);
-                    } else {
-                        createdDate = new Date(data.createdAt);
-                    }
-                }
-                let targetDate = createdDate;
-                if (!targetDate && data.expireAt) {
-                    if (data.expireAt.seconds !== undefined) {
-                        targetDate = new Date(data.expireAt.seconds * 1000);
-                    } else {
-                        targetDate = new Date(data.expireAt);
-                    }
-                }
-                // 如果目標日期存在且早於今日凌晨，則加入刪除佇列
-                if (targetDate && targetDate < startOfToday) {
-                    idsToDelete.add(doc.id);
-                    deletions.push(
-                        window.firebase.deleteDoc(
-                            window.firebase.doc(window.firebase.db, 'inquiries', doc.id)
-                        )
-                    );
-                }
+            const token = await fbUser.getIdToken();
+            const response = await fetch('/api/inquiry/cleanup', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
             });
 
-            let count = 0;
-            if (deletions.length > 0) {
-                await Promise.all(deletions);
-                count = deletions.length;
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (_e) {
+                data = null;
             }
-            return { success: true, deletedCount: count };
+            if (!response.ok) {
+                throw new Error((data && data.message) || ('HTTP ' + response.status));
+            }
+            return { success: true, deletedCount: (data && data.deletedCount) || 0 };
         } catch (error) {
             console.error('清除過期問診資料失敗:', error);
             return { success: false, error: error.message };
@@ -34382,7 +34334,8 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
     topupBonus: '充值贈送',
     payment: '看診付款',
     refund: '退款',
-    adjust: '調整'
+    adjust: '調整',
+    statusChange: '狀態變更'
   };
   // 充值收款方式（與後端 TOPUP_PAYMENT_METHODS 白名單一致）
   const WALLET_METHOD_LABELS = {
@@ -34626,15 +34579,17 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
     listEl.innerHTML = walletListLoadingHtml();
     try {
       const cid = currentWalletClinicId();
-      // 只 where 單一欄位（clinicId 相等），排序於客戶端處理，避免複合索引
-      const q = window.firebase.firestoreQuery(
-        window.firebase.collection(window.firebase.db, 'patientWalletAccounts'),
-        window.firebase.where('clinicId', '==', cid),
-        window.firebase.limit(300)
+      // 單欄位 where（clinicId 相等）走自動索引；游標分頁抓全部，
+      // 排序於客戶端處理，避免規模擴大後 limit 靜默截斷會員
+      const { docs, truncated } = await walletFetchAllDocs(
+        'patientWalletAccounts',
+        [window.firebase.where('clinicId', '==', cid)],
+        { pageSize: 300, maxDocs: 10000 }
       );
-      const snap = await window.firebase.getDocs(q);
-      const accounts = [];
-      snap.forEach((d) => accounts.push(d.data()));
+      if (truncated) {
+        showToast('會員帳戶超過一萬個，僅顯示最近部分，請用搜尋功能', 'error');
+      }
+      const accounts = docs.map((d) => d.data());
       // updatedAt 為 ISO 字串，Number() 會得到 NaN 令排序失效；
       // 統一用時間戳比較（兼容 Firestore Timestamp 物件與數字）
       const walletTs = (v) => {
@@ -34964,13 +34919,23 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       const methodLabel = WALLET_METHOD_LABELS[tx.paymentMethod] || tx.paymentMethod;
       typeText += `（${methodLabel}）`;
     }
+    // 狀態變更另顯示轉換軌跡（active→frozen 等）
+    if (tx.type === 'statusChange' && tx.toStatus) {
+      const fromL = WALLET_STATUS_LABELS[tx.fromStatus] || tx.fromStatus || '運作中';
+      const toL = WALLET_STATUS_LABELS[tx.toStatus] || tx.toStatus;
+      typeText += `（${fromL}→${toL}）`;
+    }
+    // 狀態變更不涉金額，顯示「—」，不套用紅綠色
+    const isZeroAmount = tx.type === 'statusChange' || amount === 0;
+    const amountCell = isZeroAmount
+      ? '<span class="text-gray-400">—</span>'
+      : `<span class="${isPayment ? 'text-red-600' : 'text-green-600'}">`
+        + `${isPayment ? '-' : ''}HK$${Math.abs(amount).toFixed(2)}</span>`;
     return `
       <tr class="border-t border-gray-100">
         <td class="px-3 py-1.5 text-gray-600 whitespace-nowrap">${window.escapeHtml(atText)}</td>
         <td class="px-3 py-1.5 text-gray-800">${window.escapeHtml(typeText)}</td>
-        <td class="px-3 py-1.5 text-right font-medium ${isPayment ? 'text-red-600' : 'text-green-600'}">
-          ${isPayment ? '-' : ''}HK$${Math.abs(amount).toFixed(2)}
-        </td>
+        <td class="px-3 py-1.5 text-right font-medium">${amountCell}</td>
         <td class="px-3 py-1.5 text-gray-500 max-w-sm truncate">${window.escapeHtml(tx.note || '')}</td>
       </tr>`;
   }

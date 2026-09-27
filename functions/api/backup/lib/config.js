@@ -54,7 +54,15 @@ export const TOP_COLLECTIONS = [
     // 會員錢包帳戶（每病人一筆，數量少），每次全量
     { key: 'patientWalletAccounts', collectionId: 'patientWalletAccounts', alwaysFull: true },
     // 錢包交易流水（append-only）：日常走 updatedAt 增量，每 7 日 baseline 排除已刪除
-    { key: 'patientWalletTransactions', collectionId: 'patientWalletTransactions', alwaysFull: false }
+    { key: 'patientWalletTransactions', collectionId: 'patientWalletTransactions', alwaysFull: false },
+    // 錢包冪等記錄：必須納入備份。還原備份後若 pay/topup 鍵消失，
+    // 進行中的重送可能重複扣款／入帳（pay 雖有歷史流水二次防護，
+    // topup/adjust 沒有）。新寫入的文件帶 updatedAt，可走增量同步；
+    // 另有 Firestore TTL（expiresAt，180 天）控制 live 端體積。
+    { key: 'walletIdempotency', collectionId: 'walletIdempotency', alwaysFull: false },
+    // 診症單退款累計（防重複退款／超額退款）：一診症單一筆，體積小，
+    // 每次全量；雖可從流水重建，備份可免去還原後的重建程序
+    { key: 'walletConsultationRefunds', collectionId: 'walletConsultationRefunds', alwaysFull: true }
 ];
 
 // 匯出檔中「billingItems」＝全域收費項目＋各診所非公費項目
