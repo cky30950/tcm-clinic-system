@@ -50,22 +50,24 @@ const CLINIC_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
  * 解析本次操作所屬診所：
- *  - 員工帳號帶 clinicId claim（帳號隸屬單一診所）→ 一律以 claim 為準，
- *    客戶端無法指定其他診所；
- *  - 無 clinicId claim 的超級管理員 → 必須由請求顯式帶 clinicId。
+ *  - 正常政策：帶 clinicId claim 的員工一律以 claim 為準，客戶端無法
+ *    指定其他診所；無 claim 的超管須顯式帶 clinicId。
+ *  - 【暫時政策 2026-09】員工診所對應表尚未整理完成，過渡期內所有
+ *    員工均可操作所有診所，故 clinicId 一律由請求顯式帶入（仍做格式
+ *    驗證）。日後收回跨診所權限時，恢復「bound 存在即 return bound」
+ *    的強制邏輯即可。
  * @param {object} claims 已驗證的 token claims
  * @param {object} source 請求參數（JSON body 或 URLSearchParams）
  * @returns {string}
  */
 export function resolveClinicId(claims, source) {
-    const bound = claims && claims.clinicId ? String(claims.clinicId).trim() : '';
-    if (bound) {
-        if (!CLINIC_ID_RE.test(bound)) {
-            throw new WalletError(403, 'INVALID_STAFF_CLINIC',
-                '帳號所屬診所資料異常，請聯絡管理員');
-        }
-        return bound;
-    }
+    // 【暫時政策 2026-09】跨診所隔離恢復點：
+    // 原本「claims.clinicId 存在即強制回傳該值、忽略客戶端指定」，
+    // 過渡期內所有員工可操作所有診所，故暫時一律採用請求帶入的
+    // clinicId（仍做格式驗證）。claims 參數保留，日後直接在此恢復：
+    //   const bound = claims && claims.clinicId ? String(claims.clinicId).trim() : '';
+    //   if (bound) { ...驗證... return bound; }
+    void claims;
     const given = source
         ? String(source.clinicId || source.get?.('clinicId') || '').trim()
         : '';

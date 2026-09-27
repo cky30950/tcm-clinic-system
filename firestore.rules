@@ -67,22 +67,15 @@ service cloud.firestore {
            .hasOnly(['lastLogin', 'personalSettings', 'updatedAt', 'updatedBy']);
     }
 
-    // 錢包集合的員工讀取把關：跨診所隔離
-    //  - 帶 clinicId claim 的員工（含診所管理）只可讀「自己診所」的文件；
-    //  - 無 clinicId 的超級管理員可讀全部；
-    //  - 舊工作階段（userAuthIndex fallback）以索引文件的 clinicId 比對；
-    //  - 舊制全域帳戶（無 clinicId 欄位）僅超級管理員可讀，繫結診所的
-    //    員工一律拒絕，避免 A 診所員工讀到 B 診所病人的餘額與流水。
+    // 錢包集合的員工讀取把關
+    // 【暫時政策 2026-09】員工診所對應表尚未整理完成，過渡期內所有
+    // 活躍員工均可讀全部診所的錢包資料。日後收回跨診所權限時，把此函式
+    // 恢復為「帶 clinicId claim 者僅可讀 resource.data.clinicId 相符的
+    // 文件、無 claim 超管可讀全部」的比對版本即可。
+    // 注意：get 一個「不存在」的文件時 resource 為 null（員工探測病人
+    // 是否已開戶屬正常路徑，snapshot 不含任何欄位，不構成外洩）。
     function walletStaffRead() {
-      return (isActiveStaff()
-              && (request.auth.token.clinicId == null
-                  || request.auth.token.clinicId == ''
-                  || resource.data.clinicId == request.auth.token.clinicId))
-          || (isActiveByIndex()
-              && !isActiveStaff()
-              && (staffIndex().clinicId == null
-                  || staffIndex().clinicId == ''
-                  || staffIndex().clinicId == resource.data.clinicId));
+      return resource == null || isActiveStaff() || isActiveByIndex();
     }
 
     // ============================================================
@@ -205,7 +198,7 @@ service cloud.firestore {
     // ============================================================
 
     // 儲值帳戶（每診所獨立，文件 ID = {clinicId}__{patientId}）：
-    //  - 僅員工可讀，並受跨診所隔離把關
+    //  - 僅活躍員工可讀（過渡期暫不做跨診所限制，見 walletStaffRead）
     //  - 寫入一律拒絕——所有進出均由 Pages Function 以 SA 交易處理，
     //    客戶端不可直接改餘額
     //  - 舊制全域帳戶（文件 ID = patientId）同適用本規則
@@ -215,7 +208,7 @@ service cloud.firestore {
     }
 
     // 錢包流水（只加不刪）：
-    //  - 僅員工可讀，並受跨診所隔離把關（自己診所或超管全部）
+    //  - 僅活躍員工可讀（過渡期暫不做跨診所限制，見 walletStaffRead）
     //  - 寫入一律拒絕，僅 SA 端點可建立
     match /patientWalletTransactions/{txId} {
       allow read: if walletStaffRead();

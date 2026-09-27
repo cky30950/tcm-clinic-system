@@ -24910,14 +24910,12 @@ async function restoreUser(id) {
         }
 
         // 依日期範圍讀取錢包流水。
-        // 繫結單一診所的員工（custom claims 帶 clinicId）即使介面選了
-        // 「全部診所」，也強制只讀自己診所的資料——跨診所隔離由 Rules
-        // 把關，客戶端這裡先收斂查詢範圍；無 clinicId 的超管才看全部。
+        // 【暫時政策 2026-09】過渡期內所有員工可看全部診所，診所範圍
+        // 完全依介面篩選（clinicFilter 為空＝全部診所總覽）；日後收回
+        // 跨診所權限時，繫結員工須再強制 cid = claim 的 clinicId。
         async function loadWalletFinRaw(startDate, endDate, clinicFilter) {
             const fb = window.firebase;
-            const claimCid = (window.currentUserClaims && window.currentUserClaims.clinicId)
-                ? String(window.currentUserClaims.clinicId) : '';
-            const cid = clinicFilter ? String(clinicFilter) : claimCid;
+            const cid = clinicFilter ? String(clinicFilter) : '';
             const { startIso, endIso } = walletFinRangeIso(startDate, endDate);
             const txs = [];
             if (cid) {
@@ -24934,7 +24932,7 @@ async function restoreUser(id) {
                 const txSnap = await fb.getDocs(txQ);
                 txSnap.forEach((d) => txs.push(Object.assign({ id: d.id }, d.data())));
             } else {
-                // 超管總覽：單欄位 at 範圍查詢，使用自動索引
+                // 全部診所總覽：單欄位 at 範圍查詢，使用自動索引
                 const txQ = fb.firestoreQuery(
                     fb.collection(fb.db, 'patientWalletTransactions'),
                     fb.where('at', '>=', startIso),
@@ -24947,7 +24945,7 @@ async function restoreUser(id) {
             }
 
             // 帳戶：財務報表的診所篩選在這裡一併套用（單欄位 where，
-            // 不需複合索引）；全部診所總覽（僅超管）才退回 updatedAt 排序查詢
+            // 不需複合索引）；全部診所總覽才退回 updatedAt 排序查詢
             const accounts = [];
             if (cid) {
                 const accQ = fb.firestoreQuery(
@@ -33751,7 +33749,12 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   const walletMembershipConfigCache = new Map(); // cid → membershipConfig
   let walletSelectedPatientId = '';
 
-  /** 目前操作的診所 ID（員工帳號僅隸屬單一診所；超管可切換） */
+  /**
+   * 目前操作的診所 ID（員工帳號僅隸屬單一診所；超管可切換）。
+   * 【暫時政策 2026-09】過渡期內所有員工可操作所有診所，故一律使用
+   * UI 頂部選取的診所；日後員工診所對應表整理好後，再恢復「繫結員工
+   * 強制以 currentUserClaims.clinicId 為準」的版本。
+   */
   function currentWalletClinicId() {
     let cid = '';
     try {
