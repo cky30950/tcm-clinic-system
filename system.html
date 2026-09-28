@@ -3048,17 +3048,39 @@
                 個人統計分析
               </h2>
               <div class="flex items-center gap-2">
-                <select id="personalStatsClinicSelect" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                  <option value="ALL">全部診所</option>
-                </select>
+                <select id="personalStatsClinicSelect" class="px-3 py-2 border border-gray-300 rounded-lg text-sm"></select>
                 <select id="personalStatsMonthSelect" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
                   <option value="ALL">全部月份</option>
                 </select>
               </div>
             </div>
             
-            <p class="text-gray-600 mb-6">統計醫師個人用藥與穴位使用情況，提供用藥和穴位偏好分析。</p>
-            
+            <div class="mb-6 flex items-center justify-between gap-4">
+              <p class="text-gray-600">統計醫師個人用藥與穴位使用情況，提供用藥和穴位偏好分析。</p>
+              <span id="personalStatsUpdatedAt" class="shrink-0 text-xs text-gray-400"></span>
+            </div>
+
+            <div id="personalStatsMessage" class="hidden mb-4 rounded-lg border px-4 py-3 text-sm"></div>
+
+            <div class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="bg-amber-50 rounded-lg p-4">
+                <div class="text-sm text-gray-500">診症總數</div>
+                <div id="personalStatsTotalConsultations" class="mt-1 text-2xl font-bold text-amber-800">0</div>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4">
+                <div class="text-sm text-gray-500">方劑種類</div>
+                <div id="personalStatsFormulaKinds" class="mt-1 text-2xl font-bold text-gray-800">0</div>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4">
+                <div class="text-sm text-gray-500">中藥種類</div>
+                <div id="personalStatsHerbKinds" class="mt-1 text-2xl font-bold text-gray-800">0</div>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4">
+                <div class="text-sm text-gray-500">穴位種類</div>
+                <div id="personalStatsAcupointKinds" class="mt-1 text-2xl font-bold text-gray-800">0</div>
+              </div>
+            </div>
+
             <div class="space-y-8">
               
               <div class="bg-gray-50 rounded-lg p-6">

@@ -1,4 +1,11 @@
 
+// 必須與 system.js 的 PERSONAL_STATS_SUMMARY_VERSION 一致；
+// 摘要結構改版時提升版號，舊快取會自動作廢。
+const PERSONAL_STATS_CACHE_VERSION = 1;
+const PERSONAL_STATS_CACHE_KEY = 'personalStatsV3';
+// 超過此時效的快取仍可離線展示，但會標示「可能非最新」
+const PERSONAL_STATS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
 let personalHerbChartInstance = null;
 let personalFormulaChartInstance = null;
 let personalAcupointChartInstance = null;
@@ -7,15 +14,68 @@ let personalStatsCurrentClinic = 'ALL';
 let personalStatsSelectedClinicName = '';
 let personalStatsLoading = false;
 let personalStatsBucketsCache = [];
+let personalStatsLoadSeq = 0;
+// 記住最後顯示的更新時間，供語言切換時重繪
+let personalStatsLastUpdated = { iso: '', offline: false };
+// 目前登入醫師 uid（偏好儲存的鍵）
+let personalStatsCurrentUid = '';
+
+// 圖表只畫前 N 名，其餘彙總為「其他」
+const PERSONAL_STATS_TOP_N = 10;
+// 記住每位醫師上次的診所／月份篩選
+const PERSONAL_STATS_PREF_KEY = 'personalStatsPrefV1';
+
+function psGetLang() {
+    try { return (localStorage.getItem('lang') || 'zh').toLowerCase(); } catch (_e) { return 'zh'; }
+}
+
+function psReadPref(uid) {
+    try {
+        const raw = localStorage.getItem(PERSONAL_STATS_PREF_KEY);
+        const all = raw ? JSON.parse(raw) : {};
+        const v = (all && all[String(uid)]) || {};
+        return {
+            clinic: v.clinic === undefined || v.clinic === null ? '' : String(v.clinic),
+            month: v.month === undefined || v.month === null ? '' : String(v.month)
+        };
+    } catch (_e) {
+        return { clinic: '', month: '' };
+    }
+}
+
+function psWritePref(uid, patch) {
+    try {
+        const raw = localStorage.getItem(PERSONAL_STATS_PREF_KEY);
+        const all = raw ? JSON.parse(raw) : {};
+        const key = String(uid);
+        all[key] = Object.assign({ clinic: '', month: '' }, all[key] || {}, patch || {});
+        localStorage.setItem(PERSONAL_STATS_PREF_KEY, JSON.stringify(all));
+    } catch (_e) {}
+}
+
+// 2026-09 → 繁中「2026年9月」／英文「Sep 2026」
+function formatMonthLabel(monthKey) {
+    const m = /^(\d{4})-(\d{1,2})$/.exec(String(monthKey || ''));
+    if (!m) return String(monthKey || '');
+    const y = parseInt(m[1], 10);
+    const mo = parseInt(m[2], 10);
+    if (psGetLang().startsWith('en')) {
+        try {
+            return new Date(y, mo - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        } catch (_e) {}
+    }
+    return `${y}年${mo}月`;
+}
 
 function setPersonalStatisticsLoading(loading) {
     personalStatsLoading = !!loading;
     const listIds = ['personalFormulaList', 'personalHerbList', 'personalAcupointList'];
     if (personalStatsLoading) {
+        const loadingText = (typeof window.t === 'function' ? window.t('載入中...') : '載入中...');
         const loadingHtml = `
             <li class="py-6 text-center text-gray-500">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                <div class="mt-2">載入中...</div>
+                <div class="mt-2">${loadingText}</div>
             </li>
         `;
         listIds.forEach((id) => {
@@ -31,86 +91,63 @@ function setPersonalStatisticsLoading(loading) {
 
 function psReadCache(doctor) {
     try {
-        const s = localStorage.getItem('personalStatsV3');
+        const s = localStorage.getItem(PERSONAL_STATS_CACHE_KEY);
         if (!s) return null;
         const obj = JSON.parse(s);
         const v = obj && obj[String(doctor)];
-        return v || null;
+        if (!v || v.version !== PERSONAL_STATS_CACHE_VERSION || !Array.isArray(v.buckets)) {
+            return null;
+        }
+        return v;
     } catch (_e) {
         return null;
     }
 }
 function psWriteCache(doctor, value) {
     try {
-        const s = localStorage.getItem('personalStatsV3');
+        const s = localStorage.getItem(PERSONAL_STATS_CACHE_KEY);
         const obj = s ? JSON.parse(s) : {};
-        obj[String(doctor)] = value;
-        localStorage.setItem('personalStatsV3', JSON.stringify(obj));
+        obj[String(doctor)] = {
+            ...value,
+            version: PERSONAL_STATS_CACHE_VERSION
+        };
+        localStorage.setItem(PERSONAL_STATS_CACHE_KEY, JSON.stringify(obj));
     } catch (_e) {}
 }
 
-function normalizeDateIso(d) {
-    if (!d) return null;
-    if (typeof d === 'object' && d.seconds) {
-        return new Date(d.seconds * 1000).toISOString();
+function renderPersonalStatsUpdatedAt(iso, offline) {
+    personalStatsLastUpdated = { iso: iso || '', offline: !!offline };
+    const el = document.getElementById('personalStatsUpdatedAt');
+    if (!el) return;
+    if (!iso) {
+        el.textContent = '';
+        return;
     }
-    try {
-        const dt = new Date(d);
-        if (!isNaN(dt.getTime())) return dt.toISOString();
-    } catch (_e) {}
-    return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) {
+        el.textContent = '';
+        return;
+    }
+    const tr = (text) => (typeof window.t === 'function' ? window.t(text) : text);
+    const time = d.toLocaleString();
+    el.textContent = offline
+        ? `${tr('最後更新')}：${time}（${tr('離線快取，可能非最新')}）`
+        : `${tr('最後更新')}：${time}`;
 }
 
-function getMonthKeyFromIso(iso) {
-    if (!iso) return null;
-    try {
-        const d = new Date(iso);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        return `${y}-${m}`;
-    } catch (_e) { return null; }
-}
-
-function computeStatsFromSummaries(list) {
-    const herbCounts = {};
-    const formulaCounts = {};
-    const acupointCounts = {};
-    if (!Array.isArray(list) || list.length === 0) {
-        return { herbCounts, formulaCounts, acupointCounts };
+function setPersonalStatsMessage(kind, html) {
+    const el = document.getElementById('personalStatsMessage');
+    if (!el) return;
+    if (!html) {
+        el.className = 'hidden mb-4 rounded-lg border px-4 py-3 text-sm';
+        el.innerHTML = '';
+        return;
     }
-    const isFormulaName = (name) => {
-        if (!Array.isArray(herbLibrary)) return false;
-        const f = herbLibrary.find(i => i && i.name === name);
-        return !!(f && f.type === 'formula');
-    };
-    for (const item of list) {
-        try {
-            const pres = item && item.prescription ? String(item.prescription) : '';
-            const lines = pres.split('\n');
-            for (const raw of lines) {
-                const line = raw.trim();
-                if (!line) continue;
-                const m = line.match(/^([^0-9\s\(\)\.]+)/);
-                const name = m ? m[1].trim() : line.split(/[\d\s]/)[0];
-                if (!name) continue;
-                if (isFormulaName(name)) {
-                    formulaCounts[name] = (formulaCounts[name] || 0) + 1;
-                } else {
-                    herbCounts[name] = (herbCounts[name] || 0) + 1;
-                }
-            }
-            const acNotes = item && item.acupunctureNotes ? String(item.acupunctureNotes) : '';
-            const re = /data-acupoint-name="(.*?)"/g;
-            let mm;
-            while ((mm = re.exec(acNotes)) !== null) {
-                const acName = mm[1];
-                if (acName) {
-                    acupointCounts[acName] = (acupointCounts[acName] || 0) + 1;
-                }
-            }
-        } catch (_e) {}
-    }
-    return { herbCounts, formulaCounts, acupointCounts };
+    const styles = kind === 'error'
+        ? 'border-red-300 bg-red-50 text-red-800'
+        : 'border-amber-300 bg-amber-50 text-amber-800';
+    el.className = `mb-4 rounded-lg border px-4 py-3 text-sm ${styles}`;
+    el.innerHTML = html;
 }
 
 function normalizeText(s) {
@@ -120,11 +157,17 @@ function normalizeText(s) {
     } catch (_e) { return ''; }
 }
 
+// local-default 是未選診所的本機兜底值，個人統計一律不顯示
+function isHiddenClinicId(clinicId) {
+    return normalizeText(clinicId) === 'local-default';
+}
+
 function filterByClinic(list, clinicId, clinicName) {
-    if (!clinicId || clinicId === 'ALL') return (list || []).filter(it => normalizeText(it.clinicId || '') !== 'local-default');
+    const visible = (list || []).filter(it => !isHiddenClinicId(it && it.clinicId));
+    if (!clinicId || clinicId === 'ALL') return visible;
     const idNorm = normalizeText(clinicId);
     const nameNorm = normalizeText(clinicName);
-    return (list || []).filter(it => {
+    return visible.filter(it => {
         const itemId = normalizeText(it.clinicId || '');
         const itemName = normalizeText(it.clinicName || '');
         return (itemId && itemId === idNorm) || (itemName && nameNorm && itemName === nameNorm);
@@ -152,78 +195,121 @@ function computeAvailableMonths(list) {
     return arr;
 }
 
+function mapPersonalStatsDisplayName(name, type) {
+    if (!psGetLang().startsWith('en')) return name;
+    try {
+        if (type === 'herb' || type === 'formula') {
+            if (Array.isArray(herbLibrary)) {
+                const item = herbLibrary.find(h => h && h.name === name && (type === 'herb' ? h.type === 'herb' : h.type === 'formula'));
+                if (item && item.englishName) return item.englishName;
+            }
+        } else if (type === 'acupoint') {
+            if (Array.isArray(acupointLibrary)) {
+                const ac = acupointLibrary.find(a => a && a.name === name);
+                if (ac && ac.englishName) return ac.englishName;
+            }
+        }
+    } catch (_e) {}
+    return name;
+}
+
 function renderPersonalStatistics(stats) {
     if (!stats) return;
     const { herbCounts, formulaCounts, acupointCounts } = stats;
-    function getLang() {
-        try { return (localStorage.getItem('lang') || 'zh').toLowerCase(); } catch (_e) { return 'zh'; }
+    const tr = (text) => (typeof window.t === 'function' ? window.t(text) : text);
+
+    function sortedEntries(counts) {
+        return Object.entries(counts || {}).sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]));
     }
-    function mapDisplayName(name, type) {
-        const langSel = getLang();
-        if (!langSel.startsWith('en')) return name;
-        try {
-            if (type === 'herb' || type === 'formula') {
-                if (Array.isArray(herbLibrary)) {
-                    const item = herbLibrary.find(h => h && h.name === name && (type === 'herb' ? h.type === 'herb' : h.type === 'formula'));
-                    if (item && item.englishName) return item.englishName;
-                }
-            } else if (type === 'acupoint') {
-                if (Array.isArray(acupointLibrary)) {
-                    const ac = acupointLibrary.find(a => a && a.name === name);
-                    if (ac && ac.englishName) return ac.englishName;
-                }
-            }
-        } catch (_e) {}
-        return name;
-    }
+
     function renderList(counts, listId) {
         const listEl = document.getElementById(listId);
         if (!listEl) return [];
         listEl.innerHTML = '';
-        const entries = Object.entries(counts || {}).sort((a, b) => b[1] - a[1]).slice(0, 10);
         const type = (listId === 'personalHerbList') ? 'herb' : (listId === 'personalFormulaList') ? 'formula' : 'acupoint';
+        const entries = sortedEntries(counts).slice(0, PERSONAL_STATS_TOP_N);
         entries.forEach(([name, count]) => {
             const li = document.createElement('li');
             li.className = 'py-1 flex justify-between';
-            const disp = mapDisplayName(name, type);
+            const disp = mapPersonalStatsDisplayName(name, type);
             li.innerHTML = `<span>${window.escapeHtml(disp)}</span><span class="font-semibold">${count}</span>`;
             listEl.appendChild(li);
         });
+        if (!entries.length) {
+            const li = document.createElement('li');
+            li.className = 'py-6 text-center text-gray-400';
+            li.textContent = tr('尚無資料');
+            listEl.appendChild(li);
+        }
         return entries;
     }
-    function renderChart(entries, canvasId, oldInstance) {
+    function renderKpi(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(value);
+    }
+    // 圖表取前 N 名，第 N+1 名起彙總成「其他（K 種）」
+    function buildChartRows(counts, type) {
+        const sorted = sortedEntries(counts);
+        const top = sorted.slice(0, PERSONAL_STATS_TOP_N).map(e => ({
+            label: mapPersonalStatsDisplayName(e[0], type),
+            value: e[1],
+            other: false
+        }));
+        const rest = sorted.slice(PERSONAL_STATS_TOP_N);
+        if (rest.length) {
+            const otherTotal = rest.reduce((sum, e) => sum + (Number(e[1]) || 0), 0);
+            const paren = psGetLang().startsWith('en') ? `(${rest.length})` : `（${rest.length}）`;
+            top.push({
+                label: `${tr('其他')}${paren}`,
+                value: otherTotal,
+                other: true
+            });
+        }
+        return top;
+    }
+    function renderChart(rows, canvasId, oldInstance) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) return null;
         if (oldInstance && typeof oldInstance.destroy === 'function') {
             try { oldInstance.destroy(); } catch (_e) {}
         }
-        const type = (canvasId === 'personalHerbChart') ? 'herb' : (canvasId === 'personalFormulaChart') ? 'formula' : 'acupoint';
-        const labels = entries.map(e => mapDisplayName(e[0], type));
-        const dataVals = entries.map(e => e[1]);
+        // 橫向長條圖：中文名稱不重疊；反轉使第 1 名顯示在最上方
+        const ordered = rows.slice().reverse();
+        const labels = ordered.map(r => r.label);
+        const dataVals = ordered.map(r => r.value);
         const ctx = canvas.getContext('2d');
         return new Chart(ctx, {
             type: 'bar',
             data: {
                 labels,
-                datasets: [{ label: (typeof window.t === 'function' ? window.t('使用次數') : '使用次數'), data: dataVals }],
+                datasets: [{
+                    label: tr('使用次數'),
+                    data: dataVals,
+                    backgroundColor: ordered.map(r => r.other ? 'rgba(156,163,175,0.7)' : 'rgba(217,119,6,0.75)')
+                }],
             },
             options: {
+                indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
                 scales: {
-                    x: { title: { display: true, text: (typeof window.t === 'function' ? window.t('名稱') : '名稱') } },
-                    y: { title: { display: true, text: (typeof window.t === 'function' ? window.t('使用次數') : '使用次數') }, beginAtZero: true },
+                    x: { beginAtZero: true, ticks: { precision: 0 } },
+                    y: { ticks: { autoSkip: false } }
                 },
             },
         });
     }
-    const herbEntries = renderList(herbCounts, 'personalHerbList');
-    personalHerbChartInstance = renderChart(herbEntries, 'personalHerbChart', personalHerbChartInstance);
-    const formulaEntries = renderList(formulaCounts, 'personalFormulaList');
-    personalFormulaChartInstance = renderChart(formulaEntries, 'personalFormulaChart', personalFormulaChartInstance);
-    const acEntries = renderList(acupointCounts, 'personalAcupointList');
-    personalAcupointChartInstance = renderChart(acEntries, 'personalAcupointChart', personalAcupointChartInstance);
+    renderList(formulaCounts, 'personalFormulaList');
+    personalFormulaChartInstance = renderChart(buildChartRows(formulaCounts, 'formula'), 'personalFormulaChart', personalFormulaChartInstance);
+    renderList(herbCounts, 'personalHerbList');
+    personalHerbChartInstance = renderChart(buildChartRows(herbCounts, 'herb'), 'personalHerbChart', personalHerbChartInstance);
+    renderList(acupointCounts, 'personalAcupointList');
+    personalAcupointChartInstance = renderChart(buildChartRows(acupointCounts, 'acupoint'), 'personalAcupointChart', personalAcupointChartInstance);
+    renderKpi('personalStatsTotalConsultations', Math.round(Number(stats.totalConsultations) || 0));
+    renderKpi('personalStatsFormulaKinds', Object.keys(formulaCounts || {}).length);
+    renderKpi('personalStatsHerbKinds', Object.keys(herbCounts || {}).length);
+    renderKpi('personalStatsAcupointKinds', Object.keys(acupointCounts || {}).length);
 }
 
 function entriesToCountMap(entries) {
@@ -249,12 +335,14 @@ function computeStatsFromBuckets(list) {
     const herbCounts = {};
     const formulaCounts = {};
     const acupointCounts = {};
+    let totalConsultations = 0;
     (Array.isArray(list) ? list : []).forEach((bucket) => {
         mergeCountMaps(herbCounts, entriesToCountMap(bucket && bucket.herbEntries));
         mergeCountMaps(formulaCounts, entriesToCountMap(bucket && bucket.formulaEntries));
         mergeCountMaps(acupointCounts, entriesToCountMap(bucket && bucket.acupointEntries));
+        totalConsultations += Math.round(Number(bucket && bucket.totalConsultations) || 0);
     });
-    return { herbCounts, formulaCounts, acupointCounts };
+    return { herbCounts, formulaCounts, acupointCounts, totalConsultations };
 }
 
 function updatePersonalStatisticsView(refreshMonthOptions = true) {
@@ -284,7 +372,7 @@ function populateMonthSelect(months, currentKey) {
             if (seen.has(mk)) return;
             const opt = document.createElement('option');
             opt.value = mk;
-            opt.textContent = mk;
+            opt.textContent = formatMonthLabel(mk);
             sel.appendChild(opt);
             seen.add(mk);
         });
@@ -295,8 +383,10 @@ function populateMonthSelect(months, currentKey) {
         sel.value = desiredKey;
         personalStatsCurrentMonth = desiredKey;
     }
+    if (personalStatsCurrentUid) psWritePref(personalStatsCurrentUid, { month: personalStatsCurrentMonth });
     sel.onchange = function () {
         personalStatsCurrentMonth = this.value || personalStatsCurrentMonth;
+        if (personalStatsCurrentUid) psWritePref(personalStatsCurrentUid, { month: personalStatsCurrentMonth });
         try {
             updatePersonalStatisticsView(false);
         } catch (_e) {}
@@ -321,22 +411,33 @@ function populateClinicSelect(initialClinicId) {
     const sel = document.getElementById('personalStatsClinicSelect');
     if (!sel) return;
     sel.innerHTML = '';
-    const allOpt = document.createElement('option');
-    allOpt.value = 'ALL';
-    allOpt.textContent = window.t('全部診所');
-    sel.appendChild(allOpt);
     const clinics = readClinicsForPersonalStats();
+    // 僅一間診所時不需「全部診所」選項，直接鎖定該診所
+    const singleClinic = clinics.length === 1;
+    if (!singleClinic) {
+        const allOpt = document.createElement('option');
+        allOpt.value = 'ALL';
+        allOpt.textContent = window.t('全部診所');
+        sel.appendChild(allOpt);
+    }
     clinics.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
         opt.textContent = c.name || c.id || '';
         sel.appendChild(opt);
     });
-    const desired = initialClinicId || 'ALL';
+    let desired = initialClinicId || 'ALL';
+    const clinicExists = clinics.some(c => String(c.id) === String(desired));
+    if (singleClinic) {
+        desired = clinics[0].id;
+    } else if (desired !== 'ALL' && !clinicExists) {
+        desired = 'ALL';
+    }
     sel.value = desired;
     personalStatsCurrentClinic = desired;
     const curObj = clinics.find(c => String(c.id) === String(desired));
     personalStatsSelectedClinicName = curObj ? (curObj.name || '') : '';
+    if (personalStatsCurrentUid) psWritePref(personalStatsCurrentUid, { clinic: desired });
     sel.onchange = function () {
         personalStatsCurrentClinic = this.value || personalStatsCurrentClinic;
         try {
@@ -344,36 +445,116 @@ function populateClinicSelect(initialClinicId) {
             const found = cList.find(c => String(c.id) === String(personalStatsCurrentClinic));
             personalStatsSelectedClinicName = found ? (found.name || '') : '';
         } catch (_e0) {}
+        if (personalStatsCurrentUid) psWritePref(personalStatsCurrentUid, { clinic: personalStatsCurrentClinic });
         try {
             updatePersonalStatisticsView(true);
         } catch (_e) {}
     };
 }
 
+// 語言切換時圖表不會自動更新（canvas 非文字節點），需手動重繪；
+// 下拉選項的文字也一併重建。
+function bindPersonalStatsLanguageHook() {
+    const sel = document.getElementById('languageSelector');
+    if (!sel || sel.dataset.personalStatsLangBound === '1') return;
+    sel.dataset.personalStatsLangBound = '1';
+    sel.addEventListener('change', () => {
+        const section = document.getElementById('personalStatistics');
+        if (!section || section.classList.contains('hidden')) return;
+        try {
+            populateClinicSelect(personalStatsCurrentClinic);
+            updatePersonalStatisticsView(true);
+            if (personalStatsLastUpdated.iso) {
+                renderPersonalStatsUpdatedAt(personalStatsLastUpdated.iso, personalStatsLastUpdated.offline);
+            }
+        } catch (_e) {}
+    });
+}
+
 async function loadPersonalStatistics() {
+    const seq = ++personalStatsLoadSeq;
     setPersonalStatisticsLoading(true);
+    setPersonalStatsMessage(null);
+    bindPersonalStatsLanguageHook();
+    const tr = (text) => (typeof window.t === 'function' ? window.t(text) : text);
     try {
-        const doctor = currentUser;
-        populateClinicSelect('ALL');
+        // owner 身份為 Firebase Auth uid（舊版曾用 username，已全面改 uid）
+        let doctor = '';
+        try {
+            const fbUser = window.firebase && window.firebase.auth && window.firebase.auth.currentUser;
+            doctor = fbUser && fbUser.uid ? String(fbUser.uid) : '';
+        } catch (_authErr) {}
+        if (!doctor) {
+            setPersonalStatsMessage('error', tr('無法辨識登入階段，請重新整理頁面後再試。'));
+            return;
+        }
+        personalStatsCurrentUid = doctor;
+        // 還原上次的診所／月份篩選
+        const pref = psReadPref(doctor);
+        populateClinicSelect(pref.clinic || 'ALL');
+        personalStatsCurrentMonth = pref.month || 'ALL';
         const cached = psReadCache(doctor);
         if (cached && Array.isArray(cached.buckets)) {
             personalStatsBucketsCache = cached.buckets.slice();
-            updatePersonalStatisticsView(true);
         } else {
             personalStatsBucketsCache = [];
         }
+        // 先渲染快取或空狀態，避免網路失敗時三個清單永遠卡在載入中
+        updatePersonalStatisticsView(true);
+        if (cached && cached.cachedAt) renderPersonalStatsUpdatedAt(cached.cachedAt, false);
+
+        let res = null;
+        let fetchError = null;
         try {
-            const res = await window.firebaseDataManager.getPersonalStatsMonthlySummaries(doctor);
-            if (res && res.success && Array.isArray(res.data)) {
-                personalStatsBucketsCache = res.data.slice();
-                psWriteCache(doctor, {
-                    buckets: personalStatsBucketsCache,
-                    cachedAt: new Date().toISOString()
-                });
-                updatePersonalStatisticsView(true);
+            res = await window.firebaseDataManager.getPersonalStatsMonthlySummaries(doctor);
+        } catch (e) {
+            fetchError = e;
+        }
+        // 較新的一次載入已啟動，拋棄這次過期結果
+        if (seq !== personalStatsLoadSeq) return;
+
+        if (res && res.success && Array.isArray(res.data)) {
+            personalStatsBucketsCache = res.data.slice();
+            const nowIso = new Date().toISOString();
+            psWriteCache(doctor, {
+                buckets: personalStatsBucketsCache,
+                cachedAt: nowIso
+            });
+            updatePersonalStatisticsView(true);
+            renderPersonalStatsUpdatedAt(nowIso, false);
+            if (res.initError) {
+                console.warn('個人統計歷史摘要初始化失敗:', res.initError);
+                setPersonalStatsMessage(
+                    'warn',
+                    `${tr('部分歷史統計仍在準備中，目前僅顯示已同步的資料；若長期未更新，請聯絡管理員檢查索引設定。')}`
+                );
             }
-        } catch (_e) {}
+        } else {
+            const detail = fetchError
+                ? (fetchError && fetchError.message ? fetchError.message : String(fetchError))
+                : (res && res.error ? String(res.error) : 'unknown-error');
+            console.warn('個人統計載入失敗:', detail);
+            const hasCache = !!(cached && Array.isArray(cached.buckets) && cached.buckets.length);
+            const cacheAge = cached && cached.cachedAt ? Date.now() - new Date(cached.cachedAt).getTime() : Infinity;
+            const cacheStale = hasCache && (!isFinite(cacheAge) || cacheAge > PERSONAL_STATS_CACHE_TTL_MS);
+            if (hasCache) {
+                renderPersonalStatsUpdatedAt(cached.cachedAt, true);
+            } else {
+                renderPersonalStatsUpdatedAt('', false);
+            }
+            const offlineText = cacheStale
+                ? tr('無法更新統計，目前顯示的快取已超過 24 小時，可能非最新。')
+                : tr('無法更新統計，目前顯示快取資料。');
+            setPersonalStatsMessage(
+                'error',
+                `${hasCache ? offlineText : tr('統計資料載入失敗。')}
+                 <button type="button" onclick="loadPersonalStatistics()"
+                    class="ml-2 underline font-semibold">${tr('重試')}</button>`
+            );
+        }
     } finally {
-        setPersonalStatisticsLoading(false);
+        if (seq === personalStatsLoadSeq) {
+            setPersonalStatisticsLoading(false);
+        }
     }
 }

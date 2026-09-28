@@ -237,6 +237,26 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // 個人統計
+    // ------------------------------------------------------------
+    // owner 身份為 Firebase Auth uid。客戶端唯讀「自己的」資料；
+    // 所有寫入（增量同步、全量重建、刪除）只可經
+    // /api/personal-stats/* 由 Pages Function 以 Service Account
+    // 執行（繞過 Rules）。
+    // ============================================================
+    match /personalStatisticsMonthlySummaries/{docId} {
+      allow read: if canAccess()
+        && resource.data.ownerId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /personalStatisticsSummaryStates/{ownerId} {
+      allow read: if canAccess()
+        && request.auth.uid == ownerId;
+      allow write: if false;
+    }
+
+    // ============================================================
     // Catch-all：其他業務集合（consultations、clinics、
     // clinicExpenses、globalBillingItems 等）。
     // 必須持有活躍員工身份（claims 或過渡索引）才可讀寫。
@@ -261,7 +281,9 @@ service cloud.firestore {
         && collectionId != 'walletIdempotency'
         && collectionId != 'walletConsultationRefunds'
         && collectionId != 'patients'
-        && collectionId != 'patientPackages';
+        && collectionId != 'patientPackages'
+        && collectionId != 'personalStatisticsMonthlySummaries'
+        && collectionId != 'personalStatisticsSummaryStates';
     }
   }
 }
