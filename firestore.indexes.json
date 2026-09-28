@@ -48,6 +48,78 @@
         { "fieldPath": "clinicId", "order": "ASCENDING" },
         { "fieldPath": "operatedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -23796,7 +23796,7 @@ async function restoreUser(id) {
         const financialReportCache = {};
         const FINANCIAL_REPORT_MIN_REFRESH_MS = 15000;
         // 快取版本：統計口徑／快取結構調整時遞增，避免讀到舊格式快取
-        const FINANCIAL_REPORT_CACHE_VERSION = 'v3';
+        const FINANCIAL_REPORT_CACHE_VERSION = 'v4';
         function getFinancialReportCacheKey(startDate, endDate, doctorFilter, clinicFilter) {
             return `${FINANCIAL_REPORT_CACHE_VERSION}|${startDate}|${endDate}|${doctorFilter || ''}|${clinicFilter || ''}`;
         }
@@ -24101,7 +24101,9 @@ async function restoreUser(id) {
                     const endVal = endEl.value;
                     const doctorVal = doctorEl ? doctorEl.value : '';
                     const clinicVal = clinicEl ? clinicEl.value : '';
-                    const coverageKey = getFinancialSummaryCoverageKey(startVal, endVal, doctorVal, clinicVal);
+                    // v2：舊旗標可能是在不完整查詢（date 欄位漏舊單）時寫入，
+                    // 加版本字串強制作廢一次，讓新版 sortDate 查詢重新回填。
+                    const coverageKey = 'v2|' + getFinancialSummaryCoverageKey(startVal, endVal, doctorVal, clinicVal);
                     const summaryCovered = !!readCache('financialSummaryCoverage', coverageKey);
                     const canUseSummary = typeof window.firebaseDataManager.getConsultationFinancialSummariesByRangeAndDoctor === 'function';
 
@@ -24117,12 +24119,12 @@ async function restoreUser(id) {
                     if (targeted && targeted.success) {
                         consultations = targeted.data.map(normalizeFinancialRecordForReport).filter(Boolean);
                         if (canUseSummary) {
-                            try {
-                                await window.firebaseDataManager.syncConsultationFinancialSummaries(targeted.data);
-                                writeCache('financialSummaryCoverage', coverageKey, true);
-                            } catch (_syncErr) {
-                                console.warn('財務摘要回填失敗:', _syncErr);
-                            }
+                            // 回填改為背景執行：大量舊資料時不再阻塞報表顯示。
+                            // 旗標於回填成功後才寫入；此期間重跑只會多做一次查詢，不影響正確性。
+                            Promise.resolve()
+                                .then(() => window.firebaseDataManager.syncConsultationFinancialSummaries(targeted.data))
+                                .then(() => writeCache('financialSummaryCoverage', coverageKey, true))
+                                .catch((_syncErr) => console.warn('財務摘要回填失敗:', _syncErr));
                         }
                         return;
                     }
@@ -29623,6 +29625,15 @@ async function restorePackageUseMeta(patientId) {
 }
 // 將函式暴露到全域以便其他部分調用
 window.restorePackageUseMeta = restorePackageUseMeta;
+
+// 以香港時區（+08:00）回傳指定 Date 所屬本地日的起訖邊界，
+// 讓 Firestore 查詢視窗與報表的香港日界口徑一致（瀏覽器非 HK 時區也適用）。
+function hkBoundOf(date, isEnd) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return new Date(`${y}-${m}-${d}T${isEnd ? '23:59:59.999' : '00:00:00'}+08:00`);
+}
 // Firebase 數據管理系統
 class FirebaseDataManager {
     constructor() {
@@ -30923,9 +30934,9 @@ class FirebaseDataManager {
                 start = new Date(today);
                 end = new Date(today);
             }
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
-            const pageSize = 100;
+            start = hkBoundOf(start, false);
+            end = hkBoundOf(end, true);
+            const pageSize = 300;
             const baseParts = [];
             if (completedOnly) baseParts.push(window.firebase.where('status', '==', 'completed'));
             if (doctorFilter) baseParts.push(window.firebase.where('doctor', '==', doctorFilter));
@@ -30967,11 +30978,9 @@ class FirebaseDataManager {
         if (!this.isReady) return { success: false, data: [] };
         try {
             const colRef = window.firebase.collection(window.firebase.db, 'consultationFinancialSummaries');
-            const start = new Date(startDateStr);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(endDateStr);
-            end.setHours(23, 59, 59, 999);
-            const pageSize = 100;
+            const start = hkBoundOf(new Date(startDateStr), false);
+            const end = hkBoundOf(new Date(endDateStr), true);
+            const pageSize = 300;
             const parts = [];
             if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
             if (clinicFilter) parts.push(window.firebase.where('clinicId', '==', clinicFilter));
@@ -31011,10 +31020,8 @@ class FirebaseDataManager {
         if (!this.isReady) return false;
         try {
             const colRef = window.firebase.collection(window.firebase.db, 'consultationFinancialSummaries');
-            const start = new Date(startDateStr);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(endDateStr);
-            end.setHours(23, 59, 59, 999);
+            const start = hkBoundOf(new Date(startDateStr), false);
+            const end = hkBoundOf(new Date(endDateStr), true);
             const parts = [];
             if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
             if (clinicFilter) parts.push(window.firebase.where('clinicId', '==', clinicFilter));
@@ -31053,9 +31060,9 @@ class FirebaseDataManager {
                 start = new Date(today);
                 end = new Date(today);
             }
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
-            const pageSize = 100;
+            start = hkBoundOf(start, false);
+            end = hkBoundOf(end, true);
+            const pageSize = 300;
             const baseParts = [];
             if (completedOnly) baseParts.push(window.firebase.where('status', '==', 'completed'));
             if (doctorFilter) baseParts.push(window.firebase.where('doctor', '==', doctorFilter));
@@ -31089,10 +31096,22 @@ class FirebaseDataManager {
                 }
                 return list;
             };
-            // 主力查詢 date（報表以診症日期為準，索引與語意與舊版一致）。
-            // 僅在 date 查詢回傳 0 筆時（歷史資料 date 欄位為字串／缺失），
-            // 才補查 createdAt，避免每次都把同範圍重複讀取、讀取數翻倍。
-            // 同範圍內部分 date 異常的混合型舊資料，會隨 sortDate 回填逐漸修復。
+            // 主力查詢 sortDate：所有現代寫入都會帶標準化 Timestamp，
+            // 可一併涵蓋 date 為字串／缺失的舊資料，不會再靜默漏單。
+            try {
+                const list = await runRangeQuery('sortDate', start, end);
+                return { success: true, data: list };
+            } catch (sortDateErr) {
+                // 缺少 (status[,doctor][,clinic], sortDate) 複合索引時：
+                // 印出建立連結，並退回舊的 date／createdAt 查詢，避免功能中斷。
+                const msg = String((sortDateErr && sortDateErr.message) || sortDateErr || '');
+                if (msg.toLowerCase().includes('index')) {
+                    console.warn('sortDate 複合索引未建立，暫用 date 查詢。請依連結建立索引：',
+                        (msg.match(/https:\/\/[^\s]+/) || [''])[0]);
+                } else {
+                    console.warn('sortDate 查詢失敗，暫用 date 查詢：', msg);
+                }
+            }
             let list = await runRangeQuery('date', start, end);
             if (list.length === 0) {
                 list = await runRangeQuery('createdAt', start, end);
