@@ -257,6 +257,18 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // 財務日聚合
+    // ------------------------------------------------------------
+    // 每日每診所一筆聚合文件，客戶端唯讀（員工身份）；
+    // 所有寫入（增量同步、全量重建、刪除）只可經
+    // /api/financial-stats/* 由 Pages Function 以 Service Account 執行。
+    // ============================================================
+    match /dailyFinancialStats/{docId} {
+      allow read: if canAccess();
+      allow write: if false;
+    }
+
+    // ============================================================
     // Catch-all：其他業務集合（consultations、clinics、
     // clinicExpenses、globalBillingItems 等）。
     // 必須持有活躍員工身份（claims 或過渡索引）才可讀寫。
@@ -283,7 +295,8 @@ service cloud.firestore {
         && collectionId != 'patients'
         && collectionId != 'patientPackages'
         && collectionId != 'personalStatisticsMonthlySummaries'
-        && collectionId != 'personalStatisticsSummaryStates';
+        && collectionId != 'personalStatisticsSummaryStates'
+        && collectionId != 'dailyFinancialStats';
     }
   }
 }

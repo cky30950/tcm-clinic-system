@@ -173,6 +173,29 @@
         { "fieldPath": "patientName", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+
+    {
+      "collectionGroup": "dailyFinancialStats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "dailyFinancialStats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "dailyFinancialStats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "syncedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

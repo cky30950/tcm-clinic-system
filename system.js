@@ -24640,6 +24640,30 @@ async function restoreUser(id) {
             return data || {};
         }
 
+        async function callFinancialStatsApi(path, payload) {
+            await waitForFirebase();
+            const fbUser = window.firebase && window.firebase.auth && window.firebase.auth.currentUser;
+            if (!fbUser) throw new Error('未登入，無法更新財務聚合');
+            const token = await fbUser.getIdToken();
+            const res = await fetch('/api/financial-stats/' + path, {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload || {})
+            });
+            let data = null;
+            try { data = await res.json(); } catch (_e) {}
+            if (!res.ok) {
+                const err = new Error((data && data.message) || ('HTTP ' + res.status));
+                err.status = res.status;
+                if (data && data.error) err.code = data.error;
+                throw err;
+            }
+            return data || {};
+        }
+
         function normalizePersonalStatsString(value) {
             if (value === undefined || value === null) return '';
             try {
@@ -24850,9 +24874,102 @@ async function restoreUser(id) {
             }
             if (typeof loadConsultationsForFinancial === 'function') {
                 try {
-                    await loadConsultationsForFinancial();
+                    // 先嘗試從 dailyFinancialStats 聚合（N 筆／月，快）
+                    // 注意：有 doctor 過濾時跳過（daily bucket 的 serviceStats 跨醫師，
+                    // 無法正確按醫師拆分），直接走傳統 consultation 路徑。
+                    let useDailyStats = false;
+                    let dailyStats = [];
+
+                    const hasDoctorFilter = !!doctorFilter;
+
+                    if (!hasDoctorFilter
+                        && window.firebaseDataManager
+                        && typeof window.firebaseDataManager.getDailyFinancialStatsByRange === 'function') {
+                        try {
+                            const dsRes = await window.firebaseDataManager.getDailyFinancialStatsByRange(
+                                startDate, endDate, clinicFilter || null
+                            );
+                            if (dsRes && dsRes.success && Array.isArray(dsRes.data) && dsRes.data.length > 0) {
+                                dailyStats = dsRes.data;
+                                useDailyStats = true;
+                            } else if (dsRes && dsRes.success && Array.isArray(dsRes.data) && dsRes.data.length === 0) {
+                                // 集合存在但無資料 → 背景觸發重建（首次使用或資料遺漏）
+                                // 不阻塞本次報表產生（走傳統路徑）
+                                try {
+                                    window.firebaseDataManager.ensureDailyFinancialStatsInitialized(
+                                        startDate, endDate, clinicFilter || null
+                                    ).catch(() => {});
+                                } catch (_bgErr) {}
+                            }
+                        } catch (_dsErr) {
+                            // daily stats 尚未建立（索引未建 / 首次使用），
+                            // 靜默 fallback 到傳統路徑即可
+                        }
+                    }
+
+                    // 並發載入 consultations（tables 仍然需要單筆資料）
+                    const consultationPromise = (async () => {
+                        try {
+                            await loadConsultationsForFinancial();
+                            return true;
+                        } catch (_e) { return false; }
+                    })();
+
+                    if (useDailyStats) {
+                        const fastStats = aggregateFromDailyStats(dailyStats, startDate, endDate, doctorFilter);
+                        loadFinancialPrevPeriodInBackground(cacheKey, fastStats, startDate, endDate, doctorFilter, clinicFilter);
+                        const [costRes] = await Promise.all([
+                            getApportionedCost(startDate, endDate, clinicFilter || null),
+                            consultationPromise
+                        ]);
+                        fastStats.totalCost = costRes.totalCost;
+                        fastStats.netRevenue = fastStats.totalRevenue - costRes.totalCost;
+                        fastStats.costProrated = costRes.prorated;
+
+                        // 同步後 consultations 可能已載入；用它算 detail，stats 用聚合
+                        const filteredConsultations = filterFinancialConsultations(startDate, endDate, doctorFilter, clinicFilter);
+                        const detailStats = filteredConsultations.length > 0
+                            ? calculateFinancialStatistics(filteredConsultations)
+                            : fastStats;
+                        detailStats.totalCost = fastStats.totalCost;
+                        detailStats.netRevenue = fastStats.netRevenue;
+                        detailStats.costProrated = fastStats.costProrated;
+                        if (!detailStats.prevPeriod && fastStats.prevPeriod) {
+                            detailStats.prevPeriod = fastStats.prevPeriod;
+                        }
+
+                        updateFinancialKeyMetrics(detailStats);
+                        updateFinancialTables(filteredConsultations, detailStats);
+
+                        // 快取（使用 filteredConsultations 作為 records，detailStats 作為 stats）
+                        const lastSyncAt = (() => {
+                            let latest = 0;
+                            for (const c of filteredConsultations) {
+                                const t = getFinancialReportSyncTimestamp(c);
+                                if (t && t > latest) latest = t;
+                            }
+                            // 聚合有更新時間就一併考慮
+                            for (const b of dailyStats) {
+                                const t = parseConsultationDate(b.syncedAt);
+                                if (t && t.getTime() > latest) latest = t.getTime();
+                            }
+                            return latest ? new Date(latest) : new Date();
+                        })();
+                        const entry = buildFinancialCacheEntry(filteredConsultations, detailStats, lastSyncAt.toISOString());
+                        financialReportCache[cacheKey] = entry;
+                        writePersistedFinancialCache(cacheKey, entry);
+                        financialReportLastKey = cacheKey;
+                        financialReportLastRunAt = Date.now();
+                        document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
+                        await refreshWalletFinancialSection(startDate, endDate, clinicFilter);
+                        showToast('財務報表已更新（聚合模式）！', 'success');
+                        return;
+                    }
+
+                    // 沒有 daily stats：繼續傳統路徑（consultations 已在並發載入）
+                    await consultationPromise;
                 } catch (err) {
-                    console.error('重新載入財務資料失敗:', err);
+                    console.error('載入財務資料失敗:', err);
                 }
             }
 
@@ -24889,6 +25006,86 @@ async function restoreUser(id) {
             financialReportLastRunAt = Date.now();
             document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
             showToast('財務報表已更新！', 'success');
+        }
+
+        /**
+         * 把 dailyFinancialStats 聚合陣列轉成 calculateFinancialStatistics
+         * 相同格式的 stats 物件。支援 doctor 過濾（聚合內只含匹配醫師的桶）。
+         * daily stats 不包含單筆診症明細，故不支援鑽取。
+         */
+        function aggregateFromDailyStats(dailyStats, startDate, endDate, doctorFilter) {
+            let totalRevenue = 0;
+            let totalConsultations = 0;
+            const doctorStats = {};
+            const serviceStats = {};
+            const dailyStatsAgg = {};
+
+            for (const bucket of dailyStats) {
+                if (!bucket || bucket.totalConsultations <= 0) continue;
+                // 日期 key
+                const dayKey = bucket.dateKey || '';
+                if (dayKey < startDate || dayKey > endDate) continue;
+
+                // 醫師過濾：若指定 doctor，只累加該醫師的貢獻
+                let doctorsToCount = bucket.doctorStats || {};
+                if (doctorFilter) {
+                    if (!doctorsToCount[doctorFilter]) continue; // 這天沒有該醫師
+                    doctorsToCount = { [doctorFilter]: doctorsToCount[doctorFilter] };
+                }
+
+                let dayRevenue = 0;
+                let dayCount = 0;
+                for (const [doctor, d] of Object.entries(doctorsToCount)) {
+                    const count = Math.round(d.count || 0);
+                    const rev = Math.round(d.revenue || 0);
+                    if (!doctorStats[doctor]) doctorStats[doctor] = { count: 0, revenue: 0 };
+                    doctorStats[doctor].count += count;
+                    doctorStats[doctor].revenue += rev;
+                    dayCount += count;
+                    dayRevenue += rev;
+                }
+
+                // 服務項目（服務過濾用 category，不依 doctor 拆分）
+                const services = bucket.serviceStats || {};
+                let dayServices = {};
+                for (const [cat, s] of Object.entries(services)) {
+                    const count = Math.round(s.count || 0);
+                    const rev = Math.round(s.revenue || 0);
+                    if (!serviceStats[cat]) serviceStats[cat] = {
+                        name: getFinancialCategoryDisplayName(cat),
+                        count: 0, revenue: 0, items: []
+                    };
+                    serviceStats[cat].count += count;
+                    serviceStats[cat].revenue += rev;
+                    dayServices[cat] = rev;
+                }
+
+                // 日期 key 聚合（供每日明細 / 趨勢圖）
+                if (!dailyStatsAgg[dayKey]) {
+                    dailyStatsAgg[dayKey] = { count: 0, revenue: 0, services: {} };
+                }
+                dailyStatsAgg[dayKey].count += dayCount;
+                dailyStatsAgg[dayKey].revenue += dayRevenue;
+                for (const [cat, rev] of Object.entries(dayServices)) {
+                    dailyStatsAgg[dayKey].services[cat] = (dailyStatsAgg[dayKey].services[cat] || 0) + rev;
+                }
+
+                totalConsultations += dayCount;
+                totalRevenue += dayRevenue;
+            }
+
+            const averageRevenue = totalConsultations > 0 ? Math.round(totalRevenue / totalConsultations) : 0;
+            const activeDoctors = Object.keys(doctorStats).length;
+
+            return {
+                totalRevenue,
+                totalConsultations,
+                averageRevenue,
+                activeDoctors,
+                doctorStats,
+                serviceStats,
+                dailyStats: dailyStatsAgg
+            };
         }
 
         // 過濾診症資料
@@ -30490,6 +30687,17 @@ class FirebaseDataManager {
                 console.warn('新增診症後同步個人統計摘要失敗:', _personalStatsErr);
             }
             try {
+                await this.syncConsultationDailyFinancialStats(null, {
+                    id: docRef.id,
+                    ...dataToWrite,
+                    createdAt,
+                    sortDate: sortDate || createdAt,
+                    createdBy: currentUser
+                });
+            } catch (_finStatsErr) {
+                console.warn('新增診症後同步財務日聚合失敗:', _finStatsErr);
+            }
+            try {
                 const fullConsultation = { ...dataToWrite, createdAt, sortDate, createdBy: currentUser };
                 await this.patchPatientAggregate(consultationData && consultationData.patientId, 'add', fullConsultation);
             } catch (_aggregateErr) {
@@ -30798,6 +31006,84 @@ class FirebaseDataManager {
             return { success: true, changedCount: (result && result.changedOwnerCount) || 0, result };
         } catch (error) {
             console.error('同步個人統計摘要失敗:', error);
+            return { success: false, error: error && error.message ? error.message : String(error) };
+        }
+    }
+
+    async syncConsultationDailyFinancialStats(beforeRecord, afterRecord) {
+        if (!this.isReady) return { success: false };
+        try {
+            if (!beforeRecord && !afterRecord) {
+                return { success: true, changedBuckets: 0 };
+            }
+            const result = await callFinancialStatsApi('sync', {
+                before: beforeRecord || null,
+                after: afterRecord || null
+            });
+            return { success: true, changedBuckets: (result && result.changedBuckets) || 0 };
+        } catch (error) {
+            console.warn('同步財務日聚合失敗:', error && error.message);
+            return { success: false, error: error && error.message ? error.message : String(error) };
+        }
+    }
+
+    /**
+     * 查詢指定日期範圍的 dailyFinancialStats 聚合。
+     * 前端用於財務報表的 summary cards 與 charts（約 N 筆／月）。
+     * 鑽取明細仍走 consultationFinancialSummaries。
+     */
+    async getDailyFinancialStatsByRange(startDateStr, endDateStr, clinicFilter = null) {
+        if (!this.isReady) return { success: false, data: [] };
+        try {
+            const colRef = window.firebase.collection(window.firebase.db, 'dailyFinancialStats');
+            const start = hkBoundOf(new Date(startDateStr), false);
+            const end = hkBoundOf(new Date(endDateStr), true);
+            const pageSize = 300;
+            const baseParts = [];
+            if (clinicFilter) baseParts.push(window.firebase.where('clinicId', '==', clinicFilter));
+            let q = window.firebase.firestoreQuery(
+                colRef,
+                ...baseParts,
+                window.firebase.orderBy('sortDate', 'asc'),
+                window.firebase.where('sortDate', '>=', start),
+                window.firebase.where('sortDate', '<=', end),
+                window.firebase.limit(pageSize)
+            );
+            let snap = await window.firebase.getDocs(q);
+            const list = [];
+            snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+            let lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            while (snap.docs.length === pageSize && lastVisible) {
+                q = window.firebase.firestoreQuery(
+                    colRef,
+                    ...baseParts,
+                    window.firebase.orderBy('sortDate', 'asc'),
+                    window.firebase.where('sortDate', '>=', start),
+                    window.firebase.where('sortDate', '<=', end),
+                    window.firebase.startAfter(lastVisible),
+                    window.firebase.limit(pageSize)
+                );
+                snap = await window.firebase.getDocs(q);
+                snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+                lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            }
+            return { success: true, data: list };
+        } catch (error) {
+            console.warn('財務日聚合查詢失敗:', error && error.message);
+            return { success: false, data: [], error: error && error.message ? error.message : String(error) };
+        }
+    }
+
+    async ensureDailyFinancialStatsInitialized(startDate, endDate, clinicId) {
+        if (!this.isReady) return { success: false };
+        try {
+            const res = await callFinancialStatsApi('rebuild', {
+                startDate, endDate,
+                clinicId: clinicId || null
+            });
+            return { success: true, ...res };
+        } catch (error) {
+            console.error('重建財務日聚合失敗:', error && error.message);
             return { success: false, error: error && error.message ? error.message : String(error) };
         }
     }
@@ -31411,6 +31697,21 @@ class FirebaseDataManager {
                 console.warn('更新診症後同步個人統計摘要失敗:', _personalStatsErr);
             }
             try {
+                await this.syncConsultationDailyFinancialStats(
+                    existingRecord ? { id: String(consultationId), ...existingRecord } : null,
+                    {
+                        id: String(consultationId),
+                        ...(existingRecord || {}),
+                        ...dataToWrite,
+                        updatedAt,
+                        sortDate: sortDate || updatedAt,
+                        updatedBy: currentUser
+                    }
+                );
+            } catch (_finStatsErr) {
+                console.warn('更新診症後同步財務日聚合失敗:', _finStatsErr);
+            }
+            try {
                 const oldPid = String(existingRecord && existingRecord.patientId || '');
                 const newPid = String(consultationData && consultationData.patientId || oldPid || '');
                 if (newPid) {
@@ -31512,6 +31813,14 @@ class FirebaseDataManager {
                 );
             } catch (_personalStatsErr) {
                 console.warn('刪除診症後同步個人統計摘要失敗:', _personalStatsErr);
+            }
+            try {
+                await this.syncConsultationDailyFinancialStats(
+                    existingRecord ? { ...existingRecord } : null,
+                    null
+                );
+            } catch (_finStatsErr) {
+                console.warn('刪除診症後同步財務日聚合失敗:', _finStatsErr);
             }
             try {
                 const pid = existingRecord && existingRecord.patientId;
