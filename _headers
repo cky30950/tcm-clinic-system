@@ -4,39 +4,3 @@
 # no-cache = 使用前必須驗證（允許 304），非 no-store。
 /sw.js
   Cache-Control: no-cache, must-revalidate
-
-# ============================================================
-# 全站安全標頭（所有路徑）
-# ============================================================
-/*
-  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
-  X-Frame-Options: DENY
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(), browsing-topics=()
-  Cross-Origin-Opener-Policy: same-origin-allow-popups
-  # ---- Content Security Policy（基線，不含 unsafe-eval）----
-  # script-src：同源 + 已釘版且加 SRI 的 CDN + Cloudflare Turnstile
-  # ＋ Cloudflare Web Analytics 自動注入的 beacon；
-  # Firebase SDK 已隨站代管（/vendor），gstatic 不再需要。
-  # 'unsafe-inline'：歷史頁面仍有大量 inline script／onclick，
-  # 移除需大規模重構（/system 專用政策另放寬 unsafe-eval）。
-  # 注意：Service Worker（sw.js handleCdn）以 fetch() 拉取跨域 CDN
-  # 資源寫入快取，這類請求受 connect-src 約束，故 CDN 與字體主機
-  # 必須同時列於 connect-src，否則腳本／樣式雖符合 script-src／
-  # style-src 仍會被 SW 擋下。
-  # connect-src 另涵蓋：Firebase（googleapis／firebaseio／
-  # firebasedatabase）、R2 預簽儲存、Agora（agora.io／sd-rtn.com）、
-  # Turnstile、假期 API（date.nager.at）、Web Analytics 回傳。
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://challenges.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com https://fonts.googleapis.com https://challenges.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://unpkg.com https://*.r2.cloudflarestorage.com https://*.r2.dev; connect-src 'self' blob: https://*.googleapis.com https://*.firebaseio.com https://*.firebasedatabase.app https://*.firebaseapp.com wss://*.firebaseio.com wss://*.firebasedatabase.app https://*.r2.cloudflarestorage.com https://*.r2.dev https://*.agora.io wss://*.agora.io https://*.sd-rtn.com wss://*.sd-rtn.com https://challenges.cloudflare.com https://date.nager.at https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://fonts.googleapis.com https://fonts.gstatic.com https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com https://*.firebaseapp.com; child-src blob: https://challenges.cloudflare.com; worker-src 'self' blob:; media-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
-
-# ============================================================
-# 系統管理頁：system.js 的 initInlineEventHandlers 以 new Function()
-# 動態重建 inline onchange/onclick，需額外開放 'unsafe-eval'；
-# 其餘政策與基線相同。（Pages clean URL：/system 與 /system.html）
-# ============================================================
-/system
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://challenges.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com https://fonts.googleapis.com https://challenges.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://unpkg.com https://*.r2.cloudflarestorage.com https://*.r2.dev; connect-src 'self' blob: https://*.googleapis.com https://*.firebaseio.com https://*.firebasedatabase.app https://*.firebaseapp.com wss://*.firebaseio.com wss://*.firebasedatabase.app https://*.r2.cloudflarestorage.com https://*.r2.dev https://*.agora.io wss://*.agora.io https://*.sd-rtn.com wss://*.sd-rtn.com https://challenges.cloudflare.com https://date.nager.at https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://fonts.googleapis.com https://fonts.gstatic.com https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com https://*.firebaseapp.com; child-src blob: https://challenges.cloudflare.com; worker-src 'self' blob:; media-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
-
-/system.html
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://challenges.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com https://fonts.googleapis.com https://challenges.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://unpkg.com https://*.r2.cloudflarestorage.com https://*.r2.dev; connect-src 'self' blob: https://*.googleapis.com https://*.firebaseio.com https://*.firebasedatabase.app https://*.firebaseapp.com wss://*.firebaseio.com wss://*.firebasedatabase.app https://*.r2.cloudflarestorage.com https://*.r2.dev https://*.agora.io wss://*.agora.io https://*.sd-rtn.com wss://*.sd-rtn.com https://challenges.cloudflare.com https://date.nager.at https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://fonts.googleapis.com https://fonts.gstatic.com https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com https://*.firebaseapp.com; child-src blob: https://challenges.cloudflare.com; worker-src 'self' blob:; media-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests

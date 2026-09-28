@@ -46,7 +46,6 @@ export async function onRequestPost(context) {
         if (error instanceof SessionError) {
             return jsonResponse({ valid: false, error: error.code, message: error.message }, error.status);
         }
-        console.error('[capture-status] 內部錯誤:', error && (error.stack || error.message || error));
-        return jsonResponse({ valid: false, error: 'CAPTURE_STATUS_FAILED', message: '查詢拍照連結失敗，請稍後再試' }, 500);
+        return jsonResponse({ valid: false, error: 'CAPTURE_STATUS_FAILED', message: error.message || '查詢拍照連結失敗' }, 500);
     }
 }

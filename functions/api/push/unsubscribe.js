@@ -9,7 +9,6 @@
 
 import { authenticateStaff } from '../attachments/lib/auth.js';
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
-import { errorJson } from '../_lib/http-errors.js';
 import { getSubscriptionByEndpoint, deleteSubscription } from './lib/push-store.js';
 
 export const onRequestOptions = () => optionsResponse();
@@ -45,9 +44,10 @@ export async function onRequestPost(context) {
         const result = await deleteSubscription(env, endpoint);
         return jsonResponse({ success: true, deleted: result.deleted });
     } catch (error) {
-        if (Number(error.status) === 401) {
-            return jsonResponse({ error: 'UNAUTHORIZED', message: '登入憑證無效或已過期' }, 401);
-        }
-        return errorJson(error, { code: 'UNSUBSCRIBE_FAILED', message: '取消推播訂閱失敗，請稍後再試' });
+        const status = Number(error.status) > 0 ? Number(error.status) : 500;
+        return jsonResponse({
+            error: status === 401 ? 'UNAUTHORIZED' : 'UNSUBSCRIBE_FAILED',
+            message: error.message || '取消推播訂閱失敗'
+        }, status);
     }
 }

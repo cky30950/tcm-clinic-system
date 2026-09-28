@@ -148,16 +148,9 @@ export async function onRequestPost(context) {
         });
     } catch (error) {
         const status = Number(error.status) > 0 ? Number(error.status) : 500;
-        if (status === 401 || status === 403) {
-            return jsonResponse({
-                error: 'UNAUTHORIZED',
-                message: error.message || '未授權執行此操作'
-            }, status);
-        }
-        console.error('[inquiry-cleanup] 內部錯誤:', error && (error.stack || error.message || error));
         return jsonResponse({
-            error: 'CLEANUP_FAILED',
-            message: '清除過期問診資料失敗，請稍後再試'
-        }, 500);
+            error: status === 401 || status === 403 ? 'UNAUTHORIZED' : 'CLEANUP_FAILED',
+            message: error.message || '清除過期問診資料失敗'
+        }, status);
     }
 }

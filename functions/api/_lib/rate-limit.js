@@ -65,9 +65,8 @@ function readLimit(env, bucket) {
 }
 
 function corsHeaders() {
-    // ACAO 由 functions/api/_middleware.js 依來源白名單統一核發
     return {
-        'Vary': 'Origin',
+        'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Room-Session',
         'Access-Control-Max-Age': '86400'

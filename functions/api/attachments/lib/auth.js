@@ -33,9 +33,7 @@ export async function authenticateStaff(request, env) {
     try {
         claims = await verifyIdToken(token, projectId);
     } catch (error) {
-        // 驗證失敗原因（Google 驗證端原文）只進記錄，不回客戶端
-        console.warn('ID Token 驗證失敗:', error && error.message);
-        const err = new Error('登入憑證無效或已過期');
+        const err = new Error('登入憑證無效或已過期：' + (error.message || ''));
         err.status = 401;
         throw err;
     }

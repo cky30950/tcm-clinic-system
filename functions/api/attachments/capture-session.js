@@ -13,7 +13,6 @@
 
 import { authenticateStaff, resolveUserData } from './lib/auth.js';
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
-import { errorJson } from '../_lib/http-errors.js';
 import {
     SAFE_PATIENT_ID,
     SAFE_OPT_ID,
@@ -75,24 +74,18 @@ export async function onRequestPost(context) {
         // 使用 Cloudflare Pages 的 clean URL（無 .html）：
         // 帶 .html 的網址會被 308 重新導向，在手機已安裝／曾造訪 PWA
         // （Service Worker 接管）時會導向成 opaqueredirect 而開頁失敗。
-        // token 只放 URL fragment（#）：fragment 不會進伺服器／代理存取記錄、
-        // 不隨 Referer 外洩，也不會存進瀏覽器歷史的查詢字串；sid 為一次性
-        // 會話識別碼（DB 僅存 token 雜湊），放 query 無敏感性問題。
-        // 與 video room pass 用 fragment 的做法一致。
         const captureUrl = `${origin}/mobile-capture?sid=${encodeURIComponent(sid)}` +
-            `#t=${encodeURIComponent(token)}`;
+            `&t=${encodeURIComponent(token)}`;
 
         return jsonResponse({ sid, token, expiresAt: expiresAt.toISOString(), captureUrl });
     } catch (error) {
         if (error instanceof StoreError) {
             return jsonResponse({ error: error.code, message: error.message }, error.status);
         }
-        if (Number(error.status) === 401) {
-            return jsonResponse({ error: 'UNAUTHORIZED', message: '登入憑證無效或已過期' }, 401);
-        }
-        return errorJson(error, {
-            code: 'CAPTURE_SESSION_FAILED',
-            message: '建立拍照連結失敗，請稍後再試'
-        });
+        const status = Number(error.status) > 0 ? Number(error.status) : 500;
+        return jsonResponse({
+            error: status === 401 ? 'UNAUTHORIZED' : 'CAPTURE_SESSION_FAILED',
+            message: error.message || '建立拍照連結失敗'
+        }, status);
     }
 }

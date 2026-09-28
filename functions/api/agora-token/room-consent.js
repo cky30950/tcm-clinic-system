@@ -72,12 +72,6 @@ export async function onRequestPost(context) {
             ? error.code
             : (status === 401 ? 'UNAUTHORIZED' : 'ROOM_CONSENT_FAILED');
         console.error('寫入入房同意書失敗:', error && error.message ? error.message : error);
-        if (status >= 500) {
-            return jsonResponse({
-                error: 'ROOM_CONSENT_FAILED',
-                message: '儲存同意書失敗，請稍後再試'
-            }, 500);
-        }
         return jsonResponse({
             error: code,
             message: (error && error.message) || '儲存同意書失敗'

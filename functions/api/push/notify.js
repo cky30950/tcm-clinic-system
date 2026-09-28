@@ -14,7 +14,6 @@
 
 import { authenticateStaff } from '../attachments/lib/auth.js';
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
-import { errorJson } from '../_lib/http-errors.js';
 import { processNotify } from './lib/notify-lib.js';
 
 export const onRequestOptions = () => optionsResponse();
@@ -35,15 +34,9 @@ export async function onRequestPost(context) {
         return jsonResponse(result);
     } catch (error) {
         const status = Number(error.status) > 0 ? Number(error.status) : 500;
-        if (status === 401) {
-            return jsonResponse({ error: 'UNAUTHORIZED', message: '登入憑證無效或已過期' }, 401);
-        }
-        if (status >= 400 && status < 500) {
-            return jsonResponse({
-                error: error.code || 'NOTIFY_FAILED',
-                message: error.message || '通知派送失敗'
-            }, status);
-        }
-        return errorJson(error, { code: 'NOTIFY_FAILED', message: '通知派送失敗，請稍後再試' });
+        return jsonResponse({
+            error: status === 401 ? 'UNAUTHORIZED' : (error.code || 'NOTIFY_FAILED'),
+            message: error.message || '通知派送失敗'
+        }, status);
     }
 }

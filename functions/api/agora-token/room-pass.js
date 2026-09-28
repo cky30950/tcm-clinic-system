@@ -73,12 +73,6 @@ export async function onRequestPost(context) {
         const status = Number(error && error.status) > 0 ? Number(error.status) : 500;
         const code = status === 401 ? 'UNAUTHORIZED' : 'ROOM_PASS_FAILED';
         console.error('核發入房 pass 失敗:', error && error.message ? error.message : error);
-        if (status >= 500) {
-            return jsonResponse({
-                error: 'ROOM_PASS_FAILED',
-                message: '核發入房 pass 失敗，請稍後再試'
-            }, 500);
-        }
         return jsonResponse({
             error: code,
             message: (error && error.message) || '核發入房 pass 失敗'

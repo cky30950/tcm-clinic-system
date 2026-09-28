@@ -8,7 +8,6 @@
 
 import { authenticateStaff } from '../attachments/lib/auth.js';
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
-import { errorJson } from '../_lib/http-errors.js';
 
 export const onRequestOptions = () => optionsResponse();
 
@@ -22,9 +21,10 @@ export async function onRequestGet(context) {
             configured: Boolean(vapidPublicKey)
         });
     } catch (error) {
-        if (Number(error.status) === 401) {
-            return jsonResponse({ error: 'UNAUTHORIZED', message: '登入憑證無效或已過期' }, 401);
-        }
-        return errorJson(error, { code: 'CONFIG_FAILED', message: '讀取推播設定失敗，請稍後再試' });
+        const status = Number(error.status) > 0 ? Number(error.status) : 500;
+        return jsonResponse({
+            error: status === 401 ? 'UNAUTHORIZED' : 'CONFIG_FAILED',
+            message: error.message || '讀取推播設定失敗'
+        }, status);
     }
 }

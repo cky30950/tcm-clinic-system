@@ -9,7 +9,6 @@
  * ============================================================ */
 
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
-import { errorJson } from '../_lib/http-errors.js';
 import { enforceAnonRateLimit } from '../_lib/rate-limit.js';
 import { getAccessToken } from '../backup/lib/google-auth.js';
 import { FirestoreClient } from '../backup/lib/firestore.js';
@@ -89,9 +88,9 @@ export async function onRequestPost(context) {
         if (error instanceof SessionError) {
             return jsonResponse({ error: error.code, message: error.message }, error.status);
         }
-        return errorJson(error, {
-            code: 'CAPTURE_COMPLETE_FAILED',
-            message: '更新附件狀態失敗，請稍後再試'
-        });
+        return jsonResponse({
+            error: 'CAPTURE_COMPLETE_FAILED',
+            message: error.message || '更新附件狀態失敗'
+        }, 500);
     }
 }

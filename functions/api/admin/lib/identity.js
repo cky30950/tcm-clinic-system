@@ -111,19 +111,6 @@ export class IdentityClient {
     }
 
     /**
-     * 以 uid 查詢單一 Auth 帳號（Admin SDK getAccountInfo 等價）。
-     * POST .../accounts:lookup { localIds: [uid] }
-     * @param {string} localId Firebase Auth uid
-     * @returns {Promise<object|null>} 帳號資料（含 email／customAttributes 等），不存在回 null
-     */
-    async lookupAccount(localId) {
-        if (!localId) throw new Error('lookupAccount: 缺少 localId');
-        const data = await this._post(':lookup', { localIds: [String(localId)] });
-        const users = Array.isArray(data.users) ? data.users : [];
-        return users[0] || null;
-    }
-
-    /**
      * 刪除 Auth 帳號。
      * 帳號不存在（USER_NOT_FOUND / 404）視為成功（冪等）。
      */

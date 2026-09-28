@@ -112,9 +112,6 @@ export async function issuePresignedUpload(env, p) {
     const patientId = String(p.patientId || '').trim();
     const category = String(p.category || '').trim();
     const contentType = String(p.contentType || '').trim().toLowerCase();
-    // 檔案大小為「必要」欄位：除了業務上限檢查，稍後還會把精確位元組數
-    // 簽進 R2 預簽 URL 的 content-length 標頭，缺漏即拒簽，避免有人拿
-    // URL 上傳超大檔案灌爆儲存空間。
     const contentLength = Number(p.contentLength);
 
     if (!SAFE_PATIENT_ID.test(patientId)) {
@@ -128,14 +125,10 @@ export async function issuePresignedUpload(env, p) {
     if (!ext) {
         throw new StoreError(400, 'INVALID_CONTENT_TYPE', '只支援 JPEG、PNG、WebP、GIF 圖片');
     }
-    if (!Number.isInteger(contentLength) || contentLength <= 0) {
-        throw new StoreError(400, 'MISSING_CONTENT_LENGTH',
-            '必須提供檔案實際大小（正整數 contentLength）');
-    }
     const maxBytes = Number(env.ATTACHMENT_MAX_BYTES) > 0
         ? Number(env.ATTACHMENT_MAX_BYTES)
         : DEFAULT_MAX_BYTES;
-    if (contentLength > maxBytes) {
+    if (Number.isFinite(contentLength) && contentLength > 0 && contentLength > maxBytes) {
         throw new StoreError(400, 'FILE_TOO_LARGE',
             `檔案超過大小上限（${Math.round(maxBytes / 1024 / 1024)}MB）`);
     }
@@ -156,7 +149,8 @@ export async function issuePresignedUpload(env, p) {
     const height = Math.trunc(Number(p.height));
     const widthValue = (Number.isFinite(width) && width > 0 && width <= 20000) ? width : 0;
     const heightValue = (Number.isFinite(height) && height > 0 && height <= 20000) ? height : 0;
-    const sizeValue = contentLength;
+    const sizeValue = (Number.isFinite(contentLength) && contentLength > 0)
+        ? Math.trunc(contentLength) : 0;
 
     const ttlSec = Number(env.ATTACHMENT_URL_TTL) > 0
         ? Math.floor(Number(env.ATTACHMENT_URL_TTL))
@@ -192,9 +186,6 @@ export async function issuePresignedUpload(env, p) {
             // 物件存入後一律帶 private, no-store（瀏覽器實際 PUT
             // 時亦須送相同 Cache-Control 標頭，否則簽章不符）
             cacheControl: STORED_CACHE_CONTROL,
-            // 精確檔案大小簽入 content-length：R2 比對實際請求標頭，
-            // 持此 URL 只能上傳等長內容，無法換上超大檔案
-            contentLength,
             expiresSec: ttlSec,
             now
         });
