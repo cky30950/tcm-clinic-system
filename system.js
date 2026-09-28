@@ -2947,6 +2947,228 @@ async function fetchUsers(forceRefresh = false) {
             window.showToast = showToast;
         }
 
+        // ── Firebase 索引自動檢測管理 ──
+        // Firestore 在索引缺失時會在錯誤訊息中附上一個已預填所有參數的
+        // Firebase Console 建立連結；此模組擷取該連結、去重、顯示一鍵建立 UI。
+        const IndexManager = (function () {
+            // 已發現的缺失索引：Map<url, { url, hint, collection, fields, createdAt }>
+            const missing = new Map();
+            let toastShownAt = 0;
+            let modalBuilt = false;
+
+            // 從 Firestore 錯誤訊息中擷取 Firebase Console 建立索引連結
+            function extractCreationUrl(error) {
+                if (!error) return '';
+                const msg = String(error.message || error || '');
+                const match = msg.match(/https:\/\/console\.firebase\.google\.com\/[^「\s」]+/i);
+                if (match) {
+                    let url = match[0];
+                    // 截斷到網址結束點（錯誤訊息可能在網址後面還有其他字）
+                    url = url.split(/[\s「」,，\.)）;；]/)[0];
+                    return url;
+                }
+                return '';
+            }
+
+            // 從網址參數中解析 collectionId 和 fields，方便 UI 顯示
+            function parseIndexUrl(url) {
+                try {
+                    const u = new URL(url);
+                    const params = u.searchParams;
+                    const collectionId = params.get('collectionId') || params.get('collection-group') || '';
+                    const fields = [];
+                    // Firestore 用 fields=field1:ASCENDING,field2:DESCENDING 格式
+                    const rawFields = params.get('fields');
+                    if (rawFields) {
+                        rawFields.split(',').forEach((f) => {
+                            const parts = f.split(':');
+                            fields.push({ field: parts[0], order: parts[1] || 'ASCENDING' });
+                        });
+                    }
+                    return { collectionId, fields };
+                } catch (_e) {
+                    return { collectionId: '', fields: [] };
+                }
+            }
+
+            // 把查詢出錯登記進列表，顯示提示
+            function register(error, hint) {
+                const url = extractCreationUrl(error);
+                if (!url) return;
+                if (missing.has(url)) return; // 已看過
+
+                const parsed = parseIndexUrl(url);
+                missing.set(url, {
+                    url,
+                    hint: hint || 'Firestore 複合索引缺失',
+                    collection: parsed.collectionId,
+                    fields: parsed.fields,
+                    createdAt: Date.now()
+                });
+
+                // 頻率限制：15 秒內最多彈一次 toast，避免連續查詢重複轟炸
+                const now = Date.now();
+                if (now - toastShownAt > 15000) {
+                    toastShownAt = now;
+                    showToast(`🔧 偵測到 ${missing.size} 個 Firestore 索引未建立，點擊右下角圖示一鍵建立`, 'warning');
+                }
+                buildIndicator();
+            }
+
+            // 動態建立右下角浮動提示按鈕
+            function buildIndicator() {
+                let btn = document.getElementById('indexMissingIndicator');
+                if (!btn) {
+                    btn = document.createElement('button');
+                    btn.id = 'indexMissingIndicator';
+                    btn.innerHTML = `<span>🔧</span><span class="badge">0</span>`;
+                    btn.title = '建立缺失的 Firestore 索引';
+                    btn.style.cssText = `
+                        position: fixed; bottom: 24px; right: 24px; z-index: 9998;
+                        width: 52px; height: 52px; border-radius: 50%;
+                        background: #f59e0b; color: white; border: none;
+                        box-shadow: 0 4px 14px rgba(245,158,11,0.5);
+                        font-size: 22px; cursor: pointer;
+                        display: none; align-items: center; justify-content: center;
+                        transition: transform 0.2s;
+                    `;
+                    btn.onmouseenter = () => btn.style.transform = 'scale(1.08)';
+                    btn.onmouseleave = () => btn.style.transform = 'scale(1)';
+                    btn.onclick = () => openModal();
+                    document.body.appendChild(btn);
+                }
+                const count = missing.size;
+                const badge = btn.querySelector('.badge');
+                if (count > 0) {
+                    btn.style.display = 'flex';
+                    badge.textContent = count;
+                    badge.style.cssText = `
+                        position: absolute; top: -4px; right: -4px;
+                        background: #ef4444; color: white; border-radius: 12px;
+                        min-width: 20px; height: 20px; font-size: 12px;
+                        display: flex; align-items: center; justify-content: center;
+                        padding: 0 5px; font-weight: bold;
+                    `;
+                } else {
+                    btn.style.display = 'none';
+                }
+            }
+
+            // 動態建立 Modal（只建一次）
+            function buildModal() {
+                if (modalBuilt) return;
+                modalBuilt = true;
+                const overlay = document.createElement('div');
+                overlay.id = 'indexManagerOverlay';
+                overlay.style.cssText = `
+                    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+                    z-index: 9999; display: none; align-items: center; justify-content: center;
+                `;
+                overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    background: white; border-radius: 12px; padding: 24px;
+                    max-width: 620px; width: 90vw; max-height: 80vh; overflow-y: auto;
+                    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+                `;
+                modal.innerHTML = `
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                        <h3 style="margin:0;font-size:18px;font-weight:600;color:#1f2937;">🔧 建立 Firestore 索引</h3>
+                        <button onclick="window.__indexManagerClose()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;">✕</button>
+                    </div>
+                    <div id="indexManagerIntro" style="font-size:14px;color:#6b7280;margin-bottom:16px;line-height:1.6;">
+                        以下是系統執行時發現缺失的資料庫索引。點擊「一鍵建立」會在新分頁打開已預填好參數的 Firebase Console，你只需登入後按一下 <b>Create</b> 即可。
+                        <br><br>
+                        索引建立需要幾分鐘（視資料量而定），完成後刷新頁面即可。
+                    </div>
+                    <div id="indexManagerList" style="display:flex;flex-direction:column;gap:12px;"></div>
+                `;
+                overlay.appendChild(modal);
+                document.body.appendChild(overlay);
+                window.__indexManagerClose = closeModal;
+            }
+
+            function openModal() {
+                buildModal();
+                renderList();
+                const overlay = document.getElementById('indexManagerOverlay');
+                overlay.style.display = 'flex';
+            }
+
+            function closeModal() {
+                const overlay = document.getElementById('indexManagerOverlay');
+                if (overlay) overlay.style.display = 'none';
+            }
+
+            function renderList() {
+                const listEl = document.getElementById('indexManagerList');
+                if (!listEl) return;
+                if (missing.size === 0) {
+                    listEl.innerHTML = `<div style="text-align:center;color:#10b981;padding:20px;font-size:15px;">
+                        ✅ 所有索引都已建立，沒有缺失
+                    </div>`;
+                    return;
+                }
+                listEl.innerHTML = Array.from(missing.values()).map((item, i) => {
+                    const fieldHtml = item.fields.length
+                        ? item.fields.map((f) =>
+                            `<span style="background:#f3f4f6;padding:2px 8px;border-radius:4px;margin:0 4px;font-family:monospace;font-size:12px;">
+                                ${f.field} <span style="color:#6b7280;font-size:11px;">${f.order}</span>
+                            </span>`
+                        ).join('')
+                        : '<span style="color:#9ca3af;font-size:12px;">（網址自動帶入參數）</span>';
+                    return `
+                        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;background:#fafafa;">
+                            <div style="font-size:13px;color:#374151;font-weight:500;margin-bottom:6px;">
+                                <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px;margin-right:8px;">
+                                    ${i + 1}
+                                </span>
+                                ${item.hint}
+                            </div>
+                            <div style="font-size:12px;color:#6b7280;margin-bottom:6px;">
+                                集合：<b>${item.collection || '（未知）'}</b>　|　欄位：${fieldHtml}
+                            </div>
+                            <div style="display:flex;gap:8px;">
+                                <a href="${item.url}" target="_blank" rel="noopener"
+                                   style="flex:1;background:#2563eb;color:white;padding:8px 14px;border-radius:6px;
+                                          text-decoration:none;font-size:13px;text-align:center;font-weight:500;">
+                                    🚀 一鍵建立（開啟 Firebase Console）
+                                </a>
+                                <button onclick="window.__indexManagerSkip(${i})"
+                                        style="background:#e5e7eb;color:#4b5563;border:none;padding:8px 12px;border-radius:6px;
+                                               cursor:pointer;font-size:13px;">
+                                    稍後
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                window.__indexManagerSkip = (idx) => {
+                    const items = Array.from(missing.values());
+                    let i = 0;
+                    for (const [url] of missing) {
+                        if (i === idx) { missing.delete(url); break; }
+                        i++;
+                    }
+                    renderList();
+                    buildIndicator();
+                };
+            }
+
+            // 公開 API
+            return {
+                register,
+                openModal,
+                closeModal,
+                getCount: () => missing.size
+            };
+        })();
+
+        if (!window.indexManager) {
+            window.indexManager = IndexManager;
+        }
+
         
         async function showConfirmation(message, type = 'warning') {
             
@@ -25600,8 +25822,9 @@ async function restoreUser(id) {
                 const msg = String((rangeErr && rangeErr.message) || rangeErr || '');
                 if (msg.toLowerCase().includes('index')) {
                     walletReceivablesIndexMissing = true;
-                    console.warn('待收款複合索引未建立，改用全量撈取。請依下列連結建立索引：',
-                        (msg.match(/https:\/\/[^\s]+/) || [''])[0]);
+                    if (typeof window.indexManager !== 'undefined') {
+                        window.indexManager.register(rangeErr, '待收款查詢（paymentStatus + date）');
+                    }
                 } else {
                     console.warn('待收款範圍查詢失敗，改用全量撈取：', msg);
                 }
@@ -26059,6 +26282,9 @@ async function getClinicExpensesByMonths(months, clinicId = null) {
             snapshot = await window.firebase.getDocs(window.firebase.firestoreQuery(colRef, ...parts));
         } catch (_batchErr) {
             // 若缺少複合索引，退回逐月查詢，仍避免全集合掃描。
+            if (typeof window.indexManager !== 'undefined') {
+                window.indexManager.register(_batchErr, '成本查詢（month + clinicId）');
+            }
             for (const monthKey of chunk) {
                 const fallbackParts = [window.firebase.where('month', '==', monthKey)];
                 if (clinicId) fallbackParts.push(window.firebase.where('clinicId', '==', clinicId));
@@ -30687,6 +30913,9 @@ class FirebaseDataManager {
             return { success: true, data: list };
         } catch (error) {
             console.warn('財務摘要條件查詢失敗:', error);
+            if (typeof window.indexManager !== 'undefined') {
+                window.indexManager.register(error, '財務摘要查詢（consultationFinancialSummaries）');
+            }
             return { success: false, data: [], error: 'financial-summary-query-failed' };
         }
     }
@@ -30729,6 +30958,9 @@ class FirebaseDataManager {
             return { success: true, data: list };
         } catch (error) {
             console.warn('財務摘要增量查詢失敗:', error);
+            if (typeof window.indexManager !== 'undefined') {
+                window.indexManager.register(error, '財務摘要增量查詢（syncedAt 範圍）');
+            }
             return { success: false, data: [] };
         }
     }
@@ -30825,8 +31057,9 @@ class FirebaseDataManager {
                 const msg = String((sortDateErr && sortDateErr.message) || sortDateErr || '');
                 if (msg.toLowerCase().includes('index')) {
                     this.sortDateRangeIndexMissing = true;
-                    console.warn('sortDate 複合索引未建立，暫用 date 查詢。請依連結建立索引：',
-                        (msg.match(/https:\/\/[^\s]+/) || [''])[0]);
+                    if (typeof window.indexManager !== 'undefined') {
+                        window.indexManager.register(sortDateErr, '診症財務報表（status + doctor/clinicId + sortDate）');
+                    }
                 } else {
                     console.warn('sortDate 查詢失敗，暫用 date 查詢：', msg);
                 }
