@@ -20,10 +20,12 @@ let personalStatsLastUpdated = { iso: '', offline: false };
 // 目前登入醫師 uid（偏好儲存的鍵）
 let personalStatsCurrentUid = '';
 
-// 圖表只畫前 N 名，其餘彙總為「其他」
+// 圖表與清單只顯示前 N 名
 const PERSONAL_STATS_TOP_N = 10;
-// 記住每位醫師上次的診所／月份篩選
-const PERSONAL_STATS_PREF_KEY = 'personalStatsPrefV1';
+// 記住每位醫師「明確切換過」的診所／月份篩選。
+// V2：V1 會在初始化時把預設值（含「全部診所」）寫入，導致後來新增的
+// 「預設為當前診所」永遠被舊戳記覆蓋，故升版捨棄 V1 偏好。
+const PERSONAL_STATS_PREF_KEY = 'personalStatsPrefV2';
 
 function psGetLang() {
     try { return (localStorage.getItem('lang') || 'zh').toLowerCase(); } catch (_e) { return 'zh'; }
@@ -372,7 +374,7 @@ function populateMonthSelect(months, currentKey) {
         sel.value = desiredKey;
         personalStatsCurrentMonth = desiredKey;
     }
-    if (personalStatsCurrentUid) psWritePref(personalStatsCurrentUid, { month: personalStatsCurrentMonth });
+    // 注意：初始化不寫入偏好，偏好只記錄使用者明確切換（onchange）。
     sel.onchange = function () {
         personalStatsCurrentMonth = this.value || personalStatsCurrentMonth;
         if (personalStatsCurrentUid) psWritePref(personalStatsCurrentUid, { month: personalStatsCurrentMonth });
@@ -426,7 +428,8 @@ function populateClinicSelect(initialClinicId) {
     personalStatsCurrentClinic = desired;
     const curObj = clinics.find(c => String(c.id) === String(desired));
     personalStatsSelectedClinicName = curObj ? (curObj.name || '') : '';
-    if (personalStatsCurrentUid) psWritePref(personalStatsCurrentUid, { clinic: desired });
+    // 注意：初始化（含語言切換重建下拉）不寫入偏好，
+    // 偏好只記錄使用者明確切換（onchange），否則預設值會反過來蓋掉預設邏輯。
     sel.onchange = function () {
         personalStatsCurrentClinic = this.value || personalStatsCurrentClinic;
         try {
@@ -478,9 +481,17 @@ async function loadPersonalStatistics() {
             return;
         }
         personalStatsCurrentUid = doctor;
-        // 還原上次的診所／月份篩選
+        // 診所篩選優先序：上次手動選擇 > 當前診所 > 全部診所。
+        // local-default 為未選診所的本機兜底值（個人統計不計入），視同無預設。
         const pref = psReadPref(doctor);
-        populateClinicSelect(pref.clinic || 'ALL');
+        let initialClinic = pref.clinic || '';
+        if (!initialClinic) {
+            try {
+                const cur = String(localStorage.getItem('currentClinicId') || '').trim();
+                if (cur && cur !== 'local-default') initialClinic = cur;
+            } catch (_e) {}
+        }
+        populateClinicSelect(initialClinic || 'ALL');
         personalStatsCurrentMonth = pref.month || 'ALL';
         const cached = psReadCache(doctor);
         if (cached && Array.isArray(cached.buckets)) {
