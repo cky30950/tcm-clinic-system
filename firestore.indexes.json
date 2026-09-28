@@ -16,30 +16,7 @@
         { "fieldPath": "at", "order": "DESCENDING" }
       ]
     },
-    {
-      "collectionGroup": "patients",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "phone", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "consultations",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "patientId", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "patientPackages",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "patientId", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
-      ]
-    },
+
     {
       "collectionGroup": "patientPackageHistory",
       "queryScope": "COLLECTION",
@@ -119,6 +96,31 @@
         { "fieldPath": "doctor", "order": "ASCENDING" },
         { "fieldPath": "clinicId", "order": "ASCENDING" },
         { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "clinicExpenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "month", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "paymentStatus", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "syncedAt", "order": "ASCENDING" }
       ]
     }
   ],
