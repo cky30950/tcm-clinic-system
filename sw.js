@@ -8,7 +8,7 @@
  *  - 版本化快取；更新時由用戶端訊息觸發 skipWaiting，不強制中斷
  * ============================================================ */
 
-const CACHE_VERSION = 'v1.0.6';
+const CACHE_VERSION = 'v1.0.5';
 const SHELL_CACHE = 'shell-' + CACHE_VERSION;
 const CDN_CACHE = 'cdn-' + CACHE_VERSION;
 
@@ -37,10 +37,10 @@ function isSensitiveDocument(url) {
     return SENSITIVE_DOC_PATHS.has(url.pathname) || SENSITIVE_QUERY_RE.test(url.search);
 }
 
-/* 跨域僅快取以下明確白名單主機；其餘跨域直接通過。
-   Firebase SDK 已隨站代管、Tailwind 改為本地建構 CSS，
-   故 gstatic／cdn.tailwindcss.com 已移除。 */
+/* 跨域僅快取以下明確白名單主機；其餘跨域直接通過 */
 const CDN_HOSTS = new Set([
+    'www.gstatic.com',
+    'cdn.tailwindcss.com',
     'cdnjs.cloudflare.com',
     'unpkg.com',
     'cdn.jsdelivr.net',
