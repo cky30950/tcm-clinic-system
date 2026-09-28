@@ -10868,10 +10868,13 @@ async function loadConsultationForEdit(consultationId) {
             {
               const acnEl = document.getElementById('formAcupunctureNotes');
               if (acnEl) {
-                // 以白名單淨化後再寫入，保留穴位方塊標記並攔截 Stored XSS
-                acnEl.innerHTML = (typeof window.sanitizeAcupunctureNotesHtml === 'function')
-                  ? window.sanitizeAcupunctureNotesHtml(consultation.acupunctureNotes || '')
-                  : (consultation.acupunctureNotes || '');
+                // 使用 innerText 載入針灸備註內容，以支援 contenteditable
+                // 載入針灸備註時直接使用 innerHTML，以保留方塊標記
+                acnEl.innerHTML = consultation.acupunctureNotes || '';
+                // 載入完畢後初始化既有穴位方塊的事件處理
+                if (typeof initializeAcupointNotesSpans === 'function') {
+                  initializeAcupointNotesSpans();
+                }
                 // 載入完畢後初始化既有穴位方塊的事件處理
                 if (typeof initializeAcupointNotesSpans === 'function') {
                   initializeAcupointNotesSpans();
@@ -12132,15 +12135,10 @@ function collectConsultationDraftPayload() {
     const acupunctureNotesEl = document.getElementById('formAcupunctureNotes');
     const prescriptionTextEl = document.getElementById('formPrescription');
     const billingTextEl = document.getElementById('formBillingItems');
-    // 草稿落 localStorage 前先白名單淨化，避免污染內容於還原時執行
-    const acupunctureNotesRaw = acupunctureNotesEl ? String(acupunctureNotesEl.innerHTML || '') : '';
-    const acupunctureNotesSafe = (typeof window.sanitizeAcupunctureNotesHtml === 'function')
-        ? window.sanitizeAcupunctureNotesHtml(acupunctureNotesRaw)
-        : acupunctureNotesRaw;
     return {
         version: 2,
         fields,
-        acupunctureNotesHtml: acupunctureNotesSafe,
+        acupunctureNotesHtml: acupunctureNotesEl ? String(acupunctureNotesEl.innerHTML || '') : '',
         prescription: prescriptionTextEl && 'value' in prescriptionTextEl ? String(prescriptionTextEl.value || '') : '',
         multiPrescriptions: normalizeConsultationDraftPrescriptionSections(),
         billingItems: billingTextEl && 'value' in billingTextEl ? String(billingTextEl.value || '') : '',
@@ -12259,10 +12257,7 @@ function restoreConsultationSymptomsDraft(appointment, patient) {
 
         if (!isBillingOnlyEdit && Object.prototype.hasOwnProperty.call(draft, 'acupunctureNotesHtml')) {
             const acnEl = document.getElementById('formAcupunctureNotes');
-            // 草稿雖存於本機，仍通過白名單淨化，防禦共用裝置或資料污染
-            const nextHtml = (typeof window.sanitizeAcupunctureNotesHtml === 'function')
-                ? window.sanitizeAcupunctureNotesHtml(draft.acupunctureNotesHtml || '')
-                : String(draft.acupunctureNotesHtml || '');
+            const nextHtml = String(draft.acupunctureNotesHtml || '');
             if (acnEl && String(acnEl.innerHTML || '') !== nextHtml) {
                 acnEl.innerHTML = nextHtml;
                 restored = true;
@@ -13295,16 +13290,8 @@ async function saveConsultation() {
             syndrome: document.getElementById('formSyndrome').value.trim(),
             acupunctureNotes: (() => {
                 const acnEl = document.getElementById('formAcupunctureNotes');
-                if (!acnEl) return '';
-                // 儲存前以白名單淨化：保留穴位方塊與換行，移除任何事件屬性、
-                // script/img 等非預期標記，杜絕 Stored XSS 寫入病歷
-                if (typeof window.sanitizeAcupunctureNotesHtml === 'function') {
-                  const safe = window.sanitizeAcupunctureNotesHtml(acnEl.innerHTML);
-                  // 同步把現場 DOM 收斂為淨化結果，避免殘留內容後續被讀取
-                  if (safe !== acnEl.innerHTML) acnEl.innerHTML = safe;
-                  return safe.trim();
-                }
-                return acnEl.innerHTML.trim();
+                // 儲存針灸備註使用 innerHTML 以保留方塊格式
+                return acnEl ? acnEl.innerHTML.trim() : '';
             })(),
             // 穴位結構化名單（由針灸備註的穴位方塊彙整），
             // 供統計解析使用，避免依賴刮 HTML 屬性
@@ -14378,7 +14365,7 @@ if (!patient) {
                                 ${consultation.acupunctureNotes ? `
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">針灸備註</span>
-                                    <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.escapeHtml(window.stripHtmlTags(consultation.acupunctureNotes))}</div>
+                                    <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.stripHtmlTags(consultation.acupunctureNotes)}</div>
                                 </div>
                                 ` : ''}
                             </div>
@@ -14845,7 +14832,7 @@ async function displayConsultationMedicalHistoryPage() {
                                 ${consultation.acupunctureNotes ? `
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">針灸備註</span>
-                                    <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.escapeHtml(window.stripHtmlTags(consultation.acupunctureNotes))}</div>
+                                    <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.stripHtmlTags(consultation.acupunctureNotes)}</div>
                                 </div>
                                 ` : ''}
                             </div>
@@ -15417,7 +15404,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                         const remainingLabel = isEnglish ? ` (Remaining: ${lineRemaining})` : `（餘下 ${lineRemaining} 次）`;
                         displayLine = line + ' ' + remainingLabel;
                     }
-                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${window.escapeHtml(displayLine)}</td></tr>`;
+                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${displayLine}</td></tr>`;
                 } else if (line.includes('總費用')) {
                     const match = line.match(/\$(\d+)/);
                     if (match) {
@@ -15425,7 +15412,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     }
                 } else if (line.startsWith('折扣適用於')) {
                     // 顯示折扣適用項目明細於收據中
-                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${window.escapeHtml(line)}</td></tr>`;
+                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${line}</td></tr>`;
                 }
             });
         }
@@ -19840,16 +19827,8 @@ async function initializeSystemAfterLogin() {
             });
             
             listContainer.innerHTML = html;
-
-            // 卡片按鈕以事件監聽綁定，取代 inline onclick（ID 不可進入 JS 字串上下文）
-            Array.prototype.forEach.call(listContainer.querySelectorAll('[data-action="edit-billing-item"]'), btn => {
-                btn.addEventListener('click', () => editBillingItem(btn.getAttribute('data-billing-item-id')));
-            });
-            Array.prototype.forEach.call(listContainer.querySelectorAll('[data-action="delete-billing-item"]'), btn => {
-                btn.addEventListener('click', () => deleteBillingItem(btn.getAttribute('data-billing-item-id')));
-            });
         }
-
+        
         function createBillingItemCard(item) {
             const statusClass = item.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
             const statusText = item.active ? '啟用' : '停用';
@@ -19910,12 +19889,14 @@ async function initializeSystemAfterLogin() {
                             </span>
                             <div class="flex space-x-1">
                                 <!--
-                                  id 以 data 屬性攜帶、渲染後以 addEventListener 綁定，
-                                  避免文件 ID 進入 inline onclick 的 JS 字串上下文（可含引號）
-                                  造成注入；同時以字串形式傳遞給編輯與刪除函式。
+                                  將 id 以字串形式傳遞給編輯與刪除函式，避免當文件 ID 為
+                                  字串時產生未宣告變數的錯誤。例如 Firestore 生成的文件 ID
+                                  多為隨機字串，若直接插入 onclick 中將導致瀏覽器將其當作
+                                  變數解析，觸發 ReferenceError。透過將 id 包裹在單引號內
+                                  （並轉換為字串）可確保 onclick 中傳遞的參數正確。
                                 -->
-                                <button type="button" data-action="edit-billing-item" data-billing-item-id="${window.escapeHtml(String(item.id))}" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
-                                <button type="button" data-action="delete-billing-item" data-billing-item-id="${window.escapeHtml(String(item.id))}" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
+                                <button onclick="editBillingItem('${item.id}')" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
+                                <button onclick="deleteBillingItem('${item.id}')" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
                             </div>
                         </div>
                     </div>
@@ -20165,10 +20146,8 @@ async function initializeSystemAfterLogin() {
             // 刪除收費項目確認訊息支援中英文
             {
                 const langDel = localStorage.getItem('lang') || 'zh';
-                // showConfirmation 以 HTML 渲染訊息，項目名稱須先跳脫以防 Stored XSS
-                const safeDelName = window.escapeHtml(item.name == null ? '' : String(item.name));
-                const zhMsgDel = `確定要刪除收費項目「${safeDelName}」嗎？\n\n此操作無法復原！`;
-                const enMsgDel = `Are you sure you want to delete the billing item \"${safeDelName}\"?\n\nThis action cannot be undone!`;
+                const zhMsgDel = `確定要刪除收費項目「${item.name}」嗎？\n\n此操作無法復原！`;
+                const enMsgDel = `Are you sure you want to delete the billing item \"${item.name}\"?\n\nThis action cannot be undone!`;
                 const confirmDel = await showConfirmation(langDel === 'en' ? enMsgDel : zhMsgDel, 'warning');
                 if (confirmDel) {
                     billingItems = billingItems.filter(b => String(b.id) !== idStr);
@@ -21450,30 +21429,22 @@ async function searchBillingForConsultation() {
         const categoryName = categoryNames[item.category] || '未分類';
         const bgColor = getCategoryBgColor(item.category);
 
-        const esc = (v) => window.escapeHtml(v == null ? '' : String(v));
-        const descText = item.description == null ? '' : String(item.description);
-        const descShort = descText ? `${esc(descText.substring(0, 30))}${descText.length > 30 ? '...' : ''}` : '';
         return `
-            <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" data-action="add-billing-item" data-billing-item-id="${esc(item.id)}">
+            <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToBilling('${item.id}')">
                 <div class="text-center">
-                    <div class="font-semibold text-gray-900 text-sm mb-1">${esc(item.name)}</div>
-                    <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${esc(categoryName)}</div>
+                    <div class="font-semibold text-gray-900 text-sm mb-1">${item.name}</div>
+                    <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${categoryName}</div>
                     ${item.category !== 'discount' ? `
                         <div class="text-sm font-bold text-green-600">
-                            $${esc(item.price)}
+                            $${item.price}
                         </div>
                     ` : ''}
-                    ${item.unit ? `<div class="text-xs text-gray-600">/ ${esc(item.unit)}</div>` : ''}
-                    ${descShort ? `<div class="text-xs text-gray-600 mt-1">${descShort}</div>` : ''}
+                    ${item.unit ? `<div class="text-xs text-gray-600">/ ${item.unit}</div>` : ''}
+                    ${item.description ? `<div class="text-xs text-gray-600 mt-1">${item.description.substring(0, 30)}${item.description.length > 30 ? '...' : ''}</div>` : ''}
                 </div>
             </div>
         `;
     }).join('');
-
-    // 以事件監聽取代 inline onclick，避免項目 ID 進入 JS 字串上下文造成注入
-    Array.prototype.forEach.call(resultsList.querySelectorAll('[data-action="add-billing-item"]'), card => {
-        card.addEventListener('click', () => addToBilling(card.getAttribute('data-billing-item-id')));
-    });
 
     resultsContainer.classList.remove('hidden');
 }
@@ -21634,12 +21605,6 @@ async function searchBillingForConsultation() {
             const includedItemNames = selectedBillingItems
                 .filter(it => it.category !== 'discount' && (!hasDiscount || it.includedInDiscount !== false))
                 .map(it => it.name);
-            // HTML 明細專用：逐個項目名跳脫後再合併（純文字 textarea 仍使用原始 includedItemNames）
-            const includedItemNamesHtml = includedItemNames
-                .map(n => window.escapeHtml(n == null ? '' : String(n)))
-                .join(',');
-            // 收費項目欄位（名稱/單位等，員工可編輯）插入 HTML 前統一跳脫
-            const escItem = (v) => window.escapeHtml(v == null ? '' : String(v));
             
             // 分離折扣項目和非折扣項目，但保持各自的添加順序
             const nonDiscountItems = [];
@@ -21753,8 +21718,8 @@ async function searchBillingForConsultation() {
                             <div class="flex items-center ${bgColor} border rounded-lg p-3">
                                 ${checkboxHtml}
                                 <div class="flex-1">
-                                    <div class="font-semibold text-gray-900">${escItem(item.name)}</div>
-                                    <div class="text-xs text-gray-600">${escItem(categoryName)}</div>
+                                    <div class="font-semibold text-gray-900">${item.name}</div>
+                                    <div class="text-xs text-gray-600">${categoryName}</div>
                                     <div class="text-sm font-medium ${item.category === 'discount' ? 'text-red-600' : 'text-green-600'}">
                                         ${(() => {
                                             if (item.category === 'discount') {
@@ -21767,7 +21732,7 @@ async function searchBillingForConsultation() {
                                                 }
                                             }
                                             return `$${item.price}`;
-                                        })()}${item.unit ? ` / ${escItem(item.unit)}` : ''}
+                                        })()}${item.unit ? ` / ${item.unit}` : ''}
                                     </div>
                                 </div>
                                 ${quantityControls}
@@ -21791,11 +21756,11 @@ async function searchBillingForConsultation() {
                                 if (item.price > 0 && item.price < 1) {
                                     const discountAmount = subtotalForDiscount * (1 - item.price) * item.quantity;
                                     return `<div class="text-sm text-red-600">
-                                        ${escItem(item.name)}${includedItemNames.length > 0 ? ` (適用：${includedItemNamesHtml})` : ''}：<span class="font-medium">-$${discountAmount.toFixed(0)}</span>
+                                        ${item.name}${includedItemNames.length > 0 ? ` (適用：${includedItemNames.join(',')})` : ''}：<span class="font-medium">-$${discountAmount.toFixed(0)}</span>
                                     </div>`;
                                 } else {
                                     return `<div class="text-sm text-red-600">
-                                        ${escItem(item.name)}${includedItemNames.length > 0 ? ` (適用：${includedItemNamesHtml})` : ''}：<span class="font-medium">$${item.price * item.quantity}</span>
+                                        ${item.name}${includedItemNames.length > 0 ? ` (適用：${includedItemNames.join(',')})` : ''}：<span class="font-medium">$${item.price * item.quantity}</span>
                                     </div>`;
                                 }
                             }).join('')}
@@ -22466,10 +22431,8 @@ const consultationDate = (() => {
                 {
                   const acnEl = document.getElementById('formAcupunctureNotes');
                   if (acnEl) {
-                    // 白名單淨化後載入，保留穴位方塊標記並攔截 Stored XSS
-                    acnEl.innerHTML = (typeof window.sanitizeAcupunctureNotesHtml === 'function')
-                      ? window.sanitizeAcupunctureNotesHtml(consultation.acupunctureNotes || '')
-                      : (consultation.acupunctureNotes || '');
+                    // 使用 innerHTML 載入針灸備註，以保留方塊標記
+                    acnEl.innerHTML = consultation.acupunctureNotes || '';
                     // 載入完成後初始化既有穴位方塊的事件，以使其可刪除與顯示提示
                     if (typeof initializeAcupointNotesSpans === 'function') {
                       try {
@@ -24637,7 +24600,7 @@ async function restoreUser(id) {
                             stats.totalCost = costRes.totalCost;
                             stats.netRevenue = stats.totalRevenue - costRes.totalCost;
                             stats.costProrated = costRes.prorated;
-                            await attachPreviousPeriod(stats, startDate, endDate, doctorFilter, clinicFilter);
+                            loadFinancialPrevPeriodInBackground(cacheKey, stats, startDate, endDate, doctorFilter, clinicFilter);
                             updateFinancialKeyMetrics(stats);
                             updateFinancialTables(merged, stats);
                             const lastSyncAt = (() => {
@@ -24678,8 +24641,8 @@ async function restoreUser(id) {
             stats.totalCost = costRes.totalCost;
             stats.netRevenue = stats.totalRevenue - costRes.totalCost;
             stats.costProrated = costRes.prorated;
-            await attachPreviousPeriod(stats, startDate, endDate, doctorFilter, clinicFilter);
-            
+            loadFinancialPrevPeriodInBackground(cacheKey, stats, startDate, endDate, doctorFilter, clinicFilter);
+
             // 更新關鍵指標
             updateFinancialKeyMetrics(stats);
             updateFinancialTables(filteredConsultations, stats);
@@ -24748,6 +24711,23 @@ async function restoreUser(id) {
                 };
             } catch (_e) {}
             return stats;
+        }
+
+        // 背景載入環比：不阻塞主報表渲染。完成後若頁面仍顯示同一組
+        // 報表，才更新四張卡片的環比 pill，並把結果寫回快取。
+        let financialPrevPeriodToken = 0;
+        function loadFinancialPrevPeriodInBackground(cacheKey, stats, startDate, endDate, doctorFilter, clinicFilter) {
+            const token = ++financialPrevPeriodToken;
+            attachPreviousPeriod(stats, startDate, endDate, doctorFilter, clinicFilter)
+                .then(() => {
+                    if (token !== financialPrevPeriodToken || financialReportLastKey !== cacheKey) return;
+                    updateFinancialKeyMetrics(stats);
+                    const entry = financialReportCache[cacheKey];
+                    if (entry && entry.stats === stats) {
+                        writePersistedFinancialCache(cacheKey, entry);
+                    }
+                })
+                .catch(() => {});
         }
 
         // 環比格式化：回傳 pill HTML 片段
@@ -25582,6 +25562,10 @@ async function restoreUser(id) {
         // （單欄位相等查詢，使用自動索引，無需複合索引），再於客戶端
         // 按報表日期範圍與診所篩選。
         let lastWalletFinQuery = null;
+        // 待收款查詢狀態：複合索引缺失旗標＋全量 unpaid 文件的短快取
+        let walletReceivablesIndexMissing = false;
+        let walletUnpaidDocsCache = null;
+        let walletUnpaidDocsAt = 0;
         async function loadWalletReceivables(startDate, endDate, clinicFilter) {
             const fb = window.firebase;
             const start = financialDayStart(startDate);
@@ -25589,7 +25573,8 @@ async function restoreUser(id) {
 
             // 首選：paymentStatus 相等 + date 範圍的複合查詢，由 Firestore
             // 端過濾日期，需 (paymentStatus, date) 複合索引。
-            try {
+            // 首次確認索引缺失後本工作階段直接跳過，不再白等失敗查詢。
+            if (!walletReceivablesIndexMissing) try {
                 const { docs, truncated } = await walletFetchAllDocs('consultations', [
                     fb.where('paymentStatus', '==', 'unpaid'),
                     fb.where('date', '>=', start),
@@ -25609,6 +25594,7 @@ async function restoreUser(id) {
                 // 並退回單欄位查詢（自動索引）＋客戶端過濾，功能不受影響。
                 const msg = String((rangeErr && rangeErr.message) || rangeErr || '');
                 if (msg.toLowerCase().includes('index')) {
+                    walletReceivablesIndexMissing = true;
                     console.warn('待收款複合索引未建立，改用全量撈取。請依下列連結建立索引：',
                         (msg.match(/https:\/\/[^\s]+/) || [''])[0]);
                 } else {
@@ -25616,10 +25602,24 @@ async function restoreUser(id) {
                 }
             }
 
-            // Fallback：單欄位相等查詢（自動索引），客戶端按日期與診所過濾
-            const { docs, truncated } = await walletFetchAllDocs('consultations', [
-                fb.where('paymentStatus', '==', 'unpaid')
-            ], { pageSize: 300, maxDocs: 5000 });
+            // Fallback：單欄位相等查詢（自動索引），客戶端按日期與診所過濾。
+            // 全量 unpaid 文件（最多 5000 筆）做 15 秒短快取，快速重跑或
+            // 連續改日期時直接複用，不再每次重撈。
+            const nowTs = Date.now();
+            let docs;
+            let truncated = false;
+            if (walletUnpaidDocsCache && (nowTs - walletUnpaidDocsAt) < FINANCIAL_REPORT_MIN_REFRESH_MS) {
+                docs = walletUnpaidDocsCache.docs;
+                truncated = walletUnpaidDocsCache.truncated;
+            } else {
+                const res = await walletFetchAllDocs('consultations', [
+                    fb.where('paymentStatus', '==', 'unpaid')
+                ], { pageSize: 300, maxDocs: 5000 });
+                docs = res.docs;
+                truncated = res.truncated;
+                walletUnpaidDocsCache = { docs, truncated };
+                walletUnpaidDocsAt = nowTs;
+            }
             const rows = [];
             docs.forEach((d) => {
                 const c = Object.assign({ id: d.id }, d.data() || {});
@@ -28333,26 +28333,6 @@ async function consumePackageLocally(patientId, packageRecordId) {
     }
 }
 
-// 依 data 屬性尋找套票操作按鈕（按鈕已移除 inline onclick，不可再用 onclick 選擇器）
-function findPackageActionButton(action, patientId, packageRecordId, clinicId) {
-    try {
-        return Array.prototype.find.call(
-            document.querySelectorAll(`button[data-action="${action}"]`),
-            b => b.getAttribute('data-patient-id') === String(patientId)
-                && b.getAttribute('data-package-id') === String(packageRecordId)
-                && b.getAttribute('data-clinic-id') === (clinicId == null ? '' : String(clinicId))
-        ) || null;
-    } catch (_e) {
-        return null;
-    }
-}
-
-// 取得套票操作的觸發按鈕：优先用事件當前目標，否則依 data 屬性比對
-function getPackageActionLoadingButton(action, patientId, packageRecordId, clinicId) {
-    return getLoadingButtonFromEvent(null)
-        || findPackageActionButton(action, patientId, packageRecordId, clinicId);
-}
-
 function formatPackageStatus(pkg) {
     const exp = new Date(pkg.expiresAt);
     const now = new Date();
@@ -28459,7 +28439,7 @@ async function updatePatientPackageExpiry(patientId, packageRecordId, clinicId =
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     const isEn = lang && lang.toLowerCase().startsWith('en');
     const targetClinicId = clinicId ? String(clinicId) : currentPackageClinicId();
-    const loadingButton = getPackageActionLoadingButton('pkg-edit-expiry', patientId, packageRecordId, targetClinicId);
+    const loadingButton = getLoadingButtonFromEvent(`button[onclick="updatePatientPackageExpiry('${patientId}', '${packageRecordId}', '${targetClinicId}')"]`);
     if (loadingButton) {
         setButtonLoading(loadingButton, isEn ? 'Loading...' : '讀取中...');
     }
@@ -28520,7 +28500,7 @@ async function deletePatientPackageRecord(patientId, packageRecordId, clinicId =
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     const isEn = lang && lang.toLowerCase().startsWith('en');
     const targetClinicId = clinicId ? String(clinicId) : currentPackageClinicId();
-    const loadingButton = getPackageActionLoadingButton('pkg-delete', patientId, packageRecordId, targetClinicId);
+    const loadingButton = getLoadingButtonFromEvent(`button[onclick="deletePatientPackageRecord('${patientId}', '${packageRecordId}', '${targetClinicId}')"]`);
     if (loadingButton) {
         setButtonLoading(loadingButton, isEn ? 'Deleting...' : '刪除中...');
     }
@@ -28531,12 +28511,10 @@ async function deletePatientPackageRecord(patientId, packageRecordId, clinicId =
             showToast(isEn ? 'Package not found' : '找不到套票', 'warning');
             return;
         }
-        // showConfirmation 以 HTML 渲染訊息，套票名稱須先跳脫以防 Stored XSS
-        const safePkgDeleteName = window.escapeHtml(pkg.name == null ? '' : String(pkg.name));
         const ok = await showConfirmation(
             isEn
-                ? `Delete package "${safePkgDeleteName}"?\nThis action cannot be undone.`
-                : `確定要刪除套票「${safePkgDeleteName}」嗎？\n此操作無法復原。`,
+                ? `Delete package "${pkg.name || ''}"?\nThis action cannot be undone.`
+                : `確定要刪除套票「${pkg.name || ''}」嗎？\n此操作無法復原。`,
             'warning'
         );
         if (!ok) return;
@@ -28571,7 +28549,7 @@ async function updatePatientPackageRemainingUses(patientId, packageRecordId, cli
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     const isEn = lang && lang.toLowerCase().startsWith('en');
     const targetClinicId = clinicId ? String(clinicId) : currentPackageClinicId();
-    const loadingButton = getPackageActionLoadingButton('pkg-edit-remaining', patientId, packageRecordId, targetClinicId);
+    const loadingButton = getLoadingButtonFromEvent(`button[onclick="updatePatientPackageRemainingUses('${patientId}', '${packageRecordId}', '${targetClinicId}')"]`);
     if (loadingButton) {
         setButtonLoading(loadingButton, isEn ? 'Loading...' : '讀取中...');
     }
@@ -28675,27 +28653,20 @@ async function renderPatientPackages(patientId) {
             const badge =
               expired ? '<span class="ml-2 text-xs text-white px-2 py-0.5 rounded bg-red-500">已到期</span>' :
               (pkg.remainingUses <= 0 ? '<span class="ml-2 text-xs text-white px-2 py-0.5 rounded bg-gray-500">已用完</span>' : '');
-            const escPkg = (v) => window.escapeHtml(v == null ? '' : String(v));
             return `
       <div class="flex items-center justify-between bg-white border border-purple-200 rounded p-2">
         <div>
-          <div class="font-medium text-purple-900">${escPkg(pkg.name)}${badge}</div>
-          <div class="text-xs text-gray-600">${escPkg(formatPackageStatus(pkg))}</div>
+          <div class="font-medium text-purple-900">${pkg.name}${badge}</div>
+          <div class="text-xs text-gray-600">${formatPackageStatus(pkg)}</div>
         </div>
-        <button type="button" ${disabled ? 'disabled' : ''}
-          data-action="use-package"
-          data-patient-id="${escPkg(pkg.patientId != null ? pkg.patientId : patientId)}"
-          data-package-id="${escPkg(pkg.id)}"
+        <button type="button" ${disabled ? 'disabled' : ''} 
+          onclick="useOnePackage('${pkg.patientId}', '${pkg.id}')"
           class="px-3 py-1 rounded ${disabled ? 'bg-gray-300 text-gray-600' : 'bg-purple-600 text-white hover:bg-purple-700'}">
           使用一次
         </button>
       </div>
     `;
         }).join('');
-        // 以事件監聽取代 inline onclick，避免 ID 進入 JS 字串上下文
-        Array.prototype.forEach.call(container.querySelectorAll('button[data-action="use-package"]'), btn => {
-            btn.addEventListener('click', () => useOnePackage(btn.getAttribute('data-patient-id'), btn.getAttribute('data-package-id')));
-        });
     } catch (error) {
         console.error('渲染患者套票錯誤:', error);
         container.innerHTML = '<div class="text-red-500">載入套票資料失敗</div>';
@@ -28859,8 +28830,6 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
             htmlParts.push('<div class="space-y-2">');
             pageValid.forEach(pkg => {
                 const safePkgName = window.escapeHtml(pkg.name || '');
-                // ID 以 data 屬性攜帶並跳脫，避免進入 inline onclick 的 JS 字串上下文
-                const dataIds = `data-patient-id="${window.escapeHtml(String(patientId))}" data-package-id="${window.escapeHtml(String(pkg.id))}" data-clinic-id="${window.escapeHtml(targetClinicId == null ? '' : String(targetClinicId))}"`;
                 const statusText = formatPackageStatus(pkg);
                 const safeStatusText = window.escapeHtml(statusText || '');
                 const remainingUses = typeof pkg.remainingUses === 'number' ? pkg.remainingUses : '';
@@ -28884,21 +28853,21 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
                             <div class="flex flex-wrap items-center justify-end gap-1">
                                 <button
                                     type="button"
-                                    data-action="pkg-edit-remaining" ${dataIds}
+                                    onclick="updatePatientPackageRemainingUses('${patientId}', '${pkg.id}', '${targetClinicId}')"
                                     class="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
                                 >
                                     修改剩餘次數
                                 </button>
                                 <button
                                     type="button"
-                                    data-action="pkg-edit-expiry" ${dataIds}
+                                    onclick="updatePatientPackageExpiry('${patientId}', '${pkg.id}', '${targetClinicId}')"
                                     class="px-2 py-1 text-xs rounded bg-amber-500 text-white hover:bg-amber-600"
                                 >
                                     修改有限期
                                 </button>
                                 <button
                                     type="button"
-                                    data-action="pkg-delete" ${dataIds}
+                                    onclick="deletePatientPackageRecord('${patientId}', '${pkg.id}', '${targetClinicId}')"
                                     class="px-2 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700"
                                 >
                                     刪除
@@ -28916,8 +28885,6 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
             htmlParts.push('<div class="space-y-2">');
             pageInvalid.forEach(pkg => {
                 const safePkgName = window.escapeHtml(pkg.name || '');
-                // ID 以 data 屬性攜帶並跳脫，避免進入 inline onclick 的 JS 字串上下文
-                const dataIds = `data-patient-id="${window.escapeHtml(String(patientId))}" data-package-id="${window.escapeHtml(String(pkg.id))}" data-clinic-id="${window.escapeHtml(targetClinicId == null ? '' : String(targetClinicId))}"`;
                 const statusText = formatPackageStatus(pkg);
                 const safeStatusText = window.escapeHtml(statusText || '');
                 const remainingUses = typeof pkg.remainingUses === 'number' ? pkg.remainingUses : '';
@@ -28933,21 +28900,21 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
                             <div class="flex flex-wrap items-center justify-end gap-1">
                                 <button
                                     type="button"
-                                    data-action="pkg-edit-remaining" ${dataIds}
+                                    onclick="updatePatientPackageRemainingUses('${patientId}', '${pkg.id}', '${targetClinicId}')"
                                     class="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
                                 >
                                     修改剩餘次數
                                 </button>
                                 <button
                                     type="button"
-                                    data-action="pkg-edit-expiry" ${dataIds}
+                                    onclick="updatePatientPackageExpiry('${patientId}', '${pkg.id}', '${targetClinicId}')"
                                     class="px-2 py-1 text-xs rounded bg-amber-500 text-white hover:bg-amber-600"
                                 >
                                     修改有限期
                                 </button>
                                 <button
                                     type="button"
-                                    data-action="pkg-delete" ${dataIds}
+                                    onclick="deletePatientPackageRecord('${patientId}', '${pkg.id}', '${targetClinicId}')"
                                     class="px-2 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700"
                                 >
                                     刪除
@@ -28961,19 +28928,6 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
         }
         htmlParts.push('</div>');
         contentEl.innerHTML = htmlParts.join('');
-        // 套票操作按鈕以事件監聽綁定（按鈕隨 innerHTML 重建，舊監聽器一併銷毀，不會重複註冊）
-        const bindPkgAction = (action, handler) => {
-            Array.prototype.forEach.call(contentEl.querySelectorAll(`button[data-action="${action}"]`), btn => {
-                btn.addEventListener('click', () => handler(
-                    btn.getAttribute('data-patient-id'),
-                    btn.getAttribute('data-package-id'),
-                    btn.getAttribute('data-clinic-id')
-                ));
-            });
-        };
-        bindPkgAction('pkg-edit-remaining', updatePatientPackageRemainingUses);
-        bindPkgAction('pkg-edit-expiry', updatePatientPackageExpiry);
-        bindPkgAction('pkg-delete', deletePatientPackageRecord);
         // 渲染分頁控制
         const paginEl = ensurePaginationContainer('packageStatusContent', 'patientPackageStatusPagination');
         renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
@@ -29196,12 +29150,9 @@ async function useOnePackage(patientId, packageRecordId) {
     } catch (_e) {}
     if (!loadingButton) {
         try {
-            // 按鈕已改以 data 屬性標記；逐筆比對 ID，避免屬性選擇器的值注入問題
-            const buttons = document.querySelectorAll('button[data-action="use-package"]');
-            loadingButton = Array.prototype.find.call(buttons, b =>
-                b.getAttribute('data-patient-id') === String(patientId)
-                && b.getAttribute('data-package-id') === String(packageRecordId)
-            ) || null;
+            // 透過 onclick 屬性匹配對應按鈕（使用模板字串避免引號問題）
+            const selector = `button[onclick="useOnePackage('${patientId}', '${packageRecordId}')"]`;
+            loadingButton = document.querySelector(selector);
         } catch (_e) {
             loadingButton = null;
         }
@@ -30859,7 +30810,8 @@ class FirebaseDataManager {
             };
             // 主力查詢 sortDate：所有現代寫入都會帶標準化 Timestamp，
             // 可一併涵蓋 date 為字串／缺失的舊資料，不會再靜默漏單。
-            try {
+            // 索引首次確認缺失後，本工作階段直接跳過此嘗試，避免每次都白等一條失敗查詢。
+            if (!this.sortDateRangeIndexMissing) try {
                 const list = await runRangeQuery('sortDate', start, end);
                 return { success: true, data: list };
             } catch (sortDateErr) {
@@ -30867,6 +30819,7 @@ class FirebaseDataManager {
                 // 印出建立連結，並退回舊的 date／createdAt 查詢，避免功能中斷。
                 const msg = String((sortDateErr && sortDateErr.message) || sortDateErr || '');
                 if (msg.toLowerCase().includes('index')) {
+                    this.sortDateRangeIndexMissing = true;
                     console.warn('sortDate 複合索引未建立，暫用 date 查詢。請依連結建立索引：',
                         (msg.match(/https:\/\/[^\s]+/) || [''])[0]);
                 } else {
@@ -37953,52 +37906,45 @@ function refreshTemplateCategoryFilters() {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-green-200';
               const category = item && item.category ? item.category : '';
-              // 所有使用者可編輯欄位先跳脫，按鈕改用 data-action 於渲染後綁定事件，
-              // 避免名稱插入 inline onclick 的 JS 字串上下文造成 XSS
-              const safeItemName = window.escapeHtml(item.name || '');
-              const safeCategory = window.escapeHtml(category);
-              const safeDescription = window.escapeHtml(item.description || '');
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
                   <div>
-                    <h3 class="text-lg font-semibold text-green-800">${safeItemName}</h3>
-                    <div class="text-xs text-green-600 mt-1">${safeCategory}</div>
+                    <h3 class="text-lg font-semibold text-green-800">${item.name}</h3>
+                    <div class="text-xs text-green-600 mt-1">${category}</div>
                   </div>
                   <div class="flex gap-2">
-                    <button type="button" class="text-blue-600 hover:text-blue-800 text-sm" data-action="edit-herb-combo">編輯</button>
-                    <button type="button" class="text-red-600 hover:text-red-800 text-sm" data-action="delete-herb-combo">刪除</button>
+                    <button class="text-blue-600 hover:text-blue-800 text-sm" onclick="showEditModal('herb', '${item.name}')">編輯</button>
+                    <button class="text-red-600 hover:text-red-800 text-sm" onclick="deleteHerbCombination(${item.id})">刪除</button>
                   </div>
                 </div>
-                <p class="text-gray-600 mb-3 whitespace-pre-line">${safeDescription}</p>
+                <p class="text-gray-600 mb-3">${item.description}</p>
                 <div class="text-sm text-gray-700 space-y-1">
-                  ${(Array.isArray(item.ingredients) ? item.ingredients : []).map(ing => {
+                  ${item.ingredients.map(ing => {
                     const dosage = ing && ing.dosage ? String(ing.dosage).trim() : '';
                     const displayDosage = dosage ? (dosage + '克') : '';
                     const nameVal = ing && ing.name ? ing.name : '';
-                    // 取得該藥材的提示內容並編碼（encodeURIComponent 後可安全用於雙引號屬性）
+                    // 取得該藥材的提示內容並編碼
                     const tooltipContent = getHerbTooltipContent(nameVal);
                     const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
                     let attrs = '';
                     if (tooltipContent) {
+                      // Use proper escaping for single quotes inside single-quoted strings. The
+                      // original implementation attempted to escape the single quotes surrounding
+                      // the `data-tooltip` attribute name using double backslashes (\\'), which
+                      
+                      
+                      
+                      
+                      
                       attrs = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
                     }
                     return '<div class="flex justify-between items-center p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded text-sm"' + attrs + '>' +
-                      '<span class="text-green-800">' + window.escapeHtml(nameVal) + '</span>' +
-                      '<span class="text-green-600">' + window.escapeHtml(displayDosage) + '</span>' +
+                      '<span class="text-green-800">' + nameVal + '</span>' +
+                      '<span class="text-green-600">' + displayDosage + '</span>' +
                       '</div>';
                   }).join('')}
                 </div>
               `;
-              const herbEditBtn = card.querySelector('[data-action="edit-herb-combo"]');
-              if (herbEditBtn) {
-                herbEditBtn.addEventListener('click', () => {
-                  showEditModal('herb', item.name ? String(item.name) : '');
-                });
-              }
-              const herbDeleteBtn = card.querySelector('[data-action="delete-herb-combo"]');
-              if (herbDeleteBtn) {
-                herbDeleteBtn.addEventListener('click', () => { deleteHerbCombination(item.id); });
-              }
               container.appendChild(card);
             });
             // 分頁控制元件
@@ -38144,53 +38090,39 @@ async function deleteHerbCombination(id) {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-blue-200';
               const category = item && item.category ? item.category : '';
-              // 使用者可編輯欄位跳脫，按鈕以 data-action 渲染後綁定（防 inline XSS）
-              const safeItemName = window.escapeHtml(item.name || '');
-              const safeCategory = window.escapeHtml(category);
-              const safeTechnique = window.escapeHtml(item.technique || '');
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
                   <div>
-                    <h3 class="text-lg font-semibold text-blue-800">${safeItemName}</h3>
-                    <div class="text-xs text-blue-600 mt-1">${safeCategory}</div>
+                    <h3 class="text-lg font-semibold text-blue-800">${item.name}</h3>
+                    <div class="text-xs text-blue-600 mt-1">${category}</div>
                   </div>
                   <div class="flex gap-2">
-                    <button type="button" class="text-blue-600 hover:text-blue-800 text-sm" data-action="edit-acupoint-combo">編輯</button>
-                    <button type="button" class="text-red-600 hover:text-red-800 text-sm" data-action="delete-acupoint-combo">刪除</button>
+                    <button class="text-blue-600 hover:text-blue-800 text-sm" onclick="showEditModal('acupoint', '${item.name}')">編輯</button>
+                    <button class="text-red-600 hover:text-red-800 text-sm" onclick="deleteAcupointCombination(${item.id})">刪除</button>
                   </div>
                 </div>
                 <div class="text-sm text-gray-700 space-y-1">
-                  ${(Array.isArray(item.points) ? item.points : []).map(pt => {
-
+                  ${item.points.map(pt => {
+                    
                     const nameVal = pt && pt.name ? pt.name : '';
-
+                    
                     const tooltipContent = getAcupointTooltipContent(nameVal);
                     const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
-
+                    
                     let attrs = '';
                     if (tooltipContent) {
                       attrs = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
                     }
-
+                    
                     return '<div class="flex items-center p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded text-sm"' + attrs + '>' +
                       '<span class="text-blue-800">' + window.escapeHtml(nameVal) + '</span>' +
                       '</div>';
                   }).join('')}
                 </div>
                 <div class="mt-3 pt-3 border-t border-gray-200 text-sm text-gray-600">
-                  <p>針法：${safeTechnique}</p>
+                  <p>針法：${item.technique}</p>
                 </div>
               `;
-              const acupointEditBtn = card.querySelector('[data-action="edit-acupoint-combo"]');
-              if (acupointEditBtn) {
-                acupointEditBtn.addEventListener('click', () => {
-                  showEditModal('acupoint', item.name ? String(item.name) : '');
-                });
-              }
-              const acupointDeleteBtn = card.querySelector('[data-action="delete-acupoint-combo"]');
-              if (acupointDeleteBtn) {
-                acupointDeleteBtn.addEventListener('click', () => { deleteAcupointCombination(item.id); });
-              }
               container.appendChild(card);
             });
             // 分頁控制
@@ -38989,19 +38921,19 @@ async function deleteAcupointCombination(id) {
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
                   <div>
-                    <h3 class="text-lg font-semibold text-purple-800">${window.escapeHtml(item.name || '')}</h3>
+                    <h3 class="text-lg font-semibold text-purple-800">${item.name}</h3>
                     <div class="flex gap-2 mt-1">
-                      <span class="text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded">${window.escapeHtml(item.category || '')}</span>
-                      <span class="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">療程: ${window.escapeHtml(item.duration || '')}</span>
-                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">複診: ${window.escapeHtml(item.followUp || '')}</span>
+                      <span class="text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded">${item.category}</span>
+                      <span class="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">療程: ${item.duration}</span>
+                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">複診: ${item.followUp}</span>
                     </div>
                   </div>
                   <div class="flex gap-2">
-
+                    
                   </div>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
-                  ${String(item.content || '').split('\n').map(p => '<p class="mb-2">' + window.escapeHtml(p) + '</p>').join('')}
+                  ${item.content.split('\n').map(p => '<p class="mb-2">' + p + '</p>').join('')}
                 </div>
               `;
               container.appendChild(card);
@@ -39080,43 +39012,41 @@ async function deleteAcupointCombination(id) {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-orange-200';
               // Build display content for diagnosis template fields.
-              // 所有模板欄位皆為員工可編輯內容，逐行跳脫後再以 <br> 保留換行
-              const escLines = (v) => window.escapeHtml(v == null ? '' : String(v)).split('\n').join('<br>');
               let contentHtml = '';
               if (item.chiefComplaint || item.currentHistory || item.tongue || item.pulse || item.tcmDiagnosis || item.syndromeDiagnosis) {
                 const parts = [];
                 if (item.chiefComplaint) {
-                  parts.push('<p class="mb-2"><strong>主訴：</strong>' + escLines(item.chiefComplaint) + '</p>');
+                  parts.push('<p class="mb-2"><strong>主訴：</strong>' + String(item.chiefComplaint).split('\n').map(l => l).join('<br>') + '</p>');
                 }
                 if (item.currentHistory) {
-                  parts.push('<p class="mb-2"><strong>現病史：</strong>' + escLines(item.currentHistory) + '</p>');
+                  parts.push('<p class="mb-2"><strong>現病史：</strong>' + String(item.currentHistory).split('\n').map(l => l).join('<br>') + '</p>');
                 }
                 if (item.tongue) {
-                  parts.push('<p class="mb-2"><strong>舌象：</strong>' + escLines(item.tongue) + '</p>');
+                  parts.push('<p class="mb-2"><strong>舌象：</strong>' + String(item.tongue).split('\n').map(l => l).join('<br>') + '</p>');
                 }
                 if (item.pulse) {
-                  parts.push('<p class="mb-2"><strong>脈象：</strong>' + escLines(item.pulse) + '</p>');
+                  parts.push('<p class="mb-2"><strong>脈象：</strong>' + String(item.pulse).split('\n').map(l => l).join('<br>') + '</p>');
                 }
                 if (item.tcmDiagnosis) {
-                  parts.push('<p class="mb-2"><strong>中醫診斷：</strong>' + escLines(item.tcmDiagnosis) + '</p>');
+                  parts.push('<p class="mb-2"><strong>中醫診斷：</strong>' + String(item.tcmDiagnosis).split('\n').map(l => l).join('<br>') + '</p>');
                 }
                 if (item.syndromeDiagnosis) {
-                  parts.push('<p class="mb-2"><strong>證型診斷：</strong>' + escLines(item.syndromeDiagnosis) + '</p>');
+                  parts.push('<p class="mb-2"><strong>證型診斷：</strong>' + String(item.syndromeDiagnosis).split('\n').map(l => l).join('<br>') + '</p>');
                 }
                 contentHtml = parts.join('');
               } else if (item.content) {
-                contentHtml = String(item.content).split('\n').map(p => '<p class="mb-2">' + window.escapeHtml(p) + '</p>').join('');
+                contentHtml = item.content.split('\n').map(p => '<p class="mb-2">' + p + '</p>').join('');
               }
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
                   <div>
-                    <h3 class="text-lg font-semibold text-orange-800">${window.escapeHtml(item.name || '')}</h3>
+                    <h3 class="text-lg font-semibold text-orange-800">${item.name}</h3>
                     <div class="flex gap-2 mt-1">
-                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">${window.escapeHtml(item.category || '')}</span>
+                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">${item.category}</span>
                     </div>
                   </div>
                   <div class="flex gap-2">
-
+                    
                   </div>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
@@ -39541,11 +39471,6 @@ async function deleteAcupointCombination(id) {
             }
             // 顯示 modal
             modal.classList.remove('hidden');
-            // 彈窗內所有插值（含分類 option 清單）皆為員工可編輯內容，統一 HTML 跳脫
-            const esc = (v) => window.escapeHtml(v == null ? '' : v);
-            const categoryOptionsHtml = (cats, selected) => (Array.isArray(cats) ? cats : [])
-              .map(cat => '<option value="' + window.escapeHtml(cat) + '"' + (cat === selected ? ' selected' : '') + '>' + window.escapeHtml(cat) + '</option>')
-              .join('');
             // 若為穴位組合，使用搜尋介面及提示框顯示完整資料。此邏輯將在此返回，避免進入舊的穴位分支。
             if (itemType === 'acupoint') {
               // 建立已存在穴位行的 HTML，每行包含提示資訊、名稱與刪除按鈕
@@ -39554,14 +39479,14 @@ async function deleteAcupointCombination(id) {
                     const nameVal = (pt && pt.name) ? pt.name : '';
                     const tooltipContent = getAcupointTooltipContent(nameVal);
                     const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
-                    const nameAttr = nameVal ? (' data-acupoint-name="' + window.escapeHtml(nameVal) + '"') : '';
+                    const nameAttr = nameVal ? (' data-acupoint-name="' + nameVal.replace(/\"/g, '&quot;') + '"') : '';
                     let tooltipAttr = '';
                     if (tooltipContent) {
                       // 將鼠標提示字串中的單引號正確跳脫，使用 data-tooltip 屬性
                       tooltipAttr = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
                     }
                     return '<div class="flex items-center gap-2 p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded"' + nameAttr + tooltipAttr + '>' +
-                      '<span class="flex-1 text-blue-800">' + window.escapeHtml(nameVal) + '</span>' +
+                      '<span class="flex-1 text-blue-800">' + (typeof window !== 'undefined' && window.escapeHtml ? window.escapeHtml(nameVal) : nameVal) + '</span>' +
                       '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button>' +
                       '</div>';
                   }).join('')
@@ -39570,12 +39495,12 @@ async function deleteAcupointCombination(id) {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">組合名稱 *</label>
-                    <input type="text" id="acupointNameInput" value="${esc(item.name)}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="acupointNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
                     <select id="acupointCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${categoryOptionsHtml((Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0 ? acupointComboCategories : categories.acupoints), item.category)}
+                      ${(Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0 ? acupointComboCategories : categories.acupoints).map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                     </select>
                   </div>
                   <div>
@@ -39593,7 +39518,7 @@ async function deleteAcupointCombination(id) {
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">針法</label>
-                    <input type="text" id="acupointTechniqueInput" value="${esc(item.technique || '')}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="acupointTechniqueInput" value="${item.technique || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                 </div>
               `;
@@ -39611,16 +39536,16 @@ async function deleteAcupointCombination(id) {
                     const tooltipContent = getHerbTooltipContent(nameVal);
                     const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
                     // 屬性字串：若存在名稱則添加 data-herb-name，若存在 tooltip 則添加相關屬性與事件
-                    const nameAttr = nameVal ? (' data-herb-name="' + window.escapeHtml(nameVal) + '"') : '';
+                    const nameAttr = nameVal ? (' data-herb-name="' + nameVal.replace(/\"/g, '&quot;') + '"') : '';
                     let tooltipAttr = '';
                     if (tooltipContent) {
                       tooltipAttr = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
                     }
                     return '<div class="flex items-center gap-2 p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded"' + nameAttr + tooltipAttr + '>' +
                       // 名稱以 span 顯示，不可編輯
-                      '<span class="flex-1 text-green-800">' + window.escapeHtml(nameVal) + '</span>' +
+                      '<span class="flex-1 text-green-800">' + (typeof window !== 'undefined' && window.escapeHtml ? window.escapeHtml(nameVal) : nameVal) + '</span>' +
                       // 劑量輸入欄
-                      '<input type="number" value="' + window.escapeHtml(dosageVal || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
+                      '<input type="number" value="' + (dosageVal || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
                       '<span class="text-sm text-gray-700">克</span>' +
                     '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button>' +
                       '</div>';
@@ -39630,17 +39555,17 @@ async function deleteAcupointCombination(id) {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">組合名稱 *</label>
-                    <input type="text" id="herbNameInput" value="${esc(item.name)}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="herbNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
                     <select id="herbCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${categoryOptionsHtml((Array.isArray(herbComboCategories) && herbComboCategories.length > 0 ? herbComboCategories : categories.herbs), item.category)}
+                      ${(Array.isArray(herbComboCategories) && herbComboCategories.length > 0 ? herbComboCategories : categories.herbs).map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                     </select>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">適應症描述</label>
-                    <textarea id="herbDescriptionTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="3">${esc(item.description || '')}</textarea>
+                    <textarea id="herbDescriptionTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="3">${item.description || ''}</textarea>
                   </div>
                   <!-- 先顯示搜尋欄，再列出已添加的藥材列表 -->
                   <div>
@@ -39665,27 +39590,27 @@ async function deleteAcupointCombination(id) {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">組合名稱 *</label>
-                    <input type="text" id="acupointNameInput" value="${esc(item.name)}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="acupointNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
                     <select id="acupointCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${categoryOptionsHtml((Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0 ? acupointComboCategories : categories.acupoints), item.category)}
+                      ${(Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0 ? acupointComboCategories : categories.acupoints).map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                     </select>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">穴位列表</label>
                     <div id="acupointPoints" class="space-y-2">
-${(Array.isArray(item.points) ? item.points : []).map(pt => {
+${item.points.map(pt => {
   const nameVal = pt && pt.name ? pt.name : '';
-  return '<div class="flex items-center gap-2"><input type="text" value="' + window.escapeHtml(nameVal) + '" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button></div>';
+  return '<div class="flex items-center gap-2"><input type="text" value="' + nameVal + '" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button></div>';
 }).join('')}
                     </div>
-                    <button type="button" onclick="addAcupointPointField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增穴位</button>
+                    <button onclick="addAcupointPointField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增穴位</button>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">針法</label>
-                    <input type="text" id="acupointTechniqueInput" value="${esc(item.technique || '')}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="acupointTechniqueInput" value="${item.technique || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                 </div>
               `;
@@ -39709,25 +39634,25 @@ ${(Array.isArray(item.points) ? item.points : []).map(pt => {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">模板名稱 *</label>
-                    <input type="text" id="prescriptionNameInput" value="${esc(item.name)}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="prescriptionNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">分類</label>
                       <select id="prescriptionCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                        ${categoryOptionsHtml(categories.prescriptions, item.category)}
+                        ${categories.prescriptions.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                       </select>
                     </div>
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">療程時間</label>
-                      <input type="text" id="prescriptionDurationInput" value="${esc(item.duration || '')}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                      <input type="text" id="prescriptionDurationInput" value="${item.duration || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                     </div>
                   </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">複診時間</label>
                       <div class="flex gap-2">
-                        <input type="number" id="prescriptionFollowUpNumberInput" value="${window.escapeHtml(followNum)}" min="1" class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                        <input type="number" id="prescriptionFollowUpNumberInput" value="${followNum}" min="1" class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                         <select id="prescriptionFollowUpUnitInput" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                           <option value="天" ${followUnit === '天' ? 'selected' : ''}>天</option>
                           <option value="周" ${followUnit === '周' ? 'selected' : ''}>周</option>
@@ -39737,12 +39662,12 @@ ${(Array.isArray(item.points) ? item.points : []).map(pt => {
                     </div>
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">中藥服用方法</label>
-                      <input type="text" id="prescriptionNoteInput" value="${esc(item.note || '')}" placeholder="如：服藥完畢後" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                      <input type="text" id="prescriptionNoteInput" value="${item.note || ''}" placeholder="如：服藥完畢後" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                     </div>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">醫囑內容及注意事項</label>
-                    <textarea id="prescriptionContentTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="5">${esc(item.content || '')}</textarea>
+                    <textarea id="prescriptionContentTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="5">${item.content || ''}</textarea>
                   </div>
                 </div>
               `;
@@ -39751,40 +39676,40 @@ ${(Array.isArray(item.points) ? item.points : []).map(pt => {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">模板名稱 *</label>
-                    <input type="text" id="diagnosisNameInput" value="${esc(item.name)}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="text" id="diagnosisNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">科別</label>
                     <select id="diagnosisCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                      ${categoryOptionsHtml(categories.diagnosis, item.category)}
+                      ${categories.diagnosis.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
                     </select>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">主訴</label>
-                    <textarea id="diagnosisChiefComplaintInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="3">${esc(item.chiefComplaint || '')}</textarea>
+                    <textarea id="diagnosisChiefComplaintInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="3">${item.chiefComplaint || ''}</textarea>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">現病史</label>
-                    <textarea id="diagnosisCurrentHistoryInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="6">${esc(item.currentHistory || '')}</textarea>
+                    <textarea id="diagnosisCurrentHistoryInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="6">${item.currentHistory || ''}</textarea>
                   </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">舌象</label>
-                      <textarea id="diagnosisTongueInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${esc(item.tongue || '')}</textarea>
+                      <textarea id="diagnosisTongueInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.tongue || ''}</textarea>
                     </div>
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">脈象</label>
-                      <textarea id="diagnosisPulseInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${esc(item.pulse || '')}</textarea>
+                      <textarea id="diagnosisPulseInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.pulse || ''}</textarea>
                     </div>
                   </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">中醫診斷</label>
-                      <textarea id="diagnosisTcmDiagnosisInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${esc(item.tcmDiagnosis || '')}</textarea>
+                      <textarea id="diagnosisTcmDiagnosisInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.tcmDiagnosis || ''}</textarea>
                     </div>
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">證型診斷</label>
-                      <textarea id="diagnosisSyndromeDiagnosisInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${esc(item.syndromeDiagnosis || '')}</textarea>
+                      <textarea id="diagnosisSyndromeDiagnosisInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.syndromeDiagnosis || ''}</textarea>
                     </div>
                   </div>
                 </div>
@@ -40845,88 +40770,6 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
   // 將初始化函式掛載至 window，方便外部呼叫
   window.initializeAcupointNotesSpans = initializeAcupointNotesSpans;
 
-  // 穴位方塊的固定 class，淨化後以白名單重建時沿用
-  const ACUPUNCTURE_CHIP_CLASS = 'inline-flex items-center justify-center bg-blue-100 border border-blue-200 rounded text-sm text-blue-800 px-1 py-0.5 mr-1 cursor-pointer';
-  // 視為區塊、扁平化時需補換行的標籤
-  const ACUPUNCTURE_BLOCK_TAGS = new Set(['DIV', 'P', 'LI', 'TR', 'SECTION', 'ARTICLE', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
-
-  /**
-   * 針灸備註白名單淨化（防 Stored XSS）。
-   * contenteditable 內容只允許三種節點：
-   *   1. 純文字節點；
-   *   2. <br>；
-   *   3. 穴位方塊 <span data-acupoint-name>，且僅可帶
-   *      data-acupoint-name / data-tooltip 兩個資料屬性，
-   *      一律以 createElement 重建（class 與 contenteditable 固定）。
-   * 其餘任何標記（script、img onerror、連結、事件屬性、javascript: URL、
-   * 未知巢狀結構等）都會移除標記、只保留文字，避免載入歷史病歷或草稿時
-   * 執行存入的惡意內容。歷史病歷載入、草稿還原與儲存時均應通過此函式。
-   * @param {string} html 原始 HTML
-   * @returns {string} 淨化後可安全指定給 innerHTML 的 HTML
-   */
-  function sanitizeAcupunctureNotesHtml(html) {
-    const source = String(html == null ? '' : html);
-    if (!source) return '';
-    let doc;
-    try {
-      // DOMParser 文件為惰性：不載入資源、不觸發事件，可安全解析敵意 HTML
-      doc = new DOMParser().parseFromString(source, 'text/html');
-    } catch (_e) {
-      return window.escapeHtml(source);
-    }
-    // 驗證 tooltip 確為本系統產生的 URI 編碼值，並重新編碼正規化
-    const normalizeTooltip = (raw) => {
-      const v = String(raw || '');
-      if (!v) return '';
-      try {
-        return encodeURIComponent(decodeURIComponent(v));
-      } catch (_e2) {
-        return '';
-      }
-    };
-    const isChip = (node) => node.nodeType === Node.ELEMENT_NODE
-      && node.tagName === 'SPAN'
-      && node.hasAttribute('data-acupoint-name');
-    const out = document.createElement('div');
-    const walk = (sourceNode, targetNode) => {
-      Array.prototype.slice.call(sourceNode.childNodes).forEach(node => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          targetNode.appendChild(document.createTextNode(node.nodeValue));
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-          const tag = node.tagName;
-          if (tag === 'BR') {
-            targetNode.appendChild(document.createElement('br'));
-          } else if (isChip(node)) {
-            const name = String(node.getAttribute('data-acupoint-name') || '');
-            if (!name) {
-              // 無名方塊視同一般內容，扁平化保留文字
-              walk(node, targetNode);
-              return;
-            }
-            const chip = document.createElement('span');
-            chip.className = ACUPUNCTURE_CHIP_CLASS;
-            chip.setAttribute('contenteditable', 'false');
-            chip.setAttribute('data-acupoint-name', name);
-            const tip = normalizeTooltip(node.getAttribute('data-tooltip'));
-            if (tip) chip.setAttribute('data-tooltip', tip);
-            chip.textContent = name;
-            targetNode.appendChild(chip);
-          } else {
-            // 非白名單元素：移除標記但保留文字；區塊元素補換行避免文字相接
-            const block = ACUPUNCTURE_BLOCK_TAGS.has(tag);
-            if (block) targetNode.appendChild(document.createTextNode('\n'));
-            walk(node, targetNode);
-            if (block) targetNode.appendChild(document.createTextNode('\n'));
-          }
-        }
-      });
-    };
-    walk(doc.body || doc, out);
-    return out.innerHTML;
-  }
-
-  window.sanitizeAcupunctureNotesHtml = sanitizeAcupunctureNotesHtml;
-
   /**
    * 將包含 HTML 標籤的字串轉換為純文字。
    * 用於在病歷查看模式下顯示針灸備註，避免直接顯示方塊。
@@ -40936,20 +40779,13 @@ if (typeof window !== 'undefined' && !window.removeParentElement) {
   function stripHtmlTags(html) {
     try {
       if (!html) return '';
-      // 以惰性 DOMParser 解析：直接用 innerHTML 解析會讓 <img onerror>
-      // 等負載在解析當下觸發事件；DOMParser 文件不載入資源亦不執行事件。
-      const doc = new DOMParser().parseFromString(String(html), 'text/html');
-      // 模擬 innerText 的行為：<br> 與區塊邊界轉為換行
-      doc.querySelectorAll('br').forEach(br => {
-        try { br.replaceWith(document.createTextNode('\n')); } catch (_e) {}
-      });
-      doc.querySelectorAll('div,p,li,tr,section,article,blockquote,h1,h2,h3,h4,h5,h6').forEach(el => {
-        try { el.insertBefore(document.createTextNode('\n'), el.firstChild); } catch (_e) {}
-      });
-      return doc.body.textContent || '';
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      // 使用 innerText 取得純文字，避免包含 HTML 標籤
+      return tmp.innerText || tmp.textContent || '';
     } catch (_err) {
-      // 保險：連 DOMParser 都不可用時，以正則剝除標籤，絕不回傳原 HTML
-      return String(html).replace(/<[^>]*>/g, '');
+      // 若有錯誤則回傳原始字串，避免程式中斷
+      return html;
     }
   }
 
