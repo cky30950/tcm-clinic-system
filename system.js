@@ -23795,8 +23795,105 @@ async function restoreUser(id) {
         let currentFinancialTabType = 'summary';
         const financialReportCache = {};
         const FINANCIAL_REPORT_MIN_REFRESH_MS = 15000;
+        // 快取版本：統計口徑／快取結構調整時遞增，避免讀到舊格式快取
+        const FINANCIAL_REPORT_CACHE_VERSION = 'v4';
+        function getFinancialReportCacheKey(startDate, endDate, doctorFilter, clinicFilter) {
+            return `${FINANCIAL_REPORT_CACHE_VERSION}|${startDate}|${endDate}|${doctorFilter || ''}|${clinicFilter || ''}`;
+        }
         let financialReportLastRunAt = 0;
         let financialReportLastKey = '';
+
+        // ------------------------------------------------------------
+        // 快取輕量化：持久化只存「投影欄位＋統計結果」，不存病歷全文，
+        // 並限制最多 FINANCIAL_CACHE_MAX_ENTRIES 組（LRU 式淘汰）。
+        // ------------------------------------------------------------
+        const FINANCIAL_CACHE_MAX_ENTRIES = 8;
+        const FINANCIAL_CACHE_STORAGE_KEY = 'financialReportCache';
+
+        // 只保留報表統計與鑽取清單需要的欄位；收費明文字段以預解析
+        // 結果（financialSummaryItems）取代，避免把整段病歷塞進快取。
+        function projectFinancialRecordForCache(c) {
+            if (!c || typeof c !== 'object') return c;
+            // 已是投影（帶 __finProjection）則直接回傳
+            if (c.__finProjection) return c;
+            let finItems = Array.isArray(c.financialSummaryItems)
+                ? c.financialSummaryItems : null;
+            let finTotal = (c.financialTotalAmount !== undefined && c.financialTotalAmount !== null)
+                ? Number(c.financialTotalAmount) : null;
+            if (!finItems) {
+                const parsed = parseFinancialBillingItems(c);
+                finItems = parsed.items || [];
+                if (finTotal === null) finTotal = parsed.totalAmount || 0;
+            }
+            if (finTotal === null) finTotal = 0;
+            return {
+                __finProjection: true,
+                id: c.id,
+                date: c.date,
+                doctor: c.doctor,
+                clinicId: c.clinicId,
+                patientName: c.patientName,
+                status: c.status,
+                paymentStatus: c.paymentStatus,
+                pendingAmount: c.pendingAmount,
+                walletPaySkipped: c.walletPaySkipped,
+                financialSummaryItems: finItems,
+                financialTotalAmount: finTotal
+            };
+        }
+
+        function buildFinancialCacheEntry(records, stats, lastSyncAt) {
+            return {
+                records: (Array.isArray(records) ? records : []).map(projectFinancialRecordForCache),
+                stats,
+                lastSyncAt,
+                savedAt: Date.now()
+            };
+        }
+
+        function readPersistedFinancialCache(key) {
+            try {
+                const raw = localStorage.getItem(FINANCIAL_CACHE_STORAGE_KEY);
+                if (!raw) return null;
+                const map = JSON.parse(raw) || {};
+                const entry = map[key];
+                // 只接受投影格式（含 records 與 stats），舊格式自然作廢
+                if (entry && Array.isArray(entry.records) && entry.stats) return entry;
+                return null;
+            } catch (_e) {
+                return null;
+            }
+        }
+
+        function writePersistedFinancialCache(key, entry) {
+            try {
+                let map = {};
+                try {
+                    const raw = localStorage.getItem(FINANCIAL_CACHE_STORAGE_KEY);
+                    map = raw ? (JSON.parse(raw) || {}) : {};
+                } catch (_parseErr) { map = {}; }
+                map[key] = entry;
+                pruneFinancialCacheMap(map, FINANCIAL_CACHE_MAX_ENTRIES);
+                localStorage.setItem(FINANCIAL_CACHE_STORAGE_KEY, JSON.stringify(map));
+            } catch (_quotaErr) {
+                // 容量不足：大幅裁減後重試一次
+                try {
+                    const raw = localStorage.getItem(FINANCIAL_CACHE_STORAGE_KEY);
+                    const map = raw ? (JSON.parse(raw) || {}) : {};
+                    map[key] = entry;
+                    pruneFinancialCacheMap(map, 3);
+                    localStorage.setItem(FINANCIAL_CACHE_STORAGE_KEY, JSON.stringify(map));
+                } catch (_e2) {}
+            }
+        }
+
+        function pruneFinancialCacheMap(map, keep) {
+            const entries = Object.entries(map);
+            if (entries.length <= keep) return;
+            // 最舊的 savedAt 先淘汰
+            entries.sort((a, b) => (a[1].savedAt || 0) - (b[1].savedAt || 0));
+            entries.slice(0, entries.length - keep).forEach(([k]) => { delete map[k]; });
+        }
 
         function setFinancialReportLoadingState() {
             const loadingRow = (colspan) => `
@@ -23846,6 +23943,78 @@ async function restoreUser(id) {
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
+        }
+
+        // 香港時間日界：與儲值區 walletFinRangeIso 口徑一致，
+        // 不使用 UTC（Z）日界，避免月初月末邊界差一天。
+        function financialDayStart(dateStr) {
+            return new Date(`${dateStr}T00:00:00+08:00`);
+        }
+        function financialDayEnd(dateStr) {
+            return new Date(`${dateStr}T23:59:59.999+08:00`);
+        }
+
+        // 以香港日曆日回傳日期 key（YYYY-MM-DD），供每日／儲值分組使用
+        function getFinancialDateKey(value) {
+            const parsed = parseConsultationDate(value);
+            if (!parsed || isNaN(parsed.getTime())) {
+                return String(value || '').slice(0, 10);
+            }
+            try {
+                // en-CA 語系輸出即 YYYY-MM-DD
+                return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Hong_Kong' }).format(parsed);
+            } catch (_e) {
+                return String(value || '').slice(0, 10);
+            }
+        }
+
+        // 日期字串加減天數（以香港日曆日為準），回傳 YYYY-MM-DD
+        function shiftFinancialDate(dateStr, deltaDays) {
+            const d = new Date(`${dateStr}T12:00:00+08:00`);
+            d.setUTCDate(d.getUTCDate() + deltaDays);
+            return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Hong_Kong' }).format(d);
+        }
+
+        // 列出期間內所有日曆日（含首尾）
+        function enumerateFinancialDates(startDate, endDate) {
+            const list = [];
+            let cur = startDate;
+            let guard = 0;
+            while (cur <= endDate && guard < 4000) {
+                list.push(cur);
+                cur = shiftFinancialDate(cur, 1);
+                guard += 1;
+            }
+            return list;
+        }
+
+        // 篩選條件防抖 + in-flight 去重：快速切換時只在停止操作 300ms
+        // 後執行；若報表仍在生成，則於完成後補跑一次最新條件。
+        const FINANCIAL_DEBOUNCE_MS = 300;
+        let financialDebounceTimer = null;
+        let financialRunInFlight = false;
+        let financialRunQueued = false;
+        function scheduleFinancialReportRefresh() {
+            clearTimeout(financialDebounceTimer);
+            financialDebounceTimer = setTimeout(runFinancialReportGuarded, FINANCIAL_DEBOUNCE_MS);
+        }
+        async function runFinancialReportGuarded() {
+            if (financialRunInFlight) {
+                financialRunQueued = true;
+                return;
+            }
+            financialRunInFlight = true;
+            try {
+                await generateFinancialReport();
+            } catch (_e) {
+                console.error('財務報表生成失敗:', _e);
+            } finally {
+                financialRunInFlight = false;
+                if (financialRunQueued) {
+                    financialRunQueued = false;
+                    runFinancialReportGuarded();
+                }
+            }
         }
 
         // 載入醫師選項
@@ -23932,7 +24101,9 @@ async function restoreUser(id) {
                     const endVal = endEl.value;
                     const doctorVal = doctorEl ? doctorEl.value : '';
                     const clinicVal = clinicEl ? clinicEl.value : '';
-                    const coverageKey = getFinancialSummaryCoverageKey(startVal, endVal, doctorVal, clinicVal);
+                    // v2：舊旗標可能是在不完整查詢（date 欄位漏舊單）時寫入，
+                    // 加版本字串強制作廢一次，讓新版 sortDate 查詢重新回填。
+                    const coverageKey = 'v2|' + getFinancialSummaryCoverageKey(startVal, endVal, doctorVal, clinicVal);
                     const summaryCovered = !!readCache('financialSummaryCoverage', coverageKey);
                     const canUseSummary = typeof window.firebaseDataManager.getConsultationFinancialSummariesByRangeAndDoctor === 'function';
 
@@ -23948,12 +24119,12 @@ async function restoreUser(id) {
                     if (targeted && targeted.success) {
                         consultations = targeted.data.map(normalizeFinancialRecordForReport).filter(Boolean);
                         if (canUseSummary) {
-                            try {
-                                await window.firebaseDataManager.syncConsultationFinancialSummaries(targeted.data);
-                                writeCache('financialSummaryCoverage', coverageKey, true);
-                            } catch (_syncErr) {
-                                console.warn('財務摘要回填失敗:', _syncErr);
-                            }
+                            // 回填改為背景執行：大量舊資料時不再阻塞報表顯示。
+                            // 旗標於回填成功後才寫入；此期間重跑只會多做一次查詢，不影響正確性。
+                            Promise.resolve()
+                                .then(() => window.firebaseDataManager.syncConsultationFinancialSummaries(targeted.data))
+                                .then(() => writeCache('financialSummaryCoverage', coverageKey, true))
+                                .catch((_syncErr) => console.warn('財務摘要回填失敗:', _syncErr));
                         }
                         return;
                     }
@@ -23996,28 +24167,23 @@ async function restoreUser(id) {
             const quickDate = document.getElementById('quickDate').value;
             const today = new Date();
             let startDate, endDate;
-            // 嘗試取得舊的 reportType 元素供回寫；如元素不存在則忽略
-            const rptElem = document.getElementById('reportType');
 
             switch (quickDate) {
                 case 'today':
                     // 今日：開始與結束皆為今天
                     startDate = new Date(today);
                     endDate = new Date(today);
-                    if (rptElem) rptElem.value = 'daily';
                     break;
                 case 'yesterday':
                     // 昨天：開始與結束皆為昨天
                     startDate = new Date(today);
                     startDate.setDate(today.getDate() - 1);
                     endDate = new Date(startDate);
-                    if (rptElem) rptElem.value = 'daily';
                     break;
                 case 'thisWeek': {
                     // 本週：以週一為起點，結束日期為今天
                     startDate = getStartOfWeek(today);
                     endDate = new Date(today);
-                    if (rptElem) rptElem.value = 'weekly';
                     break;
                 }
                 case 'lastWeek': {
@@ -24027,34 +24193,29 @@ async function restoreUser(id) {
                     startDate.setDate(startOfThisWeek.getDate() - 7);
                     endDate = new Date(startDate);
                     endDate.setDate(startDate.getDate() + 6);
-                    if (rptElem) rptElem.value = 'weekly';
                     break;
                 }
                 case 'thisMonth':
                     // 本月：起始為月初 (1 日)，結束為月末
                     startDate = new Date(today.getFullYear(), today.getMonth(), 1);
                     endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                    if (rptElem) rptElem.value = 'monthly';
                     break;
                 case 'lastMonth':
                     // 上月：起始為上個月 1 日，結束為上個月的最後一天
                     startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
                     endDate = new Date(today.getFullYear(), today.getMonth(), 0);
-                    if (rptElem) rptElem.value = 'monthly';
                     break;
                 case 'thisYear':
                     // 今年：起始為本年度 1 月 1 日，結束為本年度的最後一天（12 月 31 日）。
                     // 為確保跨時區日期正確，使用 new Date(下一年, 0, 0) 取得本年度的最後一天。
                     startDate = new Date(today.getFullYear(), 0, 1);
                     endDate = new Date(today.getFullYear() + 1, 0, 0);
-                    if (rptElem) rptElem.value = 'yearly';
                     break;
                 case 'lastYear':
                     // 去年：起始為去年 1 月 1 日，結束為去年的最後一天。
                     // 使用 new Date(今年, 0, 0) 取得去年的 12 月 31 日。
                     startDate = new Date(today.getFullYear() - 1, 0, 1);
                     endDate = new Date(today.getFullYear(), 0, 0);
-                    if (rptElem) rptElem.value = 'yearly';
                     break;
                 default:
                     return;
@@ -24064,8 +24225,8 @@ async function restoreUser(id) {
                 // 將日期格式化為 YYYY-MM-DD 並更新 UI
                 document.getElementById('startDate').value = formatFinancialDate(startDate);
                 document.getElementById('endDate').value = formatFinancialDate(endDate);
-                // 重新生成報表
-                generateFinancialReport();
+                // 重新生成報表（走防抖，避免與其他操作並發）
+                scheduleFinancialReportRefresh();
             }
         }
 
@@ -24122,23 +24283,24 @@ async function restoreUser(id) {
             lines.forEach(line => {
                 line = line.trim();
                 if (!line || line.includes('小計') || line.includes('總費用') || line.includes('折扣適用於') || line.includes('折扣適用於:')) {
-                    // 提取總費用
+                    // 提取總費用（支援千分位逗號與小數）
                     if (line.includes('總費用')) {
-                        const match = line.match(/\$(\d+)/);
+                        const match = line.match(/\$([\d,]+(?:\.\d+)?)/);
                         if (match) {
-                            totalAmount = parseInt(match[1]);
+                            totalAmount = Number(match[1].replace(/,/g, ''));
                         }
                     }
                     return;
                 }
 
                 // 解析收費項目格式：項目名 x數量 = $金額 或 項目名 x數量 = -$金額
-                const itemMatch = line.match(/^(.+?)\s+x(\d+)\s+=\s+(-?\$?\d+|\$?-?\d+)$/);
+                const itemMatch = line.match(/^(.+?)\s+x(\d+)\s+=\s+(-?\$?[\d,]+(?:\.\d+)?|\$?-?[\d,]+(?:\.\d+)?)$/);
                 if (itemMatch) {
                     const itemName = itemMatch[1].trim();
                     const quantity = parseInt(itemMatch[2]);
                     const rawAmount = (itemMatch[3] || '').trim();
-                    const amountNumber = parseInt(rawAmount.replace(/[^\d]/g, ''), 10) || 0;
+                    // 去除逗號與幣別符號，保留小數點；正負號另以 includes('-') 判斷
+                    const amountNumber = Number(rawAmount.replace(/[^0-9.]/g, '')) || 0;
                     const signedAmount = rawAmount.includes('-') ? -amountNumber : amountNumber;
                     const mappedQueue = categoryQueueByName[itemName];
                     const mappedCategory = Array.isArray(mappedQueue) && mappedQueue.length > 0
@@ -24560,25 +24722,23 @@ async function restoreUser(id) {
             const doctorFilter = document.getElementById('doctorFilter').value;
             const clinicFilterEl = document.getElementById('clinicFilterFinancial');
             const clinicFilter = clinicFilterEl ? clinicFilterEl.value : '';
-            let reportType = '';
-            const rptElem = document.getElementById('reportType');
-            if (rptElem) {
-                reportType = rptElem.value;
-            }
 
             if (!startDate || !endDate) {
                 showToast('請選擇日期範圍！', 'error');
                 return;
             }
 
+            // 記錄目前範圍，供圖表連續日期軸使用
+            currentFinancialRange = { startDate, endDate };
+
             setFinancialReportLoadingState();
 
-            const cacheKey = `${startDate}|${endDate}|${doctorFilter||''}|${clinicFilter||''}`;
-            const existing = financialReportCache[cacheKey] || readCache('financialReportCache', cacheKey);
+            const cacheKey = getFinancialReportCacheKey(startDate, endDate, doctorFilter, clinicFilter);
+            const existing = financialReportCache[cacheKey] || readPersistedFinancialCache(cacheKey);
             const nowTs = Date.now();
             if (existing && financialReportLastKey === cacheKey && (nowTs - financialReportLastRunAt) < FINANCIAL_REPORT_MIN_REFRESH_MS) {
                 updateFinancialKeyMetrics(existing.stats);
-                updateFinancialTables(existing.filteredConsultations, existing.stats);
+                updateFinancialTables(existing.records, existing.stats);
                 document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
                 await refreshWalletFinancialSection(startDate, endDate, clinicFilter);
                 showToast('財務報表已更新（短時間內使用快取）', 'success');
@@ -24595,7 +24755,7 @@ async function restoreUser(id) {
                             : await window.firebaseDataManager.hasConsultationUpdates(startDate, endDate, doctorFilter || null, lastSyncAtRef, clinicFilter || null);
                         if (!hasUpdates) {
                             updateFinancialKeyMetrics(existing.stats);
-                            updateFinancialTables(existing.filteredConsultations, existing.stats);
+                            updateFinancialTables(existing.records, existing.stats);
                             document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
                             financialReportLastKey = cacheKey;
                             financialReportLastRunAt = Date.now();
@@ -24608,8 +24768,8 @@ async function restoreUser(id) {
                             : await window.firebaseDataManager.getConsultationsDeltaByRangeAndDoctor(lastSyncAtRef, doctorFilter || null, true, clinicFilter || null);
                         if (deltaRes && deltaRes.success) {
                             const deltas = deltaRes.data.map(normalizeFinancialRecordForReport).filter(Boolean);
-                            const start = new Date(startDate);
-                            const end = new Date(endDate + 'T23:59:59.999Z');
+                            const start = financialDayStart(startDate);
+                            const end = financialDayEnd(endDate);
                             const mf = (c) => {
                                 const d = new Date(c.date);
                                 const dateInRange = d >= start && d <= end;
@@ -24618,7 +24778,7 @@ async function restoreUser(id) {
                                 const isCompleted = c.status === 'completed';
                                 return dateInRange && doctorMatch && clinicMatch && isCompleted;
                             };
-                            const index = new Map(existing.filteredConsultations.map(c => [String(c.id), c]));
+                            const index = new Map(existing.records.map(c => [String(c.id), c]));
                             for (const r of deltas) {
                                 const id = String(r.id);
                                 if (mf(r)) {
@@ -24629,10 +24789,11 @@ async function restoreUser(id) {
                             }
                             const merged = Array.from(index.values());
                             const stats = calculateFinancialStatistics(merged);
-                            const mlist = monthsInDateRange(startDate, endDate);
-                            const exp = await getClinicExpensesByMonths(mlist, clinicFilter || null);
-                            stats.totalCost = exp.totalCost;
-                            stats.netRevenue = stats.totalRevenue - exp.totalCost;
+                            const costRes = await getApportionedCost(startDate, endDate, clinicFilter || null);
+                            stats.totalCost = costRes.totalCost;
+                            stats.netRevenue = stats.totalRevenue - costRes.totalCost;
+                            stats.costProrated = costRes.prorated;
+                            await attachPreviousPeriod(stats, startDate, endDate, doctorFilter, clinicFilter);
                             updateFinancialKeyMetrics(stats);
                             updateFinancialTables(merged, stats);
                             const lastSyncAt = (() => {
@@ -24643,9 +24804,9 @@ async function restoreUser(id) {
                                 }
                                 return latest ? new Date(latest) : new Date();
                             })();
-                            const entry = { filteredConsultations: merged, stats, lastSyncAt: lastSyncAt.toISOString() };
+                            const entry = buildFinancialCacheEntry(merged, stats, lastSyncAt.toISOString());
                             financialReportCache[cacheKey] = entry;
-                            writeCache('financialReportCache', cacheKey, entry);
+                            writePersistedFinancialCache(cacheKey, entry);
                             financialReportLastKey = cacheKey;
                             financialReportLastRunAt = Date.now();
                             document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
@@ -24669,10 +24830,11 @@ async function restoreUser(id) {
             
             // 計算統計資料
             const stats = calculateFinancialStatistics(filteredConsultations);
-            const mlist = monthsInDateRange(startDate, endDate);
-            const exp = await getClinicExpensesByMonths(mlist, clinicFilter || null);
-            stats.totalCost = exp.totalCost;
-            stats.netRevenue = stats.totalRevenue - exp.totalCost;
+            const costRes = await getApportionedCost(startDate, endDate, clinicFilter || null);
+            stats.totalCost = costRes.totalCost;
+            stats.netRevenue = stats.totalRevenue - costRes.totalCost;
+            stats.costProrated = costRes.prorated;
+            await attachPreviousPeriod(stats, startDate, endDate, doctorFilter, clinicFilter);
             
             // 更新關鍵指標
             updateFinancialKeyMetrics(stats);
@@ -24685,9 +24847,9 @@ async function restoreUser(id) {
                 }
                 return latest ? new Date(latest) : new Date();
             })();
-            const entry = { filteredConsultations, stats, lastSyncAt: lastSyncAt.toISOString() };
+            const entry = buildFinancialCacheEntry(filteredConsultations, stats, lastSyncAt.toISOString());
             financialReportCache[cacheKey] = entry;
-            writeCache('financialReportCache', cacheKey, entry);
+            writePersistedFinancialCache(cacheKey, entry);
             financialReportLastKey = cacheKey;
             financialReportLastRunAt = Date.now();
             document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
@@ -24697,8 +24859,8 @@ async function restoreUser(id) {
 
         // 過濾診症資料
         function filterFinancialConsultations(startDate, endDate, doctorFilter, clinicFilter) {
-            const start = new Date(startDate);
-            const end = new Date(endDate + 'T23:59:59.999Z');
+            const start = financialDayStart(startDate);
+            const end = financialDayEnd(endDate);
 
             return consultations.filter(consultation => {
                 const consultationDate = new Date(consultation.date);
@@ -24709,6 +24871,59 @@ async function restoreUser(id) {
 
                 return dateInRange && doctorMatch && clinicMatch && isCompleted;
             });
+        }
+
+        // 直接抓取指定範圍診症記錄（不動全域 consultations），供環比使用
+        async function fetchFinancialRecordsForRange(startDate, endDate, doctorFilter, clinicFilter) {
+            if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) return [];
+            try {
+                const res = await window.firebaseDataManager.getConsultationsByRangeAndDoctor(
+                    startDate, endDate, doctorFilter || null, true, clinicFilter || null);
+                if (res && res.success) {
+                    return res.data.map(normalizeFinancialRecordForReport).filter(Boolean);
+                }
+            } catch (_e) {}
+            return [];
+        }
+
+        // 計算「緊鄰的上一個等長期間」統計並附掛到 stats（prevPeriod）
+        async function attachPreviousPeriod(stats, startDate, endDate, doctorFilter, clinicFilter) {
+            try {
+                const lengthDays = enumerateFinancialDates(startDate, endDate).length;
+                const prevEnd = shiftFinancialDate(startDate, -1);
+                const prevStart = shiftFinancialDate(prevEnd, -(lengthDays - 1));
+                const prevRecords = await fetchFinancialRecordsForRange(prevStart, prevEnd, doctorFilter, clinicFilter);
+                const prevStats = calculateFinancialStatistics(prevRecords);
+                stats.prevPeriod = {
+                    startDate: prevStart,
+                    endDate: prevEnd,
+                    totalRevenue: prevStats.totalRevenue,
+                    totalConsultations: prevStats.totalConsultations,
+                    averageRevenue: prevStats.averageRevenue,
+                    activeDoctors: prevStats.activeDoctors
+                };
+            } catch (_e) {}
+            return stats;
+        }
+
+        // 環比格式化：回傳 pill HTML 片段
+        function financialChangePill(current, previous) {
+            const ft = (s) => (typeof t === 'function' ? t(s) : s);
+            if (previous === null || previous === undefined) {
+                return current > 0
+                    ? `<span class="bg-white bg-opacity-25 text-white rounded-full px-2 py-0.5 text-xs">${ft('（新）')}</span>`
+                    : '';
+            }
+            if (previous === 0) {
+                return current === 0
+                    ? `<span class="bg-white bg-opacity-25 text-white rounded-full px-2 py-0.5 text-xs">0%</span>`
+                    : `<span class="bg-white text-green-700 rounded-full px-2 py-0.5 text-xs font-semibold">✦ ${ft('（新）')}</span>`;
+            }
+            const pct = ((current - previous) / previous) * 100;
+            const up = pct >= 0;
+            const cls = up ? 'bg-white text-green-700' : 'bg-white text-red-600';
+            const arrow = up ? '▲' : '▼';
+            return `<span class="${cls} rounded-full px-2 py-0.5 text-xs font-semibold">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
         }
 
         // 計算財務統計資料
@@ -24728,6 +24943,19 @@ async function restoreUser(id) {
                     : parseFinancialBillingItems(consultation);
                 const consultationRevenue = Number(parsed.totalAmount) || 0;
                 totalRevenue += consultationRevenue;
+
+                // 每日統計（先建立，供下方服務項目累加各類別金額）
+                const dateKey = getFinancialDateKey(consultation.date);
+                if (!dailyStats[dateKey]) {
+                    dailyStats[dateKey] = {
+                        count: 0,
+                        revenue: 0,
+                        services: {}
+                    };
+                }
+                const daily = dailyStats[dateKey];
+                daily.count += 1;
+                daily.revenue += consultationRevenue;
 
                 // 醫師統計
                 if (!doctorStats[consultation.doctor]) {
@@ -24752,19 +24980,9 @@ async function restoreUser(id) {
                     serviceStats[item.category].count += item.quantity;
                     serviceStats[item.category].revenue += item.totalAmount;
                     serviceStats[item.category].items.push(item);
+                    // 累計當日各類別金額，供每日明細判斷主要服務
+                    daily.services[item.category] = (daily.services[item.category] || 0) + item.totalAmount;
                 });
-
-                // 每日統計
-                const dateKey = consultation.date.split('T')[0];
-                if (!dailyStats[dateKey]) {
-                    dailyStats[dateKey] = {
-                        count: 0,
-                        revenue: 0,
-                        services: {}
-                    };
-                }
-                dailyStats[dateKey].count += 1;
-                dailyStats[dateKey].revenue += consultationRevenue;
             });
 
             const averageRevenue = totalConsultations > 0 ? totalRevenue / totalConsultations : 0;
@@ -24783,50 +25001,257 @@ async function restoreUser(id) {
 
         // 獲取類別顯示名稱
         function getFinancialCategoryDisplayName(category) {
+            const ft = (s) => (typeof t === 'function' ? t(s) : s);
             const names = {
-                consultation: '診療費',
-                medicine: '藥費',
-                treatment: '治療費',
-                other: '其他費用',
-                discount: '折扣',
-                package: '套票項目',
-                packageUse: '套票使用'
+                consultation: ft('診療費'),
+                medicine: ft('藥費'),
+                treatment: ft('治療費'),
+                other: ft('其他費用'),
+                discount: ft('折扣'),
+                package: ft('套票項目'),
+                packageUse: ft('套票使用')
             };
             return names[category] || category;
         }
 
         // 更新關鍵指標
         function updateFinancialKeyMetrics(stats) {
+            const ft = (s) => (typeof t === 'function' ? t(s) : s);
             const total = (typeof stats.totalRevenue === 'number') ? stats.totalRevenue : 0;
             const totalCost = (typeof stats.totalCost === 'number') ? stats.totalCost : 0;
             const net = (typeof stats.netRevenue === 'number') ? stats.netRevenue : (total - totalCost);
-            document.getElementById('totalRevenue').textContent = `$${Math.round(total).toLocaleString()}`;
+            document.getElementById('totalRevenue').textContent = `HK$${Math.round(total).toLocaleString()}`;
             document.getElementById('totalConsultations').textContent = stats.totalConsultations.toLocaleString();
-            document.getElementById('averageRevenue').textContent = `$${Math.round(stats.averageRevenue).toLocaleString()}`;
+            document.getElementById('averageRevenue').textContent = `HK$${Math.round(stats.averageRevenue).toLocaleString()}`;
             document.getElementById('activeDoctors').textContent = stats.activeDoctors;
+
+            const prev = stats.prevPeriod || {};
+            const labelHtml = `<span class="mr-1">${ft('較上期')}</span>`;
+            // 總收入卡片：環比 pill + 淨收入與成本補充說明
             const rc = document.getElementById('revenueChange');
-            if (rc) rc.textContent = `淨收入：$${Math.round(net).toLocaleString()}（成本：$${Math.round(totalCost).toLocaleString()}）`;
+            if (rc) {
+                const pill = stats.prevPeriod
+                    ? financialChangePill(total, prev.totalRevenue)
+                    : '';
+                rc.innerHTML = `${labelHtml}${pill}`
+                    + `<span class="block text-green-100 text-xs mt-1">`
+                    + `${ft('淨收入')}：HK$${Math.round(net).toLocaleString()}`
+                    + `（${ft('成本')}：HK$${Math.round(totalCost).toLocaleString()}）</span>`;
+            }
+            const cc = document.getElementById('consultationChange');
+            if (cc) {
+                cc.innerHTML = `${labelHtml}${stats.prevPeriod
+                    ? financialChangePill(stats.totalConsultations, prev.totalConsultations)
+                    : ''}`;
+            }
+            const ac = document.getElementById('averageChange');
+            if (ac) {
+                ac.innerHTML = `${labelHtml}${stats.prevPeriod
+                    ? financialChangePill(stats.averageRevenue, prev.averageRevenue)
+                    : ''}`;
+            }
+            const dc = document.getElementById('doctorChange');
+            if (dc) {
+                dc.innerHTML = `${labelHtml}${stats.prevPeriod
+                    ? financialChangePill(stats.activeDoctors, prev.activeDoctors)
+                    : ''}`;
+            }
         }
 
         // 更新財務表格
+        let currentFinancialConsultations = [];
         function updateFinancialTables(consultations, stats) {
+            currentFinancialConsultations = Array.isArray(consultations) ? consultations : [];
             updateFinancialSummaryTable(stats);
             updateFinancialDailyTable(stats.dailyStats);
             updateFinancialDoctorTable(stats.doctorStats);
             updateFinancialServiceTable(stats.serviceStats);
+            updateFinancialCharts(stats);
         }
+
+        // ============================================================
+        // 財務圖表（Chart.js，已於 system.html 載入）
+        // ============================================================
+        let financialTrendChartInstance = null;
+        let financialServiceChartInstance = null;
+        // 目前報表範圍（generateFinancialReport 開始時更新），供圖表連續日期使用
+        let currentFinancialRange = { startDate: '', endDate: '' };
+
+        const FINANCIAL_CHART_COLORS = [
+            '#10b981', '#3b82f6', '#8b5cf6', '#f59e0b',
+            '#ef4444', '#14b8a6', '#ec4899', '#6b7280'
+        ];
+
+        function updateFinancialCharts(stats) {
+            if (typeof Chart === 'undefined') return;
+            const ft = (s) => (typeof t === 'function' ? t(s) : s);
+            const { startDate, endDate} = currentFinancialRange;
+
+            // 每日收入趨勢：連續日曆日，無診症補 0
+            const trendCanvas = document.getElementById('financialTrendChart');
+            if (trendCanvas) {
+                if (financialTrendChartInstance) {
+                    try { financialTrendChartInstance.destroy(); } catch (_e) {}
+                }
+                const dates = startDate && endDate ? enumerateFinancialDates(startDate, endDate) : [];
+                const labels = dates.map(d => {
+                    try {
+                        return new Date(`${d}T00:00:00+08:00`).toLocaleDateString('zh-HK', { month: '2-digit', day: '2-digit' });
+                    } catch (_e) { return d; }
+                });
+                const values = dates.map(d => {
+                    const row = stats.dailyStats[d];
+                    return row ? Math.round(row.revenue * 100) / 100 : 0;
+                });
+                financialTrendChartInstance = new Chart(trendCanvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: ft('收入金額'),
+                            data: values,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16,185,129,0.15)',
+                            fill: true,
+                            tension: 0.25,
+                            pointRadius: dates.length > 60 ? 0 : 2,
+                            pointHoverRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => `HK$${Number(ctx.parsed.y || 0).toLocaleString()}`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { ticks: { maxTicksLimit: 12, autoSkip: true } },
+                            y: {
+                                beginAtZero: true,
+                                ticks: { callback: (v) => 'HK$' + Number(v).toLocaleString() }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 收入結構：服務類別甜甜圈（僅含金額為正的類別，折扣為負不適用）
+            const serviceCanvas = document.getElementById('financialServiceChart');
+            if (serviceCanvas) {
+                if (financialServiceChartInstance) {
+                    try { financialServiceChartInstance.destroy(); } catch (_e) {}
+                }
+                const entries = Object.values(stats.serviceStats || {})
+                    .filter(s => Number(s.revenue) > 0)
+                    .sort((a, b) => b.revenue - a.revenue);
+                financialServiceChartInstance = new Chart(serviceCanvas.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: entries.map(e => e.name),
+                        datasets: [{
+                            data: entries.map(e => Math.round(e.revenue * 100) / 100),
+                            backgroundColor: entries.map((_, i) => FINANCIAL_CHART_COLORS[i % FINANCIAL_CHART_COLORS.length])
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => {
+                                        const total = ctx.dataset.data.reduce((s, v) => s + Number(v || 0), 0);
+                                        const val = Number(ctx.parsed || 0);
+                                        const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
+                                        return `${ctx.label}: HK$${val.toLocaleString()}（${pct}%）`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // ============================================================
+        // 鑽取：點擊每日明細／醫師列，列出背後診症單
+        // ============================================================
+        function openFinancialDrilldown(type, key, label) {
+            const modal = document.getElementById('financialDrilldownModal');
+            const titleEl = document.getElementById('financialDrilldownTitle');
+            const body = document.getElementById('financialDrilldownBody');
+            if (!modal || !body) return;
+            const rows = currentFinancialConsultations.filter((c) => {
+                if (type === 'daily') return getFinancialDateKey(c.date) === key;
+                if (type === 'doctor') return String(c.doctor || '') === String(key);
+                return false;
+            }).sort((a, b) => new Date(b.date) - new Date(a.date));
+            const ft = (s) => (typeof t === 'function' ? t(s) : s);
+            if (titleEl) {
+                titleEl.textContent = `${label}｜${ft('診症單')} ${rows.length} ${ft('筆')}`;
+            }
+            const esc = (s) => window.escapeHtml ? window.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
+            if (!rows.length) {
+                body.innerHTML = `<tr><td colspan="4" class="px-4 py-6 text-center text-gray-500">${ft('無資料')}</td></tr>`;
+            } else {
+                body.innerHTML = rows.map((c) => {
+                    let timeText = String(c.date || '');
+                    try {
+                        timeText = new Date(c.date).toLocaleString('zh-HK', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+                    } catch (_e) {}
+                    // 單張金額：與報表相同解析口徑
+                    const parsed = Array.isArray(c.financialSummaryItems)
+                        ? Number(c.financialTotalAmount) || 0
+                        : Number(parseFinancialBillingItems(c).totalAmount) || 0;
+                    return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">${esc(timeText)}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900">${esc(c.patientName || '未知病人')}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">HK$${parsed.toLocaleString()}</td>
+                        <td class="px-4 py-3 text-sm text-right">
+                            <button type="button" data-drilldown-id="${esc(c.id)}"
+                                class="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded">
+                                ${ft('查看病歷')}
+                            </button>
+                        </td>
+                    </tr>`;
+                }).join('');
+                body.querySelectorAll('button[data-drilldown-id]').forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        if (typeof viewMedicalRecord === 'function') {
+                            viewMedicalRecord(btn.getAttribute('data-drilldown-id'), btn);
+                        }
+                    });
+                });
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeFinancialDrilldown() {
+            const modal = document.getElementById('financialDrilldownModal');
+            if (modal) modal.classList.add('hidden');
+        }
+        window.closeFinancialDrilldown = closeFinancialDrilldown;
 
         // 更新收入摘要表格
         function updateFinancialSummaryTable(stats) {
             const tbody = document.getElementById('financialSummaryTableBody');
+            const ft = (s) => (typeof t === 'function' ? t(s) : s);
             const summaryData = [
-                { item: '診療費收入', amount: 0, category: 'consultation' },
-                { item: '藥費收入', amount: 0, category: 'medicine' },
-                { item: '治療費收入', amount: 0, category: 'treatment' },
-                { item: '其他收入', amount: 0, category: 'other' },
-                { item: '套票收入', amount: 0, category: 'package' },
-                { item: '套票扣減', amount: 0, category: 'packageUse' },
-                { item: '折扣/優惠', amount: 0, category: 'discount' }
+                { item: ft('診療費收入'), amount: 0, category: 'consultation' },
+                { item: ft('藥費收入'), amount: 0, category: 'medicine' },
+                { item: ft('治療費收入'), amount: 0, category: 'treatment' },
+                { item: ft('其他收入'), amount: 0, category: 'other' },
+                { item: ft('套票收入'), amount: 0, category: 'package' },
+                { item: ft('套票扣減'), amount: 0, category: 'packageUse' },
+                { item: ft('折扣/優惠'), amount: 0, category: 'discount' }
             ];
 
             // 計算各類別收入
@@ -24843,19 +25268,20 @@ async function restoreUser(id) {
             const totalCost = typeof stats.totalCost === 'number' ? stats.totalCost : 0;
             const netRevenue = typeof stats.netRevenue === 'number' ? stats.netRevenue : (totalRevenue - totalCost);
             const extendedRows = [
-                { item: '總收入', amount: totalRevenue, category: 'total' },
-                { item: '總成本', amount: totalCost, category: 'expense' },
-                { item: '淨收入', amount: netRevenue, category: 'net' }
+                { item: ft('總收入'), amount: totalRevenue, category: 'total', ratioKind: ft('收入佔比'), note: ft('統計期間') },
+                { item: ft('總成本'), amount: totalCost, category: 'expense', ratioKind: ft('成本率'), note: stats.costProrated ? ft('部分月份按天數分攤') : ft('統計期間') },
+                { item: ft('淨收入'), amount: netRevenue, category: 'net', ratioKind: ft('利潤率'), note: ft('統計期間') }
             ];
 
             tbody.innerHTML = summaryData.concat(extendedRows).map(item => {
                 const percentage = totalRevenue > 0 ? ((item.amount / totalRevenue) * 100).toFixed(1) : '0';
+                const ratioKind = item.ratioKind || ft('收入佔比');
                 return `
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 text-sm text-gray-900">${item.item}</td>
-                        <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">$${item.amount.toLocaleString()}</td>
-                        <td class="px-4 py-3 text-sm text-gray-600 text-right">${percentage}%</td>
-                        <td class="px-4 py-3 text-sm text-gray-500 text-right">統計期間</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">HK$${item.amount.toLocaleString()}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 text-right whitespace-nowrap">${percentage}%<span class="block text-xs text-gray-400">${ratioKind}</span></td>
+                        <td class="px-4 py-3 text-sm text-gray-500 text-right">${item.note || ft('統計期間')}</td>
                     </tr>
                 `;
             }).join('');
@@ -24870,7 +25296,7 @@ async function restoreUser(id) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="5" class="px-4 py-8 text-center text-gray-500">
-                            選定期間內沒有診症記錄
+                            ${t('選定期間內沒有診症記錄')}
                         </td>
                     </tr>
                 `;
@@ -24881,17 +25307,29 @@ async function restoreUser(id) {
                 const stat = dailyStats[date];
                 const averageDaily = stat.count > 0 ? Math.round(stat.revenue / stat.count) : 0;
                 const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('zh-TW');
+                // 主要服務：取當日金額最高的類別
+                const serviceEntries = Object.entries(stat.services || {});
+                const mainService = serviceEntries.length
+                    ? getFinancialCategoryDisplayName(serviceEntries.sort((a, b) => b[1] - a[1])[0][0])
+                    : '—';
 
                 return `
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-gray-50 cursor-pointer" data-drilldown-date="${date}" data-drilldown-label="${formattedDate}">
                         <td class="px-4 py-3 text-sm text-gray-900">${formattedDate}</td>
                         <td class="px-4 py-3 text-sm text-gray-900 text-right">${stat.count}</td>
-                        <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">$${stat.revenue.toLocaleString()}</td>
-                        <td class="px-4 py-3 text-sm text-gray-600 text-right">$${averageDaily.toLocaleString()}</td>
-                        <td class="px-4 py-3 text-sm text-gray-600">診療、藥費</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">HK$${stat.revenue.toLocaleString()}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 text-right">HK$${averageDaily.toLocaleString()}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600">${mainService}</td>
                     </tr>
                 `;
             }).join('');
+            tbody.querySelectorAll('tr[data-drilldown-date]').forEach((tr) => {
+                tr.addEventListener('click', () => openFinancialDrilldown(
+                    'daily',
+                    tr.getAttribute('data-drilldown-date'),
+                    tr.getAttribute('data-drilldown-label')
+                ));
+            });
         }
 
         // 更新醫師業績表格
@@ -24903,7 +25341,7 @@ async function restoreUser(id) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="5" class="px-4 py-8 text-center text-gray-500">
-                            選定期間內沒有醫師診症記錄
+                            ${t('選定期間內沒有醫師診症記錄')}
                         </td>
                     </tr>
                 `;
@@ -24916,17 +25354,25 @@ async function restoreUser(id) {
                 const percentage = totalRevenue > 0 ? ((stat.revenue / totalRevenue) * 100).toFixed(1) : '0';
                 const average = stat.count > 0 ? Math.round(stat.revenue / stat.count) : 0;
                 const doctorName = getDoctorDisplayName(doctorUsername);
+                const attrEsc = (s) => window.escapeHtml ? window.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
 
                 return `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm text-gray-900">${doctorName}</td>
+                    <tr class="hover:bg-gray-50 cursor-pointer" data-drilldown-doctor="${attrEsc(doctorUsername)}" data-drilldown-label="${attrEsc(doctorName)}">
+                        <td class="px-4 py-3 text-sm text-gray-900">${attrEsc(doctorName)}</td>
                         <td class="px-4 py-3 text-sm text-gray-900 text-right">${stat.count}</td>
-                        <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">$${stat.revenue.toLocaleString()}</td>
-                        <td class="px-4 py-3 text-sm text-gray-600 text-right">$${average.toLocaleString()}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">HK$${stat.revenue.toLocaleString()}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 text-right">HK$${average.toLocaleString()}</td>
                         <td class="px-4 py-3 text-sm text-gray-600 text-right">${percentage}%</td>
                     </tr>
                 `;
             }).join('');
+            tbody.querySelectorAll('tr[data-drilldown-doctor]').forEach((tr) => {
+                tr.addEventListener('click', () => openFinancialDrilldown(
+                    'doctor',
+                    tr.getAttribute('data-drilldown-doctor'),
+                    tr.getAttribute('data-drilldown-label')
+                ));
+            });
         }
 
         // 更新服務分析表格
@@ -24938,7 +25384,7 @@ async function restoreUser(id) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="5" class="px-4 py-8 text-center text-gray-500">
-                            選定期間內沒有服務記錄
+                            ${t('選定期間內沒有服務記錄')}
                         </td>
                     </tr>
                 `;
@@ -24955,8 +25401,8 @@ async function restoreUser(id) {
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 text-sm text-gray-900">${stat.name}</td>
                         <td class="px-4 py-3 text-sm text-gray-900 text-right">${stat.count}</td>
-                        <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">$${stat.revenue.toLocaleString()}</td>
-                        <td class="px-4 py-3 text-sm text-gray-600 text-right">$${average.toLocaleString()}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">HK$${stat.revenue.toLocaleString()}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 text-right">HK$${average.toLocaleString()}</td>
                         <td class="px-4 py-3 text-sm text-gray-600 text-right">${percentage}%</td>
                     </tr>
                 `;
@@ -25167,7 +25613,7 @@ async function restoreUser(id) {
             (raw.txs || []).forEach((tx) => {
                 if (!tx || !txBelongs(tx)) return;
                 const amount = Number(tx.amount) || 0;
-                const day = String(tx.at || '').slice(0, 10);
+                const day = getFinancialDateKey(tx.at);
                 if (!day) return;
                 const row = ensureDay(day);
                 switch (tx.type) {
@@ -25247,14 +25693,14 @@ async function restoreUser(id) {
                 walletFinFmt(stats.outstandingPrincipal + stats.outstandingBonus);
 
             const rows = [
-                { item: '儲值充值（本金）', amount: stats.topupPrincipal, count: stats.topupCount, note: '會員現金預存' },
-                { item: '充值贈送額', amount: stats.bonusIssued, count: stats.bonusCount, note: '診所贈送，無現金流入' },
-                { item: '儲值消費－本金', amount: -stats.payPrincipal, count: stats.payCount, note: '沖銷本金餘額' },
-                { item: '儲值消費－贈送', amount: -stats.payBonus, count: '', note: '沖銷贈送額' },
-                { item: '退款', amount: -(stats.refundPrincipal + stats.refundBonus), count: stats.refundCount, note: '退回會員帳戶' },
-                { item: '人工調整（淨額）', amount: stats.adjustNet, count: stats.adjustCount, note: '正＝補入／負＝扣減' },
-                { item: '期末餘額－本金', amount: stats.outstandingPrincipal, count: '', note: '會員預存本金' },
-                { item: '期末餘額－贈送', amount: stats.outstandingBonus, count: '', note: '已贈送未使用' }
+                { item: t('儲值充值(本金)'), amount: stats.topupPrincipal, count: stats.topupCount, note: t('會員現金預存') },
+                { item: t('充值贈送額'), amount: stats.bonusIssued, count: stats.bonusCount, note: t('診所贈送，無現金流入') },
+                { item: t('儲值消費－本金'), amount: -stats.payPrincipal, count: stats.payCount, note: t('沖銷本金') },
+                { item: t('儲值消費－贈送'), amount: -stats.payBonus, count: '', note: t('沖銷贈送額') },
+                { item: t('退款'), amount: -(stats.refundPrincipal + stats.refundBonus), count: stats.refundCount, note: t('退回會員帳戶') },
+                { item: t('人工調整（淨額）'), amount: stats.adjustNet, count: stats.adjustCount, note: t('正＝補入／負＝扣減') },
+                { item: t('期末餘額－本金'), amount: stats.outstandingPrincipal, count: '', note: t('會員預存本金') },
+                { item: t('期末餘額－贈送'), amount: stats.outstandingBonus, count: '', note: t('已贈送未使用') }
             ];
             document.getElementById('financialWalletSummaryBody').innerHTML = rows.map((r) => `
                 <tr class="hover:bg-gray-50">
@@ -25269,7 +25715,7 @@ async function restoreUser(id) {
             if (!dates.length) {
                 dailyBody.innerHTML = `
                     <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">
-                        選定期間內沒有儲值交易
+                        ${t('選定期間內沒有儲值交易')}
                     </td></tr>`;
                 return;
             }
@@ -25294,12 +25740,42 @@ async function restoreUser(id) {
         let lastWalletFinQuery = null;
         async function loadWalletReceivables(startDate, endDate, clinicFilter) {
             const fb = window.firebase;
-            // 單欄位相等查詢（自動索引），游標分頁抓全後再做客戶端篩選
+            const start = financialDayStart(startDate);
+            const end = financialDayEnd(endDate);
+
+            // 首選：paymentStatus 相等 + date 範圍的複合查詢，由 Firestore
+            // 端過濾日期，需 (paymentStatus, date) 複合索引。
+            try {
+                const { docs, truncated } = await walletFetchAllDocs('consultations', [
+                    fb.where('paymentStatus', '==', 'unpaid'),
+                    fb.where('date', '>=', start),
+                    fb.where('date', '<=', end),
+                    fb.orderBy('date')
+                ], { pageSize: 300, maxDocs: 5000 });
+                const rows = [];
+                docs.forEach((d) => {
+                    const c = Object.assign({ id: d.id }, d.data() || {});
+                    if (clinicFilter && String(c.clinicId || '') !== String(clinicFilter)) return;
+                    rows.push(c);
+                });
+                rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+                return { rows, truncated, indexed: true };
+            } catch (rangeErr) {
+                // 缺少複合索引時 Firestore 會回帶建立連結的錯誤；印出連結
+                // 並退回單欄位查詢（自動索引）＋客戶端過濾，功能不受影響。
+                const msg = String((rangeErr && rangeErr.message) || rangeErr || '');
+                if (msg.toLowerCase().includes('index')) {
+                    console.warn('待收款複合索引未建立，改用全量撈取。請依下列連結建立索引：',
+                        (msg.match(/https:\/\/[^\s]+/) || [''])[0]);
+                } else {
+                    console.warn('待收款範圍查詢失敗，改用全量撈取：', msg);
+                }
+            }
+
+            // Fallback：單欄位相等查詢（自動索引），客戶端按日期與診所過濾
             const { docs, truncated } = await walletFetchAllDocs('consultations', [
                 fb.where('paymentStatus', '==', 'unpaid')
             ], { pageSize: 300, maxDocs: 5000 });
-            const start = new Date(startDate);
-            const end = new Date(endDate + 'T23:59:59.999Z');
             const rows = [];
             docs.forEach((d) => {
                 const c = Object.assign({ id: d.id }, d.data() || {});
@@ -25309,7 +25785,7 @@ async function restoreUser(id) {
                 rows.push(c);
             });
             rows.sort((a, b) => new Date(b.date) - new Date(a.date));
-            return { rows, truncated };
+            return { rows, truncated, indexed: false };
         }
 
         function renderWalletReceivables(rows) {
@@ -25320,7 +25796,7 @@ async function restoreUser(id) {
             if (!rows.length) {
                 body.innerHTML = `
                     <tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">
-                        本期沒有待收款診症單
+                        ${t('本期沒有待收款診症單')}
                     </td></tr>`;
                 return;
             }
@@ -25336,20 +25812,20 @@ async function restoreUser(id) {
                     : null) || null;
                 const clinicText = clinic ? getClinicDisplayName(clinic) : (c.clinicId || '—');
                 const note = c.walletPaySkipped
-                    ? '已改用其他方式，待核銷'
-                    : '儲值扣款失敗';
+                    ? t('已改用其他方式，待核銷')
+                    : t('儲值扣款失敗');
                 const cidAttr = esc(c.id);
                 return `
                 <tr class="hover:bg-gray-50">
                     <td class="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">${dateText}</td>
-                    <td class="px-4 py-3 text-sm text-gray-900">${esc(c.patientName || '未知病人')}</td>
+                    <td class="px-4 py-3 text-sm text-gray-900">${esc(c.patientName || t('未知病人'))}</td>
                     <td class="px-4 py-3 text-sm text-gray-600">${esc(clinicText)}</td>
                     <td class="px-4 py-3 text-sm text-red-600 text-right font-medium">HK$${amount.toFixed(2)}</td>
                     <td class="px-4 py-3 text-sm text-gray-500">${note}</td>
                     <td class="px-4 py-3 text-sm text-center">
                         <button type="button" data-receivable-id="${cidAttr}"
                             class="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded">
-                            標記已收款
+                            ${t('標記已收款')}
                         </button>
                     </td>
                 </tr>`;
@@ -25386,7 +25862,7 @@ async function restoreUser(id) {
                     if (recvBody) {
                         recvBody.innerHTML = `
                             <tr><td colspan="6" class="px-4 py-6 text-center text-red-500">
-                                暫時無法載入待收款清單，請稍後再按「更新報表」
+                                ${t('暫時無法載入待收款清單，請稍後再按「更新報表」')}
                             </td></tr>`;
                     }
                 }
@@ -25397,7 +25873,7 @@ async function restoreUser(id) {
                 if (body) {
                     body.innerHTML = `
                         <tr><td colspan="4" class="px-4 py-8 text-center text-red-500">
-                            暫時無法載入儲值資料，請稍後再按「更新報表」
+                            ${t('暫時無法載入儲值資料，請稍後再按「更新報表」')}
                         </td></tr>`;
                 }
                 return null;
@@ -25462,36 +25938,33 @@ async function restoreUser(id) {
 async function buildFinancialExportPayload() {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
-    let reportType = '';
-    const rptElem = document.getElementById('reportType');
-    if (rptElem) {
-        reportType = rptElem.value;
-    } else {
-        const quickDateElem = document.getElementById('quickDate');
-        if (quickDateElem) {
-            const selIndex = quickDateElem.selectedIndex;
-            if (selIndex >= 0) reportType = quickDateElem.options[selIndex].text || quickDateElem.value;
-            else reportType = quickDateElem.value;
-        }
-    }
     let doctorFilter = '';
     const doctorFilterInput = document.getElementById('doctorFilter');
     if (doctorFilterInput) doctorFilter = doctorFilterInput.value;
     let clinicFilter = '';
     const clinicFilterInput = document.getElementById('clinicFilterFinancial');
     if (clinicFilterInput) clinicFilter = clinicFilterInput.value;
-    const filteredConsultations = filterFinancialConsultations(startDate, endDate, doctorFilter, clinicFilter);
-    const stats = calculateFinancialStatistics(filteredConsultations);
-    const months = monthsInDateRange(startDate, endDate);
+    // 優先複用當前報表快取，確保匯出內容與畫面口徑一致
+    const cacheKey = getFinancialReportCacheKey(startDate, endDate, doctorFilter, clinicFilter);
+    const cachedEntry = financialReportCache[cacheKey] || readPersistedFinancialCache(cacheKey);
+    let stats;
+    if (cachedEntry && Array.isArray(cachedEntry.records) && cachedEntry.stats) {
+        stats = cachedEntry.stats;
+    } else {
+        const fallbackConsultations = filterFinancialConsultations(startDate, endDate, doctorFilter, clinicFilter);
+        stats = calculateFinancialStatistics(fallbackConsultations);
+    }
     let totalCost = 0;
     let byType = {};
+    let costProrated = false;
     try {
-        const exp = await getClinicExpensesByMonths(months, clinicFilter || null);
-        totalCost = exp && typeof exp.totalCost === 'number' ? exp.totalCost : 0;
-        byType = exp && exp.byType ? exp.byType : {};
+        const costRes = await getApportionedCost(startDate, endDate, clinicFilter || null);
+        byType = costRes.byType || {};
+        costProrated = !!costRes.prorated;
+        // 與畫面同步：快取 stats 已有成本時以其為準
+        totalCost = typeof stats.totalCost === 'number' ? stats.totalCost : costRes.totalCost;
     } catch (_e) {
-        totalCost = 0;
-        byType = {};
+        totalCost = typeof stats.totalCost === 'number' ? stats.totalCost : 0;
     }
     const clinicOpt = clinicFilter ? (Array.isArray(clinicsList) ? clinicsList.find(c => String(c.id) === String(clinicFilter)) : null) : null;
     const clinicName = clinicOpt ? (clinicOpt.chineseName || clinicOpt.englishName || clinicOpt.id) : clinicFilter;
@@ -25504,14 +25977,13 @@ async function buildFinancialExportPayload() {
     return {
         startDate,
         endDate,
-        reportType,
         doctorFilter,
         clinicFilter,
         clinicName,
-        filteredConsultations,
         stats,
         totalCost,
         byType,
+        costProrated,
         walletStats,
         generatedAt: new Date().toLocaleString('zh-TW')
     };
@@ -25519,69 +25991,70 @@ async function buildFinancialExportPayload() {
 
 async function exportFinancialReportTxt() {
     const data = await buildFinancialExportPayload();
-    const { startDate, endDate, reportType, doctorFilter, clinicFilter, clinicName, stats, totalCost, byType } = data;
+    const { startDate, endDate, doctorFilter, clinicFilter, clinicName, stats, totalCost, byType } = data;
+    const ft = (s) => (typeof window.t === 'function' ? window.t(s) : s);
     const doctorLines = Object.keys(stats.doctorStats).map(key => {
         const d = stats.doctorStats[key];
-        const doctorName = key || '未知醫師';
-        return `${doctorName}: 次數 ${d.count.toLocaleString()}，收入 $${d.revenue.toLocaleString()}`;
+        const doctorName = key || ft('未知醫師');
+        return `${doctorName}: ${ft('次數')} ${d.count.toLocaleString()}，${ft('收入')} HK$${d.revenue.toLocaleString()}`;
     }).join('\n');
-    const serviceLines = Object.values(stats.serviceStats).map(item => `${item.name}: 次數 ${item.count.toLocaleString()}，收入 $${item.revenue.toLocaleString()}`).join('\n');
+    const serviceLines = Object.values(stats.serviceStats).map(item => `${item.name}: ${ft('次數')} ${item.count.toLocaleString()}，${ft('收入')} HK$${item.revenue.toLocaleString()}`).join('\n');
     const dailyLines = Object.keys(stats.dailyStats).map(dateKey => {
         const d = stats.dailyStats[dateKey];
-        return `${dateKey}: 次數 ${d.count.toLocaleString()}，收入 $${d.revenue.toLocaleString()}`;
+        return `${dateKey}: ${ft('次數')} ${d.count.toLocaleString()}，${ft('收入')} HK$${d.revenue.toLocaleString()}`;
     }).join('\n');
     let textReport = '';
-    if (doctorFilter) textReport += `選擇醫師: ${doctorFilter}\n`;
-    if (clinicFilter) textReport += `選擇診所: ${clinicName}\n`;
-    textReport += `報表標題: 財務報表 - ${reportType}\n`;
-    textReport += `期間: ${startDate} 至 ${endDate}\n`;
-    textReport += `生成時間: ${data.generatedAt}\n`;
-    textReport += `總收入(未扣成本): $${stats.totalRevenue.toLocaleString()}\n`;
-    textReport += `總成本: $${totalCost.toLocaleString()}\n`;
-    textReport += `淨收入: $${(stats.totalRevenue - totalCost).toLocaleString()}\n`;
-    textReport += `總診症數: ${stats.totalConsultations.toLocaleString()}\n`;
-    textReport += `平均收入: $${Math.round(stats.averageRevenue).toLocaleString()}\n`;
-    textReport += `有效醫師數: ${stats.activeDoctors.toLocaleString()}\n\n`;
-    textReport += `醫師統計:\n${doctorLines || '無資料'}\n\n`;
-    textReport += `服務分類統計:\n${serviceLines || '無資料'}\n\n`;
-    textReport += `每日統計:\n${dailyLines || '無資料'}\n`;
-    const costLines = Object.keys(byType).map(t => `${t}: $${Number(byType[t] || 0).toLocaleString()}`).join('\n');
-    textReport += `\n成本統計:\n${costLines || '無資料'}\n`;
+    if (doctorFilter) textReport += `${ft('選擇醫師')}: ${doctorFilter}\n`;
+    if (clinicFilter) textReport += `${ft('選擇診所')}: ${clinicName}\n`;
+    textReport += `${ft('期間')}: ${startDate} ${ft('至')} ${endDate}\n`;
+    textReport += `${ft('生成時間')}: ${data.generatedAt}\n`;
+    textReport += `${ft('總收入(未扣成本)')}: HK$${stats.totalRevenue.toLocaleString()}\n`;
+    textReport += `${ft('總成本')}: HK$${totalCost.toLocaleString()}\n`;
+    textReport += `${ft('成本計算')}: ${data.costProrated ? ft('部分月份按天數分攤') : ft('整月實際成本')}\n`;
+    textReport += `${ft('淨收入')}: HK$${(stats.totalRevenue - totalCost).toLocaleString()}\n`;
+    textReport += `${ft('總診症數')}: ${stats.totalConsultations.toLocaleString()}\n`;
+    textReport += `${ft('平均收入')}: HK$${Math.round(stats.averageRevenue).toLocaleString()}\n`;
+    textReport += `${ft('有效醫師數')}: ${stats.activeDoctors.toLocaleString()}\n\n`;
+    textReport += `${ft('醫師統計')}:\n${doctorLines || ft('無資料')}\n\n`;
+    textReport += `${ft('服務分類統計')}:\n${serviceLines || ft('無資料')}\n\n`;
+    textReport += `${ft('每日統計')}:\n${dailyLines || ft('無資料')}\n`;
+    const costLines = Object.keys(byType).map(tp => `${tp}: HK$${Number(byType[tp] || 0).toLocaleString()}`).join('\n');
+    textReport += `\n${ft('成本統計')}:\n${costLines || ft('無資料')}\n`;
 
     // 會員儲值統計
     const w = data.walletStats;
     if (w) {
-        textReport += `\n會員儲值統計:\n`;
-        textReport += `儲值充值(本金): ${walletFinFmt(w.topupPrincipal)}（${w.topupCount} 筆；屬預存，非營業收入）\n`;
-        textReport += `充值贈送額: ${walletFinFmt(w.bonusIssued)}（${w.bonusCount} 筆）\n`;
-        textReport += `儲值消費: ${walletFinFmt(w.payPrincipal + w.payBonus)}（${w.payCount} 筆；已計入診症收入）\n`;
-        textReport += `　－本金 ${walletFinFmt(w.payPrincipal)}，贈送 ${walletFinFmt(w.payBonus)}\n`;
-        textReport += `退款: ${walletFinFmt(w.refundPrincipal + w.refundBonus)}（${w.refundCount} 筆）\n`;
-        textReport += `人工調整(淨額): ${walletFinFmt(w.adjustNet)}（${w.adjustCount} 筆）\n`;
-        textReport += `期末會員餘額: ${walletFinFmt(w.outstandingPrincipal + w.outstandingBonus)}`
-            + `（本金 ${walletFinFmt(w.outstandingPrincipal)}＋贈送 ${walletFinFmt(w.outstandingBonus)}；診所負債）\n`;
+        textReport += `\n${ft('會員儲值統計')}:\n`;
+        textReport += `${ft('儲值充值(本金)')}: ${walletFinFmt(w.topupPrincipal)}（${w.topupCount} ${ft('筆')}；${ft('屬預存，非營業收入')}）\n`;
+        textReport += `${ft('充值贈送額')}: ${walletFinFmt(w.bonusIssued)}（${w.bonusCount} ${ft('筆')}）\n`;
+        textReport += `${ft('儲值消費')}: ${walletFinFmt(w.payPrincipal + w.payBonus)}（${w.payCount} ${ft('筆')}；${ft('已計入診症收入')}）\n`;
+        textReport += `　－${ft('本金')} ${walletFinFmt(w.payPrincipal)}，${ft('贈送')} ${walletFinFmt(w.payBonus)}\n`;
+        textReport += `${ft('退款')}: ${walletFinFmt(w.refundPrincipal + w.refundBonus)}（${w.refundCount} ${ft('筆')}）\n`;
+        textReport += `${ft('人工調整(淨額)')}: ${walletFinFmt(w.adjustNet)}（${w.adjustCount} ${ft('筆')}）\n`;
+        textReport += `${ft('期末會員餘額')}: ${walletFinFmt(w.outstandingPrincipal + w.outstandingBonus)}`
+            + `（${ft('本金')} ${walletFinFmt(w.outstandingPrincipal)}＋${ft('贈送')} ${walletFinFmt(w.outstandingBonus)}；${ft('診所負債')}）\n`;
         const walletDailyLines = Object.keys(w.daily).sort().reverse().map((day) => {
             const r = w.daily[day];
-            return `${day}: 充值 ${walletFinFmt(r.topupAmount)}（${r.topupCount} 筆），`
-                + `消費 ${walletFinFmt(r.payAmount)}（${r.payCount} 筆），退款 ${walletFinFmt(r.refundAmount)}`;
+            return `${day}: ${ft('充值')} ${walletFinFmt(r.topupAmount)}（${r.topupCount} ${ft('筆')}），`
+                + `${ft('消費')} ${walletFinFmt(r.payAmount)}（${r.payCount} ${ft('筆')}），${ft('退款')} ${walletFinFmt(r.refundAmount)}`;
         }).join('\n');
-        textReport += `每日儲值明細:\n${walletDailyLines || '無資料'}\n`;
+        textReport += `${ft('每日儲值明細')}:\n${walletDailyLines || ft('無資料')}\n`;
     }
     const blob = new Blob([textReport], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `財務報表_${startDate}_${endDate}.txt`;
+    a.download = `${ft('財務報表')}_${startDate}_${endDate}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('財務報表 TXT 已匯出！', 'success');
+    showToast(ft('財務報表 TXT 已匯出！'), 'success');
 }
 
 async function exportFinancialReportExcel() {
     const data = await buildFinancialExportPayload();
-    const { startDate, endDate, reportType, doctorFilter, clinicFilter, clinicName, stats, totalCost, byType } = data;
+    const { startDate, endDate, doctorFilter, clinicFilter, clinicName, stats, totalCost, byType } = data;
     const esc = (value) => {
         const str = String(value == null ? '' : value);
         return str
@@ -25591,9 +26064,10 @@ async function exportFinancialReportExcel() {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
     };
+    const ft = (s) => (typeof window.t === 'function' ? window.t(s) : s);
     const doctorRows = Object.keys(stats.doctorStats).map(key => {
         const d = stats.doctorStats[key];
-        return `<tr><td>${esc(key || '未知醫師')}</td><td>${d.count}</td><td>${d.revenue}</td></tr>`;
+        return `<tr><td>${esc(key || ft('未知醫師'))}</td><td>${d.count}</td><td>${d.revenue}</td></tr>`;
     }).join('');
     const serviceRows = Object.values(stats.serviceStats).map(item => {
         return `<tr><td>${esc(item.name)}</td><td>${item.count}</td><td>${item.revenue}</td></tr>`;
@@ -25616,14 +26090,14 @@ async function exportFinancialReportExcel() {
             `<tr><td>${esc(label)}</td><td>${Number(amount) || 0}</td>`
             + `<td>${count === '' || count == null ? '' : count}</td><td>${esc(note || '')}</td></tr>`;
         walletSummaryRows =
-            wrow('儲值充值（本金）', w.topupPrincipal, w.topupCount, '預存，非營業收入')
-            + wrow('充值贈送額', w.bonusIssued, w.bonusCount, '診所贈送')
-            + wrow('儲值消費－本金', -w.payPrincipal, w.payCount, '沖銷本金')
-            + wrow('儲值消費－贈送', -w.payBonus, '', '沖銷贈送額')
-            + wrow('退款', -(w.refundPrincipal + w.refundBonus), w.refundCount, '退回會員帳戶')
-            + wrow('人工調整（淨額）', w.adjustNet, w.adjustCount, '正＝補入／負＝扣減')
-            + wrow('期末餘額－本金', w.outstandingPrincipal, '', '診所負債')
-            + wrow('期末餘額－贈送', w.outstandingBonus, '', '診所負債');
+            wrow(ft('儲值充值(本金)'), w.topupPrincipal, w.topupCount, ft('屬預存，非營業收入'))
+            + wrow(ft('充值贈送額'), w.bonusIssued, w.bonusCount, ft('診所贈送'))
+            + wrow(ft('儲值消費－本金'), -w.payPrincipal, w.payCount, ft('沖銷本金'))
+            + wrow(ft('儲值消費－贈送'), -w.payBonus, '', ft('沖銷贈送額'))
+            + wrow(ft('退款'), -(w.refundPrincipal + w.refundBonus), w.refundCount, ft('退回會員帳戶'))
+            + wrow(ft('人工調整（淨額）'), w.adjustNet, w.adjustCount, ft('正＝補入／負＝扣減'))
+            + wrow(ft('期末餘額－本金'), w.outstandingPrincipal, '', ft('診所負債'))
+            + wrow(ft('期末餘額－贈送'), w.outstandingBonus, '', ft('診所負債'));
         walletDailyRows = Object.keys(w.daily).sort().reverse().map((day) => {
             const r = w.daily[day];
             return `<tr><td>${esc(day)}</td><td>${r.topupCount}</td><td>${r.topupAmount}</td>`
@@ -25642,45 +26116,45 @@ h2, h3 { margin: 8px 0; }
 </style>
 </head>
 <body>
-<h2>財務報表</h2>
+<h2>${ft('財務報表')}</h2>
 <table>
-<tr><th>欄位</th><th>內容</th></tr>
-<tr><td>報表標題</td><td>${esc(reportType)}</td></tr>
-<tr><td>期間</td><td>${esc(startDate)} 至 ${esc(endDate)}</td></tr>
-<tr><td>生成時間</td><td>${esc(data.generatedAt)}</td></tr>
-<tr><td>選擇醫師</td><td>${esc(doctorFilter || '全部醫師')}</td></tr>
-<tr><td>選擇診所</td><td>${esc(clinicFilter ? clinicName : '全部診所')}</td></tr>
-<tr><td>總收入(未扣成本)</td><td>${stats.totalRevenue}</td></tr>
-<tr><td>總成本</td><td>${totalCost}</td></tr>
-<tr><td>淨收入</td><td>${stats.totalRevenue - totalCost}</td></tr>
-<tr><td>總診症數</td><td>${stats.totalConsultations}</td></tr>
-<tr><td>平均收入</td><td>${Math.round(stats.averageRevenue)}</td></tr>
-<tr><td>有效醫師數</td><td>${stats.activeDoctors}</td></tr>
+<tr><th>${ft('欄位')}</th><th>${ft('內容')}</th></tr>
+<tr><td>${ft('期間')}</td><td>${esc(startDate)} ${ft('至')} ${esc(endDate)}</td></tr>
+<tr><td>${ft('生成時間')}</td><td>${esc(data.generatedAt)}</td></tr>
+<tr><td>${ft('選擇醫師')}</td><td>${esc(doctorFilter || ft('全部醫師'))}</td></tr>
+<tr><td>${ft('選擇診所')}</td><td>${esc(clinicFilter ? clinicName : ft('全部診所'))}</td></tr>
+<tr><td>${ft('總收入(未扣成本)')}</td><td>${stats.totalRevenue}</td></tr>
+<tr><td>${ft('總成本')}</td><td>${totalCost}</td></tr>
+<tr><td>${ft('成本計算')}</td><td>${data.costProrated ? ft('部分月份按天數分攤') : ft('整月實際成本')}</td></tr>
+<tr><td>${ft('淨收入')}</td><td>${stats.totalRevenue - totalCost}</td></tr>
+<tr><td>${ft('總診症數')}</td><td>${stats.totalConsultations}</td></tr>
+<tr><td>${ft('平均收入')}</td><td>${Math.round(stats.averageRevenue)}</td></tr>
+<tr><td>${ft('有效醫師數')}</td><td>${stats.activeDoctors}</td></tr>
 </table>
-<h3>醫師統計</h3>
-<table><tr><th>醫師</th><th>次數</th><th>收入</th></tr>${doctorRows || '<tr><td colspan="3">無資料</td></tr>'}</table>
-<h3>服務分類統計</h3>
-<table><tr><th>服務類型</th><th>次數</th><th>收入</th></tr>${serviceRows || '<tr><td colspan="3">無資料</td></tr>'}</table>
-<h3>每日統計</h3>
-<table><tr><th>日期</th><th>次數</th><th>收入</th></tr>${dailyRows || '<tr><td colspan="3">無資料</td></tr>'}</table>
-<h3>成本統計</h3>
-<table><tr><th>成本類型</th><th>金額</th></tr>${costRows || '<tr><td colspan="2">無資料</td></tr>'}</table>
-<h3>會員儲值統計</h3>
-<table><tr><th>項目</th><th>金額</th><th>筆數</th><th>備註</th></tr>${walletSummaryRows || '<tr><td colspan="4">無資料</td></tr>'}</table>
-<h3>每日儲值明細</h3>
-<table><tr><th>日期</th><th>充值筆數</th><th>充值金額</th><th>消費筆數</th><th>消費金額</th><th>退款金額</th></tr>${walletDailyRows || '<tr><td colspan="6">無資料</td></tr>'}</table>
+<h3>${ft('醫師統計')}</h3>
+<table><tr><th>${ft('醫師')}</th><th>${ft('次數')}</th><th>${ft('收入')}</th></tr>${doctorRows || `<tr><td colspan="3">${ft('無資料')}</td></tr>`}</table>
+<h3>${ft('服務分類統計')}</h3>
+<table><tr><th>${ft('服務類型')}</th><th>${ft('次數')}</th><th>${ft('收入')}</th></tr>${serviceRows || `<tr><td colspan="3">${ft('無資料')}</td></tr>`}</table>
+<h3>${ft('每日統計')}</h3>
+<table><tr><th>${ft('日期')}</th><th>${ft('次數')}</th><th>${ft('收入')}</th></tr>${dailyRows || `<tr><td colspan="3">${ft('無資料')}</td></tr>`}</table>
+<h3>${ft('成本統計')}</h3>
+<table><tr><th>${ft('成本類型')}</th><th>${ft('金額')}</th></tr>${costRows || `<tr><td colspan="2">${ft('無資料')}</td></tr>`}</table>
+<h3>${ft('會員儲值統計')}</h3>
+<table><tr><th>${ft('項目')}</th><th>${ft('金額')}</th><th>${ft('筆數')}</th><th>${ft('備註')}</th></tr>${walletSummaryRows || `<tr><td colspan="4">${ft('無資料')}</td></tr>`}</table>
+<h3>${ft('每日儲值明細')}</h3>
+<table><tr><th>${ft('日期')}</th><th>${ft('充值筆數')}</th><th>${ft('充值金額')}</th><th>${ft('消費筆數')}</th><th>${ft('消費金額')}</th><th>${ft('退款金額')}</th></tr>${walletDailyRows || `<tr><td colspan="6">${ft('無資料')}</td></tr>`}</table>
 </body>
 </html>`;
     const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `財務報表_${startDate}_${endDate}.xls`;
+    a.download = `${ft('財務報表')}_${startDate}_${endDate}.xls`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('財務報表 Excel 已匯出！', 'success');
+    showToast(ft('財務報表 Excel 已匯出！'), 'success');
 }
 
 function monthsInDateRange(startDateStr, endDateStr) {
@@ -25702,10 +26176,24 @@ async function getClinicExpensesByMonths(months, clinicId = null) {
     await waitForFirebaseDb();
     const validMonths = Array.from(new Set((Array.isArray(months) ? months : []).filter(Boolean)));
     if (validMonths.length === 0) {
-        return { totalCost: 0, byType: {} };
+        return { totalCost: 0, byType: {}, byMonth: {} };
     }
     let total = 0;
     const byType = {};
+    // 按月保留總額與類別明細，供部分月份按天數分攤
+    const byMonth = {};
+    const addExpense = (d) => {
+        const amt = Number(d.amount) || 0;
+        const t = d.type || '其他費用';
+        const monthKey = d.month || '';
+        total += amt;
+        byType[t] = (byType[t] || 0) + amt;
+        if (monthKey) {
+            if (!byMonth[monthKey]) byMonth[monthKey] = { total: 0, byType: {} };
+            byMonth[monthKey].total += amt;
+            byMonth[monthKey].byType[t] = (byMonth[monthKey].byType[t] || 0) + amt;
+        }
+    };
     const chunkSize = 10;
     const chunks = [];
     for (let i = 0; i < validMonths.length; i += chunkSize) {
@@ -25726,25 +26214,45 @@ async function getClinicExpensesByMonths(months, clinicId = null) {
                 const fallbackParts = [window.firebase.where('month', '==', monthKey)];
                 if (clinicId) fallbackParts.push(window.firebase.where('clinicId', '==', clinicId));
                 const fallbackSnap = await window.firebase.getDocs(window.firebase.firestoreQuery(colRef, ...fallbackParts));
-                fallbackSnap.forEach(docSnap => {
-                    const d = docSnap.data() || {};
-                    const amt = Number(d.amount) || 0;
-                    total += amt;
-                    const t = d.type || '其他費用';
-                    byType[t] = (byType[t] || 0) + amt;
-                });
+                fallbackSnap.forEach(docSnap => addExpense(docSnap.data() || {}));
             }
             continue;
         }
-        snapshot.forEach(docSnap => {
-            const d = docSnap.data() || {};
-            const amt = Number(d.amount) || 0;
-            total += amt;
-            const t = d.type || '其他費用';
-            byType[t] = (byType[t] || 0) + amt;
-        });
+        snapshot.forEach(docSnap => addExpense(docSnap.data() || {}));
     }
-    return { totalCost: total, byType };
+    return { totalCost: total, byType, byMonth };
+}
+
+// 依報表期間計算成本：整月涵蓋時採實際成本；
+// 僅涵蓋部分天數的月份按「覆蓋天數／該月天數」比例分攤。
+async function getApportionedCost(startDate, endDate, clinicId = null) {
+    const months = monthsInDateRange(startDate, endDate);
+    const exp = await getClinicExpensesByMonths(months, clinicId);
+    const byMonth = exp.byMonth || {};
+    const [sy, sm, sd] = String(startDate).split('-').map(Number);
+    const [ey, em, ed] = String(endDate).split('-').map(Number);
+    let totalCost = 0;
+    let prorated = false;
+    const byType = {};
+    const round2 = (n) => Math.round(n * 100) / 100;
+
+    months.forEach(monthKey => {
+        const [y, m] = monthKey.split('-').map(Number);
+        const daysInMonth = new Date(y, m, 0).getDate();
+        const firstDay = (y === sy && m === sm) ? sd : 1;
+        const lastDay = (y === ey && m === em) ? ed : daysInMonth;
+        const overlapDays = Math.max(0, lastDay - firstDay + 1);
+        if (overlapDays < daysInMonth) prorated = true;
+        const ratio = overlapDays / daysInMonth;
+        const entry = byMonth[monthKey] || { total: 0, byType: {} };
+        totalCost += entry.total * ratio;
+        Object.entries(entry.byType || {}).forEach(([t, amt]) => {
+            byType[t] = (byType[t] || 0) + amt * ratio;
+        });
+    });
+
+    Object.keys(byType).forEach(t => { byType[t] = round2(byType[t]); });
+    return { totalCost: round2(totalCost), byType, byMonth, prorated };
 }
 
 function showExpenseImportModal() {
@@ -25822,7 +26330,7 @@ async function loadClinicExpensesForSelectedMonth() {
         return `
             <tr data-id="${item.id}" class="hover:bg-gray-50">
                 <td class="px-4 py-3 text-sm text-gray-900">${type}</td>
-                <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">$${amt.toLocaleString()}</td>
+                <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">HK$${amt.toLocaleString()}</td>
                 <td class="px-4 py-3 text-sm text-gray-600">${note}</td>
                 <td class="px-4 py-3 text-sm text-right">
                     <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded mr-2" onclick="startEditExpense('${item.id}')">編輯</button>
@@ -25854,7 +26362,7 @@ async function loadClinicExpensesForListMonth() {
         return `
             <tr data-id="${item.id}" class="hover:bg-gray-50">
                 <td class="px-4 py-3 text-sm text-gray-900">${type}</td>
-                <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">$${amt.toLocaleString()}</td>
+                <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">HK$${amt.toLocaleString()}</td>
                 <td class="px-4 py-3 text-sm text-gray-600">${note}</td>
                 <td class="px-4 py-3 text-sm text-right">
                     <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded mr-2" onclick="startEditExpense('${item.id}')">編輯</button>
@@ -25884,7 +26392,7 @@ function startEditExpense(id) {
     if (!row) return;
     const tds = row.querySelectorAll('td');
     const curType = tds[0].textContent.trim();
-    const curAmountText = tds[1].textContent.replace(/\$|,/g, '').trim();
+    const curAmountText = tds[1].textContent.replace(/[^0-9.]/g, '').trim();
     const curAmount = Number(curAmountText) || 0;
     const curNote = tds[2].textContent.trim();
     row.innerHTML = `
@@ -29117,6 +29625,15 @@ async function restorePackageUseMeta(patientId) {
 }
 // 將函式暴露到全域以便其他部分調用
 window.restorePackageUseMeta = restorePackageUseMeta;
+
+// 以香港時區（+08:00）回傳指定 Date 所屬本地日的起訖邊界，
+// 讓 Firestore 查詢視窗與報表的香港日界口徑一致（瀏覽器非 HK 時區也適用）。
+function hkBoundOf(date, isEnd) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return new Date(`${y}-${m}-${d}T${isEnd ? '23:59:59.999' : '00:00:00'}+08:00`);
+}
 // Firebase 數據管理系統
 class FirebaseDataManager {
     constructor() {
@@ -30417,9 +30934,9 @@ class FirebaseDataManager {
                 start = new Date(today);
                 end = new Date(today);
             }
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
-            const pageSize = 100;
+            start = hkBoundOf(start, false);
+            end = hkBoundOf(end, true);
+            const pageSize = 300;
             const baseParts = [];
             if (completedOnly) baseParts.push(window.firebase.where('status', '==', 'completed'));
             if (doctorFilter) baseParts.push(window.firebase.where('doctor', '==', doctorFilter));
@@ -30461,11 +30978,9 @@ class FirebaseDataManager {
         if (!this.isReady) return { success: false, data: [] };
         try {
             const colRef = window.firebase.collection(window.firebase.db, 'consultationFinancialSummaries');
-            const start = new Date(startDateStr);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(endDateStr);
-            end.setHours(23, 59, 59, 999);
-            const pageSize = 100;
+            const start = hkBoundOf(new Date(startDateStr), false);
+            const end = hkBoundOf(new Date(endDateStr), true);
+            const pageSize = 300;
             const parts = [];
             if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
             if (clinicFilter) parts.push(window.firebase.where('clinicId', '==', clinicFilter));
@@ -30505,10 +31020,8 @@ class FirebaseDataManager {
         if (!this.isReady) return false;
         try {
             const colRef = window.firebase.collection(window.firebase.db, 'consultationFinancialSummaries');
-            const start = new Date(startDateStr);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(endDateStr);
-            end.setHours(23, 59, 59, 999);
+            const start = hkBoundOf(new Date(startDateStr), false);
+            const end = hkBoundOf(new Date(endDateStr), true);
             const parts = [];
             if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
             if (clinicFilter) parts.push(window.firebase.where('clinicId', '==', clinicFilter));
@@ -30547,9 +31060,9 @@ class FirebaseDataManager {
                 start = new Date(today);
                 end = new Date(today);
             }
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
-            const pageSize = 100;
+            start = hkBoundOf(start, false);
+            end = hkBoundOf(end, true);
+            const pageSize = 300;
             const baseParts = [];
             if (completedOnly) baseParts.push(window.firebase.where('status', '==', 'completed'));
             if (doctorFilter) baseParts.push(window.firebase.where('doctor', '==', doctorFilter));
@@ -30583,10 +31096,22 @@ class FirebaseDataManager {
                 }
                 return list;
             };
-            // 主力查詢 date（報表以診症日期為準，索引與語意與舊版一致）。
-            // 僅在 date 查詢回傳 0 筆時（歷史資料 date 欄位為字串／缺失），
-            // 才補查 createdAt，避免每次都把同範圍重複讀取、讀取數翻倍。
-            // 同範圍內部分 date 異常的混合型舊資料，會隨 sortDate 回填逐漸修復。
+            // 主力查詢 sortDate：所有現代寫入都會帶標準化 Timestamp，
+            // 可一併涵蓋 date 為字串／缺失的舊資料，不會再靜默漏單。
+            try {
+                const list = await runRangeQuery('sortDate', start, end);
+                return { success: true, data: list };
+            } catch (sortDateErr) {
+                // 缺少 (status[,doctor][,clinic], sortDate) 複合索引時：
+                // 印出建立連結，並退回舊的 date／createdAt 查詢，避免功能中斷。
+                const msg = String((sortDateErr && sortDateErr.message) || sortDateErr || '');
+                if (msg.toLowerCase().includes('index')) {
+                    console.warn('sortDate 複合索引未建立，暫用 date 查詢。請依連結建立索引：',
+                        (msg.match(/https:\/\/[^\s]+/) || [''])[0]);
+                } else {
+                    console.warn('sortDate 查詢失敗，暫用 date 查詢：', msg);
+                }
+            }
             let list = await runRangeQuery('date', start, end);
             if (list.length === 0) {
                 list = await runRangeQuery('createdAt', start, end);
@@ -35843,6 +36368,7 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   window.filterHerbLibrary = filterHerbLibrary;
   window.filterUsers = filterUsers;
   window.generateFinancialReport = generateFinancialReport;
+  window.scheduleFinancialReportRefresh = scheduleFinancialReportRefresh;
   window.hideAddBillingItemForm = hideAddBillingItemForm;
   window.hideAddFormulaForm = hideAddFormulaForm;
   window.hideAddHerbForm = hideAddHerbForm;
