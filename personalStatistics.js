@@ -247,25 +247,14 @@ function renderPersonalStatistics(stats) {
         const el = document.getElementById(id);
         if (el) el.textContent = String(value);
     }
-    // 圖表取前 N 名，第 N+1 名起彙總成「其他（K 種）」
+    // 圖表只取前 N 名。曾把第 N+1 名以後彙總成「其他（K 種）」，
+    // 但中藥／穴位為長尾分布，彙總值幾乎必然壓過第 1 名，
+    // 視覺上像一個真實且最常用的品項，造成誤導，故移除。
     function buildChartRows(counts, type) {
-        const sorted = sortedEntries(counts);
-        const top = sorted.slice(0, PERSONAL_STATS_TOP_N).map(e => ({
+        return sortedEntries(counts).slice(0, PERSONAL_STATS_TOP_N).map(e => ({
             label: mapPersonalStatsDisplayName(e[0], type),
-            value: e[1],
-            other: false
+            value: e[1]
         }));
-        const rest = sorted.slice(PERSONAL_STATS_TOP_N);
-        if (rest.length) {
-            const otherTotal = rest.reduce((sum, e) => sum + (Number(e[1]) || 0), 0);
-            const paren = psGetLang().startsWith('en') ? `(${rest.length})` : `（${rest.length}）`;
-            top.push({
-                label: `${tr('其他')}${paren}`,
-                value: otherTotal,
-                other: true
-            });
-        }
-        return top;
     }
     function renderChart(rows, canvasId, oldInstance) {
         const canvas = document.getElementById(canvasId);
@@ -285,7 +274,7 @@ function renderPersonalStatistics(stats) {
                 datasets: [{
                     label: tr('使用次數'),
                     data: dataVals,
-                    backgroundColor: ordered.map(r => r.other ? 'rgba(156,163,175,0.7)' : 'rgba(217,119,6,0.75)')
+                    backgroundColor: 'rgba(217,119,6,0.75)'
                 }],
             },
             options: {
