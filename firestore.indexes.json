@@ -33,6 +33,22 @@
       ]
     },
     {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "createdBy", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "patientPackages",
       "queryScope": "COLLECTION",
       "fields": [

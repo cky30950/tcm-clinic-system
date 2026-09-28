@@ -2822,7 +2822,21 @@ window.translations = {
             '尚無病人資料': 'No patient data yet',
             '匯入進度': 'Import progress',
             '匯入完成！': 'Import complete!',
-            '匯入失敗！': 'Import failed!'
+            '匯入失敗！': 'Import failed!',
+            '診症總數': 'Total Consultations',
+            '方劑種類': 'Formula Types',
+            '中藥種類': 'Herb Types',
+            '穴位種類': 'Acupoint Types',
+            '尚無資料': 'No data',
+            '最後更新': 'Last updated',
+            '離線快取，可能非最新': 'offline cache, may be outdated',
+            '重試': 'Retry',
+            '載入中...': 'Loading...',
+            '統計資料載入失敗。': 'Failed to load statistics.',
+            '無法更新統計，目前顯示快取資料。': 'Unable to update statistics. Showing cached data.',
+            '無法更新統計，目前顯示的快取已超過 24 小時，可能非最新。': 'Unable to update statistics. The cached data shown is over 24 hours old and may be outdated.',
+            '無法辨識登入階段，請重新整理頁面後再試。': 'Unable to identify your login session. Please refresh the page and try again.',
+            '部分歷史統計仍在準備中，目前僅顯示已同步的資料；若長期未更新，請聯絡管理員檢查索引設定。': 'Some historical statistics are still being prepared, so only synced data is shown for now. If it stays outdated, please contact the administrator to check the index settings.'
         };
         
         Object.keys(dynamicTranslations).forEach(function(key) {
