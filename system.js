@@ -24596,11 +24596,14 @@ async function restoreUser(id) {
                             }
                             const merged = Array.from(index.values());
                             const stats = calculateFinancialStatistics(merged);
-                            const costRes = await getApportionedCost(startDate, endDate, clinicFilter || null);
+                            loadFinancialPrevPeriodInBackground(cacheKey, stats, startDate, endDate, doctorFilter, clinicFilter);
+                            const [costRes] = await Promise.all([
+                                getApportionedCost(startDate, endDate, clinicFilter || null),
+                                refreshWalletFinancialSection(startDate, endDate, clinicFilter)
+                            ]);
                             stats.totalCost = costRes.totalCost;
                             stats.netRevenue = stats.totalRevenue - costRes.totalCost;
                             stats.costProrated = costRes.prorated;
-                            loadFinancialPrevPeriodInBackground(cacheKey, stats, startDate, endDate, doctorFilter, clinicFilter);
                             updateFinancialKeyMetrics(stats);
                             updateFinancialTables(merged, stats);
                             const lastSyncAt = (() => {
@@ -24617,7 +24620,6 @@ async function restoreUser(id) {
                             financialReportLastKey = cacheKey;
                             financialReportLastRunAt = Date.now();
                             document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
-                            await refreshWalletFinancialSection(startDate, endDate, clinicFilter);
                             showToast('財務報表已更新！', 'success');
                             return;
                         }
@@ -24632,16 +24634,20 @@ async function restoreUser(id) {
                 }
             }
 
-            // 過濾診症資料
+            // 過濾診症資料 + 計算統計（同步，本地運算）
             const filteredConsultations = filterFinancialConsultations(startDate, endDate, doctorFilter, clinicFilter);
-            
-            // 計算統計資料
             const stats = calculateFinancialStatistics(filteredConsultations);
-            const costRes = await getApportionedCost(startDate, endDate, clinicFilter || null);
+
+            // 環比在背景獨立執行，完成後自行更新 UI
+            loadFinancialPrevPeriodInBackground(cacheKey, stats, startDate, endDate, doctorFilter, clinicFilter);
+            // 成本查詢 + 儲值查詢並發，縮短總等待時間
+            const [costRes] = await Promise.all([
+                getApportionedCost(startDate, endDate, clinicFilter || null),
+                refreshWalletFinancialSection(startDate, endDate, clinicFilter)
+            ]);
             stats.totalCost = costRes.totalCost;
             stats.netRevenue = stats.totalRevenue - costRes.totalCost;
             stats.costProrated = costRes.prorated;
-            loadFinancialPrevPeriodInBackground(cacheKey, stats, startDate, endDate, doctorFilter, clinicFilter);
 
             // 更新關鍵指標
             updateFinancialKeyMetrics(stats);
@@ -24660,7 +24666,6 @@ async function restoreUser(id) {
             financialReportLastKey = cacheKey;
             financialReportLastRunAt = Date.now();
             document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
-            await refreshWalletFinancialSection(startDate, endDate, clinicFilter);
             showToast('財務報表已更新！', 'success');
         }
 
