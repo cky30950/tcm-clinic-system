@@ -462,12 +462,15 @@ function fullReplaceWrite(db, docPath, fields, precondition) {
 }
 
 function mergeWrite(db, docPath, fields, precondition) {
+    // Firestore v1 commit：updateMask 是 Write 的頂層欄位，
+    // 與 update／currentDocument 同層；誤放進 update 文件內會被
+    // REST API 以 400「Unknown name updateMask at writes[].update」拒絕。
     const write = {
         update: {
             name: `${db.documentsPath()}/${docPath}`,
-            fields: jsObjectToFirestoreFields(fields),
-            updateMask: { fieldPaths: Object.keys(fields) }
-        }
+            fields: jsObjectToFirestoreFields(fields)
+        },
+        updateMask: { fieldPaths: Object.keys(fields) }
     };
     if (precondition) write.currentDocument = precondition;
     return write;
