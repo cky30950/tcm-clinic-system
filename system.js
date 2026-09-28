@@ -15417,7 +15417,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                         const remainingLabel = isEnglish ? ` (Remaining: ${lineRemaining})` : `（餘下 ${lineRemaining} 次）`;
                         displayLine = line + ' ' + remainingLabel;
                     }
-                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${displayLine}</td></tr>`;
+                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${window.escapeHtml(displayLine)}</td></tr>`;
                 } else if (line.includes('總費用')) {
                     const match = line.match(/\$(\d+)/);
                     if (match) {
@@ -15425,7 +15425,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     }
                 } else if (line.startsWith('折扣適用於')) {
                     // 顯示折扣適用項目明細於收據中
-                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${line}</td></tr>`;
+                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${window.escapeHtml(line)}</td></tr>`;
                 }
             });
         }
@@ -19840,8 +19840,16 @@ async function initializeSystemAfterLogin() {
             });
             
             listContainer.innerHTML = html;
+
+            // 卡片按鈕以事件監聽綁定，取代 inline onclick（ID 不可進入 JS 字串上下文）
+            Array.prototype.forEach.call(listContainer.querySelectorAll('[data-action="edit-billing-item"]'), btn => {
+                btn.addEventListener('click', () => editBillingItem(btn.getAttribute('data-billing-item-id')));
+            });
+            Array.prototype.forEach.call(listContainer.querySelectorAll('[data-action="delete-billing-item"]'), btn => {
+                btn.addEventListener('click', () => deleteBillingItem(btn.getAttribute('data-billing-item-id')));
+            });
         }
-        
+
         function createBillingItemCard(item) {
             const statusClass = item.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
             const statusText = item.active ? '啟用' : '停用';
@@ -19902,14 +19910,12 @@ async function initializeSystemAfterLogin() {
                             </span>
                             <div class="flex space-x-1">
                                 <!--
-                                  將 id 以字串形式傳遞給編輯與刪除函式，避免當文件 ID 為
-                                  字串時產生未宣告變數的錯誤。例如 Firestore 生成的文件 ID
-                                  多為隨機字串，若直接插入 onclick 中將導致瀏覽器將其當作
-                                  變數解析，觸發 ReferenceError。透過將 id 包裹在單引號內
-                                  （並轉換為字串）可確保 onclick 中傳遞的參數正確。
+                                  id 以 data 屬性攜帶、渲染後以 addEventListener 綁定，
+                                  避免文件 ID 進入 inline onclick 的 JS 字串上下文（可含引號）
+                                  造成注入；同時以字串形式傳遞給編輯與刪除函式。
                                 -->
-                                <button onclick="editBillingItem('${item.id}')" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
-                                <button onclick="deleteBillingItem('${item.id}')" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
+                                <button type="button" data-action="edit-billing-item" data-billing-item-id="${window.escapeHtml(String(item.id))}" class="text-blue-600 hover:text-blue-800 text-sm">編輯</button>
+                                <button type="button" data-action="delete-billing-item" data-billing-item-id="${window.escapeHtml(String(item.id))}" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
                             </div>
                         </div>
                     </div>
@@ -20159,8 +20165,10 @@ async function initializeSystemAfterLogin() {
             // 刪除收費項目確認訊息支援中英文
             {
                 const langDel = localStorage.getItem('lang') || 'zh';
-                const zhMsgDel = `確定要刪除收費項目「${item.name}」嗎？\n\n此操作無法復原！`;
-                const enMsgDel = `Are you sure you want to delete the billing item \"${item.name}\"?\n\nThis action cannot be undone!`;
+                // showConfirmation 以 HTML 渲染訊息，項目名稱須先跳脫以防 Stored XSS
+                const safeDelName = window.escapeHtml(item.name == null ? '' : String(item.name));
+                const zhMsgDel = `確定要刪除收費項目「${safeDelName}」嗎？\n\n此操作無法復原！`;
+                const enMsgDel = `Are you sure you want to delete the billing item \"${safeDelName}\"?\n\nThis action cannot be undone!`;
                 const confirmDel = await showConfirmation(langDel === 'en' ? enMsgDel : zhMsgDel, 'warning');
                 if (confirmDel) {
                     billingItems = billingItems.filter(b => String(b.id) !== idStr);
@@ -21442,22 +21450,30 @@ async function searchBillingForConsultation() {
         const categoryName = categoryNames[item.category] || '未分類';
         const bgColor = getCategoryBgColor(item.category);
 
+        const esc = (v) => window.escapeHtml(v == null ? '' : String(v));
+        const descText = item.description == null ? '' : String(item.description);
+        const descShort = descText ? `${esc(descText.substring(0, 30))}${descText.length > 30 ? '...' : ''}` : '';
         return `
-            <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToBilling('${item.id}')">
+            <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" data-action="add-billing-item" data-billing-item-id="${esc(item.id)}">
                 <div class="text-center">
-                    <div class="font-semibold text-gray-900 text-sm mb-1">${item.name}</div>
-                    <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${categoryName}</div>
+                    <div class="font-semibold text-gray-900 text-sm mb-1">${esc(item.name)}</div>
+                    <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${esc(categoryName)}</div>
                     ${item.category !== 'discount' ? `
                         <div class="text-sm font-bold text-green-600">
-                            $${item.price}
+                            $${esc(item.price)}
                         </div>
                     ` : ''}
-                    ${item.unit ? `<div class="text-xs text-gray-600">/ ${item.unit}</div>` : ''}
-                    ${item.description ? `<div class="text-xs text-gray-600 mt-1">${item.description.substring(0, 30)}${item.description.length > 30 ? '...' : ''}</div>` : ''}
+                    ${item.unit ? `<div class="text-xs text-gray-600">/ ${esc(item.unit)}</div>` : ''}
+                    ${descShort ? `<div class="text-xs text-gray-600 mt-1">${descShort}</div>` : ''}
                 </div>
             </div>
         `;
     }).join('');
+
+    // 以事件監聽取代 inline onclick，避免項目 ID 進入 JS 字串上下文造成注入
+    Array.prototype.forEach.call(resultsList.querySelectorAll('[data-action="add-billing-item"]'), card => {
+        card.addEventListener('click', () => addToBilling(card.getAttribute('data-billing-item-id')));
+    });
 
     resultsContainer.classList.remove('hidden');
 }
@@ -21618,6 +21634,12 @@ async function searchBillingForConsultation() {
             const includedItemNames = selectedBillingItems
                 .filter(it => it.category !== 'discount' && (!hasDiscount || it.includedInDiscount !== false))
                 .map(it => it.name);
+            // HTML 明細專用：逐個項目名跳脫後再合併（純文字 textarea 仍使用原始 includedItemNames）
+            const includedItemNamesHtml = includedItemNames
+                .map(n => window.escapeHtml(n == null ? '' : String(n)))
+                .join(',');
+            // 收費項目欄位（名稱/單位等，員工可編輯）插入 HTML 前統一跳脫
+            const escItem = (v) => window.escapeHtml(v == null ? '' : String(v));
             
             // 分離折扣項目和非折扣項目，但保持各自的添加順序
             const nonDiscountItems = [];
@@ -21731,8 +21753,8 @@ async function searchBillingForConsultation() {
                             <div class="flex items-center ${bgColor} border rounded-lg p-3">
                                 ${checkboxHtml}
                                 <div class="flex-1">
-                                    <div class="font-semibold text-gray-900">${item.name}</div>
-                                    <div class="text-xs text-gray-600">${categoryName}</div>
+                                    <div class="font-semibold text-gray-900">${escItem(item.name)}</div>
+                                    <div class="text-xs text-gray-600">${escItem(categoryName)}</div>
                                     <div class="text-sm font-medium ${item.category === 'discount' ? 'text-red-600' : 'text-green-600'}">
                                         ${(() => {
                                             if (item.category === 'discount') {
@@ -21745,7 +21767,7 @@ async function searchBillingForConsultation() {
                                                 }
                                             }
                                             return `$${item.price}`;
-                                        })()}${item.unit ? ` / ${item.unit}` : ''}
+                                        })()}${item.unit ? ` / ${escItem(item.unit)}` : ''}
                                     </div>
                                 </div>
                                 ${quantityControls}
@@ -21769,11 +21791,11 @@ async function searchBillingForConsultation() {
                                 if (item.price > 0 && item.price < 1) {
                                     const discountAmount = subtotalForDiscount * (1 - item.price) * item.quantity;
                                     return `<div class="text-sm text-red-600">
-                                        ${item.name}${includedItemNames.length > 0 ? ` (適用：${includedItemNames.join(',')})` : ''}：<span class="font-medium">-$${discountAmount.toFixed(0)}</span>
+                                        ${escItem(item.name)}${includedItemNames.length > 0 ? ` (適用：${includedItemNamesHtml})` : ''}：<span class="font-medium">-$${discountAmount.toFixed(0)}</span>
                                     </div>`;
                                 } else {
                                     return `<div class="text-sm text-red-600">
-                                        ${item.name}${includedItemNames.length > 0 ? ` (適用：${includedItemNames.join(',')})` : ''}：<span class="font-medium">$${item.price * item.quantity}</span>
+                                        ${escItem(item.name)}${includedItemNames.length > 0 ? ` (適用：${includedItemNamesHtml})` : ''}：<span class="font-medium">$${item.price * item.quantity}</span>
                                     </div>`;
                                 }
                             }).join('')}
@@ -28311,6 +28333,26 @@ async function consumePackageLocally(patientId, packageRecordId) {
     }
 }
 
+// 依 data 屬性尋找套票操作按鈕（按鈕已移除 inline onclick，不可再用 onclick 選擇器）
+function findPackageActionButton(action, patientId, packageRecordId, clinicId) {
+    try {
+        return Array.prototype.find.call(
+            document.querySelectorAll(`button[data-action="${action}"]`),
+            b => b.getAttribute('data-patient-id') === String(patientId)
+                && b.getAttribute('data-package-id') === String(packageRecordId)
+                && b.getAttribute('data-clinic-id') === (clinicId == null ? '' : String(clinicId))
+        ) || null;
+    } catch (_e) {
+        return null;
+    }
+}
+
+// 取得套票操作的觸發按鈕：优先用事件當前目標，否則依 data 屬性比對
+function getPackageActionLoadingButton(action, patientId, packageRecordId, clinicId) {
+    return getLoadingButtonFromEvent(null)
+        || findPackageActionButton(action, patientId, packageRecordId, clinicId);
+}
+
 function formatPackageStatus(pkg) {
     const exp = new Date(pkg.expiresAt);
     const now = new Date();
@@ -28417,7 +28459,7 @@ async function updatePatientPackageExpiry(patientId, packageRecordId, clinicId =
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     const isEn = lang && lang.toLowerCase().startsWith('en');
     const targetClinicId = clinicId ? String(clinicId) : currentPackageClinicId();
-    const loadingButton = getLoadingButtonFromEvent(`button[onclick="updatePatientPackageExpiry('${patientId}', '${packageRecordId}', '${targetClinicId}')"]`);
+    const loadingButton = getPackageActionLoadingButton('pkg-edit-expiry', patientId, packageRecordId, targetClinicId);
     if (loadingButton) {
         setButtonLoading(loadingButton, isEn ? 'Loading...' : '讀取中...');
     }
@@ -28478,7 +28520,7 @@ async function deletePatientPackageRecord(patientId, packageRecordId, clinicId =
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     const isEn = lang && lang.toLowerCase().startsWith('en');
     const targetClinicId = clinicId ? String(clinicId) : currentPackageClinicId();
-    const loadingButton = getLoadingButtonFromEvent(`button[onclick="deletePatientPackageRecord('${patientId}', '${packageRecordId}', '${targetClinicId}')"]`);
+    const loadingButton = getPackageActionLoadingButton('pkg-delete', patientId, packageRecordId, targetClinicId);
     if (loadingButton) {
         setButtonLoading(loadingButton, isEn ? 'Deleting...' : '刪除中...');
     }
@@ -28489,10 +28531,12 @@ async function deletePatientPackageRecord(patientId, packageRecordId, clinicId =
             showToast(isEn ? 'Package not found' : '找不到套票', 'warning');
             return;
         }
+        // showConfirmation 以 HTML 渲染訊息，套票名稱須先跳脫以防 Stored XSS
+        const safePkgDeleteName = window.escapeHtml(pkg.name == null ? '' : String(pkg.name));
         const ok = await showConfirmation(
             isEn
-                ? `Delete package "${pkg.name || ''}"?\nThis action cannot be undone.`
-                : `確定要刪除套票「${pkg.name || ''}」嗎？\n此操作無法復原。`,
+                ? `Delete package "${safePkgDeleteName}"?\nThis action cannot be undone.`
+                : `確定要刪除套票「${safePkgDeleteName}」嗎？\n此操作無法復原。`,
             'warning'
         );
         if (!ok) return;
@@ -28527,7 +28571,7 @@ async function updatePatientPackageRemainingUses(patientId, packageRecordId, cli
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     const isEn = lang && lang.toLowerCase().startsWith('en');
     const targetClinicId = clinicId ? String(clinicId) : currentPackageClinicId();
-    const loadingButton = getLoadingButtonFromEvent(`button[onclick="updatePatientPackageRemainingUses('${patientId}', '${packageRecordId}', '${targetClinicId}')"]`);
+    const loadingButton = getPackageActionLoadingButton('pkg-edit-remaining', patientId, packageRecordId, targetClinicId);
     if (loadingButton) {
         setButtonLoading(loadingButton, isEn ? 'Loading...' : '讀取中...');
     }
@@ -28631,20 +28675,27 @@ async function renderPatientPackages(patientId) {
             const badge =
               expired ? '<span class="ml-2 text-xs text-white px-2 py-0.5 rounded bg-red-500">已到期</span>' :
               (pkg.remainingUses <= 0 ? '<span class="ml-2 text-xs text-white px-2 py-0.5 rounded bg-gray-500">已用完</span>' : '');
+            const escPkg = (v) => window.escapeHtml(v == null ? '' : String(v));
             return `
       <div class="flex items-center justify-between bg-white border border-purple-200 rounded p-2">
         <div>
-          <div class="font-medium text-purple-900">${pkg.name}${badge}</div>
-          <div class="text-xs text-gray-600">${formatPackageStatus(pkg)}</div>
+          <div class="font-medium text-purple-900">${escPkg(pkg.name)}${badge}</div>
+          <div class="text-xs text-gray-600">${escPkg(formatPackageStatus(pkg))}</div>
         </div>
-        <button type="button" ${disabled ? 'disabled' : ''} 
-          onclick="useOnePackage('${pkg.patientId}', '${pkg.id}')"
+        <button type="button" ${disabled ? 'disabled' : ''}
+          data-action="use-package"
+          data-patient-id="${escPkg(pkg.patientId != null ? pkg.patientId : patientId)}"
+          data-package-id="${escPkg(pkg.id)}"
           class="px-3 py-1 rounded ${disabled ? 'bg-gray-300 text-gray-600' : 'bg-purple-600 text-white hover:bg-purple-700'}">
           使用一次
         </button>
       </div>
     `;
         }).join('');
+        // 以事件監聽取代 inline onclick，避免 ID 進入 JS 字串上下文
+        Array.prototype.forEach.call(container.querySelectorAll('button[data-action="use-package"]'), btn => {
+            btn.addEventListener('click', () => useOnePackage(btn.getAttribute('data-patient-id'), btn.getAttribute('data-package-id')));
+        });
     } catch (error) {
         console.error('渲染患者套票錯誤:', error);
         container.innerHTML = '<div class="text-red-500">載入套票資料失敗</div>';
@@ -28808,6 +28859,8 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
             htmlParts.push('<div class="space-y-2">');
             pageValid.forEach(pkg => {
                 const safePkgName = window.escapeHtml(pkg.name || '');
+                // ID 以 data 屬性攜帶並跳脫，避免進入 inline onclick 的 JS 字串上下文
+                const dataIds = `data-patient-id="${window.escapeHtml(String(patientId))}" data-package-id="${window.escapeHtml(String(pkg.id))}" data-clinic-id="${window.escapeHtml(targetClinicId == null ? '' : String(targetClinicId))}"`;
                 const statusText = formatPackageStatus(pkg);
                 const safeStatusText = window.escapeHtml(statusText || '');
                 const remainingUses = typeof pkg.remainingUses === 'number' ? pkg.remainingUses : '';
@@ -28831,21 +28884,21 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
                             <div class="flex flex-wrap items-center justify-end gap-1">
                                 <button
                                     type="button"
-                                    onclick="updatePatientPackageRemainingUses('${patientId}', '${pkg.id}', '${targetClinicId}')"
+                                    data-action="pkg-edit-remaining" ${dataIds}
                                     class="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
                                 >
                                     修改剩餘次數
                                 </button>
                                 <button
                                     type="button"
-                                    onclick="updatePatientPackageExpiry('${patientId}', '${pkg.id}', '${targetClinicId}')"
+                                    data-action="pkg-edit-expiry" ${dataIds}
                                     class="px-2 py-1 text-xs rounded bg-amber-500 text-white hover:bg-amber-600"
                                 >
                                     修改有限期
                                 </button>
                                 <button
                                     type="button"
-                                    onclick="deletePatientPackageRecord('${patientId}', '${pkg.id}', '${targetClinicId}')"
+                                    data-action="pkg-delete" ${dataIds}
                                     class="px-2 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700"
                                 >
                                     刪除
@@ -28863,6 +28916,8 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
             htmlParts.push('<div class="space-y-2">');
             pageInvalid.forEach(pkg => {
                 const safePkgName = window.escapeHtml(pkg.name || '');
+                // ID 以 data 屬性攜帶並跳脫，避免進入 inline onclick 的 JS 字串上下文
+                const dataIds = `data-patient-id="${window.escapeHtml(String(patientId))}" data-package-id="${window.escapeHtml(String(pkg.id))}" data-clinic-id="${window.escapeHtml(targetClinicId == null ? '' : String(targetClinicId))}"`;
                 const statusText = formatPackageStatus(pkg);
                 const safeStatusText = window.escapeHtml(statusText || '');
                 const remainingUses = typeof pkg.remainingUses === 'number' ? pkg.remainingUses : '';
@@ -28878,21 +28933,21 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
                             <div class="flex flex-wrap items-center justify-end gap-1">
                                 <button
                                     type="button"
-                                    onclick="updatePatientPackageRemainingUses('${patientId}', '${pkg.id}', '${targetClinicId}')"
+                                    data-action="pkg-edit-remaining" ${dataIds}
                                     class="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
                                 >
                                     修改剩餘次數
                                 </button>
                                 <button
                                     type="button"
-                                    onclick="updatePatientPackageExpiry('${patientId}', '${pkg.id}', '${targetClinicId}')"
+                                    data-action="pkg-edit-expiry" ${dataIds}
                                     class="px-2 py-1 text-xs rounded bg-amber-500 text-white hover:bg-amber-600"
                                 >
                                     修改有限期
                                 </button>
                                 <button
                                     type="button"
-                                    onclick="deletePatientPackageRecord('${patientId}', '${pkg.id}', '${targetClinicId}')"
+                                    data-action="pkg-delete" ${dataIds}
                                     class="px-2 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700"
                                 >
                                     刪除
@@ -28906,6 +28961,19 @@ async function renderPackageStatusSection(patientId, pageChange = false, clinicI
         }
         htmlParts.push('</div>');
         contentEl.innerHTML = htmlParts.join('');
+        // 套票操作按鈕以事件監聽綁定（按鈕隨 innerHTML 重建，舊監聽器一併銷毀，不會重複註冊）
+        const bindPkgAction = (action, handler) => {
+            Array.prototype.forEach.call(contentEl.querySelectorAll(`button[data-action="${action}"]`), btn => {
+                btn.addEventListener('click', () => handler(
+                    btn.getAttribute('data-patient-id'),
+                    btn.getAttribute('data-package-id'),
+                    btn.getAttribute('data-clinic-id')
+                ));
+            });
+        };
+        bindPkgAction('pkg-edit-remaining', updatePatientPackageRemainingUses);
+        bindPkgAction('pkg-edit-expiry', updatePatientPackageExpiry);
+        bindPkgAction('pkg-delete', deletePatientPackageRecord);
         // 渲染分頁控制
         const paginEl = ensurePaginationContainer('packageStatusContent', 'patientPackageStatusPagination');
         renderPagination(totalItems, itemsPerPage, currentPage, function(newPage) {
@@ -29128,9 +29196,12 @@ async function useOnePackage(patientId, packageRecordId) {
     } catch (_e) {}
     if (!loadingButton) {
         try {
-            // 透過 onclick 屬性匹配對應按鈕（使用模板字串避免引號問題）
-            const selector = `button[onclick="useOnePackage('${patientId}', '${packageRecordId}')"]`;
-            loadingButton = document.querySelector(selector);
+            // 按鈕已改以 data 屬性標記；逐筆比對 ID，避免屬性選擇器的值注入問題
+            const buttons = document.querySelectorAll('button[data-action="use-package"]');
+            loadingButton = Array.prototype.find.call(buttons, b =>
+                b.getAttribute('data-patient-id') === String(patientId)
+                && b.getAttribute('data-package-id') === String(packageRecordId)
+            ) || null;
         } catch (_e) {
             loadingButton = null;
         }
