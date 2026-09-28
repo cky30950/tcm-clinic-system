@@ -419,6 +419,30 @@
             </div>
         </div>
         
+        <div id="financialDrilldownModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full">
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
+                    <h3 id="financialDrilldownTitle" class="text-xl font-bold text-gray-800">診症單清單</h3>
+                    <button onclick="closeFinancialDrilldown()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                </div>
+                <div class="p-6">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">時間</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">病人</th>
+                                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">金額</th>
+                                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="financialDrilldownBody" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
         
         <nav class="bg-white shadow-lg border-b-4 border-green-500">
@@ -2249,12 +2273,12 @@
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">開始日期</label>
-                            <input type="date" id="startDate" onchange="generateFinancialReport()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                            <input type="date" id="startDate" onchange="scheduleFinancialReportRefresh()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                         </div>
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">結束日期</label>
-                            <input type="date" id="endDate" onchange="generateFinancialReport()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                            <input type="date" id="endDate" onchange="scheduleFinancialReportRefresh()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                         </div>
                     </div>
                     
@@ -2262,10 +2286,10 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">醫師篩選</label>
                             <div class="flex gap-4">
-                                <select id="doctorFilter" onchange="generateFinancialReport()" class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                <select id="doctorFilter" onchange="scheduleFinancialReportRefresh()" class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                     <option value="">全部醫師</option>
                                 </select>
-                                <select id="clinicFilterFinancial" onchange="generateFinancialReport()" class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                <select id="clinicFilterFinancial" onchange="scheduleFinancialReportRefresh()" class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                     <option value="">全部診所</option>
                                 </select>
                             </div>
@@ -2290,7 +2314,7 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-green-100 text-sm font-medium">總收入</p>
-                                <h3 id="totalRevenue" class="text-3xl font-bold">$0</h3>
+                                <h3 id="totalRevenue" class="text-3xl font-bold">HK$0</h3>
                                 <p id="revenueChange" class="text-green-100 text-sm mt-1">統計期間收入</p>
                             </div>
                             <div class="bg-white bg-opacity-20 rounded-full p-3">
@@ -2316,7 +2340,7 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-purple-100 text-sm font-medium">平均消費</p>
-                                <h3 id="averageRevenue" class="text-3xl font-bold">$0</h3>
+                                <h3 id="averageRevenue" class="text-3xl font-bold">HK$0</h3>
                                 <p id="averageChange" class="text-purple-100 text-sm mt-1">每次診症平均</p>
                             </div>
                             <div class="bg-white bg-opacity-20 rounded-full p-3">
@@ -2339,6 +2363,25 @@
                     </div>
                 </div>
                 
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white border border-gray-200 rounded-lg p-4 lg:col-span-2">
+                        <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
+                            <span class="mr-2">📈</span><span data-fin-i18n="每日收入趨勢">每日收入趨勢</span>
+                        </h3>
+                        <div class="relative" style="height:300px;">
+                            <canvas id="financialTrendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
+                            <span class="mr-2">🥧</span><span data-fin-i18n="收入結構">收入結構</span>
+                        </h3>
+                        <div class="relative" style="height:300px;">
+                            <canvas id="financialServiceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="bg-white border border-gray-200 rounded-lg">
                     <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
                         <div class="flex justify-between items-center">
@@ -2384,7 +2427,7 @@
                                         <tr>
                                             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">項目</th>
                                             <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">金額</th>
-                                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">佔比</th>
+                                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">比率</th>
                                             <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">備註</th>
                                         </tr>
                                     </thead>
@@ -2476,22 +2519,22 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                                 <div class="bg-gradient-to-r from-teal-400 to-teal-600 text-white rounded-xl p-5 shadow">
                                     <p class="text-teal-100 text-sm">本期儲值充值</p>
-                                    <h3 id="walletFinTopup" class="text-2xl font-bold mt-1">$0</h3>
+                                    <h3 id="walletFinTopup" class="text-2xl font-bold mt-1">HK$0</h3>
                                     <p class="text-teal-100 text-xs mt-1">現金流入（未賺取）</p>
                                 </div>
                                 <div class="bg-gradient-to-r from-indigo-400 to-indigo-600 text-white rounded-xl p-5 shadow">
                                     <p class="text-indigo-100 text-sm">本期儲值消費</p>
-                                    <h3 id="walletFinPayment" class="text-2xl font-bold mt-1">$0</h3>
+                                    <h3 id="walletFinPayment" class="text-2xl font-bold mt-1">HK$0</h3>
                                     <p class="text-indigo-100 text-xs mt-1">已計入診症收入</p>
                                 </div>
                                 <div class="bg-gradient-to-r from-red-400 to-red-600 text-white rounded-xl p-5 shadow">
                                     <p class="text-red-100 text-sm">本期退款</p>
-                                    <h3 id="walletFinRefund" class="text-2xl font-bold mt-1">$0</h3>
+                                    <h3 id="walletFinRefund" class="text-2xl font-bold mt-1">HK$0</h3>
                                     <p class="text-red-100 text-xs mt-1">儲值退款回補</p>
                                 </div>
                                 <div class="bg-gradient-to-r from-amber-400 to-amber-600 text-white rounded-xl p-5 shadow">
                                     <p class="text-amber-100 text-sm">期末會員餘額</p>
-                                    <h3 id="walletFinOutstanding" class="text-2xl font-bold mt-1">$0</h3>
+                                    <h3 id="walletFinOutstanding" class="text-2xl font-bold mt-1">HK$0</h3>
                                     <p class="text-amber-100 text-xs mt-1">會員預存（診所負債）</p>
                                 </div>
                             </div>
