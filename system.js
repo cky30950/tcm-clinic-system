@@ -28668,7 +28668,7 @@ async function renderPatientWalletStatus(patientId, clinicId = '') {
     let recentTxsFailed = false;
     try {
         if (typeof window.getRecentWalletTransactions === 'function') {
-            recentTxs = await window.getRecentWalletTransactions(patientId, clinicId, 10);
+            recentTxs = await window.getRecentWalletTransactions(patientId, clinicId, 5);
         }
     } catch (txError) {
         console.warn('載入近期儲值交易失敗:', txError);
@@ -28711,7 +28711,7 @@ const patientWalletTxTypeLabels = {
  */
 function renderPatientRecentWalletTxsHtml(txs, failed, patientId) {
     const pidAttr = window.escapeHtml(String(patientId || ''));
-    const rows = Array.isArray(txs) ? txs.slice(0, 10) : [];
+    const rows = Array.isArray(txs) ? txs.slice(0, 5) : [];
     let bodyHtml = '';
     if (failed) {
         bodyHtml = '<div class="text-center text-xs text-gray-400 py-3">無法載入近期交易</div>';
@@ -28742,10 +28742,10 @@ function renderPatientRecentWalletTxsHtml(txs, failed, patientId) {
     }
     return `
         <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50/60 p-3">
-            <div class="mb-1 text-xs font-medium text-gray-600">近期交易（最近 10 次）</div>
+            <div class="mb-1 text-xs font-medium text-gray-600">近期交易（最近 5 次）</div>
             ${bodyHtml}
             <div class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 pt-2">
-                <span class="text-[11px] text-gray-400">僅顯示最近 10 次，其他交易紀錄請至會員儲值查看</span>
+                <span class="text-[11px] text-gray-400">僅顯示最近 5 次，其他交易紀錄請至會員儲值查看</span>
                 <button type="button"
                     onclick="openWalletManagementForPatient('${pidAttr}')"
                     class="px-2.5 py-1 text-[11px] rounded bg-teal-600 text-white hover:bg-teal-700 whitespace-nowrap">
@@ -35522,8 +35522,8 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   window.runWalletLegacyMigration = runWalletLegacyMigration;
   window.selectWalletPatient = selectWalletPatient;
   window.getWalletAccount = getWalletAccount;
-  // 病人詳情面板用：取指定診所最近 N 筆交易（預設 10）
-  window.getRecentWalletTransactions = (patientId, clinicId, limit = 10) =>
+  // 病人詳情面板用：取指定診所最近 N 筆交易（預設 5）
+  window.getRecentWalletTransactions = (patientId, clinicId, limit = 5) =>
     loadWalletTransactions(patientId, clinicId || '', limit);
   window.walletRound2 = walletRound2;
   window.submitWalletTopup = submitWalletTopup;
