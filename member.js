@@ -121,6 +121,17 @@ document.getElementById('langToggle').addEventListener('click', () => {
 
 const $ = (id) => document.getElementById(id);
 
+// 後端回傳的姓名、套片名、錢包備註等均為員工輸入內容，
+// 插入 innerHTML 前一律跳脫，防範「員工 → 病人」跨信任邊界 XSS
+function esc(v) {
+    return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function showAuthMsg(keyOrText, kind = 'error') {
     const el = $('authMsg');
     const text = I18N[lang][keyOrText] || keyOrText;
@@ -353,7 +364,7 @@ function renderPatientTabs() {
     }
     tabsEl.innerHTML = patientEntries.map((entry, i) => {
         const active = i === activePatientIndex ? ' active' : '';
-        const label = `${t('patientLabel')}: ${entry.name || entry.patientId}`;
+        const label = `${t('patientLabel')}: ${esc(entry.name || entry.patientId)}`;
         return `<button class="tab${active}" data-patient-idx="${i}" type="button">${label}</button>`;
     }).join('');
     tabsEl.querySelectorAll('[data-patient-idx]').forEach((btn) => {
@@ -376,7 +387,7 @@ function renderClinicSelector() {
     card.classList.remove('hidden');
     if (activeClinicIndex >= cs.length) activeClinicIndex = 0;
     sel.innerHTML = cs.map((c, i) =>
-        `<option value="${i}">${clinicDisplayName(c)}</option>`).join('');
+        `<option value="${i}">${esc(clinicDisplayName(c))}</option>`).join('');
     sel.value = String(activeClinicIndex);
 }
 
@@ -405,7 +416,7 @@ function renderPackages() {
         return `
             <li>
                 <div class="row">
-                    <span class="name">${name}</span>
+                    <span class="name">${esc(name)}</span>
                     <span class="pill">${remaining}/${total} ${t('uses')}</span>
                 </div>
                 <div class="meta">${expiry}</div>
@@ -448,7 +459,7 @@ function renderTransactions() {
         const cls = isNeg ? 'amt-neg' : 'amt-pos';
         const sign = isNeg ? '-' : '+';
         const at = formatDateTime(tx.at);
-        const note = tx.note ? String(tx.note) : '';
+        const note = tx.note ? esc(String(tx.note)) : '';
         const meta = [at, note].filter(Boolean).join(' · ');
         // 狀態變更不涉金額，顯示「—」而非 +HK$0.00
         const amountHtml = (tx.type === 'statusChange' || amount === 0)
