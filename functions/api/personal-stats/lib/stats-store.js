@@ -428,6 +428,12 @@ async function rawGetDocument(db, docPath) {
     };
 }
 
+// :commit 請求體內的文件欄位（update.name／delete）必須是相對資源名
+// projects/{project}/databases/(default)/documents/...，不能帶主機 URL。
+function docResourceName(db, docPath) {
+    return `projects/${db.projectId}/databases/(default)/documents/${docPath}`;
+}
+
 async function commitWrites(db, writes) {
     if (!writes.length) return;
     const res = await fetch(`${db.documentsPath()}:commit`, {
@@ -455,7 +461,7 @@ async function commitWrites(db, writes) {
 
 function fullReplaceWrite(db, docPath, fields, precondition) {
     const write = {
-        update: { name: `${db.documentsPath()}/${docPath}`, fields: jsObjectToFirestoreFields(fields) }
+        update: { name: docResourceName(db, docPath), fields: jsObjectToFirestoreFields(fields) }
     };
     if (precondition) write.currentDocument = precondition;
     return write;
@@ -467,7 +473,7 @@ function mergeWrite(db, docPath, fields, precondition) {
     // REST API 以 400「Unknown name updateMask at writes[].update」拒絕。
     const write = {
         update: {
-            name: `${db.documentsPath()}/${docPath}`,
+            name: docResourceName(db, docPath),
             fields: jsObjectToFirestoreFields(fields)
         },
         updateMask: { fieldPaths: Object.keys(fields) }
@@ -562,7 +568,7 @@ async function applyOwnerDelta(db, ownerUid, changes) {
 
             if (!hasEntries && totalConsultations <= 0) {
                 if (raw.exists) {
-                    writes.push({ delete: `${db.documentsPath()}/${docPath}` });
+                    writes.push({ delete: docResourceName(db, docPath) });
                 }
                 continue;
             }
