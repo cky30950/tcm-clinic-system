@@ -12,6 +12,7 @@
 
 import { authenticateStaff, resolveUserData } from './lib/auth.js';
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
+import { errorJson } from '../_lib/http-errors.js';
 import { issuePresignedUpload, StoreError } from './lib/attachments-store.js';
 
 export const onRequestOptions = () => optionsResponse();
@@ -63,10 +64,9 @@ export async function onRequestPost(context) {
         if (error instanceof StoreError) {
             return jsonResponse({ error: error.code, message: error.message }, error.status);
         }
-        const status = Number(error.status) > 0 ? Number(error.status) : 500;
-        return jsonResponse({
-            error: status === 401 ? 'UNAUTHORIZED' : 'PRESIGN_FAILED',
-            message: error.message || '簽發上傳 URL 失敗'
-        }, status);
+        if (Number(error.status) === 401) {
+            return jsonResponse({ error: 'UNAUTHORIZED', message: '登入憑證無效或已過期' }, 401);
+        }
+        return errorJson(error, { code: 'PRESIGN_FAILED', message: '簽發上傳 URL 失敗，請稍後再試' });
     }
 }

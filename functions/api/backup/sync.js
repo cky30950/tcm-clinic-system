@@ -39,14 +39,18 @@ export async function onRequestPost(context) {
         });
         return jsonResponse(result, 200);
     } catch (error) {
-        const status = error.status || (String(error.message || '').includes('BACKUP_BUCKET') ? 500 : 500);
-        return new Response(JSON.stringify({
+        const status = Number(error.status) > 0 ? Number(error.status) : 500;
+        if (status >= 400 && status < 500) {
+            return jsonResponse({
+                error: 'BACKUP_SYNC_FAILED',
+                message: error.message || '備份同步要求被拒絕'
+            }, status);
+        }
+        console.error('[backup-sync] 內部錯誤:', error && (error.stack || error.message || error));
+        return jsonResponse({
             error: 'BACKUP_SYNC_FAILED',
-            message: String((error && error.message) || error)
-        }), {
-            status,
-            headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, corsHeaders())
-        });
+            message: '備份同步失敗，請稍後再試'
+        }, 500);
     }
 }
 

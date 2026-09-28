@@ -1,5 +1,5 @@
 
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { initializeApp } from './vendor/firebasejs/10.7.1/firebase-app.js';
 import {
   collection,
   addDoc,
@@ -29,7 +29,7 @@ import {
   onSnapshot,
   clearIndexedDbPersistence,
   terminate
-} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+} from './vendor/firebasejs/10.7.1/firebase-firestore.js';
 import { getDatabase, ref, set, get, update, remove, onValue, off,
 
         onChildAdded,
@@ -45,14 +45,14 @@ import { getDatabase, ref, set, get, update, remove, onValue, off,
         startAt,
         endAt,
         
-        limitToLast } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+        limitToLast } from './vendor/firebasejs/10.7.1/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, signOut, setPersistence,
         browserSessionPersistence, browserLocalPersistence,
         createUserWithEmailAndPassword, updateProfile,
         
         updatePassword, deleteUser as firebaseDeleteUser, EmailAuthProvider, reauthenticateWithCredential,
         
-        onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        onAuthStateChanged } from './vendor/firebasejs/10.7.1/firebase-auth.js';
 
 
 import firebaseConfig from './firebaseConfig.js';

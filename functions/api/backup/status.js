@@ -32,12 +32,17 @@ export async function onRequestGet(context) {
             }))
         });
     } catch (error) {
-        return new Response(JSON.stringify({
+        const status = Number(error.status) > 0 ? Number(error.status) : 500;
+        if (status >= 400 && status < 500) {
+            return jsonResponse({
+                error: 'BACKUP_STATUS_FAILED',
+                message: error.message || '備份狀態查詢被拒絕'
+            }, status);
+        }
+        console.error('[backup-status] 內部錯誤:', error && (error.stack || error.message || error));
+        return jsonResponse({
             error: 'BACKUP_STATUS_FAILED',
-            message: String((error && error.message) || error)
-        }), {
-            status: error.status || 500,
-            headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, corsHeaders())
-        });
+            message: '讀取備份狀態失敗，請稍後再試'
+        }, 500);
     }
 }

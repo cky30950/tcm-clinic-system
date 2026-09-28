@@ -13,6 +13,7 @@
 
 import { authenticateStaff } from '../attachments/lib/auth.js';
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
+import { errorJson } from '../_lib/http-errors.js';
 import { getSubscriptionByEndpoint } from './lib/push-store.js';
 import { sendOne } from './lib/sender.js';
 
@@ -83,10 +84,9 @@ export async function onRequestPost(context) {
             reason: result.reasonText || null
         });
     } catch (error) {
-        const status = Number(error.status) > 0 ? Number(error.status) : 500;
-        return jsonResponse({
-            error: status === 401 ? 'UNAUTHORIZED' : 'TEST_FAILED',
-            message: error.message || '發送測試通知失敗'
-        }, status);
+        if (Number(error.status) === 401) {
+            return jsonResponse({ error: 'UNAUTHORIZED', message: '登入憑證無效或已過期' }, 401);
+        }
+        return errorJson(error, { code: 'TEST_FAILED', message: '發送測試通知失敗，請稍後再試' });
     }
 }

@@ -95,6 +95,12 @@ function formatAmzDate(date) {
  * @param {Date}   p.now             簽章時間
  * @param {Array<[string,string]>} p.headers
  *        會被簽入的標頭（名稱需小寫）；瀏覽器實際請求時必須帶上相同值。
+ * @param {number} [p.contentLength]
+ *        PUT 專用：已知檔案大小時把 content-length 一併簽入。瀏覽器 PUT
+ *        帶 body 時會自動送出等於實際位元組數的 Content-Length，R2 比對
+ *        簽章值不符即拒絕，因此真實檔案大小受到密碼學簽章約束，持 URL 者
+ *        無法上傳超大檔案。payload hash 仍用 UNSIGNED-PAYLOAD（瀏覽器
+ *        端無法強制加 x-amz-content-sha256 標頭）。
  * @param {boolean} p.includeUnsignedPayloadQuery
  *        是否於 query 放 X-Amz-Content-Sha256=UNSIGNED-PAYLOAD。
  *        PUT：R2 嚴格要求此參數；GET：AWS SDK 慣例不放（canonical
@@ -111,6 +117,7 @@ async function buildPresignedUrl({
     expiresSec,
     now,
     headers,
+    contentLength,
     includeUnsignedPayloadQuery
 }) {
     const ttl = Number.isFinite(Number(expiresSec)) && Number(expiresSec) > 0
@@ -128,7 +135,20 @@ async function buildPresignedUrl({
             .map((part) => part.split('/').map(awsUriEncode).join('/'))
             .join('/');
 
-    const signedHeaderNames = headers.map(([name]) => name).sort();
+    // PUT 且已知檔案大小：content-length 加入簽章標頭（R2 會要求實際
+    // 請求帶上完全相同的值，而該值由瀏覽器依 body 實際位元組數自動產生）
+    const signedHeadersList = headers.slice();
+    if (method === 'PUT'
+        && Number.isFinite(Number(contentLength))
+        && Number(contentLength) > 0
+        && Number.isInteger(Number(contentLength))) {
+        const len = String(Number(contentLength));
+        if (!signedHeadersList.some(([name]) => name === 'content-length')) {
+            signedHeadersList.push(['content-length', len]);
+        }
+    }
+
+    const signedHeaderNames = signedHeadersList.map(([name]) => name).sort();
     const queryParams = {
         'X-Amz-Algorithm': ALGORITHM,
         'X-Amz-Credential': `${accessKeyId}/${credentialScope}`,
@@ -147,7 +167,7 @@ async function buildPresignedUrl({
         .join('&');
 
     // Canonical headers：名稱小寫、值 trim、以換行結尾；順序依名稱排序
-    const headerMap = new Map(headers.map(([name, val]) => [name, String(val).trim()]));
+    const headerMap = new Map(signedHeadersList.map(([name, val]) => [name, String(val).trim()]));
     const canonicalHeaders = signedHeaderNames
         .map((name) => `${name}:${headerMap.get(name)}\n`)
         .join('');
@@ -191,6 +211,9 @@ async function buildPresignedUrl({
  * @param {string} p.contentType     上傳時必須使用的 Content-Type（會被簽入 header）
  * @param {string} [p.cacheControl]  上傳時必須使用的 Cache-Control（簽入，
  *                                   物件日後讀取時由 R2 原樣回帶）
+ * @param {number} [p.contentLength] 檔案實際位元組數（正整數）；提供時會被
+ *                                   簽入 content-length，持 URL 者只能上傳
+ *                                   完全相同大小的檔案
  * @param {number} p.expiresSec      URL 有效秒數
  * @param {Date}   [p.now]           注入簽章時間（測試用）
  * @returns {Promise<{url:string, signedAt:string, expiresAt:string}>}
@@ -203,6 +226,7 @@ export async function buildPresignedPutUrl({
     key,
     contentType,
     cacheControl,
+    contentLength,
     expiresSec,
     now = new Date()
 }) {
@@ -233,6 +257,7 @@ export async function buildPresignedPutUrl({
         expiresSec,
         now,
         headers,
+        contentLength,
         includeUnsignedPayloadQuery: true
     });
 }

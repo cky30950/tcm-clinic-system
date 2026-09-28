@@ -21,6 +21,9 @@ import { IdentityClient, serializeCustomAttributes } from './identity.js';
 
 const ADMIN_POSITION = '診所管理';
 const CLAIMS_VERSION = 1;
+// 主管理員信箱：任何路徑（含管理員操作）皆不得封存／刪除，
+// 避免系統永久失去可重建權限的種子帳號。
+const PRIMARY_ADMIN_EMAIL = 'admin@clinic.com';
 
 async function getClients(env) {
     const auth = await getAccessToken(env);
@@ -32,6 +35,51 @@ async function getClients(env) {
 
 function cleanText(value, max = 100) {
     return value === null || value === undefined ? '' : String(value).slice(0, max);
+}
+
+function isUserActive(data) {
+    return !(data.active === false || data.archived === true || data.status === 'archived');
+}
+
+/**
+ * 封存／刪除管理員等級帳號前的保護性檢查，所有路徑（管理員操作與
+ * 員工自助）都必須通過：
+ *   1. 主管理員 admin@clinic.com 永不許封存／刪除；
+ *   2. 封存在職管理員時，必須至少還有「另一名」在職管理員，
+ *      避免管理員帳號被全數鎖死、無人可進後台。
+ *
+ * @param {FirestoreClient} db
+ * @param {object} p
+ * @param {string} p.userId     目標 users 文件 ID
+ * @param {object} p.userData   目標 users 文件資料
+ * @param {boolean} p.archived  true＝封存（需做最後管理員檢查）；false＝復職（免檢查）
+ * @param {string} p.actionLabel 錯誤訊息使用的動作名稱（封存／刪除）
+ */
+async function assertAdminMutationAllowed(db, { userId, userData, archived, actionLabel }) {
+    const data = userData || {};
+    const email = cleanText(data.email, 200).toLowerCase();
+    if (email === PRIMARY_ADMIN_EMAIL) {
+        const err = new Error(`主管理員帳號不可${actionLabel}`);
+        err.status = 403;
+        throw err;
+    }
+    // 復職是增加在職管理員，不受最後管理員限制
+    if (archived === false) return;
+    if (cleanText(data.position, 40) !== ADMIN_POSITION) return;
+    if (!isUserActive(data)) return;
+
+    const allUsers = await db.queryCollection({ collectionId: 'users' });
+    const otherActiveAdmins = (allUsers.docs || []).filter(d => {
+        if (String(d.id) === String(userId)) return false;
+        const dd = d.data || {};
+        if (!isUserActive(dd)) return false;
+        return cleanText(dd.position, 40) === ADMIN_POSITION;
+    });
+    if (otherActiveAdmins.length === 0) {
+        const err = new Error('這是最後一個在職診所管理帳號，不可' + actionLabel + '，請先安排其他管理員');
+        err.status = 403;
+        throw err;
+    }
 }
 
 /**
@@ -152,6 +200,62 @@ export async function deleteStaffAuth(env, targetUid) {
         throw err;
     }
     const { db, identity } = await getClients(env);
+
+    // 保護性檢查（與封存相同）：管理員路徑不得刪除主管理員或最後一名
+    // 在職管理員，否則可把整個系統鎖死。帳號已不存在則視為冪等清理，
+    // 僅移除殘留索引。
+    let account = null;
+    try {
+        account = await identity.lookupAccount(uid);
+    } catch (error) {
+        throw error;
+    }
+    if (account) {
+        const email = cleanText(account.email, 200).toLowerCase();
+        if (email === PRIMARY_ADMIN_EMAIL) {
+            const err = new Error('主管理員帳號不可刪除');
+            err.status = 403;
+            throw err;
+        }
+        let isAdmin = false;
+        try {
+            const attrs = JSON.parse(String(account.customAttributes || '{}'));
+            isAdmin = attrs.admin === true;
+        } catch (_e) { /* 無 claims 時以下方索引判斷 */ }
+
+        let indexData = null;
+        let indexUserId = '';
+        try {
+            const indexDoc = await db.getDocument(`userAuthIndex/${encodeURIComponent(uid)}`);
+            indexData = indexDoc && indexDoc.data;
+            indexUserId = indexData ? String(indexData.userId || '') : '';
+        } catch (_e) { /* 舊帳號可能無索引 */ }
+        if (!isAdmin && indexData && cleanText(indexData.position, 40) === ADMIN_POSITION
+            && isUserActive(indexData)) {
+            isAdmin = true;
+        }
+
+        if (isAdmin) {
+            const allUsers = await db.queryCollection({ collectionId: 'users' });
+            const otherActiveAdmins = (allUsers.docs || []).filter(d => {
+                const dd = d.data || {};
+                if (!isUserActive(dd)) return false;
+                if (cleanText(dd.position, 40) !== ADMIN_POSITION) return false;
+                // 排除目標本人的 users 文件（前端流程可能已先行刪除，
+                // 直接呼叫 API 時文件可能仍在）
+                if (indexUserId && String(d.id) === indexUserId) return false;
+                if (dd.uid && String(dd.uid) === uid) return false;
+                if (email && cleanText(dd.email, 200).toLowerCase() === email) return false;
+                return true;
+            });
+            if (otherActiveAdmins.length === 0) {
+                const err = new Error('這是最後一個在職診所管理帳號，不可刪除，請先安排其他管理員');
+                err.status = 403;
+                throw err;
+            }
+        }
+    }
+
     await db.deleteDocument(`userAuthIndex/${encodeURIComponent(uid)}`);
 
     // 一併清空殘留 claims 後再刪帳號，確保無法再登入
@@ -212,29 +316,18 @@ export async function archiveStaffAuth(env, input = {}) {
     }
     const currentData = (userDoc && userDoc.data) || userDoc || {};
 
-    // 員工自我封存：後端代寫 users 文件並執行保護性檢查
+    // 保護性檢查對「所有封存／復職路徑」生效（管理員封存他人同樣適用），
+    // 避免有 admin 權限者把主管理員或最後一名管理員鎖死
+    await assertAdminMutationAllowed(db, {
+        userId,
+        userData: currentData,
+        archived,
+        actionLabel: '封存'
+    });
+
+    // 員工自我封存：後端代寫 users 文件（客戶端 Rules 不允許自行變更 active/archived）
     let sourceData = currentData;
     if (selfService) {
-        const email = cleanText(currentData.email, 200).toLowerCase();
-        if (email === 'admin@clinic.com') {
-            const err = new Error('主管理員帳號不可封存');
-            err.status = 403;
-            throw err;
-        }
-        if (cleanText(currentData.position, 40) === ADMIN_POSITION) {
-            const allUsers = await db.queryCollection({ collectionId: 'users' });
-            const otherActiveAdmins = (allUsers.docs || []).filter(d => {
-                const dd = d.data || {};
-                if (String(d.id) === String(userId)) return false;
-                if (dd.active === false || dd.archived === true || dd.status === 'archived') return false;
-                return cleanText(dd.position, 40) === ADMIN_POSITION;
-            });
-            if (otherActiveAdmins.length === 0) {
-                const err = new Error('您是最後一個在職診所管理帳號，不可封存，請先安排其他管理員');
-                err.status = 403;
-                throw err;
-            }
-        }
         const now = new Date();
         const actor = cleanText(input.actorEmail, 200) || 'self';
         await db.patchDocument(`users/${encodeURIComponent(userId)}`, {

@@ -18,6 +18,7 @@
 import { authenticateStaff, resolveUserData } from './lib/auth.js';
 import { enqueuePurge } from './lib/reaper.js';
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
+import { errorJson } from '../_lib/http-errors.js';
 import { getAccessToken } from '../backup/lib/google-auth.js';
 import { FirestoreClient } from '../backup/lib/firestore.js';
 
@@ -223,10 +224,15 @@ export async function onRequestPost(context) {
             r2Warnings: r2Errors
         });
     } catch (error) {
-        const status = Number(error.status) > 0 ? Number(error.status) : 500;
-        return jsonResponse({
-            error: status === 401 ? 'UNAUTHORIZED' : 'DELETE_FAILED',
-            message: error.message || '刪除附件失敗'
-        }, status);
+        if (Number(error.status) === 401) {
+            return jsonResponse({ error: 'UNAUTHORIZED', message: '登入憑證無效或已過期' }, 401);
+        }
+        if (Number.isInteger(error.status) && error.status >= 400 && error.status < 500) {
+            return jsonResponse({
+                error: error.code || 'DELETE_FAILED',
+                message: error.message || '刪除附件失敗'
+            }, error.status);
+        }
+        return errorJson(error, { code: 'DELETE_FAILED', message: '刪除附件失敗，請稍後再試' });
     }
 }

@@ -9,14 +9,19 @@
  * （Pages Cron Trigger 直接呼叫 runAttachmentReaper，不走 HTTP）
  * ============================================================ */
 
-import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
+import { jsonResponse, optionsResponse, isConfiguredSecretStrong, MIN_SHARED_SECRET_LENGTH } from '../backup/lib/http.js';
 import { runAttachmentReaper } from './lib/reaper.js';
 
 export const onRequestOptions = () => optionsResponse();
 
 function isAuthorized(request, env) {
     const secret = env && env.ATTACHMENT_CRON_SECRET;
-    if (!secret) return false;
+    // 長效排程密鑰須為高熵隨機值（至少 32 字元），不足一律拒絕
+    if (!isConfiguredSecretStrong(secret)) {
+        console.error('ATTACHMENT_CRON_SECRET 未設定或長度不足（須至少 '
+            + MIN_SHARED_SECRET_LENGTH + ' 字元），回收排程呼叫一律拒絕');
+        return false;
+    }
     const provided = request.headers.get('X-Attachment-Reap-Secret') || '';
     if (provided.length !== secret.length) return false;
     let mismatch = 0;
@@ -44,11 +49,17 @@ export async function onRequestPost(context) {
         });
         return jsonResponse(result, 200);
     } catch (error) {
-        const status = Number(error.status) > 0 ? Number(error.status) : 500;
+        if (Number.isInteger(error.status) && error.status >= 400 && error.status < 500) {
+            return jsonResponse({
+                error: error.code || 'REAP_FAILED',
+                message: error.message || '附件回收失敗'
+            }, error.status);
+        }
+        console.error('[reap] 內部錯誤:', error && (error.stack || error.message || error));
         return jsonResponse({
-            error: error.code || 'REAP_FAILED',
-            message: error.message || '附件回收失敗'
-        }, status);
+            error: 'REAP_FAILED',
+            message: '附件回收失敗，請稍後再試'
+        }, 500);
     }
 }
 

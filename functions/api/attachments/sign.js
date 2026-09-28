@@ -16,6 +16,7 @@
 
 import { authenticateStaff } from './lib/auth.js';
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
+import { errorJson } from '../_lib/http-errors.js';
 import { signGetUrls, StoreError } from './lib/attachments-store.js';
 
 export const onRequestOptions = () => optionsResponse();
@@ -41,10 +42,9 @@ export async function onRequestPost(context) {
         if (error instanceof StoreError) {
             return jsonResponse({ error: error.code, message: error.message }, error.status);
         }
-        const status = Number(error.status) > 0 ? Number(error.status) : 500;
-        return jsonResponse({
-            error: status === 401 ? 'UNAUTHORIZED' : 'SIGN_URLS_FAILED',
-            message: error.message || '簽發讀取 URL 失敗'
-        }, status);
+        if (Number(error.status) === 401) {
+            return jsonResponse({ error: 'UNAUTHORIZED', message: '登入憑證無效或已過期' }, 401);
+        }
+        return errorJson(error, { code: 'SIGN_URLS_FAILED', message: '簽發讀取 URL 失敗，請稍後再試' });
     }
 }

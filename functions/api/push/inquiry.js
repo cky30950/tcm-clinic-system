@@ -42,6 +42,10 @@ export async function onRequestPost(context) {
         const status = Number(error && error.status) > 0 ? Number(error.status) : 500;
         if (status >= 500) {
             console.error('新預診推播派送失敗:', error && error.message ? error.message : error);
+            return jsonResponse({
+                error: 'INQUIRY_NOTIFY_FAILED',
+                message: '通知派送失敗，請稍後再試'
+            }, 500);
         }
         return jsonResponse({
             error: status === 400 ? 'INVALID_INQUIRY_ID' : 'INQUIRY_NOTIFY_FAILED',

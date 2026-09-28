@@ -13,6 +13,7 @@
 
 import { authenticateStaff, resolveUserData } from '../attachments/lib/auth.js';
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
+import { errorJson } from '../_lib/http-errors.js';
 import { upsertSubscription } from './lib/push-store.js';
 import { isAllowedEvent } from './lib/events.js';
 
@@ -124,10 +125,9 @@ export async function onRequestPost(context) {
 
         return jsonResponse({ success: true, created: result.created });
     } catch (error) {
-        const status = Number(error.status) > 0 ? Number(error.status) : 500;
-        return jsonResponse({
-            error: status === 401 ? 'UNAUTHORIZED' : 'SUBSCRIBE_FAILED',
-            message: error.message || '建立推播訂閱失敗'
-        }, status);
+        if (Number(error.status) === 401) {
+            return jsonResponse({ error: 'UNAUTHORIZED', message: '登入憑證無效或已過期' }, 401);
+        }
+        return errorJson(error, { code: 'SUBSCRIBE_FAILED', message: '建立推播訂閱失敗，請稍後再試' });
     }
 }

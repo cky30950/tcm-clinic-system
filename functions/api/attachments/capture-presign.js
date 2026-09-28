@@ -12,6 +12,7 @@
  * ============================================================ */
 
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
+import { errorJson } from '../_lib/http-errors.js';
 import { enforceAnonRateLimit } from '../_lib/rate-limit.js';
 import {
     issuePresignedUpload,
@@ -93,9 +94,9 @@ export async function onRequestPost(context) {
         if (error instanceof StoreError) {
             return jsonResponse({ error: error.code, message: error.message }, error.status);
         }
-        return jsonResponse({
-            error: 'CAPTURE_PRESIGN_FAILED',
-            message: error.message || '簽發拍照上傳 URL 失敗'
-        }, 500);
+        return errorJson(error, {
+            code: 'CAPTURE_PRESIGN_FAILED',
+            message: '簽發拍照上傳 URL 失敗，請稍後再試'
+        });
     }
 }

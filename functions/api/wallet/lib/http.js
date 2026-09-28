@@ -155,8 +155,10 @@ export function toErrorResponse(error) {
     if (error instanceof WalletError) {
         return jsonResponse({ error: error.code, message: error.message }, error.status);
     }
+    // 非預期錯誤（含 Firestore/RTDB 上游原文）只進記錄，不回客戶端
+    console.error('[wallet-api] 內部錯誤:', error && (error.stack || error.message || error));
     return jsonResponse({
         error: 'WALLET_API_ERROR',
-        message: error && error.message ? error.message : '儲值功能發生錯誤'
+        message: '儲值功能發生錯誤，請稍後再試'
     }, 500);
 }

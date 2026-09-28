@@ -58,6 +58,12 @@ export async function onRequestPost(context) {
             ? error.code
             : (status === 401 ? 'UNAUTHORIZED' : 'ROOM_SESSION_FAILED');
         console.error('換發入房 session 失敗:', error && error.message ? error.message : error);
+        if (status >= 500) {
+            return jsonResponse({
+                error: 'ROOM_SESSION_FAILED',
+                message: '換發入房 session 失敗，請稍後再試'
+            }, 500);
+        }
         return jsonResponse({
             error: code,
             message: (error && error.message) || '換發入房 session 失敗'

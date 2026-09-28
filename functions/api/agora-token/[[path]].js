@@ -199,8 +199,9 @@ export async function buildRtcToken(appId, appCertificate, channelName, uid, exp
 }
 
 function corsHeaders() {
+    // ACAO 由 functions/api/_middleware.js 依來源白名單統一核發
     return {
-        'Access-Control-Allow-Origin': '*',
+        'Vary': 'Origin',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Room-Session',
         'Access-Control-Max-Age': '86400'

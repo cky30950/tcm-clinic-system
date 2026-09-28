@@ -8,6 +8,24 @@ let currentUserData = null;
 
 window.currentUserClaims = {};
 
+// 密碼強度政策（與後端 functions/api/admin/lib/password.js 同步）：
+// ≥8 碼，且大寫／小寫／數字／特殊符號四類中至少符合 3 類
+const PASSWORD_MIN_LENGTH = 8;
+function validatePasswordPolicy(rawPassword) {
+    const password = String(rawPassword == null ? '' : rawPassword).trim();
+    if (password.length < PASSWORD_MIN_LENGTH) {
+        return { ok: false, code: 'TOO_SHORT', message: `密碼長度至少需 ${PASSWORD_MIN_LENGTH} 碼` };
+    }
+    let categories = 0;
+    if (/[a-z]/.test(password)) categories += 1;
+    if (/[A-Z]/.test(password)) categories += 1;
+    if (/[0-9]/.test(password)) categories += 1;
+    if (/[^A-Za-z0-9]/.test(password)) categories += 1;
+    if (categories < 3) {
+        return { ok: false, code: 'COMPLEXITY', message: '密碼須包含大寫英文、小寫英文、數字、特殊符號其中至少 3 類' };
+    }
+    return { ok: true, password };
+}
 
 function debounce(func, wait, immediate = false) {
     let timeout;
@@ -1088,8 +1106,13 @@ async function changeCurrentUserPassword() {
         showToast(msg, 'error');
         return;
     }
-    if (newPassword.length < 6) {
-        const msg = lang === 'en' ? 'Password must be at least 6 characters' : '新密碼長度至少 6 個字元';
+    const newPasswordPolicy = validatePasswordPolicy(newPassword);
+    if (!newPasswordPolicy.ok) {
+        const msg = lang === 'en'
+            ? (newPasswordPolicy.code === 'TOO_SHORT'
+                ? 'Password must be at least 8 characters'
+                : 'Password must contain at least 3 of: uppercase letters, lowercase letters, numbers, special characters')
+            : newPasswordPolicy.message;
         showToast(msg, 'error');
         return;
     }
@@ -23462,8 +23485,9 @@ async function saveUser() {
                     clearButtonLoading(saveButton);
                     return;
                 }
-                if (password.length < 6) {
-                    showToast('密碼長度至少需 6 位數！', 'error');
+                const newUserPasswordPolicy = validatePasswordPolicy(password);
+                if (!newUserPasswordPolicy.ok) {
+                    showToast(newUserPasswordPolicy.message + '！', 'error');
                     clearButtonLoading(saveButton);
                     return;
                 }

@@ -163,9 +163,13 @@
     });
   }
 
+  // sid 為一次性會話識別碼，走 query；token 為 256-bit 上傳授權，
+  // 新制只走 URL fragment（#t=），不會進伺服器／代理存取記錄、Referer
+  // 或瀏覽器歷史的查詢字串。相容舊連結 query ?t=（向後過渡）。
   var qs = new URLSearchParams(location.search);
+  var hashQs = new URLSearchParams((location.hash || '').replace(/^#/, ''));
   var sid = qs.get('sid') || '';
-  var token = qs.get('t') || '';
+  var token = (hashQs.get('t') || qs.get('t') || '').trim();
 
   var session = null;       // {mode, patientName}
   var maxBytes = 15 * 1024 * 1024;
@@ -503,7 +507,8 @@
     await handleFileV2(file);
   });
 
-  if (!sid || !token) {
+  // token 格式先做客戶端把關（實際為 32 bytes = 64 hex）
+  if (!sid || !/^[a-f0-9]{32,256}$/i.test(token)) {
     showError(L.invalid);
   } else {
     apiPost('/capture-status', { sid: sid, token: token }).then(function (info) {

@@ -565,9 +565,10 @@ export async function onRequestPost(context) {
                 message: error.clientMessage || '人機驗證未完成設定'
             }, error.status || 500);
         }
+        // 非預期錯誤（含 Firestore 上游原文）只進記錄，客戶端只收通用訊息
         return jsonResponse({
             error: 'LOOKUP_FAILED',
-            message: error && error.message ? error.message : '查詢服務發生錯誤'
+            message: '查詢服務暫時無法使用，請稍後再試'
         }, 500);
     }
 }

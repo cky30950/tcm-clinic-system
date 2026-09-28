@@ -6,8 +6,10 @@ import { requireAdmin, getAccessToken, getServiceAccount } from './google-auth.j
 import { FirestoreClient } from './firestore.js';
 
 export function corsHeaders() {
+    // ACAO 由 functions/api/_middleware.js 依來源白名單統一核發，
+    // 此處不再回萬用「*」；保留其餘預檢欄位供直連與快取使用。
     return {
-        'Access-Control-Allow-Origin': '*',
+        'Vary': 'Origin',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Backup-Cron-Secret, X-Room-Session',
         'Access-Control-Max-Age': '86400'
@@ -105,18 +107,38 @@ export async function authenticateAdmin(request, env) {
 }
 
 /**
- * 外部排程服務（cron-job.org 等）以共享密鑰呼叫時使用。
+ * 長效共享密鑰（cron／bootstrap）的最低長度要求。
+ * 長效密鑰不會過期，熵不足（短密碼、字典字詞）等於無防護：
+ * 未設定或短於 32 字元一律視為未授權，迫使使用高熵隨機值
+ * （例如 `openssl rand -base64 32` 產生後設入環境變數）。
  */
-export function isAuthorizedCronCall(request, env) {
-    const secret = env && env.BACKUP_CRON_SECRET;
-    if (!secret) return false;
-    const provided = request.headers.get('X-Backup-Cron-Secret') || '';
+export const MIN_SHARED_SECRET_LENGTH = 32;
+
+export function isConfiguredSecretStrong(secret) {
+    return typeof secret === 'string' && secret.length >= MIN_SHARED_SECRET_LENGTH;
+}
+
+function timingSafeEqual(provided, secret) {
     if (provided.length !== secret.length) return false;
     let mismatch = 0;
     for (let i = 0; i < secret.length; i++) {
         mismatch |= provided.charCodeAt(i) ^ secret.charCodeAt(i);
     }
     return mismatch === 0;
+}
+
+/**
+ * 外部排程服務（cron-job.org 等）以共享密鑰呼叫時使用。
+ */
+export function isAuthorizedCronCall(request, env) {
+    const secret = env && env.BACKUP_CRON_SECRET;
+    if (!isConfiguredSecretStrong(secret)) {
+        console.error('BACKUP_CRON_SECRET 未設定或長度不足（須至少 '
+            + MIN_SHARED_SECRET_LENGTH + ' 字元），排程呼叫一律拒絕');
+        return false;
+    }
+    const provided = request.headers.get('X-Backup-Cron-Secret') || '';
+    return timingSafeEqual(provided, secret);
 }
 
 export function projectIdOf(env) {
