@@ -24,6 +24,7 @@ import { getAccessToken } from '../backup/lib/google-auth.js';
 import { FirestoreClient } from '../backup/lib/firestore.js';
 import { jsonResponse, optionsResponse } from '../backup/lib/http.js';
 import { verifyTurnstile } from '../_lib/turnstile.js';
+import { fetchUpcomingByPatient } from './appointments/lib/booking-core.js';
 
 export const onRequestOptions = () => optionsResponse();
 
@@ -265,7 +266,7 @@ async function fetchPackageClinicEvidence(client, patientId, neededPkgIds) {
     return { pkgClinicMap, scanned, truncated };
 }
 
-async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clinicIds) {
+async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clinicIds, upcomingMap) {
     const patientId = patientDoc.id;
     const [pkgPage, txPage, accountDocs] = await Promise.all([
         // 每診所獨立帳戶：平行讀取各診所的複合 ID 帳戶文件
@@ -483,10 +484,25 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
     // 有明確診所的排在前，未分組墊後
     clinics.sort((a, b) => (a.clinicId ? 0 : 1) - (b.clinicId ? 0 : 1));
 
+    // 未來有效預約（lookup 時一次 range 查詢後依 patientId 分組）。
+    // 只回傳非 PHI 欄位供會員端展示與取消，主訴不回傳。
+    const upcoming = upcomingMap && upcomingMap.get(patientId)
+        ? upcomingMap.get(patientId).map((a) => ({
+            id: a.id,
+            appointmentTime: a.appointmentTime,
+            appointmentDoctor: a.appointmentDoctor,
+            doctorName: a.doctorName || '',
+            status: a.status,
+            clinicId: a.clinicId || '',
+            source: a.source || ''
+        }))
+        : [];
+
     return {
         patientId,
         name: patientDoc.data.name || '',
-        clinics
+        clinics,
+        upcomingAppointments: upcoming
     };
 }
 
@@ -546,13 +562,17 @@ export async function onRequestPost(context) {
             env.FIREBASE_RTDB_URL || ''
         );
 
-        // 診所名稱表（id → 中英文名），跨請求快取 5 分鐘
-        const clinicTable = await getClinicTable(client);
+        // 診所名稱表（id → 中英文名），跨請求快取 5 分鐘；
+        // 同時以一次 range 查詢取回未來 30 天掛號供會員端展示
+        const [clinicTable, upcomingMap] = await Promise.all([
+            getClinicTable(client),
+            fetchUpcomingByPatient(client, auth.token, 30)
+        ]);
 
         const patientDocs = await findPatients(client, phoneVariants);
         const patients = await Promise.all(
             patientDocs.map((d) => buildPatientEntry(
-                client, auth.token, d, clinicTable.nameMap, clinicTable.ids))
+                client, auth.token, d, clinicTable.nameMap, clinicTable.ids, upcomingMap))
         );
 
         return jsonResponse({ patients });

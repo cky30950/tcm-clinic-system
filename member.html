@@ -169,6 +169,26 @@
             border: 1px solid #99f6e4;
         }
         .pill.gray { background: #f3f4f6; color: var(--muted); border-color: var(--line); }
+        .pill.waiting { background: #fffbeb; color: var(--warn); border-color: #fde68a; }
+        .pill.consulting { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+        .pill.cancelled { background: #f3f4f6; color: var(--muted); border-color: var(--line); }
+
+        /* 線上預約 */
+        .slot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .slot {
+            padding: 9px 4px; font-size: 14px; border-radius: 8px;
+            border: 1px solid var(--line); background: #fff; color: var(--brand-dark);
+            cursor: pointer;
+        }
+        .slot.selected { background: var(--brand); border-color: var(--brand); color: #fff; }
+        .slot.full, .slot.closed { color: #bbb; background: #f9fafb; cursor: default; }
+        .slot .slot-sub { display: block; font-size: 10px; margin-top: 1px; }
+        .cancel-btn {
+            border: 1px solid #fecaca; background: #fff; color: var(--danger);
+            border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+        }
+        .cancel-btn:disabled { color: #bbb; border-color: var(--line); cursor: default; }
+        .rules-note { font-size: 12px; color: var(--muted); margin: 2px 0 14px; }
 
         .list { list-style: none; margin: 0; padding: 0; }
         .list li {
@@ -259,6 +279,60 @@
         </div>
 
         <div class="tabs" id="patientTabs"></div>
+
+        <!-- 線上預約掛號 -->
+        <div class="card" id="bookingCard">
+            <h2>📅 <span data-i18n="bookingTitle">線上預約掛號</span></h2>
+            <p class="sub" data-i18n="bookingSub">選擇醫師、應診日期及時段，24 小時均可線上預約。</p>
+
+            <div class="msg info hidden" id="bookingDisabledMsg"></div>
+
+            <div id="bookingForm">
+                <p class="rules-note" id="rulesNote"></p>
+
+                <div class="field">
+                    <label for="bookingDoctor" data-i18n="doctorLabel">醫師</label>
+                    <select id="bookingDoctor">
+                        <option value="" data-i18n="selectDoctorPrompt">請選擇醫師</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="bookingDate" data-i18n="dateLabel">應診日期</label>
+                    <select id="bookingDate" disabled>
+                        <option value="" data-i18n="selectDatePrompt">請先選擇醫師</option>
+                    </select>
+                </div>
+
+                <div class="field hidden" id="slotField">
+                    <label data-i18n="slotLabel">應診時段</label>
+                    <div class="slot-grid" id="slotGrid"></div>
+                    <p class="hint hidden" id="slotDayHint"></p>
+                </div>
+
+                <div class="field hidden" id="complaintField">
+                    <label for="bookingComplaint" data-i18n="complaintLabel">主訴（選填）</label>
+                    <input type="text" id="bookingComplaint" maxlength="200"
+                           data-i18n-ph="complaintPlaceholder">
+                    <p class="hint" data-i18n="complaintHint">可簡單描述不適，方便醫師事前準備。</p>
+                </div>
+
+                <div class="turnstile-box" id="bookingTurnstileBox">
+                    <div id="bookingTurnstile"></div>
+                </div>
+
+                <button class="btn" id="confirmBookingBtn" type="button" disabled
+                        data-i18n="confirmBooking">確認預約</button>
+
+                <div class="msg" id="bookingMsg"></div>
+            </div>
+        </div>
+
+        <!-- 我的預約 -->
+        <div class="card">
+            <h2>📆 <span data-i18n="myAppointments">我的預約</span></h2>
+            <ul class="list" id="myApptList"></ul>
+        </div>
 
         <div class="card">
             <h2>🎫 <span data-i18n="packages">有效套票</span></h2>
