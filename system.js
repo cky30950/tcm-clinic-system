@@ -1234,6 +1234,11 @@ let patientConsultationsCache = {};
 let patientConsultationsListeners = {};
 let currentPatientHistoryPatientId = null;
 let currentConsultationHistoryPatientId = null;
+// consultationHistoryPager 批次拉取大小：每次 getDocs 拉取多筆病歷，
+// 而不是逐筆拉取。例如一個病人有 50 筆病歷，原本需要 50 次 getDocs，
+// 改為 BATCH_SIZE=20 後只需要 3 次。
+const CONSULTATION_PAGER_BATCH_SIZE = 20;
+
 const consultationHistoryPager = {
     patientPagedCache: {},
     contexts: {
@@ -1400,39 +1405,72 @@ const consultationHistoryPager = {
     },
     async fetchDescPage(patientId, descPageNumber) {
         const pid = String(patientId || '');
-        const pageNum = Number(descPageNumber) || 1;
+        const targetPageNum = Number(descPageNumber) || 1;
         const state = this.getCachedPatientState(pid);
-        if (!state || pageNum < 1) return { success: false };
+        if (!state || targetPageNum < 1) return { success: false };
         if (state.mode === 'full') return { success: true };
-        if (state.descPageCache[pageNum]) return { success: true };
+        if (Object.prototype.hasOwnProperty.call(state.descPageCache, targetPageNum)) return { success: true };
         try {
             await waitForFirebaseDb();
             const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            for (let i = 1; i <= pageNum; i++) {
-                if (state.descPageCache[i]) continue;
+
+            // 找出第一個缺失的 page（從 1 到 targetPageNum）
+            // 用 hasOwnProperty 檢查，確保 null sentinel（表示到底）不被當成缺失
+            let firstMissing = 1;
+            for (; firstMissing <= targetPageNum; firstMissing++) {
+                if (!Object.prototype.hasOwnProperty.call(state.descPageCache, firstMissing)) break;
+            }
+            if (firstMissing > targetPageNum) return { success: true };
+
+            // 批次拉取：每次從 firstMissing 開始拉 BATCH_SIZE 筆
+            // 一次 getDocs 就填多個 cache entry，大幅減少 read 次數
+            while (firstMissing <= targetPageNum) {
                 const queryParts = [
                     window.firebase.where('patientId', '==', pid),
                     window.firebase.orderBy('sortDate', 'desc'),
-                    window.firebase.limit(1)
+                    window.firebase.limit(CONSULTATION_PAGER_BATCH_SIZE)
                 ];
-                if (i > 1 && state.descPageCursors[i - 1]) {
-                    queryParts.push(window.firebase.startAfter(state.descPageCursors[i - 1]));
+                // 用上一個已拉完 page 的 cursor 來 startAfter
+                const cursorKey = firstMissing - 1;
+                if (cursorKey >= 1 && state.descPageCursors[cursorKey]) {
+                    queryParts.push(window.firebase.startAfter(state.descPageCursors[cursorKey]));
                 }
                 const q = window.firebase.firestoreQuery(colRef, ...queryParts);
                 const snapshot = await window.firebase.getDocs(q);
+
                 const docs = [];
                 snapshot.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
+
                 if (docs.length === 0) {
-                    state.descPageCache[i] = null;
-                    continue;
+                    // 沒有更多資料了：在 firstMissing 標記 null 表示到底
+                    state.descPageCache[firstMissing] = null;
+                    break;
                 }
-                const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-                state.descPageCursors[i] = lastDoc;
-                state.descPageCache[i] = docs[0];
-                const uiIndex = state.totalCount - i;
-                if (uiIndex >= 0) {
-                    state.recordsByIndex[uiIndex] = docs[0];
+
+                // 把整個批次的 doc 都填到 cache（預取超範圍的資料是批次拉取的優勢）
+                for (let j = 0; j < docs.length; j++) {
+                    const pageIdx = firstMissing + j;
+                    const doc = docs[j];
+                    state.descPageCache[pageIdx] = doc;
+                    const uiIndex = state.totalCount - pageIdx;
+                    if (uiIndex >= 0 && uiIndex < state.totalCount) {
+                        state.recordsByIndex[uiIndex] = doc;
+                    }
                 }
+
+                // 存 cursor：這個 batch 最後一筆對應的 pageIdx
+                const lastPageIdx = firstMissing + docs.length - 1;
+                state.descPageCursors[lastPageIdx] = snapshot.docs[snapshot.docs.length - 1];
+
+                // 如果這個 batch 不滿（到尾了）就停，並填充 null sentinels
+                // 避免未來請求超過實際資料範圍時再發一次空的 getDocs
+                if (docs.length < CONSULTATION_PAGER_BATCH_SIZE) {
+                    for (let p = lastPageIdx + 1; p <= targetPageNum; p++) {
+                        state.descPageCache[p] = null;
+                    }
+                    break;
+                }
+                firstMissing += docs.length;
             }
             return { success: true };
         } catch (error) {
@@ -1442,39 +1480,69 @@ const consultationHistoryPager = {
     },
     async fetchAscPage(patientId, ascPageNumber) {
         const pid = String(patientId || '');
-        const pageNum = Number(ascPageNumber) || 1;
+        const targetPageNum = Number(ascPageNumber) || 1;
         const state = this.getCachedPatientState(pid);
-        if (!state || pageNum < 1) return { success: false };
+        if (!state || targetPageNum < 1) return { success: false };
         if (state.mode === 'full') return { success: true };
-        if (Object.prototype.hasOwnProperty.call(state.ascPageCache, pageNum)) return { success: true };
+        if (Object.prototype.hasOwnProperty.call(state.ascPageCache, targetPageNum)) return { success: true };
         try {
             await waitForFirebaseDb();
             const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            for (let i = 1; i <= pageNum; i++) {
-                if (Object.prototype.hasOwnProperty.call(state.ascPageCache, i)) continue;
+
+            // 找出第一個缺失的 page（從 1 到 targetPageNum）
+            let firstMissing = 1;
+            for (; firstMissing <= targetPageNum; firstMissing++) {
+                if (!Object.prototype.hasOwnProperty.call(state.ascPageCache, firstMissing)) break;
+            }
+            if (firstMissing > targetPageNum) return { success: true };
+
+            // 批次拉取：每次從 firstMissing 開始拉 BATCH_SIZE 筆
+            while (firstMissing <= targetPageNum) {
                 const queryParts = [
                     window.firebase.where('patientId', '==', pid),
                     window.firebase.orderBy('sortDate', 'asc'),
-                    window.firebase.limit(1)
+                    window.firebase.limit(CONSULTATION_PAGER_BATCH_SIZE)
                 ];
-                if (i > 1 && state.ascPageCursors[i - 1]) {
-                    queryParts.push(window.firebase.startAfter(state.ascPageCursors[i - 1]));
+                // 用上一個已拉完 page 的 cursor 來 startAfter
+                const cursorKey = firstMissing - 1;
+                if (cursorKey >= 1 && state.ascPageCursors[cursorKey]) {
+                    queryParts.push(window.firebase.startAfter(state.ascPageCursors[cursorKey]));
                 }
                 const q = window.firebase.firestoreQuery(colRef, ...queryParts);
                 const snapshot = await window.firebase.getDocs(q);
+
                 const docs = [];
                 snapshot.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
+
                 if (docs.length === 0) {
-                    state.ascPageCache[i] = null;
-                    continue;
+                    state.ascPageCache[firstMissing] = null;
+                    break;
                 }
-                const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-                state.ascPageCursors[i] = lastDoc;
-                state.ascPageCache[i] = docs[0];
-                const uiIndex = i - 1;
-                if (uiIndex >= 0 && uiIndex < state.totalCount) {
-                    state.recordsByIndex[uiIndex] = docs[0];
+
+                // 把整個批次的 doc 都填到 cache（預取超範圍的資料是批次拉取的優勢）
+                for (let j = 0; j < docs.length; j++) {
+                    const pageIdx = firstMissing + j;
+                    const doc = docs[j];
+                    state.ascPageCache[pageIdx] = doc;
+                    const uiIndex = pageIdx - 1;
+                    if (uiIndex >= 0 && uiIndex < state.totalCount) {
+                        state.recordsByIndex[uiIndex] = doc;
+                    }
                 }
+
+                // 存 cursor：這個 batch 最後一筆對應的 pageIdx
+                const lastPageIdx = firstMissing + docs.length - 1;
+                state.ascPageCursors[lastPageIdx] = snapshot.docs[snapshot.docs.length - 1];
+
+                // 如果這個 batch 不滿（到尾了）就停，並填充 null sentinels
+                // 避免未來請求超過實際資料範圍時再發一次空的 getDocs
+                if (docs.length < CONSULTATION_PAGER_BATCH_SIZE) {
+                    for (let p = lastPageIdx + 1; p <= targetPageNum; p++) {
+                        state.ascPageCache[p] = null;
+                    }
+                    break;
+                }
+                firstMissing += docs.length;
             }
             return { success: true };
         } catch (error) {
