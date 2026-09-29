@@ -5,7 +5,7 @@
  * 僅公開非敏感欄位（不含病歷）；IP 限速防列舉。
  * ============================================================ */
 
-import { jsonResponse, optionsResponse } from '../../../backup/lib/http.js';
+import { jsonResponse, optionsResponse } from '../../backup/lib/http.js';
 import {
     buildServiceContext,
     loadBookingConfig,

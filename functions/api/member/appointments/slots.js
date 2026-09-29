@@ -7,7 +7,7 @@
  * 只讀 RTDB（設定/排班/掛號），IP 限速防掃描。
  * ============================================================ */
 
-import { jsonResponse, optionsResponse } from '../../../backup/lib/http.js';
+import { jsonResponse, optionsResponse } from '../../backup/lib/http.js';
 import {
     buildServiceContext,
     loadBookingConfig,

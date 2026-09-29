@@ -14,8 +14,8 @@
  *   7. RTDB push 建立 registered 掛號（source: member_online）
  * ============================================================ */
 
-import { jsonResponse, optionsResponse } from '../../../backup/lib/http.js';
-import { verifyTurnstile } from '../../../_lib/turnstile.js';
+import { jsonResponse, optionsResponse } from '../../backup/lib/http.js';
+import { verifyTurnstile } from '../../_lib/turnstile.js';
 import {
     buildServiceContext,
     loadBookingConfig,

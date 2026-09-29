@@ -11,8 +11,8 @@
  * 軟取消：PATCH status='cancelled'，保留記錄並釋放時段名額。
  * ============================================================ */
 
-import { jsonResponse, optionsResponse } from '../../../backup/lib/http.js';
-import { verifyTurnstile } from '../../../_lib/turnstile.js';
+import { jsonResponse, optionsResponse } from '../../backup/lib/http.js';
+import { verifyTurnstile } from '../../_lib/turnstile.js';
 import {
     buildServiceContext,
     loadBookingConfig,
