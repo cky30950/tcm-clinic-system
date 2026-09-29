@@ -11652,7 +11652,8 @@ function createAppointmentRow(appointment, patient, index) {
                 'registered': { text: '已掛號', class: 'bg-blue-100 text-blue-800' },
                 'waiting': { text: '候診中', class: 'bg-yellow-100 text-yellow-800' },
                 'consulting': { text: '診症中', class: 'bg-green-100 text-green-800' },
-                'completed': { text: '已完成', class: 'bg-gray-100 text-gray-800' }
+                'completed': { text: '已完成', class: 'bg-gray-100 text-gray-800' },
+                'cancelled': { text: '已取消', class: 'bg-gray-100 text-gray-500 line-through' }
             };
             return statusMap[status] || { text: '未知', class: 'bg-gray-100 text-gray-800' };
         }
@@ -11795,6 +11796,13 @@ function getOperationButtons(appointment, patient = null) {
             }
             break;
             
+        case 'cancelled':
+            // 病人線上取消之軟取消記錄：管理員／護理師可永久移除
+            if (!isDisabled && canManage) {
+                buttons.push(`<button onclick="removeAppointment('${qid}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">移除掛號</button>`);
+            }
+            break;
+
         default:
             buttons.push('<span class="text-gray-400 text-xs">狀態異常</span>');
             break;
@@ -11950,13 +11958,15 @@ async function removeAppointment(appointmentId) {
             'registered': '已掛號',
             'waiting': '候診中',
             'consulting': '診症中',
-            'completed': '已完成'
+            'completed': '已完成',
+            'cancelled': '已取消'
         };
         const statusNamesEn = {
             'registered': 'Registered',
             'waiting': 'Waiting',
             'consulting': 'Consulting',
-            'completed': 'Completed'
+            'completed': 'Completed',
+            'cancelled': 'Cancelled'
         };
         const lang2 = localStorage.getItem('lang') || 'zh';
         const statusTextZh = statusNamesZh[appointment.status] || appointment.status;
