@@ -2281,7 +2281,7 @@ async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
         let q = window.firebase.firestoreQuery(
             window.firebase.collection(window.firebase.db, 'patients'),
             window.firebase.orderBy('patientNumber', 'desc'),
-            window.firebase.limit(pageSize)
+            window.firebase.limit(pageSize),
         );
         
         if (pageNumber > 1) {
@@ -2338,7 +2338,7 @@ async function fetchPatientsPageAsc(ascPageNumber = 1, forceRefresh = false) {
         let q = window.firebase.firestoreQuery(
             window.firebase.collection(window.firebase.db, 'patients'),
             window.firebase.orderBy('patientNumber', 'asc'),
-            window.firebase.limit(pageSize)
+            window.firebase.limit(pageSize),
         );
         if (ascPageNumber > 1) {
             const prevCursor = patientAscPageCursors[ascPageNumber - 1];
@@ -2441,6 +2441,12 @@ async function fetchUsers(forceRefresh = false) {
 }
         
         let clinicSettings = {};
+        // 確保跨 script（systemmanagement.js 等）可見，且重新賦值時保持同步
+        Object.defineProperty(window, 'clinicSettings', {
+            get: () => clinicSettings,
+            set: (v) => { clinicSettings = v; },
+            configurable: true
+        });
         let currentClinicId = localStorage.getItem('currentClinicId') || null;
         let clinicsList = [];
         function prePopulateClinicsFromCache() {
@@ -30951,7 +30957,7 @@ class FirebaseDataManager {
             // 建立查詢：使用 limit 控制單次載入筆數
             const q = window.firebase.firestoreQuery(
                 window.firebase.collection(window.firebase.db, 'consultations'),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
             );
             const querySnapshot = await window.firebase.getDocs(q);
             const consultations = [];
@@ -30998,7 +31004,7 @@ class FirebaseDataManager {
             const q = window.firebase.firestoreQuery(
                 window.firebase.collection(window.firebase.db, 'consultations'),
                 window.firebase.startAfter(this.consultationsLastVisible),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
             );
             const snapshot = await window.firebase.getDocs(q);
             const newData = [];
@@ -31137,7 +31143,6 @@ class FirebaseDataManager {
                 ...parts,
                 window.firebase.orderBy('sortDate', 'asc'),
                 window.firebase.limit(500),
-                window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
             );
             const snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31176,7 +31181,6 @@ class FirebaseDataManager {
                 window.firebase.where('sortDate', '>=', start),
                 window.firebase.where('sortDate', '<=', end),
                 window.firebase.limit(pageSize),
-                window.firebase.select(...DAILY_STATS_FIELDS)
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31191,7 +31195,6 @@ class FirebaseDataManager {
                     window.firebase.where('sortDate', '<=', end),
                     window.firebase.startAfter(lastVisible),
                     window.firebase.limit(pageSize),
-                    window.firebase.select(...DAILY_STATS_FIELDS)
                 );
                 snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31306,8 +31309,7 @@ class FirebaseDataManager {
                 window.firebase.orderBy('sortDate', 'asc'),
                 window.firebase.where('sortDate', '>=', start),
                 window.firebase.where('sortDate', '<=', end),
-                window.firebase.limit(pageSize)
-                window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
+                window.firebase.limit(pageSize),
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31322,7 +31324,6 @@ class FirebaseDataManager {
                     window.firebase.where('sortDate', '<=', end),
                     window.firebase.startAfter(lastVisible),
                     window.firebase.limit(pageSize)
-                    window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
                 );
                 snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31355,8 +31356,7 @@ class FirebaseDataManager {
                 colRef,
                 ...parts,
                 window.firebase.orderBy('syncedAt', 'asc'),
-                window.firebase.limit(pageSize)
-                window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
+                window.firebase.limit(pageSize),
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31369,7 +31369,6 @@ class FirebaseDataManager {
                     window.firebase.orderBy('syncedAt', 'asc'),
                     window.firebase.startAfter(lastVisible),
                     window.firebase.limit(pageSize)
-                    window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
                 );
                 snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31445,7 +31444,6 @@ class FirebaseDataManager {
                     window.firebase.where(fieldName, '>=', startValue),
                     window.firebase.where(fieldName, '<=', endValue),
                     window.firebase.limit(pageSize)
-                    window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
                 );
                 let snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31459,7 +31457,6 @@ class FirebaseDataManager {
                         window.firebase.where(fieldName, '<=', endValue),
                         window.firebase.startAfter(lastVisible),
                         window.firebase.limit(pageSize)
-                        window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
                     );
                     snap = await window.firebase.getDocs(q);
                     snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31505,8 +31502,7 @@ class FirebaseDataManager {
                 colRef,
                 window.firebase.where('doctor', '==', doctor),
                 window.firebase.orderBy('date', 'asc'),
-                window.firebase.limit(pageSize)
-                window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
+                window.firebase.limit(pageSize),
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31519,7 +31515,6 @@ class FirebaseDataManager {
                     window.firebase.orderBy('date', 'asc'),
                     window.firebase.startAfter(lastVisible),
                     window.firebase.limit(pageSize)
-                    window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
                 );
                 snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31558,8 +31553,7 @@ class FirebaseDataManager {
                 ...q1Parts,
                 window.firebase.where('updatedAt', '>', sinceDate),
                 window.firebase.orderBy('updatedAt', 'asc'),
-                window.firebase.limit(pageSize)
-                window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
+                window.firebase.limit(pageSize),
             );
             let snap1 = await window.firebase.getDocs(q1);
             snap1.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31572,7 +31566,6 @@ class FirebaseDataManager {
                     window.firebase.orderBy('updatedAt', 'asc'),
                     window.firebase.startAfter(last1),
                     window.firebase.limit(pageSize)
-                    window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
                 );
                 snap1 = await window.firebase.getDocs(q1);
                 snap1.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31605,7 +31598,7 @@ class FirebaseDataManager {
                 window.firebase.where('doctor', '==', doctor),
                 window.firebase.where('updatedAt', '>', sinceDate),
                 window.firebase.orderBy('updatedAt', 'asc'),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
             );
             let snap1 = await window.firebase.getDocs(q1);
             snap1.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31617,7 +31610,7 @@ class FirebaseDataManager {
                     window.firebase.where('updatedAt', '>', sinceDate),
                     window.firebase.orderBy('updatedAt', 'asc'),
                     window.firebase.startAfter(last1),
-                    window.firebase.limit(pageSize)
+                    window.firebase.limit(pageSize),
                 );
                 snap1 = await window.firebase.getDocs(q1);
                 snap1.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31628,7 +31621,7 @@ class FirebaseDataManager {
                 window.firebase.where('doctor', '==', doctor),
                 window.firebase.where('createdAt', '>', sinceDate),
                 window.firebase.orderBy('createdAt', 'asc'),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
             );
             let snap2 = await window.firebase.getDocs(q2);
             snap2.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31640,7 +31633,7 @@ class FirebaseDataManager {
                     window.firebase.where('createdAt', '>', sinceDate),
                     window.firebase.orderBy('createdAt', 'asc'),
                     window.firebase.startAfter(last2),
-                    window.firebase.limit(pageSize)
+                    window.firebase.limit(pageSize),
                 );
                 snap2 = await window.firebase.getDocs(q2);
                 snap2.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -32239,7 +32232,7 @@ class FirebaseDataManager {
             const pageSize = 100;
             const q = window.firebase.firestoreQuery(
                 window.firebase.collection(window.firebase.db, 'users'),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
             );
             const snapshot = await window.firebase.getDocs(q);
             const users = [];
@@ -32283,7 +32276,7 @@ class FirebaseDataManager {
             const q = window.firebase.firestoreQuery(
                 window.firebase.collection(window.firebase.db, 'users'),
                 window.firebase.startAfter(this.usersLastVisible),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
             );
             const snapshot = await window.firebase.getDocs(q);
             const newData = [];
@@ -34204,7 +34197,7 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             q = window.firebase.firestoreQuery(
                 colRef,
                 window.firebase.orderBy('sortDate', 'desc'),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
             );
             const snap = await window.firebase.getDocs(q);
             let arr = [];
@@ -34234,7 +34227,7 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             colRef,
             window.firebase.orderBy('sortDate', 'desc'),
             window.firebase.startAfter(last),
-            window.firebase.limit(pageSize)
+            window.firebase.limit(pageSize),
         );
         const snap2 = await window.firebase.getDocs(q);
         let arr2 = [];
@@ -34262,7 +34255,7 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             q = window.firebase.firestoreQuery(
                 colRef,
                 window.firebase.orderBy('sortDate', 'asc'),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
             );
             const snap = await window.firebase.getDocs(q);
             let arr = [];
@@ -34291,7 +34284,7 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             colRef,
             window.firebase.orderBy('sortDate', 'asc'),
             window.firebase.startAfter(last),
-            window.firebase.limit(pageSize)
+            window.firebase.limit(pageSize),
         );
         const snap2 = await window.firebase.getDocs(q);
         let arr2 = [];
