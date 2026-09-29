@@ -431,6 +431,7 @@ $('clinicSelect').addEventListener('change', (e) => {
     activeClinicIndex = Number(e.target.value) || 0;
     txPage = 1;
     renderBalance();
+    renderMyAppointments();
     renderPackages();
     renderTransactions();
     // 預約為診所級：切換診所時關閉彈窗並重新預備醫師與規則
@@ -892,8 +893,15 @@ function aptStatusText(s) {
 function renderMyAppointments() {
     const ul = $('myApptList');
     const entry = activeEntry();
+    // 只顯示「當前選中診所」的預約；舊制無 clinicId 的預約置於第一間診所
+    const cid = activeClinic() ? activeClinic().clinicId : '';
+    const isFirst = activeClinicIndex === 0;
     const list = entry && Array.isArray(entry.upcomingAppointments)
-        ? entry.upcomingAppointments : [];
+        ? entry.upcomingAppointments.filter((a) => {
+            const ac = a.clinicId || '';
+            return ac === cid || (!ac && isFirst);
+        })
+        : [];
     if (!list.length) {
         ul.innerHTML = `<li class="empty">${t('noMyAppointments')}</li>`;
         return;
