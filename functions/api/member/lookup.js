@@ -88,22 +88,26 @@ const MAX_PATIENTS = 10;
 const LIMIT_PACKAGES = 50;
 const LIMIT_TRANSACTIONS = 100;   // 舊制帳戶餘額推算可能少算極早期流水；
                                   // 新制帳戶餘額以帳戶文件為準，不受影響
-// 套票診所歸屬舉證用：舊套票無 clinicId 才需翻病歷，每頁 100 份、
-// 單一病人最多掃 1000 份（活躍病人舊寫法只取最早 50 份會算錯診所）
+// 套票診所歸屬舉證用：只有透過使用歷史、錢包帳戶與近期關聯都無法判定的
+// 舊套票才需要翻病歷。改用 (patientId, sortDate DESC) 既有複合索引由「最近」
+// 病歷往回找（有效套票的使用記錄幾乎都在近期），每頁 100 份、單一病人最多
+// 掃 200 份即停止（舊寫法由最早一頁開始翻、上限 1000 份）
 const CONS_EVIDENCE_PAGE = 100;
-const CONS_EVIDENCE_MAX = 1000;
+const CONS_EVIDENCE_MAX = 200;
 // 套票使用歷史（patientPackageHistory）舉證：舊套票可能從未在病歷的
 // financialSummaryItems 留下 packageRecordId，但新制寫入的使用歷史帶 clinicId
 const PK_HISTORY_LIMIT = 100;
 // 近期病歷關聯：只取最近一頁收集病人實際就診過的診所，確保診所選擇器
 // 列出全部診所（即使該診所錢包無資料）
 const ASSOC_PAGE = 50;
-const CLINIC_CACHE_TTL_MS = 5 * 60 * 1000;
+const CLINIC_CACHE_TTL_MS = 30 * 60 * 1000;
 let clinicCache = null; // { at, ids, nameMap }
 
-// 員工表同樣跨請求快取 5 分鐘：舊流水只有 operatorName/createdBy（使用者名稱）
-// 或 userAuthIndex 缺件時，以 users 文件的 clinicId 補足歸屬證據
-const STAFF_CACHE_TTL_MS = 5 * 60 * 1000;
+// 員工表同樣跨請求快取 30 分鐘：舊流水只有 operatorName/createdBy（使用者名稱）
+// 或 userAuthIndex 缺件時，以 users 文件的 clinicId 補足歸屬證據。
+// 診所與員工歸屬都屬罕見變更資料，延長 TTL 可把 users 全表（300 份）＋
+// clinics（50 份）的固定讀取頻率降為原來的 1/6
+const STAFF_CACHE_TTL_MS = 30 * 60 * 1000;
 let staffCache = null; // { at, byUid, byUsername }
 
 async function getStaffTable(client) {
@@ -288,22 +292,20 @@ async function fetchDocMap(client, collectionId, ids, opts = {}) {
 }
 
 // 為「無 clinicId 的舊套票」翻閱診症記錄舉證診所。
-// 游標分頁掃描（patientId == + __name__ 排序，已有複合索引），
-// 每掃完一頁：① 從 financialSummaryItems 提取 packageRecordId→clinicId；
-// ② 收集病人實際就診過的診所（patientClinicIds）；
-// ③ 對使用記錄舉證失敗的套票，找「購買同日、同名套票銷售列」舉證
+// 游標分頁掃描（patientId == + sortDate DESC，已有複合索引），由最近病歷
+// 往回找，每掃完一頁：① 從 financialSummaryItems 提取 packageRecordId→clinicId；
+// ② 對使用記錄舉證失敗的套票，找「購買同日、同名套票銷售列」舉證
 // （saleEvidence）。所有待舉證套票都找到（或掃到上限）即停止。
-// 回傳 { pkgClinicMap, saleEvidence, patientClinicIds, scanned, truncated }。
+// 回傳 { pkgClinicMap, saleEvidence, scanned, truncated }。
 async function fetchPackageClinicEvidence(client, patientId, missingPkgs) {
     const pkgClinicMap = new Map();
     const saleEvidence = new Map();
-    const patientClinicIds = new Set();
     if (!missingPkgs.length) {
-        return { pkgClinicMap, saleEvidence, patientClinicIds, scanned: 0, truncated: false };
+        return { pkgClinicMap, saleEvidence, scanned: 0, truncated: false };
     }
     const byPkgId = new Map(missingPkgs.map((p) => [String(p.id), p]));
     const unresolved = new Set(byPkgId.keys());
-    const orderBy = [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }];
+    const orderBy = [{ field: { fieldPath: 'sortDate' }, direction: 'DESCENDING' }];
     const where = eqFilter('patientId', { stringValue: patientId });
     let cursor = null;
     let scanned = 0;
@@ -324,7 +326,6 @@ async function fetchPackageClinicEvidence(client, patientId, missingPkgs) {
         batch.forEach((d) => {
             const c = d.data || {};
             const cid = c.clinicId ? String(c.clinicId) : '';
-            if (cid) patientClinicIds.add(cid);
             if (!cid) return;
             // 同一天的日期字串（HKT，以病歷有效日期為準）
             const consDay = hktDayKey(c.date) || hktDayKey(c.sortDate);
@@ -359,7 +360,7 @@ async function fetchPackageClinicEvidence(client, patientId, missingPkgs) {
         cursor = res.nextCursor;
     }
     if (unresolved.size) truncated = scanned >= CONS_EVIDENCE_MAX;
-    return { pkgClinicMap, saleEvidence, patientClinicIds, scanned, truncated };
+    return { pkgClinicMap, saleEvidence, scanned, truncated };
 }
 
 // 以套票使用歷史（patientPackageHistory）舉證：查病人最近 PK_HISTORY_LIMIT
@@ -515,55 +516,87 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
     }
 
     // ── 2. 套票 → 診所歸屬（記錄欄位 clinicId 為準；舊套票依多種證據推斷）──
-    // 待舉證的舊套票（本身無 clinicId），連同名稱與購買日期一併傳入舉證
-    const missingPkgs = pkgPage.docs
-        .filter((d) => !d.data.clinicId)
-        .map((d) => ({
-            id: d.id,
-            name: d.data.name || d.data.packageName || '',
-            purchasedAt: d.data.purchasedAt || d.data.createdAt || ''
-        }));
-    // 近期病歷關聯只在有舊資料需查證時執行，避免全為新制資料時的額外讀取
-    const needAssociation = legacyTxs.length > 0 || missingPkgs.length > 0;
-    const [evidence, historyEvidence, assocClinicIds] = await Promise.all([
-        fetchPackageClinicEvidence(client, patientId, missingPkgs),
-        fetchPackageHistoryEvidence(client, patientId),
-        needAssociation
-            ? fetchPatientAssociatedClinics(client, patientId)
-            : Promise.resolve(new Set())
-    ]);
-    const pkgUseMap = evidence.pkgClinicMap;
-    const pkgSaleMap = evidence.saleEvidence;
-
-    // ── 3. 僅保留有效套票並依證據決定診所 ──
+    // 先做有效期過濾：已用罄／過期套票不會回傳，無須為它們舉證，
+    // 可避免對大量歷史套票發生病歷掃描。
     const nowMs = Date.now();
-    const packages = pkgPage.docs
+    const validPkgDocs = pkgPage.docs
         .map((d) => ({ id: d.id, data: d.data }))
         .filter((p) => Number(p.data.remainingUses) > 0)
         .filter((p) => {
             if (!p.data.expiresAt) return true;
             const expMs = expiryToMs(p.data.expiresAt);
             return expMs === null ? true : expMs >= nowMs;
-        })
-        .map((p) => {
-            // 證據優先序：記錄 clinicId > 病歷使用列 > 套票使用歷史
-            // > 購買同日同名銷售列
-            let cid = p.data.clinicId
-                ? String(p.data.clinicId)
-                : (pkgUseMap.has(p.id) ? pkgUseMap.get(p.id)
-                    : (historyEvidence.has(p.id) ? historyEvidence.get(p.id)
-                        : (pkgSaleMap.has(p.id) ? pkgSaleMap.get(p.id) : '')));
-            return {
-                clinicId: cid || '',
-                name: p.data.name || p.data.packageName || '',
-                totalUses: Number(p.data.totalUses) || 0,
-                remainingUses: Number(p.data.remainingUses) || 0,
-                expiresAt: p.data.expiresAt || null
-            };
         });
+    // 待舉證的舊套票（有效但本身無 clinicId），連同名稱與購買日期一併傳入舉證
+    const missingPkgs = validPkgDocs
+        .filter((p) => !p.data.clinicId)
+        .map((p) => ({
+            id: p.id,
+            name: p.data.name || p.data.packageName || '',
+            purchasedAt: p.data.purchasedAt || p.data.createdAt || ''
+        }));
 
-    // 各診所帳戶文件（餘額的權威來源）
+    // 各診所帳戶文件（餘額的權威來源）先解出，同時作為單一診所便宜舉證依據
     const accountMap = new Map(accountDocs.filter(Boolean));
+
+    // 近期病歷關聯只在有舊資料需查證時執行，避免全為新制資料時的額外讀取。
+    // 使用歷史（新制寫入帶 clinicId）與近期關聯是最便宜的舉證來源，兩者平行查；
+    // 沒有舊套票時連使用歷史查詢都一併省略。
+    const needAssociation = legacyTxs.length > 0 || missingPkgs.length > 0;
+    const [historyEvidence, assocClinicIds] = await Promise.all([
+        missingPkgs.length
+            ? fetchPackageHistoryEvidence(client, patientId)
+            : Promise.resolve(new Map()),
+        needAssociation
+            ? fetchPatientAssociatedClinics(client, patientId)
+            : Promise.resolve(new Set())
+    ]);
+
+    // 便宜證據先收斂：使用歷史無法判定，且病人「有錢包帳戶或近期就診記錄」
+    // 的診所恰好只有一間時，未決舊套票必屬該診所（與後續分組階段既有的
+    // 單一診所兜底同語意，只是提前適用以免去病歷掃描）。
+    const inferredPkgClinic = new Map();
+    let scanPkgs = missingPkgs.filter((p) => !historyEvidence.has(p.id));
+    if (scanPkgs.length) {
+        const knownClinicIds = new Set([
+            ...Array.from(accountMap.keys()).filter(Boolean),
+            ...assocClinicIds
+        ]);
+        if (knownClinicIds.size === 1) {
+            const onlyCid = Array.from(knownClinicIds)[0];
+            scanPkgs.forEach((p) => inferredPkgClinic.set(p.id, onlyCid));
+            scanPkgs = [];
+        }
+    }
+
+    // 最後手段：以上皆無法判定者，才掃近期病歷（由最近往回、上限 200 份）
+    const pkgUseMap = new Map();
+    const pkgSaleMap = new Map();
+    if (scanPkgs.length) {
+        const evidence = await fetchPackageClinicEvidence(client, patientId, scanPkgs);
+        evidence.pkgClinicMap.forEach((cid, pid) => pkgUseMap.set(pid, cid));
+        evidence.saleEvidence.forEach((cid, pid) => pkgSaleMap.set(pid, cid));
+    }
+
+    // ── 3. 依證據決定有效套票的診所 ──
+    const packages = validPkgDocs.map((p) => {
+        // 證據優先序：記錄 clinicId > 病歷使用列 > 套票使用歷史
+        // > 購買同日同名銷售列 > 單一診所推論
+        const cid = p.data.clinicId
+            ? String(p.data.clinicId)
+            : (pkgUseMap.get(p.id)
+                || historyEvidence.get(p.id)
+                || pkgSaleMap.get(p.id)
+                || inferredPkgClinic.get(p.id)
+                || '');
+        return {
+            clinicId: cid || '',
+            name: p.data.name || p.data.packageName || '',
+            totalUses: Number(p.data.totalUses) || 0,
+            remainingUses: Number(p.data.remainingUses) || 0,
+            expiresAt: p.data.expiresAt || null
+        };
+    });
 
     // 會員判定（唯一權威點）：任一診所帳戶為 active 且
     // 本金＋贈送額 > 0 即為會員；frozen/closed 或零結餘均非有效會員。
@@ -778,7 +811,7 @@ export async function onRequestPost(context) {
             env.FIREBASE_RTDB_URL || ''
         );
 
-        // 診所名稱表（id → 中英文名），跨請求快取 5 分鐘；
+        // 診所名稱表（id → 中英文名），跨請求快取 30 分鐘；
         // 員工表（uid/username → clinicId）同快取，供舊資料歸屬補證；
         // 同時以一次 range 查詢取回未來 30 天掛號供會員端展示
         const [clinicTable, staffTable, upcomingMap] = await Promise.all([
