@@ -24,7 +24,8 @@ import {
     ipRateAllow,
     phoneMatchVariants,
     findPatientsByPhone,
-    fetchActiveAppointmentsForPatient,
+    fetchAppointmentsForPatient,
+    ACTIVE_STATUSES,
     rtdbPush,
     rtdbPatch,
     isoToHktDateStr,
@@ -141,8 +142,19 @@ export async function onRequestPost(context) {
             return jsonResponse({ error: 'SLOT_UNAVAILABLE', message: '此時段已滿或不可預約，請選擇其他時段' }, 409);
         }
 
-        // ── 病人既有有效預約：上限＋防重複 ──
-        const ownAppts = await fetchActiveAppointmentsForPatient(client, auth.token, patientId);
+        // ── 病人既有預約：每日上限＋有效預約上限＋防重複 ──
+        const ownAll = await fetchAppointmentsForPatient(client, auth.token, patientId);
+        // 每日一約：當日已有非取消預約即拒（含已完成之預約）
+        const sameDayCount = ownAll.filter((a) =>
+            isoToHktDateStr(a.appointmentTime) === slotDate
+            && a.status !== 'cancelled').length;
+        if (sameDayCount >= config.maxPerDayPerPatient) {
+            return jsonResponse({
+                error: 'ONE_PER_DAY',
+                message: `每日只可預約 ${config.maxPerDayPerPatient} 次，您當日已有預約`
+            }, 409);
+        }
+        const ownAppts = ownAll.filter((a) => ACTIVE_STATUSES.includes(a.status));
         if (ownAppts.length >= config.maxActivePerPatient) {
             return jsonResponse({
                 error: 'TOO_MANY_ACTIVE',

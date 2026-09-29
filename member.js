@@ -68,7 +68,7 @@ const I18N = {
         bookingDisabled: '此診所目前未開放線上預約，請致電診所掛號。',
         errNoClinic: '未能確定診所，請聯絡診所職員。',
         cancelAppointment: '取消',
-        rulesNoteTpl: '須於應診前 {a} 分鐘預約；提前 {b} 分鐘可線上取消；每人最多 {c} 個有效預約。',
+        rulesNoteTpl: '須於應診前 {a} 分鐘預約；提前 {b} 分鐘可線上取消；每人最多 {c} 個有效預約，每日只可預約 {d} 次。',
         bookingSuccess: '預約成功！請準時到診，如需更改請於「我的預約」處理。',
         cancelSuccess: '預約已取消。',
         statusRegistered: '已預約',
@@ -144,7 +144,7 @@ const I18N = {
         bookingDisabled: 'Online booking is not available for this clinic. Please call to book.',
         errNoClinic: 'Clinic could not be determined. Please contact the clinic.',
         cancelAppointment: 'Cancel',
-        rulesNoteTpl: 'Book at least {a} minutes ahead; cancel at least {b} minutes ahead; max {c} active appointments per member.',
+        rulesNoteTpl: 'Book at least {a} minutes ahead; cancel at least {b} minutes ahead; max {c} active appointments per member and {d} booking(s) per day.',
         bookingSuccess: 'Booking confirmed! Please arrive on time. Changes can be made under “My appointments”.',
         cancelSuccess: 'Appointment cancelled.',
         statusRegistered: 'Booked',
@@ -697,7 +697,8 @@ function renderRulesNote() {
     $('rulesNote').textContent = t('rulesNoteTpl')
         .replace('{a}', r.minLeadMinutes)
         .replace('{b}', r.cancelLeadMinutes)
-        .replace('{c}', r.maxActivePerPatient);
+        .replace('{c}', r.maxActivePerPatient)
+        .replace('{d}', r.maxPerDayPerPatient);
 }
 
 function renderDoctors() {
@@ -720,11 +721,22 @@ function renderBookingDates() {
     }
     sel.disabled = false;
     const start = clientHktTodayStr();
+    // 今日已過最遲營業時間（收訖）→ 不顯示今天。
+    const hmToMin = (hm) => {
+        const m = /^(\d{2}):(\d{2})$/.exec(hm || '');
+        return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
+    };
+    const nowHm = new Date(Date.now() + HKT_FIXED_OFFSET_MS).toISOString().slice(11, 16);
+    const nowMin = hmToMin(nowHm);
+    const sessions = Array.isArray(bookingRules.sessions) ? bookingRules.sessions : [];
+    const closeMin = sessions.reduce(
+        (mx, s2) => Math.max(mx, hmToMin(s2 && s2.end)), -1);
     let html = '';
     for (let i = 0; i <= bookingRules.advanceDays; i++) {
         const ds = clientAddDays(start, i);
         const wd = new Date(`${ds}T12:00:00+08:00`).getUTCDay();
         if (bookingRules.closedWeekdays.includes(wd)) continue;
+        if (i === 0 && closeMin >= 0 && nowMin >= closeMin) continue;
         let label = `${ds.slice(5)} ${t('weekdaysShort')[wd]}`;
         if (i === 0) label += ` · ${t('today')}`;
         if (i === 1) label += ` · ${t('tomorrow')}`;

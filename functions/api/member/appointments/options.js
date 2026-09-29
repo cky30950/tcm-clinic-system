@@ -51,7 +51,9 @@ export async function onRequestGet(context) {
                 minLeadMinutes: config.minLeadMinutes,
                 cancelLeadMinutes: config.cancelLeadMinutes,
                 maxActivePerPatient: config.maxActivePerPatient,
-                closedWeekdays: config.closedWeekdays
+                maxPerDayPerPatient: config.maxPerDayPerPatient,
+                closedWeekdays: config.closedWeekdays,
+                sessions: config.sessions
             },
             doctors: doctors.map((d) => ({
                 username: d.username,

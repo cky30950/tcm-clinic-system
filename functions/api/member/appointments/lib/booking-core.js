@@ -22,7 +22,8 @@ export const DEFAULT_BOOKING_CONFIG = Object.freeze({
     slotMinutes: 15,          // 每節長度（分）
     perSlotCapacity: 1,       // 每醫師每節線上名額
     dailyCapacity: 40,        // 每醫師每日線上名額上限
-    maxActivePerPatient: 3,   // 每病人同時有效預約上限
+    maxActivePerPatient: 1,   // 每病人同時有效預約上限
+    maxPerDayPerPatient: 1,   // 每病人每日預約上限
     minLeadMinutes: 60,       // 最遲於應診前 60 分鐘預約
     cancelLeadMinutes: 120,   // 最遲於應診前 120 分鐘自行取消
     closedWeekdays: [0],      // 每週休診日（0=日）
@@ -202,8 +203,8 @@ function sanitizeConfig(over) {
     if (over && typeof over === 'object') {
         if (typeof over.enabled === 'boolean') out.enabled = over.enabled;
         for (const k of ['advanceDays', 'slotMinutes', 'perSlotCapacity',
-            'dailyCapacity', 'maxActivePerPatient', 'minLeadMinutes',
-            'cancelLeadMinutes']) {
+            'dailyCapacity', 'maxActivePerPatient', 'maxPerDayPerPatient',
+            'minLeadMinutes', 'cancelLeadMinutes']) {
             const n = Number(over[k]);
             if (Number.isInteger(n) && n >= 0 && n <= 10000) out[k] = n;
         }
@@ -508,7 +509,8 @@ export async function findPatientsByPhone(client, variants) {
  * 若 RTDB Rules 未對 patientId 設索引仍可運作（伺服器全掃），建議日後加上
  * ".indexOn": ["patientId"] 以提升效能。
  */
-export async function fetchActiveAppointmentsForPatient(client, token, patientId) {
+// 病人全部掛號（不限狀態；RTDB patientId 索引一次取回）
+export async function fetchAppointmentsForPatient(client, token, patientId) {
     let data;
     try {
         data = await rtdbGet(client, token, 'appointments', {
@@ -520,8 +522,12 @@ export async function fetchActiveAppointmentsForPatient(client, token, patientId
     }
     if (!data || typeof data !== 'object') return [];
     return Object.entries(data)
-        .map(([id, v]) => ({ id, ...v }))
-        .filter((a) => ACTIVE_STATUSES.includes(a.status));
+        .map(([id, v]) => ({ id, ...v }));
+}
+
+export async function fetchActiveAppointmentsForPatient(client, token, patientId) {
+    const all = await fetchAppointmentsForPatient(client, token, patientId);
+    return all.filter((a) => ACTIVE_STATUSES.includes(a.status));
 }
 
 /* ---------------- lookup 用：批次取多病人未來掛號 ---------------- */
