@@ -25024,57 +25024,10 @@ async function restoreUser(id) {
                         return;
                     }
 
-                    // 2. dailyStats 不存在：用 Firestore 伺服器端聚合查詢拿總量級指標
-                    //    sum() + count() 不回傳任何文件，流量接近 0
-                    let serverStats = null;
-                    try {
-                        if (window.firebaseDataManager
-                            && typeof window.firebaseDataManager.getFinancialAggregates === 'function') {
-                            const aggRes = await window.firebaseDataManager.getFinancialAggregates(
-                                startDate, endDate, doctorFilter || null, clinicFilter || null
-                            );
-                            if (aggRes && aggRes.success && aggRes.data && aggRes.data.totalConsultations >= 0) {
-                                serverStats = aggRes.data;
-                            }
-                        }
-                    } catch (_aggErr) {
-                        // 聚合查詢失敗時靜默 fallback
-                    }
-
-                    if (serverStats) {
-                        const aggStats = {
-                            totalRevenue: serverStats.totalRevenue,
-                            totalConsultations: serverStats.totalConsultations,
-                            averageRevenue: serverStats.averageRevenue,
-                            activeDoctors: doctorFilter ? 1 : 0,
-                            doctorStats: {},
-                            serviceStats: {},
-                            dailyStats: {}
-                        };
-                        // 環比也用聚合查詢，不拉全量
-                        loadFinancialPrevPeriodInBackground(cacheKey, aggStats, startDate, endDate, doctorFilter, clinicFilter);
-                        const [costRes] = await Promise.all([
-                            getApportionedCost(startDate, endDate, clinicFilter || null),
-                            refreshWalletFinancialSection(startDate, endDate, clinicFilter)
-                        ]);
-                        aggStats.totalCost = costRes.totalCost;
-                        aggStats.netRevenue = aggStats.totalRevenue - costRes.totalCost;
-                        aggStats.costProrated = costRes.prorated;
-
-                        updateFinancialKeyMetrics(aggStats);
-                        updateFinancialTables([], aggStats);
-
-                        const entry = buildFinancialCacheEntry([], aggStats, new Date().toISOString());
-                        financialReportCache[cacheKey] = entry;
-                        writePersistedFinancialCache(cacheKey, entry);
-                        financialReportLastKey = cacheKey;
-                        financialReportLastRunAt = Date.now();
-                        document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
-                        showToast('財務報表已更新（伺服器聚合，點擊表格可鑽取明細）！', 'success');
-                        return;
-                    }
-
-                    // 3. 最後 fallback：拉全量 consultations（最慢，但最完整）
+                    // 2. dailyStats 不存在：直接拉全量 consultations（最可靠的 fallback）
+                    //    伺服器端聚合查詢（getFinancialAggregates）只有在確認
+                    //    consultationFinancialSummaries 有完整資料後才會啟用，
+                    //    否則查詢成功但回 0 筆會導致畫面全零。
                     await loadConsultationsForFinancial();
                 } catch (err) {
                     console.error('載入財務資料失敗:', err);
@@ -25231,40 +25184,15 @@ async function restoreUser(id) {
                 const lengthDays = enumerateFinancialDates(startDate, endDate).length;
                 const prevEnd = shiftFinancialDate(startDate, -1);
                 const prevStart = shiftFinancialDate(prevEnd, -(lengthDays - 1));
-
-                // 優先用 Firestore 聚合查詢（不回傳文件，最快）
-                let prevTotalRevenue = 0, prevTotalConsultations = 0, prevAverageRevenue = 0, prevActiveDoctors = 0;
-                let usedServerAgg = false;
-                try {
-                    if (window.firebaseDataManager && typeof window.firebaseDataManager.getFinancialAggregates === 'function') {
-                        const aggRes = await window.firebaseDataManager.getFinancialAggregates(prevStart, prevEnd, doctorFilter, clinicFilter);
-                        if (aggRes && aggRes.success && aggRes.data) {
-                            prevTotalRevenue = aggRes.data.totalRevenue || 0;
-                            prevTotalConsultations = aggRes.data.totalConsultations || 0;
-                            prevAverageRevenue = aggRes.data.averageRevenue || 0;
-                            prevActiveDoctors = doctorFilter ? 1 : 0;
-                            usedServerAgg = true;
-                        }
-                    }
-                } catch (_aggErr) {}
-
-                // 聚合查詢失敗時 fallback 到拉全量
-                if (!usedServerAgg) {
-                    const prevRecords = await fetchFinancialRecordsForRange(prevStart, prevEnd, doctorFilter, clinicFilter);
-                    const prevStats = calculateFinancialStatistics(prevRecords);
-                    prevTotalRevenue = prevStats.totalRevenue;
-                    prevTotalConsultations = prevStats.totalConsultations;
-                    prevAverageRevenue = prevStats.averageRevenue;
-                    prevActiveDoctors = prevStats.activeDoctors;
-                }
-
+                const prevRecords = await fetchFinancialRecordsForRange(prevStart, prevEnd, doctorFilter, clinicFilter);
+                const prevStats = calculateFinancialStatistics(prevRecords);
                 stats.prevPeriod = {
                     startDate: prevStart,
                     endDate: prevEnd,
-                    totalRevenue: prevTotalRevenue,
-                    totalConsultations: prevTotalConsultations,
-                    averageRevenue: prevAverageRevenue,
-                    activeDoctors: prevActiveDoctors
+                    totalRevenue: prevStats.totalRevenue,
+                    totalConsultations: prevStats.totalConsultations,
+                    averageRevenue: prevStats.averageRevenue,
+                    activeDoctors: prevStats.activeDoctors
                 };
             } catch (_e) {}
             return stats;
