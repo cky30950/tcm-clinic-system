@@ -1,5 +1,5 @@
 
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
 import {
   collection,
   addDoc,
@@ -28,8 +28,12 @@ import {
   serverTimestamp as firestoreServerTimestamp,
   onSnapshot,
   clearIndexedDbPersistence,
-  terminate
-} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+  terminate,
+  select,
+  sum,
+  average,
+  getAggregateFromServer
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
 import { getDatabase, ref, set, get, update, remove, onValue, off,
 
         onChildAdded,
@@ -45,14 +49,14 @@ import { getDatabase, ref, set, get, update, remove, onValue, off,
         startAt,
         endAt,
         
-        limitToLast } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+        limitToLast } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, signOut, setPersistence,
         browserSessionPersistence, browserLocalPersistence,
         createUserWithEmailAndPassword, updateProfile,
         
         updatePassword, deleteUser as firebaseDeleteUser, EmailAuthProvider, reauthenticateWithCredential,
         
-        onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
 
 
 import firebaseConfig from './firebaseConfig.js';
@@ -180,6 +184,10 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         onSnapshot,
         clearIndexedDbPersistence,
         terminate,
+        select,
+        sum,
+        average,
+        getAggregateFromServer,
         
         ref,
         set,

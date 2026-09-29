@@ -31136,7 +31136,8 @@ class FirebaseDataManager {
                 colRef,
                 ...parts,
                 window.firebase.orderBy('sortDate', 'asc'),
-                window.firebase.limit(500)
+                window.firebase.limit(500),
+                window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
             );
             const snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31162,8 +31163,6 @@ class FirebaseDataManager {
             const pageSize = 300;
             const baseParts = [];
             if (clinicFilter) baseParts.push(window.firebase.where('clinicId', '==', clinicFilter));
-            // dailyFinancialStats 本身就是小聚合文件，全部欄位都會用到，
-            // 但仍加 select 確保不帶入多餘的 Firestore metadata
             const DAILY_STATS_FIELDS = [
                 'dateKey', 'sortDate', 'clinicId', 'clinicName',
                 'totalRevenue', 'totalConsultations', 'averageRevenue',
@@ -31176,7 +31175,8 @@ class FirebaseDataManager {
                 window.firebase.orderBy('sortDate', 'asc'),
                 window.firebase.where('sortDate', '>=', start),
                 window.firebase.where('sortDate', '<=', end),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
+                window.firebase.select(...DAILY_STATS_FIELDS)
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31190,7 +31190,8 @@ class FirebaseDataManager {
                     window.firebase.where('sortDate', '>=', start),
                     window.firebase.where('sortDate', '<=', end),
                     window.firebase.startAfter(lastVisible),
-                    window.firebase.limit(pageSize)
+                    window.firebase.limit(pageSize),
+                    window.firebase.select(...DAILY_STATS_FIELDS)
                 );
                 snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31306,6 +31307,7 @@ class FirebaseDataManager {
                 window.firebase.where('sortDate', '>=', start),
                 window.firebase.where('sortDate', '<=', end),
                 window.firebase.limit(pageSize)
+                window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31320,6 +31322,7 @@ class FirebaseDataManager {
                     window.firebase.where('sortDate', '<=', end),
                     window.firebase.startAfter(lastVisible),
                     window.firebase.limit(pageSize)
+                    window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
                 );
                 snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31353,6 +31356,7 @@ class FirebaseDataManager {
                 ...parts,
                 window.firebase.orderBy('syncedAt', 'asc'),
                 window.firebase.limit(pageSize)
+                window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31365,6 +31369,7 @@ class FirebaseDataManager {
                     window.firebase.orderBy('syncedAt', 'asc'),
                     window.firebase.startAfter(lastVisible),
                     window.firebase.limit(pageSize)
+                    window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
                 );
                 snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31440,6 +31445,7 @@ class FirebaseDataManager {
                     window.firebase.where(fieldName, '>=', startValue),
                     window.firebase.where(fieldName, '<=', endValue),
                     window.firebase.limit(pageSize)
+                    window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
                 );
                 let snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31453,6 +31459,7 @@ class FirebaseDataManager {
                         window.firebase.where(fieldName, '<=', endValue),
                         window.firebase.startAfter(lastVisible),
                         window.firebase.limit(pageSize)
+                        window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
                     );
                     snap = await window.firebase.getDocs(q);
                     snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31499,6 +31506,7 @@ class FirebaseDataManager {
                 window.firebase.where('doctor', '==', doctor),
                 window.firebase.orderBy('date', 'asc'),
                 window.firebase.limit(pageSize)
+                window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31511,6 +31519,7 @@ class FirebaseDataManager {
                     window.firebase.orderBy('date', 'asc'),
                     window.firebase.startAfter(lastVisible),
                     window.firebase.limit(pageSize)
+                    window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
                 );
                 snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31550,6 +31559,7 @@ class FirebaseDataManager {
                 window.firebase.where('updatedAt', '>', sinceDate),
                 window.firebase.orderBy('updatedAt', 'asc'),
                 window.firebase.limit(pageSize)
+                window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
             );
             let snap1 = await window.firebase.getDocs(q1);
             snap1.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31562,6 +31572,7 @@ class FirebaseDataManager {
                     window.firebase.orderBy('updatedAt', 'asc'),
                     window.firebase.startAfter(last1),
                     window.firebase.limit(pageSize)
+                    window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
                 );
                 snap1 = await window.firebase.getDocs(q1);
                 snap1.forEach(d => list.push({ id: d.id, ...d.data() }));

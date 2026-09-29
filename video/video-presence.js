@@ -47,7 +47,7 @@
     'use strict';
 
     var COLLECTION = 'videoPresence';
-    var FIRESTORE_VERSION = '10.7.1';
+    var FIRESTORE_VERSION = '12.15.0';
     var FIRESTORE_MODULE_URL =
         'https://www.gstatic.com/firebasejs/' + FIRESTORE_VERSION + '/firebase-firestore.js';
 
