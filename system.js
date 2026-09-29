@@ -8290,6 +8290,52 @@ async function logout() {
             clearPatientMedicalProfileForm();
         }
 
+/**
+ * 以電話號碼尋找既有病人（病人資料管理防重複登記用）。
+ * 比對策略：
+ *   1. 先查本機病人快取（純數字歸一，零網路開銷）；
+ *   2. 再以 Firestore equality 查詢做權威確認，避免快取過期漏判。
+ * 緊急聯絡人電話不屬病人主電話，不在此檢查範圍。
+ *
+ * @param {string} phone 表單輸入之病人電話
+ * @param {string} [excludePatientId] 編輯時排除當前病人自身
+ * @returns {Promise<object|null>} 命中之病人記錄；查詢服務異常時回 null
+ */
+async function findPatientByPhone(phone, excludePatientId) {
+    const normalized = String(phone || '').replace(/\D/g, '');
+    const isOther = (p) => p
+        && String(p.id) !== String(excludePatientId || '')
+        && String(p.phone || '').replace(/\D/g, '') === normalized;
+
+    // 1) 本機快取
+    try {
+        const cached = await window.firebaseDataManager.getPatients();
+        if (cached && cached.success && Array.isArray(cached.data)) {
+            const hit = cached.data.find(isOther);
+            if (hit) return hit;
+        }
+    } catch (_cacheErr) { /* 快取不可用就走遠端 */ }
+
+    // 2) Firestore 權威 equality 查詢
+    try {
+        const dupQuery = window.firebase.firestoreQuery(
+            window.firebase.collection(window.firebase.db, 'patients'),
+            window.firebase.where('phone', '==', String(phone).trim())
+        );
+        const snapshot = await window.firebase.getDocs(dupQuery);
+        let found = null;
+        snapshot.forEach((docSnap) => {
+            if (found) return;
+            if (String(docSnap.id) === String(excludePatientId || '')) return;
+            found = { id: docSnap.id, ...docSnap.data() };
+        });
+        return found;
+    } catch (queryErr) {
+        console.error('電話重複查詢失敗:', queryErr);
+        return null;
+    }
+}
+
 async function savePatient() {
     if (editingPatientId && !hasActionPermission('patientEdit')) {
         showToast('權限不足，無法編輯病人資料', 'error');
@@ -8351,7 +8397,18 @@ async function savePatient() {
         return;
     }
 
-    
+    // 電話號碼唯一性：新增及編輯均不可與其他病人重複
+    // （緊急聯絡人電話不在管制範圍）；編輯時排除病人自身
+    const duplicatePatient = await findPatientByPhone(patient.phone, editingPatientId);
+    if (duplicatePatient) {
+        showToast(
+            `電話號碼已使用於病人「${duplicatePatient.name || duplicatePatient.id}」，不可重複登記！`,
+            'error'
+        );
+        return;
+    }
+
+
 
     
     

@@ -268,7 +268,7 @@ async function fetchPackageClinicEvidence(client, patientId, neededPkgIds) {
 
 async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clinicIds, upcomingMap) {
     const patientId = patientDoc.id;
-    const [pkgPage, txPage, accountDocs] = await Promise.all([
+    const [accountDocs, pkgPage, txPage] = await Promise.all([
         // 每診所獨立帳戶：平行讀取各診所的複合 ID 帳戶文件
         Promise.all((clinicIds || []).map(async (cid) => {
             try {
@@ -585,9 +585,11 @@ export async function onRequestPost(context) {
                 message: error.clientMessage || '人機驗證未完成設定'
             }, error.status || 500);
         }
+        // 不把原始錯誤細節（可能含內部路徑/資料）回傳給客戶端，
+        // 完整內容只進伺服器 log
         return jsonResponse({
             error: 'LOOKUP_FAILED',
-            message: error && error.message ? error.message : '查詢服務發生錯誤'
+            message: '查詢服務發生錯誤，請稍後再試'
         }, 500);
     }
 }
