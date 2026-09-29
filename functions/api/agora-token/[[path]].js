@@ -34,7 +34,7 @@ import { authenticateStaff } from '../attachments/lib/auth.js';
 import { validateRoomSession, touchRoomSession } from './lib/room-pass.js';
 import { assertChannelConsent } from './lib/consent.js';
 import { enforceAnonRateLimit } from '../_lib/rate-limit.js';
-
+import { apiHeaders as _apiHeaders } from '../_lib/cors.js';
 const TOKEN_VERSION = '007';
 
 // Service type
@@ -199,18 +199,19 @@ export async function buildRtcToken(appId, appCertificate, channelName, uid, exp
 }
 
 function corsHeaders() {
-    return {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Room-Session',
-        'Access-Control-Max-Age': '86400'
-    };
+    return _apiHeaders({
+        methods: 'GET, OPTIONS',
+        headers: 'Authorization, Content-Type, X-Room-Session, Idempotency-Key'
+    });
 }
 
 function jsonResponse(data, status) {
     return new Response(JSON.stringify(data), {
         status: status || 200,
-        headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, corsHeaders())
+        headers: Object.assign(
+            { 'Content-Type': 'application/json; charset=utf-8' },
+            corsHeaders()
+        )
     });
 }
 

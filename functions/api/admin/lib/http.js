@@ -5,14 +5,16 @@
 import { authenticateAdmin } from '../../backup/lib/http.js';
 import { getAccessToken, verifyIdToken, extractBearerToken, getServiceAccount } from '../../backup/lib/google-auth.js';
 import { FirestoreClient } from '../../backup/lib/firestore.js';
+import { corsHeaders as _corsHeaders } from '../../_lib/cors.js';
 
-export function corsHeaders() {
-    return {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Admin-Bootstrap-Secret',
-        'Access-Control-Max-Age': '86400'
-    };
+/**
+ * 動態 CORS + 安全響應標頭（讀取 setRequestContext 設定的上下文）。
+ */
+export function corsHeaders(options) {
+    return _corsHeaders(Object.assign({
+        methods: 'POST, OPTIONS',
+        headers: 'Authorization, Content-Type, X-Admin-Bootstrap-Secret, Idempotency-Key'
+    }, options));
 }
 
 /**
@@ -103,7 +105,10 @@ export async function resolveStaffUser(env, claims) {
 export function jsonResponse(data, status = 200) {
     return new Response(JSON.stringify(data), {
         status,
-        headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, corsHeaders())
+        headers: Object.assign(
+            { 'Content-Type': 'application/json; charset=utf-8' },
+            corsHeaders()
+        )
     });
 }
 

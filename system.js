@@ -7281,9 +7281,10 @@ const LOCAL_CLINIC_DATA_PREFIXES = Object.freeze([
     'patientConsultations:',   // 單一病人病歷快取
     'patientPackages_',        // 單一病人收費套票快取
     'tcmDraft:consultation:',  // 診症症狀草稿（含病人 ID／掛號號／主訴）
-    'billingItems_',           // 分科診所收費項目快取
+    'billingItems_',           // 分科診所收費項目快取（getClinicScopedStorageKey 產生）
     'chat_lastSeen_',          // 聊天未讀時間（依員工 UID）
     'chat_lastPreview_',       // 聊天訊息預覽（依員工 UID）
+    'chat_bootstrapEmpty_',   // 聊天啟動負快取（依員工 UID）
     'tcm-video-consent:'       // 視訊同意書本機記錄（含頻道／掛號號）
 ]);
 function clearLocalClinicData() {

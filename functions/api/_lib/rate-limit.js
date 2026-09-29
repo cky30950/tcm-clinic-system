@@ -25,6 +25,8 @@
  * session uploadCount 強制上限作為第二道防線。
  * ============================================================ */
 
+import { apiHeaders as _apiHeaders } from './cors.js';
+
 // 各限流桶：key 為 KV／綁定計數鍵前綴；defaultLimit 為每分鐘請求數
 export const RL_BUCKETS = {
     // 病人入房換發 RTC token：正常入房 1～2 次，宽限重試與重連
@@ -65,12 +67,10 @@ function readLimit(env, bucket) {
 }
 
 function corsHeaders() {
-    return {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Room-Session',
-        'Access-Control-Max-Age': '86400'
-    };
+    return _apiHeaders({
+        methods: 'GET, POST, OPTIONS',
+        headers: 'Authorization, Content-Type, X-Room-Session, Idempotency-Key'
+    });
 }
 
 /**

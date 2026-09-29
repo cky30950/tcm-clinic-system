@@ -967,14 +967,14 @@
         var visitLabel = '';
         if (gallery.scope === 'patient') {
             visitLabel = doc.consultationId
-                ? tt('診症') + ' ' + (doc.consultationDate || '')
+                ? tt('診症') + ' ' + esc(doc.consultationDate || '')
                 : '<span class="text-amber-600">' + tt('未歸檔診症') + '</span>';
         } else if (mixedVisitView) {
             // 本次／過往一目了然：本次掛藍色標記，過往顯示所屬診症日期
             visitLabel = isCurrentVisitDoc(doc)
                 ? '<span class="text-blue-700">■ ' + tt('本次診症') + '</span>'
                 : (doc.consultationId
-                    ? tt('診症') + ' ' + (doc.consultationDate || '')
+                    ? tt('診症') + ' ' + esc(doc.consultationDate || '')
                     : '<span class="text-amber-600">' + tt('未歸檔診症') + '</span>');
         }
         var delBtn = canDelete(doc)
