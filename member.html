@@ -173,6 +173,46 @@
         .pill.consulting { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
         .pill.cancelled { background: #f3f4f6; color: var(--muted); border-color: var(--line); }
 
+        /* 我的預約卡標題列：標題左、預約按鈕右 */
+        .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+        .card-head h2 { margin: 0; }
+        .book-open-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: var(--brand); color: #fff; border: none;
+            border-radius: 8px; padding: 7px 13px; font-size: 13px;
+            font-weight: 600; cursor: pointer; white-space: nowrap;
+        }
+        .book-open-btn:active { background: var(--brand-dark); }
+        .book-open-btn:disabled { opacity: .55; cursor: default; }
+
+        /* 預約彈窗 */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            background: rgba(17,24,39,.45);
+            display: flex; align-items: flex-end; justify-content: center;
+        }
+        .modal-overlay.hidden { display: none; }
+        .modal {
+            background: #fff; width: 100%; max-width: 560px;
+            max-height: 92vh; overflow-y: auto;
+            border-radius: 18px 18px 0 0; padding: 20px 20px 24px;
+        }
+        @media (min-width: 600px) {
+            .modal-overlay { align-items: center; padding: 20px; }
+            .modal { border-radius: 18px; }
+        }
+        .modal-head {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; margin-bottom: 6px;
+        }
+        .modal-head h2 { margin: 0; }
+        .modal-close {
+            border: none; background: #f3f4f6; color: var(--muted);
+            width: 30px; height: 30px; border-radius: 999px;
+            font-size: 16px; line-height: 1; cursor: pointer;
+        }
+        .modal-sub { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+
         /* 線上預約 */
         .slot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
         .slot {
@@ -280,58 +320,16 @@
 
         <div class="tabs" id="patientTabs"></div>
 
-        <!-- 線上預約掛號 -->
-        <div class="card" id="bookingCard">
-            <h2>📅 <span data-i18n="bookingTitle">線上預約掛號</span></h2>
-            <p class="sub" data-i18n="bookingSub">選擇醫師、應診日期及時段，24 小時均可線上預約。</p>
-
-            <div class="msg info hidden" id="bookingDisabledMsg"></div>
-
-            <div id="bookingForm">
-                <p class="rules-note" id="rulesNote"></p>
-
-                <div class="field">
-                    <label for="bookingDoctor" data-i18n="doctorLabel">醫師</label>
-                    <select id="bookingDoctor">
-                        <option value="" data-i18n="selectDoctorPrompt">請選擇醫師</option>
-                    </select>
-                </div>
-
-                <div class="field">
-                    <label for="bookingDate" data-i18n="dateLabel">應診日期</label>
-                    <select id="bookingDate" disabled>
-                        <option value="" data-i18n="selectDatePrompt">請先選擇醫師</option>
-                    </select>
-                </div>
-
-                <div class="field hidden" id="slotField">
-                    <label data-i18n="slotLabel">應診時段</label>
-                    <div class="slot-grid" id="slotGrid"></div>
-                    <p class="hint hidden" id="slotDayHint"></p>
-                </div>
-
-                <div class="field hidden" id="complaintField">
-                    <label for="bookingComplaint" data-i18n="complaintLabel">主訴（選填）</label>
-                    <input type="text" id="bookingComplaint" maxlength="200"
-                           data-i18n-ph="complaintPlaceholder">
-                    <p class="hint" data-i18n="complaintHint">可簡單描述不適，方便醫師事前準備。</p>
-                </div>
-
-                <div class="turnstile-box" id="bookingTurnstileBox">
-                    <div id="bookingTurnstile"></div>
-                </div>
-
-                <button class="btn" id="confirmBookingBtn" type="button" disabled
-                        data-i18n="confirmBooking">確認預約</button>
-
-                <div class="msg" id="bookingMsg"></div>
-            </div>
-        </div>
-
-        <!-- 我的預約 -->
+        <!-- 我的預約（右上角按鈕開啟預約彈窗） -->
         <div class="card">
-            <h2>📆 <span data-i18n="myAppointments">我的預約</span></h2>
+            <div class="card-head">
+                <h2>📆 <span data-i18n="myAppointments">我的預約</span></h2>
+                <button class="book-open-btn" id="openBookingBtn" type="button">
+                    ＋ <span data-i18n="bookingTitle">線上預約掛號</span>
+                </button>
+            </div>
             <ul class="list" id="myApptList"></ul>
+            <div class="msg" id="myApptMsg"></div>
         </div>
 
         <div class="card">
@@ -347,6 +345,59 @@
 
         <div class="footer-actions">
             <button class="btn ghost" id="backBtn" type="button" data-i18n="back">返回</button>
+        </div>
+    </div>
+</div>
+
+<!-- 線上預約彈窗 -->
+<div class="modal-overlay hidden" id="bookingModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="bookingModalTitle">
+        <div class="modal-head">
+            <h2 id="bookingModalTitle">📅 <span data-i18n="bookingTitle">線上預約掛號</span></h2>
+            <button class="modal-close" id="closeBookingBtn" type="button" aria-label="Close">✕</button>
+        </div>
+        <p class="modal-sub" data-i18n="bookingSub">選擇醫師、應診日期及時段，24 小時均可線上預約。</p>
+
+        <div class="msg info hidden" id="bookingDisabledMsg"></div>
+
+        <div id="bookingForm">
+            <p class="rules-note" id="rulesNote"></p>
+
+            <div class="field">
+                <label for="bookingDoctor" data-i18n="doctorLabel">醫師</label>
+                <select id="bookingDoctor">
+                    <option value="" data-i18n="selectDoctorPrompt">請選擇醫師</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="bookingDate" data-i18n="dateLabel">應診日期</label>
+                <select id="bookingDate" disabled>
+                    <option value="" data-i18n="selectDatePrompt">請先選擇醫師</option>
+                </select>
+            </div>
+
+            <div class="field hidden" id="slotField">
+                <label data-i18n="slotLabel">應診時段</label>
+                <div class="slot-grid" id="slotGrid"></div>
+                <p class="hint hidden" id="slotDayHint"></p>
+            </div>
+
+            <div class="field hidden" id="complaintField">
+                <label for="bookingComplaint" data-i18n="complaintLabel">主訴（選填）</label>
+                <input type="text" id="bookingComplaint" maxlength="200"
+                       data-i18n-ph="complaintPlaceholder">
+                <p class="hint" data-i18n="complaintHint">可簡單描述不適，方便醫師事前準備。</p>
+            </div>
+
+            <div class="turnstile-box" id="bookingTurnstileBox">
+                <div id="bookingTurnstile"></div>
+            </div>
+
+            <button class="btn" id="confirmBookingBtn" type="button" disabled
+                    data-i18n="confirmBooking">確認預約</button>
+
+            <div class="msg" id="bookingMsg"></div>
         </div>
     </div>
 </div>

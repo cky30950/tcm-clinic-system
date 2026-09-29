@@ -457,6 +457,26 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
         });
     });
 
+    // 單一診所兜底：舊制（多診所功能上線前）流水及其掛號皆無 clinicId，
+    // 直接推斷會落入「未分組」。若此病人的全部帳戶與已歸屬流水只涉及
+    // 一間明確診所，這些舊資料必屬於該診所，予以併入，避免診所選擇器
+    // 出現無法操作的「未分組」。
+    const definiteCids = Array.from(groups.keys()).filter((x) => x);
+    if (definiteCids.length === 1 && groups.has('')) {
+        const target = ensureGroup(definiteCids[0]);
+        const orphan = groups.get('');
+        target.derivedBalance += orphan.derivedBalance;
+        target.derivedBonus += orphan.derivedBonus;
+        target.packages.push(...orphan.packages);
+        target.transactions.push(...orphan.transactions);
+        target.transactions.sort(
+            (a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+        if (target.transactions.length > 30) {
+            target.transactions.length = 30;
+        }
+        groups.delete('');
+    }
+
     const round2 = (n) => Math.round(n * 100) / 100;
     const clinics = Array.from(groups.values())
         // 未分組（''）若完全無交易則不顯示；有帳戶的明確診所一律顯示

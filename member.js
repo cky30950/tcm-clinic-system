@@ -76,6 +76,9 @@ const I18N = {
         errBookingFailed: '預約失敗，請稍後再試',
         errCancelFailed: '取消失敗，請稍後再試',
         errNeedSlot: '請先選擇應診時段',
+        humanVerifyTitle: '取消預約',
+        humanVerifyPrompt: '請完成人機驗證以確認取消預約。',
+        humanVerifyCancel: '放棄',
         today: '今天',
         tomorrow: '明天',
         weekdaysShort: ['日', '一', '二', '三', '四', '五', '六'],
@@ -148,6 +151,9 @@ const I18N = {
         errBookingFailed: 'Booking failed, please try again later',
         errCancelFailed: 'Cancellation failed, please try again later',
         errNeedSlot: 'Please select a time slot first',
+        humanVerifyTitle: 'Cancel appointment',
+        humanVerifyPrompt: 'Please complete the verification to confirm cancellation.',
+        humanVerifyCancel: 'Dismiss',
         today: 'Today',
         tomorrow: 'Tomorrow',
         weekdaysShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
@@ -427,15 +433,16 @@ $('clinicSelect').addEventListener('change', (e) => {
     renderBalance();
     renderPackages();
     renderTransactions();
-    // 預約表單為診所級，切換診所時重新載入醫師與規則
-    resetBookingForClinic();
+    // 預約為診所級：切換診所時關閉彈窗並重新預備醫師與規則
+    closeBookingModal();
+    prepareBooking();
 });
 
 $('backBtn').addEventListener('click', () => {
+    closeBookingModal();
     $('dataView').classList.add('hidden');
     $('authView').classList.remove('hidden');
     resetTurnstile();
-    removeBookingWidget();
 });
 
 /* ---------------- 渲染 ---------------- */
@@ -597,7 +604,7 @@ function renderAll() {
     renderBalance();
     renderPackages();
     renderTransactions();
-    initBooking();
+    prepareBooking();
 }
 
 /* ============================================================
@@ -915,8 +922,10 @@ function renderMyAppointments() {
     ul.querySelectorAll('.cancel-btn').forEach((b) => {
         b.addEventListener('click', async () => {
             if (b.disabled) return;
-            if (!bookingToken) { showBookingMsg('errCaptcha'); return; }
             const id = b.getAttribute('data-id');
+            // 取消操作獨立以小彈窗完成人機驗證（無需打開預約表單）
+            const humanToken = await promptTurnstile();
+            if (!humanToken) return;
             b.disabled = true;
             try {
                 const res = await fetch('/api/member/appointments/cancel', {
@@ -924,13 +933,13 @@ function renderMyAppointments() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         phone: lastPhone,
-                        turnstileToken: bookingToken,
+                        turnstileToken: humanToken,
                         appointmentId: id
                     })
                 });
                 const data = await res.json().catch(() => null);
                 if (!res.ok) {
-                    showBookingMsg((data && data.message) || 'errCancelFailed');
+                    showMyApptMsg((data && data.message) || 'errCancelFailed');
                     b.disabled = false;
                     return;
                 }
@@ -938,14 +947,11 @@ function renderMyAppointments() {
                     .filter((x) => x.id !== id);
                 renderMyAppointments();
                 if (bookingState.slotsData) refreshSlots();
-                showBookingMsg('cancelSuccess', 'info');
+                showMyApptMsg('cancelSuccess', 'info');
             } catch (e) {
                 console.error('cancel error:', e);
-                showBookingMsg('errCancelFailed');
+                showMyApptMsg('errCancelFailed');
                 b.disabled = false;
-            } finally {
-                resetBookingWidget();
-                setBookingEnabled();
             }
         });
     });
@@ -990,22 +996,38 @@ function removeBookingWidget() {
     bookingWidgetId = null;
 }
 
-/* ---------------- 初始化 / 重設 ---------------- */
+/* ---------------- 「我的預約」卡訊息 ---------------- */
 
-async function initBooking() {
-    removeBookingWidget();
-    clearBookingMsg();
+function showMyApptMsg(keyOrText, kind = 'error') {
+    const el = $('myApptMsg');
+    el.textContent = I18N[lang][keyOrText] || keyOrText;
+    el.className = 'msg ' + kind;
+}
+
+/* ---------------- 背景預備（查詢成功/切換診所後） ---------------- */
+
+let bookingPrepPromise = null;
+let bookingReady = false;       // options 已成功載入
+let bookingAvailable = false;   // 診所目前有開放線上預約
+let bookingPrepError = '';      // 預備失敗之訊息 key
+
+function resetBookingFormState() {
     bookingState = { doctor: '', date: '', slotsData: null, selected: null };
     $('slotField').classList.add('hidden');
     $('complaintField').classList.add('hidden');
     $('bookingComplaint').value = '';
+}
 
+async function doPrepareBooking() {
     renderMyAppointments();
+    bookingReady = false;
+    bookingAvailable = false;
+    bookingPrepError = '';
 
     const cid = currentBookingClinic();
     bookingClinicId = cid;
     if (!cid) {
-        setBookingDisabledForm('errNoClinic');
+        bookingPrepError = 'errNoClinic';
         return;
     }
     let opt;
@@ -1013,12 +1035,35 @@ async function initBooking() {
         opt = await loadOptions(cid);
     } catch (e) {
         console.error('load booking options failed:', e);
-        setBookingDisabledForm('errBookingFailed');
+        bookingPrepError = 'errBookingFailed';
         return;
     }
     bookingRules = opt.rules;
     bookingDoctors = Array.isArray(opt.doctors) ? opt.doctors : [];
-    if (!opt.enabled) {
+    bookingAvailable = !!opt.enabled;
+    bookingReady = true;
+}
+
+function prepareBooking() {
+    bookingPrepPromise = doPrepareBooking();
+    return bookingPrepPromise;
+}
+
+/* ---------------- 預約彈窗開關 ---------------- */
+
+async function openBookingModal() {
+    // 等待背景預備完成（避免與診所切換時的預備競態）
+    await (bookingPrepPromise || prepareBooking());
+
+    clearBookingMsg();
+    resetBookingFormState();
+    $('bookingModal').classList.remove('hidden');
+
+    if (bookingPrepError) {
+        setBookingDisabledForm(bookingPrepError);
+        return;
+    }
+    if (!bookingAvailable) {
         setBookingDisabledForm('bookingDisabled');
         return;
     }
@@ -1026,13 +1071,107 @@ async function initBooking() {
     renderDoctors();
     renderBookingDates();
     renderRulesNote();
+    // 彈窗可見後才渲染 Turnstile，避免 hidden 容器影響 widget 初始化
     initBookingWidget();
 }
 
-function resetBookingForClinic() {
-    if ($('dataView').classList.contains('hidden')) return;
-    initBooking();
+function closeBookingModal() {
+    const modal = $('bookingModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    removeBookingWidget();
+    clearBookingMsg();
+    resetBookingFormState();
 }
+
+$('openBookingBtn').addEventListener('click', openBookingModal);
+$('closeBookingBtn').addEventListener('click', closeBookingModal);
+
+// 點擊遮罩（彈窗外圍）關閉；點擊彈窗本體不關
+$('bookingModal').addEventListener('click', (e) => {
+    if (e.target === $('bookingModal')) closeBookingModal();
+});
+
+/* ---------------- 取消驗證小彈窗（動態建立，單一實例重用） ---------------- */
+
+let humanVerifyEl = null;
+let humanVerifyWidgetId = null;
+let humanVerifyResolver = null;
+
+function ensureHumanVerifyEl() {
+    if (humanVerifyEl) return humanVerifyEl;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal" role="dialog" aria-modal="true" style="max-width:380px">
+            <div class="modal-head">
+                <h2 id="humanVerifyTitleText"></h2>
+                <button class="modal-close" type="button">✕</button>
+            </div>
+            <p class="modal-sub" id="humanVerifyPromptText"></p>
+            <div id="humanVerifyTurnstile"></div>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeHumanVerify(null);
+    });
+    overlay.querySelector('.modal-close').addEventListener('click',
+        () => closeHumanVerify(null));
+    humanVerifyEl = overlay;
+    return overlay;
+}
+
+function closeHumanVerify(token) {
+    if (humanVerifyWidgetId !== null && window.turnstile) {
+        try { window.turnstile.remove(humanVerifyWidgetId); } catch (_e) {}
+    }
+    humanVerifyWidgetId = null;
+    if (humanVerifyEl) humanVerifyEl.classList.add('hidden');
+    const resolve = humanVerifyResolver;
+    humanVerifyResolver = null;
+    if (resolve) resolve(token);
+}
+
+/**
+ * 彈出人機驗證小彈窗。
+ * @returns {Promise<string|null>} 成功回傳 token；放棄/關閉/未設定回 null
+ */
+function promptTurnstile() {
+    return new Promise((resolve) => {
+        const overlay = ensureHumanVerifyEl();
+        overlay.querySelector('#humanVerifyTitleText').textContent =
+            t('humanVerifyTitle');
+        overlay.querySelector('#humanVerifyPromptText').textContent =
+            t('humanVerifyPrompt');
+        humanVerifyResolver = resolve;
+        humanVerifyWidgetId = null;
+        overlay.classList.remove('hidden');
+
+        if (!turnstileSiteKey || !window.turnstile) {
+            // 驗證未完成設定：無法核對，直接結束
+            closeHumanVerify(null);
+            return;
+        }
+        humanVerifyWidgetId = window.turnstile.render(
+            overlay.querySelector('#humanVerifyTurnstile'), {
+                sitekey: turnstileSiteKey,
+                language: lang === 'en' ? 'en' : 'zh-HK',
+                callback: (tok) => closeHumanVerify(String(tok || '')),
+                'timeout-callback': () => closeHumanVerify(null),
+                'error-callback': () => true
+            });
+    });
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (humanVerifyEl && !humanVerifyEl.classList.contains('hidden')) {
+        closeHumanVerify(null);
+    }
+    if (!$('bookingModal').classList.contains('hidden')) {
+        closeBookingModal();
+    }
+});
 
 $('bookingDoctor').addEventListener('change', (e) => {
     bookingState.doctor = e.target.value;
