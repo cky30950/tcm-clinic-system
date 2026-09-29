@@ -25937,6 +25937,91 @@ async function restoreUser(id) {
             return { docs, truncated };
         }
 
+        // ── 聚合查詢：一次性取得所有 KPI 指標（交易總額 + outstanding 餘額）
+        // 6 個並行 getAggregateFromServer，只回傳數字取代全量文件抓取。
+        // 失敗時（索引未部署）回傳 null，由呼叫端回退到 getDocs 路徑。
+        async function loadWalletFinAggregates(startDate, endDate, clinicFilter) {
+            const fb = window.firebase;
+            if (!fb || typeof fb.getAggregateFromServer !== 'function') {
+                return null; // 聚合函式不可用 → 回退
+            }
+            const cid = clinicFilter ? String(clinicFilter) : '';
+            const { startIso, endIso } = walletFinRangeIso(startDate, endDate);
+
+            try {
+                const buildTxQ = (type) => {
+                    const col = fb.collection(fb.db, 'patientWalletTransactions');
+                    const c = [];
+                    if (cid) c.push(fb.where('clinicId', '==', cid));
+                    c.push(fb.where('at', '>=', startIso));
+                    c.push(fb.where('at', '<=', endIso));
+                    c.push(fb.where('type', '==', type));
+                    return fb.firestoreQuery(col, ...c);
+                };
+
+                const buildAccQ = () => {
+                    const col = fb.collection(fb.db, 'patientWalletAccounts');
+                    if (cid) {
+                        return fb.firestoreQuery(col, fb.where('clinicId', '==', cid));
+                    }
+                    // 全部診所總覽：排除已遷移舊帳戶（同 loadWalletFinRaw 邏輯）
+                    return fb.firestoreQuery(col, fb.where('walletMigratedAt', '==', null));
+                };
+
+                const [
+                    topupSnap, topupBonusSnap, paySnap, refundSnap, adjustSnap, accSnap
+                ] = await Promise.all([
+                    fb.getAggregateFromServer(buildTxQ('topup'), {
+                        total: fb.sum('amount'), count: fb.count()
+                    }),
+                    fb.getAggregateFromServer(buildTxQ('topupBonus'), {
+                        total: fb.sum('amount'), count: fb.count()
+                    }),
+                    fb.getAggregateFromServer(buildTxQ('payment'), {
+                        principal: fb.sum('fromBalance'),
+                        bonus: fb.sum('fromBonus'),
+                        count: fb.count()
+                    }),
+                    fb.getAggregateFromServer(buildTxQ('refund'), {
+                        principal: fb.sum('fromBalance'),
+                        bonus: fb.sum('fromBonus'),
+                        count: fb.count()
+                    }),
+                    fb.getAggregateFromServer(buildTxQ('adjust'), {
+                        net: fb.sum('amount'), count: fb.count()
+                    }),
+                    fb.getAggregateFromServer(buildAccQ(), {
+                        principal: fb.sum('balance'),
+                        bonus: fb.sum('bonusBalance')
+                    })
+                ]);
+
+                const rnd = (n) => Math.round((Number(n) || 0) * 100) / 100;
+                const n = (v) => Number(v) || 0;
+                const d = (s) => s.data();
+
+                return {
+                    topupPrincipal: rnd(n(d(topupSnap).total)),
+                    topupCount: n(d(topupSnap).count),
+                    bonusIssued: rnd(n(d(topupBonusSnap).total)),
+                    bonusCount: n(d(topupBonusSnap).count),
+                    payPrincipal: rnd(n(d(paySnap).principal)),
+                    payBonus: rnd(n(d(paySnap).bonus)),
+                    payCount: n(d(paySnap).count),
+                    refundPrincipal: rnd(n(d(refundSnap).principal)),
+                    refundBonus: rnd(n(d(refundSnap).bonus)),
+                    refundCount: n(d(refundSnap).count),
+                    adjustNet: rnd(n(d(adjustSnap).net)),
+                    adjustCount: n(d(adjustSnap).count),
+                    outstandingPrincipal: rnd(n(d(accSnap).principal)),
+                    outstandingBonus: rnd(n(d(accSnap).bonus))
+                };
+            } catch (err) {
+                console.warn('錢包聚合查詢失敗，回退全量抓取:', err && err.message);
+                return null;
+            }
+        }
+
         // 完全依介面篩選（clinicFilter 為空＝全部診所總覽）；日後收回
         // 跨診所權限時，繫結員工須再強制 cid = claim 的 clinicId。
         async function loadWalletFinRaw(startDate, endDate, clinicFilter) {
@@ -25944,18 +26029,30 @@ async function restoreUser(id) {
             const cid = clinicFilter ? String(clinicFilter) : '';
             const { startIso, endIso } = walletFinRangeIso(startDate, endDate);
             const warnings = [];
+
+            // 先嘗試聚合查詢拿 KPI（成功則 outstanding 帳戶不用全量抓）
+            const aggregates = await loadWalletFinAggregates(startDate, endDate, cid);
+            if (aggregates) {
+                console.info('[WalletFin] 聚合查詢成功，KPI 走 fast path', {
+                    topupPrincipal: aggregates.topupPrincipal,
+                    payPrincipal: aggregates.payPrincipal,
+                    payBonus: aggregates.payBonus,
+                    outstandingPrincipal: aggregates.outstandingPrincipal,
+                    outstandingBonus: aggregates.outstandingBonus
+                });
+            } else {
+                console.warn('[WalletFin] 聚合查詢失敗，回退 getDocs 全量路徑');
+            }
+
+            // 交易文件：每日明細仍需 getDocs（Firestore 無 group by 日期）
             let txResult;
             if (cid) {
-                // 診所範圍：clinicId 相等 + at 範圍（需 (clinicId, at)
-                // 複合索引，見 firestore.indexes.json）；統計只按日期聚合，
-                // 不需要 orderBy
                 txResult = await walletFetchAllDocs('patientWalletTransactions', [
                     fb.where('clinicId', '==', cid),
                     fb.where('at', '>=', startIso),
                     fb.where('at', '<=', endIso)
                 ], { pageSize: 300, maxDocs: 10000 });
             } else {
-                // 全部診所總覽：單欄位 at 範圍查詢，使用自動索引
                 txResult = await walletFetchAllDocs('patientWalletTransactions', [
                     fb.where('at', '>=', startIso),
                     fb.where('at', '<=', endIso),
@@ -25968,26 +26065,27 @@ async function restoreUser(id) {
             const txs = txResult.docs.map((d) =>
                 Object.assign({ id: d.id }, d.data()));
 
-            // 帳戶：財務報表的診所篩選在這裡一併套用（單欄位 where，
-            // 不需複合索引）；全部診所總覽才退回 updatedAt 排序查詢
-            let accResult;
-            if (cid) {
-                accResult = await walletFetchAllDocs('patientWalletAccounts', [
-                    fb.where('clinicId', '==', cid)
-                ], { pageSize: 300, maxDocs: 10000 });
-            } else {
-                accResult = await walletFetchAllDocs('patientWalletAccounts', [
-                    fb.orderBy('updatedAt', 'desc')
-                ], { pageSize: 300, maxDocs: 10000 });
+            // 帳戶：有 aggregates 就跳過全量抓取（節省 500+ 筆傳輸）
+            let accounts = [];
+            if (!aggregates) {
+                let accResult;
+                if (cid) {
+                    accResult = await walletFetchAllDocs('patientWalletAccounts', [
+                        fb.where('clinicId', '==', cid)
+                    ], { pageSize: 300, maxDocs: 10000 });
+                } else {
+                    accResult = await walletFetchAllDocs('patientWalletAccounts', [
+                        fb.orderBy('updatedAt', 'desc')
+                    ], { pageSize: 300, maxDocs: 10000 });
+                }
+                if (accResult.truncated) {
+                    warnings.push('儲值帳戶超過一萬個，期末餘額僅含部分帳戶');
+                }
+                accounts = accResult.docs
+                    .map((d) => d.data())
+                    .filter((a) => !(cid === '' && a && a.walletMigratedAt));
             }
-            if (accResult.truncated) {
-                warnings.push('儲值帳戶超過一萬個，期末餘額僅含部分帳戶');
-            }
-            // 已遷移的舊制全域帳戶其結存已轉到複合帳戶，跳過避免重複計
-            const accounts = accResult.docs
-                .map((d) => d.data())
-                .filter((a) => !(cid === '' && a && a.walletMigratedAt));
-            return { txs, accounts, warnings };
+            return { txs, accounts, aggregates, warnings };
         }
 
         async function getWalletFinRaw(startDate, endDate, forceRefresh, clinicFilter) {
@@ -26026,11 +26124,10 @@ async function restoreUser(id) {
         }
 
         function calculateWalletFinancialStats(raw, clinicFilter) {
+            const { aggregates } = raw || {};
             const { patientClinics, appointmentClinics } = buildWalletPatientClinicMap();
-            // 單一診所系統：所有數據皆屬該診所，無需記錄自證
             const singleClinicId = (Array.isArray(clinicsList) && clinicsList.length === 1)
                 ? String(clinicsList[0].id) : '';
-            // 流水歸屬：新制直接看 tx.clinicId；舊制無欄位才用證據推斷
             const txBelongs = (tx) => {
                 if (!clinicFilter) return true;
                 const f = String(clinicFilter);
@@ -26042,13 +26139,10 @@ async function restoreUser(id) {
                     && appointmentClinics.get(String(tx.appointmentId)) === f) {
                     return true;
                 }
-                // 無任何診所證據的記錄（如舊數據）不歸入任何診所，避免跨診所重複計入
                 return false;
             };
-            // 帳戶歸屬：新制帳戶自帶 clinicId
             const accountBelongs = (acc) => {
                 if (!clinicFilter) {
-                    // 總覽時已於查詢層跳過已遷移舊帳戶，這裡再保險一次
                     return !(acc && acc.walletMigratedAt);
                 }
                 const f = String(clinicFilter);
@@ -26060,7 +26154,24 @@ async function restoreUser(id) {
                     && patientClinics.get(String(acc.patientId)).has(f));
             };
 
-            const stats = {
+            // 有聚合結果 → KPI 直接用（與 getDocs 查詢條件一致，結果對齊）
+            const stats = aggregates ? {
+                topupCount: aggregates.topupCount,
+                topupPrincipal: aggregates.topupPrincipal,
+                bonusCount: aggregates.bonusCount,
+                bonusIssued: aggregates.bonusIssued,
+                payCount: aggregates.payCount,
+                payPrincipal: aggregates.payPrincipal,
+                payBonus: aggregates.payBonus,
+                refundCount: aggregates.refundCount,
+                refundPrincipal: aggregates.refundPrincipal,
+                refundBonus: aggregates.refundBonus,
+                adjustCount: aggregates.adjustCount,
+                adjustNet: aggregates.adjustNet,
+                outstandingPrincipal: aggregates.outstandingPrincipal,
+                outstandingBonus: aggregates.outstandingBonus,
+                daily: {}
+            } : {
                 topupCount: 0, topupPrincipal: 0,
                 bonusCount: 0, bonusIssued: 0,
                 payCount: 0, payPrincipal: 0, payBonus: 0,
@@ -26080,6 +26191,8 @@ async function restoreUser(id) {
                 return stats.daily[day];
             };
 
+            // 無 aggregates 時才從交易文件加總 KPI；
+            // 有 aggregates 時只算每日明細（Firestore 無 group by 日期）
             (raw.txs || []).forEach((tx) => {
                 if (!tx || !txBelongs(tx)) return;
                 const amount = Number(tx.amount) || 0;
@@ -26088,55 +26201,74 @@ async function restoreUser(id) {
                 const row = ensureDay(day);
                 switch (tx.type) {
                     case 'topup':
-                        stats.topupCount += 1;
-                        stats.topupPrincipal += amount;
+                        if (!aggregates) {
+                            stats.topupCount += 1;
+                            stats.topupPrincipal += amount;
+                        }
                         row.topupCount += 1;
                         row.topupAmount += amount;
                         break;
                     case 'topupBonus':
-                        stats.bonusCount += 1;
-                        stats.bonusIssued += amount;
+                        if (!aggregates) {
+                            stats.bonusCount += 1;
+                            stats.bonusIssued += amount;
+                        }
                         break;
                     case 'payment': {
-                        stats.payCount += 1;
+                        if (!aggregates) {
+                            stats.payCount += 1;
+                        }
                         const fromBalance = Number(tx.fromBalance) || 0;
                         const fromBonus = Number(tx.fromBonus) || 0;
-                        stats.payPrincipal += fromBalance;
-                        stats.payBonus += fromBonus;
+                        if (!aggregates) {
+                            stats.payPrincipal += fromBalance;
+                            stats.payBonus += fromBonus;
+                        }
                         row.payCount += 1;
                         row.payAmount += (fromBalance + fromBonus);
                         break;
                     }
                     case 'refund': {
-                        stats.refundCount += 1;
+                        if (!aggregates) {
+                            stats.refundCount += 1;
+                        }
                         const fromBalance = Number(tx.fromBalance) || 0;
                         const fromBonus = Number(tx.fromBonus) || 0;
-                        stats.refundPrincipal += fromBalance;
-                        stats.refundBonus += fromBonus;
+                        if (!aggregates) {
+                            stats.refundPrincipal += fromBalance;
+                            stats.refundBonus += fromBonus;
+                        }
                         row.refundAmount += (fromBalance + fromBonus);
                         break;
                     }
                     case 'adjust':
-                        stats.adjustCount += 1;
-                        stats.adjustNet += amount;
+                        if (!aggregates) {
+                            stats.adjustCount += 1;
+                            stats.adjustNet += amount;
+                        }
                         break;
                     default:
                         break;
                 }
             });
 
-            (raw.accounts || []).forEach((acc) => {
-                if (!acc || !accountBelongs(acc)) return;
-                stats.outstandingPrincipal += Number(acc.balance) || 0;
-                stats.outstandingBonus += Number(acc.bonusBalance) || 0;
-            });
+            // 無 aggregates 時才從帳戶文件加總 outstanding
+            if (!aggregates) {
+                (raw.accounts || []).forEach((acc) => {
+                    if (!acc || !accountBelongs(acc)) return;
+                    stats.outstandingPrincipal += Number(acc.balance) || 0;
+                    stats.outstandingBonus += Number(acc.bonusBalance) || 0;
+                });
+            }
 
-            // 統一圓整到 2 位小數
-            ['topupPrincipal', 'bonusIssued', 'payPrincipal', 'payBonus',
-             'refundPrincipal', 'refundBonus', 'adjustNet',
-             'outstandingPrincipal', 'outstandingBonus'].forEach((k) => {
-                stats[k] = Math.round(stats[k] * 100) / 100;
-            });
+            // 統一圓整到 2 位小數（aggregates 已圓整過，但每日明細需要）
+            if (!aggregates) {
+                ['topupPrincipal', 'bonusIssued', 'payPrincipal', 'payBonus',
+                 'refundPrincipal', 'refundBonus', 'adjustNet',
+                 'outstandingPrincipal', 'outstandingBonus'].forEach((k) => {
+                    stats[k] = Math.round(stats[k] * 100) / 100;
+                });
+            }
             Object.keys(stats.daily).forEach((d) => {
                 const r = stats.daily[d];
                 ['topupAmount', 'payAmount', 'refundAmount'].forEach((k) => {
