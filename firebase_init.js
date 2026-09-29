@@ -29,7 +29,6 @@ import {
   onSnapshot,
   clearIndexedDbPersistence,
   terminate,
-  select,
   sum,
   average,
   getAggregateFromServer
@@ -184,7 +183,6 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         onSnapshot,
         clearIndexedDbPersistence,
         terminate,
-        select,
         sum,
         average,
         getAggregateFromServer,
