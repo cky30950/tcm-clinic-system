@@ -223,18 +223,56 @@ function sanitizeConfig(over) {
     return out;
 }
 
+/**
+ * 以診所文件（clinics/{clinicId}）的結構化營業時間生成應診 sessions：
+ * 營業 [open,close]；若設定午飯 [ls,le]，則切成開診两段，午飯時段不給約。
+ * 欄位缺失或無效 → []（由呼叫端退回預設 sessions）。
+ */
+function sessionsFromClinicDoc(clinicDoc) {
+    const d = clinicDoc && clinicDoc.data ? clinicDoc.data : clinicDoc;
+    const open = parseHM(d && d.businessHoursStart);
+    const close = parseHM(d && d.businessHoursEnd);
+    if (open < 0 || close <= open) return [];
+    const ls = parseHM(d && d.lunchStart);
+    const le = parseHM(d && d.lunchEnd);
+    const hasLunch = ls >= 0 && le >= 0 && le > ls;
+    const windows = [];
+    if (hasLunch) {
+        if (ls > open) windows.push([open, ls]);
+        if (close > le) windows.push([le, close]);
+        if (!windows.length) return [];
+    } else {
+        windows.push([open, close]);
+    }
+    return windows.map(([a, b]) => ({ start: toHM(a), end: toHM(b) }));
+}
+
 export async function loadBookingConfig(clientOrUrl, token, clinicId) {
     const cached = configCache.get(clinicId);
     if (cached && Date.now() - cached.at < CONFIG_CACHE_TTL_MS) return cached.config;
-    let override = {};
-    try {
-        const raw = await rtdbGet(clientOrUrl, token,
-            `clinics/${encodeURIComponent(clinicId)}/bookingConfig`);
-        override = sanitizeConfig(raw);
-    } catch (_e) {
-        override = {};
-    }
+    // 並行：① RTDB bookingConfig 覆寫（規則數值）；② Firestore 診所文件
+    // （營業時間＋午飯時間為預約時段的權威來源）
+    const [override, clinicDoc] = await Promise.all([
+        rtdbGet(clientOrUrl, token,
+            `clinics/${encodeURIComponent(clinicId)}/bookingConfig`)
+            .then((raw) => sanitizeConfig(raw))
+            .catch(() => ({})),
+        (clientOrUrl && typeof clientOrUrl.getDocument === 'function')
+            ? clientOrUrl.getDocument(`clinics/${encodeURIComponent(clinicId)}`)
+                .then((doc) => doc || null)
+                .catch(() => null)
+            : Promise.resolve(null)
+    ]);
     const config = Object.assign({}, DEFAULT_BOOKING_CONFIG, override);
+    // 營業時間掛鉤：診所文件設定了營業時間 → 預約 sessions 以其為準
+    // （午飯自動扣除）；未設定才使用預設 sessions。
+    const clinicSessions = sessionsFromClinicDoc(clinicDoc);
+    if (clinicSessions.length) {
+        config.sessions = clinicSessions;
+        config.hoursSource = 'clinic';
+    } else {
+        config.hoursSource = 'default';
+    }
     configCache.set(clinicId, { at: Date.now(), config });
     return config;
 }

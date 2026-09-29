@@ -18774,11 +18774,43 @@ async function initializeSystemAfterLogin() {
             }
         }
 
+        // 收集「診所營業時間＋午飯時間」時間輸入（prefix＝'' 或 'addClinic'），
+        // 同時生成 businessHours 顯示字串，供收據/頁腳等既有展示沿用。
+        function collectBusinessHoursUI(prefix) {
+            const val = (id) => {
+                const el = document.getElementById(prefix + id);
+                return el ? String(el.value || '').trim() : '';
+            };
+            const start = val('BusinessHoursStart');
+            const end = val('BusinessHoursEnd');
+            const lunchStart = val('LunchStart');
+            const lunchEnd = val('LunchEnd');
+            let businessHours = '';
+            if (start && end) businessHours = `${start}-${end}`;
+            if (lunchStart && lunchEnd && businessHours) {
+                businessHours += `（休息 ${lunchStart}-${lunchEnd}）`;
+            }
+            return { start, end, lunchStart, lunchEnd, businessHours };
+        }
+
+        // 以時間字串（HH:mm）換算分鐘，便於驗證先後
+        function hmToMinutes(s) {
+            const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || ''));
+            return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
+        }
+
         function showClinicSettingsModal() {
             // 載入現有設定
             document.getElementById('clinicChineseName').value = clinicSettings.chineseName || '';
             document.getElementById('clinicEnglishName').value = clinicSettings.englishName || '';
-            document.getElementById('clinicBusinessHours').value = clinicSettings.businessHours || '';
+            const setVal = (id, v) => {
+                const el = document.getElementById(id);
+                if (el) el.value = v || '';
+            };
+            setVal('clinicBusinessHoursStart', clinicSettings.businessHoursStart);
+            setVal('clinicBusinessHoursEnd', clinicSettings.businessHoursEnd);
+            setVal('clinicLunchStart', clinicSettings.lunchStart);
+            setVal('clinicLunchEnd', clinicSettings.lunchEnd);
             document.getElementById('clinicPhone').value = clinicSettings.phone || '';
             document.getElementById('clinicAddress').value = clinicSettings.address || '';
             const thankYouInput = document.getElementById('clinicReceiptThankYouText');
@@ -18803,7 +18835,10 @@ async function initializeSystemAfterLogin() {
                     return;
                 }
             } catch (_e) {}
-            ['addClinicChineseName', 'addClinicEnglishName', 'addClinicBusinessHours', 'addClinicPhone', 'addClinicAddress', 'addClinicReceiptThankYouText'].forEach((id) => {
+            ['addClinicChineseName', 'addClinicEnglishName',
+                'addClinicBusinessHoursStart', 'addClinicBusinessHoursEnd',
+                'addClinicLunchStart', 'addClinicLunchEnd',
+                'addClinicPhone', 'addClinicAddress', 'addClinicReceiptThankYouText'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el && 'value' in el) el.value = '';
             });
@@ -18819,7 +18854,7 @@ async function initializeSystemAfterLogin() {
         async function saveNewClinic() {
             const chineseName = String((document.getElementById('addClinicChineseName') || {}).value || '').trim();
             const englishName = String((document.getElementById('addClinicEnglishName') || {}).value || '').trim();
-            const businessHours = String((document.getElementById('addClinicBusinessHours') || {}).value || '').trim();
+            const hours = collectBusinessHoursUI('addClinic');
             const phone = String((document.getElementById('addClinicPhone') || {}).value || '').trim();
             const address = String((document.getElementById('addClinicAddress') || {}).value || '').trim();
             const receiptThankYouText = String((document.getElementById('addClinicReceiptThankYouText') || {}).value || '').trim();
@@ -18827,11 +18862,36 @@ async function initializeSystemAfterLogin() {
                 showToast('請輸入診所中文名稱！', 'error');
                 return;
             }
+            // 營業時間須成對且結束晚於開始；午飯須落在營業時間內
+            if ((hours.start && !hours.end) || (!hours.start && hours.end)) {
+                showToast('請完整設定診所營業時間（開始及結束）', 'error');
+                return;
+            }
+            if (hours.start && hmToMinutes(hours.end) <= hmToMinutes(hours.start)) {
+                showToast('診所結束時間必須晚於開始時間', 'error');
+                return;
+            }
+            if ((hours.lunchStart && !hours.lunchEnd)
+                || (!hours.lunchStart && hours.lunchEnd)
+                || (hours.lunchStart && hmToMinutes(hours.lunchEnd) <= hmToMinutes(hours.lunchStart))) {
+                showToast('請完整設定休息時間，且結束須晚於開始', 'error');
+                return;
+            }
+            if (hours.start && hours.lunchStart
+                && (hmToMinutes(hours.lunchStart) < hmToMinutes(hours.start)
+                    || hmToMinutes(hours.lunchEnd) > hmToMinutes(hours.end))) {
+                showToast('休息時間必須設定於診所營業時間之內', 'error');
+                return;
+            }
             try {
                 const created = await window.firebaseDataManager.addClinic({
                     chineseName,
                     englishName,
-                    businessHours,
+                    businessHours: hours.businessHours,
+                    businessHoursStart: hours.start,
+                    businessHoursEnd: hours.end,
+                    lunchStart: hours.lunchStart,
+                    lunchEnd: hours.lunchEnd,
                     phone,
                     address,
                     receiptThankYouText,
@@ -18858,20 +18918,45 @@ async function initializeSystemAfterLogin() {
         async function saveClinicSettings() {
             const chineseName = document.getElementById('clinicChineseName').value.trim();
             const englishName = document.getElementById('clinicEnglishName').value.trim();
-            const businessHours = document.getElementById('clinicBusinessHours').value.trim();
+            const hours = collectBusinessHoursUI('clinic');
             const phone = document.getElementById('clinicPhone').value.trim();
             const address = document.getElementById('clinicAddress').value.trim();
             const thankYouInput = document.getElementById('clinicReceiptThankYouText');
             const receiptThankYouText = thankYouInput ? thankYouInput.value.trim() : '';
-            
+
             if (!chineseName) {
                 showToast('請輸入診所中文名稱！', 'error');
                 return;
             }
-            
+            // 營業時間須成對且結束晚於開始；午飯須落在營業時間內
+            if ((hours.start && !hours.end) || (!hours.start && hours.end)) {
+                showToast('請完整設定診所營業時間（開始及結束）', 'error');
+                return;
+            }
+            if (hours.start && hmToMinutes(hours.end) <= hmToMinutes(hours.start)) {
+                showToast('診所結束時間必須晚於開始時間', 'error');
+                return;
+            }
+            if ((hours.lunchStart && !hours.lunchEnd)
+                || (!hours.lunchStart && hours.lunchEnd)
+                || (hours.lunchStart && hmToMinutes(hours.lunchEnd) <= hmToMinutes(hours.lunchStart))) {
+                showToast('請完整設定休息時間，且結束須晚於開始', 'error');
+                return;
+            }
+            if (hours.start && hours.lunchStart
+                && (hmToMinutes(hours.lunchStart) < hmToMinutes(hours.start)
+                    || hmToMinutes(hours.lunchEnd) > hmToMinutes(hours.end))) {
+                showToast('休息時間必須設定於診所營業時間之內', 'error');
+                return;
+            }
+
             clinicSettings.chineseName = chineseName;
             clinicSettings.englishName = englishName;
-            clinicSettings.businessHours = businessHours;
+            clinicSettings.businessHours = hours.businessHours;
+            clinicSettings.businessHoursStart = hours.start;
+            clinicSettings.businessHoursEnd = hours.end;
+            clinicSettings.lunchStart = hours.lunchStart;
+            clinicSettings.lunchEnd = hours.lunchEnd;
             clinicSettings.phone = phone;
             clinicSettings.address = address;
             clinicSettings.receiptThankYouText = receiptThankYouText;
@@ -18881,7 +18966,11 @@ async function initializeSystemAfterLogin() {
                     await window.firebaseDataManager.updateClinic(currentClinicId, {
                         chineseName,
                         englishName,
-                        businessHours,
+                        businessHours: hours.businessHours,
+                        businessHoursStart: hours.start,
+                        businessHoursEnd: hours.end,
+                        lunchStart: hours.lunchStart,
+                        lunchEnd: hours.lunchEnd,
                         phone,
                         address,
                         receiptThankYouText,
