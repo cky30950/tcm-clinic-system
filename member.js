@@ -52,6 +52,7 @@ const I18N = {
         selectDoctorPrompt: '請選擇醫師',
         dateLabel: '應診日期',
         selectDatePrompt: '請先選擇醫師',
+        datePlaceholder: '請選擇日期',
         slotLabel: '應診時段',
         complaintLabel: '主訴（選填）',
         complaintPlaceholder: '例如：咳嗽、失眠…',
@@ -128,6 +129,7 @@ const I18N = {
         selectDoctorPrompt: 'Please select a doctor',
         dateLabel: 'Consultation date',
         selectDatePrompt: 'Please select a doctor first',
+        datePlaceholder: 'Please select a date',
         slotLabel: 'Time slot',
         complaintLabel: 'Chief complaint (optional)',
         complaintPlaceholder: 'e.g. cough, insomnia…',
@@ -731,7 +733,7 @@ function renderBookingDates() {
     const sessions = Array.isArray(bookingRules.sessions) ? bookingRules.sessions : [];
     const closeMin = sessions.reduce(
         (mx, s2) => Math.max(mx, hmToMin(s2 && s2.end)), -1);
-    let html = '';
+    let html = `<option value="">${t('datePlaceholder')}</option>`;
     for (let i = 0; i <= bookingRules.advanceDays; i++) {
         const ds = clientAddDays(start, i);
         const wd = new Date(`${ds}T12:00:00+08:00`).getUTCDay();
@@ -747,7 +749,9 @@ function renderBookingDates() {
         && sel.querySelector(`option[value="${bookingState.date}"]`)) {
         sel.value = bookingState.date;
     } else {
-        bookingState.date = sel.value;
+        // 不預設日期：維持「請選擇日期」，待病人自行選擇
+        bookingState.date = '';
+        sel.value = '';
     }
 }
 
