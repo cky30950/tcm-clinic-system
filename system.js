@@ -24033,7 +24033,7 @@ async function restoreUser(id) {
         const financialReportCache = {};
         const FINANCIAL_REPORT_MIN_REFRESH_MS = 15000;
         // 快取版本：統計口徑／快取結構調整時遞增，避免讀到舊格式快取
-        const FINANCIAL_REPORT_CACHE_VERSION = 'v4';
+        const FINANCIAL_REPORT_CACHE_VERSION = 'v5';
         function getFinancialReportCacheKey(startDate, endDate, doctorFilter, clinicFilter) {
             return `${FINANCIAL_REPORT_CACHE_VERSION}|${startDate}|${endDate}|${doctorFilter || ''}|${clinicFilter || ''}`;
         }
@@ -24801,73 +24801,114 @@ async function restoreUser(id) {
                 try {
                     if (window.firebaseDataManager && typeof window.firebaseDataManager.hasConsultationUpdates === 'function') {
                         const lastSyncAtRef = existing.lastSyncAt ? new Date(existing.lastSyncAt) : null;
-                        const useSummaryDelta = typeof window.firebaseDataManager.hasConsultationFinancialSummaryUpdates === 'function'
-                            && typeof window.firebaseDataManager.getConsultationFinancialSummariesDeltaByRangeAndDoctor === 'function';
-                        const hasUpdates = useSummaryDelta
-                            ? await window.firebaseDataManager.hasConsultationFinancialSummaryUpdates(startDate, endDate, doctorFilter || null, lastSyncAtRef, clinicFilter || null)
-                            : await window.firebaseDataManager.hasConsultationUpdates(startDate, endDate, doctorFilter || null, lastSyncAtRef, clinicFilter || null);
-                        if (!hasUpdates) {
-                            updateFinancialKeyMetrics(existing.stats);
-                            updateFinancialTables(existing.records, existing.stats);
-                            document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
-                            financialReportLastKey = cacheKey;
-                            financialReportLastRunAt = Date.now();
-                            await refreshWalletFinancialSection(startDate, endDate, clinicFilter);
-                            showToast('財務報表已更新（使用快取）！', 'success');
-                            return;
-                        }
-                        const deltaRes = useSummaryDelta
-                            ? await window.firebaseDataManager.getConsultationFinancialSummariesDeltaByRangeAndDoctor(lastSyncAtRef, startDate, endDate, doctorFilter || null, clinicFilter || null)
-                            : await window.firebaseDataManager.getConsultationsDeltaByRangeAndDoctor(lastSyncAtRef, doctorFilter || null, true, clinicFilter || null);
-                        if (deltaRes && deltaRes.success) {
-                            const deltas = deltaRes.data.map(normalizeFinancialRecordForReport).filter(Boolean);
-                            const start = financialDayStart(startDate);
-                            const end = financialDayEnd(endDate);
-                            const mf = (c) => {
-                                const d = new Date(c.date);
-                                const dateInRange = d >= start && d <= end;
-                                const doctorMatch = !doctorFilter || c.doctor === doctorFilter;
-                                const clinicMatch = !clinicFilter || (c.clinicId && String(c.clinicId) === String(clinicFilter));
-                                const isCompleted = c.status === 'completed';
-                                return dateInRange && doctorMatch && clinicMatch && isCompleted;
-                            };
-                            const index = new Map(existing.records.map(c => [String(c.id), c]));
-                            for (const r of deltas) {
-                                const id = String(r.id);
-                                if (mf(r)) {
-                                    index.set(id, r);
-                                } else {
-                                    index.delete(id);
-                                }
+                        // 按需鑽取快取：records 為空時，若有更新就跳過 delta merge，
+                        // 交給下方的 dailyStats 路徑重新讀取聚合（比合併 delta 更省流量）
+                        const isOnDemandCache = Array.isArray(existing.records) && existing.records.length === 0;
+                        if (isOnDemandCache) {
+                            // 無更新 → 直接用快取；有更新 → 跳出 if (existing)，讓下方重跑
+                            const useSummaryDelta = typeof window.firebaseDataManager.hasConsultationFinancialSummaryUpdates === 'function';
+                            const hasUpdates = useSummaryDelta
+                                ? await window.firebaseDataManager.hasConsultationFinancialSummaryUpdates(startDate, endDate, doctorFilter || null, lastSyncAtRef, clinicFilter || null)
+                                : await window.firebaseDataManager.hasConsultationUpdates(startDate, endDate, doctorFilter || null, lastSyncAtRef, clinicFilter || null);
+                            if (!hasUpdates) {
+                                updateFinancialKeyMetrics(existing.stats);
+                                updateFinancialTables(existing.records, existing.stats);
+                                document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
+                                financialReportLastKey = cacheKey;
+                                financialReportLastRunAt = Date.now();
+                                await refreshWalletFinancialSection(startDate, endDate, clinicFilter);
+                                showToast('財務報表已更新（聚合快取）！', 'success');
+                                return;
                             }
-                            const merged = Array.from(index.values());
-                            const stats = calculateFinancialStatistics(merged);
-                            loadFinancialPrevPeriodInBackground(cacheKey, stats, startDate, endDate, doctorFilter, clinicFilter);
-                            const [costRes] = await Promise.all([
-                                getApportionedCost(startDate, endDate, clinicFilter || null),
-                                refreshWalletFinancialSection(startDate, endDate, clinicFilter)
-                            ]);
-                            stats.totalCost = costRes.totalCost;
-                            stats.netRevenue = stats.totalRevenue - costRes.totalCost;
-                            stats.costProrated = costRes.prorated;
-                            updateFinancialKeyMetrics(stats);
-                            updateFinancialTables(merged, stats);
-                            const lastSyncAt = (() => {
-                                let latest = existing.lastSyncAt ? new Date(existing.lastSyncAt).getTime() : 0;
-                                for (const c of deltas) {
-                                    const t = getFinancialReportSyncTimestamp(c);
-                                    if (t && t > latest) latest = t;
+                            // 有更新 → fall through 到下方重跑
+                        } else {
+                            // 傳統快取（有完整 records）→ 正常走 delta merge 邏輯
+                            const useSummaryDelta = typeof window.firebaseDataManager.hasConsultationFinancialSummaryUpdates === 'function'
+                                && typeof window.firebaseDataManager.getConsultationFinancialSummariesDeltaByRangeAndDoctor === 'function';
+                            const hasUpdates = useSummaryDelta
+                                ? await window.firebaseDataManager.hasConsultationFinancialSummaryUpdates(startDate, endDate, doctorFilter || null, lastSyncAtRef, clinicFilter || null)
+                                : await window.firebaseDataManager.hasConsultationUpdates(startDate, endDate, doctorFilter || null, lastSyncAtRef, clinicFilter || null);
+                            if (!hasUpdates) {
+                                updateFinancialKeyMetrics(existing.stats);
+                                updateFinancialTables(existing.records, existing.stats);
+                                document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
+                                financialReportLastKey = cacheKey;
+                                financialReportLastRunAt = Date.now();
+                                await refreshWalletFinancialSection(startDate, endDate, clinicFilter);
+                                showToast('財務報表已更新（使用快取）！', 'success');
+                                return;
+                            }
+                            // 有更新 → fall through 到下方重跑
+                        } else {
+                            // 傳統快取（有完整 records）→ 正常走 delta merge 邏輯
+                            const useSummaryDelta = typeof window.firebaseDataManager.hasConsultationFinancialSummaryUpdates === 'function'
+                                && typeof window.firebaseDataManager.getConsultationFinancialSummariesDeltaByRangeAndDoctor === 'function';
+                            const hasUpdates = useSummaryDelta
+                                ? await window.firebaseDataManager.hasConsultationFinancialSummaryUpdates(startDate, endDate, doctorFilter || null, lastSyncAtRef, clinicFilter || null)
+                                : await window.firebaseDataManager.hasConsultationUpdates(startDate, endDate, doctorFilter || null, lastSyncAtRef, clinicFilter || null);
+                            if (!hasUpdates) {
+                                updateFinancialKeyMetrics(existing.stats);
+                                updateFinancialTables(existing.records, existing.stats);
+                                document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
+                                financialReportLastKey = cacheKey;
+                                financialReportLastRunAt = Date.now();
+                                await refreshWalletFinancialSection(startDate, endDate, clinicFilter);
+                                showToast('財務報表已更新（使用快取）！', 'success');
+                                return;
+                            }
+                            const deltaRes = useSummaryDelta
+                                ? await window.firebaseDataManager.getConsultationFinancialSummariesDeltaByRangeAndDoctor(lastSyncAtRef, startDate, endDate, doctorFilter || null, clinicFilter || null)
+                                : await window.firebaseDataManager.getConsultationsDeltaByRangeAndDoctor(lastSyncAtRef, doctorFilter || null, true, clinicFilter || null);
+                            if (deltaRes && deltaRes.success) {
+                                const deltas = deltaRes.data.map(normalizeFinancialRecordForReport).filter(Boolean);
+                                const start = financialDayStart(startDate);
+                                const end = financialDayEnd(endDate);
+                                const mf = (c) => {
+                                    const d = new Date(c.date);
+                                    const dateInRange = d >= start && d <= end;
+                                    const doctorMatch = !doctorFilter || c.doctor === doctorFilter;
+                                    const clinicMatch = !clinicFilter || (c.clinicId && String(c.clinicId) === String(clinicFilter));
+                                    const isCompleted = c.status === 'completed';
+                                    return dateInRange && doctorMatch && clinicMatch && isCompleted;
+                                };
+                                const index = new Map(existing.records.map(c => [String(c.id), c]));
+                                for (const r of deltas) {
+                                    const id = String(r.id);
+                                    if (mf(r)) {
+                                        index.set(id, r);
+                                    } else {
+                                        index.delete(id);
+                                    }
                                 }
-                                return latest ? new Date(latest) : new Date();
-                            })();
-                            const entry = buildFinancialCacheEntry(merged, stats, lastSyncAt.toISOString());
-                            financialReportCache[cacheKey] = entry;
-                            writePersistedFinancialCache(cacheKey, entry);
-                            financialReportLastKey = cacheKey;
-                            financialReportLastRunAt = Date.now();
-                            document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
-                            showToast('財務報表已更新！', 'success');
-                            return;
+                                const merged = Array.from(index.values());
+                                const stats = calculateFinancialStatistics(merged);
+                                loadFinancialPrevPeriodInBackground(cacheKey, stats, startDate, endDate, doctorFilter, clinicFilter);
+                                const [costRes] = await Promise.all([
+                                    getApportionedCost(startDate, endDate, clinicFilter || null),
+                                    refreshWalletFinancialSection(startDate, endDate, clinicFilter)
+                                ]);
+                                stats.totalCost = costRes.totalCost;
+                                stats.netRevenue = stats.totalRevenue - costRes.totalCost;
+                                stats.costProrated = costRes.prorated;
+                                updateFinancialKeyMetrics(stats);
+                                updateFinancialTables(merged, stats);
+                                const lastSyncAt = (() => {
+                                    let latest = existing.lastSyncAt ? new Date(existing.lastSyncAt).getTime() : 0;
+                                    for (const c of deltas) {
+                                        const t = getFinancialReportSyncTimestamp(c);
+                                        if (t && t > latest) latest = t;
+                                    }
+                                    return latest ? new Date(latest) : new Date();
+                                })();
+                                const entry = buildFinancialCacheEntry(merged, stats, lastSyncAt.toISOString());
+                                financialReportCache[cacheKey] = entry;
+                                writePersistedFinancialCache(cacheKey, entry);
+                                financialReportLastKey = cacheKey;
+                                financialReportLastRunAt = Date.now();
+                                document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
+                                showToast('財務報表已更新！', 'success');
+                                return;
+                            }
                         }
                     }
                 } catch (_e) {}
@@ -24907,67 +24948,44 @@ async function restoreUser(id) {
                         }
                     }
 
-                    // 並發載入 consultations（tables 仍然需要單筆資料）
-                    const consultationPromise = (async () => {
-                        try {
-                            await loadConsultationsForFinancial();
-                            return true;
-                        } catch (_e) { return false; }
-                    })();
-
                     if (useDailyStats) {
+                        // 聚合模式：只讀 dailyFinancialStats（N 筆／月），
+                        // 不並發拉完整 consultations。鑽取時才按需查詢。
                         const fastStats = aggregateFromDailyStats(dailyStats, startDate, endDate, doctorFilter);
                         loadFinancialPrevPeriodInBackground(cacheKey, fastStats, startDate, endDate, doctorFilter, clinicFilter);
                         const [costRes] = await Promise.all([
                             getApportionedCost(startDate, endDate, clinicFilter || null),
-                            consultationPromise
+                            refreshWalletFinancialSection(startDate, endDate, clinicFilter)
                         ]);
                         fastStats.totalCost = costRes.totalCost;
                         fastStats.netRevenue = fastStats.totalRevenue - costRes.totalCost;
                         fastStats.costProrated = costRes.prorated;
 
-                        // 同步後 consultations 可能已載入；用它算 detail，stats 用聚合
-                        const filteredConsultations = filterFinancialConsultations(startDate, endDate, doctorFilter, clinicFilter);
-                        const detailStats = filteredConsultations.length > 0
-                            ? calculateFinancialStatistics(filteredConsultations)
-                            : fastStats;
-                        detailStats.totalCost = fastStats.totalCost;
-                        detailStats.netRevenue = fastStats.netRevenue;
-                        detailStats.costProrated = fastStats.costProrated;
-                        if (!detailStats.prevPeriod && fastStats.prevPeriod) {
-                            detailStats.prevPeriod = fastStats.prevPeriod;
-                        }
+                        // 直接用聚合 stats 渲染；records 為空表示「按需鑽取模式」
+                        updateFinancialKeyMetrics(fastStats);
+                        updateFinancialTables([], fastStats);
 
-                        updateFinancialKeyMetrics(detailStats);
-                        updateFinancialTables(filteredConsultations, detailStats);
-
-                        // 快取（使用 filteredConsultations 作為 records，detailStats 作為 stats）
+                        // 快取：records 留空，stats 用聚合結果，lastSyncAt 取 dailyStats syncedAt
                         const lastSyncAt = (() => {
                             let latest = 0;
-                            for (const c of filteredConsultations) {
-                                const t = getFinancialReportSyncTimestamp(c);
-                                if (t && t > latest) latest = t;
-                            }
-                            // 聚合有更新時間就一併考慮
                             for (const b of dailyStats) {
                                 const t = parseConsultationDate(b.syncedAt);
                                 if (t && t.getTime() > latest) latest = t.getTime();
                             }
                             return latest ? new Date(latest) : new Date();
                         })();
-                        const entry = buildFinancialCacheEntry(filteredConsultations, detailStats, lastSyncAt.toISOString());
+                        const entry = buildFinancialCacheEntry([], fastStats, lastSyncAt.toISOString());
                         financialReportCache[cacheKey] = entry;
                         writePersistedFinancialCache(cacheKey, entry);
                         financialReportLastKey = cacheKey;
                         financialReportLastRunAt = Date.now();
                         document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
-                        await refreshWalletFinancialSection(startDate, endDate, clinicFilter);
-                        showToast('財務報表已更新（聚合模式）！', 'success');
+                        showToast('財務報表已更新（聚合模式，點擊表格可鑽取明細）！', 'success');
                         return;
                     }
 
-                    // 沒有 daily stats：繼續傳統路徑（consultations 已在並發載入）
-                    await consultationPromise;
+                    // 沒有 daily stats：走傳統路徑（完整拉取 consultations）
+                    await loadConsultationsForFinancial();
                 } catch (err) {
                     console.error('載入財務資料失敗:', err);
                 }
@@ -25430,22 +25448,94 @@ async function restoreUser(id) {
 
         // ============================================================
         // 鑽取：點擊每日明細／醫師列，列出背後診症單
+        // 支援「按需鑽取模式」：聚合模式下 currentFinancialConsultations 為空，
+        // 此時才從 consultationFinancialSummaries 拉取該日期/醫師的明細。
         // ============================================================
-        function openFinancialDrilldown(type, key, label) {
+        function showFinancialDrilldownLoading(modal, titleEl, body, label) {
+            const ft = (s) => (typeof t === 'function' ? t(s) : s);
+            if (titleEl) {
+                titleEl.textContent = `${label}｜${ft('診症單')}`;
+            }
+            body.innerHTML = `<tr><td colspan="4" class="px-4 py-10 text-center text-gray-500">
+                <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
+                <div class="mt-2 text-sm">${ft('載入中…')}</div>
+            </td></tr>`;
+            modal.classList.remove('hidden');
+        }
+
+        async function fetchFinancialDrilldownRecords(type, key) {
+            if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) return [];
+            const doctorEl = document.getElementById('doctorFilter');
+            const clinicEl = document.getElementById('clinicFilterFinancial');
+            const baseDoctor = doctorEl ? doctorEl.value || null : null;
+            const clinicFilter = clinicEl ? clinicEl.value || null : null;
+
+            try {
+                let records = [];
+
+                if (type === 'daily') {
+                    // 單日鑽取：用 key（已就是 HK dateKey YYYY-MM-DD）
+                    // 只拉這一天的資料（通常幾十筆），比全 range 查詢省得多
+                    const res = await window.firebaseDataManager
+                        .getConsultationFinancialSummariesByDateKey(key, baseDoctor, clinicFilter);
+                    if (res && res.success) records = res.data;
+                } else if (type === 'doctor') {
+                    // 醫師鑽取：用報表的日期範圍 + doctor 過濾
+                    const startEl = document.getElementById('startDate');
+                    const endEl = document.getElementById('endDate');
+                    const reportStart = startEl ? startEl.value : '';
+                    const reportEnd = endEl ? endEl.value : '';
+                    const res = await window.firebaseDataManager
+                        .getConsultationFinancialSummariesByRangeAndDoctor(
+                            reportStart, reportEnd, key, true, clinicFilter
+                        );
+                    if (res && res.success) records = res.data;
+                }
+
+                return records.map(normalizeFinancialRecordForReport).filter(Boolean);
+            } catch (_e) {
+                console.warn('按需鑽取失敗:', _e);
+                return [];
+            }
+        }
+
+        async function openFinancialDrilldown(type, key, label) {
             const modal = document.getElementById('financialDrilldownModal');
             const titleEl = document.getElementById('financialDrilldownTitle');
             const body = document.getElementById('financialDrilldownBody');
             if (!modal || !body) return;
-            const rows = currentFinancialConsultations.filter((c) => {
-                if (type === 'daily') return getFinancialDateKey(c.date) === key;
-                if (type === 'doctor') return String(c.doctor || '') === String(key);
-                return false;
-            }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
             const ft = (s) => (typeof t === 'function' ? t(s) : s);
+            const esc = (s) => window.escapeHtml ? window.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
+
+            // 決定用本地快取還是按需查詢
+            let rows;
+            const hasLocalData = Array.isArray(currentFinancialConsultations)
+                && currentFinancialConsultations.length > 0;
+
+            if (hasLocalData) {
+                // 傳統路徑：本地已載入完整 consultations
+                rows = currentFinancialConsultations.filter((c) => {
+                    if (type === 'daily') return getFinancialDateKey(c.date) === key;
+                    if (type === 'doctor') return String(c.doctor || '') === String(key);
+                    return false;
+                }).sort((a, b) => new Date(b.date) - new Date(a.date));
+            } else {
+                // 按需鑽取模式：顯示 loading → 查詢 → 渲染
+                showFinancialDrilldownLoading(modal, titleEl, body, label);
+                try {
+                    rows = await fetchFinancialDrilldownRecords(type, key);
+                    rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+                } catch (_e) {
+                    body.innerHTML = `<tr><td colspan="4" class="px-4 py-6 text-center text-red-500">${ft('載入失敗，請重試')}</td></tr>`;
+                    return;
+                }
+            }
+
             if (titleEl) {
                 titleEl.textContent = `${label}｜${ft('診症單')} ${rows.length} ${ft('筆')}`;
             }
-            const esc = (s) => window.escapeHtml ? window.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
+
             if (!rows.length) {
                 body.innerHTML = `<tr><td colspan="4" class="px-4 py-6 text-center text-gray-500">${ft('無資料')}</td></tr>`;
             } else {
@@ -29906,6 +29996,27 @@ function hkBoundOf(date, isEnd) {
     const d = String(date.getDate()).padStart(2, '0');
     return new Date(`${y}-${m}-${d}T${isEnd ? '23:59:59.999' : '00:00:00'}+08:00`);
 }
+
+// ============================================================
+// 財務報表 Field Mask：只取報表所需欄位，大幅縮減傳輸量
+// ============================================================
+const FINANCIAL_CONSULTATION_FIELDS = [
+    'patientId', 'patientName', 'doctor', 'status',
+    'clinicId', 'clinicName',
+    'date', 'dateKey', 'sortDate',
+    'totalAmount', 'financialTotalAmount',
+    'summaryItems', 'financialSummaryItems',
+    'billingItems', 'billingItemsStructured',
+    'createdAt', 'updatedAt', 'syncedAt', 'isDeleted'
+];
+const FINANCIAL_SUMMARY_FIELDS = [
+    'consultationId', 'patientId', 'patientName', 'doctor', 'status',
+    'clinicId', 'clinicName',
+    'date', 'dateKey', 'sortDate',
+    'totalAmount', 'summaryItems',
+    'createdAt', 'updatedAt', 'syncedAt', 'isDeleted'
+];
+
 // Firebase 數據管理系統
 class FirebaseDataManager {
     constructor() {
@@ -31028,6 +31139,35 @@ class FirebaseDataManager {
     }
 
     /**
+     * 按需鑽取：查詢指定 dateKey（YYYY-MM-DD）的 consultationFinancialSummaries。
+     * 只拉一天的資料（通常幾十筆），比 range 查詢整個報表期間省得多。
+     */
+    async getConsultationFinancialSummariesByDateKey(dateKey, doctorFilter = null, clinicFilter = null) {
+        if (!this.isReady || !dateKey) return { success: false, data: [] };
+        try {
+            const colRef = window.firebase.collection(window.firebase.db, 'consultationFinancialSummaries');
+            const parts = [window.firebase.where('dateKey', '==', dateKey)];
+            parts.push(window.firebase.where('status', '==', 'completed'));
+            if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
+            if (clinicFilter) parts.push(window.firebase.where('clinicId', '==', clinicFilter));
+            const q = window.firebase.firestoreQuery(
+                colRef,
+                ...parts,
+                window.firebase.orderBy('sortDate', 'asc'),
+                window.firebase.limit(500),
+                window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
+            );
+            const snap = await window.firebase.getDocs(q);
+            const list = [];
+            snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+            return { success: true, data: list };
+        } catch (error) {
+            console.warn('單日鑽取查詢失敗:', error && error.message);
+            return { success: false, data: [], error: error && error.message ? error.message : String(error) };
+        }
+    }
+
+    /**
      * 查詢指定日期範圍的 dailyFinancialStats 聚合。
      * 前端用於財務報表的 summary cards 與 charts（約 N 筆／月）。
      * 鑽取明細仍走 consultationFinancialSummaries。
@@ -31041,13 +31181,22 @@ class FirebaseDataManager {
             const pageSize = 300;
             const baseParts = [];
             if (clinicFilter) baseParts.push(window.firebase.where('clinicId', '==', clinicFilter));
+            // dailyFinancialStats 本身就是小聚合文件，全部欄位都會用到，
+            // 但仍加 select 確保不帶入多餘的 Firestore metadata
+            const DAILY_STATS_FIELDS = [
+                'dateKey', 'sortDate', 'clinicId', 'clinicName',
+                'totalRevenue', 'totalConsultations', 'averageRevenue',
+                'doctorStats', 'serviceStats',
+                'syncedAt', 'summaryVersion', 'updatedAt'
+            ];
             let q = window.firebase.firestoreQuery(
                 colRef,
                 ...baseParts,
                 window.firebase.orderBy('sortDate', 'asc'),
                 window.firebase.where('sortDate', '>=', start),
                 window.firebase.where('sortDate', '<=', end),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
+                window.firebase.select(...DAILY_STATS_FIELDS)
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31061,7 +31210,8 @@ class FirebaseDataManager {
                     window.firebase.where('sortDate', '>=', start),
                     window.firebase.where('sortDate', '<=', end),
                     window.firebase.startAfter(lastVisible),
-                    window.firebase.limit(pageSize)
+                    window.firebase.limit(pageSize),
+                    window.firebase.select(...DAILY_STATS_FIELDS)
                 );
                 snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31176,7 +31326,8 @@ class FirebaseDataManager {
                 window.firebase.orderBy('sortDate', 'asc'),
                 window.firebase.where('sortDate', '>=', start),
                 window.firebase.where('sortDate', '<=', end),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
+                window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31190,7 +31341,8 @@ class FirebaseDataManager {
                     window.firebase.where('sortDate', '>=', start),
                     window.firebase.where('sortDate', '<=', end),
                     window.firebase.startAfter(lastVisible),
-                    window.firebase.limit(pageSize)
+                    window.firebase.limit(pageSize),
+                    window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
                 );
                 snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31223,7 +31375,8 @@ class FirebaseDataManager {
                 colRef,
                 ...parts,
                 window.firebase.orderBy('syncedAt', 'asc'),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
+                window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
@@ -31235,7 +31388,8 @@ class FirebaseDataManager {
                     ...parts,
                     window.firebase.orderBy('syncedAt', 'asc'),
                     window.firebase.startAfter(lastVisible),
-                    window.firebase.limit(pageSize)
+                    window.firebase.limit(pageSize),
+                    window.firebase.select(...FINANCIAL_SUMMARY_FIELDS)
                 );
                 snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31310,7 +31464,8 @@ class FirebaseDataManager {
                     window.firebase.orderBy(fieldName, 'asc'),
                     window.firebase.where(fieldName, '>=', startValue),
                     window.firebase.where(fieldName, '<=', endValue),
-                    window.firebase.limit(pageSize)
+                    window.firebase.limit(pageSize),
+                    window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
                 );
                 let snap = await window.firebase.getDocs(q);
                 snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31323,7 +31478,8 @@ class FirebaseDataManager {
                         window.firebase.where(fieldName, '>=', startValue),
                         window.firebase.where(fieldName, '<=', endValue),
                         window.firebase.startAfter(lastVisible),
-                        window.firebase.limit(pageSize)
+                        window.firebase.limit(pageSize),
+                        window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
                     );
                     snap = await window.firebase.getDocs(q);
                     snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31420,7 +31576,8 @@ class FirebaseDataManager {
                 ...q1Parts,
                 window.firebase.where('updatedAt', '>', sinceDate),
                 window.firebase.orderBy('updatedAt', 'asc'),
-                window.firebase.limit(pageSize)
+                window.firebase.limit(pageSize),
+                window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
             );
             let snap1 = await window.firebase.getDocs(q1);
             snap1.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -31432,7 +31589,8 @@ class FirebaseDataManager {
                     window.firebase.where('updatedAt', '>', sinceDate),
                     window.firebase.orderBy('updatedAt', 'asc'),
                     window.firebase.startAfter(last1),
-                    window.firebase.limit(pageSize)
+                    window.firebase.limit(pageSize),
+                    window.firebase.select(...FINANCIAL_CONSULTATION_FIELDS)
                 );
                 snap1 = await window.firebase.getDocs(q1);
                 snap1.forEach(d => list.push({ id: d.id, ...d.data() }));

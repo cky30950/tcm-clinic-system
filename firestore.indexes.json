@@ -176,6 +176,18 @@
     },
 
     {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "dateKey", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+
+    {
       "collectionGroup": "dailyFinancialStats",
       "queryScope": "COLLECTION",
       "fields": [
