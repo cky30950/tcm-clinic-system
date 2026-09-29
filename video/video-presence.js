@@ -28,13 +28,23 @@
  *     做斷線清理）；leave 時主動 remove 自己的節點。
  *
  * 安全規則（必須在 Firebase Console → Realtime Database → 規則，
- * 合併進「現有」規則樹；病人端無登入，不可要求 auth）：
+ * 合併進「現有」規則樹；病人端無登入，不可要求 auth。RTDB 規則只會
+ * 向下加權、無法收緊，故此分支為純增量，不影響既有規則）：
  *   "videoPresence": {
  *     "$channelId": {
- *       ".read":  "$channelId.matches(/^tcm-consult-.{1,64}$/)",
- *       ".write": "$channelId.matches(/^tcm-consult-.{1,64}$/)"
+ *       ".read": "$channelId.matches(/^tcm-consult-[0-9A-Za-z_-]{1,64}$/)",
+ *       "$role": {
+ *         ".write": "$channelId.matches(/^tcm-consult-[0-9A-Za-z_-]{1,64}$/)
+ *                    && ($role === 'doctor' || $role === 'patient')",
+ *         ".validate": "newData.hasChildren(['at','sid','joined'])
+ *                       && newData.child('at').isNumber()
+ *                       && newData.child('sid').isString()
+ *                       && newData.child('joined').isBoolean()"
+ *       }
  *     }
  *   }
+ *   （serverTimestamp 在規則驗證時已解析為 number；delete／onDisconnect
+ *   移除不觸發 .validate。）
  *
  * Firestore 相容橋接（過渡期，確認所有客戶端皆已部署新版後可移除）：
  *   舊版客戶端（快取未更新的 system.html／room.html）只讀寫 Firestore
