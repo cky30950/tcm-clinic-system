@@ -101,6 +101,57 @@ const ASSOC_PAGE = 50;
 const CLINIC_CACHE_TTL_MS = 5 * 60 * 1000;
 let clinicCache = null; // { at, ids, nameMap }
 
+// 員工表同樣跨請求快取 5 分鐘：舊流水只有 operatorName/createdBy（使用者名稱）
+// 或 userAuthIndex 缺件時，以 users 文件的 clinicId 補足歸屬證據
+const STAFF_CACHE_TTL_MS = 5 * 60 * 1000;
+let staffCache = null; // { at, byUid, byUsername }
+
+async function getStaffTable(client) {
+    if (staffCache && (Date.now() - staffCache.at) < STAFF_CACHE_TTL_MS) {
+        return staffCache;
+    }
+    const page = await client.queryCollection({
+        collectionId: 'users',
+        orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+        limit: 300
+    });
+    const byUid = new Map();                 // 文件 ID（Auth uid）→ clinicId
+    const nameVotes = new Map();             // 小寫 username → Map(cid → count)
+    page.docs.forEach((d) => {
+        const cid = d.data && d.data.clinicId ? String(d.data.clinicId) : '';
+        if (cid) byUid.set(d.id, cid);
+        const uname = d.data && d.data.username ? String(d.data.username) : '';
+        const key = uname.trim().toLowerCase();
+        if (!key || !cid) return;
+        if (!nameVotes.has(key)) nameVotes.set(key, new Map());
+        const m = nameVotes.get(key);
+        m.set(cid, (m.get(cid) || 0) + 1);
+    });
+    // 同名員工分屬不同診所時不採用，避免錯誤歸屬
+    const byUsername = new Map();
+    nameVotes.forEach((m, key) => {
+        if (m.size === 1) byUsername.set(key, Array.from(m.keys())[0]);
+    });
+    staffCache = { at: Date.now(), byUid, byUsername };
+    return staffCache;
+}
+
+// 以員工表解析人員所屬診所：先比使用者名稱（唯一性保證），再比 uid
+function staffClinic(staff, nameOrUid) {
+    const v = String(nameOrUid || '').trim();
+    if (!v || !staff) return '';
+    const key = v.toLowerCase();
+    return staff.byUsername.get(key) || staff.byUid.get(v) || '';
+}
+
+// 舊掛號可能無 clinicId：以「登記經手人 createdBy」（職員 username/uid）
+// 歸診所；再退而求其次以應診醫師 username 所屬診所判定。
+function resolveApptClinic(a, staff) {
+    if (!a) return '';
+    if (a.clinicId) return String(a.clinicId);
+    return staffClinic(staff, a.createdBy) || staffClinic(staff, a.appointmentDoctor) || '';
+}
+
 async function getClinicTable(client) {
     if (clinicCache && (Date.now() - clinicCache.at) < CLINIC_CACHE_TTL_MS) {
         return clinicCache;
@@ -355,7 +406,7 @@ async function fetchPatientAssociatedClinics(client, patientId) {
     return ids;
 }
 
-async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clinicIds, upcomingMap) {
+async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clinicIds, upcomingMap, staff) {
     const patientId = patientDoc.id;
     const [accountDocs, pkgPage, txPage] = await Promise.all([
         // 每診所獨立帳戶：平行讀取各診所的複合 ID 帳戶文件
@@ -417,6 +468,13 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
     operatorDocMap.forEach((d, uid) => {
         if (d && d.clinicId) operatorClinicMap.set(uid, String(d.clinicId));
     });
+    // userAuthIndex 缺件時，退回 users 文件本身的 clinicId（doc id＝uid）
+    operatorUids.forEach((uid) => {
+        if (!operatorClinicMap.has(uid)) {
+            const cid = staff && staff.byUid.get(uid);
+            if (cid) operatorClinicMap.set(uid, cid);
+        }
+    });
 
     // 先解析舊制 topup 單：其同 idempotencyKey 的 topupBonus 照單歸同一診所
     const idemClinicMap = new Map();
@@ -425,7 +483,7 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
         let cid = (tx.consultationId && consMap.has(tx.consultationId)
             && consMap.get(tx.consultationId).clinicId)
             || (tx.appointmentId && apptMap.has(tx.appointmentId)
-            && apptMap.get(tx.appointmentId).clinicId)
+            && resolveApptClinic(apptMap.get(tx.appointmentId), staff))
             || (tx.operatorUid && operatorClinicMap.get(tx.operatorUid))
             || '';
         if (tx.idempotencyKey) idemClinicMap.set(tx.idempotencyKey, String(cid || ''));
@@ -439,8 +497,8 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
             if (c && c.clinicId) return String(c.clinicId);
         }
         if (tx.appointmentId) {
-            const a = apptMap.get(tx.appointmentId);
-            if (a && a.clinicId) return String(a.clinicId);
+            const cid = resolveApptClinic(apptMap.get(tx.appointmentId), staff);
+            if (cid) return cid;
         }
         if (tx.type === 'topupBonus' && tx.idempotencyKey
             && idemClinicMap.has(tx.idempotencyKey)) {
@@ -449,6 +507,10 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
         if (tx.operatorUid && operatorClinicMap.has(tx.operatorUid)) {
             return operatorClinicMap.get(tx.operatorUid);
         }
+        // 舊流水僅有 operatorName（無 uid）或 createdBy 時，以員工表補證
+        const byName = staffClinic(staff, tx.operatorName)
+            || staffClinic(staff, tx.createdBy);
+        if (byName) return byName;
         return ''; // 無法歸屬 → 未分組
     }
 
@@ -634,7 +696,7 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
             appointmentDoctor: a.appointmentDoctor,
             doctorName: a.doctorName || '',
             status: a.status,
-            clinicId: a.clinicId || '',
+            clinicId: resolveApptClinic(a, staff),
             source: a.source || ''
         }))
         : [];
@@ -704,16 +766,18 @@ export async function onRequestPost(context) {
         );
 
         // 診所名稱表（id → 中英文名），跨請求快取 5 分鐘；
+        // 員工表（uid/username → clinicId）同快取，供舊資料歸屬補證；
         // 同時以一次 range 查詢取回未來 30 天掛號供會員端展示
-        const [clinicTable, upcomingMap] = await Promise.all([
+        const [clinicTable, staffTable, upcomingMap] = await Promise.all([
             getClinicTable(client),
+            getStaffTable(client),
             fetchUpcomingByPatient(client, auth.token, 30)
         ]);
 
         const patientDocs = await findPatients(client, phoneVariants);
         const patients = await Promise.all(
             patientDocs.map((d) => buildPatientEntry(
-                client, auth.token, d, clinicTable.nameMap, clinicTable.ids, upcomingMap))
+                client, auth.token, d, clinicTable.nameMap, clinicTable.ids, upcomingMap, staffTable))
         );
 
         return jsonResponse({ patients });
