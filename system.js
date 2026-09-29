@@ -1283,7 +1283,9 @@ const consultationHistoryPager = {
             mode: 'paged',
             dateIndexMap: {},
             dateIndexReady: false,
-            monthDateIndexCache: {}
+            monthDateIndexCache: {},
+            // 部分月索引：true 代表該月快取只含單日補讀結果，不能當成整月索引使用
+            monthDateIndexPartial: {}
         };
     },
     dateToKey(dateObj) {
@@ -1400,6 +1402,10 @@ const consultationHistoryPager = {
         state.recordsByIndex = sorted.slice();
         state.descPageCache = {};
         state.descPageCursors = {};
+        // 全量模式的索引基準（有效日期排序）與分頁模式（sortDate 排序）不同，
+        // 必須丟棄所有月索引，避免日曆沿用舊的錯位索引
+        state.monthDateIndexCache = {};
+        state.monthDateIndexPartial = {};
         this.rebuildDateIndexFromState(state);
         return { success: true, state };
     },
@@ -1571,6 +1577,46 @@ const consultationHistoryPager = {
         }
         return !!(pageResult && pageResult.success && state.recordsByIndex[targetIndex]);
     },
+    buildFullModeMonthMap(state, year, month) {
+        const monthKey = `${Number(year)}-${String(Number(month) + 1).padStart(2, '0')}`;
+        const monthMap = {};
+        Object.entries((state && state.dateIndexMap) || {}).forEach(([dateKey, indices]) => {
+            if (String(dateKey).slice(0, 7) === monthKey) {
+                monthMap[dateKey] = Array.isArray(indices) ? indices.slice() : [];
+            }
+        });
+        if (state) {
+            state.monthDateIndexCache[monthKey] = monthMap;
+            state.monthDateIndexPartial[monthKey] = false;
+        }
+        return monthMap;
+    },
+    // 校驗月/日索引指向的已載入槽位，其記錄日期必須與圓點日期一致。
+    // 若不一致，代表 totalCount 聚合欄位飄移或存在缺失/異常 sortDate 的病歷，
+    // 升序（日曆）與降序（翻頁）索引已錯位，分頁模式不可再用。
+    validateDateMapSlots(state, dateMap) {
+        if (!state || !Array.isArray(state.recordsByIndex)) return true;
+        const records = state.recordsByIndex;
+        const entries = dateMap ? Object.entries(dateMap) : [];
+        for (let i = 0; i < entries.length; i++) {
+            const [key, indices] = entries[i];
+            if (!Array.isArray(indices)) continue;
+            for (let j = 0; j < indices.length; j++) {
+                const rec = records[indices[j]];
+                if (rec && this.getRecordDateKey(rec) !== key) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    },
+    // 強制切換到全量模式並以「有效日期」重建索引，保證日曆圓點與點擊結果一致
+    async forceFullMode(patientId) {
+        const fallback = await this.loadFullModeFallback(patientId);
+        if (!fallback || !fallback.success || !fallback.state) return null;
+        this.rebuildDateIndexFromState(fallback.state);
+        return fallback.state;
+    },
     async ensureMonthDateIndex(patientId, year, month) {
         const pid = String(patientId || '');
         if (!pid) return false;
@@ -1580,20 +1626,16 @@ const consultationHistoryPager = {
         const stateResult = await this.ensurePatientState(pid, false);
         if (!stateResult.success || !stateResult.state) return false;
         const state = stateResult.state;
+        const monthKey = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
         if (state.mode === 'full') {
             this.rebuildDateIndexFromState(state);
-            const monthKey = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
-            const monthMap = {};
-            Object.entries(state.dateIndexMap || {}).forEach(([dateKey, indices]) => {
-                if (String(dateKey).slice(0, 7) === monthKey) {
-                    monthMap[dateKey] = Array.isArray(indices) ? indices.slice() : [];
-                }
-            });
-            state.monthDateIndexCache[monthKey] = monthMap;
+            this.buildFullModeMonthMap(state, targetYear, targetMonth);
             return true;
         }
-        const monthKey = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
-        if (state.monthDateIndexCache && state.monthDateIndexCache[monthKey]) {
+        // 只有完整的整月索引可直接重用；單日補讀產生的部分索引必須重建
+        if (state.monthDateIndexCache &&
+            state.monthDateIndexCache[monthKey] &&
+            !state.monthDateIndexPartial[monthKey]) {
             return true;
         }
         try {
@@ -1628,21 +1670,23 @@ const consultationHistoryPager = {
                 }
                 ascOffset += 1;
             });
+            // 已預載槽位若與日曆日期對不上，代表分頁索引已飄移，轉全量模式自愈
+            if (!this.validateDateMapSlots(state, monthMap)) {
+                console.warn('病歷分頁索引與日期不一致，改用全量讀取模式重建日曆索引');
+                const fullState = await this.forceFullMode(pid);
+                if (!fullState) return false;
+                this.buildFullModeMonthMap(fullState, targetYear, targetMonth);
+                return true;
+            }
             state.monthDateIndexCache[monthKey] = monthMap;
+            state.monthDateIndexPartial[monthKey] = false;
             return true;
         } catch (error) {
             console.warn('建立病歷月份索引失敗，改用全量讀取模式:', error);
             const fallback = await this.loadFullModeFallback(pid);
             if (!fallback.success || !fallback.state) return false;
-            const fallbackState = fallback.state;
-            this.rebuildDateIndexFromState(fallbackState);
-            const monthMap = {};
-            Object.entries(fallbackState.dateIndexMap || {}).forEach(([dateKey, indices]) => {
-                if (String(dateKey).slice(0, 7) === monthKey) {
-                    monthMap[dateKey] = Array.isArray(indices) ? indices.slice() : [];
-                }
-            });
-            fallbackState.monthDateIndexCache[monthKey] = monthMap;
+            this.rebuildDateIndexFromState(fallback.state);
+            this.buildFullModeMonthMap(fallback.state, targetYear, targetMonth);
             return true;
         }
     },
@@ -1734,6 +1778,14 @@ const consultationHistoryPager = {
             }
             return { success: true, indices: Array.isArray(state.dateIndexMap[key]) ? state.dateIndexMap[key].slice() : [] };
         }
+        const fallbackToFull = async () => {
+            const fullState = await this.forceFullMode(pid);
+            if (!fullState) return { success: false, indices: [] };
+            return {
+                success: true,
+                indices: Array.isArray(fullState.dateIndexMap[key]) ? fullState.dateIndexMap[key].slice() : []
+            };
+        };
         const existingIndices = [];
         if (state.monthDateIndexCache) {
             Object.values(state.monthDateIndexCache).forEach((monthMap) => {
@@ -1748,6 +1800,14 @@ const consultationHistoryPager = {
             });
         }
         if (existingIndices.length > 0 && existingIndices.every((idx) => !!state.recordsByIndex[idx])) {
+            // 槽位內容必須真的是該日期的病歷；對不上代表索引飄移，改全量模式
+            const slotsMatch = existingIndices
+                .map((idx) => this.getRecordDateKey(state.recordsByIndex[idx]))
+                .every((slotKey) => slotKey === key);
+            if (!slotsMatch) {
+                console.warn('日曆日期與已載入病歷不一致，改用全量讀取模式');
+                return await fallbackToFull();
+            }
             existingIndices.sort((a, b) => a - b);
             return { success: true, indices: existingIndices };
         }
@@ -1773,28 +1833,40 @@ const consultationHistoryPager = {
             );
             const daySnap = await window.firebase.getDocs(dayQuery);
             const loadedIndices = [];
+            let dateCoherent = true;
             daySnap.forEach((docSnap) => {
                 const rec = { id: docSnap.id, ...docSnap.data() };
                 const idx = ascOffset;
+                // sortDate 落在該日但病歷日期不是該日（兩欄不一致），或索引超出總數（聚合飄移），
+                // 分頁索引基準都已不可信，交給全量模式處理
+                if (this.getRecordDateKey(rec) !== key || idx < 0 || idx >= state.totalCount) {
+                    dateCoherent = false;
+                }
                 if (idx >= 0 && idx < state.totalCount) {
                     state.recordsByIndex[idx] = rec;
                     loadedIndices.push(idx);
                 }
                 ascOffset += 1;
             });
+            if (!dateCoherent || ascOffset > state.totalCount) {
+                console.warn('按日期查到的病歷與日曆日期不一致，改用全量讀取模式');
+                return await fallbackToFull();
+            }
             loadedIndices.sort((a, b) => a - b);
             const monthKey = key.slice(0, 7);
             if (!state.monthDateIndexCache[monthKey]) {
                 state.monthDateIndexCache[monthKey] = {};
             }
             state.monthDateIndexCache[monthKey][key] = loadedIndices.slice();
+            // 單日補讀只代表該月的部分索引，標記後下次開日曆會重建完整月索引
+            state.monthDateIndexPartial[monthKey] = true;
             if (state.dateIndexReady || state.mode === 'full') {
                 state.dateIndexMap[key] = loadedIndices.slice();
             }
             return { success: true, indices: loadedIndices };
         } catch (error) {
-            console.warn('按日期載入病歷失敗，改用既有補讀模式:', error);
-            return { success: false, indices: [] };
+            console.warn('按日期載入病歷失敗，改用全量讀取模式:', error);
+            return await fallbackToFull();
         }
     },
     async loadAdjacentRecord(patientId, currentIndex, direction) {
@@ -1902,6 +1974,7 @@ const consultationHistoryPager = {
             state.ascPageCache = {};
             state.ascPageCursors = {};
             state.monthDateIndexCache = {};
+            state.monthDateIndexPartial = {};
             this.rebuildDateIndexFromState(state);
         }
         const contexts = ['patient', 'consultation'];
@@ -14287,6 +14360,37 @@ async function saveConsultation() {
             closeHistoryCalendar(contextKey);
             renderHistoryCalendar(contextKey);
         }
+        // 最終守備：跳轉前確認目標槽位的病歷日期真的是所選日期。
+        // 若對不上（分頁索引飄移），自動轉全量模式後以有效日期重新定位，
+        // 杜絕「點 24 號卻跳到其他日期病歷」。
+        async function resolveHistoryCalendarJump(contextKey, patientId, dateKey, targetIndex) {
+            const key = String(dateKey || '');
+            const pager = consultationHistoryPager;
+            let state = pager.getCachedPatientState(patientId);
+            let rec = state && Array.isArray(state.recordsByIndex)
+                ? state.recordsByIndex[Number(targetIndex)]
+                : null;
+            if (!rec || (key && pager.getRecordDateKey(rec) !== key)) {
+                const fullState = await pager.forceFullMode(patientId);
+                if (!fullState) return;
+                const indices = key && Array.isArray(fullState.dateIndexMap[key])
+                    ? fullState.dateIndexMap[key].slice()
+                    : [];
+                if (indices.length > 1) {
+                    const st = historyCalendarState[contextKey];
+                    if (st) st.selectedDateKey = key;
+                    // 全量模式下重建當月索引，保證同日多筆清單與圓點一致
+                    await pager.ensureMonthDateIndex(patientId, st ? st.year : Number(key.slice(0, 4)), st ? st.month : Number(key.slice(5, 7)) - 1);
+                    renderHistoryCalendar(contextKey);
+                    return;
+                }
+                if (indices.length === 1) {
+                    jumpToHistoryCalendarIndex(contextKey, patientId, indices[0]);
+                }
+                return;
+            }
+            jumpToHistoryCalendarIndex(contextKey, patientId, Number(targetIndex));
+        }
         async function selectHistoryCalendarDate(contextKey, dateKey, evt) {
             const btn = evt && evt.currentTarget ? evt.currentTarget : null;
             if (btn) setButtonLoading(btn, '讀取中...');
@@ -14316,7 +14420,7 @@ async function saveConsultation() {
                 const targetIndex = dateIndices[0];
                 const loaded = await consultationHistoryPager.ensureLoadedAtIndex(patientId, targetIndex);
                 if (!loaded) return;
-                jumpToHistoryCalendarIndex(contextKey, patientId, targetIndex);
+                await resolveHistoryCalendarJump(contextKey, patientId, dateKey, targetIndex);
             } finally {
                 if (btn) clearButtonLoading(btn);
             }
@@ -14328,14 +14432,15 @@ async function saveConsultation() {
                 const patientId = getHistoryCalendarContextPatientId(contextKey);
                 if (!patientId) return;
                 const st = historyCalendarState[contextKey];
-                if (st && st.selectedDateKey) {
-                    await consultationHistoryPager.loadRecordsForDate(patientId, st.selectedDateKey);
+                const selectedKey = st && st.selectedDateKey ? st.selectedDateKey : '';
+                if (selectedKey) {
+                    await consultationHistoryPager.loadRecordsForDate(patientId, selectedKey);
                 }
                 const state = consultationHistoryPager.getCachedPatientState(patientId);
                 const alreadyLoaded = !!(state && Array.isArray(state.recordsByIndex) && state.recordsByIndex[targetIndex]);
                 const loaded = alreadyLoaded ? true : await consultationHistoryPager.ensureLoadedAtIndex(patientId, targetIndex);
                 if (!loaded) return;
-                jumpToHistoryCalendarIndex(contextKey, patientId, targetIndex);
+                await resolveHistoryCalendarJump(contextKey, patientId, selectedKey, targetIndex);
             } finally {
                 if (btn) clearButtonLoading(btn);
             }
