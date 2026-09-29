@@ -1234,6 +1234,11 @@ let patientConsultationsCache = {};
 let patientConsultationsListeners = {};
 let currentPatientHistoryPatientId = null;
 let currentConsultationHistoryPatientId = null;
+// consultationHistoryPager 批次拉取大小：每次 getDocs 拉取多筆病歷，
+// 而不是逐筆拉取。例如一個病人有 50 筆病歷，原本需要 50 次 getDocs，
+// 改為 BATCH_SIZE=20 後只需要 3 次。
+const CONSULTATION_PAGER_BATCH_SIZE = 20;
+
 const consultationHistoryPager = {
     patientPagedCache: {},
     contexts: {
@@ -1278,7 +1283,9 @@ const consultationHistoryPager = {
             mode: 'paged',
             dateIndexMap: {},
             dateIndexReady: false,
-            monthDateIndexCache: {}
+            monthDateIndexCache: {},
+            // 部分月索引：true 代表該月快取只含單日補讀結果，不能當成整月索引使用
+            monthDateIndexPartial: {}
         };
     },
     dateToKey(dateObj) {
@@ -1395,44 +1402,81 @@ const consultationHistoryPager = {
         state.recordsByIndex = sorted.slice();
         state.descPageCache = {};
         state.descPageCursors = {};
+        // 全量模式的索引基準（有效日期排序）與分頁模式（sortDate 排序）不同，
+        // 必須丟棄所有月索引，避免日曆沿用舊的錯位索引
+        state.monthDateIndexCache = {};
+        state.monthDateIndexPartial = {};
         this.rebuildDateIndexFromState(state);
         return { success: true, state };
     },
     async fetchDescPage(patientId, descPageNumber) {
         const pid = String(patientId || '');
-        const pageNum = Number(descPageNumber) || 1;
+        const targetPageNum = Number(descPageNumber) || 1;
         const state = this.getCachedPatientState(pid);
-        if (!state || pageNum < 1) return { success: false };
+        if (!state || targetPageNum < 1) return { success: false };
         if (state.mode === 'full') return { success: true };
-        if (state.descPageCache[pageNum]) return { success: true };
+        if (Object.prototype.hasOwnProperty.call(state.descPageCache, targetPageNum)) return { success: true };
         try {
             await waitForFirebaseDb();
             const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            for (let i = 1; i <= pageNum; i++) {
-                if (state.descPageCache[i]) continue;
+
+            // 找出第一個缺失的 page（從 1 到 targetPageNum）
+            // 用 hasOwnProperty 檢查，確保 null sentinel（表示到底）不被當成缺失
+            let firstMissing = 1;
+            for (; firstMissing <= targetPageNum; firstMissing++) {
+                if (!Object.prototype.hasOwnProperty.call(state.descPageCache, firstMissing)) break;
+            }
+            if (firstMissing > targetPageNum) return { success: true };
+
+            // 批次拉取：每次從 firstMissing 開始拉 BATCH_SIZE 筆
+            // 一次 getDocs 就填多個 cache entry，大幅減少 read 次數
+            while (firstMissing <= targetPageNum) {
                 const queryParts = [
                     window.firebase.where('patientId', '==', pid),
                     window.firebase.orderBy('sortDate', 'desc'),
-                    window.firebase.limit(1)
+                    window.firebase.limit(CONSULTATION_PAGER_BATCH_SIZE)
                 ];
-                if (i > 1 && state.descPageCursors[i - 1]) {
-                    queryParts.push(window.firebase.startAfter(state.descPageCursors[i - 1]));
+                // 用上一個已拉完 page 的 cursor 來 startAfter
+                const cursorKey = firstMissing - 1;
+                if (cursorKey >= 1 && state.descPageCursors[cursorKey]) {
+                    queryParts.push(window.firebase.startAfter(state.descPageCursors[cursorKey]));
                 }
                 const q = window.firebase.firestoreQuery(colRef, ...queryParts);
                 const snapshot = await window.firebase.getDocs(q);
+
                 const docs = [];
                 snapshot.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
+
                 if (docs.length === 0) {
-                    state.descPageCache[i] = null;
-                    continue;
+                    // 沒有更多資料了：在 firstMissing 標記 null 表示到底
+                    state.descPageCache[firstMissing] = null;
+                    break;
                 }
-                const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-                state.descPageCursors[i] = lastDoc;
-                state.descPageCache[i] = docs[0];
-                const uiIndex = state.totalCount - i;
-                if (uiIndex >= 0) {
-                    state.recordsByIndex[uiIndex] = docs[0];
+
+                // 把整個批次的 doc 都填到 cache（預取超範圍的資料是批次拉取的優勢）
+                for (let j = 0; j < docs.length; j++) {
+                    const pageIdx = firstMissing + j;
+                    const doc = docs[j];
+                    state.descPageCache[pageIdx] = doc;
+                    const uiIndex = state.totalCount - pageIdx;
+                    if (uiIndex >= 0 && uiIndex < state.totalCount) {
+                        state.recordsByIndex[uiIndex] = doc;
+                    }
                 }
+
+                // 存 cursor：這個 batch 最後一筆對應的 pageIdx
+                const lastPageIdx = firstMissing + docs.length - 1;
+                state.descPageCursors[lastPageIdx] = snapshot.docs[snapshot.docs.length - 1];
+
+                // 如果這個 batch 不滿（到尾了）就停，並填充 null sentinels
+                // 避免未來請求超過實際資料範圍時再發一次空的 getDocs
+                if (docs.length < CONSULTATION_PAGER_BATCH_SIZE) {
+                    for (let p = lastPageIdx + 1; p <= targetPageNum; p++) {
+                        state.descPageCache[p] = null;
+                    }
+                    break;
+                }
+                firstMissing += docs.length;
             }
             return { success: true };
         } catch (error) {
@@ -1442,39 +1486,69 @@ const consultationHistoryPager = {
     },
     async fetchAscPage(patientId, ascPageNumber) {
         const pid = String(patientId || '');
-        const pageNum = Number(ascPageNumber) || 1;
+        const targetPageNum = Number(ascPageNumber) || 1;
         const state = this.getCachedPatientState(pid);
-        if (!state || pageNum < 1) return { success: false };
+        if (!state || targetPageNum < 1) return { success: false };
         if (state.mode === 'full') return { success: true };
-        if (Object.prototype.hasOwnProperty.call(state.ascPageCache, pageNum)) return { success: true };
+        if (Object.prototype.hasOwnProperty.call(state.ascPageCache, targetPageNum)) return { success: true };
         try {
             await waitForFirebaseDb();
             const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            for (let i = 1; i <= pageNum; i++) {
-                if (Object.prototype.hasOwnProperty.call(state.ascPageCache, i)) continue;
+
+            // 找出第一個缺失的 page（從 1 到 targetPageNum）
+            let firstMissing = 1;
+            for (; firstMissing <= targetPageNum; firstMissing++) {
+                if (!Object.prototype.hasOwnProperty.call(state.ascPageCache, firstMissing)) break;
+            }
+            if (firstMissing > targetPageNum) return { success: true };
+
+            // 批次拉取：每次從 firstMissing 開始拉 BATCH_SIZE 筆
+            while (firstMissing <= targetPageNum) {
                 const queryParts = [
                     window.firebase.where('patientId', '==', pid),
                     window.firebase.orderBy('sortDate', 'asc'),
-                    window.firebase.limit(1)
+                    window.firebase.limit(CONSULTATION_PAGER_BATCH_SIZE)
                 ];
-                if (i > 1 && state.ascPageCursors[i - 1]) {
-                    queryParts.push(window.firebase.startAfter(state.ascPageCursors[i - 1]));
+                // 用上一個已拉完 page 的 cursor 來 startAfter
+                const cursorKey = firstMissing - 1;
+                if (cursorKey >= 1 && state.ascPageCursors[cursorKey]) {
+                    queryParts.push(window.firebase.startAfter(state.ascPageCursors[cursorKey]));
                 }
                 const q = window.firebase.firestoreQuery(colRef, ...queryParts);
                 const snapshot = await window.firebase.getDocs(q);
+
                 const docs = [];
                 snapshot.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
+
                 if (docs.length === 0) {
-                    state.ascPageCache[i] = null;
-                    continue;
+                    state.ascPageCache[firstMissing] = null;
+                    break;
                 }
-                const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-                state.ascPageCursors[i] = lastDoc;
-                state.ascPageCache[i] = docs[0];
-                const uiIndex = i - 1;
-                if (uiIndex >= 0 && uiIndex < state.totalCount) {
-                    state.recordsByIndex[uiIndex] = docs[0];
+
+                // 把整個批次的 doc 都填到 cache（預取超範圍的資料是批次拉取的優勢）
+                for (let j = 0; j < docs.length; j++) {
+                    const pageIdx = firstMissing + j;
+                    const doc = docs[j];
+                    state.ascPageCache[pageIdx] = doc;
+                    const uiIndex = pageIdx - 1;
+                    if (uiIndex >= 0 && uiIndex < state.totalCount) {
+                        state.recordsByIndex[uiIndex] = doc;
+                    }
                 }
+
+                // 存 cursor：這個 batch 最後一筆對應的 pageIdx
+                const lastPageIdx = firstMissing + docs.length - 1;
+                state.ascPageCursors[lastPageIdx] = snapshot.docs[snapshot.docs.length - 1];
+
+                // 如果這個 batch 不滿（到尾了）就停，並填充 null sentinels
+                // 避免未來請求超過實際資料範圍時再發一次空的 getDocs
+                if (docs.length < CONSULTATION_PAGER_BATCH_SIZE) {
+                    for (let p = lastPageIdx + 1; p <= targetPageNum; p++) {
+                        state.ascPageCache[p] = null;
+                    }
+                    break;
+                }
+                firstMissing += docs.length;
             }
             return { success: true };
         } catch (error) {
@@ -1503,6 +1577,46 @@ const consultationHistoryPager = {
         }
         return !!(pageResult && pageResult.success && state.recordsByIndex[targetIndex]);
     },
+    buildFullModeMonthMap(state, year, month) {
+        const monthKey = `${Number(year)}-${String(Number(month) + 1).padStart(2, '0')}`;
+        const monthMap = {};
+        Object.entries((state && state.dateIndexMap) || {}).forEach(([dateKey, indices]) => {
+            if (String(dateKey).slice(0, 7) === monthKey) {
+                monthMap[dateKey] = Array.isArray(indices) ? indices.slice() : [];
+            }
+        });
+        if (state) {
+            state.monthDateIndexCache[monthKey] = monthMap;
+            state.monthDateIndexPartial[monthKey] = false;
+        }
+        return monthMap;
+    },
+    // 校驗月/日索引指向的已載入槽位，其記錄日期必須與圓點日期一致。
+    // 若不一致，代表 totalCount 聚合欄位飄移或存在缺失/異常 sortDate 的病歷，
+    // 升序（日曆）與降序（翻頁）索引已錯位，分頁模式不可再用。
+    validateDateMapSlots(state, dateMap) {
+        if (!state || !Array.isArray(state.recordsByIndex)) return true;
+        const records = state.recordsByIndex;
+        const entries = dateMap ? Object.entries(dateMap) : [];
+        for (let i = 0; i < entries.length; i++) {
+            const [key, indices] = entries[i];
+            if (!Array.isArray(indices)) continue;
+            for (let j = 0; j < indices.length; j++) {
+                const rec = records[indices[j]];
+                if (rec && this.getRecordDateKey(rec) !== key) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    },
+    // 強制切換到全量模式並以「有效日期」重建索引，保證日曆圓點與點擊結果一致
+    async forceFullMode(patientId) {
+        const fallback = await this.loadFullModeFallback(patientId);
+        if (!fallback || !fallback.success || !fallback.state) return null;
+        this.rebuildDateIndexFromState(fallback.state);
+        return fallback.state;
+    },
     async ensureMonthDateIndex(patientId, year, month) {
         const pid = String(patientId || '');
         if (!pid) return false;
@@ -1512,20 +1626,16 @@ const consultationHistoryPager = {
         const stateResult = await this.ensurePatientState(pid, false);
         if (!stateResult.success || !stateResult.state) return false;
         const state = stateResult.state;
+        const monthKey = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
         if (state.mode === 'full') {
             this.rebuildDateIndexFromState(state);
-            const monthKey = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
-            const monthMap = {};
-            Object.entries(state.dateIndexMap || {}).forEach(([dateKey, indices]) => {
-                if (String(dateKey).slice(0, 7) === monthKey) {
-                    monthMap[dateKey] = Array.isArray(indices) ? indices.slice() : [];
-                }
-            });
-            state.monthDateIndexCache[monthKey] = monthMap;
+            this.buildFullModeMonthMap(state, targetYear, targetMonth);
             return true;
         }
-        const monthKey = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
-        if (state.monthDateIndexCache && state.monthDateIndexCache[monthKey]) {
+        // 只有完整的整月索引可直接重用；單日補讀產生的部分索引必須重建
+        if (state.monthDateIndexCache &&
+            state.monthDateIndexCache[monthKey] &&
+            !state.monthDateIndexPartial[monthKey]) {
             return true;
         }
         try {
@@ -1560,21 +1670,23 @@ const consultationHistoryPager = {
                 }
                 ascOffset += 1;
             });
+            // 已預載槽位若與日曆日期對不上，代表分頁索引已飄移，轉全量模式自愈
+            if (!this.validateDateMapSlots(state, monthMap)) {
+                console.warn('病歷分頁索引與日期不一致，改用全量讀取模式重建日曆索引');
+                const fullState = await this.forceFullMode(pid);
+                if (!fullState) return false;
+                this.buildFullModeMonthMap(fullState, targetYear, targetMonth);
+                return true;
+            }
             state.monthDateIndexCache[monthKey] = monthMap;
+            state.monthDateIndexPartial[monthKey] = false;
             return true;
         } catch (error) {
             console.warn('建立病歷月份索引失敗，改用全量讀取模式:', error);
             const fallback = await this.loadFullModeFallback(pid);
             if (!fallback.success || !fallback.state) return false;
-            const fallbackState = fallback.state;
-            this.rebuildDateIndexFromState(fallbackState);
-            const monthMap = {};
-            Object.entries(fallbackState.dateIndexMap || {}).forEach(([dateKey, indices]) => {
-                if (String(dateKey).slice(0, 7) === monthKey) {
-                    monthMap[dateKey] = Array.isArray(indices) ? indices.slice() : [];
-                }
-            });
-            fallbackState.monthDateIndexCache[monthKey] = monthMap;
+            this.rebuildDateIndexFromState(fallback.state);
+            this.buildFullModeMonthMap(fallback.state, targetYear, targetMonth);
             return true;
         }
     },
@@ -1666,6 +1778,14 @@ const consultationHistoryPager = {
             }
             return { success: true, indices: Array.isArray(state.dateIndexMap[key]) ? state.dateIndexMap[key].slice() : [] };
         }
+        const fallbackToFull = async () => {
+            const fullState = await this.forceFullMode(pid);
+            if (!fullState) return { success: false, indices: [] };
+            return {
+                success: true,
+                indices: Array.isArray(fullState.dateIndexMap[key]) ? fullState.dateIndexMap[key].slice() : []
+            };
+        };
         const existingIndices = [];
         if (state.monthDateIndexCache) {
             Object.values(state.monthDateIndexCache).forEach((monthMap) => {
@@ -1680,6 +1800,14 @@ const consultationHistoryPager = {
             });
         }
         if (existingIndices.length > 0 && existingIndices.every((idx) => !!state.recordsByIndex[idx])) {
+            // 槽位內容必須真的是該日期的病歷；對不上代表索引飄移，改全量模式
+            const slotsMatch = existingIndices
+                .map((idx) => this.getRecordDateKey(state.recordsByIndex[idx]))
+                .every((slotKey) => slotKey === key);
+            if (!slotsMatch) {
+                console.warn('日曆日期與已載入病歷不一致，改用全量讀取模式');
+                return await fallbackToFull();
+            }
             existingIndices.sort((a, b) => a - b);
             return { success: true, indices: existingIndices };
         }
@@ -1705,28 +1833,40 @@ const consultationHistoryPager = {
             );
             const daySnap = await window.firebase.getDocs(dayQuery);
             const loadedIndices = [];
+            let dateCoherent = true;
             daySnap.forEach((docSnap) => {
                 const rec = { id: docSnap.id, ...docSnap.data() };
                 const idx = ascOffset;
+                // sortDate 落在該日但病歷日期不是該日（兩欄不一致），或索引超出總數（聚合飄移），
+                // 分頁索引基準都已不可信，交給全量模式處理
+                if (this.getRecordDateKey(rec) !== key || idx < 0 || idx >= state.totalCount) {
+                    dateCoherent = false;
+                }
                 if (idx >= 0 && idx < state.totalCount) {
                     state.recordsByIndex[idx] = rec;
                     loadedIndices.push(idx);
                 }
                 ascOffset += 1;
             });
+            if (!dateCoherent || ascOffset > state.totalCount) {
+                console.warn('按日期查到的病歷與日曆日期不一致，改用全量讀取模式');
+                return await fallbackToFull();
+            }
             loadedIndices.sort((a, b) => a - b);
             const monthKey = key.slice(0, 7);
             if (!state.monthDateIndexCache[monthKey]) {
                 state.monthDateIndexCache[monthKey] = {};
             }
             state.monthDateIndexCache[monthKey][key] = loadedIndices.slice();
+            // 單日補讀只代表該月的部分索引，標記後下次開日曆會重建完整月索引
+            state.monthDateIndexPartial[monthKey] = true;
             if (state.dateIndexReady || state.mode === 'full') {
                 state.dateIndexMap[key] = loadedIndices.slice();
             }
             return { success: true, indices: loadedIndices };
         } catch (error) {
-            console.warn('按日期載入病歷失敗，改用既有補讀模式:', error);
-            return { success: false, indices: [] };
+            console.warn('按日期載入病歷失敗，改用全量讀取模式:', error);
+            return await fallbackToFull();
         }
     },
     async loadAdjacentRecord(patientId, currentIndex, direction) {
@@ -1834,6 +1974,7 @@ const consultationHistoryPager = {
             state.ascPageCache = {};
             state.ascPageCursors = {};
             state.monthDateIndexCache = {};
+            state.monthDateIndexPartial = {};
             this.rebuildDateIndexFromState(state);
         }
         const contexts = ['patient', 'consultation'];
@@ -8290,6 +8431,52 @@ async function logout() {
             clearPatientMedicalProfileForm();
         }
 
+/**
+ * 以電話號碼尋找既有病人（病人資料管理防重複登記用）。
+ * 比對策略：
+ *   1. 先查本機病人快取（純數字歸一，零網路開銷）；
+ *   2. 再以 Firestore equality 查詢做權威確認，避免快取過期漏判。
+ * 緊急聯絡人電話不屬病人主電話，不在此檢查範圍。
+ *
+ * @param {string} phone 表單輸入之病人電話
+ * @param {string} [excludePatientId] 編輯時排除當前病人自身
+ * @returns {Promise<object|null>} 命中之病人記錄；查詢服務異常時回 null
+ */
+async function findPatientByPhone(phone, excludePatientId) {
+    const normalized = String(phone || '').replace(/\D/g, '');
+    const isOther = (p) => p
+        && String(p.id) !== String(excludePatientId || '')
+        && String(p.phone || '').replace(/\D/g, '') === normalized;
+
+    // 1) 本機快取
+    try {
+        const cached = await window.firebaseDataManager.getPatients();
+        if (cached && cached.success && Array.isArray(cached.data)) {
+            const hit = cached.data.find(isOther);
+            if (hit) return hit;
+        }
+    } catch (_cacheErr) { /* 快取不可用就走遠端 */ }
+
+    // 2) Firestore 權威 equality 查詢
+    try {
+        const dupQuery = window.firebase.firestoreQuery(
+            window.firebase.collection(window.firebase.db, 'patients'),
+            window.firebase.where('phone', '==', String(phone).trim())
+        );
+        const snapshot = await window.firebase.getDocs(dupQuery);
+        let found = null;
+        snapshot.forEach((docSnap) => {
+            if (found) return;
+            if (String(docSnap.id) === String(excludePatientId || '')) return;
+            found = { id: docSnap.id, ...docSnap.data() };
+        });
+        return found;
+    } catch (queryErr) {
+        console.error('電話重複查詢失敗:', queryErr);
+        return null;
+    }
+}
+
 async function savePatient() {
     if (editingPatientId && !hasActionPermission('patientEdit')) {
         showToast('權限不足，無法編輯病人資料', 'error');
@@ -8351,7 +8538,18 @@ async function savePatient() {
         return;
     }
 
-    
+    // 電話號碼唯一性：新增及編輯均不可與其他病人重複
+    // （緊急聯絡人電話不在管制範圍）；編輯時排除病人自身
+    const duplicatePatient = await findPatientByPhone(patient.phone, editingPatientId);
+    if (duplicatePatient) {
+        showToast(
+            `電話號碼已使用於病人「${duplicatePatient.name || duplicatePatient.id}」，不可重複登記！`,
+            'error'
+        );
+        return;
+    }
+
+
 
     
     
@@ -11595,7 +11793,8 @@ function createAppointmentRow(appointment, patient, index) {
                 'registered': { text: '已掛號', class: 'bg-blue-100 text-blue-800' },
                 'waiting': { text: '候診中', class: 'bg-yellow-100 text-yellow-800' },
                 'consulting': { text: '診症中', class: 'bg-green-100 text-green-800' },
-                'completed': { text: '已完成', class: 'bg-gray-100 text-gray-800' }
+                'completed': { text: '已完成', class: 'bg-gray-100 text-gray-800' },
+                'cancelled': { text: '已取消', class: 'bg-gray-100 text-gray-500 line-through' }
             };
             return statusMap[status] || { text: '未知', class: 'bg-gray-100 text-gray-800' };
         }
@@ -11603,6 +11802,9 @@ function createAppointmentRow(appointment, patient, index) {
 // 2. 修改 getOperationButtons 函數，確保使用正確的 patientId
 function getOperationButtons(appointment, patient = null) {
     const buttons = [];
+    // 掛號 ID 可能為 RTDB push key（以 '-' 開頭，如 -P2xxx），inline 事件
+    // 必須以引號字串傳參，否則會被解析成「減去變數」而報 ReferenceError。
+    const qid = String(appointment.id == null ? '' : appointment.id).replace(/'/g, "\\'");
     const medicalRecordEditLabel = getMedicalRecordEditButtonLabel(null, appointment);
     
     // 檢查目前用戶是否為醫師
@@ -11669,10 +11871,10 @@ function getOperationButtons(appointment, patient = null) {
                 }
             } else {
                 if (canConfirmArrival) {
-                    buttons.push(`<button onclick="confirmPatientArrival(${appointment.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">確認到達</button>`);
+                    buttons.push(`<button onclick="confirmPatientArrival('${qid}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">確認到達</button>`);
                 }
                 if (canManage) {
-                    buttons.push(`<button onclick="removeAppointment(${appointment.id})" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">移除掛號</button>`);
+                    buttons.push(`<button onclick="removeAppointment('${qid}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">移除掛號</button>`);
                 }
             }
             break;
@@ -11688,29 +11890,29 @@ function getOperationButtons(appointment, patient = null) {
                 }
             } else {
                 if (canStartConsultationForAppointment) {
-                    buttons.push(`<button onclick="startConsultation(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">開始診症</button>`);
+                    buttons.push(`<button onclick="startConsultation('${qid}')" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">開始診症</button>`);
                 }
                 // 管理員或護理師可以取消候診，將狀態回復為已掛號
                 if (canManage) {
-                    buttons.push(`<button onclick="cancelWaiting(${appointment.id})" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">取消候診</button>`);
+                    buttons.push(`<button onclick="cancelWaiting('${qid}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">取消候診</button>`);
                 }
             }
             break;
             
         case 'consulting':
             if (canContinueConsultationForAppointment) {
-                buttons.push(`<button onclick="continueConsultation(${appointment.id})" class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">繼續診症</button>`);
+                buttons.push(`<button onclick="continueConsultation('${qid}')" class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">繼續診症</button>`);
             }
             break;
             
         case 'completed':
             // 列印收據功能不受診症狀態限制
-            buttons.push(`<button onclick="printReceiptFromAppointment(${appointment.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">列印收據</button>`);
+            buttons.push(`<button onclick="printReceiptFromAppointment('${qid}')" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">列印收據</button>`);
             if (!isGeneralRegistration) {
                 // 新增方藥醫囑列印功能，位於列印收據旁
-                buttons.push(`<button onclick="printPrescriptionInstructionsFromAppointment(${appointment.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">藥單醫囑</button>`);
-                buttons.push(`<button onclick="printAttendanceCertificateFromAppointment(${appointment.id})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">到診證明</button>`);
-                buttons.push(`<button onclick="printSickLeaveFromAppointment(${appointment.id})" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">病假證明</button>`);
+                buttons.push(`<button onclick="printPrescriptionInstructionsFromAppointment('${qid}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">藥單醫囑</button>`);
+                buttons.push(`<button onclick="printAttendanceCertificateFromAppointment('${qid}')" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">到診證明</button>`);
+                buttons.push(`<button onclick="printSickLeaveFromAppointment('${qid}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">病假證明</button>`);
             }
             const editWindowStatus = getMedicalRecordEditWindowStatus(null, appointment);
             
@@ -11724,17 +11926,24 @@ function getOperationButtons(appointment, patient = null) {
             } else {
                 if (canEditMedicalRecord) {
                     if (editWindowStatus.allowed) {
-                        buttons.push(`<button onclick="editMedicalRecord(${appointment.id})" class="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">${medicalRecordEditLabel}</button>`);
+                        buttons.push(`<button onclick="editMedicalRecord('${qid}')" class="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">${medicalRecordEditLabel}</button>`);
                     } else {
                         buttons.push(`<span class="bg-gray-300 text-gray-500 px-2 py-1 rounded text-xs whitespace-nowrap cursor-not-allowed" title="${editWindowStatus.reason}">${medicalRecordEditLabel}</span>`);
                     }
                 }
                 if (canManage) {
-                    buttons.push(`<button onclick="withdrawConsultation(${appointment.id})" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">撤回診症</button>`);
+                    buttons.push(`<button onclick="withdrawConsultation('${qid}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">撤回診症</button>`);
                 }
             }
             break;
             
+        case 'cancelled':
+            // 病人線上取消之軟取消記錄：管理員／護理師可永久移除
+            if (!isDisabled && canManage) {
+                buttons.push(`<button onclick="removeAppointment('${qid}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition duration-200">移除掛號</button>`);
+            }
+            break;
+
         default:
             buttons.push('<span class="text-gray-400 text-xs">狀態異常</span>');
             break;
@@ -11890,13 +12099,15 @@ async function removeAppointment(appointmentId) {
             'registered': '已掛號',
             'waiting': '候診中',
             'consulting': '診症中',
-            'completed': '已完成'
+            'completed': '已完成',
+            'cancelled': '已取消'
         };
         const statusNamesEn = {
             'registered': 'Registered',
             'waiting': 'Waiting',
             'consulting': 'Consulting',
-            'completed': 'Completed'
+            'completed': 'Completed',
+            'cancelled': 'Cancelled'
         };
         const lang2 = localStorage.getItem('lang') || 'zh';
         const statusTextZh = statusNamesZh[appointment.status] || appointment.status;
@@ -14149,6 +14360,37 @@ async function saveConsultation() {
             closeHistoryCalendar(contextKey);
             renderHistoryCalendar(contextKey);
         }
+        // 最終守備：跳轉前確認目標槽位的病歷日期真的是所選日期。
+        // 若對不上（分頁索引飄移），自動轉全量模式後以有效日期重新定位，
+        // 杜絕「點 24 號卻跳到其他日期病歷」。
+        async function resolveHistoryCalendarJump(contextKey, patientId, dateKey, targetIndex) {
+            const key = String(dateKey || '');
+            const pager = consultationHistoryPager;
+            let state = pager.getCachedPatientState(patientId);
+            let rec = state && Array.isArray(state.recordsByIndex)
+                ? state.recordsByIndex[Number(targetIndex)]
+                : null;
+            if (!rec || (key && pager.getRecordDateKey(rec) !== key)) {
+                const fullState = await pager.forceFullMode(patientId);
+                if (!fullState) return;
+                const indices = key && Array.isArray(fullState.dateIndexMap[key])
+                    ? fullState.dateIndexMap[key].slice()
+                    : [];
+                if (indices.length > 1) {
+                    const st = historyCalendarState[contextKey];
+                    if (st) st.selectedDateKey = key;
+                    // 全量模式下重建當月索引，保證同日多筆清單與圓點一致
+                    await pager.ensureMonthDateIndex(patientId, st ? st.year : Number(key.slice(0, 4)), st ? st.month : Number(key.slice(5, 7)) - 1);
+                    renderHistoryCalendar(contextKey);
+                    return;
+                }
+                if (indices.length === 1) {
+                    jumpToHistoryCalendarIndex(contextKey, patientId, indices[0]);
+                }
+                return;
+            }
+            jumpToHistoryCalendarIndex(contextKey, patientId, Number(targetIndex));
+        }
         async function selectHistoryCalendarDate(contextKey, dateKey, evt) {
             const btn = evt && evt.currentTarget ? evt.currentTarget : null;
             if (btn) setButtonLoading(btn, '讀取中...');
@@ -14178,7 +14420,7 @@ async function saveConsultation() {
                 const targetIndex = dateIndices[0];
                 const loaded = await consultationHistoryPager.ensureLoadedAtIndex(patientId, targetIndex);
                 if (!loaded) return;
-                jumpToHistoryCalendarIndex(contextKey, patientId, targetIndex);
+                await resolveHistoryCalendarJump(contextKey, patientId, dateKey, targetIndex);
             } finally {
                 if (btn) clearButtonLoading(btn);
             }
@@ -14190,14 +14432,15 @@ async function saveConsultation() {
                 const patientId = getHistoryCalendarContextPatientId(contextKey);
                 if (!patientId) return;
                 const st = historyCalendarState[contextKey];
-                if (st && st.selectedDateKey) {
-                    await consultationHistoryPager.loadRecordsForDate(patientId, st.selectedDateKey);
+                const selectedKey = st && st.selectedDateKey ? st.selectedDateKey : '';
+                if (selectedKey) {
+                    await consultationHistoryPager.loadRecordsForDate(patientId, selectedKey);
                 }
                 const state = consultationHistoryPager.getCachedPatientState(patientId);
                 const alreadyLoaded = !!(state && Array.isArray(state.recordsByIndex) && state.recordsByIndex[targetIndex]);
                 const loaded = alreadyLoaded ? true : await consultationHistoryPager.ensureLoadedAtIndex(patientId, targetIndex);
                 if (!loaded) return;
-                jumpToHistoryCalendarIndex(contextKey, patientId, targetIndex);
+                await resolveHistoryCalendarJump(contextKey, patientId, selectedKey, targetIndex);
             } finally {
                 if (btn) clearButtonLoading(btn);
             }
@@ -18717,11 +18960,43 @@ async function initializeSystemAfterLogin() {
             }
         }
 
+        // 收集「診所營業時間＋午飯時間」時間輸入（prefix＝'' 或 'addClinic'），
+        // 同時生成 businessHours 顯示字串，供收據/頁腳等既有展示沿用。
+        function collectBusinessHoursUI(prefix) {
+            const val = (id) => {
+                const el = document.getElementById(prefix + id);
+                return el ? String(el.value || '').trim() : '';
+            };
+            const start = val('BusinessHoursStart');
+            const end = val('BusinessHoursEnd');
+            const lunchStart = val('LunchStart');
+            const lunchEnd = val('LunchEnd');
+            let businessHours = '';
+            if (start && end) businessHours = `${start}-${end}`;
+            if (lunchStart && lunchEnd && businessHours) {
+                businessHours += `（休息 ${lunchStart}-${lunchEnd}）`;
+            }
+            return { start, end, lunchStart, lunchEnd, businessHours };
+        }
+
+        // 以時間字串（HH:mm）換算分鐘，便於驗證先後
+        function hmToMinutes(s) {
+            const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || ''));
+            return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
+        }
+
         function showClinicSettingsModal() {
             // 載入現有設定
             document.getElementById('clinicChineseName').value = clinicSettings.chineseName || '';
             document.getElementById('clinicEnglishName').value = clinicSettings.englishName || '';
-            document.getElementById('clinicBusinessHours').value = clinicSettings.businessHours || '';
+            const setVal = (id, v) => {
+                const el = document.getElementById(id);
+                if (el) el.value = v || '';
+            };
+            setVal('clinicBusinessHoursStart', clinicSettings.businessHoursStart);
+            setVal('clinicBusinessHoursEnd', clinicSettings.businessHoursEnd);
+            setVal('clinicLunchStart', clinicSettings.lunchStart);
+            setVal('clinicLunchEnd', clinicSettings.lunchEnd);
             document.getElementById('clinicPhone').value = clinicSettings.phone || '';
             document.getElementById('clinicAddress').value = clinicSettings.address || '';
             const thankYouInput = document.getElementById('clinicReceiptThankYouText');
@@ -18746,7 +19021,10 @@ async function initializeSystemAfterLogin() {
                     return;
                 }
             } catch (_e) {}
-            ['addClinicChineseName', 'addClinicEnglishName', 'addClinicBusinessHours', 'addClinicPhone', 'addClinicAddress', 'addClinicReceiptThankYouText'].forEach((id) => {
+            ['addClinicChineseName', 'addClinicEnglishName',
+                'addClinicBusinessHoursStart', 'addClinicBusinessHoursEnd',
+                'addClinicLunchStart', 'addClinicLunchEnd',
+                'addClinicPhone', 'addClinicAddress', 'addClinicReceiptThankYouText'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el && 'value' in el) el.value = '';
             });
@@ -18762,7 +19040,7 @@ async function initializeSystemAfterLogin() {
         async function saveNewClinic() {
             const chineseName = String((document.getElementById('addClinicChineseName') || {}).value || '').trim();
             const englishName = String((document.getElementById('addClinicEnglishName') || {}).value || '').trim();
-            const businessHours = String((document.getElementById('addClinicBusinessHours') || {}).value || '').trim();
+            const hours = collectBusinessHoursUI('addClinic');
             const phone = String((document.getElementById('addClinicPhone') || {}).value || '').trim();
             const address = String((document.getElementById('addClinicAddress') || {}).value || '').trim();
             const receiptThankYouText = String((document.getElementById('addClinicReceiptThankYouText') || {}).value || '').trim();
@@ -18770,11 +19048,36 @@ async function initializeSystemAfterLogin() {
                 showToast('請輸入診所中文名稱！', 'error');
                 return;
             }
+            // 營業時間須成對且結束晚於開始；午飯須落在營業時間內
+            if ((hours.start && !hours.end) || (!hours.start && hours.end)) {
+                showToast('請完整設定診所營業時間（開始及結束）', 'error');
+                return;
+            }
+            if (hours.start && hmToMinutes(hours.end) <= hmToMinutes(hours.start)) {
+                showToast('診所結束時間必須晚於開始時間', 'error');
+                return;
+            }
+            if ((hours.lunchStart && !hours.lunchEnd)
+                || (!hours.lunchStart && hours.lunchEnd)
+                || (hours.lunchStart && hmToMinutes(hours.lunchEnd) <= hmToMinutes(hours.lunchStart))) {
+                showToast('請完整設定休息時間，且結束須晚於開始', 'error');
+                return;
+            }
+            if (hours.start && hours.lunchStart
+                && (hmToMinutes(hours.lunchStart) < hmToMinutes(hours.start)
+                    || hmToMinutes(hours.lunchEnd) > hmToMinutes(hours.end))) {
+                showToast('休息時間必須設定於診所營業時間之內', 'error');
+                return;
+            }
             try {
                 const created = await window.firebaseDataManager.addClinic({
                     chineseName,
                     englishName,
-                    businessHours,
+                    businessHours: hours.businessHours,
+                    businessHoursStart: hours.start,
+                    businessHoursEnd: hours.end,
+                    lunchStart: hours.lunchStart,
+                    lunchEnd: hours.lunchEnd,
                     phone,
                     address,
                     receiptThankYouText,
@@ -18801,20 +19104,45 @@ async function initializeSystemAfterLogin() {
         async function saveClinicSettings() {
             const chineseName = document.getElementById('clinicChineseName').value.trim();
             const englishName = document.getElementById('clinicEnglishName').value.trim();
-            const businessHours = document.getElementById('clinicBusinessHours').value.trim();
+            const hours = collectBusinessHoursUI('clinic');
             const phone = document.getElementById('clinicPhone').value.trim();
             const address = document.getElementById('clinicAddress').value.trim();
             const thankYouInput = document.getElementById('clinicReceiptThankYouText');
             const receiptThankYouText = thankYouInput ? thankYouInput.value.trim() : '';
-            
+
             if (!chineseName) {
                 showToast('請輸入診所中文名稱！', 'error');
                 return;
             }
-            
+            // 營業時間須成對且結束晚於開始；午飯須落在營業時間內
+            if ((hours.start && !hours.end) || (!hours.start && hours.end)) {
+                showToast('請完整設定診所營業時間（開始及結束）', 'error');
+                return;
+            }
+            if (hours.start && hmToMinutes(hours.end) <= hmToMinutes(hours.start)) {
+                showToast('診所結束時間必須晚於開始時間', 'error');
+                return;
+            }
+            if ((hours.lunchStart && !hours.lunchEnd)
+                || (!hours.lunchStart && hours.lunchEnd)
+                || (hours.lunchStart && hmToMinutes(hours.lunchEnd) <= hmToMinutes(hours.lunchStart))) {
+                showToast('請完整設定休息時間，且結束須晚於開始', 'error');
+                return;
+            }
+            if (hours.start && hours.lunchStart
+                && (hmToMinutes(hours.lunchStart) < hmToMinutes(hours.start)
+                    || hmToMinutes(hours.lunchEnd) > hmToMinutes(hours.end))) {
+                showToast('休息時間必須設定於診所營業時間之內', 'error');
+                return;
+            }
+
             clinicSettings.chineseName = chineseName;
             clinicSettings.englishName = englishName;
-            clinicSettings.businessHours = businessHours;
+            clinicSettings.businessHours = hours.businessHours;
+            clinicSettings.businessHoursStart = hours.start;
+            clinicSettings.businessHoursEnd = hours.end;
+            clinicSettings.lunchStart = hours.lunchStart;
+            clinicSettings.lunchEnd = hours.lunchEnd;
             clinicSettings.phone = phone;
             clinicSettings.address = address;
             clinicSettings.receiptThankYouText = receiptThankYouText;
@@ -18824,7 +19152,11 @@ async function initializeSystemAfterLogin() {
                     await window.firebaseDataManager.updateClinic(currentClinicId, {
                         chineseName,
                         englishName,
-                        businessHours,
+                        businessHours: hours.businessHours,
+                        businessHoursStart: hours.start,
+                        businessHoursEnd: hours.end,
+                        lunchStart: hours.lunchStart,
+                        lunchEnd: hours.lunchEnd,
                         phone,
                         address,
                         receiptThankYouText,
@@ -24903,16 +25235,14 @@ async function restoreUser(id) {
             }
             if (typeof loadConsultationsForFinancial === 'function') {
                 try {
-                    // 先嘗試從 dailyFinancialStats 聚合（N 筆／月，快）
-                    // 注意：有 doctor 過濾時跳過（daily bucket 的 serviceStats 跨醫師，
-                    // 無法正確按醫師拆分），直接走傳統 consultation 路徑。
+                    // 1. 先嘗試 dailyFinancialStats 聚合（N 筆／月，最快）
+                    //    後端 bucket 的 doctorStats 欄位本身已按醫師分組，
+                    //    aggregateFromDailyStats 也支援 doctorFilter 過濾，
+                    //    所以有無醫師過濾都能走這條路徑。
                     let useDailyStats = false;
                     let dailyStats = [];
 
-                    const hasDoctorFilter = !!doctorFilter;
-
-                    if (!hasDoctorFilter
-                        && window.firebaseDataManager
+                    if (window.firebaseDataManager
                         && typeof window.firebaseDataManager.getDailyFinancialStatsByRange === 'function') {
                         try {
                             const dsRes = await window.firebaseDataManager.getDailyFinancialStatsByRange(
@@ -24923,7 +25253,6 @@ async function restoreUser(id) {
                                 useDailyStats = true;
                             } else if (dsRes && dsRes.success && Array.isArray(dsRes.data) && dsRes.data.length === 0) {
                                 // 集合存在但無資料 → 背景觸發重建（首次使用或資料遺漏）
-                                // 不阻塞本次報表產生（走傳統路徑）
                                 try {
                                     window.firebaseDataManager.ensureDailyFinancialStatsInitialized(
                                         startDate, endDate, clinicFilter || null
@@ -24932,7 +25261,7 @@ async function restoreUser(id) {
                             }
                         } catch (_dsErr) {
                             // daily stats 尚未建立（索引未建 / 首次使用），
-                            // 靜默 fallback 到傳統路徑即可
+                            // 靜默 fallback 到下方聚合查詢路徑
                         }
                     }
 
@@ -24949,11 +25278,9 @@ async function restoreUser(id) {
                         fastStats.netRevenue = fastStats.totalRevenue - costRes.totalCost;
                         fastStats.costProrated = costRes.prorated;
 
-                        // 直接用聚合 stats 渲染；records 為空表示「按需鑽取模式」
                         updateFinancialKeyMetrics(fastStats);
                         updateFinancialTables([], fastStats);
 
-                        // 快取：records 留空，stats 用聚合結果，lastSyncAt 取 dailyStats syncedAt
                         const lastSyncAt = (() => {
                             let latest = 0;
                             for (const b of dailyStats) {
@@ -24972,7 +25299,10 @@ async function restoreUser(id) {
                         return;
                     }
 
-                    // 沒有 daily stats：走傳統路徑（完整拉取 consultations）
+                    // 2. dailyStats 不存在：直接拉全量 consultations（最可靠的 fallback）
+                    //    伺服器端聚合查詢（getFinancialAggregates）只有在確認
+                    //    consultationFinancialSummaries 有完整資料後才會啟用，
+                    //    否則查詢成功但回 0 筆會導致畫面全零。
                     await loadConsultationsForFinancial();
                 } catch (err) {
                     console.error('載入財務資料失敗:', err);
@@ -25793,6 +26123,91 @@ async function restoreUser(id) {
             return { docs, truncated };
         }
 
+        // ── 聚合查詢：一次性取得所有 KPI 指標（交易總額 + outstanding 餘額）
+        // 6 個並行 getAggregateFromServer，只回傳數字取代全量文件抓取。
+        // 失敗時（索引未部署）回傳 null，由呼叫端回退到 getDocs 路徑。
+        async function loadWalletFinAggregates(startDate, endDate, clinicFilter) {
+            const fb = window.firebase;
+            if (!fb || typeof fb.getAggregateFromServer !== 'function') {
+                return null; // 聚合函式不可用 → 回退
+            }
+            const cid = clinicFilter ? String(clinicFilter) : '';
+            const { startIso, endIso } = walletFinRangeIso(startDate, endDate);
+
+            try {
+                const buildTxQ = (type) => {
+                    const col = fb.collection(fb.db, 'patientWalletTransactions');
+                    const c = [];
+                    if (cid) c.push(fb.where('clinicId', '==', cid));
+                    c.push(fb.where('at', '>=', startIso));
+                    c.push(fb.where('at', '<=', endIso));
+                    c.push(fb.where('type', '==', type));
+                    return fb.firestoreQuery(col, ...c);
+                };
+
+                const buildAccQ = () => {
+                    const col = fb.collection(fb.db, 'patientWalletAccounts');
+                    if (cid) {
+                        return fb.firestoreQuery(col, fb.where('clinicId', '==', cid));
+                    }
+                    // 全部診所總覽：排除已遷移舊帳戶（同 loadWalletFinRaw 邏輯）
+                    return fb.firestoreQuery(col, fb.where('walletMigratedAt', '==', null));
+                };
+
+                const [
+                    topupSnap, topupBonusSnap, paySnap, refundSnap, adjustSnap, accSnap
+                ] = await Promise.all([
+                    fb.getAggregateFromServer(buildTxQ('topup'), {
+                        total: fb.sum('amount'), count: fb.count()
+                    }),
+                    fb.getAggregateFromServer(buildTxQ('topupBonus'), {
+                        total: fb.sum('amount'), count: fb.count()
+                    }),
+                    fb.getAggregateFromServer(buildTxQ('payment'), {
+                        principal: fb.sum('fromBalance'),
+                        bonus: fb.sum('fromBonus'),
+                        count: fb.count()
+                    }),
+                    fb.getAggregateFromServer(buildTxQ('refund'), {
+                        principal: fb.sum('fromBalance'),
+                        bonus: fb.sum('fromBonus'),
+                        count: fb.count()
+                    }),
+                    fb.getAggregateFromServer(buildTxQ('adjust'), {
+                        net: fb.sum('amount'), count: fb.count()
+                    }),
+                    fb.getAggregateFromServer(buildAccQ(), {
+                        principal: fb.sum('balance'),
+                        bonus: fb.sum('bonusBalance')
+                    })
+                ]);
+
+                const rnd = (n) => Math.round((Number(n) || 0) * 100) / 100;
+                const n = (v) => Number(v) || 0;
+                const d = (s) => s.data();
+
+                return {
+                    topupPrincipal: rnd(n(d(topupSnap).total)),
+                    topupCount: n(d(topupSnap).count),
+                    bonusIssued: rnd(n(d(topupBonusSnap).total)),
+                    bonusCount: n(d(topupBonusSnap).count),
+                    payPrincipal: rnd(n(d(paySnap).principal)),
+                    payBonus: rnd(n(d(paySnap).bonus)),
+                    payCount: n(d(paySnap).count),
+                    refundPrincipal: rnd(n(d(refundSnap).principal)),
+                    refundBonus: rnd(n(d(refundSnap).bonus)),
+                    refundCount: n(d(refundSnap).count),
+                    adjustNet: rnd(n(d(adjustSnap).net)),
+                    adjustCount: n(d(adjustSnap).count),
+                    outstandingPrincipal: rnd(n(d(accSnap).principal)),
+                    outstandingBonus: rnd(n(d(accSnap).bonus))
+                };
+            } catch (err) {
+                console.warn('錢包聚合查詢失敗，回退全量抓取:', err && err.message);
+                return null;
+            }
+        }
+
         // 完全依介面篩選（clinicFilter 為空＝全部診所總覽）；日後收回
         // 跨診所權限時，繫結員工須再強制 cid = claim 的 clinicId。
         async function loadWalletFinRaw(startDate, endDate, clinicFilter) {
@@ -25800,18 +26215,30 @@ async function restoreUser(id) {
             const cid = clinicFilter ? String(clinicFilter) : '';
             const { startIso, endIso } = walletFinRangeIso(startDate, endDate);
             const warnings = [];
+
+            // 先嘗試聚合查詢拿 KPI（成功則 outstanding 帳戶不用全量抓）
+            const aggregates = await loadWalletFinAggregates(startDate, endDate, cid);
+            if (aggregates) {
+                console.info('[WalletFin] 聚合查詢成功，KPI 走 fast path', {
+                    topupPrincipal: aggregates.topupPrincipal,
+                    payPrincipal: aggregates.payPrincipal,
+                    payBonus: aggregates.payBonus,
+                    outstandingPrincipal: aggregates.outstandingPrincipal,
+                    outstandingBonus: aggregates.outstandingBonus
+                });
+            } else {
+                console.warn('[WalletFin] 聚合查詢失敗，回退 getDocs 全量路徑');
+            }
+
+            // 交易文件：每日明細仍需 getDocs（Firestore 無 group by 日期）
             let txResult;
             if (cid) {
-                // 診所範圍：clinicId 相等 + at 範圍（需 (clinicId, at)
-                // 複合索引，見 firestore.indexes.json）；統計只按日期聚合，
-                // 不需要 orderBy
                 txResult = await walletFetchAllDocs('patientWalletTransactions', [
                     fb.where('clinicId', '==', cid),
                     fb.where('at', '>=', startIso),
                     fb.where('at', '<=', endIso)
                 ], { pageSize: 300, maxDocs: 10000 });
             } else {
-                // 全部診所總覽：單欄位 at 範圍查詢，使用自動索引
                 txResult = await walletFetchAllDocs('patientWalletTransactions', [
                     fb.where('at', '>=', startIso),
                     fb.where('at', '<=', endIso),
@@ -25824,26 +26251,27 @@ async function restoreUser(id) {
             const txs = txResult.docs.map((d) =>
                 Object.assign({ id: d.id }, d.data()));
 
-            // 帳戶：財務報表的診所篩選在這裡一併套用（單欄位 where，
-            // 不需複合索引）；全部診所總覽才退回 updatedAt 排序查詢
-            let accResult;
-            if (cid) {
-                accResult = await walletFetchAllDocs('patientWalletAccounts', [
-                    fb.where('clinicId', '==', cid)
-                ], { pageSize: 300, maxDocs: 10000 });
-            } else {
-                accResult = await walletFetchAllDocs('patientWalletAccounts', [
-                    fb.orderBy('updatedAt', 'desc')
-                ], { pageSize: 300, maxDocs: 10000 });
+            // 帳戶：有 aggregates 就跳過全量抓取（節省 500+ 筆傳輸）
+            let accounts = [];
+            if (!aggregates) {
+                let accResult;
+                if (cid) {
+                    accResult = await walletFetchAllDocs('patientWalletAccounts', [
+                        fb.where('clinicId', '==', cid)
+                    ], { pageSize: 300, maxDocs: 10000 });
+                } else {
+                    accResult = await walletFetchAllDocs('patientWalletAccounts', [
+                        fb.orderBy('updatedAt', 'desc')
+                    ], { pageSize: 300, maxDocs: 10000 });
+                }
+                if (accResult.truncated) {
+                    warnings.push('儲值帳戶超過一萬個，期末餘額僅含部分帳戶');
+                }
+                accounts = accResult.docs
+                    .map((d) => d.data())
+                    .filter((a) => !(cid === '' && a && a.walletMigratedAt));
             }
-            if (accResult.truncated) {
-                warnings.push('儲值帳戶超過一萬個，期末餘額僅含部分帳戶');
-            }
-            // 已遷移的舊制全域帳戶其結存已轉到複合帳戶，跳過避免重複計
-            const accounts = accResult.docs
-                .map((d) => d.data())
-                .filter((a) => !(cid === '' && a && a.walletMigratedAt));
-            return { txs, accounts, warnings };
+            return { txs, accounts, aggregates, warnings };
         }
 
         async function getWalletFinRaw(startDate, endDate, forceRefresh, clinicFilter) {
@@ -25882,11 +26310,10 @@ async function restoreUser(id) {
         }
 
         function calculateWalletFinancialStats(raw, clinicFilter) {
+            const { aggregates } = raw || {};
             const { patientClinics, appointmentClinics } = buildWalletPatientClinicMap();
-            // 單一診所系統：所有數據皆屬該診所，無需記錄自證
             const singleClinicId = (Array.isArray(clinicsList) && clinicsList.length === 1)
                 ? String(clinicsList[0].id) : '';
-            // 流水歸屬：新制直接看 tx.clinicId；舊制無欄位才用證據推斷
             const txBelongs = (tx) => {
                 if (!clinicFilter) return true;
                 const f = String(clinicFilter);
@@ -25898,13 +26325,10 @@ async function restoreUser(id) {
                     && appointmentClinics.get(String(tx.appointmentId)) === f) {
                     return true;
                 }
-                // 無任何診所證據的記錄（如舊數據）不歸入任何診所，避免跨診所重複計入
                 return false;
             };
-            // 帳戶歸屬：新制帳戶自帶 clinicId
             const accountBelongs = (acc) => {
                 if (!clinicFilter) {
-                    // 總覽時已於查詢層跳過已遷移舊帳戶，這裡再保險一次
                     return !(acc && acc.walletMigratedAt);
                 }
                 const f = String(clinicFilter);
@@ -25916,7 +26340,24 @@ async function restoreUser(id) {
                     && patientClinics.get(String(acc.patientId)).has(f));
             };
 
-            const stats = {
+            // 有聚合結果 → KPI 直接用（與 getDocs 查詢條件一致，結果對齊）
+            const stats = aggregates ? {
+                topupCount: aggregates.topupCount,
+                topupPrincipal: aggregates.topupPrincipal,
+                bonusCount: aggregates.bonusCount,
+                bonusIssued: aggregates.bonusIssued,
+                payCount: aggregates.payCount,
+                payPrincipal: aggregates.payPrincipal,
+                payBonus: aggregates.payBonus,
+                refundCount: aggregates.refundCount,
+                refundPrincipal: aggregates.refundPrincipal,
+                refundBonus: aggregates.refundBonus,
+                adjustCount: aggregates.adjustCount,
+                adjustNet: aggregates.adjustNet,
+                outstandingPrincipal: aggregates.outstandingPrincipal,
+                outstandingBonus: aggregates.outstandingBonus,
+                daily: {}
+            } : {
                 topupCount: 0, topupPrincipal: 0,
                 bonusCount: 0, bonusIssued: 0,
                 payCount: 0, payPrincipal: 0, payBonus: 0,
@@ -25936,6 +26377,8 @@ async function restoreUser(id) {
                 return stats.daily[day];
             };
 
+            // 無 aggregates 時才從交易文件加總 KPI；
+            // 有 aggregates 時只算每日明細（Firestore 無 group by 日期）
             (raw.txs || []).forEach((tx) => {
                 if (!tx || !txBelongs(tx)) return;
                 const amount = Number(tx.amount) || 0;
@@ -25944,55 +26387,74 @@ async function restoreUser(id) {
                 const row = ensureDay(day);
                 switch (tx.type) {
                     case 'topup':
-                        stats.topupCount += 1;
-                        stats.topupPrincipal += amount;
+                        if (!aggregates) {
+                            stats.topupCount += 1;
+                            stats.topupPrincipal += amount;
+                        }
                         row.topupCount += 1;
                         row.topupAmount += amount;
                         break;
                     case 'topupBonus':
-                        stats.bonusCount += 1;
-                        stats.bonusIssued += amount;
+                        if (!aggregates) {
+                            stats.bonusCount += 1;
+                            stats.bonusIssued += amount;
+                        }
                         break;
                     case 'payment': {
-                        stats.payCount += 1;
+                        if (!aggregates) {
+                            stats.payCount += 1;
+                        }
                         const fromBalance = Number(tx.fromBalance) || 0;
                         const fromBonus = Number(tx.fromBonus) || 0;
-                        stats.payPrincipal += fromBalance;
-                        stats.payBonus += fromBonus;
+                        if (!aggregates) {
+                            stats.payPrincipal += fromBalance;
+                            stats.payBonus += fromBonus;
+                        }
                         row.payCount += 1;
                         row.payAmount += (fromBalance + fromBonus);
                         break;
                     }
                     case 'refund': {
-                        stats.refundCount += 1;
+                        if (!aggregates) {
+                            stats.refundCount += 1;
+                        }
                         const fromBalance = Number(tx.fromBalance) || 0;
                         const fromBonus = Number(tx.fromBonus) || 0;
-                        stats.refundPrincipal += fromBalance;
-                        stats.refundBonus += fromBonus;
+                        if (!aggregates) {
+                            stats.refundPrincipal += fromBalance;
+                            stats.refundBonus += fromBonus;
+                        }
                         row.refundAmount += (fromBalance + fromBonus);
                         break;
                     }
                     case 'adjust':
-                        stats.adjustCount += 1;
-                        stats.adjustNet += amount;
+                        if (!aggregates) {
+                            stats.adjustCount += 1;
+                            stats.adjustNet += amount;
+                        }
                         break;
                     default:
                         break;
                 }
             });
 
-            (raw.accounts || []).forEach((acc) => {
-                if (!acc || !accountBelongs(acc)) return;
-                stats.outstandingPrincipal += Number(acc.balance) || 0;
-                stats.outstandingBonus += Number(acc.bonusBalance) || 0;
-            });
+            // 無 aggregates 時才從帳戶文件加總 outstanding
+            if (!aggregates) {
+                (raw.accounts || []).forEach((acc) => {
+                    if (!acc || !accountBelongs(acc)) return;
+                    stats.outstandingPrincipal += Number(acc.balance) || 0;
+                    stats.outstandingBonus += Number(acc.bonusBalance) || 0;
+                });
+            }
 
-            // 統一圓整到 2 位小數
-            ['topupPrincipal', 'bonusIssued', 'payPrincipal', 'payBonus',
-             'refundPrincipal', 'refundBonus', 'adjustNet',
-             'outstandingPrincipal', 'outstandingBonus'].forEach((k) => {
-                stats[k] = Math.round(stats[k] * 100) / 100;
-            });
+            // 統一圓整到 2 位小數（aggregates 已圓整過，但每日明細需要）
+            if (!aggregates) {
+                ['topupPrincipal', 'bonusIssued', 'payPrincipal', 'payBonus',
+                 'refundPrincipal', 'refundBonus', 'adjustNet',
+                 'outstandingPrincipal', 'outstandingBonus'].forEach((k) => {
+                    stats[k] = Math.round(stats[k] * 100) / 100;
+                });
+            }
             Object.keys(stats.daily).forEach((d) => {
                 const r = stats.daily[d];
                 ['topupAmount', 'payAmount', 'refundAmount'].forEach((k) => {
@@ -31123,6 +31585,41 @@ class FirebaseDataManager {
         } catch (error) {
             console.warn('同步財務日聚合失敗:', error && error.message);
             return { success: false, error: error && error.message ? error.message : String(error) };
+        }
+    }
+
+    /**
+     * Firestore 伺服器端聚合查詢：只回結果數字，不回傳任何文件。
+     * 比拉全量 consultations 後前端 reduce 省得多（幾乎 0 流量）。
+     * 適用於：總營收、總筆數、平均營收這幾個 Key Metrics。
+     * 分組統計（doctorStats / serviceStats / dailyStats）仍走後端 dailyFinancialStats 增量聚合。
+     */
+    async getFinancialAggregates(startDateStr, endDateStr, doctorFilter = null, clinicFilter = null) {
+        if (!this.isReady) return { success: false, data: {} };
+        try {
+            const colRef = window.firebase.collection(window.firebase.db, 'consultationFinancialSummaries');
+            const start = hkBoundOf(new Date(startDateStr), false);
+            const end = hkBoundOf(new Date(endDateStr), true);
+            const parts = [
+                window.firebase.where('status', '==', 'completed'),
+                window.firebase.where('sortDate', '>=', start),
+                window.firebase.where('sortDate', '<=', end),
+            ];
+            if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
+            if (clinicFilter) parts.push(window.firebase.where('clinicId', '==', clinicFilter));
+            const q = window.firebase.firestoreQuery(colRef, ...parts);
+            const agg = await window.firebase.getAggregateFromServer(q, {
+                totalRevenue: window.firebase.sum('financialTotalAmount'),
+                count: window.firebase.count(),
+            });
+            const d = agg.data();
+            const totalConsultations = Number(d.count || 0);
+            const totalRevenue = Math.round(Number(d.totalRevenue || 0));
+            const averageRevenue = totalConsultations > 0 ? Math.round(totalRevenue / totalConsultations) : 0;
+            return { success: true, data: { totalRevenue, averageRevenue, totalConsultations } };
+        } catch (error) {
+            console.warn('Firestore 聚合查詢失敗:', error && error.message);
+            return { success: false, data: {}, error: error && error.message ? error.message : String(error) };
         }
     }
 

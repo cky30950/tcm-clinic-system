@@ -3,15 +3,22 @@
 
 
 function showClinicSettingsModal() {
-    
+
     document.getElementById('clinicChineseName').value = clinicSettings.chineseName || '';
     document.getElementById('clinicEnglishName').value = clinicSettings.englishName || '';
-    document.getElementById('clinicBusinessHours').value = clinicSettings.businessHours || '';
+    const setVal = (id, v) => {
+        const el = document.getElementById(id);
+        if (el) el.value = v || '';
+    };
+    setVal('clinicBusinessHoursStart', clinicSettings.businessHoursStart);
+    setVal('clinicBusinessHoursEnd', clinicSettings.businessHoursEnd);
+    setVal('clinicLunchStart', clinicSettings.lunchStart);
+    setVal('clinicLunchEnd', clinicSettings.lunchEnd);
     document.getElementById('clinicPhone').value = clinicSettings.phone || '';
     document.getElementById('clinicAddress').value = clinicSettings.address || '';
     const thankYouInput = document.getElementById('clinicReceiptThankYouText');
     if (thankYouInput) thankYouInput.value = clinicSettings.receiptThankYouText || '';
-    
+
     try { populateClinicSelectors(); } catch (_e) {}
     document.getElementById('clinicSettingsModal').classList.remove('hidden');
 }
@@ -23,20 +30,63 @@ function hideClinicSettingsModal() {
 async function saveClinicSettings() {
     const chineseName = document.getElementById('clinicChineseName').value.trim();
     const englishName = document.getElementById('clinicEnglishName').value.trim();
-    const businessHours = document.getElementById('clinicBusinessHours').value.trim();
+    const readTime = (id) => {
+        const el = document.getElementById(id);
+        return el ? String(el.value || '').trim() : '';
+    };
+    const businessHoursStart = readTime('clinicBusinessHoursStart');
+    const businessHoursEnd = readTime('clinicBusinessHoursEnd');
+    const lunchStart = readTime('clinicLunchStart');
+    const lunchEnd = readTime('clinicLunchEnd');
+    let businessHours = (businessHoursStart && businessHoursEnd)
+        ? `${businessHoursStart}-${businessHoursEnd}` : '';
+    if (businessHours && lunchStart && lunchEnd) {
+        businessHours += `（休息 ${lunchStart}-${lunchEnd}）`;
+    }
     const phone = document.getElementById('clinicPhone').value.trim();
     const address = document.getElementById('clinicAddress').value.trim();
     const thankYouInput = document.getElementById('clinicReceiptThankYouText');
     const receiptThankYouText = thankYouInput ? thankYouInput.value.trim() : '';
-    
+
     if (!chineseName) {
         showToast('請輸入診所中文名稱！', 'error');
         return;
     }
-    
+    // 營業時間須成對且結束晚於開始；午飯須落在營業時間內
+    const hm = (x) => {
+        const m = /^(\d{2}):(\d{2})$/.exec(x || '');
+        return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
+    };
+    const open = hm(businessHoursStart);
+    const close = hm(businessHoursEnd);
+    if ((businessHoursStart && !businessHoursEnd) || (!businessHoursStart && businessHoursEnd)) {
+        showToast('請完整設定診所營業時間（開始及結束）', 'error');
+        return;
+    }
+    if (businessHoursStart && close <= open) {
+        showToast('診所結束時間必須晚於開始時間', 'error');
+        return;
+    }
+    const lunchS = hm(lunchStart);
+    const lunchE = hm(lunchEnd);
+    if ((lunchStart && !lunchEnd) || (!lunchStart && lunchEnd)
+        || (lunchStart && lunchE <= lunchS)) {
+        showToast('請完整設定休息時間，且結束須晚於開始', 'error');
+        return;
+    }
+    if (businessHoursStart && lunchStart
+        && (lunchS < open || lunchE > close)) {
+        showToast('休息時間必須設定於診所營業時間之內', 'error');
+        return;
+    }
+
     clinicSettings.chineseName = chineseName;
     clinicSettings.englishName = englishName;
     clinicSettings.businessHours = businessHours;
+    clinicSettings.businessHoursStart = businessHoursStart;
+    clinicSettings.businessHoursEnd = businessHoursEnd;
+    clinicSettings.lunchStart = lunchStart;
+    clinicSettings.lunchEnd = lunchEnd;
     clinicSettings.phone = phone;
     clinicSettings.address = address;
     clinicSettings.receiptThankYouText = receiptThankYouText;

@@ -3417,7 +3417,20 @@
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">診所營業時間</label>
-                        <input type="text" id="clinicBusinessHours" placeholder="例：週一至週五 09:00-18:00" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <div class="grid grid-cols-2 gap-3">
+                            <input type="time" id="clinicBusinessHoursStart" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <input type="time" id="clinicBusinessHoursEnd" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">設定後，病人端線上預約時段會自動跟隨營業時間。</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">休息時間</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <input type="time" id="clinicLunchStart" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <input type="time" id="clinicLunchEnd" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">休息時段不開放預約。</p>
                     </div>
                     
                     <div>
@@ -3464,7 +3477,20 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">診所營業時間</label>
-                    <input type="text" id="addClinicBusinessHours" placeholder="例：週一至週五 09:00-18:00" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="time" id="addClinicBusinessHoursStart" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                        <input type="time" id="addClinicBusinessHoursEnd" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">設定後，病人端線上預約時段會自動跟隨營業時間。</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">休息時間</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="time" id="addClinicLunchStart" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                        <input type="time" id="addClinicLunchEnd" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">休息時段不開放預約。</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">診所電話</label>
