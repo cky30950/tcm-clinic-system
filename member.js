@@ -41,6 +41,7 @@ const I18N = {
         txStatus: '狀態變更',
         errPhone: '請輸入於診所登記的電話號碼',
         errNoPatient: '系統中沒有以此電話登記的病人記錄。',
+        errNotMember: '閣下尚未登記成為會員，未能進入會員端。請親臨診所開通儲值帳戶，或聯絡診所職員協助。',
         errLoad: '查詢失敗，請稍後再試',
         patientLabel: '病人',
         selectClinic: '選擇診所',
@@ -116,6 +117,7 @@ const I18N = {
         txStatus: 'Status change',
         errPhone: 'Please enter the phone number registered with the clinic',
         errNoPatient: 'No patient record is registered with this phone number.',
+        errNotMember: "You are not a registered member yet, so you cannot access the member portal. Please visit the clinic to open a stored-value account, or contact our staff for assistance.",
         errLoad: 'Lookup failed, please try again later',
         patientLabel: 'Patient',
         selectClinic: 'Select clinic',
@@ -400,13 +402,24 @@ async function lookup() {
             data = null;
         }
         if (!res.ok) {
+            // 後端會員把關：非會員統一顯示本地化提示
+            if (data && data.error === 'NOT_MEMBER') {
+                showAuthMsg('errNotMember', 'info');
+                return;
+            }
             showAuthMsg((data && data.message) || 'errLoad');
             return;
         }
-        patientEntries = (data && Array.isArray(data.patients)) ? data.patients : [];
+        // 雙重保險：即使回應格式有變，也只放行已確認的會員
+        const rawEntries = (data && Array.isArray(data.patients)) ? data.patients : [];
+        patientEntries = rawEntries.filter((p) => p.isMember !== false);
         activePatientIndex = 0;
-        if (!patientEntries.length) {
+        if (!rawEntries.length) {
             showAuthMsg('errNoPatient', 'info');
+            return;
+        }
+        if (!patientEntries.length) {
+            showAuthMsg('errNotMember', 'info');
             return;
         }
         renderAll();

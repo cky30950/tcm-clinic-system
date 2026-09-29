@@ -565,6 +565,18 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
     // 各診所帳戶文件（餘額的權威來源）
     const accountMap = new Map(accountDocs.filter(Boolean));
 
+    // 會員判定（唯一權威點）：任一診所帳戶為 active 且
+    // 本金＋贈送額 > 0 即為會員；frozen/closed 或零結餘均非有效會員。
+    // 定義見 .trae/documents/membership_wallet_plan.md。
+    let isMember = false;
+    accountMap.forEach((acc) => {
+        if (isMember) return;
+        const st = acc && acc.status ? String(acc.status) : 'active';
+        const total = (Number(acc && acc.balance) || 0)
+            + (Number(acc && acc.bonusBalance) || 0);
+        if (st === 'active' && total > 0) isMember = true;
+    });
+
     // ── 4. 流水暫分組：餘額（依完整流水推算，舊制容錯）＋近期交易 ──
     const groups = new Map();
     const ensureGroup = (cid) => {
@@ -704,6 +716,7 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
     return {
         patientId,
         name: patientDoc.data.name || '',
+        isMember,
         clinics,
         upcomingAppointments: upcoming
     };
@@ -775,10 +788,23 @@ export async function onRequestPost(context) {
         ]);
 
         const patientDocs = await findPatients(client, phoneVariants);
-        const patients = await Promise.all(
+        const allEntries = await Promise.all(
             patientDocs.map((d) => buildPatientEntry(
                 client, auth.token, d, clinicTable.nameMap, clinicTable.ids, upcomingMap, staffTable))
         );
+
+        // 完全沒有病人記錄 → 維持原「查無病人」流程（前端顯示 errNoPatient）
+        if (!allEntries.length) return jsonResponse({ patients: [] });
+
+        // 會員端把關：病人存在但非會員（無有效儲值帳戶或零結餘）不得進入。
+        // 同一電話下僅保留會員記錄；全部非會員 → 403 由前端顯示提示。
+        const patients = allEntries.filter((p) => p.isMember);
+        if (!patients.length) {
+            return jsonResponse({
+                error: 'NOT_MEMBER',
+                message: '閣下尚未登記成為會員，請親臨診所開通儲值帳戶，或聯絡診所職員協助。'
+            }, 403);
+        }
 
         return jsonResponse({ patients });
     } catch (error) {
