@@ -24903,16 +24903,14 @@ async function restoreUser(id) {
             }
             if (typeof loadConsultationsForFinancial === 'function') {
                 try {
-                    // 先嘗試從 dailyFinancialStats 聚合（N 筆／月，快）
-                    // 注意：有 doctor 過濾時跳過（daily bucket 的 serviceStats 跨醫師，
-                    // 無法正確按醫師拆分），直接走傳統 consultation 路徑。
+                    // 1. 先嘗試 dailyFinancialStats 聚合（N 筆／月，最快）
+                    //    後端 bucket 的 doctorStats 欄位本身已按醫師分組，
+                    //    aggregateFromDailyStats 也支援 doctorFilter 過濾，
+                    //    所以有無醫師過濾都能走這條路徑。
                     let useDailyStats = false;
                     let dailyStats = [];
 
-                    const hasDoctorFilter = !!doctorFilter;
-
-                    if (!hasDoctorFilter
-                        && window.firebaseDataManager
+                    if (window.firebaseDataManager
                         && typeof window.firebaseDataManager.getDailyFinancialStatsByRange === 'function') {
                         try {
                             const dsRes = await window.firebaseDataManager.getDailyFinancialStatsByRange(
@@ -24923,7 +24921,6 @@ async function restoreUser(id) {
                                 useDailyStats = true;
                             } else if (dsRes && dsRes.success && Array.isArray(dsRes.data) && dsRes.data.length === 0) {
                                 // 集合存在但無資料 → 背景觸發重建（首次使用或資料遺漏）
-                                // 不阻塞本次報表產生（走傳統路徑）
                                 try {
                                     window.firebaseDataManager.ensureDailyFinancialStatsInitialized(
                                         startDate, endDate, clinicFilter || null
@@ -24932,7 +24929,7 @@ async function restoreUser(id) {
                             }
                         } catch (_dsErr) {
                             // daily stats 尚未建立（索引未建 / 首次使用），
-                            // 靜默 fallback 到傳統路徑即可
+                            // 靜默 fallback 到下方聚合查詢路徑
                         }
                     }
 
@@ -24949,11 +24946,9 @@ async function restoreUser(id) {
                         fastStats.netRevenue = fastStats.totalRevenue - costRes.totalCost;
                         fastStats.costProrated = costRes.prorated;
 
-                        // 直接用聚合 stats 渲染；records 為空表示「按需鑽取模式」
                         updateFinancialKeyMetrics(fastStats);
                         updateFinancialTables([], fastStats);
 
-                        // 快取：records 留空，stats 用聚合結果，lastSyncAt 取 dailyStats syncedAt
                         const lastSyncAt = (() => {
                             let latest = 0;
                             for (const b of dailyStats) {
@@ -24972,7 +24967,57 @@ async function restoreUser(id) {
                         return;
                     }
 
-                    // 沒有 daily stats：走傳統路徑（完整拉取 consultations）
+                    // 2. dailyStats 不存在：用 Firestore 伺服器端聚合查詢拿總量級指標
+                    //    sum() + count() 不回傳任何文件，流量接近 0
+                    let serverStats = null;
+                    try {
+                        if (window.firebaseDataManager
+                            && typeof window.firebaseDataManager.getFinancialAggregates === 'function') {
+                            const aggRes = await window.firebaseDataManager.getFinancialAggregates(
+                                startDate, endDate, doctorFilter || null, clinicFilter || null
+                            );
+                            if (aggRes && aggRes.success && aggRes.data && aggRes.data.totalConsultations >= 0) {
+                                serverStats = aggRes.data;
+                            }
+                        }
+                    } catch (_aggErr) {
+                        // 聚合查詢失敗時靜默 fallback
+                    }
+
+                    if (serverStats) {
+                        const aggStats = {
+                            totalRevenue: serverStats.totalRevenue,
+                            totalConsultations: serverStats.totalConsultations,
+                            averageRevenue: serverStats.averageRevenue,
+                            activeDoctors: doctorFilter ? 1 : 0,
+                            doctorStats: {},
+                            serviceStats: {},
+                            dailyStats: {}
+                        };
+                        // 環比也用聚合查詢，不拉全量
+                        loadFinancialPrevPeriodInBackground(cacheKey, aggStats, startDate, endDate, doctorFilter, clinicFilter);
+                        const [costRes] = await Promise.all([
+                            getApportionedCost(startDate, endDate, clinicFilter || null),
+                            refreshWalletFinancialSection(startDate, endDate, clinicFilter)
+                        ]);
+                        aggStats.totalCost = costRes.totalCost;
+                        aggStats.netRevenue = aggStats.totalRevenue - costRes.totalCost;
+                        aggStats.costProrated = costRes.prorated;
+
+                        updateFinancialKeyMetrics(aggStats);
+                        updateFinancialTables([], aggStats);
+
+                        const entry = buildFinancialCacheEntry([], aggStats, new Date().toISOString());
+                        financialReportCache[cacheKey] = entry;
+                        writePersistedFinancialCache(cacheKey, entry);
+                        financialReportLastKey = cacheKey;
+                        financialReportLastRunAt = Date.now();
+                        document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString('zh-TW');
+                        showToast('財務報表已更新（伺服器聚合，點擊表格可鑽取明細）！', 'success');
+                        return;
+                    }
+
+                    // 3. 最後 fallback：拉全量 consultations（最慢，但最完整）
                     await loadConsultationsForFinancial();
                 } catch (err) {
                     console.error('載入財務資料失敗:', err);
@@ -25129,15 +25174,40 @@ async function restoreUser(id) {
                 const lengthDays = enumerateFinancialDates(startDate, endDate).length;
                 const prevEnd = shiftFinancialDate(startDate, -1);
                 const prevStart = shiftFinancialDate(prevEnd, -(lengthDays - 1));
-                const prevRecords = await fetchFinancialRecordsForRange(prevStart, prevEnd, doctorFilter, clinicFilter);
-                const prevStats = calculateFinancialStatistics(prevRecords);
+
+                // 優先用 Firestore 聚合查詢（不回傳文件，最快）
+                let prevTotalRevenue = 0, prevTotalConsultations = 0, prevAverageRevenue = 0, prevActiveDoctors = 0;
+                let usedServerAgg = false;
+                try {
+                    if (window.firebaseDataManager && typeof window.firebaseDataManager.getFinancialAggregates === 'function') {
+                        const aggRes = await window.firebaseDataManager.getFinancialAggregates(prevStart, prevEnd, doctorFilter, clinicFilter);
+                        if (aggRes && aggRes.success && aggRes.data) {
+                            prevTotalRevenue = aggRes.data.totalRevenue || 0;
+                            prevTotalConsultations = aggRes.data.totalConsultations || 0;
+                            prevAverageRevenue = aggRes.data.averageRevenue || 0;
+                            prevActiveDoctors = doctorFilter ? 1 : 0;
+                            usedServerAgg = true;
+                        }
+                    }
+                } catch (_aggErr) {}
+
+                // 聚合查詢失敗時 fallback 到拉全量
+                if (!usedServerAgg) {
+                    const prevRecords = await fetchFinancialRecordsForRange(prevStart, prevEnd, doctorFilter, clinicFilter);
+                    const prevStats = calculateFinancialStatistics(prevRecords);
+                    prevTotalRevenue = prevStats.totalRevenue;
+                    prevTotalConsultations = prevStats.totalConsultations;
+                    prevAverageRevenue = prevStats.averageRevenue;
+                    prevActiveDoctors = prevStats.activeDoctors;
+                }
+
                 stats.prevPeriod = {
                     startDate: prevStart,
                     endDate: prevEnd,
-                    totalRevenue: prevStats.totalRevenue,
-                    totalConsultations: prevStats.totalConsultations,
-                    averageRevenue: prevStats.averageRevenue,
-                    activeDoctors: prevStats.activeDoctors
+                    totalRevenue: prevTotalRevenue,
+                    totalConsultations: prevTotalConsultations,
+                    averageRevenue: prevAverageRevenue,
+                    activeDoctors: prevActiveDoctors
                 };
             } catch (_e) {}
             return stats;
@@ -31123,6 +31193,41 @@ class FirebaseDataManager {
         } catch (error) {
             console.warn('同步財務日聚合失敗:', error && error.message);
             return { success: false, error: error && error.message ? error.message : String(error) };
+        }
+    }
+
+    /**
+     * Firestore 伺服器端聚合查詢：只回結果數字，不回傳任何文件。
+     * 比拉全量 consultations 後前端 reduce 省得多（幾乎 0 流量）。
+     * 適用於：總營收、總筆數、平均營收這幾個 Key Metrics。
+     * 分組統計（doctorStats / serviceStats / dailyStats）仍走後端 dailyFinancialStats 增量聚合。
+     */
+    async getFinancialAggregates(startDateStr, endDateStr, doctorFilter = null, clinicFilter = null) {
+        if (!this.isReady) return { success: false, data: {} };
+        try {
+            const colRef = window.firebase.collection(window.firebase.db, 'consultationFinancialSummaries');
+            const start = hkBoundOf(new Date(startDateStr), false);
+            const end = hkBoundOf(new Date(endDateStr), true);
+            const parts = [
+                window.firebase.where('status', '==', 'completed'),
+                window.firebase.where('sortDate', '>=', start),
+                window.firebase.where('sortDate', '<=', end),
+            ];
+            if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
+            if (clinicFilter) parts.push(window.firebase.where('clinicId', '==', clinicFilter));
+            const q = window.firebase.firestoreQuery(colRef, ...parts);
+            const agg = await window.firebase.getAggregateFromServer(q, {
+                totalRevenue: window.firebase.sum('financialTotalAmount'),
+                count: window.firebase.count(),
+            });
+            const d = agg.data();
+            const totalConsultations = Number(d.count || 0);
+            const totalRevenue = Math.round(Number(d.totalRevenue || 0));
+            const averageRevenue = totalConsultations > 0 ? Math.round(totalRevenue / totalConsultations) : 0;
+            return { success: true, data: { totalRevenue, averageRevenue, totalConsultations } };
+        } catch (error) {
+            console.warn('Firestore 聚合查詢失敗:', error && error.message);
+            return { success: false, data: {}, error: error && error.message ? error.message : String(error) };
         }
     }
 

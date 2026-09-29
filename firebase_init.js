@@ -31,6 +31,7 @@ import {
   terminate,
   sum,
   average,
+  count,
   getAggregateFromServer
 } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
 import { getDatabase, ref, set, get, update, remove, onValue, off,
@@ -60,18 +61,23 @@ import { getAuth, signInWithEmailAndPassword, signOut, setPersistence,
 
 import firebaseConfig from './firebaseConfig.js';
 
-    
     const app = initializeApp(firebaseConfig);
     
-    
-    
     const db = initializeFirestore(app, {
-      
-      
       localCache: persistentLocalCache({
         tabManager: persistentMultipleTabManager()
       })
     });
+
+    // SDK 大版本升級時清除舊 IndexedDB 快取（格式可能不相容）
+    try {
+      const EXPECTED_SDK = '12.15.0';
+      const savedSdk = localStorage.getItem('fs_sdk_version');
+      if (savedSdk !== EXPECTED_SDK) {
+        clearIndexedDbPersistence(db).catch(() => {});
+        localStorage.setItem('fs_sdk_version', EXPECTED_SDK);
+      }
+    } catch (_v) {}
 
     
     const rtdb = getDatabase(app);
@@ -185,6 +191,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         terminate,
         sum,
         average,
+        count,
         getAggregateFromServer,
         
         ref,
