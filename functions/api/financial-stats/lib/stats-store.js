@@ -103,6 +103,22 @@ function hkDayStartTimestamp(dateKey) {
     return d;
 }
 
+// Firestore 保留名清理：遞迴移除所有以 "__" 開頭的 key
+// （Firestore 禁止以 __ 開頭的欄位／map key，如 __general_registration__）
+function sanitizeReservedKeys(obj) {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj)) return obj.map(sanitizeReservedKeys).filter(v => v !== undefined);
+    if (typeof obj === 'object') {
+        const out = {};
+        for (const [k, v] of Object.entries(obj)) {
+            if (k.startsWith('__')) continue;
+            out[k] = sanitizeReservedKeys(v);
+        }
+        return out;
+    }
+    return obj;
+}
+
 // docId = {dateKey}__{clinicId}（clinicId 經 encodeURIComponent）
 function getDailyDocId(dateKey, clinicId) {
     const cid = encodeURIComponent(normStr(clinicId) || 'no-clinic');
@@ -189,6 +205,8 @@ function extractFinancialFromRecord(record) {
 
     const doctor = normStr(record.doctor);
     if (!doctor) return null; // 無醫師歸屬的不算入
+    // Firestore 保留名：以 "__" 開頭的欄位 key 不允許（如一般掛號 __general_registration__）
+    if (doctor.startsWith('__')) return null;
 
     // 金額
     const totalAmount = Math.round(
@@ -424,7 +442,7 @@ async function applyBucketDelta(db, bucket) {
 
         const now = new Date();
         const sortDate = hkDayStartTimestamp(bucket.dateKey);
-        const fields = {
+        const fields = sanitizeReservedKeys({
             dateKey: bucket.dateKey,
             sortDate,
             clinicId: bucket.clinicId,
@@ -437,7 +455,7 @@ async function applyBucketDelta(db, bucket) {
             syncedAt: now,
             summaryVersion: FINANCIAL_STATS_VERSION,
             updatedAt: now
-        };
+        });
 
         try {
             await commitWrites(db, [
@@ -609,7 +627,7 @@ export async function rebuildDailyStatsForDateRange(env, startDate, endDate, cli
         const avgRev = bucket.totalConsultations > 0
             ? Math.round(bucket.totalRevenue / bucket.totalConsultations)
             : 0;
-        const fields = {
+        const fields = sanitizeReservedKeys({
             dateKey: bucket.dateKey,
             sortDate: hkDayStartTimestamp(bucket.dateKey),
             clinicId: bucket.clinicId,
@@ -622,7 +640,7 @@ export async function rebuildDailyStatsForDateRange(env, startDate, endDate, cli
             syncedAt: now,
             summaryVersion: FINANCIAL_STATS_VERSION,
             updatedAt: now
-        };
+        });
         writes.push(fullReplaceWrite(db, `${DAILY_COLLECTION}/${bucketDocId}`, fields, null));
     }
 
