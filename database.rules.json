@@ -1,15 +1,12 @@
 {
   "rules": {
-    "isStaff()": "auth !== null && auth.token.staff === true && auth.token.active === true",
-    "isChatParticipant(chatId)": "chatId.beginsWith(auth.uid + '_') || chatId.endsWith('_' + auth.uid)",
-
     ".read": false,
     ".write": false,
 
     "presence": {
-      ".read": "isStaff()",
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
       "$userId": {
-        ".write": "isStaff() && auth.uid === $userId",
+        ".write": "auth !== null && auth.token.staff === true && auth.token.active === true && auth.uid === $userId",
         "connections": {
           "$connId": {
             ".validate": "newData.hasChildren(['startedAt']) && newData.child('startedAt').isNumber()"
@@ -20,82 +17,82 @@
 
     "onlineUsers": {
       "$userId": {
-        ".read": "isStaff()",
-        ".write": "isStaff()"
+        ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+        ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
       }
     },
 
     "appointments": {
-      ".read": "isStaff()",
-      ".write": "isStaff()",
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true",
       ".indexOn": ["appointmentTime"]
     },
 
     "consultationStatus": {
-      ".read": "isStaff()",
-      ".write": "isStaff()"
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
     },
 
     "notifications": {
-      ".read": "isStaff()",
-      ".write": "isStaff()"
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
     },
 
     "herbInventory": {
-      ".read": "isStaff()",
-      ".write": "isStaff()"
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
     },
 
     "herbInventorySlice": {
-      ".read": "isStaff()",
-      ".write": "isStaff()"
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
     },
 
     "inventoryLogs": {
-      ".read": "isStaff()",
-      ".write": "isStaff()"
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
     },
 
     "clinics": {
       "$clinicId": {
-        ".read": "isStaff()",
-        ".write": "isStaff()"
+        ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+        ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
       }
     },
 
     "chat": {
       "messages": {
         "public": {
-          ".read": "isStaff()",
-          ".write": "isStaff()",
+          ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+          ".write": "auth !== null && auth.token.staff === true && auth.token.active === true",
           ".indexOn": ["timestamp"]
         }
       },
       "private": {
         "$chatId": {
-          ".read": "isStaff() && isChatParticipant($chatId)",
-          ".write": "isStaff() && isChatParticipant($chatId)",
+          ".read": "auth !== null && auth.token.staff === true && auth.token.active === true && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))",
+          ".write": "auth !== null && auth.token.staff === true && auth.token.active === true && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))",
           ".indexOn": ["timestamp"]
         }
       },
       "summaries": {
         "public": {
-          ".read": "isStaff()",
-          ".write": "isStaff()"
+          ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+          ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
         }
       },
       "userSummaries": {
         "$uid": {
-          ".read": "isStaff() && auth.uid === $uid",
+          ".read": "auth !== null && auth.token.staff === true && auth.token.active === true && auth.uid === $uid",
           "$chatId": {
-            ".write": "isStaff() && (auth.uid === $uid || isChatParticipant($chatId))"
+            ".write": "auth !== null && auth.token.staff === true && auth.token.active === true && (auth.uid === $uid || $chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))"
           }
         }
       },
       "lastSeen": {
         "$uid": {
-          ".read": "isStaff() && auth.uid === $uid",
-          ".write": "isStaff() && auth.uid === $uid"
+          ".read": "auth !== null && auth.token.staff === true && auth.token.active === true && auth.uid === $uid",
+          ".write": "auth !== null && auth.token.staff === true && auth.token.active === true && auth.uid === $uid"
         }
       }
     },

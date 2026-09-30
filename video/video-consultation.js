@@ -38,38 +38,11 @@
     //   - Android Chrome 等有原生 Fullscreen API 的瀏覽器，於點擊「視訊
     //     診症」的手勢時序內對 <html> 請求真全螢幕（隱藏瀏覽器列）；
     //     對 documentElement 全螢幕可保留 body 層的 toast／SweetAlert。
-    var PHONE_FS_STYLE_ID = 'vc-phone-fullscreen-style';
     var PHONE_FS_PANEL_CLASS = 'vc-phone-fullscreen';
     var PHONE_FS_BODY_CLASS = 'vc-phone-fullscreen-open';
     var PHONE_QUERY = '(pointer: coarse) and (max-width: 1023px)';
 
-    function injectPhoneFullscreenStyle() {
-        if (document.getElementById(PHONE_FS_STYLE_ID)) return;
-        var style = document.createElement('style');
-        style.id = PHONE_FS_STYLE_ID;
-        style.textContent =
-            '@media (pointer: coarse) and (max-width: 1023px) {\n' +
-            '  #videoConsultPanel.' + PHONE_FS_PANEL_CLASS + ' {\n' +
-            '    position: fixed !important;\n' +
-            '    inset: 0 !important;\n' +
-            '    z-index: 900 !important;\n' +
-            '    width: 100vw !important;\n' +
-            '    height: 100vh !important;\n' +
-            '    height: 100dvh !important;\n' +
-            '    max-height: none !important;\n' +
-            '    margin: 0 !important;\n' +
-            '    border: 0 !important;\n' +
-            '    border-radius: 0 !important;\n' +
-            '  }\n' +
-            '  #videoConsultPanel.' + PHONE_FS_PANEL_CLASS + ' > div:first-child {\n' +
-            '    padding-top: max(0.75rem, env(safe-area-inset-top));\n' +
-            '    padding-left: max(1rem, env(safe-area-inset-left));\n' +
-            '    padding-right: max(1rem, env(safe-area-inset-right));\n' +
-            '  }\n' +
-            '}\n' +
-            'body.' + PHONE_FS_BODY_CLASS + ' { overflow: hidden !important; }';
-        document.head.appendChild(style);
-    }
+    // 手機全螢幕樣式已移至同源靜態檔 video/video-consultation.css。
 
     function isPhoneLayout() {
         try {
@@ -690,12 +663,10 @@
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function () {
-            injectPhoneFullscreenStyle();
             initCopyRoomUrlButton();
             initRoleGate();
         });
     } else {
-        injectPhoneFullscreenStyle();
         initCopyRoomUrlButton();
         initRoleGate();
     }

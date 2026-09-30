@@ -1,0 +1,39 @@
+/* Agora 視訊通話 UI 樣式（原 agora-call.js injectStyle 動態注入，
+   改為同源靜態檔以符合 strict CSP：style-src 'self'，無需 nonce）。 */
+.av-root{position:absolute;inset:0;display:flex;flex-direction:column;background:#000;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;}
+.av-grid{flex:1;min-height:0;display:grid;gap:10px;padding:10px;grid-template-columns:1fr;grid-auto-rows:1fr;}
+/* 焦點排版：主畫面用完整高度、不留邊距；影片以 contain 完整顯示鏡頭範圍 */
+.av-root.av-spotlight .av-grid{gap:0;padding:0;}
+.av-root.av-spotlight .av-grid > .av-tile{border-radius:0;}
+.av-root.av-spotlight .av-grid video{object-fit:contain;}
+/* 醫師端：對方抵達前暫時隱藏本機滿版畫面，只留「連線中…」狀態列 */
+.av-root.av-spotlight .av-tile.av-local.av-local-hidden{display:none;}
+.av-pips{position:absolute;left:12px;right:12px;top:12px;bottom:88px;z-index:4;pointer-events:none;}
+/* 本機小畫面固定為打直的 9:16 長方框（手機自拍視角），影片置中裁切填滿 */
+.av-tile.av-pip{position:absolute;top:0;right:0;width:clamp(84px,22%,140px);aspect-ratio:9/16;border:2px solid rgba(255,255,255,.45);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.5);pointer-events:auto;background:#000;}
+.av-tile.av-pip .av-namebar{display:none;}
+.av-tile.av-pip .av-avatar{width:42%;min-width:38px;max-width:64px;font-size:clamp(18px,3vw,28px);}
+.av-tile{position:relative;background:#111827;border-radius:12px;overflow:hidden;min-height:0;display:flex;align-items:center;justify-content:center;}
+.av-media{position:absolute;inset:0;}
+.av-media video{width:100%;height:100%;object-fit:cover;display:block;}
+.av-local .av-media video{transform:scaleX(-1);}
+.av-avatar{position:relative;z-index:1;width:24%;aspect-ratio:1/1;min-width:64px;max-width:130px;border-radius:9999px;background:linear-gradient(135deg,#2563eb,#0ea5e9);color:#fff;display:flex;align-items:center;justify-content:center;font-size:clamp(28px,5vw,52px);font-weight:700;user-select:none;}
+.av-namebar{position:absolute;z-index:3;left:8px;bottom:8px;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.55);color:#fff;font-size:13px;line-height:1;padding:6px 10px;border-radius:999px;max-width:calc(100% - 16px);}
+.av-namebar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.av-badge{font-size:13px;line-height:1;}
+.av-status{position:absolute;z-index:5;top:14px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:8px;background:rgba(0,0,0,.6);color:#fff;font-size:14px;font-weight:500;padding:7px 16px;border-radius:9999px;white-space:nowrap;backdrop-filter:blur(4px);}
+.av-dot{font-size:13px;line-height:1;width:9px;height:9px;border-radius:9999px;background:#fbbf24;animation:av-pulse 1.2s ease-in-out infinite;}
+.av-dot.av-green{background:#34d399;animation:none;}
+.av-dot.av-red{background:#f87171;animation:none;}
+@keyframes av-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.av-bar{flex:none;display:flex;align-items:center;justify-content:center;gap:18px;padding:14px;background:#0f172a;border-top:1px solid #1e293b;}
+.av-btn{width:52px;height:52px;border-radius:9999px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:#1f2937;color:#f9fafb;transition:background .15s,transform .1s;}
+.av-btn:hover{background:#374151;}
+.av-btn:active{transform:scale(.94);}
+.av-btn.av-on{background:#374151;}
+.av-btn.av-off{background:#ef4444;}
+.av-btn.av-off:hover{background:#dc2626;}
+.av-btn svg{width:24px;height:24px;}
+.av-hangup{width:60px;height:60px;background:#dc2626;}
+.av-hangup:hover{background:#b91c1c;}
+.av-hangup svg{width:28px;height:28px;}

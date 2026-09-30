@@ -246,8 +246,10 @@ export function extractBearerToken(request) {
 
 /**
  * 完整管理員驗證：ID Token 有效，且符合以下任一：
- *  - custom claims: admin === true 或 role === 'admin'
- *  - users 文件（經 userAuthIndex／uid／email 解析）之 position === '診所管理'
+ *  - custom claims: staff === true 且 active === true，
+ *    且 admin === true 或 role === 'admin'
+ *  - users 文件（經 userAuthIndex／uid／email 解析）為在職
+ *    （active !== false）且 position === '診所管理'
  *
  * @param {Request} request
  * @param {object} env Pages 環境
@@ -260,8 +262,15 @@ export async function requireAdmin(request, env, getUserDoc) {
     const sa = getServiceAccount(env);
     const claims = await verifyIdToken(token, sa.project_id);
 
+    // claims 路徑必須同時為在職員工（staff + active），
+    // 與 wallet requireStaff 對齊：停用的管理員在 active claim
+    // 刷新後即被封鎖，不能僅憑殘留的 admin claim 通過。
     const claimRole = claims.role ? String(claims.role).trim().toLowerCase() : '';
-    if (claims.admin === true || claimRole === 'admin') {
+    if (
+        claims.staff === true
+        && claims.active === true
+        && (claims.admin === true || claimRole === 'admin')
+    ) {
         return { uid: claims.sub, email: claims.email || '', claims, via: 'claims' };
     }
     if (typeof getUserDoc === 'function') {
