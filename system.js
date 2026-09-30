@@ -22158,6 +22158,9 @@ async function searchBillingForConsultation() {
                 hiddenTextarea.value = '';
                 totalAmountSpan.textContent = '$0';
                 queueConsultationSymptomsDraftSave();
+                if (typeof window.refreshWalletPaymentLockState === 'function') {
+                    window.refreshWalletPaymentLockState();
+                }
                 return;
             }
             
@@ -22404,6 +22407,10 @@ async function searchBillingForConsultation() {
             billingText += `\n總費用：$${Math.round(totalAmount)}`;
             hiddenTextarea.value = billingText.trim();
             queueConsultationSymptomsDraftSave();
+            // 每次收費項目變更後，檢查儲值支付 checkbox 是否需要鎖定/解鎖
+            if (typeof window.refreshWalletPaymentLockState === 'function') {
+                window.refreshWalletPaymentLockState();
+            }
         }
         
         // 更新收費項目數量
@@ -37368,6 +37375,9 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       cb.disabled = false;
       cb.onchange = null;
     }
+    // 清除可能殘留的鎖定樣式
+    const label = document.getElementById('useWalletPaymentLabel');
+    if (label) label.classList.remove('opacity-50', 'cursor-not-allowed', 'select-none');
     showWalletPayMessage('', false);
   }
 
@@ -37444,19 +37454,89 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
           showWalletPayMessage('', false);
           return;
         }
+        // 使用中心化檢查：讀取最新可用餘額（非初始化快取值）
+        const latestAvailable = walletAvailable(consultWallet.account);
         const total = readConsultationTotal();
-        if (total > available) {
+        if (total > latestAvailable) {
           cb.checked = false;
-          showToast('儲值餘額不足，可用 HK$' + available.toFixed(2), 'warning');
+          // 這邊立即觸發鎖定狀態同步（雖然 updateBillingDisplay 之後也會呼叫）
+          refreshWalletPaymentLockState();
           return;
         }
         consultWallet.pendingPay = true;
+        showWalletPayMessage('將以儲值餘額支付 HK$' + total.toFixed(2), false);
       };
     }
 
     // 新診症：僅「有效會員」（儲值帳戶 active 且有餘額）自動帶入折扣；
     // 未開戶、凍結/關閉或零餘額者皆不套用（available 已含 active 檢查）
     if (!isEdit && available > 0) applyAutoMembershipDiscount();
+    // 初始化完畢後立即檢查一次鎖定狀態（編輯模式下總費用可能已超過餘額）
+    refreshWalletPaymentLockState();
+  }
+
+  /**
+   * 根據當前總費用與儲值餘額，同步「使用儲值餘額支付」checkbox 的鎖定狀態。
+   * 當總費用高於餘額時，自動取消勾選並反白禁用；
+   * 當總費用回到餘額以內時，自動解鎖。
+   * 此函式在每次 updateBillingDisplay() 後被呼叫，確保鎖定即時反應。
+   */
+  function refreshWalletPaymentLockState() {
+    const area = document.getElementById('walletPaymentArea');
+    if (!area || area.classList.contains('hidden')) return;
+    if (!consultWallet.account) return;
+    // 已付款的診症保持原樣（setupConsultationWallet 已處理）
+    if (consultWallet.paid) return;
+
+    const cb = document.getElementById('useWalletPayment');
+    const label = document.getElementById('useWalletPaymentLabel');
+    if (!cb) return;
+
+    const total = walletRound2(readConsultationTotal());
+    const available = walletAvailable(consultWallet.account);
+
+    if (available <= 0) {
+      // 無可用餘額：應由 setupConsultationWallet 隱藏區域，此處為安全網
+      return;
+    }
+
+    if (total > available) {
+      // 總費用超過餘額 → 鎖定
+      const wasLocked = cb.disabled;
+      const wasChecked = cb.checked;
+      cb.checked = false;
+      cb.disabled = true;
+      consultWallet.pendingPay = false;
+      if (label) {
+        label.classList.add('opacity-50', 'cursor-not-allowed', 'select-none');
+      }
+      // 顯示警告訊息（僅在狀態變化時避免重複 toast）
+      const msg = `儲值餘額不足（可用 HK$${available.toFixed(2)}），總費用 HK$${total.toFixed(2)} 超過餘額`;
+      showWalletPayMessage(msg, true);
+      if (!wasLocked) {
+        showToast(
+          wasChecked
+            ? '儲值餘額不足，已取消儲值支付'
+            : '儲值餘額不足，無法選用儲值支付',
+          'warning'
+        );
+      }
+    } else {
+      // 總費用在餘額以內 → 解鎖
+      const wasLocked = cb.disabled;
+      cb.disabled = false;
+      if (label) {
+        label.classList.remove('opacity-50', 'cursor-not-allowed', 'select-none');
+      }
+      // 如果之前是因餘額不足顯示的錯誤訊息，清除它
+      const m = document.getElementById('walletPaymentMessage');
+      if (m && m.classList.contains('text-red-600')) {
+        showWalletPayMessage('', false);
+      }
+      if (wasLocked) {
+        showToast('儲值餘額已足夠，可再次選擇儲值支付', 'success');
+      }
+    }
   }
 
   function applyAutoMembershipDiscount() {
@@ -37666,6 +37746,7 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   window.retryConsultationWalletPayment = retryConsultationWalletPayment;
   window.cancelConsultationWalletPayment = cancelConsultationWalletPayment;
   window.preCheckConsultationWalletPayment = preCheckConsultationWalletPayment;
+  window.refreshWalletPaymentLockState = refreshWalletPaymentLockState;
 
   window.filterBillingItems = filterBillingItems;
   window.filterHerbLibrary = filterHerbLibrary;
