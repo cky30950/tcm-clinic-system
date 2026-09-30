@@ -1,0 +1,113 @@
+{
+  "rules": {
+    "isStaff()": "auth !== null && auth.token.staff === true && auth.token.active === true",
+    "isChatParticipant(chatId)": "chatId.beginsWith(auth.uid + '_') || chatId.endsWith('_' + auth.uid)",
+
+    ".read": false,
+    ".write": false,
+
+    "presence": {
+      ".read": "isStaff()",
+      "$userId": {
+        ".write": "isStaff() && auth.uid === $userId",
+        "connections": {
+          "$connId": {
+            ".validate": "newData.hasChildren(['startedAt']) && newData.child('startedAt').isNumber()"
+          }
+        }
+      }
+    },
+
+    "onlineUsers": {
+      "$userId": {
+        ".read": "isStaff()",
+        ".write": "isStaff()"
+      }
+    },
+
+    "appointments": {
+      ".read": "isStaff()",
+      ".write": "isStaff()",
+      ".indexOn": ["appointmentTime"]
+    },
+
+    "consultationStatus": {
+      ".read": "isStaff()",
+      ".write": "isStaff()"
+    },
+
+    "notifications": {
+      ".read": "isStaff()",
+      ".write": "isStaff()"
+    },
+
+    "herbInventory": {
+      ".read": "isStaff()",
+      ".write": "isStaff()"
+    },
+
+    "herbInventorySlice": {
+      ".read": "isStaff()",
+      ".write": "isStaff()"
+    },
+
+    "inventoryLogs": {
+      ".read": "isStaff()",
+      ".write": "isStaff()"
+    },
+
+    "clinics": {
+      "$clinicId": {
+        ".read": "isStaff()",
+        ".write": "isStaff()"
+      }
+    },
+
+    "chat": {
+      "messages": {
+        "public": {
+          ".read": "isStaff()",
+          ".write": "isStaff()",
+          ".indexOn": ["timestamp"]
+        }
+      },
+      "private": {
+        "$chatId": {
+          ".read": "isStaff() && isChatParticipant($chatId)",
+          ".write": "isStaff() && isChatParticipant($chatId)",
+          ".indexOn": ["timestamp"]
+        }
+      },
+      "summaries": {
+        "public": {
+          ".read": "isStaff()",
+          ".write": "isStaff()"
+        }
+      },
+      "userSummaries": {
+        "$uid": {
+          ".read": "isStaff() && auth.uid === $uid",
+          "$chatId": {
+            ".write": "isStaff() && (auth.uid === $uid || isChatParticipant($chatId))"
+          }
+        }
+      },
+      "lastSeen": {
+        "$uid": {
+          ".read": "isStaff() && auth.uid === $uid",
+          ".write": "isStaff() && auth.uid === $uid"
+        }
+      }
+    },
+
+    "videoPresence": {
+      "$channelId": {
+        ".read": "$channelId.matches(/^tcm-consult-[0-9A-Za-z_-]{1,64}$/)",
+        "$role": {
+          ".write": "$channelId.matches(/^tcm-consult-[0-9A-Za-z_-]{1,64}$/) && ($role === 'doctor' || $role === 'patient')",
+          ".validate": "newData.hasChildren(['at', 'sid', 'joined']) && newData.child('at').isNumber() && newData.child('sid').isString() && newData.child('joined').isBoolean()"
+        }
+      }
+    }
+  }
+}
