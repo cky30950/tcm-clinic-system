@@ -965,6 +965,15 @@
         }
         this.handleIncomingPreview(channelId, this.lastMessageInfo[channelId] || latestMsg, latestTs);
 
+        // 自己發的訊息不論聊天視窗是否開著都標為已讀；serverTimestamp
+        // 解析後的 child_changed 會再進入此處，補齊發送當下只寫入
+        // clientTimestamp 的 lastSeenTime。
+        this.markOwnLatestMessageSeen(
+          channelId,
+          latestTs,
+          latestMsg && latestMsg.senderId
+        );
+
         try {
           let isCurrent = false;
           if (this.currentChannel === 'public' && channelId === 'public') {
@@ -1236,6 +1245,9 @@
         timestamp: latestTs
       };
       this.handleIncomingPreview(channelId, this.lastMessageInfo[channelId], latestTs);
+      // 自己是最後發送者時視為已讀：涵蓋重新登入（摘要監聽為各頻道補齊），
+      // 也涵蓋發完訊息隨即關閉視窗／切換頻道的時序。
+      this.markOwnLatestMessageSeen(channelId, latestTs, summary.senderId);
     }
 
     
@@ -1263,6 +1275,38 @@
     markCurrentChannelAsRead() {
       const channelId = this.getCurrentChannelId();
       this.markChannelAsRead(channelId);
+    }
+
+    /**
+     * 判斷某頻道最後一則訊息是否由當前使用者自己發出。
+     * 自己發的訊息不得對自己產生未讀紅點或通知聲。
+     */
+    isOwnLatestMessage(channelId) {
+      const info = this.lastMessageInfo && this.lastMessageInfo[channelId];
+      return !!(info && info.senderId &&
+        String(info.senderId) === String(this.currentUserUid));
+    }
+
+    /**
+     * 自己發出的最新訊息永遠視為已讀。
+     * 訊息的 timestamp 是 Firebase serverTimestamp，通常略晚於發送端
+     * Date.now() 寫入的 lastSeenTime（網路延遲／裝置時鐘誤差）；若發完
+     * 訊息隨即關閉視窗或登出，重新登入後 lastMessageTime（server 時間）
+     * 會大於 lastSeenTime（client 時間），自己的訊息被誤判成未讀。
+     * 只要頻道最後發送者是自己，就把已讀時間補齊到該訊息時間。
+     * 僅在時間戳真的推進時寫入，避免多餘的 RTDB 寫入。
+     */
+    markOwnLatestMessageSeen(channelId, latestTs, senderId) {
+      if (!channelId || !latestTs) return;
+      if (!senderId || String(senderId) !== String(this.currentUserUid)) return;
+      if ((this.lastSeenTime[channelId] || 0) >= latestTs) return;
+      this.lastSeenTime[channelId] = latestTs;
+      if (typeof this.persistLastSeenTimes === 'function') {
+        this.persistLastSeenTimes();
+      }
+      if (typeof this.updateNewMessageIndicators === 'function') {
+        this.updateNewMessageIndicators();
+      }
     }
 
     
@@ -1628,7 +1672,7 @@
         }
         const lastMsg = this.lastMessageTime[channelId] || 0;
         const lastSeen = this.lastSeenTime[channelId] || 0;
-        if (lastMsg > lastSeen) {
+        if (!this.isOwnLatestMessage(channelId) && lastMsg > lastSeen) {
           indicator.classList.remove('hidden');
         } else {
           indicator.classList.add('hidden');
@@ -1667,7 +1711,7 @@
               return;
             }
           }
-          if (lastMsg > lastSeen) {
+          if (!this.isOwnLatestMessage(channelId) && lastMsg > lastSeen) {
             hasUnread = true;
             if (lastMsg > latestUnreadTs) {
               latestUnreadTs = lastMsg;

@@ -1,0 +1,110 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "presence": {
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      "$userId": {
+        ".write": "auth !== null && auth.token.staff === true && auth.token.active === true && auth.uid === $userId",
+        "connections": {
+          "$connId": {
+            ".validate": "newData.hasChildren(['startedAt']) && newData.child('startedAt').isNumber()"
+          }
+        }
+      }
+    },
+
+    "onlineUsers": {
+      "$userId": {
+        ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+        ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
+      }
+    },
+
+    "appointments": {
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".indexOn": ["appointmentTime"]
+    },
+
+    "consultationStatus": {
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
+    },
+
+    "notifications": {
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
+    },
+
+    "herbInventory": {
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
+    },
+
+    "herbInventorySlice": {
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
+    },
+
+    "inventoryLogs": {
+      ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+      ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
+    },
+
+    "clinics": {
+      "$clinicId": {
+        ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+        ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
+      }
+    },
+
+    "chat": {
+      "messages": {
+        "public": {
+          ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+          ".write": "auth !== null && auth.token.staff === true && auth.token.active === true",
+          ".indexOn": ["timestamp"]
+        }
+      },
+      "private": {
+        "$chatId": {
+          ".read": "auth !== null && auth.token.staff === true && auth.token.active === true && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))",
+          ".write": "auth !== null && auth.token.staff === true && auth.token.active === true && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))",
+          ".indexOn": ["timestamp"]
+        }
+      },
+      "summaries": {
+        "public": {
+          ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
+          ".write": "auth !== null && auth.token.staff === true && auth.token.active === true"
+        }
+      },
+      "userSummaries": {
+        "$uid": {
+          ".read": "auth !== null && auth.token.staff === true && auth.token.active === true && auth.uid === $uid",
+          "$chatId": {
+            ".write": "auth !== null && auth.token.staff === true && auth.token.active === true && (auth.uid === $uid || $chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))"
+          }
+        }
+      },
+      "lastSeen": {
+        "$uid": {
+          ".read": "auth !== null && auth.token.staff === true && auth.token.active === true && auth.uid === $uid",
+          ".write": "auth !== null && auth.token.staff === true && auth.token.active === true && auth.uid === $uid"
+        }
+      }
+    },
+
+    "videoPresence": {
+      "$channelId": {
+        ".read": "$channelId.matches(/^tcm-consult-[0-9A-Za-z_-]{1,64}$/)",
+        "$role": {
+          ".write": "$channelId.matches(/^tcm-consult-[0-9A-Za-z_-]{1,64}$/) && ($role === 'doctor' || $role === 'patient')",
+          ".validate": "newData.hasChildren(['at', 'sid', 'joined']) && newData.child('at').isNumber() && newData.child('sid').isString() && newData.child('joined').isBoolean()"
+        }
+      }
+    }
+  }
+}
