@@ -14053,10 +14053,19 @@ async function saveConsultation() {
                     clearConsultationSymptomsDraft(consultationSymptomsDraftState.key);
                 }
             } catch (_e) {}
-            // 保存成功時，先提交暫存的套票購買與使用
-            await commitPendingPackagePurchases();
-            // 提交暫存套票購買後，提交本地暫存的套票使用變更至資料庫
-            await commitPendingPackageChanges();
+            // 保存成功時，先提交暫存的套票購買與使用。
+            // 開啟套票聚合合併作用域：購買＋使用可能連動多張套票，
+            // 期間所有病人文件的套票聚合更新合併至沖排時一次寫入。
+            window.firebaseDataManager.beginPackageAggregateBatching();
+            try {
+                await commitPendingPackagePurchases();
+                // 提交暫存套票購買後，提交本地暫存的套票使用變更至資料庫
+                await commitPendingPackageChanges();
+            } finally {
+                // 每個受影響病人僅重算一次 packageActiveCount/packageRemainingUses
+                // （含一次 patientsMeta 通知），消除舊路徑的重複寫入。
+                await window.firebaseDataManager.flushPackageAggregateBatching();
+            }
             // 提交後清空暫存變更
             pendingPackageChanges = [];
             // 套票購買與使用提交完成後，將每個套票使用項目「使用後的餘下次數」快照固定寫入病歷：
@@ -14077,9 +14086,11 @@ async function saveConsultation() {
                         backfillConsultationId = appointment && appointment.consultationId ? String(appointment.consultationId) : '';
                     }
                     if (backfillConsultationId && structuredWithSnapshot !== consultationData.billingItemsStructured) {
+                        // 僅回填套票 packageRecordId／餘次快照，金額欄位完全相同，
+                        // 不需重跑財務摘要、SA 統計、病人聚合與 patientsMeta。
                         await window.firebaseDataManager.updateConsultation(backfillConsultationId, {
                             billingItemsStructured: structuredWithSnapshot
-                        });
+                        }, { skipSideEffects: true });
                         // 同步更新本地診症記錄快取，避免本次工作階段讀到舊資料
                         try {
                             if (Array.isArray(consultations)) {
@@ -26705,7 +26716,8 @@ async function restoreUser(id) {
                         paymentStatus: 'external_paid',
                         pendingAmount: 0,
                         externalPaidAt: new Date().toISOString()
-                    }
+                    },
+                    { skipSideEffects: true }
                 );
                 showToast('已標記為收款完成', 'success');
                 if (lastWalletFinQuery) {
@@ -30594,20 +30606,88 @@ class FirebaseDataManager {
     }
 
     /**
-     * 精簡版病人診症聚合更新 — 完全不讀取 Firestore，只靠 FieldValue.increment 寫入。
-     * 取代原本 syncPatientConsultationAggregate（每次 2-3 次讀取），改為 0 次讀取。
+     * 建構病人診症聚合的寫入計畫（純邏輯、不寫入）。
+     * 供 patchPatientAggregate 單獨提交，或由 add/update/deleteConsultation
+     * 放進與病歷主文件相同的 writeBatch 一起原子提交。
      *
-     * 策略：
-     *   - consultationCount 用 FieldValue.increment 原子增減
-     *   - latestConsultationAt / latestFollowUpDate 樂觀更新（取當前寫入的 record 值）
-     *     邊緣情況（out-of-order 寫入、刪除最新記錄）下可能短暫不準確，
-     *     但醫療場景對這兩個欄位的即時性要求不高，可接受。
-     *   - 如需完全精確，用 recomputePatientConsultationAggregate 全量重算（管理工具用）
-     *
-     * @param {string} patientId         主要要更新聚合的病人 ID
-     * @param {'add'|'update'|'delete'} operation
-     * @param {object} [consultation]    新增/更新時的診症記錄（含 patientId, sortDate, followUpDate）
-     * @param {string} [prevPatientId]   更新時若病人 ID 有變更，傳舊的病人 ID
+     * @returns {{patientOps: Array<{pid:string, patch:object, cachePatch:object}>, meta: object|null}}
+     */
+    _buildPatientAggregatePlan(patientId, operation, consultation, prevPatientId) {
+        const pid = String(patientId || '');
+        const patientOps = [];
+        const increment = window.firebase.FieldValue.increment;
+
+        // 先處理舊病人（update 時病人 ID 變更的情況）
+        if (operation === 'update' && prevPatientId && String(prevPatientId) !== pid) {
+            const oldPid = String(prevPatientId);
+            // 舊病人 count -1
+            patientOps.push({
+                pid: oldPid,
+                patch: { consultationCount: increment(-1) },
+                cachePatch: { consultationCountDelta: -1 }
+            });
+        }
+
+        const patch = {};
+        if (operation === 'add') {
+            patch.consultationCount = increment(1);
+        } else if (operation === 'delete') {
+            patch.consultationCount = increment(-1);
+            // 刪除時不動 latest — 我們不知道是不是刪了最新那筆，
+            // 讓它保持樂觀值即可，下次 add/update 會被覆蓋
+        }
+        // update：同一病人下 count 不變，只更新 latest
+
+        // latest 欄位：add / update 時樂觀設定為當前 record 的值
+        if (consultation && (operation === 'add' || operation === 'update')) {
+            const sortDate = getConsultationEffectiveDate(consultation);
+            if (sortDate) patch.latestConsultationAt = sortDate;
+            const fu = parseConsultationDate(consultation.followUpDate);
+            if (fu) patch.latestFollowUpDate = fu;
+        }
+
+        // 只有 patch 有內容才寫入病人文件
+        if (pid && Object.keys(patch).length > 0) {
+            // cachePatch 與舊行為一致：直接傳 patch（increment sentinel 會被快取邏輯忽略，
+            // 僅 latest 欄位生效）
+            patientOps.push({ pid, patch, cachePatch: patch });
+        }
+
+        // patientsMeta/lastChange 全域通知旗標：同一文件於單一批次只能寫一次，
+        // 故聚合成一個最終 payload（舊路徑會連寫兩次，第二次覆蓋第一次）
+        const meta = pid ? { timestamp: new Date(), operation: 'update', patientId: pid } : null;
+        return { patientOps, meta };
+    }
+
+    /** 把聚合計畫的 Firestore 寫入加入既有批次。 */
+    _appendPatientAggregateToBatch(batch, plan) {
+        if (!batch || !plan) return;
+        (plan.patientOps || []).forEach((op) => {
+            batch.update(window.firebase.doc(window.firebase.db, 'patients', op.pid), op.patch);
+        });
+        if (plan.meta) {
+            batch.set(
+                window.firebase.doc(window.firebase.db, 'patientsMeta', 'lastChange'),
+                plan.meta,
+                { merge: true }
+            );
+        }
+    }
+
+    /** 批次提交成功後，把聚合變更套用到本地病人快取。 */
+    _applyPatientAggregatePlanCaches(plan) {
+        if (!plan) return;
+        (plan.patientOps || []).forEach((op) => {
+            try {
+                this.applyPatientAggregateToCaches(op.pid, op.cachePatch);
+            } catch (_e) {}
+        });
+    }
+
+    /**
+     * 精簡版病人診症聚合更新 — 0 次讀取，單一批次原子寫入病人文件與 patientsMeta。
+     * 一般 CRUD 已改為與病歷主文件同批次提交（見 add/update/deleteConsultation），
+     * 此方法保留給獨立呼叫使用。邊緣不精確可用 recomputePatientConsultationAggregate 重算。
      */
     async patchPatientAggregate(patientId, operation, consultation, prevPatientId) {
         if (!this.isReady) return;
@@ -30615,49 +30695,11 @@ class FirebaseDataManager {
         if (!pid) return;
 
         try {
-            const increment = window.firebase.FieldValue.increment;
-            const patch = {};
-
-            // 先處理舊病人（update 時病人 ID 變更的情況，或 delete 時）
-            if (operation === 'update' && prevPatientId && String(prevPatientId) !== pid) {
-                const oldPid = String(prevPatientId);
-                // 舊病人 count -1
-                await window.firebase.updateDoc(
-                    window.firebase.doc(window.firebase.db, 'patients', oldPid),
-                    { consultationCount: increment(-1) }
-                ).catch(() => {});
-                this.applyPatientAggregateToCaches(oldPid, { consultationCountDelta: -1 });
-                touchPatientsMeta('update', oldPid).catch(() => {});
-            }
-
-            if (operation === 'add') {
-                patch.consultationCount = increment(1);
-            } else if (operation === 'delete') {
-                patch.consultationCount = increment(-1);
-                // 刪除時不動 latest — 我們不知道是不是刪了最新那筆，
-                // 讓它保持樂觀值即可，下次 add/update 會被覆蓋
-            } else if (operation === 'update') {
-                // 同一病人下 update，count 不變；只有 patientId 變更時上面已處理
-                // 不動 count，只更新 latest
-            }
-
-            // latest 欄位：add / update 時樂觀設定為當前 record 的值
-            if (consultation && (operation === 'add' || operation === 'update')) {
-                const sortDate = getConsultationEffectiveDate(consultation);
-                if (sortDate) patch.latestConsultationAt = sortDate;
-                const fu = parseConsultationDate(consultation.followUpDate);
-                if (fu) patch.latestFollowUpDate = fu;
-            }
-
-            // 只有 patch 有內容才寫入
-            if (Object.keys(patch).length > 0) {
-                await window.firebase.updateDoc(
-                    window.firebase.doc(window.firebase.db, 'patients', pid),
-                    patch
-                );
-                this.applyPatientAggregateToCaches(pid, patch);
-            }
-            touchPatientsMeta('update', pid).catch(() => {});
+            const plan = this._buildPatientAggregatePlan(pid, operation, consultation, prevPatientId);
+            const batch = window.firebase.writeBatch(window.firebase.db);
+            this._appendPatientAggregateToBatch(batch, plan);
+            await batch.commit();
+            this._applyPatientAggregatePlanCaches(plan);
         } catch (error) {
             console.warn('patchPatientAggregate 失敗（非致錯路徑）:', error.message);
         }
@@ -31217,56 +31259,72 @@ class FirebaseDataManager {
             const createdAt = new Date();
             const sortDate = getConsultationEffectiveDate({ ...dataToWrite, createdAt }, createdAt);
             const searchKeywords = generateConsultationSearchKeywords({ ...dataToWrite, createdAt, sortDate });
-            const docRef = await window.firebase.addDoc(
-                window.firebase.collection(window.firebase.db, 'consultations'),
-                {
-                    ...dataToWrite,
-                    createdAt,
-                    sortDate: sortDate || createdAt,
-                    createdBy: currentUser,
-                    searchKeywords
-                }
+            const fullRecord = {
+                ...dataToWrite,
+                createdAt,
+                sortDate: sortDate || createdAt,
+                createdBy: currentUser,
+                searchKeywords
+            };
+            // 客戶端預先產生病歷 ID，使「病歷主文件 + 財務摘要 + 病人聚合 + patientsMeta」
+            // 四處寫入於同一個 writeBatch 原子提交（原本是 4 次獨立 RPC）。
+            const consRef = window.firebase.doc(
+                window.firebase.collection(window.firebase.db, 'consultations')
             );
+            const batch = window.firebase.writeBatch(window.firebase.db);
+            batch.set(consRef, fullRecord);
+            const summaryRecord = {
+                ...dataToWrite,
+                createdAt,
+                sortDate: sortDate || createdAt,
+                createdBy: currentUser
+            };
+            const summaryPayload = buildConsultationFinancialSummaryPayload(consRef.id, summaryRecord);
+            batch.set(
+                window.firebase.doc(window.firebase.db, 'consultationFinancialSummaries', consRef.id),
+                summaryPayload,
+                { merge: true }
+            );
+            let aggregatePlan = null;
             try {
-                await this.syncConsultationFinancialSummary(docRef.id, {
-                    ...dataToWrite,
-                    createdAt,
-                    sortDate: sortDate || createdAt,
-                    createdBy: currentUser
-                });
-            } catch (_summaryErr) {
-                console.warn('新增診症後同步財務摘要失敗:', _summaryErr);
+                const aggPid = consultationData && consultationData.patientId
+                    ? String(consultationData.patientId)
+                    : '';
+                if (aggPid) {
+                    aggregatePlan = this._buildPatientAggregatePlan(
+                        aggPid,
+                        'add',
+                        { ...dataToWrite, createdAt, sortDate, createdBy: currentUser }
+                    );
+                    this._appendPatientAggregateToBatch(batch, aggregatePlan);
+                }
+            } catch (_planErr) {
+                console.warn('建構病人診症彙總計畫失敗:', _planErr);
             }
+            await batch.commit();
+            if (aggregatePlan) {
+                this._applyPatientAggregatePlanCaches(aggregatePlan);
+            }
+            // 個人統計 / 財務日聚合寫入在 SA 端，無法與客戶端批次合併，
+            // 於主批次成功後以 best-effort 方式同步。
             try {
                 await this.syncConsultationPersonalStatsSummaries(null, {
-                    id: docRef.id,
-                    ...dataToWrite,
-                    createdAt,
-                    sortDate: sortDate || createdAt,
-                    createdBy: currentUser
+                    id: consRef.id,
+                    ...summaryRecord
                 });
             } catch (_personalStatsErr) {
                 console.warn('新增診症後同步個人統計摘要失敗:', _personalStatsErr);
             }
             try {
                 await this.syncConsultationDailyFinancialStats(null, {
-                    id: docRef.id,
-                    ...dataToWrite,
-                    createdAt,
-                    sortDate: sortDate || createdAt,
-                    createdBy: currentUser
+                    id: consRef.id,
+                    ...summaryRecord
                 });
             } catch (_finStatsErr) {
                 console.warn('新增診症後同步財務日聚合失敗:', _finStatsErr);
             }
-            try {
-                const fullConsultation = { ...dataToWrite, createdAt, sortDate, createdBy: currentUser };
-                await this.patchPatientAggregate(consultationData && consultationData.patientId, 'add', fullConsultation);
-            } catch (_aggregateErr) {
-                console.warn('新增診症後同步病人診症彙總失敗:', _aggregateErr);
-            }
-            
-            console.log('診症記錄已添加到 Firebase:', docRef.id);
+
+            console.log('診症記錄已添加到 Firebase:', consRef.id);
             // 新增診症後清除全域診症快取並移除本地存檔
             this.consultationsCache = null;
             try {
@@ -31303,7 +31361,7 @@ class FirebaseDataManager {
                     }
                 } catch (_e4) {}
             }
-            return { success: true, id: docRef.id };
+            return { success: true, id: consRef.id };
         } catch (error) {
             console.error('添加診症記錄失敗:', error);
             showToast('保存診症記錄失敗', 'error');
@@ -32270,8 +32328,18 @@ class FirebaseDataManager {
         }
     }
 
-    async updateConsultation(consultationId, consultationData) {
+    /**
+     * 更新診症記錄。
+     * @param {object} [options]
+     * @param {boolean} [options.skipSideEffects=false]
+     *        僅寫入病歷主文件，不同步財務摘要／SA 統計／病人聚合／patientsMeta。
+     *        適用於「不影響收費金額與病人歸屬」的局部回寫，例如：
+     *        套票餘次快照回填、儲值付款狀態（walletPaid/paymentStatus/pendingAmount）、
+     *        待收款核銷。這些更新若走完整鏈，會產生淨值為 0 的重複統計寫入。
+     */
+    async updateConsultation(consultationId, consultationData, options = {}) {
         try {
+            const skipSideEffects = !!(options && options.skipSideEffects);
             // 移除 id 屬性，避免將 id 寫入文件內容
             let dataToWrite;
             let existingRecord = null;
@@ -32291,79 +32359,83 @@ class FirebaseDataManager {
             let temporalBase = { ...(existingRecord || {}), ...dataToWrite, updatedAt };
             const sortDate = getConsultationEffectiveDate(temporalBase, updatedAt);
             const searchKeywords = generateConsultationSearchKeywords({ ...temporalBase, sortDate: sortDate || updatedAt });
-            await window.firebase.updateDoc(
-                window.firebase.doc(window.firebase.db, 'consultations', consultationId),
-                {
-                    ...dataToWrite,
-                    updatedAt,
-                    sortDate: sortDate || updatedAt,
-                    updatedBy: currentUser,
-                    searchKeywords
+            const corePatch = {
+                ...dataToWrite,
+                updatedAt,
+                sortDate: sortDate || updatedAt,
+                updatedBy: currentUser,
+                searchKeywords
+            };
+            const consRef = window.firebase.doc(window.firebase.db, 'consultations', String(consultationId));
+            const afterRecord = {
+                id: String(consultationId),
+                ...(existingRecord || {}),
+                ...dataToWrite,
+                updatedAt,
+                sortDate: sortDate || updatedAt,
+                updatedBy: currentUser
+            };
+
+            if (skipSideEffects) {
+                // 局部欄位回寫：單次 updateDoc，不觸發任何連鎖寫入。
+                await window.firebase.updateDoc(consRef, corePatch);
+            } else {
+                // 完整編輯：病歷主文件 + 財務摘要 + 病人聚合 + patientsMeta 單一批次原子提交。
+                const batch = window.firebase.writeBatch(window.firebase.db);
+                batch.update(consRef, corePatch);
+                const summaryPayload = buildConsultationFinancialSummaryPayload(String(consultationId), afterRecord);
+                batch.set(
+                    window.firebase.doc(window.firebase.db, 'consultationFinancialSummaries', String(consultationId)),
+                    summaryPayload,
+                    { merge: true }
+                );
+                let aggregatePlan = null;
+                try {
+                    const oldPid = String((existingRecord && existingRecord.patientId) || '');
+                    const newPid = String((consultationData && consultationData.patientId) || oldPid || '');
+                    if (newPid) {
+                        aggregatePlan = this._buildPatientAggregatePlan(
+                            newPid,
+                            'update',
+                            {
+                                ...(existingRecord || {}),
+                                ...dataToWrite,
+                                updatedAt,
+                                sortDate: sortDate || updatedAt
+                            },
+                            oldPid && oldPid !== newPid ? oldPid : null
+                        );
+                    } else if (oldPid) {
+                        // 邊緣情況：診症被清除了病人 ID（只更新 patientsMeta）
+                        aggregatePlan = this._buildPatientAggregatePlan(oldPid, 'update', null);
+                    }
+                    if (aggregatePlan) {
+                        this._appendPatientAggregateToBatch(batch, aggregatePlan);
+                    }
+                } catch (_planErr) {
+                    console.warn('建構病人診症彙總計畫失敗:', _planErr);
                 }
-            );
-            try {
-                await this.syncConsultationFinancialSummary(String(consultationId), {
-                    ...(existingRecord || {}),
-                    ...dataToWrite,
-                    updatedAt,
-                    sortDate: sortDate || updatedAt,
-                    updatedBy: currentUser
-                });
-            } catch (_summaryErr) {
-                console.warn('更新診症後同步財務摘要失敗:', _summaryErr);
-            }
-            try {
-                await this.syncConsultationPersonalStatsSummaries(
-                    existingRecord ? { id: String(consultationId), ...existingRecord } : null,
-                    {
-                        id: String(consultationId),
-                        ...(existingRecord || {}),
-                        ...dataToWrite,
-                        updatedAt,
-                        sortDate: sortDate || updatedAt,
-                        updatedBy: currentUser
-                    }
-                );
-            } catch (_personalStatsErr) {
-                console.warn('更新診症後同步個人統計摘要失敗:', _personalStatsErr);
-            }
-            try {
-                await this.syncConsultationDailyFinancialStats(
-                    existingRecord ? { id: String(consultationId), ...existingRecord } : null,
-                    {
-                        id: String(consultationId),
-                        ...(existingRecord || {}),
-                        ...dataToWrite,
-                        updatedAt,
-                        sortDate: sortDate || updatedAt,
-                        updatedBy: currentUser
-                    }
-                );
-            } catch (_finStatsErr) {
-                console.warn('更新診症後同步財務日聚合失敗:', _finStatsErr);
-            }
-            try {
-                const oldPid = String(existingRecord && existingRecord.patientId || '');
-                const newPid = String(consultationData && consultationData.patientId || oldPid || '');
-                if (newPid) {
-                    const fullConsultation = {
-                        ...(existingRecord || {}),
-                        ...dataToWrite,
-                        updatedAt,
-                        sortDate: sortDate || updatedAt
-                    };
-                    await this.patchPatientAggregate(
-                        newPid,
-                        'update',
-                        fullConsultation,
-                        oldPid && oldPid !== newPid ? oldPid : null
+                await batch.commit();
+                if (aggregatePlan) {
+                    this._applyPatientAggregatePlanCaches(aggregatePlan);
+                }
+                // 個人統計 / 財務日聚合在 SA 端，主批次成功後 best-effort 同步。
+                try {
+                    await this.syncConsultationPersonalStatsSummaries(
+                        existingRecord ? { id: String(consultationId), ...existingRecord } : null,
+                        afterRecord
                     );
-                } else if (oldPid) {
-                    // 邊緣情況：診症被清除了病人 ID
-                    await this.patchPatientAggregate(oldPid, 'update', null);
+                } catch (_personalStatsErr) {
+                    console.warn('更新診症後同步個人統計摘要失敗:', _personalStatsErr);
                 }
-            } catch (_aggregateErr) {
-                console.warn('更新診症後同步病人診症彙總失敗:', _aggregateErr);
+                try {
+                    await this.syncConsultationDailyFinancialStats(
+                        existingRecord ? { id: String(consultationId), ...existingRecord } : null,
+                        afterRecord
+                    );
+                } catch (_finStatsErr) {
+                    console.warn('更新診症後同步財務日聚合失敗:', _finStatsErr);
+                }
             }
             // 更新診症後清除全域診症快取並移除本地存檔
             this.consultationsCache = null;
@@ -32425,18 +32497,35 @@ class FirebaseDataManager {
                     existingRecord = { id: existingDoc.id, ...existingDoc.data() };
                 }
             } catch (_getErr) {}
-            await window.firebase.deleteDoc(
-                window.firebase.doc(window.firebase.db, 'consultations', idStr)
+            // 刪除主文件 + 財務摘要標記刪除 + 病人聚合 + patientsMeta 單一批次原子提交。
+            const deletedAt = new Date();
+            const batch = window.firebase.writeBatch(window.firebase.db);
+            batch.delete(window.firebase.doc(window.firebase.db, 'consultations', idStr));
+            const summaryPayload = buildConsultationFinancialSummaryPayload(
+                idStr,
+                { ...(existingRecord || {}), status: 'deleted', updatedAt: deletedAt },
+                { forceDeleted: true, now: deletedAt }
             );
+            batch.set(
+                window.firebase.doc(window.firebase.db, 'consultationFinancialSummaries', idStr),
+                summaryPayload,
+                { merge: true }
+            );
+            let aggregatePlan = null;
             try {
-                await this.syncConsultationFinancialSummary(idStr, {
-                    ...(existingRecord || {}),
-                    status: 'deleted',
-                    updatedAt: new Date()
-                }, { forceDeleted: true });
-            } catch (_summaryErr) {
-                console.warn('刪除診症後同步財務摘要失敗:', _summaryErr);
+                const pid = existingRecord && existingRecord.patientId ? String(existingRecord.patientId) : '';
+                if (pid) {
+                    aggregatePlan = this._buildPatientAggregatePlan(pid, 'delete');
+                    this._appendPatientAggregateToBatch(batch, aggregatePlan);
+                }
+            } catch (_planErr) {
+                console.warn('建構病人診症彙總計畫失敗:', _planErr);
             }
+            await batch.commit();
+            if (aggregatePlan) {
+                this._applyPatientAggregatePlanCaches(aggregatePlan);
+            }
+            // 個人統計 / 財務日聚合在 SA 端，主批次成功後 best-effort 同步。
             try {
                 await this.syncConsultationPersonalStatsSummaries(
                     existingRecord ? { ...existingRecord } : null,
@@ -32452,14 +32541,6 @@ class FirebaseDataManager {
                 );
             } catch (_finStatsErr) {
                 console.warn('刪除診症後同步財務日聚合失敗:', _finStatsErr);
-            }
-            try {
-                const pid = existingRecord && existingRecord.patientId;
-                if (pid) {
-                    await this.patchPatientAggregate(pid, 'delete');
-                }
-            } catch (_aggregateErr) {
-                console.warn('刪除診症後同步病人診症彙總失敗:', _aggregateErr);
             }
             this.consultationsCache = null;
             try {
@@ -32525,6 +32606,23 @@ class FirebaseDataManager {
                     }
                 }
             });
+            // 無實質變更（例如僅觸發儲存但所有欄位皆相同）就不寫 audit log，
+            // 避免無意義的寫入；UI 本來就以 changedFields 驅動差異顯示。
+            if (changedFields.length === 0) {
+                return { success: true, skipped: true, id: '' };
+            }
+            // 只保留「有變更」的頂層欄位。舊版把完整 before/after 病歷快照
+            // （含處方等大型欄位）各存一份，文件體積龐大且大部分內容重複。
+            const beforeSlim = {};
+            const afterSlim = {};
+            changedFields.forEach((key) => {
+                if (beforeData && Object.prototype.hasOwnProperty.call(beforeData, key)) {
+                    beforeSlim[key] = beforeData[key];
+                }
+                if (afterData && Object.prototype.hasOwnProperty.call(afterData, key)) {
+                    afterSlim[key] = afterData[key];
+                }
+            });
             const docRef = await window.firebase.addDoc(
                 window.firebase.collection(window.firebase.db, 'consultationAuditLogs'),
                 {
@@ -32535,8 +32633,9 @@ class FirebaseDataManager {
                     editedBy: auditData && auditData.editedBy ? String(auditData.editedBy) : (currentUser || 'system'),
                     editReason: auditData && auditData.editReason ? String(auditData.editReason) : '',
                     changedFields,
-                    beforeData,
-                    afterData,
+                    changeCount: changedFields.length,
+                    beforeData: beforeSlim,
+                    afterData: afterSlim,
                     editedAt: new Date()
                 }
             );
@@ -33024,7 +33123,7 @@ class FirebaseDataManager {
             try {
                 // 套票資料中應包含 patientId
                 if (packageData && packageData.patientId) {
-                    await this.updatePatientPackageAggregates(packageData.patientId);
+                    await this._schedulePatientPackageAggregate(packageData.patientId);
                 }
             } catch (aggErr) {
                 console.error('新增套票後更新套票彙總欄位失敗:', aggErr);
@@ -33100,7 +33199,7 @@ class FirebaseDataManager {
             // 套票更新後，同步更新對應病人的套票彙總欄位。
             try {
                 if (packageData && packageData.patientId) {
-                    await this.updatePatientPackageAggregates(packageData.patientId);
+                    await this._schedulePatientPackageAggregate(packageData.patientId);
                 }
             } catch (aggErr) {
                 console.error('更新套票後更新套票彙總欄位失敗:', aggErr);
@@ -33133,7 +33232,7 @@ class FirebaseDataManager {
             }
             try {
                 if (patientId) {
-                    await this.updatePatientPackageAggregates(patientId);
+                    await this._schedulePatientPackageAggregate(patientId);
                 }
             } catch (aggErr) {
                 console.error('刪除套票後更新套票彙總欄位失敗:', aggErr);
@@ -33291,6 +33390,44 @@ class FirebaseDataManager {
             console.error('讀取套票記錄分頁失敗:', error);
             return { success: false, data: [], error: error.message };
         }
+    }
+
+    /**
+     * 開啟套票聚合「合併作用域」：作用域期間 addPatientPackage / updatePatientPackage /
+     * deletePatientPackage 不再每次重算並寫入 patients 文件（含 patientsMeta），
+     * 只記錄受影響的病人 ID；待 flushPackageAggregateBatching() 時每個病人只重算一次。
+     *
+     * 用途：儲存病歷時可能連續「購買套票＋即時使用＋抵扣多張套票」，
+     * 舊路徑每一步都會對同一個病人文件與 patientsMeta 各寫一次（2-4 次）。
+     */
+    beginPackageAggregateBatching() {
+        this._pkgAggBatch = new Set();
+    }
+
+    /** 沖排合併作用域：對作用域期間受影響的每個病人執行一次聚合重算。 */
+    async flushPackageAggregateBatching() {
+        const pending = this._pkgAggBatch;
+        this._pkgAggBatch = null;
+        if (!pending || pending.size === 0) return;
+        // 序列執行，避免同一病人文件並發覆蓋
+        for (const pid of Array.from(pending)) {
+            try {
+                await this.updatePatientPackageAggregates(pid);
+            } catch (err) {
+                console.warn('沖排套票彙總失敗（非致錯路徑）:', pid, err && err.message);
+            }
+        }
+    }
+
+    /** 供 add/update/deletePatientPackage 呼叫：作用域中改為登記，否則立即重算。 */
+    _schedulePatientPackageAggregate(patientId) {
+        const pid = String(patientId || '');
+        if (!pid) return Promise.resolve();
+        if (this._pkgAggBatch) {
+            this._pkgAggBatch.add(pid);
+            return Promise.resolve();
+        }
+        return this.updatePatientPackageAggregates(pid);
     }
 
     /**
@@ -37163,7 +37300,7 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
         paymentStatus: 'wallet_paid',
         pendingAmount: 0,
         walletPaidAt: new Date().toISOString()
-      });
+      }, { skipSideEffects: true });
       consultWallet.paid = true;
       consultWallet.pendingPay = false;
       invalidateWalletAccount(patientId, clinicId);
@@ -37178,7 +37315,7 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
             paymentStatus: 'wallet_paid',
             pendingAmount: 0,
             walletPaidAt: new Date().toISOString()
-          });
+          }, { skipSideEffects: true });
         } catch (_markErr) { /* 標記失敗不阻擋流程 */ }
         consultWallet.paid = true;
         consultWallet.pendingPay = false;
@@ -37192,7 +37329,7 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
           paymentStatus: 'unpaid',
           pendingAmount: walletRound2(amount),
           walletPayFailedAt: new Date().toISOString()
-        });
+        }, { skipSideEffects: true });
       } catch (_markErr) { /* 略過 */ }
       showWalletPayMessage(
         '⚠️ 儲值扣款失敗：' + escapeHtml(msg) +
@@ -37238,7 +37375,8 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
             pendingAmount: owed,
             walletPayFailedAt: new Date().toISOString(),
             walletPaySkipped: true
-          }
+          },
+          { skipSideEffects: true }
         );
       }
     } catch (_markErr) { /* 標記失敗不阻擋提示流程 */ }
