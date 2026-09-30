@@ -30669,7 +30669,7 @@ class FirebaseDataManager {
     _buildPatientAggregatePlan(patientId, operation, consultation, prevPatientId) {
         const pid = String(patientId || '');
         const patientOps = [];
-        const increment = window.firebase.FieldValue.increment;
+        const increment = window.firebase.increment;
 
         // 先處理舊病人（update 時病人 ID 變更的情況）
         if (operation === 'update' && prevPatientId && String(prevPatientId) !== pid) {
