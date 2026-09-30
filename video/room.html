@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 入房連結帶 fragment 憑證：全域不送出 Referer，避免憑證經外連資源外洩 -->
+    <meta name="referrer" content="no-referrer">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#D9782D">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="名醫診所">
+    <link rel="apple-touch-icon" href="/images/icons/apple-touch-icon.png">
+    <title>視訊診間</title>
+    <!-- 僅載入本頁實際使用到的 utility 類別；不在正式環境使用 cdn.tailwindcss.com -->
+    <link rel="stylesheet" href="room.css">
+    <style>
+        html, body { height: 100%; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <div id="app" class="h-screen flex flex-col">
+
+        <!-- 診所系統頂部橫額（與系統首頁一致） -->
+        <nav class="bg-white shadow-lg border-b-4 border-green-500 shrink-0">
+            <div class="max-w-7xl mx-auto px-4">
+                <a href="../index.html" class="flex items-center py-3 group">
+                    <span class="mr-3">
+                        <img src="../images/myLogo.png" alt="Logo" class="h-7">
+                    </span>
+                    <div>
+                        <h1 class="text-lg sm:text-xl font-bold text-gray-800">名醫診所系統</h1>
+                        <p class="text-xs text-gray-500">Dr.Great Clinic</p>
+                    </div>
+                </a>
+            </div>
+        </nav>
+
+        <!-- 進入前大廳 -->
+        <div id="lobbyScreen" class="flex-1 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
+                <div class="text-5xl mb-4" aria-hidden="true">📹</div>
+                <h1 class="text-2xl font-bold text-gray-800">視訊診間</h1>
+                <p id="roomCodeLine" class="text-sm text-gray-500 mt-2">
+                    診間編號：<span id="roomCodeText" class="font-semibold text-gray-700">—</span>
+                </p>
+                <p class="text-sm text-gray-600 leading-relaxed mt-5">
+                    請於安靜、光線充足的環境就診，<br>
+                    進入後請允許瀏覽器使用<b>鏡頭與麥克風</b>。
+                </p>
+                <button
+                    type="button"
+                    id="joinRoomBtn"
+                    class="mt-6 w-full inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold px-6 py-3 rounded-xl shadow transition duration-200"
+                >
+                    <span aria-hidden="true">🚪</span>進入診間
+                </button>
+                <p class="text-xs text-gray-400 mt-4">建議使用最新版 Chrome、Edge 或 Safari 瀏覽器</p>
+            </div>
+        </div>
+
+        <!-- 視像診症電子同意書（必須同意才可進入診間） -->
+        <div id="consentScreen" class="hidden flex-1 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 sm:p-8 flex flex-col max-h-full">
+                <div class="text-center shrink-0">
+                    <div class="text-4xl mb-2" aria-hidden="true">📋</div>
+                    <h1 class="text-xl font-bold text-gray-800">視像診症電子同意書</h1>
+                    <p class="text-xs text-gray-400 mt-1">版本 v1</p>
+                </div>
+
+                <div class="mt-4 border border-gray-200 rounded-xl bg-gray-50 p-4 overflow-y-auto text-sm text-gray-700 leading-relaxed space-y-3">
+                    <p>1. 本人明白視像診症是經互聯網以視像方式提供的醫療諮詢，<b>不能取代面對面的實體檢查</b>，醫師的臨床判斷或會因此受到限制。如屬急症、重症或病情突然轉壞，本人會立即致電 999 或前往就近急症室求診。</p>
+                    <p>2. 本人同意診所收集及使用本人於診症期間提供的身分及健康資料，作診斷、治療及醫療記錄用途；診所會按照《個人資料（私隱）條例》妥善保存，未經本人同意不會向第三方披露。</p>
+                    <p>3. 本人明白視像傳輸經加密處理，診所不會在未經本人同意下錄影、錄音或截圖；本人亦承諾不會在未經醫師同意下，自行錄影、錄音、截圖或轉播診症過程。</p>
+                    <p>4. 本人會在安靜及保障私隱的環境應診，並如實提供身分證明及病歷資料；如有需要，本人會配合診所的身分核對程序。</p>
+                    <p>5. 本人明白網絡連線、設備故障或其他技術問題，可能導致診症中斷或影像、聲音不清，屆時可重新連線或更改診症安排。</p>
+                    <p>6. 本人屬<b>自願同意</b>接受視像診症，並明白有權在任何時候終止診症；終止後如仍有醫療需要，會安排實體就診。</p>
+                </div>
+
+                <p class="text-xs text-gray-400 mt-3 shrink-0">按下「同意並進入診間」後，系統會記錄同意時間、診間編號及同意書版本，作為診所存檔憑據。</p>
+
+                <p id="consentErrorLine" class="hidden text-xs text-red-600 mt-3 shrink-0"></p>
+
+                <label class="mt-3 flex items-start gap-2 text-sm text-gray-700 shrink-0 cursor-pointer">
+                    <input id="consentAgreeCheck" type="checkbox"
+                        class="mt-0.5 w-4 h-4 accent-green-600 shrink-0">
+                    <span>我已細閱及明白上述內容，<b>同意接受視像診症</b>。</span>
+                </label>
+
+                <div class="mt-5 flex flex-col sm:flex-row gap-3 shrink-0">
+                    <button
+                        type="button"
+                        id="declineConsentBtn"
+                        class="flex-1 inline-flex items-center justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-600 text-base font-semibold px-6 py-3 rounded-xl transition duration-200"
+                    >
+                        不同意
+                    </button>
+                    <button
+                        type="button"
+                        id="acceptConsentBtn"
+                        disabled
+                        class="flex-1 inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-base font-semibold px-6 py-3 rounded-xl shadow transition duration-200"
+                    >
+                        <span aria-hidden="true">✓</span>同意並進入診間
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 錯誤提示 -->
+        <div id="errorScreen" class="hidden flex-1 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
+                <div class="text-5xl mb-4" aria-hidden="true">⚠️</div>
+                <h1 class="text-xl font-bold text-gray-800">無法進入診間</h1>
+                <p id="errorMessage" class="text-sm text-gray-600 mt-3">連結無效或已過期。</p>
+                <p class="text-xs text-gray-400 mt-4">請確認您開啟的是醫師提供的完整連結，或聯絡診所重新索取。</p>
+            </div>
+        </div>
+
+        <!-- 視訊通話中（原生 SDK 自建介面由 agora-call.js 注入 #roomStage） -->
+        <div id="callScreen" class="hidden flex-1 min-h-0 flex flex-col bg-gray-900 relative">
+            <div id="roomStage" class="flex-1 min-h-0"></div>
+        </div>
+
+        <!-- 已離開診間 -->
+        <div id="endedScreen" class="hidden flex-1 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
+                <div class="text-5xl mb-4" aria-hidden="true">✅</div>
+                <h1 class="text-xl font-bold text-gray-800">你已離開診間</h1>
+                <p class="text-sm text-gray-500 mt-3">如醫師要求重新連線，可再次進入。</p>
+                <button
+                    type="button"
+                    id="rejoinRoomBtn"
+                    class="mt-6 w-full inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-base font-semibold px-6 py-3 rounded-xl shadow transition duration-200"
+                >
+                    <span aria-hidden="true">🔄</span>重新進入診間
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase：用於雙方就緒檢測（雙方到齊才進入 Agora 頻道，避免等待期間計費） -->
+    <script type="module" src="../firebase_init.js"></script>
+    <!-- 與醫師端共用：設定 → RTC SDK → 通話介面模組 → 就緒信號 → 病人端邏輯 -->
+    <script src="agora-config.js"></script>
+    <script src="agora-rtc-sdk.js"></script>
+    <script src="agora-call.js"></script>
+    <script src="video-presence.js"></script>
+    <script src="video-consent.js"></script>
+    <script src="room.js"></script>
+    <script src="/pwa.js" defer></script>
+</body>
+</html>
