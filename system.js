@@ -13703,6 +13703,16 @@ async function saveConsultation() {
         }
     }
 
+    // --- 儲值支付預檢查：保存病歷前先驗證扣款是否可行 ---
+    // 避免扣款失敗時病歷已標記為 completed 造成狀態不一致
+    if (typeof window.preCheckConsultationWalletPayment === 'function') {
+        const walletOk = await window.preCheckConsultationWalletPayment();
+        if (!walletOk) {
+            // 預檢查不通過，中止保存
+            return;
+        }
+    }
+
     // 在進入 try 區塊之前禁用保存按鈕並顯示讀取中小圈
     // 由於 saveConsultation 函式可能透過 onclick 直接呼叫，
     // 無法保證 event 物件始終存在，故使用通用輔助函式取得按鈕。
@@ -37577,10 +37587,61 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
     if (cb) cb.checked = false;
   }
 
+  /**
+   * 儲值支付預檢查：在保存病歷前驗證扣款是否可行
+   * 避免扣款失敗時病歷已標記為 completed 造成狀態不一致
+   * @returns {Promise<boolean>} true=可繼續保存；false=應中止保存
+   */
+  async function preCheckConsultationWalletPayment() {
+    // 沒有用儲值支付或已付過款，直接放行
+    if (!consultWallet.pendingPay || consultWallet.paid) return true;
+
+    const patientId = String(consultWallet.patientId || '');
+    const clinicId = String(consultWallet.clinicId || '');
+    if (!patientId) return true;
+
+    try {
+      // force: true 確保讀取最新帳戶狀態，不用快取
+      const freshAccount = await getWalletAccount(patientId, true, clinicId);
+      const totalAmount = readConsultationTotal();
+
+      let warningMsg = '';
+
+      if (!freshAccount) {
+        warningMsg = '儲值帳戶不存在，請改用其他付款方式';
+      } else if (freshAccount.status !== 'active') {
+        const statusText = freshAccount.status === 'frozen'
+          ? '已凍結'
+          : (freshAccount.status === 'closed' ? '已關閉' : (freshAccount.status || '狀態異常'));
+        warningMsg = `儲值帳戶${statusText}，請改用其他付款方式`;
+      } else {
+        const availableTotal = walletRound2(
+          Number(freshAccount.balance || 0) + Number(freshAccount.bonusBalance || 0)
+        );
+        if (availableTotal < totalAmount) {
+          warningMsg = `儲值餘額不足（可用 HK$${availableTotal.toFixed(2)}），請改用其他付款方式`;
+        }
+      }
+
+      if (!warningMsg) return true;
+
+      // 有問題：toast 提示 + 顯示在儲值區塊，阻止保存
+      showWalletPayMessage('⚠️ ' + escapeHtml(warningMsg), true);
+      showToast(warningMsg, 'error');
+      return false;
+    } catch (preCheckErr) {
+      console.warn('儲值預檢查失敗:', preCheckErr);
+      // 預檢查本身出錯時，保守起見阻止保存
+      showToast('無法確認儲值帳戶狀態，請稍後再試或改用其他付款方式', 'error');
+      return false;
+    }
+  }
+
   window.setupConsultationWallet = setupConsultationWallet;
   window.processConsultationWalletPayment = processConsultationWalletPayment;
   window.retryConsultationWalletPayment = retryConsultationWalletPayment;
   window.cancelConsultationWalletPayment = cancelConsultationWalletPayment;
+  window.preCheckConsultationWalletPayment = preCheckConsultationWalletPayment;
 
   window.filterBillingItems = filterBillingItems;
   window.filterHerbLibrary = filterHerbLibrary;
