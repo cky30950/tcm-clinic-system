@@ -25,6 +25,7 @@ import {
   
   writeBatch,
   FieldValue,
+  increment as firestoreIncrement,
   serverTimestamp as firestoreServerTimestamp,
   onSnapshot,
   clearIndexedDbPersistence,
@@ -59,7 +60,7 @@ import { getAuth, signInWithEmailAndPassword, signOut, setPersistence,
         onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
 
 
-import firebaseConfig from './firebaseConfig.js';
+import firebaseConfig from './firebaseConfig.js?v=20261001b';
 
     const app = initializeApp(firebaseConfig);
     
@@ -175,7 +176,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         writeBatch: trackedWriteBatch,
         
         FieldValue,
-        increment: FieldValue.increment,
+        increment: firestoreIncrement,
 
         firestoreQuery: query,
         where,
@@ -272,5 +273,6 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
     });
 
     console.log('Firebase 初始化完成');
+    console.log('[Firebase init] increment 類型:', typeof firestoreIncrement, '| FieldValue 類型:', typeof FieldValue);
 
     

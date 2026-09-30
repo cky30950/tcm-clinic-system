@@ -2689,7 +2689,7 @@ async function fetchUsers(forceRefresh = false) {
             try {
                 const loginSel = document.getElementById('loginClinicSelector');
                 if (loginSel) {
-                    loginSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${getClinicDisplayName(c)}</option>`).join('');
+                    loginSel.innerHTML = clinicsList.map(c => `<option value="${window.escapeHtml(c.id)}">${window.escapeHtml(getClinicDisplayName(c))}</option>`).join('');
                     if (currentClinicId) loginSel.value = currentClinicId;
                     loginSel.addEventListener('change', function() {
                         setCurrentClinicId(this.value);
@@ -2706,7 +2706,7 @@ async function fetchUsers(forceRefresh = false) {
                         parent.replaceChild(cloned, currentSel);
                         currentSel = cloned;
                     }
-                    currentSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${getClinicDisplayName(c)}</option>`).join('');
+                    currentSel.innerHTML = clinicsList.map(c => `<option value="${window.escapeHtml(c.id)}">${window.escapeHtml(getClinicDisplayName(c))}</option>`).join('');
                     if (currentClinicId) currentSel.value = currentClinicId;
                     
                 }
@@ -2720,7 +2720,7 @@ async function fetchUsers(forceRefresh = false) {
                         parent.replaceChild(cloned, systemSel);
                         systemSel = cloned;
                     }
-                    systemSel.innerHTML = clinicsList.map(c => `<option value="${c.id}">${getClinicDisplayName(c)}</option>`).join('');
+                    systemSel.innerHTML = clinicsList.map(c => `<option value="${window.escapeHtml(c.id)}">${window.escapeHtml(getClinicDisplayName(c))}</option>`).join('');
                     if (currentClinicId) systemSel.value = currentClinicId;
                     systemSel.addEventListener('change', async function() {
                         if (this.value && String(this.value) !== String(currentClinicId || '')) {
@@ -3258,10 +3258,12 @@ async function fetchUsers(forceRefresh = false) {
                     return;
                 }
                 listEl.innerHTML = Array.from(missing.values()).map((item, i) => {
+                    // 集合名/欄位名雖來自 Firestore 錯誤訊息中的 console 網址，
+                    // 仍統一跳脫動態文字，避免任何罕見的內容注入
                     const fieldHtml = item.fields.length
                         ? item.fields.map((f) =>
                             `<span style="background:#f3f4f6;padding:2px 8px;border-radius:4px;margin:0 4px;font-family:monospace;font-size:12px;">
-                                ${f.field} <span style="color:#6b7280;font-size:11px;">${f.order}</span>
+                                ${window.escapeHtml(f.field)} <span style="color:#6b7280;font-size:11px;">${window.escapeHtml(f.order)}</span>
                             </span>`
                         ).join('')
                         : '<span style="color:#9ca3af;font-size:12px;">（網址自動帶入參數）</span>';
@@ -3271,10 +3273,10 @@ async function fetchUsers(forceRefresh = false) {
                                 <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px;margin-right:8px;">
                                     ${i + 1}
                                 </span>
-                                ${item.hint}
+                                ${window.escapeHtml(item.hint)}
                             </div>
                             <div style="font-size:12px;color:#6b7280;margin-bottom:6px;">
-                                集合：<b>${item.collection || '（未知）'}</b>　|　欄位：${fieldHtml}
+                                集合：<b>${window.escapeHtml(item.collection || '（未知）')}</b>　|　欄位：${fieldHtml}
                             </div>
                             <div style="display:flex;gap:8px;">
                                 <a href="${item.url}" target="_blank" rel="noopener"
@@ -5728,7 +5730,7 @@ async function recordInventoryHistory(type, entries, extra = {}) {
                     if (type === 'in' && rec.mode) { extra.push((typeof window.t === 'function' ? window.t('類型：') : '類型：') + rec.mode); }
                     if (type === 'out' && rec.consultationId) {
                         const mrn = await getMedicalRecordNumberByConsultationId(rec.consultationId);
-                        extra.push((typeof window.t === 'function' ? window.t('病歷編號：') : '病歷編號：') + mrn);
+                        extra.push((typeof window.t === 'function' ? window.t('病歷編號：') : '病歷編號：') + window.escapeHtml(mrn));
                         const modes = new Set(items.map(e => e && e.mode).filter(m => m === 'slice' || m === 'granule'));
                         if (modes.size === 1) {
                             const m = Array.from(modes)[0];
@@ -5810,7 +5812,7 @@ async function recordInventoryHistory(type, entries, extra = {}) {
                             }
                             }
                         } catch (_eLoc) {}
-                        div.innerHTML = '<div class="text-sm text-gray-600">' + ((typeof window.t === 'function') ? window.t('舊出庫記錄') : '舊出庫記錄') + '（' + ((typeof window.t === 'function') ? window.t('病歷編號：') : '病歷編號：') + mrn + locText + extraTag + '）</div>' +
+                        div.innerHTML = '<div class="text-sm text-gray-600">' + ((typeof window.t === 'function') ? window.t('舊出庫記錄') : '舊出庫記錄') + '（' + ((typeof window.t === 'function') ? window.t('病歷編號：') : '病歷編號：') + window.escapeHtml(mrn) + locText + extraTag + '）</div>' +
                             '<div class="mt-1 text-gray-800">' + (lines.length ? lines.join('；') : ((typeof window.t === 'function') ? window.t('無項目') : '無項目')) + '</div>';
                         container.appendChild(div);
                     }
@@ -11296,8 +11298,9 @@ async function loadConsultationForEdit(consultationId) {
               const acnEl = document.getElementById('formAcupunctureNotes');
               if (acnEl) {
                 // 使用 innerText 載入針灸備註內容，以支援 contenteditable
-                // 載入針灸備註時直接使用 innerHTML，以保留方塊標記
-                acnEl.innerHTML = consultation.acupunctureNotes || '';
+                // 載入針灸備註時直接使用 innerHTML，以保留方塊標記；
+                // 必須經過白名單淨化，歷史病歷可能含惡意內容（Stored XSS 防護）
+                acnEl.innerHTML = window.sanitizeAcupunctureNotesHtml(consultation.acupunctureNotes || '');
                 // 載入完畢後初始化既有穴位方塊的事件處理
                 if (typeof initializeAcupointNotesSpans === 'function') {
                   initializeAcupointNotesSpans();
@@ -12578,7 +12581,8 @@ function collectConsultationDraftPayload() {
     return {
         version: 2,
         fields,
-        acupunctureNotesHtml: acupunctureNotesEl ? String(acupunctureNotesEl.innerHTML || '') : '',
+        // 存入 localStorage 前一併白名單淨化，避免草稿成為 XSS 載體
+        acupunctureNotesHtml: acupunctureNotesEl ? window.sanitizeAcupunctureNotesHtml(acupunctureNotesEl.innerHTML) : '',
         prescription: prescriptionTextEl && 'value' in prescriptionTextEl ? String(prescriptionTextEl.value || '') : '',
         multiPrescriptions: normalizeConsultationDraftPrescriptionSections(),
         billingItems: billingTextEl && 'value' in billingTextEl ? String(billingTextEl.value || '') : '',
@@ -12697,7 +12701,7 @@ function restoreConsultationSymptomsDraft(appointment, patient) {
 
         if (!isBillingOnlyEdit && Object.prototype.hasOwnProperty.call(draft, 'acupunctureNotesHtml')) {
             const acnEl = document.getElementById('formAcupunctureNotes');
-            const nextHtml = String(draft.acupunctureNotesHtml || '');
+            const nextHtml = window.sanitizeAcupunctureNotesHtml(draft.acupunctureNotesHtml || '');
             if (acnEl && String(acnEl.innerHTML || '') !== nextHtml) {
                 acnEl.innerHTML = nextHtml;
                 restored = true;
@@ -13730,8 +13734,9 @@ async function saveConsultation() {
             syndrome: document.getElementById('formSyndrome').value.trim(),
             acupunctureNotes: (() => {
                 const acnEl = document.getElementById('formAcupunctureNotes');
-                // 儲存針灸備註使用 innerHTML 以保留方塊格式
-                return acnEl ? acnEl.innerHTML.trim() : '';
+                // 儲存針灸備註使用 innerHTML 以保留方塊格式；
+                // 寫入 Firestore 前必須通過白名單淨化（Stored XSS 防護）
+                return acnEl ? window.sanitizeAcupunctureNotesHtml(acnEl.innerHTML).trim() : '';
             })(),
             // 穴位結構化名單（由針灸備註的穴位方塊彙整），
             // 供統計解析使用，避免依賴刮 HTML 屬性
@@ -14848,7 +14853,7 @@ if (!patient) {
                                 ${consultation.acupunctureNotes ? `
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">針灸備註</span>
-                                    <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.stripHtmlTags(consultation.acupunctureNotes)}</div>
+                                    <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.escapeHtml(window.stripHtmlTags(consultation.acupunctureNotes))}</div>
                                 </div>
                                 ` : ''}
                             </div>
@@ -15315,7 +15320,7 @@ async function displayConsultationMedicalHistoryPage() {
                                 ${consultation.acupunctureNotes ? `
                                 <div>
                                     <span class="text-sm font-semibold text-gray-700 block mb-2">針灸備註</span>
-                                    <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.stripHtmlTags(consultation.acupunctureNotes)}</div>
+                                    <div class="bg-orange-50 p-3 rounded-lg text-sm text-gray-900 border-l-4 border-orange-400 medical-field">${window.escapeHtml(window.stripHtmlTags(consultation.acupunctureNotes))}</div>
                                 </div>
                                 ` : ''}
                             </div>
@@ -15656,7 +15661,9 @@ async function buildConsultationBillingDisplayHtml(consultation, patientId) {
         }
         return html;
     } catch (_e) {
-        return consultation && consultation.billingItems ? String(consultation.billingItems) : '';
+        // 例外時仍須跳脫，輸出會以 innerHTML 插入檢視視窗，不可回傳原始內容
+        const raw = consultation && consultation.billingItems ? String(consultation.billingItems) : '';
+        return window.escapeHtml ? window.escapeHtml(raw) : raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 }
 
@@ -15887,7 +15894,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                         const remainingLabel = isEnglish ? ` (Remaining: ${lineRemaining})` : `（餘下 ${lineRemaining} 次）`;
                         displayLine = line + ' ' + remainingLabel;
                     }
-                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${displayLine}</td></tr>`;
+                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${window.escapeHtml(displayLine)}</td></tr>`;
                 } else if (line.includes('總費用')) {
                     const match = line.match(/\$(\d+)/);
                     if (match) {
@@ -15895,7 +15902,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     }
                 } else if (line.startsWith('折扣適用於')) {
                     // 顯示折扣適用項目明細於收據中
-                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${line}</td></tr>`;
+                    billingItemsHtml += `<tr><td style="padding: 5px; border-bottom: 1px dotted #ccc;">${window.escapeHtml(line)}</td></tr>`;
                 }
             });
         }
@@ -15941,7 +15948,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             medInfoHtml += '<strong>每日次數：</strong>' + medFreq + '次　';
         }
         if (consultation.usage) {
-            medInfoHtml += '<strong>服用方法：</strong>' + consultation.usage;
+            medInfoHtml += '<strong>服用方法：</strong>' + window.escapeHtml(String(consultation.usage));
         }
         
         // 將處方內容、醫囑、複診日期、服藥天數、每日次數與服用方法移至方藥醫囑功能
@@ -15966,7 +15973,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             medInfoLocalized += '<strong>' + (isEnglish ? 'Daily Frequency' : '每日次數') + colon + '</strong>' + medFreq + (isEnglish ? ' times ' : '次　');
         }
         if (consultation.usage) {
-            medInfoLocalized += '<strong>' + (isEnglish ? 'Administration Method' : '服用方法') + colon + '</strong>' + consultation.usage;
+            medInfoLocalized += '<strong>' + (isEnglish ? 'Administration Method' : '服用方法') + colon + '</strong>' + window.escapeHtml(String(consultation.usage));
         }
         // 若本次診症沒有開藥（無純文字處方內容，也無多處方項目），收據不顯示服用方法等服藥資訊
         const hasPrescribedMedication = !!String(originalPrescription || '').trim() || consultationHasPrescription(consultation);
@@ -16010,7 +16017,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
             <html lang="${htmlLang}">
             <head>
                 <meta charset="UTF-8">
-                <title>${TR.title} - ${patient.name}</title>
+                <title>${TR.title} - ${window.escapeHtml(patient.name)}</title>
                 <style>
                     body { 
                         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif; 
@@ -16166,9 +16173,9 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                 <div class="receipt-container">
                     <!-- Clinic Header -->
                     <div class="clinic-header">
-                        <div class="clinic-name">${clinicPrint.chineseName || '名醫診所系統'}</div>
-                        <div class="clinic-subtitle">${clinicPrint.englishName || 'Dr.Great Clinic'}</div>
-                        <div class="clinic-subtitle">${isEnglish ? 'Tel:' : '電話：'}${clinicPrint.phone || '(852) 2345-6789'}　${isEnglish ? 'Address:' : '地址：'}${clinicPrint.address || '香港中環皇后大道中123號'}</div>
+                        <div class="clinic-name">${window.escapeHtml(clinicPrint.chineseName || '名醫診所系統')}</div>
+                        <div class="clinic-subtitle">${window.escapeHtml(clinicPrint.englishName || 'Dr.Great Clinic')}</div>
+                        <div class="clinic-subtitle">${isEnglish ? 'Tel:' : '電話：'}${window.escapeHtml(clinicPrint.phone || '(852) 2345-6789')}　${isEnglish ? 'Address:' : '地址：'}${window.escapeHtml(clinicPrint.address || '香港中環皇后大道中123號')}</div>
                     </div>
                     
                     <!-- Receipt Title -->
@@ -16184,18 +16191,18 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                         ` : ''}
                         <div class="info-row">
                             <span class="info-label">${TR.patientName}${colon}</span>
-                            <span>${patient.name}</span>
+                            <span>${window.escapeHtml(patient.name)}</span>
                         </div>
                         ${receiptVisibility.medicalRecordNo ? `
                         <div class="info-row">
                             <span class="info-label">${TR.medicalRecordNo}${colon}</span>
-                            <span>${consultation.medicalRecordNumber || consultation.id}</span>
+                            <span>${window.escapeHtml(String(consultation.medicalRecordNumber || consultation.id))}</span>
                         </div>
                         ` : ''}
                         ${receiptVisibility.patientNumber ? `
                         <div class="info-row">
                             <span class="info-label">${TR.patientNumber}${colon}</span>
-                            <span>${patient.patientNumber || '-'}</span>
+                            <span>${window.escapeHtml(patient.patientNumber || '-')}</span>
                         </div>
                         ` : ''}
                         ${receiptVisibility.consultationDate ? `
@@ -16220,7 +16227,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                         ${hideDoctorInfo ? '' : `
                         <div class="info-row">
                             <span class="info-label">${TR.doctorName}${colon}</span>
-                            <span>${getDoctorDisplayName(consultation.doctor)}</span>
+                            <span>${window.escapeHtml(getDoctorDisplayName(consultation.doctor))}</span>
                         </div>
                         `}
                         ${hideDoctorInfo ? '' : (() => {
@@ -16228,7 +16235,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                             return regNumber ? `
                                 <div class="info-row">
                                     <span class="info-label">${TR.registrationNo}${colon}</span>
-                                    <span>${regNumber}</span>
+                                    <span>${window.escapeHtml(regNumber)}</span>
                                 </div>
                             ` : '';
                         })()}
@@ -16239,12 +16246,12 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     <div class="diagnosis-section">
                         <div>
                             <span class="diagnosis-title">${TR.diagnosis}${colon}</span>
-                            <span>${consultation.diagnosis}</span>
+                            <span>${window.escapeHtml(consultation.diagnosis)}</span>
                         </div>
                         ${consultation.syndrome ? `
                         <div>
                             <span class="diagnosis-title">${TR.syndrome}${colon}</span>
-                            <span>${consultation.syndrome}</span>
+                            <span>${window.escapeHtml(consultation.syndrome)}</span>
                         </div>
                         ` : ''}
                     </div>
@@ -16353,14 +16360,14 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                                 processedComposition = String(compositionText).replace(/\n/g, '、');
                                             }
                                         }
-                                        // 將括號及其內容縮小至三分之一大小
-                                        const compWrap = processedComposition ? `<span style="font-size: 0.33em;">（${processedComposition}）</span>` : '';
-                                        allItems.push(`${itemName} ${dosage}g${compWrap}`);
+                                        // 將括號及其內容縮小至三分之一大小（藥名與組成皆為文字，須跳脫）
+                                        const compWrap = processedComposition ? `<span style="font-size: 0.33em;">（${window.escapeHtml(processedComposition)}）</span>` : '';
+                                        allItems.push(`${window.escapeHtml(itemName)} ${dosage}g${compWrap}`);
                                     } else {
-                                        allItems.push(`${itemName}${dosage}g`);
+                                        allItems.push(`${window.escapeHtml(itemName)}${dosage}g`);
                                     }
                                 } else {
-                                    allItems.push(`<div style="margin: 2px 0; font-size: 9px; color: #666;">${line}</div>`);
+                                    allItems.push(`<div style="margin: 2px 0; font-size: 9px; color: #666;">${window.escapeHtml(line)}</div>`);
                                 }
                                 i++;
                             }
@@ -16391,7 +16398,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                                 const joined = formulasArr.concat(herbsArr).join('、');
                                 result += `<div style="margin: 2px 0;">${joined}</div>`;
                             }
-                            return result || consultation.prescription.replace(/\n/g, '<br>');
+                            return result || window.escapeHtml(consultation.prescription).replace(/\n/g, '<br>');
                         })()}</div>
                         ${medInfoLocalized ? `
                         <div style="margin-top: 8px; font-size: ${layout.sectionTitleFont};">${medInfoLocalized}</div>
@@ -16403,7 +16410,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     ${consultation.instructions ? `
                     <div style="margin: 6px 0; font-size: ${layout.sectionContentFont}; background: #fff3cd; padding: ${layout.highlightPadding}; border: 1px solid #ffeaa7;">
                         <strong>${TR.instructions}${colon}</strong><br>
-                        ${consultation.instructions}
+                        ${window.escapeHtml(consultation.instructions)}
                     </div>
                     ` : ''}
                     
@@ -16417,7 +16424,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                     
                     <!-- Thank You -->
                     <div class="thank-you">
-                        ${customThankYouText || TR.thankYou}
+                        ${customThankYouText ? window.escapeHtml(customThankYouText) : TR.thankYou}
                     </div>
                     
                     <!-- Footer -->
@@ -16428,7 +16435,7 @@ async function printConsultationRecord(consultationId, consultationData = null) 
                         </div>
                         <div class="footer-row">
                             <span>${TR.clinicHours}${colon}</span>
-                            <span>${clinicPrint.businessHours || '週一至週五 09:00-18:00'}</span>
+                            <span>${window.escapeHtml(clinicPrint.businessHours || '週一至週五 09:00-18:00')}</span>
                         </div>
                         <div class="footer-row">
                             <span>${TR.keepReceipt}</span>
@@ -16557,7 +16564,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
             <html lang="${htmlLang}">
             <head>
                 <meta charset="UTF-8">
-                <title>${TC.certificateTitle} - ${patient.name}</title>
+                <title>${TC.certificateTitle} - ${window.escapeHtml(patient.name)}</title>
                 <style>
                     body { 
                         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif; 
@@ -16727,9 +16734,9 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                     <div class="content">
                         <!-- Clinic Header -->
                         <div class="clinic-header">
-                            <div class="clinic-name">${clinicPrint.chineseName || '名醫診所系統'}</div>
-                            <div class="clinic-subtitle">${clinicPrint.englishName || 'Dr.Great Clinic'}</div>
-                            <div class="clinic-subtitle">${isEnglish ? 'Tel:' : '電話：'}${clinicPrint.phone || '(852) 2345-6789'}　${isEnglish ? 'Address:' : '地址：'}${clinicPrint.address || '香港中環皇后大道中123號'}</div>
+                            <div class="clinic-name">${window.escapeHtml(clinicPrint.chineseName || '名醫診所系統')}</div>
+                            <div class="clinic-subtitle">${window.escapeHtml(clinicPrint.englishName || 'Dr.Great Clinic')}</div>
+                            <div class="clinic-subtitle">${isEnglish ? 'Tel:' : '電話：'}${window.escapeHtml(clinicPrint.phone || '(852) 2345-6789')}　${isEnglish ? 'Address:' : '地址：'}${window.escapeHtml(clinicPrint.address || '香港中環皇后大道中123號')}</div>
                         </div>
                         
                         <!-- Certificate Number -->
@@ -16744,23 +16751,23 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                         <div class="patient-info">
                             <div class="info-row">
                                 <span class="info-label">${TC.name}${colon}</span>
-                                <span class="info-value">${patient.name}</span>
+                                <span class="info-value">${window.escapeHtml(patient.name)}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">${TC.medicalRecordNo}${colon}</span>
-                                <span class="info-value">${consultation.medicalRecordNumber || consultation.id}</span>
+                                <span class="info-value">${window.escapeHtml(String(consultation.medicalRecordNumber || consultation.id))}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">${TC.gender}${colon}</span>
-                                <span class="info-value">${genderDisplay}</span>
+                                <span class="info-value">${window.escapeHtml(genderDisplay || '')}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">${TC.age}${colon}</span>
-                                <span class="info-value">${ageDisplay}</span>
+                                <span class="info-value">${window.escapeHtml(ageDisplay || '')}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">${TC.idCard}${colon}</span>
-                                <span class="info-value">${idDisplay}</span>
+                                <span class="info-value">${window.escapeHtml(idDisplay)}</span>
                             </div>
                         </div>
                         
@@ -16777,7 +16784,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                         ${consultation.diagnosis ? `
                         <div class="content-section">
                             <div style="margin-bottom: 15px;">
-                                <strong>${TC.diagnosisResult}${colon}</strong>${consultation.diagnosis}
+                                <strong>${TC.diagnosisResult}${colon}</strong>${window.escapeHtml(consultation.diagnosis)}
                             </div>
                         </div>
                         ` : ''}
@@ -16797,13 +16804,13 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                                 <div class="signature-line"></div>
                                 <div class="signature-label">${TC.doctorSignature}</div>
                                 <div style="margin-top: 10px; font-weight: bold;">
-                                    ${getDoctorDisplayName(consultation.doctor)}
+                                    ${window.escapeHtml(getDoctorDisplayName(consultation.doctor))}
                                 </div>
                                 ${(() => {
                                     const regNumber = getDoctorRegistrationNumber(consultation.doctor);
                                     return regNumber ? `
                                         <div style="margin-top: 5px; font-size: ${layout.sectionFont}; color: #666;">
-                                            ${TC.registrationNo}${colon}${regNumber}
+                                            ${TC.registrationNo}${colon}${window.escapeHtml(regNumber)}
                                         </div>
                                     ` : '';
                                 })()}
@@ -16829,7 +16836,7 @@ async function printAttendanceCertificate(consultationId, consultationData = nul
                         <!-- Footer Note -->
                         <div class="footer-note">
                             <div>${TC.footerNote1}</div>
-                            <div>${TC.footerTel}${colon}${clinicPrint.phone || '(852) 2345-6789'} | ${TC.footerHours}${colon}${clinicPrint.businessHours || '週一至週五 09:00-18:00'}</div>
+                            <div>${TC.footerTel}${colon}${window.escapeHtml(clinicPrint.phone || '(852) 2345-6789')} | ${TC.footerHours}${colon}${window.escapeHtml(clinicPrint.businessHours || '週一至週五 09:00-18:00')}</div>
                             <div style="margin-top: 10px; font-size: 10px;">
                                 ${TC.certificateIssuedAt}${colon}${new Date().toLocaleString(dateLocale)}
                             </div>
@@ -16955,7 +16962,7 @@ async function printSickLeave(consultationId, consultationData = null) {
         };
         const restPeriodStr = computeRestPeriod();
         // 医师建议内容
-        const instructionsHtml = consultation.instructions ? consultation.instructions.replace(/\n/g, '<br>') : '';
+        const instructionsHtml = consultation.instructions ? window.escapeHtml(String(consultation.instructions)).replace(/\n/g, '<br>') : '';
         // 翻譯字典
         const SL = {
             title: isEnglish ? 'Sick Leave Certificate' : '病假證明書',
@@ -16990,7 +16997,7 @@ async function printSickLeave(consultationId, consultationData = null) {
             <html lang="${htmlLang}">
             <head>
                 <meta charset="UTF-8">
-                <title>${SL.title} - ${patient.name}</title>
+                <title>${SL.title} - ${window.escapeHtml(patient.name)}</title>
                 <style>
                     body {
                         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
@@ -17156,22 +17163,22 @@ async function printSickLeave(consultationId, consultationData = null) {
                     <div class="watermark">${SL.watermark}</div>
                     <div class="content">
                         <div class="clinic-header">
-                            <div class="clinic-name">${clinicPrint.chineseName || '名醫診所系統'}</div>
-                            <div class="clinic-subtitle">${clinicPrint.englishName || 'Dr.Great Clinic'}</div>
-                            <div class="clinic-subtitle">${isEnglish ? 'Tel' : '電話'}${colon}${clinicPrint.phone || '(852) 2345-6789'}　${isEnglish ? 'Address' : '地址'}${colon}${clinicPrint.address || '香港中環皇后大道中123號'}</div>
+                            <div class="clinic-name">${window.escapeHtml(clinicPrint.chineseName || '名醫診所系統')}</div>
+                            <div class="clinic-subtitle">${window.escapeHtml(clinicPrint.englishName || 'Dr.Great Clinic')}</div>
+                            <div class="clinic-subtitle">${isEnglish ? 'Tel' : '電話'}${colon}${window.escapeHtml(clinicPrint.phone || '(852) 2345-6789')}　${isEnglish ? 'Address' : '地址'}${colon}${window.escapeHtml(clinicPrint.address || '香港中環皇后大道中123號')}</div>
                         </div>
                         <div class="certificate-number">${SL.certificateNumber}${colon}SL${consultation.id.toString().padStart(6, '0')}</div>
                         <div class="certificate-title">${SL.title}</div>
                         <div class="patient-info">
-                            <div class="info-row"><span class="info-label">${SL.name}${colon}</span><span class="info-value">${patient.name}</span></div>
-                            <div class="info-row"><span class="info-label">${SL.medicalRecordNo}${colon}</span><span class="info-value">${consultation.medicalRecordNumber || consultation.id}</span></div>
-                            <div class="info-row"><span class="info-label">${SL.genderLabel}${colon}</span><span class="info-value">${genderDisplay}</span></div>
-                            <div class="info-row"><span class="info-label">${SL.ageLabel}${colon}</span><span class="info-value">${ageDisplay}</span></div>
-                            <div class="info-row"><span class="info-label">${SL.idNumber}${colon}</span><span class="info-value">${idNumberDisplay}</span></div>
+                            <div class="info-row"><span class="info-label">${SL.name}${colon}</span><span class="info-value">${window.escapeHtml(patient.name)}</span></div>
+                            <div class="info-row"><span class="info-label">${SL.medicalRecordNo}${colon}</span><span class="info-value">${window.escapeHtml(String(consultation.medicalRecordNumber || consultation.id))}</span></div>
+                            <div class="info-row"><span class="info-label">${SL.genderLabel}${colon}</span><span class="info-value">${window.escapeHtml(genderDisplay || '')}</span></div>
+                            <div class="info-row"><span class="info-label">${SL.ageLabel}${colon}</span><span class="info-value">${window.escapeHtml(ageDisplay || '')}</span></div>
+                            <div class="info-row"><span class="info-label">${SL.idNumber}${colon}</span><span class="info-value">${window.escapeHtml(idNumberDisplay)}</span></div>
                         </div>
                         <div class="diagnosis-section">
                             <div style="margin-bottom: 15px;"><strong>${SL.consultationDate}${colon}</strong>${visitDateStr}</div>
-                            <div style="margin-bottom: 15px;"><strong>${SL.diagnosisResult}${colon}</strong>${diagnosisResult}</div>
+                            <div style="margin-bottom: 15px;"><strong>${SL.diagnosisResult}${colon}</strong>${window.escapeHtml(diagnosisResult)}</div>
                         </div>
                         <div class="rest-period">${SL.restPeriod}${colon}${restPeriodStr}</div>
                         ${instructionsHtml ? `<div class="content-section"><strong>${SL.doctorAdvice}${colon}</strong><br>${instructionsHtml}</div>` : ''}
@@ -17181,10 +17188,10 @@ async function printSickLeave(consultationId, consultationData = null) {
                             <div class="signature-section">
                                 <div class="signature-line"></div>
                                 <div class="signature-label">${SL.signature}</div>
-                                <div style="margin-top: 10px; font-weight: bold;">${getDoctorDisplayName(consultation.doctor)}</div>
+                                <div style="margin-top: 10px; font-weight: bold;">${window.escapeHtml(getDoctorDisplayName(consultation.doctor))}</div>
                                 ${(() => {
                                     const regNumber = getDoctorRegistrationNumber(consultation.doctor);
-                                    return regNumber ? `<div style="margin-top: 5px; font-size: ${layout.sectionFont}; color: #666;">${SL.registrationNo}${colon}${regNumber}</div>` : '';
+                                    return regNumber ? `<div style="margin-top: 5px; font-size: ${layout.sectionFont}; color: #666;">${SL.registrationNo}${colon}${window.escapeHtml(regNumber)}</div>` : '';
                                 })()}
                             </div>
                             <div class="date-section">
@@ -17195,7 +17202,7 @@ async function printSickLeave(consultationId, consultationData = null) {
                         `}
                         <div class="footer-note">
                             <div>${SL.footerNote}</div>
-                            <div>${SL.footerTel}${colon}${clinicPrint.phone || '(852) 2345-6789'} | ${SL.footerHours}${colon}${clinicPrint.businessHours || '週一至週五 09:00-18:00'}</div>
+                            <div>${SL.footerTel}${colon}${window.escapeHtml(clinicPrint.phone || '(852) 2345-6789')} | ${SL.footerHours}${colon}${window.escapeHtml(clinicPrint.businessHours || '週一至週五 09:00-18:00')}</div>
                             <div style="margin-top: 10px; font-size: ${layout.sectionFont};">${SL.issuedAt}${colon}${new Date().toLocaleString(dateLocale)}</div>
                         </div>
                     </div>
@@ -17489,15 +17496,15 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                                     // ignore
                                 }
                             }
-                            // 方劑在主列表僅顯示名稱與劑量，不顯示組成
-                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
+                            // 方劑在主列表僅顯示名稱與劑量，不顯示組成（藥名為文字，須跳脫）
+                            itemsList.push(`<div style="margin-bottom: 4px;">${window.escapeHtml(itemName)} ${dosage}g</div>`);
                         } else {
                             // 普通藥材區塊
-                            itemsList.push(`<div style="margin-bottom: 4px;">${itemName} ${dosage}g</div>`);
+                            itemsList.push(`<div style="margin-bottom: 4px;">${window.escapeHtml(itemName)} ${dosage}g</div>`);
                         }
                     } else {
                         // 其他說明行直接以較小字體顯示
-                        itemsList.push(`<div style="margin-bottom: 4px; font-size: 9px; color: #666;">${raw}</div>`);
+                        itemsList.push(`<div style="margin-bottom: 4px; font-size: 9px; color: #666;">${window.escapeHtml(raw)}</div>`);
                     }
                     i++;
                 }
@@ -17527,12 +17534,12 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     }
                     prescriptionHtml = html + compositionHtml;
                 } else {
-                    // 若未能解析任何項目，直接以換行顯示原始內容
-                    prescriptionHtml = consultation.prescription.replace(/\n/g, '<br>');
+                    // 若未能解析任何項目，直接以換行顯示原始內容（先跳脫再保留換行）
+                    prescriptionHtml = window.escapeHtml(consultation.prescription).replace(/\n/g, '<br>');
                 }
             } catch (_e) {
                 // 解析出錯時，退回顯示原始處方內容
-                prescriptionHtml = consultation.prescription.replace(/\n/g, '<br>');
+                prescriptionHtml = window.escapeHtml(consultation.prescription).replace(/\n/g, '<br>');
             }
         } else {
             // 無處方內容
@@ -17564,7 +17571,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                         const partDays = d > 0 ? `${labelDays}${colon}${d}${isEnglish ? ' days' : '天'}` : '';
                         const partFreq = f > 0 ? `${labelFreq}${colon}${f}${isEnglish ? '' : '次'}` : '';
                         const combined = [partDays, partFreq].filter(Boolean).join('      ');
-                        return combined ? `${showNames ? (secName + colon) : ''}${combined}` : '';
+                        return combined ? `${showNames ? (window.escapeHtml(secName) + colon) : ''}${combined}` : '';
                     }).filter(x => x);
                 }
             } catch (_e) {}
@@ -17594,7 +17601,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                 medInfoHtml += rows.join('');
             }
             if (consultation.usage) {
-                medInfoHtml += `<div><strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${consultation.usage}</div>`;
+                medInfoHtml += `<div><strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${window.escapeHtml(String(consultation.usage))}</div>`;
             }
         } else {
             if (medDays) {
@@ -17604,14 +17611,14 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                 medInfoHtml += `<strong>${isEnglish ? 'Times per day' : '每日次數'}${colon}</strong>${medFreq}${isEnglish ? '' : '次'}&nbsp;`;
             }
             if (consultation.usage) {
-                medInfoHtml += `<strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${consultation.usage}`;
+                medInfoHtml += `<strong>${isEnglish ? 'Usage' : '服用方法'}${colon}</strong>${window.escapeHtml(String(consultation.usage))}`;
             }
             if (!consultation.prescription || (typeof consultation.prescription === 'string' && consultation.prescription.trim() === '')) {
                 medInfoHtml = '';
             }
         }
-        // 醫囑及注意事項
-        const instructionsHtml = consultation.instructions ? consultation.instructions.replace(/\n/g, '<br>') : '';
+        // 醫囑及注意事項（先跳脫再保留換行）
+        const instructionsHtml = consultation.instructions ? window.escapeHtml(String(consultation.instructions)).replace(/\n/g, '<br>') : '';
         // 建議複診時間，根據語言格式化
         let followUpHtml = '';
         if (consultation.followUpDate) {
@@ -17660,7 +17667,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             <html lang="${htmlLang}">
             <head>
                 <meta charset="UTF-8">
-                <title>${PI.title} - ${patient.name}</title>
+                <title>${PI.title} - ${window.escapeHtml(patient.name)}</title>
                 <style>
                     body {
                         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
@@ -17769,23 +17776,23 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
             <body>
                 <div class="advice-container">
                     <div class="clinic-header">
-                        <div class="clinic-name">${clinicPrint.chineseName || '名醫診所系統'}</div>
-                        <div class="clinic-subtitle">${clinicPrint.englishName || 'Dr.Great Clinic'}</div>
-                        <div class="clinic-subtitle">${isEnglish ? 'Tel' : '電話'}${colon}${clinicPrint.phone || '(852) 2345-6789'}　${isEnglish ? 'Address' : '地址'}${colon}${clinicPrint.address || '香港中環皇后大道中123號'}</div>
+                        <div class="clinic-name">${window.escapeHtml(clinicPrint.chineseName || '名醫診所系統')}</div>
+                        <div class="clinic-subtitle">${window.escapeHtml(clinicPrint.englishName || 'Dr.Great Clinic')}</div>
+                        <div class="clinic-subtitle">${isEnglish ? 'Tel' : '電話'}${colon}${window.escapeHtml(clinicPrint.phone || '(852) 2345-6789')}　${isEnglish ? 'Address' : '地址'}${colon}${window.escapeHtml(clinicPrint.address || '香港中環皇后大道中123號')}</div>
                     </div>
                     <div class="advice-title">${PI.title}</div>
                     <div class="patient-info">
-                        <div class="info-row"><span class="info-label">${PI.patientName}${colon}</span><span>${patient.name}</span></div>
-                        ${prescriptionVisibility.medicalRecordNo ? `<div class="info-row"><span class="info-label">${PI.medicalRecordNo}${colon}</span><span>${consultation.medicalRecordNumber || consultation.id}</span></div>` : ''}
-                        ${prescriptionVisibility.patientNumber ? `<div class="info-row"><span class="info-label">${PI.patientNo}${colon}</span><span>${patient.patientNumber || '-'}</span></div>` : ''}
+                        <div class="info-row"><span class="info-label">${PI.patientName}${colon}</span><span>${window.escapeHtml(patient.name)}</span></div>
+                        ${prescriptionVisibility.medicalRecordNo ? `<div class="info-row"><span class="info-label">${PI.medicalRecordNo}${colon}</span><span>${window.escapeHtml(String(consultation.medicalRecordNumber || consultation.id))}</span></div>` : ''}
+                        ${prescriptionVisibility.patientNumber ? `<div class="info-row"><span class="info-label">${PI.patientNo}${colon}</span><span>${window.escapeHtml(patient.patientNumber || '-')}</span></div>` : ''}
                         ${prescriptionVisibility.consultationDate ? `<div class="info-row"><span class="info-label">${PI.consultationDate}${colon}</span><span>${consultationDate.toLocaleDateString(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit' })}</span></div>` : ''}
                         ${prescriptionVisibility.consultationTime ? `<div class="info-row"><span class="info-label">${PI.consultationTime}${colon}</span><span>${consultationDate.toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}</span></div>` : ''}
-                        ${hideDoctorInfo ? '' : `<div class="info-row"><span class="info-label">${PI.doctor}${colon}</span><span>${getDoctorDisplayName(consultation.doctor)}</span></div>`}
+                        ${hideDoctorInfo ? '' : `<div class="info-row"><span class="info-label">${PI.doctor}${colon}</span><span>${window.escapeHtml(getDoctorDisplayName(consultation.doctor))}</span></div>`}
                         ${hideDoctorInfo ? '' : (() => {
                             const regNumber = getDoctorRegistrationNumber(consultation.doctor);
-                            return regNumber ? `<div class="info-row"><span class="info-label">${PI.registrationNo}${colon}</span><span>${regNumber}</span></div>` : '';
+                            return regNumber ? `<div class="info-row"><span class="info-label">${PI.registrationNo}${colon}</span><span>${window.escapeHtml(regNumber)}</span></div>` : '';
                         })()}
-                        ${consultation.diagnosis ? `<div class="info-row"><span class="info-label">${PI.diagnosis}${colon}</span><span>${consultation.diagnosis}</span></div>` : ''}
+                        ${consultation.diagnosis ? `<div class="info-row"><span class="info-label">${PI.diagnosis}${colon}</span><span>${window.escapeHtml(consultation.diagnosis)}</span></div>` : ''}
                     </div>
                     ${hasPrescription ? `<div class="section-title">${PI.prescriptionContent}</div>
                     <div class="section-content">${prescriptionHtml}</div>` : ''}
@@ -17794,7 +17801,7 @@ async function printPrescriptionInstructions(consultationId, consultationData = 
                     ${followUpHtml ? `<div class="section-title">${PI.followUp}</div><div class="section-content">${followUpHtml}</div>` : ''}
                     <div class="footer-info">
                         <div class="footer-row"><span>${PI.printTime}${colon}</span><span>${new Date().toLocaleString(dateLocale)}</span></div>
-                        <div class="footer-row"><span>${PI.businessHours}${colon}</span><span>${clinicPrint.businessHours || '週一至週五 09:00-18:00'}</span></div>
+                        <div class="footer-row"><span>${PI.businessHours}${colon}</span><span>${window.escapeHtml(clinicPrint.businessHours || '週一至週五 09:00-18:00')}</span></div>
                         <div class="footer-row"><span>${PI.saveAdvice}</span><span>${PI.contact}</span></div>
                     </div>
                 </div>
@@ -21519,7 +21526,7 @@ async function initializeSystemAfterLogin() {
                                             }
                                         })()}
                                         <input type="number"
-                                               value="${item.customDosage || (item.type === 'herb' ? '1' : '5')}"
+                                               value="${window.escapeHtml(String(item.customDosage || (item.type === 'herb' ? '1' : '5')))}"
                                                min="0.5"
                                                max="100"
                                                step="0.5"
@@ -22001,18 +22008,24 @@ async function searchBillingForConsultation() {
         const categoryName = categoryNames[item.category] || '未分類';
         const bgColor = getCategoryBgColor(item.category);
 
+        // 收費項目名稱/單位/描述皆為具管理權帳號可輸入的資料，統一跳脫防 XSS
+        const safeBillingName = window.escapeHtml(item.name);
+        const safeBillingUnit = item.unit ? window.escapeHtml(item.unit) : '';
+        const safeBillingDesc = item.description
+            ? window.escapeHtml(item.description.substring(0, 30)) + (item.description.length > 30 ? '...' : '')
+            : '';
         return `
             <div class="p-3 ${bgColor} border rounded-lg cursor-pointer transition duration-200" onclick="addToBilling('${item.id}')">
                 <div class="text-center">
-                    <div class="font-semibold text-gray-900 text-sm mb-1">${item.name}</div>
+                    <div class="font-semibold text-gray-900 text-sm mb-1">${safeBillingName}</div>
                     <div class="text-xs bg-white text-gray-600 px-2 py-1 rounded mb-2">${categoryName}</div>
                     ${item.category !== 'discount' ? `
                         <div class="text-sm font-bold text-green-600">
                             $${item.price}
                         </div>
                     ` : ''}
-                    ${item.unit ? `<div class="text-xs text-gray-600">/ ${item.unit}</div>` : ''}
-                    ${item.description ? `<div class="text-xs text-gray-600 mt-1">${item.description.substring(0, 30)}${item.description.length > 30 ? '...' : ''}</div>` : ''}
+                    ${safeBillingUnit ? `<div class="text-xs text-gray-600">/ ${safeBillingUnit}</div>` : ''}
+                    ${safeBillingDesc ? `<div class="text-xs text-gray-600 mt-1">${safeBillingDesc}</div>` : ''}
                 </div>
             </div>
         `;
@@ -22290,7 +22303,7 @@ async function searchBillingForConsultation() {
                             <div class="flex items-center ${bgColor} border rounded-lg p-3">
                                 ${checkboxHtml}
                                 <div class="flex-1">
-                                    <div class="font-semibold text-gray-900">${item.name}</div>
+                                    <div class="font-semibold text-gray-900">${window.escapeHtml(item.name)}</div>
                                     <div class="text-xs text-gray-600">${categoryName}</div>
                                     <div class="text-sm font-medium ${item.category === 'discount' ? 'text-red-600' : 'text-green-600'}">
                                         ${(() => {
@@ -22304,7 +22317,7 @@ async function searchBillingForConsultation() {
                                                 }
                                             }
                                             return `$${item.price}`;
-                                        })()}${item.unit ? ` / ${item.unit}` : ''}
+                                        })()}${item.unit ? ` / ${window.escapeHtml(item.unit)}` : ''}
                                     </div>
                                 </div>
                                 ${quantityControls}
@@ -22325,14 +22338,19 @@ async function searchBillingForConsultation() {
                                 小計：<span class="font-medium">$${subtotalForDiscount}</span>
                             </div>
                             ${selectedBillingItems.filter(item => item.category === 'discount').map(item => {
+                                // 折扣項目名稱與適用項目名稱皆為可輸入資料，逐項跳脫
+                                const safeDiscountName = window.escapeHtml(item.name);
+                                const safeApplicable = includedItemNames.length > 0
+                                    ? ` (適用：${includedItemNames.map(n => window.escapeHtml(n)).join(',')})`
+                                    : '';
                                 if (item.price > 0 && item.price < 1) {
                                     const discountAmount = subtotalForDiscount * (1 - item.price) * item.quantity;
                                     return `<div class="text-sm text-red-600">
-                                        ${item.name}${includedItemNames.length > 0 ? ` (適用：${includedItemNames.join(',')})` : ''}：<span class="font-medium">-$${discountAmount.toFixed(0)}</span>
+                                        ${safeDiscountName}${safeApplicable}：<span class="font-medium">-$${discountAmount.toFixed(0)}</span>
                                     </div>`;
                                 } else {
                                     return `<div class="text-sm text-red-600">
-                                        ${item.name}${includedItemNames.length > 0 ? ` (適用：${includedItemNames.join(',')})` : ''}：<span class="font-medium">$${item.price * item.quantity}</span>
+                                        ${safeDiscountName}${safeApplicable}：<span class="font-medium">$${item.price * item.quantity}</span>
                                     </div>`;
                                 }
                             }).join('')}
@@ -23003,8 +23021,9 @@ const consultationDate = (() => {
                 {
                   const acnEl = document.getElementById('formAcupunctureNotes');
                   if (acnEl) {
-                    // 使用 innerHTML 載入針灸備註，以保留方塊標記
-                    acnEl.innerHTML = consultation.acupunctureNotes || '';
+                    // 使用 innerHTML 載入針灸備註，以保留方塊標記；
+                // 必須經過白名單淨化，歷史病歷可能含惡意內容（Stored XSS 防護）
+                acnEl.innerHTML = window.sanitizeAcupunctureNotesHtml(consultation.acupunctureNotes || '');
                     // 載入完成後初始化既有穴位方塊的事件，以使其可刪除與顯示提示
                     if (typeof initializeAcupointNotesSpans === 'function') {
                       try {
@@ -23078,8 +23097,9 @@ const consultationDate = (() => {
                     document.getElementById('formPrescription').value = consultation.prescription;
                     const containerEl = document.getElementById('selectedPrescriptionItems');
                     if (containerEl) {
-                        // 使用 whitespace-pre-line 使原始處方換行保持
-                        containerEl.innerHTML = '<div class="text-sm text-gray-900 whitespace-pre-line">' + consultation.prescription + '</div>';
+                        // 使用 whitespace-pre-line 使原始處方換行保持；
+                        // 處方為醫師輸入內容，必須跳脫（與 L11443 安全版本一致）
+                        containerEl.innerHTML = '<div class="text-sm text-gray-900 whitespace-pre-line">' + window.escapeHtml(consultation.prescription) + '</div>';
                     }
                     const medicationSettingsEl = document.getElementById('medicationSettings');
                     if (medicationSettingsEl) {
@@ -25987,7 +26007,7 @@ async function restoreUser(id) {
                         <td class="px-4 py-3 text-sm text-gray-900 text-right">${stat.count}</td>
                         <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">HK$${stat.revenue.toLocaleString()}</td>
                         <td class="px-4 py-3 text-sm text-gray-600 text-right">HK$${averageDaily.toLocaleString()}</td>
-                        <td class="px-4 py-3 text-sm text-gray-600">${mainService}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600">${window.escapeHtml(mainService)}</td>
                     </tr>
                 `;
             }).join('');
@@ -27134,12 +27154,38 @@ async function listClinicExpensesForMonth(month) {
     return list;
 }
 
+// 支出列表的事件委派只綁定一次，兩個渲染函式共用同一個 tbody
+function bindClinicExpenseRowActions(tbody) {
+    if (!tbody || tbody.dataset.expenseActionsBound === '1') return;
+    tbody.dataset.expenseActionsBound = '1';
+    tbody.addEventListener('click', function(e) {
+        const btn = e.target.closest && e.target.closest('button[data-action]');
+        if (!btn || !tbody.contains(btn)) return;
+        const id = btn.getAttribute('data-id') || '';
+        switch (btn.getAttribute('data-action')) {
+            case 'edit-expense':
+                startEditExpense(id);
+                break;
+            case 'delete-expense':
+                deleteExpense(id);
+                break;
+            case 'save-expense':
+                saveEditExpense(id);
+                break;
+            case 'cancel-expense':
+                cancelEditExpense();
+                break;
+        }
+    });
+}
+
 async function loadClinicExpensesForSelectedMonth() {
     const month = document.getElementById('expenseMonth').value;
     if (!month) return;
     const list = await listClinicExpensesForMonth(month);
     const tbody = document.getElementById('expenseListBody');
     if (!tbody) return;
+    bindClinicExpenseRowActions(tbody);
     if (list.length === 0) {
         tbody.innerHTML = `
             <tr>
@@ -27150,16 +27196,18 @@ async function loadClinicExpensesForSelectedMonth() {
     }
     tbody.innerHTML = list.map(item => {
         const amt = Number(item.amount) || 0;
-        const note = item.note || '';
-        const type = item.type || '其他費用';
+        // 類型/備註為管理員可輸入欄位，統一跳脫避免 XSS
+        const note = window.escapeHtml(item.note || '');
+        const type = window.escapeHtml(item.type || '其他費用');
+        const safeId = window.escapeHtml(item.id);
         return `
-            <tr data-id="${item.id}" class="hover:bg-gray-50">
+            <tr data-id="${safeId}" class="hover:bg-gray-50">
                 <td class="px-4 py-3 text-sm text-gray-900">${type}</td>
                 <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">HK$${amt.toLocaleString()}</td>
                 <td class="px-4 py-3 text-sm text-gray-600">${note}</td>
                 <td class="px-4 py-3 text-sm text-right">
-                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded mr-2" onclick="startEditExpense('${item.id}')">編輯</button>
-                    <button class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded" onclick="deleteExpense('${item.id}')">刪除</button>
+                    <button type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded mr-2" data-action="edit-expense" data-id="${safeId}">編輯</button>
+                    <button type="button" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded" data-action="delete-expense" data-id="${safeId}">刪除</button>
                 </td>
             </tr>
         `;
@@ -27172,6 +27220,7 @@ async function loadClinicExpensesForListMonth() {
     const list = await listClinicExpensesForMonth(month);
     const tbody = document.getElementById('expenseListBody');
     if (!tbody) return;
+    bindClinicExpenseRowActions(tbody);
     if (list.length === 0) {
         tbody.innerHTML = `
             <tr>
@@ -27182,16 +27231,18 @@ async function loadClinicExpensesForListMonth() {
     }
     tbody.innerHTML = list.map(item => {
         const amt = Number(item.amount) || 0;
-        const note = item.note || '';
-        const type = item.type || '其他費用';
+        // 類型/備註為管理員可輸入欄位，統一跳脫避免 XSS
+        const note = window.escapeHtml(item.note || '');
+        const type = window.escapeHtml(item.type || '其他費用');
+        const safeId = window.escapeHtml(item.id);
         return `
-            <tr data-id="${item.id}" class="hover:bg-gray-50">
+            <tr data-id="${safeId}" class="hover:bg-gray-50">
                 <td class="px-4 py-3 text-sm text-gray-900">${type}</td>
                 <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">HK$${amt.toLocaleString()}</td>
                 <td class="px-4 py-3 text-sm text-gray-600">${note}</td>
                 <td class="px-4 py-3 text-sm text-right">
-                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded mr-2" onclick="startEditExpense('${item.id}')">編輯</button>
-                    <button class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded" onclick="deleteExpense('${item.id}')">刪除</button>
+                    <button type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded mr-2" data-action="edit-expense" data-id="${safeId}">編輯</button>
+                    <button type="button" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded" data-action="delete-expense" data-id="${safeId}">刪除</button>
                 </td>
             </tr>
         `;
@@ -27220,9 +27271,12 @@ function startEditExpense(id) {
     const curAmountText = tds[1].textContent.replace(/[^0-9.]/g, '').trim();
     const curAmount = Number(curAmountText) || 0;
     const curNote = tds[2].textContent.trim();
+    const safeId = window.escapeHtml(id);
+    // 備註回填至 value 屬性必須跳脫，否則含引號的文字會截斷屬性
+    const safeNote = window.escapeHtml(curNote);
     row.innerHTML = `
         <td class="px-4 py-3">
-            <select id="exp_type_${id}" class="w-full border border-gray-300 rounded-lg px-2 py-1">
+            <select id="exp_type_${safeId}" class="w-full border border-gray-300 rounded-lg px-2 py-1">
                 <option value="針灸用具"${curType==='針灸用具'?' selected':''}>針灸用具</option>
                 <option value="飲片"${curType==='飲片'?' selected':''}>飲片</option>
                 <option value="顆粒沖劑"${curType==='顆粒沖劑'?' selected':''}>顆粒沖劑</option>
@@ -27233,14 +27287,14 @@ function startEditExpense(id) {
             </select>
         </td>
         <td class="px-4 py-3">
-            <input id="exp_amount_${id}" type="number" min="0" step="1" value="${curAmount}" class="w-full border border-gray-300 rounded-lg px-2 py-1 text-right">
+            <input id="exp_amount_${safeId}" type="number" min="0" step="1" value="${curAmount}" class="w-full border border-gray-300 rounded-lg px-2 py-1 text-right">
         </td>
         <td class="px-4 py-3">
-            <input id="exp_note_${id}" type="text" value="${curNote}" class="w-full border border-gray-300 rounded-lg px-2 py-1">
+            <input id="exp_note_${safeId}" type="text" value="${safeNote}" class="w-full border border-gray-300 rounded-lg px-2 py-1">
         </td>
         <td class="px-4 py-3 text-right">
-            <button class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded mr-2" onclick="saveEditExpense('${id}')">儲存</button>
-            <button class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded" onclick="cancelEditExpense()">取消</button>
+            <button type="button" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded mr-2" data-action="save-expense" data-id="${safeId}">儲存</button>
+            <button type="button" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded" data-action="cancel-expense">取消</button>
         </td>
     `;
 }
@@ -30615,7 +30669,18 @@ class FirebaseDataManager {
     _buildPatientAggregatePlan(patientId, operation, consultation, prevPatientId) {
         const pid = String(patientId || '');
         const patientOps = [];
-        const increment = window.firebase.FieldValue.increment;
+        // Firebase v12 modular SDK 只有頂級 increment() 函數，FieldValue 類別
+        // 在此版本沒有靜態 increment 方法。如果 increment 不可用，說明
+        // firebase_init.js 可能被 Service Worker 快取了舊版本。
+        const increment = window.firebase && window.firebase.increment;
+        if (typeof increment !== 'function') {
+            console.error('[聚合計畫] Firebase increment 函數不可用！'
+                + ' 請強制刷新（Ctrl+F5）或清除瀏覽器快取。'
+                + ' window.firebase 鍵:', window.firebase ? Object.keys(window.firebase) : 'null');
+            // 靜默降級：返回空計畫，不中斷病歷保存主流程。
+            // 病人聚合統計會在下次 add/update 時被正確覆蓋。
+            return { patientOps: [], meta: null };
+        }
 
         // 先處理舊病人（update 時病人 ID 變更的情況）
         if (operation === 'update' && prevPatientId && String(prevPatientId) !== pid) {
@@ -34752,8 +34817,10 @@ async function displayMedicalRecords(pageChange = false) {
             const canDeleteMedicalRecord = hasActionPermission('medicalRecordDelete');
             const viewButtonClasses = `${getMedicalHistoryActionButtonClasses('load')} mr-2`;
             const deleteButtonClasses = getMedicalHistoryActionButtonClasses('delete');
+            // 改用 data-* 屬性傳參，避免病人姓名含單引號（如 O'Brien）截斷
+            // onclick 屬性造成注入；屬性值一律 escapeHtml
             const deleteButtonHtml = canDeleteMedicalRecord
-                ? `<button type="button" class="${deleteButtonClasses}" onclick='confirmDeleteMedicalRecord(${JSON.stringify(recordId)}, ${JSON.stringify(patientName)}, this)'>${window.escapeHtml(deleteLabel)}</button>`
+                ? `<button type="button" class="${deleteButtonClasses}" data-action="delete-medical-record" data-record-id="${window.escapeHtml(recordId)}" data-patient-name="${window.escapeHtml(patientName)}">${window.escapeHtml(deleteLabel)}</button>`
                 : '';
             tbody.innerHTML += `
                 <tr>
@@ -34764,11 +34831,27 @@ async function displayMedicalRecords(pageChange = false) {
                     <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(doctorName)}</td>
                     <td class="px-4 py-2 whitespace-nowrap">${window.escapeHtml(dateStr)}</td>
                     <td class="px-4 py-2 whitespace-nowrap">
-                        <button type="button" class="${viewButtonClasses}" onclick='viewMedicalRecord(${JSON.stringify(recordId)}, this)'>${window.escapeHtml(viewLabel)}</button>
+                        <button type="button" class="${viewButtonClasses}" data-action="view-medical-record" data-record-id="${window.escapeHtml(recordId)}">${window.escapeHtml(viewLabel)}</button>
                         ${deleteButtonHtml}
                     </td>
                 </tr>
             `;
+        });
+
+        // 綁定檢視/刪除按鈕事件（取代 inline onclick，避免屬性注入）
+        tbody.querySelectorAll('button[data-action="view-medical-record"]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                viewMedicalRecord(this.getAttribute('data-record-id'), this);
+            });
+        });
+        tbody.querySelectorAll('button[data-action="delete-medical-record"]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                confirmDeleteMedicalRecord(
+                    this.getAttribute('data-record-id'),
+                    this.getAttribute('data-patient-name'),
+                    this
+                );
+            });
         });
     }
     // 確保分頁容器存在並渲染
@@ -35792,6 +35875,95 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   };
 
   /**
+   * 針灸備註（contenteditable）專用白名單淨化，防範 Stored XSS。
+   * ------------------------------------------------------------
+   * 針灸備註以 HTML 格式儲存，合法內容只有三種：
+   *   1. 純文字節點（醫師輸入的備註）
+   *   2. <br> 換行
+   *   3. 系統產生的穴位方塊 <span data-acupoint-name>（見 addAcupointToNotes）
+   * 穴位方塊一律以 DOM API 重建，只保留固定的 class 與白名單屬性；
+   * 其他任何元素（img/svg/script/樣式標籤/on* 事件等）整個解構，
+   * 僅保留其文字子節點。來源 HTML 只在脫離文件的容器中解析，
+   * 不會掛載到 DOM，故不會觸發資源載入或事件。
+   * 儲存前與載入時都呼叫此函式：儲存前擋下新輸入，載入時中立化
+   * 已存在於歷史病歷中的攻擊內容（縱深防禦）。
+   * @param {string} html 未受信任的針灸備註 HTML
+   * @returns {string} 淨化後的安全 HTML
+   */
+  window.sanitizeAcupunctureNotesHtml = function(html) {
+    const source = String(html == null ? '' : html);
+    if (!source) return '';
+    // 穴位方塊的固定樣式（與 addAcupointToNotes 保持一致）
+    const ACU_SPAN_CLASS = 'inline-flex items-center justify-center bg-blue-100 border border-blue-200 rounded text-sm text-blue-800 px-1 py-0.5 mr-1 cursor-pointer';
+    // data-tooltip 只接受 encodeURIComponent 產生的字元集
+    const TOOLTIP_RE = /^[A-Za-z0-9\-_.!~*'()%]{0,4000}$/;
+    const NAME_RE = /^[\s\S]{1,100}$/;
+
+    /**
+     * 以白名單遞迴複製節點；不容許的元素只保留其文字內容。
+     * @returns {Node|null}
+     */
+    function cloneSafe(node) {
+      if (node.nodeType === 3) { // Node.TEXT_NODE
+        return document.createTextNode(node.nodeValue || '');
+      }
+      if (node.nodeType !== 1) { // 非元素節點（註解等）一律丟棄
+        return null;
+      }
+      const tag = node.tagName;
+      if (tag === 'BR') {
+        return document.createElement('br');
+      }
+      if (tag === 'SPAN' && node.hasAttribute && node.hasAttribute('data-acupoint-name')) {
+        const name = String(node.getAttribute('data-acupoint-name') || '');
+        if (!NAME_RE.test(name)) return null;
+        const span = document.createElement('span');
+        span.className = ACU_SPAN_CLASS;
+        span.setAttribute('contenteditable', 'false');
+        // 以 setAttribute 寫入的屬性值是純資料，不會被解析為標記或事件
+        span.setAttribute('data-acupoint-name', name);
+        const tooltip = node.getAttribute('data-tooltip');
+        if (tooltip && TOOLTIP_RE.test(tooltip)) {
+          span.setAttribute('data-tooltip', tooltip);
+        }
+        span.textContent = name;
+        return span;
+      }
+      // 其他元素（b/font/div 等）：解構元素本身，保留其子內容
+      const frag = document.createDocumentFragment();
+      const children = node.childNodes || [];
+      for (let i = 0; i < children.length; i++) {
+        const safeChild = cloneSafe(children[i]);
+        if (safeChild) frag.appendChild(safeChild);
+      }
+      return frag;
+    }
+
+    let src;
+    try {
+      // 脫離文件的容器：不插入 document，img 等不會開始載入、事件不會觸發
+      src = document.createElement('div');
+      src.innerHTML = source;
+      const out = document.createElement('div');
+      const children = src.childNodes;
+      for (let i = 0; i < children.length; i++) {
+        const safeNode = cloneSafe(children[i]);
+        if (safeNode) out.appendChild(safeNode);
+      }
+      return out.innerHTML;
+    } catch (_e) {
+      // 任何異常一律 fail-closed：回傳全跳脫純文字（渲染時只顯示字面內容）
+      try {
+        const fallback = document.createElement('div');
+        fallback.textContent = source;
+        return fallback.innerHTML;
+      } catch (_e2) {
+        return '';
+      }
+    }
+  };
+
+  /**
    * 列印文件專用的 HTML 防護：以非執行的 DOMParser 解析整份列印 HTML，
    * 移除 script 等危險元素與所有 on* 事件屬性、javascript: URL，
    * 再交給 printWindow.document.write。可攔截所有殘留於資料插值中的
@@ -35810,12 +35982,26 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
         window.escapeHtml(source) + '</pre></body></html>';
     }
 
-    const DANGEROUS_TAGS = ['script', 'iframe', 'object', 'embed', 'applet', 'base', 'form'];
+    // script/iframe/object 等可執行或載入外部內容的標籤一律移除
+    const DANGEROUS_TAGS = ['script', 'iframe', 'object', 'embed', 'applet', 'base', 'form', 'link'];
     DANGEROUS_TAGS.forEach(function (tag) {
       doc.querySelectorAll(tag).forEach(function (node) { node.remove(); });
     });
+    // <meta http-equiv="refresh" content="0;url=javascript:..."> 之於
+    // 舊式跳轉/腳本執行；charset 之類的良性 meta 保留
+    doc.querySelectorAll('meta[http-equiv]').forEach(function (node) { node.remove(); });
 
-    const DANGEROUS_URL_ATTRS = new Set(['href', 'src', 'xlink:href', 'poster', 'background']);
+    const DANGEROUS_URL_ATTRS = new Set(['href', 'src', 'xlink:href', 'poster', 'background', 'formaction', 'cite', 'longdesc', 'manifest']);
+    // 正規化 URL：移除所有控制字元（含 tab/LS/PS/soft hyphen/BOM），
+    // 抵擋「java&#x09;script:」「java\nscript:」這類以空白字元混淆的 scheme
+    const CTRL_CHARS_RE = /[\u0000-\u0020\u007f-\u009f\u00ad\u200b-\u200f\u2028\u2029\ufeff]/g;
+    const isDangerousUrl = function (raw) {
+      const v = String(raw == null ? '' : raw).replace(CTRL_CHARS_RE, '').toLowerCase();
+      if (/^(javascript|vbscript|livescript|file|data:text\/html|mocha):/.test(v)) return true;
+      // data: 只允許圖片，其餘（如 data:image/svg+xml 內藏 script 也不應出現於列印）封鎖
+      if (/^data:(?!image\/(png|jpeg|jpg|gif|webp|bmp);)/i.test(v)) return true;
+      return false;
+    };
     const allElements = doc.querySelectorAll('*');
     Array.prototype.forEach.call(allElements, function (el) {
       const attrs = Array.prototype.slice.call(el.attributes);
@@ -35824,10 +36010,12 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
         const value = String(attr.value || '');
         if (name.indexOf('on') === 0) {
           el.removeAttribute(attr.name);
-        } else if (DANGEROUS_URL_ATTRS.has(name) && /^\s*javascript:/i.test(value)) {
+        } else if (DANGEROUS_URL_ATTRS.has(name) && isDangerousUrl(value)) {
           el.removeAttribute(attr.name);
         }
       });
+      // srcdoc 可內嵌完整文件（含 script），不應出現於列印
+      if (el.hasAttribute && el.hasAttribute('srcdoc')) el.removeAttribute('srcdoc');
     });
 
     return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
@@ -39225,17 +39413,17 @@ function refreshTemplateCategoryFilters() {
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
                   <div>
-                    <h3 class="text-lg font-semibold text-green-800">${item.name}</h3>
-                    <div class="text-xs text-green-600 mt-1">${category}</div>
+                    <h3 class="text-lg font-semibold text-green-800">${window.escapeHtml(item.name)}</h3>
+                    <div class="text-xs text-green-600 mt-1">${window.escapeHtml(category)}</div>
                   </div>
                   <div class="flex gap-2">
-                    <button class="text-blue-600 hover:text-blue-800 text-sm" onclick="showEditModal('herb', '${item.name}')">編輯</button>
-                    <button class="text-red-600 hover:text-red-800 text-sm" onclick="deleteHerbCombination(${item.id})">刪除</button>
+                    <button type="button" class="text-blue-600 hover:text-blue-800 text-sm" data-action="edit-herb-combo" data-id="${window.escapeHtml(String(item.id))}">編輯</button>
+                    <button type="button" class="text-red-600 hover:text-red-800 text-sm" data-action="delete-herb-combo" data-id="${window.escapeHtml(String(item.id))}">刪除</button>
                   </div>
                 </div>
-                <p class="text-gray-600 mb-3">${item.description}</p>
+                <p class="text-gray-600 mb-3">${window.escapeHtml(item.description || '')}</p>
                 <div class="text-sm text-gray-700 space-y-1">
-                  ${item.ingredients.map(ing => {
+                  ${(Array.isArray(item.ingredients) ? item.ingredients : []).map(ing => {
                     const dosage = ing && ing.dosage ? String(ing.dosage).trim() : '';
                     const displayDosage = dosage ? (dosage + '克') : '';
                     const nameVal = ing && ing.name ? ing.name : '';
@@ -39244,23 +39432,26 @@ function refreshTemplateCategoryFilters() {
                     const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
                     let attrs = '';
                     if (tooltipContent) {
-                      // Use proper escaping for single quotes inside single-quoted strings. The
-                      // original implementation attempted to escape the single quotes surrounding
-                      // the `data-tooltip` attribute name using double backslashes (\\'), which
-                      
-                      
-                      
-                      
-                      
+                      // 名稱與劑量為可輸入資料，一律跳脫；tooltip 為 encodeURIComponent 輸出
                       attrs = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
                     }
                     return '<div class="flex justify-between items-center p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded text-sm"' + attrs + '>' +
-                      '<span class="text-green-800">' + nameVal + '</span>' +
-                      '<span class="text-green-600">' + displayDosage + '</span>' +
+                      '<span class="text-green-800">' + window.escapeHtml(nameVal) + '</span>' +
+                      '<span class="text-green-600">' + window.escapeHtml(displayDosage) + '</span>' +
                       '</div>';
                   }).join('')}
                 </div>
               `;
+              // 以事件綁定取代 inline onclick，避免組合名稱含引號時注入
+              const editBtn = card.querySelector('button[data-action="edit-herb-combo"]');
+              if (editBtn) editBtn.addEventListener('click', () => {
+                const target = herbCombinations.find(h => String(h.id) === editBtn.getAttribute('data-id'));
+                if (target) showEditModal('herb', target.name);
+              });
+              const delBtn = card.querySelector('button[data-action="delete-herb-combo"]');
+              if (delBtn) delBtn.addEventListener('click', () => {
+                deleteHerbCombination(Number(delBtn.getAttribute('data-id')));
+              });
               container.appendChild(card);
             });
             // 分頁控制元件
@@ -39409,36 +39600,42 @@ async function deleteHerbCombination(id) {
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
                   <div>
-                    <h3 class="text-lg font-semibold text-blue-800">${item.name}</h3>
-                    <div class="text-xs text-blue-600 mt-1">${category}</div>
+                    <h3 class="text-lg font-semibold text-blue-800">${window.escapeHtml(item.name)}</h3>
+                    <div class="text-xs text-blue-600 mt-1">${window.escapeHtml(category)}</div>
                   </div>
                   <div class="flex gap-2">
-                    <button class="text-blue-600 hover:text-blue-800 text-sm" onclick="showEditModal('acupoint', '${item.name}')">編輯</button>
-                    <button class="text-red-600 hover:text-red-800 text-sm" onclick="deleteAcupointCombination(${item.id})">刪除</button>
+                    <button type="button" class="text-blue-600 hover:text-blue-800 text-sm" data-action="edit-acupoint-combo" data-id="${window.escapeHtml(String(item.id))}">編輯</button>
+                    <button type="button" class="text-red-600 hover:text-red-800 text-sm" data-action="delete-acupoint-combo" data-id="${window.escapeHtml(String(item.id))}">刪除</button>
                   </div>
                 </div>
                 <div class="text-sm text-gray-700 space-y-1">
-                  ${item.points.map(pt => {
-                    
+                  ${(Array.isArray(item.points) ? item.points : []).map(pt => {
                     const nameVal = pt && pt.name ? pt.name : '';
-                    
                     const tooltipContent = getAcupointTooltipContent(nameVal);
                     const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
-                    
                     let attrs = '';
                     if (tooltipContent) {
                       attrs = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
                     }
-                    
                     return '<div class="flex items-center p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded text-sm"' + attrs + '>' +
                       '<span class="text-blue-800">' + window.escapeHtml(nameVal) + '</span>' +
                       '</div>';
                   }).join('')}
                 </div>
                 <div class="mt-3 pt-3 border-t border-gray-200 text-sm text-gray-600">
-                  <p>針法：${item.technique}</p>
+                  <p>針法：${window.escapeHtml(item.technique || '')}</p>
                 </div>
               `;
+              // 以事件綁定取代 inline onclick，避免組合名稱含引號時注入
+              const editBtn = card.querySelector('button[data-action="edit-acupoint-combo"]');
+              if (editBtn) editBtn.addEventListener('click', () => {
+                const target = acupointCombinations.find(a => String(a.id) === editBtn.getAttribute('data-id'));
+                if (target) showEditModal('acupoint', target.name);
+              });
+              const delBtn = card.querySelector('button[data-action="delete-acupoint-combo"]');
+              if (delBtn) delBtn.addEventListener('click', () => {
+                deleteAcupointCombination(Number(delBtn.getAttribute('data-id')));
+              });
               container.appendChild(card);
             });
             // 分頁控制
@@ -40237,11 +40434,11 @@ async function deleteAcupointCombination(id) {
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
                   <div>
-                    <h3 class="text-lg font-semibold text-purple-800">${item.name}</h3>
+                    <h3 class="text-lg font-semibold text-purple-800">${window.escapeHtml(item.name || '')}</h3>
                     <div class="flex gap-2 mt-1">
-                      <span class="text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded">${item.category}</span>
-                      <span class="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">療程: ${item.duration}</span>
-                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">複診: ${item.followUp}</span>
+                      <span class="text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded">${window.escapeHtml(item.category || '')}</span>
+                      <span class="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">療程: ${window.escapeHtml(item.duration || '')}</span>
+                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">複診: ${window.escapeHtml(item.followUp || '')}</span>
                     </div>
                   </div>
                   <div class="flex gap-2">
@@ -40249,7 +40446,7 @@ async function deleteAcupointCombination(id) {
                   </div>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
-                  ${item.content.split('\n').map(p => '<p class="mb-2">' + p + '</p>').join('')}
+                  ${String(item.content || '').split('\n').map(p => '<p class="mb-2">' + window.escapeHtml(p) + '</p>').join('')}
                 </div>
               `;
               container.appendChild(card);
@@ -40328,37 +40525,41 @@ async function deleteAcupointCombination(id) {
               const card = document.createElement('div');
               card.className = 'bg-white p-6 rounded-lg border-2 border-orange-200';
               // Build display content for diagnosis template fields.
+              // 所有欄位皆為使用者可輸入內容，逐行跳脫後再以 <br> 保留換行
+              const escLines = (v) => String(v == null ? '' : v).split('\n')
+                .map(l => window.escapeHtml(l)).join('<br>');
               let contentHtml = '';
               if (item.chiefComplaint || item.currentHistory || item.tongue || item.pulse || item.tcmDiagnosis || item.syndromeDiagnosis) {
                 const parts = [];
                 if (item.chiefComplaint) {
-                  parts.push('<p class="mb-2"><strong>主訴：</strong>' + String(item.chiefComplaint).split('\n').map(l => l).join('<br>') + '</p>');
+                  parts.push('<p class="mb-2"><strong>主訴：</strong>' + escLines(item.chiefComplaint) + '</p>');
                 }
                 if (item.currentHistory) {
-                  parts.push('<p class="mb-2"><strong>現病史：</strong>' + String(item.currentHistory).split('\n').map(l => l).join('<br>') + '</p>');
+                  parts.push('<p class="mb-2"><strong>現病史：</strong>' + escLines(item.currentHistory) + '</p>');
                 }
                 if (item.tongue) {
-                  parts.push('<p class="mb-2"><strong>舌象：</strong>' + String(item.tongue).split('\n').map(l => l).join('<br>') + '</p>');
+                  parts.push('<p class="mb-2"><strong>舌象：</strong>' + escLines(item.tongue) + '</p>');
                 }
                 if (item.pulse) {
-                  parts.push('<p class="mb-2"><strong>脈象：</strong>' + String(item.pulse).split('\n').map(l => l).join('<br>') + '</p>');
+                  parts.push('<p class="mb-2"><strong>脈象：</strong>' + escLines(item.pulse) + '</p>');
                 }
                 if (item.tcmDiagnosis) {
-                  parts.push('<p class="mb-2"><strong>中醫診斷：</strong>' + String(item.tcmDiagnosis).split('\n').map(l => l).join('<br>') + '</p>');
+                  parts.push('<p class="mb-2"><strong>中醫診斷：</strong>' + escLines(item.tcmDiagnosis) + '</p>');
                 }
                 if (item.syndromeDiagnosis) {
-                  parts.push('<p class="mb-2"><strong>證型診斷：</strong>' + String(item.syndromeDiagnosis).split('\n').map(l => l).join('<br>') + '</p>');
+                  parts.push('<p class="mb-2"><strong>證型診斷：</strong>' + escLines(item.syndromeDiagnosis) + '</p>');
                 }
                 contentHtml = parts.join('');
               } else if (item.content) {
-                contentHtml = item.content.split('\n').map(p => '<p class="mb-2">' + p + '</p>').join('');
+                contentHtml = String(item.content).split('\n')
+                  .map(p => '<p class="mb-2">' + window.escapeHtml(p) + '</p>').join('');
               }
               card.innerHTML = `
                 <div class="flex justify-between items-start mb-3">
                   <div>
-                    <h3 class="text-lg font-semibold text-orange-800">${item.name}</h3>
+                    <h3 class="text-lg font-semibold text-orange-800">${window.escapeHtml(item.name || '')}</h3>
                     <div class="flex gap-2 mt-1">
-                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">${item.category}</span>
+                      <span class="text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded">${window.escapeHtml(item.category || '')}</span>
                     </div>
                   </div>
                   <div class="flex gap-2">
@@ -40584,10 +40785,17 @@ async function deleteAcupointCombination(id) {
             sourceList.forEach((cat, idx) => {
               const div = document.createElement('div');
               div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
-              div.innerHTML = `
-                <span class="text-gray-700">${cat}</span>
-                <button onclick="removeCategory('${type}', ${idx})" class="text-red-600 hover:text-red-800 text-sm">刪除</button>
-              `;
+              // 分類名稱為可輸入內容，以 textContent 渲染；按鈕事件直接綁定
+              const span = document.createElement('span');
+              span.className = 'text-gray-700';
+              span.textContent = String(cat == null ? '' : cat);
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'text-red-600 hover:text-red-800 text-sm';
+              btn.textContent = '刪除';
+              btn.addEventListener('click', () => { removeCategory(type, idx); });
+              div.appendChild(span);
+              div.appendChild(btn);
               listEl.appendChild(div);
             });
           }
@@ -40721,6 +40929,13 @@ async function deleteAcupointCombination(id) {
             const modal = document.getElementById('editModal');
             const modalTitle = document.getElementById('editModalTitle');
             const modalContent = document.getElementById('editModalContent');
+            // 編輯視窗所有插值（input/textarea 值、option、自訂屬性）皆為
+            // 使用者可輸入內容，統一以 esc 跳脫，避免屬性截斷與 Stored XSS
+            const esc = (v) => window.escapeHtml(v);
+            // 分類 <option> 清單：value 與標題文字都跳脫，selected 比對用原始值
+            const optionsHtml = (cats, selected) => (Array.isArray(cats) ? cats : [])
+              .map(cat => '<option value="' + esc(cat) + '"' + (cat === selected ? ' selected' : '') + '>' + esc(cat) + '</option>')
+              .join('');
             // 將當前編輯類型存於 modal dataset 中，以便保存時使用
             modal.dataset.editType = itemType;
             // 根據 itemType 尋找對應的資料陣列與顯示名稱
@@ -40795,14 +41010,14 @@ async function deleteAcupointCombination(id) {
                     const nameVal = (pt && pt.name) ? pt.name : '';
                     const tooltipContent = getAcupointTooltipContent(nameVal);
                     const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
-                    const nameAttr = nameVal ? (' data-acupoint-name="' + nameVal.replace(/\"/g, '&quot;') + '"') : '';
+                    const nameAttr = nameVal ? (' data-acupoint-name="' + esc(nameVal) + '"') : '';
                     let tooltipAttr = '';
                     if (tooltipContent) {
                       // 將鼠標提示字串中的單引號正確跳脫，使用 data-tooltip 屬性
                       tooltipAttr = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
                     }
                     return '<div class="flex items-center gap-2 p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded"' + nameAttr + tooltipAttr + '>' +
-                      '<span class="flex-1 text-blue-800">' + (typeof window !== 'undefined' && window.escapeHtml ? window.escapeHtml(nameVal) : nameVal) + '</span>' +
+                      '<span class="flex-1 text-blue-800">' + esc(nameVal) + '</span>' +
                       '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button>' +
                       '</div>';
                   }).join('')
@@ -40811,12 +41026,12 @@ async function deleteAcupointCombination(id) {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">組合名稱 *</label>
-                    <input type="text" id="acupointNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="acupointNameInput" value="${esc(item.name || '')}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
                     <select id="acupointCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${(Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0 ? acupointComboCategories : categories.acupoints).map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                      ${optionsHtml((Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0 ? acupointComboCategories : categories.acupoints), item.category)}
                     </select>
                   </div>
                   <div>
@@ -40834,7 +41049,7 @@ async function deleteAcupointCombination(id) {
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">針法</label>
-                    <input type="text" id="acupointTechniqueInput" value="${item.technique || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="acupointTechniqueInput" value="${esc(item.technique || '')}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                 </div>
               `;
@@ -40852,16 +41067,16 @@ async function deleteAcupointCombination(id) {
                     const tooltipContent = getHerbTooltipContent(nameVal);
                     const encoded = tooltipContent ? encodeURIComponent(tooltipContent) : '';
                     // 屬性字串：若存在名稱則添加 data-herb-name，若存在 tooltip 則添加相關屬性與事件
-                    const nameAttr = nameVal ? (' data-herb-name="' + nameVal.replace(/\"/g, '&quot;') + '"') : '';
+                    const nameAttr = nameVal ? (' data-herb-name="' + esc(nameVal) + '"') : '';
                     let tooltipAttr = '';
                     if (tooltipContent) {
                       tooltipAttr = ' data-tooltip="' + encoded + '" onmouseenter="showTooltip(event, this.getAttribute(\'data-tooltip\'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"';
                     }
                     return '<div class="flex items-center gap-2 p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded"' + nameAttr + tooltipAttr + '>' +
                       // 名稱以 span 顯示，不可編輯
-                      '<span class="flex-1 text-green-800">' + (typeof window !== 'undefined' && window.escapeHtml ? window.escapeHtml(nameVal) : nameVal) + '</span>' +
+                      '<span class="flex-1 text-green-800">' + esc(nameVal) + '</span>' +
                       // 劑量輸入欄
-                      '<input type="number" value="' + (dosageVal || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
+                      '<input type="number" value="' + esc(dosageVal || '') + '" placeholder="" class="w-20 px-2 py-1 border border-gray-300 rounded">' +
                       '<span class="text-sm text-gray-700">克</span>' +
                     '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button>' +
                       '</div>';
@@ -40871,17 +41086,17 @@ async function deleteAcupointCombination(id) {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">組合名稱 *</label>
-                    <input type="text" id="herbNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="herbNameInput" value="${esc(item.name || '')}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
                     <select id="herbCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${(Array.isArray(herbComboCategories) && herbComboCategories.length > 0 ? herbComboCategories : categories.herbs).map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                      ${optionsHtml((Array.isArray(herbComboCategories) && herbComboCategories.length > 0 ? herbComboCategories : categories.herbs), item.category)}
                     </select>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">適應症描述</label>
-                    <textarea id="herbDescriptionTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="3">${item.description || ''}</textarea>
+                    <textarea id="herbDescriptionTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="3">${esc(item.description || '')}</textarea>
                   </div>
                   <!-- 先顯示搜尋欄，再列出已添加的藥材列表 -->
                   <div>
@@ -40906,27 +41121,27 @@ async function deleteAcupointCombination(id) {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">組合名稱 *</label>
-                    <input type="text" id="acupointNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="acupointNameInput" value="${esc(item.name || '')}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">分類</label>
                     <select id="acupointCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                      ${(Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0 ? acupointComboCategories : categories.acupoints).map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                      ${optionsHtml((Array.isArray(acupointComboCategories) && acupointComboCategories.length > 0 ? acupointComboCategories : categories.acupoints), item.category)}
                     </select>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">穴位列表</label>
                     <div id="acupointPoints" class="space-y-2">
-${item.points.map(pt => {
+${(Array.isArray(item.points) ? item.points : []).map(pt => {
   const nameVal = pt && pt.name ? pt.name : '';
-  return '<div class="flex items-center gap-2"><input type="text" value="' + nameVal + '" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button></div>';
+  return '<div class="flex items-center gap-2"><input type="text" value="' + esc(nameVal) + '" placeholder="穴位名稱" class="flex-1 px-2 py-1 border border-gray-300 rounded"><button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeParentElement(this)">刪除</button></div>';
 }).join('')}
                     </div>
                     <button onclick="addAcupointPointField()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ 新增穴位</button>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">針法</label>
-                    <input type="text" id="acupointTechniqueInput" value="${item.technique || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="acupointTechniqueInput" value="${esc(item.technique || '')}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                 </div>
               `;
@@ -40950,25 +41165,25 @@ ${item.points.map(pt => {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">模板名稱 *</label>
-                    <input type="text" id="prescriptionNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                    <input type="text" id="prescriptionNameInput" value="${esc(item.name || '')}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">分類</label>
                       <select id="prescriptionCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
-                        ${categories.prescriptions.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                        ${optionsHtml(categories.prescriptions, item.category)}
                       </select>
                     </div>
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">療程時間</label>
-                      <input type="text" id="prescriptionDurationInput" value="${item.duration || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                      <input type="text" id="prescriptionDurationInput" value="${esc(item.duration || '')}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                     </div>
                   </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">複診時間</label>
                       <div class="flex gap-2">
-                        <input type="number" id="prescriptionFollowUpNumberInput" value="${followNum}" min="1" class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                        <input type="number" id="prescriptionFollowUpNumberInput" value="${esc(followNum)}" min="1" class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                         <select id="prescriptionFollowUpUnitInput" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                           <option value="天" ${followUnit === '天' ? 'selected' : ''}>天</option>
                           <option value="周" ${followUnit === '周' ? 'selected' : ''}>周</option>
@@ -40978,12 +41193,12 @@ ${item.points.map(pt => {
                     </div>
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">中藥服用方法</label>
-                      <input type="text" id="prescriptionNoteInput" value="${item.note || ''}" placeholder="如：服藥完畢後" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
+                      <input type="text" id="prescriptionNoteInput" value="${esc(item.note || '')}" placeholder="如：服藥完畢後" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                     </div>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">醫囑內容及注意事項</label>
-                    <textarea id="prescriptionContentTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="5">${item.content || ''}</textarea>
+                    <textarea id="prescriptionContentTextarea" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none" rows="5">${esc(item.content || '')}</textarea>
                   </div>
                 </div>
               `;
@@ -40992,40 +41207,40 @@ ${item.points.map(pt => {
                 <div class="space-y-4">
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">模板名稱 *</label>
-                    <input type="text" id="diagnosisNameInput" value="${item.name}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="text" id="diagnosisNameInput" value="${esc(item.name || '')}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">科別</label>
                     <select id="diagnosisCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                      ${categories.diagnosis.map(cat => '<option value="' + cat + '" ' + (cat === item.category ? 'selected' : '') + '>' + cat + '</option>').join('')}
+                      ${optionsHtml(categories.diagnosis, item.category)}
                     </select>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">主訴</label>
-                    <textarea id="diagnosisChiefComplaintInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="3">${item.chiefComplaint || ''}</textarea>
+                    <textarea id="diagnosisChiefComplaintInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="3">${esc(item.chiefComplaint || '')}</textarea>
                   </div>
                   <div>
                     <label class="block text-gray-700 font-medium mb-2">現病史</label>
-                    <textarea id="diagnosisCurrentHistoryInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="6">${item.currentHistory || ''}</textarea>
+                    <textarea id="diagnosisCurrentHistoryInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="6">${esc(item.currentHistory || '')}</textarea>
                   </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">舌象</label>
-                      <textarea id="diagnosisTongueInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.tongue || ''}</textarea>
+                      <textarea id="diagnosisTongueInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${esc(item.tongue || '')}</textarea>
                     </div>
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">脈象</label>
-                      <textarea id="diagnosisPulseInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.pulse || ''}</textarea>
+                      <textarea id="diagnosisPulseInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${esc(item.pulse || '')}</textarea>
                     </div>
                   </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">中醫診斷</label>
-                      <textarea id="diagnosisTcmDiagnosisInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.tcmDiagnosis || ''}</textarea>
+                      <textarea id="diagnosisTcmDiagnosisInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${esc(item.tcmDiagnosis || '')}</textarea>
                     </div>
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">證型診斷</label>
-                      <textarea id="diagnosisSyndromeDiagnosisInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${item.syndromeDiagnosis || ''}</textarea>
+                      <textarea id="diagnosisSyndromeDiagnosisInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${esc(item.syndromeDiagnosis || '')}</textarea>
                     </div>
                   </div>
                 </div>
@@ -41348,7 +41563,6 @@ ${item.points.map(pt => {
             }
             // 顯示搜尋結果：移除劑量顯示並使用 tooltip 顯示詳細資料
             resultsList.innerHTML = matched.map(item => {
-              const safeName = (item.name || '').replace(/'/g, "\\'");
               // 構建詳細資訊內容
               const details = [];
               details.push('名稱：' + (item.name || ''));
@@ -41365,10 +41579,15 @@ ${item.points.map(pt => {
               }
               if (item.cautions) details.push('注意：' + item.cautions);
               const encoded = encodeURIComponent(details.join('\n'));
-              // 使用模板字串來組合 HTML，避免字串串接時的引號轉義錯誤
-              // 這裡使用單引號包裹 safeName 參數，並確保任何單引號都已在上方以 \\ 替換
-              return `<div class="p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addHerbToCombo('${safeName}', '')">${window.escapeHtml(item.name)}</div>`;
+              // 名稱以 data 屬性傳遞（經跳脫），點擊事件於渲染後統一綁定，
+              // 避免名稱含引號時截斷 inline onclick 屬性造成注入
+              return `<div class="p-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" data-add-herb-name="${window.escapeHtml(item.name || '')}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()">${window.escapeHtml(item.name)}</div>`;
             }).join('');
+            resultsList.querySelectorAll('[data-add-herb-name]').forEach(el => {
+              el.addEventListener('click', function() {
+                addHerbToCombo(this.getAttribute('data-add-herb-name'), '');
+              });
+            });
             resultsContainer.classList.remove('hidden');
             prescriptionSearchSelectionIndex = -1;
         }
@@ -41552,7 +41771,6 @@ ${item.points.map(pt => {
             }
             // 顯示搜尋結果，每個結果可點擊加入穴位清單，並顯示 tooltip 詳細資料
             resultsList.innerHTML = matched.map(item => {
-              const safeName = (item.name || '').replace(/'/g, "\\'");
               const details = [];
               details.push('名稱：' + (item.name || ''));
               if (item.meridian) details.push('經絡：' + item.meridian);
@@ -41568,10 +41786,15 @@ ${item.points.map(pt => {
               if (item.method) details.push('針法：' + item.method);
               if (item.category) details.push('分類：' + item.category);
               const encoded = encodeURIComponent(details.join('\n'));
-              // 使用模板字串來組合 HTML，避免字串串接時的引號轉義錯誤
-              // 注意 safeName 中的單引號已使用 \ 替換，因此可以安全地放入單引號包裹的 onclick 引數
-              return `<div class="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="addAcupointToCombo('${safeName}')">${window.escapeHtml(item.name)}</div>`;
+              // 名稱以 data 屬性傳遞（經跳脫），點擊事件於渲染後統一綁定，
+              // 避免名稱含引號時截斷 inline onclick 屬性造成注入
+              return `<div class="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded cursor-pointer text-center text-sm" data-tooltip="${encoded}" data-add-acupoint-name="${window.escapeHtml(item.name || '')}" onmouseenter="showTooltip(event, this.getAttribute('data-tooltip'))" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()">${window.escapeHtml(item.name)}</div>`;
             }).join('');
+            resultsList.querySelectorAll('[data-add-acupoint-name]').forEach(el => {
+              el.addEventListener('click', function() {
+                addAcupointToCombo(this.getAttribute('data-add-acupoint-name'));
+              });
+            });
             resultsContainer.classList.remove('hidden');
           }
 
