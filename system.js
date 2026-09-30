@@ -22669,7 +22669,13 @@ async function searchBillingForConsultation() {
                     updatePrescriptionDisplay();
                     try { updateMedicineFeeByDays(getTotalMedicationDays()); } catch (_e) {}
                 }
-                
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    const zhMsg = '已載入上次處方';
+                    const enMsg = 'Previous prescription loaded';
+                    const msg = lang === 'en' ? enMsg : zhMsg;
+                    showToast(msg, 'success');
+                }
             } catch (error) {
                 console.error('讀取病人資料錯誤:', error);
                 showToast('讀取病人資料失敗', 'error');
@@ -22851,6 +22857,13 @@ async function searchBillingForConsultation() {
                 }
                 // 更新顯示
                 updateBillingDisplay();
+                {
+                    const lang = localStorage.getItem('lang') || 'zh';
+                    const zhMsg = '已載入上次收費';
+                    const enMsg = 'Previous billing items loaded';
+                    const msg = lang === 'en' ? enMsg : zhMsg;
+                    showToast(msg, 'success');
+                }
             } catch (error) {
                 console.error('讀取病人資料錯誤:', error);
                 showToast('讀取病人資料失敗', 'error');
@@ -32749,24 +32762,35 @@ class FirebaseDataManager {
         }
     }
 
-    async getPatientConsultations(patientId, _forceRefresh = false) {
+    async getPatientConsultations(patientId, forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
 
         try {
-            // 若快取存在，直接回傳快取資料
-            if (patientConsultationsCache && Array.isArray(patientConsultationsCache[patientId])) {
+            // 若要求強制刷新，先清除該病人的快取，確保從 Firestore 重新讀取最新資料
+            if (forceRefresh) {
+                if (patientConsultationsCache) {
+                    delete patientConsultationsCache[patientId];
+                }
+                try {
+                    localStorage.removeItem('patientConsultations:' + String(patientId));
+                } catch (_lsCleanErr) {}
+            }
+            // 若快取存在（且未被強制清除），直接回傳快取資料
+            if (!forceRefresh && patientConsultationsCache && Array.isArray(patientConsultationsCache[patientId])) {
                 return { success: true, data: patientConsultationsCache[patientId] };
             }
-            try {
-                const stored = localStorage.getItem('patientConsultations:' + String(patientId));
-                if (stored) {
-                    const arr = JSON.parse(stored);
-                    if (Array.isArray(arr)) {
-                        patientConsultationsCache[patientId] = arr;
-                        return { success: true, data: arr };
+            if (!forceRefresh) {
+                try {
+                    const stored = localStorage.getItem('patientConsultations:' + String(patientId));
+                    if (stored) {
+                        const arr = JSON.parse(stored);
+                        if (Array.isArray(arr)) {
+                            patientConsultationsCache[patientId] = arr;
+                            return { success: true, data: arr };
+                        }
                     }
-                }
-            } catch (_lsErr) {}
+                } catch (_lsErr) {}
+            }
             /**
              * 改為直接使用 Firestore 查詢特定 patientId 的診療記錄，避免先讀取全部後再過濾。
              * 這樣可降低讀取量，僅在開啟病歷時讀取該病患相關的診療記錄。
