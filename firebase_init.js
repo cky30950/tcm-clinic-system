@@ -60,7 +60,7 @@ import { getAuth, signInWithEmailAndPassword, signOut, setPersistence,
         onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
 
 
-import firebaseConfig from './firebaseConfig.js';
+import firebaseConfig from './firebaseConfig.js?v=20261001b';
 
     const app = initializeApp(firebaseConfig);
     
