@@ -38,7 +38,17 @@
   X-Download-Options: noopen
   # HSTS（Strict-Transport-Security）強制 HTTPS 一年
   Strict-Transport-Security: max-age=31536000; includeSubDomains
-  # Content-Security-Policy 由 functions/_middleware.js 對每份 HTML 回應
-  # 逐請求核發（含一次性 nonce）：強制政策＋Report-Only 嚴格目標政策。
-  # 違規報告送至 /api/csp-report。勿在此再加靜態 CSP，否則兩份政策
-  # （一含 nonce、一不含）會同時生效而互相衝突。
+  # Content-Security-Policy（report-only 模式，先收集再強制）
+  # 之後可移除 -report-only 切換到強制執行
+  Content-Security-Policy-Report-Only:
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.cloudflareinsights.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    img-src 'self' data: blob: https:;
+    font-src 'self' https://fonts.gstatic.com data:;
+    connect-src 'self' https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://oauth2.googleapis.com https://fcm.googleapis.com https://challenges.cloudflare.com https://*.agora.io https://*.agoraio.cn https://www.googleapis.com;
+    frame-src 'self' https://challenges.cloudflare.com;
+    frame-ancestors 'none';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
