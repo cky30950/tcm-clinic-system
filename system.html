@@ -12,21 +12,21 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="名醫診所">
     <link rel="apple-touch-icon" href="/images/icons/apple-touch-icon.png">
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <script type="module" src="firebase_init.js?v=20261001b"></script>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/2.1.4/toastr.min.css" integrity="sha384-YzEqZ2pBV0i9OmlTyoz75PqwTR8If8GsXBv7HLQclEVqIC3VxIt98/U94ES6CJTR" crossorigin="anonymous" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/2.1.4/toastr.min.js" integrity="sha384-VDls8ImYGI8SwVxpmjX2Bn27U2TcNodzTNROTusVEWO55+lmL+H9NczoQJk6mwZR" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
     
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script src="acupointIntegration.js"></script>
     
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.25/dist/sweetalert2.all.min.js" integrity="sha384-nLoOnA/BDh8A/jxqtckg4DumuCGOBYUnNJLZdQz/zfYNp3wcjGSoWTAzgko06G/2" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Noto Sans TC', sans-serif; }
@@ -1091,7 +1091,7 @@
                             type="button"
                             onclick="openVideoConsultation()"
                             id="videoConsultBtn"
-                            class="inline-flex items-center gap-2 bg-white text-green-700 hover:bg-green-50 active:bg-green-100 font-semibold text-sm px-4 py-2 rounded-lg shadow transition duration-200 whitespace-nowrap"
+                            class="hidden inline-flex items-center gap-2 bg-white text-green-700 hover:bg-green-50 active:bg-green-100 font-semibold text-sm px-4 py-2 rounded-lg shadow transition duration-200 whitespace-nowrap"
                         >
                             <span aria-hidden="true">📹</span>
                             <span>視訊診症</span>
@@ -4586,7 +4586,981 @@
     <div class="notification" id="notification"></div>
 
     
+    <script type="text/removed">
+        // 全域變數
+        let currentDate = new Date();
+        let currentView = 'month';
+        let draggedShift = null;
+        let currentStaffFilter = 'all';
 
+        // 醫護人員資料
+        // 預設不使用任何示範用戶。實際人員資料將由 schedule_management.js 載入，
+        // 並儲存在全域 window.staff 中。此處僅從 window.staff 取得引用，若尚未載入則為空陣列。
+        let staff = window.staff || [];
+
+        // 管理員檢查與時間解析函式
+        // 判斷當前登入用戶是否具有管理員權限：當前用戶職位包含「管理」或郵件為 admin@clinic.com。
+        if (typeof window.isAdminUser !== 'function') {
+            window.isAdminUser = function () {
+                try {
+                    let user = null;
+                    if (typeof currentUserData !== 'undefined' && currentUserData) {
+                        user = currentUserData;
+                    } else if (typeof window.currentUserData !== 'undefined' && window.currentUserData) {
+                        user = window.currentUserData;
+                    } else if (typeof window.currentUser !== 'undefined' && window.currentUser) {
+                        user = window.currentUser;
+                    } else {
+                        user = {};
+                    }
+                    const pos = (user.position || user.role || '').toString().trim();
+                    const email = (user.email || '').toString().toLowerCase().trim();
+                    if (pos && (pos === '診所管理' || pos.includes('管理'))) {
+                        return true;
+                    }
+                    if (email === 'admin@clinic.com') {
+                        return true;
+                    }
+                    return false;
+                } catch (_e) {
+                    return false;
+                }
+            };
+        }
+
+        /**
+         * 確認是否為管理員。非管理員時顯示提示訊息並返回 false。
+         * @param {string} operationName 用於提示的操作描述
+         * @returns {boolean}
+         */
+        function ensureAdmin(operationName = '此操作') {
+            if (!window.isAdminUser || !window.isAdminUser()) {
+                const opText = operationName || '此操作';
+                showNotification('只有管理員才能執行' + opText + '！');
+                return false;
+            }
+            return true;
+        }
+
+        /**
+         * 將時間字串轉換為分鐘，支援 24:00 跨日情況。
+         * @param {string} timeStr 格式 HH:MM
+         * @returns {number}
+         */
+        function parseTimeToMinutes(timeStr) {
+            if (!timeStr) return 0;
+            const parts = timeStr.split(':');
+            const hh = parseInt(parts[0], 10);
+            const mm = parseInt(parts[1], 10) || 0;
+            if (!isNaN(hh) && hh >= 24) {
+                return 24 * 60 + (isNaN(mm) ? 0 : mm);
+            }
+            const hours = isNaN(hh) ? 0 : hh;
+            const minutes = isNaN(mm) ? 0 : mm;
+            return hours * 60 + minutes;
+        }
+
+        // 透過人員 ID 取得人員資料。由於 staff 可能尚未載入，或找不到對應人員，
+        // 因此此函式會從 window.staff 或本地 staff 陣列中查找，若無結果則回傳預設物件。
+        function getStaffMemberById(id) {
+            // 嘗試從最新的 window.staff 取得
+            const arr = (window.staff && Array.isArray(window.staff)) ? window.staff : staff;
+            const member = Array.isArray(arr) ? arr.find(s => s.id == id) : undefined;
+            // 如果沒有找到，提供預設值以避免 undefined 屬性存取錯誤
+            return member || {
+                id: id,
+                name: '未知人員',
+                role: '',
+                department: '',
+                level: '',
+                phone: '',
+                email: ''
+            };
+        }
+
+        // 包裝函式：處理班表上按鈕點擊，避免 inline 事件包含多個語句而無法被 system.js 解析。
+        // 這些函式會處理事件的 stopPropagation / preventDefault，然後呼叫實際的編輯或刪除函式。
+        function handleEditShift(e, shiftId) {
+            if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+            // 如果 scheduleEditShift 函式存在（由 schedule_management.js 或其他腳本暴露），優先使用
+            if (typeof window.scheduleEditShift === 'function') {
+                window.scheduleEditShift(shiftId);
+            } else if (typeof editShift === 'function') {
+                // 否則退回本地定義的 editShift
+                editShift(shiftId);
+            }
+        }
+
+        function handleDeleteShift(e, shiftId) {
+            if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+            if (e && typeof e.preventDefault === 'function') e.preventDefault();
+            if (typeof window.scheduleDeleteShift === 'function') {
+                window.scheduleDeleteShift(shiftId);
+            } else if (typeof deleteShift === 'function') {
+                deleteShift(shiftId);
+            }
+        }
+
+        // 將包裝函式掛載到全域（window），供 inline 事件呼叫
+        window.handleEditShift = handleEditShift;
+        window.handleDeleteShift = handleDeleteShift;
+
+        // 排班資料 - 使用當前月份的日期
+        let shifts = [];
+
+        // 初始化一些示範排班資料
+        function initializeSampleShifts() {
+            const today = new Date();
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+
+            // 確保使用一致的日期，避免視圖間不同步
+            const baseDate = 26; // 統一使用26號作為示範日期
+
+            shifts = [
+                { id: 1, staffId: 1, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${baseDate.toString().padStart(2, '0')}`, startTime: '08:00', endTime: '16:00', type: 'morning', status: 'confirmed', notes: '門診' },
+                { id: 2, staffId: 4, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${baseDate.toString().padStart(2, '0')}`, startTime: '08:00', endTime: '16:00', type: 'morning', status: 'confirmed', notes: '病房' },
+                { id: 3, staffId: 2, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate + 1).toString().padStart(2, '0')}`, startTime: '16:00', endTime: '24:00', type: 'afternoon', status: 'pending', notes: '手術房' },
+                { id: 4, staffId: 5, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate + 1).toString().padStart(2, '0')}`, startTime: '16:00', endTime: '24:00', type: 'afternoon', status: 'confirmed', notes: '病房' },
+                { id: 5, staffId: 3, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate + 2).toString().padStart(2, '0')}`, startTime: '00:00', endTime: '08:00', type: 'night', status: 'confirmed', notes: '急診' },
+                { id: 6, staffId: 6, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate + 2).toString().padStart(2, '0')}`, startTime: '00:00', endTime: '08:00', type: 'night', status: 'confirmed', notes: '急診' },
+                { id: 7, staffId: 7, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate - 1).toString().padStart(2, '0')}`, startTime: '09:00', endTime: '17:00', type: 'morning', status: 'confirmed', notes: '兒科門診' },
+                { id: 8, staffId: 8, date: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${(baseDate - 1).toString().padStart(2, '0')}`, startTime: '09:00', endTime: '17:00', type: 'morning', status: 'confirmed', notes: '兒科病房' }
+            ];
+        }
+
+        // 篩選狀態
+        let currentFilters = {
+            department: '',
+            role: '',
+            shiftType: '',
+            staffSearch: ''
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 不再載入示範排班資料
+            updateCurrentDate();
+            renderCalendar();
+            renderStaffPanel();
+            setupEventListeners();
+            updateStats();
+        });
+
+        // 設定事件監聽器
+        function setupEventListeners() {
+            // 班別選擇變更
+            document.getElementById('shiftType').addEventListener('change', function() {
+                const type = this.value;
+                const startTime = document.getElementById('startTime');
+                const endTime = document.getElementById('endTime');
+
+                switch(type) {
+                    case 'morning':
+                        startTime.value = '08:00';
+                        endTime.value = '16:00';
+                        break;
+                    case 'afternoon':
+                        startTime.value = '16:00';
+                        endTime.value = '24:00';
+                        break;
+                    case 'night':
+                        startTime.value = '00:00';
+                        endTime.value = '08:00';
+                        break;
+                }
+            });
+
+            // 固定排班班別選擇變更
+            document.getElementById('fixedShiftType').addEventListener('change', function() {
+                const type = this.value;
+                const customTimeGroup = document.getElementById('customTimeGroup');
+                const startTime = document.getElementById('fixedStartTime');
+                const endTime = document.getElementById('fixedEndTime');
+
+                if (type === 'custom') {
+                    customTimeGroup.style.display = 'block';
+                } else {
+                    customTimeGroup.style.display = 'none';
+                    switch(type) {
+                        case 'morning':
+                            startTime.value = '08:00';
+                            endTime.value = '16:00';
+                            break;
+                        case 'afternoon':
+                            startTime.value = '16:00';
+                            endTime.value = '24:00';
+                            break;
+                        case 'night':
+                            startTime.value = '00:00';
+                            endTime.value = '08:00';
+                            break;
+                    }
+                }
+            });
+
+            // 排程範圍選擇變更
+            document.getElementById('scheduleRange').addEventListener('change', function() {
+                const customRangeGroup = document.getElementById('customRangeGroup');
+                if (this.value === 'custom-range') {
+                    customRangeGroup.style.display = 'block';
+                } else {
+                    customRangeGroup.style.display = 'none';
+                }
+            });
+
+            // 表單提交
+            document.getElementById('shiftForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                addShift();
+            });
+
+            // 固定排班表單提交
+            document.getElementById('fixedScheduleForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                createFixedSchedule();
+            });
+        }
+
+        // 更新當前日期顯示
+        function updateCurrentDate() {
+            const options = { year: 'numeric', month: 'long' };
+            document.getElementById('currentDate').textContent = currentDate.toLocaleDateString('zh-TW', options);
+        }
+
+        // 導航行事曆
+        function navigateCalendar(direction) {
+            currentDate.setMonth(currentDate.getMonth() + direction);
+            updateCurrentDate();
+            renderCalendar();
+        }
+
+        // 切換視圖（僅保留月視圖）
+        function changeView(view) {
+            // 僅支援月視圖
+            currentView = 'month';
+            updateCurrentDate();
+            renderCalendar();
+        }
+
+        // 渲染行事曆
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            grid.className = 'calendar-grid month-view';
+            renderMonthView(grid);
+        }
+
+        // 渲染月視圖
+        function renderMonthView(grid) {
+            // 添加星期標題
+            const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+            weekdays.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'calendar-header';
+                header.textContent = day;
+                grid.appendChild(header);
+            });
+
+            // 獲取月份的第一天和最後一天
+            const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+            const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+            // 渲染42個格子（6週）
+            for (let i = 0; i < 42; i++) {
+                const cellDate = new Date(startDate);
+                cellDate.setDate(startDate.getDate() + i);
+
+                const cell = document.createElement('div');
+                cell.className = 'calendar-cell';
+                cell.dataset.date = cellDate.toISOString().split('T')[0];
+
+                if (cellDate.getMonth() !== currentDate.getMonth()) {
+                    cell.classList.add('other-month');
+                }
+
+                if (isToday(cellDate)) {
+                    cell.classList.add('today');
+                }
+
+                const dayNumber = document.createElement('div');
+                dayNumber.className = 'day-number';
+                dayNumber.textContent = cellDate.getDate();
+                cell.appendChild(dayNumber);
+
+                // 添加排班
+                const dayShifts = getShiftsForDate(cellDate).filter(passesFilter);
+                dayShifts.forEach(shift => {
+                    const shiftElement = createShiftElement(shift);
+                    cell.appendChild(shiftElement);
+                });
+
+                // 添加拖放功能
+                setupCellDropZone(cell);
+
+                grid.appendChild(cell);
+            }
+        }
+
+
+
+        // 創建排班元素
+        function createShiftElement(shift) {
+            const staffMember = getStaffMemberById(shift.staffId);
+            const element = document.createElement('div');
+
+            // 設定基礎樣式
+            let shiftClasses = `shift-item ${staffMember.role}`;
+            if (shift.type === 'emergency') shiftClasses += ' emergency';
+            if (shift.status === 'overtime') shiftClasses += ' overtime';
+
+            element.className = shiftClasses;
+            element.draggable = true;
+            element.dataset.shiftId = shift.id;
+
+            // 計算時數並獲取狀態圖示
+            const duration = calculateShiftDuration(shift.startTime, shift.endTime);
+            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌';
+
+            // 判斷是否為管理員以決定是否顯示操作按鈕
+            const isAdmin = window.isAdminUser && window.isAdminUser();
+            let actionsHtml = '';
+            if (isAdmin) {
+                actionsHtml = `<div class="shift-actions">
+                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
+                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="刪除">🗑️</button>
+                    </div>`;
+            }
+
+            // 組合內部 HTML，非管理員將不顯示操作按鈕
+            element.innerHTML = `
+                <div class="shift-header">
+                    <div class="shift-name">${staffMember.name}</div>
+                    ${actionsHtml}
+                </div>
+                <div class="shift-details">
+                    ${shift.startTime}-${shift.endTime} (${duration}h)<br>
+                    ${statusIcon} ${shift.notes || '一般排班'}<br>
+                    <small>${staffMember.department} - ${staffMember.level}</small>
+                </div>
+            `;
+
+            // 拖拽事件
+            element.addEventListener('dragstart', function(e) {
+                draggedShift = shift;
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            element.addEventListener('dragend', function() {
+                this.classList.remove('dragging');
+                draggedShift = null;
+            });
+
+            // 點擊事件（防止拖拽時觸發）
+            element.addEventListener('click', function(e) {
+                if (!e.target.classList.contains('shift-action-btn')) {
+                    showShiftDetails(shift);
+                }
+            });
+
+            return element;
+        }
+
+        // 計算排班時數（使用分鐘計算，支援跨日與 24:00）
+        function calculateShiftDuration(startTime, endTime) {
+            let startMinutes = parseTimeToMinutes(startTime);
+            let endMinutes = parseTimeToMinutes(endTime);
+            // 若結束分鐘小於等於開始分鐘，表示跨日，需補 24 小時
+            if (endMinutes <= startMinutes) {
+                endMinutes += 24 * 60;
+            }
+            const durationMinutes = endMinutes - startMinutes;
+            return Math.round((durationMinutes / 60) * 10) / 10;
+        }
+
+        // 設定格子拖放區域
+        function setupCellDropZone(cell) {
+            cell.addEventListener('dragover', function(e) {
+                e.preventDefault();
+
+                // 檢查是否是人員拖拽或排班拖拽
+                const staffId = e.dataTransfer.getData('text/plain');
+                if (staffId) {
+                    e.dataTransfer.dropEffect = 'copy';
+                } else if (draggedShift) {
+                    e.dataTransfer.dropEffect = 'move';
+                }
+
+                this.classList.add('drop-zone');
+            });
+
+            cell.addEventListener('dragleave', function(e) {
+                // 只有當滑鼠真正離開格子時才移除樣式
+                if (!this.contains(e.relatedTarget)) {
+                    this.classList.remove('drop-zone');
+                }
+            });
+
+            cell.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('drop-zone');
+
+                // 僅限管理員可操作拖拽新增或移動排班
+                if (!ensureAdmin('新增或移動排班')) {
+                    return;
+                }
+
+                const staffId = e.dataTransfer.getData('text/plain');
+
+                if (staffId) {
+                    // 人員拖拽 - 快速新增排班
+                    const staffMember = getStaffMemberById(staffId);
+                    // 如果找到有效人員則快速新增排班；若為未知人員則不處理
+                    if (staffMember && staffMember.name !== '未知人員') {
+                        quickAddShiftFromDrag(staffMember, this.dataset.date);
+                    }
+                } else if (draggedShift) {
+                    // 排班拖拽 - 移動排班
+                    const newDate = this.dataset.date;
+                    // 更新排班日期
+                    draggedShift.date = newDate;
+                    renderCalendar();
+                    showNotification('排班已成功移動！');
+                }
+            });
+
+            // 點擊添加排班
+            cell.addEventListener('click', function(e) {
+                // 避免在拖拽操作時觸發點擊
+                if (!e.target.closest('.shift-item')) {
+                    openShiftModal(this.dataset.date);
+                }
+            });
+        }
+
+        // 快速新增排班（從拖拽）
+        function quickAddShiftFromDrag(staffMember, date, hour) {
+            // 僅允許管理員執行快速新增排班
+            if (!ensureAdmin('新增排班')) {
+                return;
+            }
+            // 月視圖 - 預設早班
+            const startTime = '08:00';
+            const endTime = '16:00';
+            const shiftType = 'morning';
+
+            // 檢查是否已有排班衝突
+            const existingShift = shifts.find(s =>
+                s.staffId === staffMember.id &&
+                s.date === date &&
+                s.startTime === startTime
+            );
+
+            if (existingShift) {
+                showNotification(`${staffMember.name} 在該時段已有排班！`);
+                return;
+            }
+
+            // 新增排班
+            const newShift = {
+                id: Date.now(),
+                staffId: staffMember.id,
+                date: date,
+                startTime: startTime,
+                endTime: endTime,
+                type: shiftType,
+                status: 'confirmed',
+                notes: '拖拽快速新增'
+            };
+
+            shifts.push(newShift);
+            renderCalendar();
+            renderStaffPanel(); // 更新人員狀態
+            updateStats();
+
+            const shiftTypeName = getShiftTypeName(shiftType);
+            showNotification(`已為 ${staffMember.name} 新增 ${shiftTypeName} (${startTime}-${endTime})！`);
+        }
+
+        // 輔助函數
+        function isToday(date) {
+            const today = new Date();
+            return date.toDateString() === today.toDateString();
+        }
+
+        function getShiftsForDate(date) {
+            const dateStr = date.toISOString().split('T')[0];
+            return shifts.filter(shift => shift.date === dateStr);
+        }
+
+        // 渲染人員面板
+        function renderStaffPanel() {
+            const grid = document.getElementById('staffGrid');
+            grid.innerHTML = '';
+
+            const filteredStaff = getFilteredStaff();
+
+            filteredStaff.forEach(member => {
+                const card = document.createElement('div');
+                card.className = `staff-card ${member.role}`;
+                card.draggable = true;
+                card.dataset.staffId = member.id;
+
+
+
+                card.innerHTML = `
+                    <div class="staff-name">${member.name}</div>
+                    <div class="drag-hint">🖱️</div>
+                `;
+
+                // 設定拖拽事件
+                setupStaffDragEvents(card, member);
+
+                grid.appendChild(card);
+            });
+
+            // 更新人員選擇下拉選單
+            updateStaffSelects();
+        }
+
+        // 設定人員拖拽事件
+        function setupStaffDragEvents(card, member) {
+            let draggedStaffMember = null;
+
+            card.addEventListener('dragstart', function(e) {
+                draggedStaffMember = member;
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'copy';
+                e.dataTransfer.setData('text/plain', member.id);
+
+                // 高亮可放置的區域
+                document.querySelectorAll('.calendar-cell').forEach(cell => {
+                    cell.classList.add('drop-target');
+                });
+            });
+
+            card.addEventListener('dragend', function() {
+                this.classList.remove('dragging');
+                draggedStaffMember = null;
+
+                // 移除高亮
+                document.querySelectorAll('.calendar-cell').forEach(cell => {
+                    cell.classList.remove('drop-target');
+                });
+            });
+
+            // 儲存到全域變數供其他函數使用
+            card.draggedStaffMember = member;
+        }
+
+        // 獲取篩選後的人員
+        function getFilteredStaff() {
+            const filter = currentStaffFilter || 'all';
+
+            switch (filter) {
+                case 'doctor':
+                    return staff.filter(s => s.role === 'doctor');
+                case 'nurse':
+                    return staff.filter(s => s.role === 'nurse');
+                default:
+                    return staff;
+            }
+        }
+
+        // 獲取今日人員排班
+        function getTodayShiftsForStaff(staffId) {
+            const today = new Date().toISOString().split('T')[0];
+            return shifts.filter(shift => shift.staffId === staffId && shift.date === today);
+        }
+
+        // 獲取人員狀態
+        function getStaffStatus(staffId, todayShifts) {
+            if (todayShifts.length === 0) {
+                return { class: '', icon: '✅', text: '可排班' };
+            } else if (todayShifts.length === 1) {
+                return { class: 'partial', icon: '⏰', text: '已排班' };
+            } else {
+                return { class: 'busy', icon: '🔴', text: '滿班' };
+            }
+        }
+
+        // 更新人員選擇下拉選單
+        function updateStaffSelects() {
+            const select = document.getElementById('staffSelect');
+            select.innerHTML = '';
+            staff.forEach(member => {
+                const option = document.createElement('option');
+                option.value = member.id;
+                option.textContent = `${member.name} (${member.role === 'doctor' ? '醫師' : '護理師'})`;
+                select.appendChild(option);
+            });
+
+            // 更新固定排班人員選擇下拉選單
+            const fixedSelect = document.getElementById('fixedStaffSelect');
+            if (fixedSelect) {
+                fixedSelect.innerHTML = '';
+                staff.forEach(member => {
+                    const option = document.createElement('option');
+                    option.value = member.id;
+                    option.textContent = `${member.name} (${member.role === 'doctor' ? '醫師' : '護理師'}) - ${member.department}`;
+                    fixedSelect.appendChild(option);
+                });
+            }
+        }
+
+        // 模態框操作
+        function openShiftModal(date = null, staffId = null) {
+            // 僅允許管理員開啟新增或編輯排班視窗
+            if (!ensureAdmin('新增或編輯排班')) {
+                return;
+            }
+            const modal = document.getElementById('shiftModal');
+            const form = document.getElementById('shiftForm');
+
+            // 重置表單
+            form.reset();
+
+            // 設定預設值
+            if (date) {
+                document.getElementById('shiftDate').value = date;
+            } else {
+                document.getElementById('shiftDate').value = currentDate.toISOString().split('T')[0];
+            }
+
+            if (staffId) {
+                document.getElementById('staffSelect').value = staffId;
+            }
+
+            // 設定預設時間
+            document.getElementById('startTime').value = '08:00';
+            document.getElementById('endTime').value = '16:00';
+            // 清空備註欄位（若存在）
+            if (document.getElementById('shiftNotes')) {
+                document.getElementById('shiftNotes').value = '';
+            }
+            modal.classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('shiftModal').classList.remove('show');
+        }
+
+        // 新增排班
+        function addShift() {
+            // 僅允許管理員新增或編輯排班
+            if (!ensureAdmin('新增或編輯排班')) {
+                return;
+            }
+            const form = document.getElementById('shiftForm');
+            const modal = document.getElementById('shiftModal');
+            const editId = modal.dataset.editId;
+
+            // 驗證必填欄位
+            const staffId = document.getElementById('staffSelect').value;
+            const date = document.getElementById('shiftDate').value;
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            const type = document.getElementById('shiftType').value;
+
+            if (!staffId || !date || !startTime || !endTime || !type) {
+                alert('請填寫所有必填欄位！');
+                return;
+            }
+
+            const shiftData = {
+                staffId: parseInt(staffId),
+                date: date,
+                startTime: startTime,
+                endTime: endTime,
+                type: type,
+                status: 'confirmed',
+                notes: document.getElementById('shiftNotes') ? document.getElementById('shiftNotes').value : ''
+            };
+
+            if (editId) {
+                // 編輯模式
+                const shiftIndex = shifts.findIndex(s => s.id == editId);
+                if (shiftIndex !== -1) {
+                    shifts[shiftIndex] = { ...shifts[shiftIndex], ...shiftData };
+                    showNotification('排班更新成功！');
+                }
+                delete modal.dataset.editId;
+                modal.querySelector('h3').textContent = '新增排班';
+            } else {
+                // 新增模式
+                const newShift = {
+                    id: Date.now(),
+                    ...shiftData
+                };
+                shifts.push(newShift);
+                showNotification('排班新增成功！');
+            }
+
+            // 重置表單並關閉視窗
+            form.reset();
+            modal.classList.remove('show');
+
+            // 更新顯示
+            renderCalendar();
+            updateStats();
+        }
+
+        // 已移除同步至 Google Calendar 功能，原有程式碼已刪除
+
+        // 匯出 iCal
+        function exportToICal() {
+            let icalContent = [
+                'BEGIN:VCALENDAR',
+                'VERSION:2.0',
+                'PRODID:-//醫療排班系統//排班行事曆//ZH',
+                'CALSCALE:GREGORIAN'
+            ];
+
+            shifts.forEach(shift => {
+                const staffMember = getStaffMemberById(shift.staffId);
+                // 計算跨日與 24:00 結束的班次
+                let endDateStr = shift.date;
+                let endTimeStr = shift.endTime;
+                const startMinutes = parseTimeToMinutes(shift.startTime);
+                let endMinutes = parseTimeToMinutes(shift.endTime);
+                if (endMinutes <= startMinutes || endMinutes >= 24 * 60) {
+                    const dateObj = new Date(shift.date);
+                    dateObj.setDate(dateObj.getDate() + 1);
+                    endDateStr = dateObj.toISOString().split('T')[0];
+                    if (endMinutes >= 24 * 60) {
+                        endTimeStr = '00:00';
+                    }
+                }
+                const startDateTime = `${shift.date.replace(/-/g, '')}T${shift.startTime.replace(':', '')}00`;
+                const endDateTime = `${endDateStr.replace(/-/g, '')}T${endTimeStr.replace(':', '')}00`;
+                // 組合描述，僅包含班別與備註
+                let descriptionLines = [];
+                descriptionLines.push(`班別: ${shift.type}`);
+                if (shift.notes) {
+                    descriptionLines.push(`備註: ${shift.notes}`);
+                }
+                const descriptionString = descriptionLines.join('\\n');
+                icalContent.push(
+                    'BEGIN:VEVENT',
+                    `UID:${shift.id}@medical-schedule.com`,
+                    `DTSTART:${startDateTime}`,
+                    `DTEND:${endDateTime}`,
+                    `SUMMARY:${staffMember.name} - ${staffMember.role === 'doctor' ? '醫師' : '護理師'}排班`,
+                    `DESCRIPTION:${descriptionString}`,
+                    `LOCATION:醫院`,
+                    'END:VEVENT'
+                );
+            });
+
+            icalContent.push('END:VCALENDAR');
+
+            // 創建下載連結
+            const blob = new Blob([icalContent.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = '醫療排班行事曆.ics';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            showNotification('iCal 檔案已下載！');
+        }
+
+        // 新增功能函數
+
+        // 回到今天
+        function goToToday() {
+            currentDate = new Date();
+            updateCurrentDate();
+            renderCalendar();
+            updateStats();
+        }
+
+        // 應用篩選
+        function applyFilters() {
+            // The department filter has been removed from the UI.  Always use a
+            // blank string so that all departments are shown and avoid querying
+            // a non‑existent DOM element.
+            currentFilters.department = '';
+
+            // Retrieve the remaining filters.  These inputs still exist.
+            currentFilters.role = document.getElementById('roleFilter').value;
+            currentFilters.shiftType = document.getElementById('shiftTypeFilter').value;
+            currentFilters.staffSearch = document.getElementById('staffSearch').value.toLowerCase();
+
+            renderCalendar();
+            updateStats();
+        }
+
+        // 檢查排班是否符合篩選條件
+        function passesFilter(shift) {
+            const staffMember = getStaffMemberById(shift.staffId);
+
+            // Department filtering has been disabled.  Do not restrict by department.
+            if (currentFilters.role && staffMember.role !== currentFilters.role) return false;
+            if (currentFilters.shiftType && shift.type !== currentFilters.shiftType) return false;
+            if (currentFilters.staffSearch && !staffMember.name.toLowerCase().includes(currentFilters.staffSearch)) return false;
+
+            return true;
+        }
+
+        // 更新統計資訊
+        function updateStats() {
+            // 統計功能已移除，保留函數以避免錯誤
+        }
+
+
+
+        // 檢查衝突
+        function checkConflicts() {
+            const conflicts = checkAllConflicts();
+
+            if (conflicts.length === 0) {
+                showNotification('沒有發現排班衝突！');
+                return;
+            }
+
+            let message = `發現 ${conflicts.length} 個排班衝突：\n\n`;
+            conflicts.forEach((conflict, index) => {
+                const staff1 = getStaffMemberById(conflict.shift1.staffId);
+                const staff2 = getStaffMemberById(conflict.shift2.staffId);
+                message += `${index + 1}. ${staff1.name} 在 ${conflict.shift1.date} 有重疊排班\n`;
+            });
+
+            alert(message);
+        }
+
+        // 檢查所有衝突
+        function checkAllConflicts() {
+            const conflicts = [];
+            for (let i = 0; i < shifts.length; i++) {
+                for (let j = i + 1; j < shifts.length; j++) {
+                    const shift1 = shifts[i];
+                    const shift2 = shifts[j];
+                    if (shift1.staffId === shift2.staffId && shift1.date === shift2.date) {
+                        let start1 = parseTimeToMinutes(shift1.startTime);
+                        let end1 = parseTimeToMinutes(shift1.endTime);
+                        let start2 = parseTimeToMinutes(shift2.startTime);
+                        let end2 = parseTimeToMinutes(shift2.endTime);
+                        // 處理跨日情況：若結束時間小於或等於開始時間，補加 24 小時
+                        if (end1 <= start1) end1 += 24 * 60;
+                        if (end2 <= start2) end2 += 24 * 60;
+                        // 判定是否重疊
+                        if (start1 < end2 && start2 < end1) {
+                            conflicts.push({ shift1, shift2 });
+                        }
+                    }
+                }
+            }
+            return conflicts;
+        }
+
+        // 清空所有排班
+        function clearAllShifts() {
+            // 僅允許管理員清空排班
+            if (!ensureAdmin('清空所有排班')) {
+                return;
+            }
+            if (confirm('確定要清空所有排班嗎？此操作無法復原。')) {
+                shifts = [];
+                renderCalendar();
+                updateStats();
+                showNotification('所有排班已清空！');
+            }
+        }
+
+        // 編輯排班
+        function editShift(shiftId) {
+            // 僅允許管理員編輯排班
+            if (!ensureAdmin('編輯排班')) {
+                return;
+            }
+            const shift = shifts.find(s => s.id === shiftId);
+            if (!shift) return;
+
+            // 填入現有資料到表單
+            document.getElementById('staffSelect').value = shift.staffId;
+            document.getElementById('shiftDate').value = shift.date;
+            document.getElementById('startTime').value = shift.startTime;
+            document.getElementById('endTime').value = shift.endTime;
+            document.getElementById('shiftType').value = shift.type;
+
+            // 標記為編輯模式
+            const modal = document.getElementById('shiftModal');
+            modal.dataset.editId = shiftId;
+            modal.querySelector('h3').textContent = '編輯排班';
+            modal.classList.add('show');
+        }
+
+        // 刪除排班
+        function deleteShift(shiftId) {
+
+            // 僅允許管理員刪除排班
+            if (!ensureAdmin('刪除排班')) {
+                return;
+            }
+
+            // 事件傳播在 handleDeleteShift 中處理，此函式僅執行刪除邏輯
+
+            // 獲取排班資訊用於確認對話框
+            const shift = shifts.find(s => s.id == shiftId);
+            if (!shift) {
+                showNotification('找不到要刪除的排班！');
+                return;
+            }
+
+            const staffMember = getStaffMemberById(shift.staffId);
+            const confirmMessage = `確定要刪除以下排班嗎？\n\n` +
+                                 `人員：${staffMember.name}\n` +
+                                 `日期：${shift.date}\n` +
+                                 `時間：${shift.startTime} - ${shift.endTime}\n` +
+                                 `備註：${shift.notes || '無'}\n\n` +
+                                 `此操作無法復原！`;
+
+            if (confirm(confirmMessage)) {
+                const shiftIndex = shifts.findIndex(s => s.id == shiftId);
+                if (shiftIndex !== -1) {
+                    shifts.splice(shiftIndex, 1);
+                    renderCalendar();
+                    updateStats();
+                    showNotification('排班已刪除！');
+                } else {
+                    showNotification('刪除失敗：找不到排班資料！');
+                }
+            }
+        }
+
+        // 顯示排班詳情
+        function showShiftDetails(shift) {
+            const staffMember = getStaffMemberById(shift.staffId);
+            const duration = calculateShiftDuration(shift.startTime, shift.endTime);
+
+            // 顯示排班詳情，移除部門與狀態資訊以簡化顯示
+            alert(`排班詳情：
+姓名：${staffMember.name}
+職位：${staffMember.level}
+日期：${shift.date}
+時間：${shift.startTime} - ${shift.endTime} (${duration} 小時)
+備註：${shift.notes || '無'}
+聯絡電話：${staffMember.phone}
+電子郵件：${staffMember.email}`);
+        }
+
+        // 根據ID顯示排班詳情
+        function showShiftDetailsById(shiftId) {
+            const shift = shifts.find(s => s.id === shiftId);
+            if (shift) {
+                showShiftDetails(shift);
+            }
+        }
+
+        // 列印排班表功能已移除，以下函式不再使用
+    </script>
     
 </div>
 
@@ -4677,27 +5651,20 @@
 
     <div id="tooltip" class="hidden pointer-events-none fixed bg-gray-800 text-white text-xs px-3 py-1 rounded-lg shadow-lg z-50 whitespace-pre-line" style="z-index: 2147483647;"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@04f46c6a0708418cb7b96fc563eacae0fbf77674/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@04f46c6a0708418cb7b96fc563eacae0fbf77674/qrcode.min.js"></script>
 
-    <script src="version-config.js"></script>
+    <script src="version-config.js" defer></script>
     <script src="pwa.js?v=20260923b" defer></script>
-    <script src="schedule_management.js"></script><script src="system.js?v=20261001b"></script>
-    <script src="attachments.js"></script>
-    <script src="personalStatistics.js"></script>
-    
-    <script src="systemmanagement.js"></script>
-    
-    <script src="chat_module.js"></script>
-    
-    <script src="i18n.js"></script>
+    <script src="schedule_management.js" defer></script>
+    <script src="system.js?v=20261001b" defer></script>
+    <script src="attachments.js" defer></script>
+    <script src="personalStatistics.js" defer></script>
+    <script src="systemmanagement.js" defer></script>
+    <script src="chat_module.js" defer></script>
+    <script src="i18n.js" defer></script>
 
-    <!-- Agora 視訊診症：設定檔 → RTC SDK 原生 → 通話介面模組 → 醫師端整合（統一放在 video/） -->
-    <script src="video/agora-config.js"></script>
-    <script src="video/agora-rtc-sdk.js"></script>
-    <script src="video/agora-call.js"></script>
-    <script src="video/video-presence.js"></script>
-    <script src="video/video-consent.js"></script>
-    <script src="video/video-consultation.js"></script>
+    <!-- 視訊診症延遲載入器：只有醫師點擊「視訊診症」時才動態下載 Agora SDK -->
+    <script src="video/video-loader.js" defer></script>
 </body>
 </html>
