@@ -1091,7 +1091,7 @@
                             type="button"
                             onclick="openVideoConsultation()"
                             id="videoConsultBtn"
-                            class="inline-flex items-center gap-2 bg-white text-green-700 hover:bg-green-50 active:bg-green-100 font-semibold text-sm px-4 py-2 rounded-lg shadow transition duration-200 whitespace-nowrap"
+                            class="hidden inline-flex items-center gap-2 bg-white text-green-700 hover:bg-green-50 active:bg-green-100 font-semibold text-sm px-4 py-2 rounded-lg shadow transition duration-200 whitespace-nowrap"
                         >
                             <span aria-hidden="true">📹</span>
                             <span>視訊診症</span>
@@ -5654,24 +5654,17 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@04f46c6a0708418cb7b96fc563eacae0fbf77674/qrcode.min.js"></script>
 
-    <script src="version-config.js"></script>
+    <script src="version-config.js" defer></script>
     <script src="pwa.js?v=20260923b" defer></script>
-    <script src="schedule_management.js"></script><script src="system.js?v=20261001b"></script>
-    <script src="attachments.js"></script>
-    <script src="personalStatistics.js"></script>
-    
-    <script src="systemmanagement.js"></script>
-    
-    <script src="chat_module.js"></script>
-    
-    <script src="i18n.js"></script>
+    <script src="schedule_management.js" defer></script>
+    <script src="system.js?v=20261001b" defer></script>
+    <script src="attachments.js" defer></script>
+    <script src="personalStatistics.js" defer></script>
+    <script src="systemmanagement.js" defer></script>
+    <script src="chat_module.js" defer></script>
+    <script src="i18n.js" defer></script>
 
-    <!-- Agora 視訊診症：設定檔 → RTC SDK 原生 → 通話介面模組 → 醫師端整合（統一放在 video/） -->
-    <script src="video/agora-config.js"></script>
-    <script src="video/agora-rtc-sdk.js"></script>
-    <script src="video/agora-call.js"></script>
-    <script src="video/video-presence.js"></script>
-    <script src="video/video-consent.js"></script>
-    <script src="video/video-consultation.js"></script>
+    <!-- 視訊診症延遲載入器：只有醫師點擊「視訊診症」時才動態下載 Agora SDK -->
+    <script src="video/video-loader.js" defer></script>
 </body>
 </html>

@@ -12,13 +12,17 @@
 /sw.js
   Cache-Control: no-cache, must-revalidate
 
-# ── 靜態資源（帶 hash 的 JS/CSS/圖片）長快取 ──
-# build 產生時帶 content hash，內容改變時檔名改變，瀏覽器會自動拉新版。
-# 設 immutable 告知瀏覽器永遠不會有更新版本的同一檔案。
+# ── 靜態資源快取 ──
+# 專案目前沒有 build + content hash 機制（package.json 無 build 腳本），
+# 所有 JS/CSS 檔名固定（system.js / chat_module.js / style.css ...）。
+# 若設長快取，安全修復最長一年送不到舊用戶端（含 SW 背景更新也會
+# 命中瀏覽器舊快取）。因此 JS/CSS 先用 no-cache 強制向原站驗證（允許
+# 304，Cloudflare Pages 自產 ETag，效能影響極小）。未來上 hash 檔名後
+# 可改回 immutable。圖片內容很少變且非安全風險，保留長快取。
 /*.js
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: no-cache, must-revalidate
 /*.css
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: no-cache, must-revalidate
 /images/*
   Cache-Control: public, max-age=31536000, immutable
 
@@ -42,8 +46,8 @@
   # 之後可移除 -report-only 切換到強制執行
   Content-Security-Policy-Report-Only:
     default-src 'self';
-    script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.cloudflareinsights.com;
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.cloudflareinsights.com https://cdnjs.cloudflare.com https://unpkg.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://unpkg.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com;
     img-src 'self' data: blob: https:;
     font-src 'self' https://fonts.gstatic.com data:;
     connect-src 'self' https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://oauth2.googleapis.com https://fcm.googleapis.com https://challenges.cloudflare.com https://*.agora.io https://*.agoraio.cn https://www.googleapis.com;
