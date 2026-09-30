@@ -326,13 +326,29 @@
   }
 
   function renderThumbs() {
-    thumbsEl.innerHTML = uploaded.map(function (u) {
-      return '<div class="thumb">' +
-        (u.thumbUrl ? '<img src="' + u.thumbUrl + '" alt="">' : '') +
-        '<span class="tag">' + u.label + '</span>' +
-        (u.done ? '<span class="done-mark">✓</span>' : '') +
-      '</div>';
-    }).join('');
+    // 以 DOM API 建立縮圖，避免把網址/標籤字串拼進 HTML
+    thumbsEl.textContent = '';
+    uploaded.forEach(function (u) {
+      var div = document.createElement('div');
+      div.className = 'thumb';
+      if (u.thumbUrl) {
+        var img = document.createElement('img');
+        img.src = u.thumbUrl;
+        img.alt = '';
+        div.appendChild(img);
+      }
+      var tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = u.label;
+      div.appendChild(tag);
+      if (u.done) {
+        var mark = document.createElement('span');
+        mark.className = 'done-mark';
+        mark.textContent = '✓';
+        div.appendChild(mark);
+      }
+      thumbsEl.appendChild(div);
+    });
     var doneN = uploaded.filter(function (u) { return u.done; }).length;
     countLine.textContent = doneN > 0 ? L.doneCount(doneN) : '';
   }
