@@ -273,5 +273,6 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
     });
 
     console.log('Firebase 初始化完成');
+    console.log('[Firebase init] increment 類型:', typeof firestoreIncrement, '| FieldValue 類型:', typeof FieldValue);
 
     

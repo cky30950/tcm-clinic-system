@@ -8,7 +8,7 @@
  *  - 版本化快取；更新時由用戶端訊息觸發 skipWaiting，不強制中斷
  * ============================================================ */
 
-const CACHE_VERSION = 'v1.0.5';
+const CACHE_VERSION = 'v1.0.6';
 const SHELL_CACHE = 'shell-' + CACHE_VERSION;
 const CDN_CACHE = 'cdn-' + CACHE_VERSION;
 
@@ -336,7 +336,31 @@ function fetchWithTimeout(fetchFactory, ms) {
 
 /* ---------- 同源靜態資源：stale-while-revalidate ---------- */
 
+/* 以下檔案不走 SWR，改為 network-first（它們是啟動配置／模組入口，
+   過時快取會導致功能缺失或 API 版本錯配） */
+const NETWORK_FIRST_PATHS = new Set([
+    '/firebase_init.js',
+    '/version-config.js',
+    '/firebaseConfig.js',
+    '/sw.js'  // 已在 fetch handler 開頭排除，這裡是雙保險
+]);
+
 async function handleSameOriginStatic(req) {
+    const url = new URL(req.url);
+
+    // firebase_init.js 等啟動檔案：network-first，避免過時快取
+    if (NETWORK_FIRST_PATHS.has(url.pathname)) {
+        try {
+            const fresh = await fetch(req);
+            if (fresh.ok) return fresh;
+        } catch (_e) {}
+        // 網路失敗才退回快取
+        const cache = await caches.open(SHELL_CACHE);
+        const cached = await cache.match(req);
+        if (cached) return cached;
+        throw new Error('Network and cache both failed for ' + url.pathname);
+    }
+
     const cache = await caches.open(SHELL_CACHE);
     const cachedPromise = cache.match(req);
     const networkPromise = fetch(req)

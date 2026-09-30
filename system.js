@@ -30669,7 +30669,18 @@ class FirebaseDataManager {
     _buildPatientAggregatePlan(patientId, operation, consultation, prevPatientId) {
         const pid = String(patientId || '');
         const patientOps = [];
-        const increment = window.firebase.increment;
+        // Firebase v12 modular SDK 只有頂級 increment() 函數，FieldValue 類別
+        // 在此版本沒有靜態 increment 方法。如果 increment 不可用，說明
+        // firebase_init.js 可能被 Service Worker 快取了舊版本。
+        const increment = window.firebase && window.firebase.increment;
+        if (typeof increment !== 'function') {
+            console.error('[聚合計畫] Firebase increment 函數不可用！'
+                + ' 請強制刷新（Ctrl+F5）或清除瀏覽器快取。'
+                + ' window.firebase 鍵:', window.firebase ? Object.keys(window.firebase) : 'null');
+            // 靜默降級：返回空計畫，不中斷病歷保存主流程。
+            // 病人聚合統計會在下次 add/update 時被正確覆蓋。
+            return { patientOps: [], meta: null };
+        }
 
         // 先處理舊病人（update 時病人 ID 變更的情況）
         if (operation === 'update' && prevPatientId && String(prevPatientId) !== pid) {
