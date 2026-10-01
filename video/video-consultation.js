@@ -253,10 +253,20 @@
         return false;
     }
 
-    // 依當前登入角色顯示／隱藏診症記錄標題列的「視訊診症」按鈕
+    // 版本開關：目前版本是否提供視訊診症（設定見 version-config.js）
+    function isVideoFeatureEnabled() {
+        try {
+            if (typeof window.isVersionFeatureEnabled === 'function') {
+                return window.isVersionFeatureEnabled('videoConsultation');
+            }
+        } catch (e) { /* ignore */ }
+        return true;
+    }
+
+    // 依當前登入角色與版本顯示／隱藏診症記錄標題列的「視訊診症」按鈕
     function syncVideoEntryVisibility() {
         var btn = document.getElementById('videoConsultBtn');
-        if (btn) btn.classList.toggle('hidden', !isDoctorUser());
+        if (btn) btn.classList.toggle('hidden', !isDoctorUser() || !isVideoFeatureEnabled());
     }
 
     function showSetupGuide() {
@@ -500,6 +510,11 @@
 
     window.openVideoConsultation = async function () {
         try {
+            // 版本閘門：此版本未提供視訊診症（按鈕亦已隱藏，此處擋住控制台或殘留入口）
+            if (!isVideoFeatureEnabled()) {
+                notify('目前版本未提供視訊診症功能', 'error');
+                return;
+            }
             // 權限閘門：非醫師不得開啟（按鈕亦已隱藏，此處擋住控制台或殘留入口）
             if (!isDoctorUser()) {
                 notify('視訊診症僅限醫師帳號使用', 'error');
