@@ -1185,6 +1185,7 @@
                                         <button
                                             type="button"
                                             onclick="MedicalAttachments.openGalleryFromEvent(event, { scope: 'visit', category: 'all' })"
+                                            data-version-feature="medicalAttachments"
                                             class="text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded transition duration-200"
                                         >
                                             📎 <span>醫學報告</span>
@@ -1202,6 +1203,7 @@
                                         <button
                                             type="button"
                                             onclick="MedicalAttachments.openGalleryFromEvent(event, { scope: 'patient', category: 'tongue' })"
+                                            data-version-feature="medicalAttachments"
                                             class="text-xs bg-pink-500 hover:bg-pink-600 text-white px-3 py-1 rounded transition duration-200"
                                         >
                                         🧑‍🦰 <span>舌象圖片</span>
@@ -2399,7 +2401,7 @@
                             <button onclick="switchFinancialTab('service')" id="financialServiceTab" class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm transition duration-200">
                                 服務分析
                             </button>
-                            <button onclick="switchFinancialTab('wallet')" id="financialWalletTab" class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm transition duration-200">
+                            <button onclick="switchFinancialTab('wallet')" id="financialWalletTab" data-version-feature="membership" class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm transition duration-200">
                                 會員儲值
                             </button>
                         </nav>
@@ -2667,7 +2669,7 @@
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permSection_medicalRecordManagement" class="rounded border-gray-300">病歷管理</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permSection_scheduleManagement" class="rounded border-gray-300">醫療排班</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permSection_billingManagement" class="rounded border-gray-300">收費項目管理</label>
-                                    <label class="flex items-center gap-2"><input type="checkbox" id="permSection_walletManagement" class="rounded border-gray-300">會員儲值</label>
+                                    <label class="flex items-center gap-2" data-version-feature="membership"><input type="checkbox" id="permSection_walletManagement" class="rounded border-gray-300">會員儲值</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permSection_herbLibrary" class="rounded border-gray-300">中藥庫</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permSection_acupointLibrary" class="rounded border-gray-300">穴位庫</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permSection_templateLibrary" class="rounded border-gray-300">模板庫</label>

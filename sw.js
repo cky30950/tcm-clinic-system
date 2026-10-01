@@ -2,13 +2,19 @@
  * 名醫診所系統 — Service Worker（根 scope）
  * ------------------------------------------------------------
  * 職責：
- *  - App Shell / 同源靜態資源快取（HTML network-first、其餘 SWR）
+ *  - App Shell / 同源靜態資源快取（HTML／JS／CSS／資料檔 network-first，
+ *    圖片等其餘資源 SWR）——日常部署無需手動遞增 CACHE_VERSION
  *  - 白名單 CDN 跨域資源 cache-first（100 項上限／30 天）
  *  - 推播通知顯示與點擊開啟系統頁
  *  - 版本化快取；更新時由用戶端訊息觸發 skipWaiting，不強制中斷
  * ============================================================ */
 
-const CACHE_VERSION = 'v1.0.7';
+// 日常部署（改 JS/CSS/HTML/資料檔）無需再手動遞增此版本號：
+// 程式類資源已改為 network-first，部署後客戶端下次載入即取新版。
+// 只有在「修改 PRECACHE_URLS 預快取清單」或需強制清空所有人快取時才遞增。
+// v1.0.8：程式資源改 network-first；這一次遞增用於把殘留 v1.0.7 或更舊
+// SWR 快取的客戶端一次性換代刷新。
+const CACHE_VERSION = 'v1.0.8';
 const SHELL_CACHE = 'shell-' + CACHE_VERSION;
 const CDN_CACHE = 'cdn-' + CACHE_VERSION;
 
@@ -334,10 +340,14 @@ function fetchWithTimeout(fetchFactory, ms) {
     });
 }
 
-/* ---------- 同源靜態資源：stale-while-revalidate ---------- */
+/* ---------- 同源靜態資源 ---------- */
 
-/* 以下檔案不走 SWR，改為 network-first（它們是啟動配置／模組入口，
-   過時快取會導致功能缺失或 API 版本錯配） */
+/* 程式／資料類資源一律 network-first：
+   每次使用前向原站驗證（_headers 已設 no-cache，Cloudflare 以 ETag 回 304，
+   流量與延遲極小），部署後「下次載入即新版」，無需手動遞增 CACHE_VERSION，
+   也不會出現 SWR「第一次仍是舊檔、要重新整理兩次」的問題。
+   唯獨網路失敗（離線／斷線）才退回 Cache Storage 中的備份，
+   成功取得新版時同步更新離線備份。 */
 const NETWORK_FIRST_PATHS = new Set([
     '/firebase_init.js',
     '/version-config.js',
@@ -345,22 +355,44 @@ const NETWORK_FIRST_PATHS = new Set([
     '/sw.js'  // 已在 fetch handler 開頭排除，這裡是雙保險
 ]);
 
+/* fetch 請求的 destination：<script>＝script、<link rel=stylesheet>＝style、
+   @font-face＝font、<link rel=manifest>＝manifest。
+   /data/ 下的 JSON 詞庫／範本以 fetch() 讀取（destination 為空字串），
+   屬於應用資料，一併 network-first，避免詞庫更新後舊客戶端持續用舊檔。 */
+const NETWORK_FIRST_DESTINATIONS = new Set(['script', 'style', 'font', 'manifest']);
+
+function isNetworkFirst(req, url) {
+    return NETWORK_FIRST_PATHS.has(url.pathname)
+        || NETWORK_FIRST_DESTINATIONS.has(req.destination || '')
+        || url.pathname.startsWith('/data/');
+}
+
+async function networkFirstWithCacheFallback(req) {
+    const cache = await caches.open(SHELL_CACHE);
+    try {
+        const fresh = await fetch(req);
+        if (fresh.ok) {
+            // 成功取新：更新離線備份後回傳
+            cache.put(req, fresh.clone());
+            return fresh;
+        }
+    } catch (_e) {
+        // 網路錯誤（離線）：落入快取備援
+    }
+    const cached = await cache.match(req);
+    if (cached) return cached;
+    throw new Error('Network and cache both failed for ' + new URL(req.url).pathname);
+}
+
 async function handleSameOriginStatic(req) {
     const url = new URL(req.url);
 
-    // firebase_init.js 等啟動檔案：network-first，避免過時快取
-    if (NETWORK_FIRST_PATHS.has(url.pathname)) {
-        try {
-            const fresh = await fetch(req);
-            if (fresh.ok) return fresh;
-        } catch (_e) {}
-        // 網路失敗才退回快取
-        const cache = await caches.open(SHELL_CACHE);
-        const cached = await cache.match(req);
-        if (cached) return cached;
-        throw new Error('Network and cache both failed for ' + url.pathname);
+    // JS/CSS/字體/manifest/資料檔：network-first，確保部署即生效
+    if (isNetworkFirst(req, url)) {
+        return networkFirstWithCacheFallback(req);
     }
 
+    // 其餘資源（圖片等）：stale-while-revalidate，先給快取再背景更新
     const cache = await caches.open(SHELL_CACHE);
     const cachedPromise = cache.match(req);
     const networkPromise = fetch(req)

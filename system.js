@@ -834,9 +834,42 @@ function refreshClinicScopedUi() {
 }
 
 
+// 依系統版本（version-config.js）隱藏標示 data-version-feature 的元素：
+// 功能關閉時加上 hidden，開啟時移除（避免殘留隱藏狀態）。
+function applyVersionFeatureVisibility() {
+  try {
+    document.querySelectorAll('[data-version-feature]').forEach(function (el) {
+      var feature = el.getAttribute('data-version-feature');
+      var enabled = (typeof window.isVersionFeatureEnabled === 'function')
+        ? window.isVersionFeatureEnabled(feature)
+        : true;
+      el.classList.toggle('hidden', !enabled);
+    });
+  } catch (_e) {}
+}
+
+// 版本功能是否開啟的簡短封裝（API 不存在時視為開啟，保持舊行為）
+function versionFeatureEnabled(featureName) {
+  return (typeof window.isVersionFeatureEnabled === 'function')
+    ? window.isVersionFeatureEnabled(featureName)
+    : true;
+}
+
+// 頁面載入時先套用一次（defer 腳本執行時 DOM 已解析完成）
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', applyVersionFeatureVisibility);
+} else {
+  applyVersionFeatureVisibility();
+}
+
 function hasAccessToSection(sectionId) {
-  
+
   if (!currentUserData || !currentUserData.position) return false;
+
+  // 版本限制：會員功能關閉時（如簡單版），不得進入「會員儲值」區
+  if (sectionId === 'walletManagement' && !versionFeatureEnabled('membership')) {
+    return false;
+  }
 
   
   const pos = currentUserData.position.trim ? currentUserData.position.trim() : currentUserData.position;
@@ -2733,6 +2766,10 @@ async function fetchUsers(forceRefresh = false) {
                 const addBtn = document.getElementById('systemAddClinicButton');
                 if (addBtn && !addBtn.dataset.bound) {
                     addBtn.addEventListener('click', function() {
+                        if (typeof window.isSimpleVersion === 'function' && window.isSimpleVersion()) {
+                            showToast('簡單版僅可使用一間診所，無法新增診所', 'error');
+                            return;
+                        }
                         if (typeof window.isAdvancedVersion === 'function' && !window.isAdvancedVersion()) {
                             showToast('「新增診所」為進階版系統專屬功能', 'error');
                             return;
@@ -2746,6 +2783,10 @@ async function fetchUsers(forceRefresh = false) {
                 const delBtn = document.getElementById('systemDeleteClinicButton');
                 if (delBtn && !delBtn.dataset.bound) {
                     delBtn.addEventListener('click', async function() {
+                        if (typeof window.isSimpleVersion === 'function' && window.isSimpleVersion()) {
+                            showToast('簡單版僅可使用一間診所，無法刪除診所', 'error');
+                            return;
+                        }
                         if (typeof window.isAdvancedVersion === 'function' && !window.isAdvancedVersion()) {
                             showToast('「刪除目前診所」為進階版系統專屬功能', 'error');
                             return;
@@ -2813,10 +2854,13 @@ async function fetchUsers(forceRefresh = false) {
             // 依版本設定更新新增／刪除診所按鈕狀態
             try { applyClinicVersionRestrictions(); } catch (_e6) {}
         }
-        // 依據系統版本（普通版／進階版，設定見 version-config.js）處理診所按鈕：
-        // 普通版時將「新增診所」「刪除目前診所」按鈕反白，並標示為進階版專屬功能。
+        // 依據系統版本（簡單版／普通版／進階版，設定見 version-config.js）處理診所按鈕：
+        // 簡單版：實際隱藏「新增診所」「刪除目前診所」按鈕，只能使用一間診所；
+        // 普通版：按鈕反白，並標示為進階版專屬功能；
+        // 進階版：按鈕正常可用。
         function applyClinicVersionRestrictions() {
             const advanced = (typeof window.isAdvancedVersion === 'function') ? window.isAdvancedVersion() : true;
+            const simple = (typeof window.isSimpleVersion === 'function') ? window.isSimpleVersion() : false;
             const maxClinics = (typeof window.getMaxClinics === 'function') ? window.getMaxClinics() : 3;
             const lockTip = '此功能僅限「進階版」系統提供';
             const buttonStyles = [
@@ -2826,6 +2870,12 @@ async function fetchUsers(forceRefresh = false) {
             buttonStyles.forEach(function(item) {
                 const btn = document.getElementById(item.id);
                 if (!btn) return;
+                if (simple) {
+                    // 簡單版：實際隱藏按鈕（不顯示、不可點）
+                    btn.classList.add('hidden');
+                    return;
+                }
+                btn.classList.remove('hidden');
                 if (advanced) {
                     btn.classList.remove('bg-gray-400', 'opacity-60', 'cursor-not-allowed');
                     btn.classList.add(item.colorClass, item.hoverClass);
@@ -2838,11 +2888,11 @@ async function fetchUsers(forceRefresh = false) {
                     btn.setAttribute('aria-disabled', 'true');
                 }
             });
-            // 普通版時於按鈕下方顯示進階版專屬標示；進階版時移除標示
+            // 普通版時於按鈕下方顯示進階版專屬標示；簡單版／進階版時移除標示
             let note = document.getElementById('clinicVersionRestrictionNote');
             const addBtn = document.getElementById('systemAddClinicButton');
             const buttonGroup = addBtn ? addBtn.parentNode : null;
-            if (!advanced) {
+            if (!advanced && !simple) {
                 if (buttonGroup) buttonGroup.classList.add('flex-wrap');
                 if (!note && buttonGroup) {
                     note = document.createElement('p');
@@ -2853,9 +2903,9 @@ async function fetchUsers(forceRefresh = false) {
                 if (note) {
                     note.textContent = '🔒 「新增診所 / 刪除目前診所」為進階版系統專屬功能（目前為普通版，僅可使用 ' + maxClinics + ' 間診所）';
                 }
-            } else if (note) {
+            } else {
                 if (buttonGroup) buttonGroup.classList.remove('flex-wrap');
-                note.parentNode.removeChild(note);
+                if (note) note.parentNode.removeChild(note);
             }
         }
         let _globalLoadingTotal = 0;
@@ -7575,6 +7625,9 @@ async function logout() {
             const menuContainer = document.getElementById('sidebarMenu');
             menuContainer.innerHTML = '';
 
+            // 重新套用版本功能隱藏（如簡單版的會員／附件相關元素）
+            try { applyVersionFeatureVisibility(); } catch (_eVersion) {}
+
             
             const menuItems = {
                 patientManagement: { title: '病人資料管理', icon: '👥', description: '新增、查看、管理病人資料' },
@@ -9302,6 +9355,7 @@ async function viewPatient(id) {
         <div class="mt-6 pt-6 border-t border-gray-200">
             <div class="flex justify-between items-center mb-4">
                 <h4 class="text-lg font-semibold text-gray-800">${lblConsultationSummary}</h4>
+                ${versionFeatureEnabled('medicalAttachments') ? `
                 <button type="button"
                     data-ma-open="1"
                     data-scope="patient"
@@ -9310,7 +9364,7 @@ async function viewPatient(id) {
                     data-patient-name="${safeName}"
                     class="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded transition duration-200">
                     📎 <span>醫學報告及舌象圖片</span>
-                </button>
+                </button>` : ''}
             </div>
             <div id="patientConsultationSummary">
                 <div class="text-center py-4">
@@ -18415,6 +18469,27 @@ function buildPackageWalletCombinedSection(patientId) {
             </div>`;
     }
 
+    // 會員功能關閉時（如簡單版）不建構「會員儲值餘額」子區
+    var walletSubSection = versionFeatureEnabled('membership') ? `
+            <!-- 會員儲值餘額子區 -->
+            <div class="pt-4 border-t border-gray-100">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                        </svg>
+                        <h3 class="text-base font-semibold text-teal-800">會員儲值餘額</h3>
+                    </div>
+                    <div id="patientWalletStatusBadge" class="text-xs text-teal-700 bg-white px-2 py-1 rounded-full">讀取中…</div>
+                </div>
+                <div id="patientWalletBalanceContent">
+                    <div class="text-center py-4">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                        <div class="mt-2 text-sm">載入儲值餘額中...</div>
+                    </div>
+                </div>
+            </div>` : '';
+
     return `
         <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             ${selectorHtml}
@@ -18450,24 +18525,7 @@ function buildPackageWalletCombinedSection(patientId) {
                     </div>
                 </div>
             </div>
-            <!-- 會員儲值餘額子區 -->
-            <div class="pt-4 border-t border-gray-100">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-                        </svg>
-                        <h3 class="text-base font-semibold text-teal-800">會員儲值餘額</h3>
-                    </div>
-                    <div id="patientWalletStatusBadge" class="text-xs text-teal-700 bg-white px-2 py-1 rounded-full">讀取中…</div>
-                </div>
-                <div id="patientWalletBalanceContent">
-                    <div class="text-center py-4">
-                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                        <div class="mt-2 text-sm">載入儲值餘額中...</div>
-                    </div>
-                </div>
-            </div>
+            ${walletSubSection}
         </div>`;
 }
 
@@ -18592,8 +18650,10 @@ async function loadPatientConsultationSummary(patientId) {
             bindPackageHeaderButtons(patientId);
             // 渲染指定診所的套票分頁與內容
             await renderPackageStatusSection(patientId, false, selectedClinicId);
-            // 載入指定診所的會員儲值餘額（失敗時自行降級顯示，不影響套票區塊）
-            await renderPatientWalletStatus(patientId, selectedClinicId);
+            // 載入指定診所的會員儲值餘額（會員功能關閉時跳過，如簡單版）
+            if (versionFeatureEnabled('membership')) {
+                await renderPatientWalletStatus(patientId, selectedClinicId);
+            }
             return;
         }
 
@@ -19039,6 +19099,10 @@ async function initializeSystemAfterLogin() {
 
         function showAddClinicModal() {
             try {
+                if (typeof window.isSimpleVersion === 'function' && window.isSimpleVersion()) {
+                    showToast('簡單版僅可使用一間診所，無法新增診所', 'error');
+                    return;
+                }
                 if (typeof window.isAdvancedVersion === 'function' && !window.isAdvancedVersion()) {
                     showToast('「新增診所」為進階版系統專屬功能', 'error');
                     return;
@@ -22158,6 +22222,10 @@ async function searchBillingForConsultation() {
                 hiddenTextarea.value = '';
                 totalAmountSpan.textContent = '$0';
                 queueConsultationSymptomsDraftSave();
+                // 總費用歸零：若儲值支付欄位因餘額不足被鎖定，此時應解鎖
+                if (typeof window.syncConsultWalletAvailability === 'function') {
+                    window.syncConsultWalletAvailability();
+                }
                 return;
             }
             
@@ -22404,6 +22472,11 @@ async function searchBillingForConsultation() {
             billingText += `\n總費用：$${Math.round(totalAmount)}`;
             hiddenTextarea.value = billingText.trim();
             queueConsultationSymptomsDraftSave();
+            // 總費用重算完成：若高於儲值餘額則取消並鎖定「使用儲值餘額支付」，
+            // 回落至餘額以內時自動解鎖
+            if (typeof window.syncConsultWalletAvailability === 'function') {
+                window.syncConsultWalletAvailability();
+            }
         }
         
         // 更新收費項目數量
@@ -26704,6 +26777,9 @@ async function restoreUser(id) {
         }
 
         async function refreshWalletFinancialSection(startDate, endDate, clinicFilter, forceRefresh) {
+            // 版本限制：會員功能關閉時（如簡單版）不讀取儲值資料，
+            // 回報表匯出亦會因此略過會員儲值段落
+            if (!versionFeatureEnabled('membership')) return null;
             lastWalletFinQuery = { startDate, endDate, clinicFilter };
             try {
                 const raw = await getWalletFinRaw(
@@ -26779,6 +26855,11 @@ async function restoreUser(id) {
 
         // 切換財務標籤
         function switchFinancialTab(tabType) {
+            // 版本限制：會員功能關閉時（如簡單版）不可切換至「會員儲值」標籤
+            if (tabType === 'wallet' && !versionFeatureEnabled('membership')) {
+                showToast('目前版本未提供會員儲值功能', 'warning');
+                return;
+            }
             // 更新標籤按鈕樣式
             document.querySelectorAll('[role="tablist"] button').forEach(btn => {
                 if (btn.id && btn.id.startsWith('financial')) {
@@ -37333,7 +37414,9 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
     autoDiscountApplied: false,
     consultationId: '',
     pendingPay: false,
-    paid: false
+    paid: false,
+    // 總費用高於餘額而自動取消並鎖定勾選框時為 true
+    autoLocked: false
   };
 
   function showWalletPayMessage(html, isError) {
@@ -37360,6 +37443,7 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
     consultWallet.consultationId = '';
     consultWallet.pendingPay = false;
     consultWallet.paid = false;
+    consultWallet.autoLocked = false;
     const area = document.getElementById('walletPaymentArea');
     if (area) area.classList.add('hidden');
     const cb = document.getElementById('useWalletPayment');
@@ -37367,6 +37451,11 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
       cb.checked = false;
       cb.disabled = false;
       cb.onchange = null;
+      const label = cb.closest('label');
+      if (label) {
+        label.classList.remove('opacity-50', 'cursor-not-allowed');
+        label.classList.add('cursor-pointer');
+      }
     }
     showWalletPayMessage('', false);
   }
@@ -37378,8 +37467,63 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
     return isNaN(n) ? 0 : walletRound2(n);
   }
 
+  /**
+   * 依目前總費用與儲值餘額的關係，同步「使用儲值餘額支付」欄位：
+   * 總費用 > 餘額 → 取消選擇、反白並鎖定欄位，顯示原因
+   * 總費用 <= 餘額 → 解鎖欄位（不自動重新勾選，由員工自行選擇）
+   * 由 updateBillingDisplay() 於每次總費用重算後調用。
+   */
+  function syncConsultWalletAvailability() {
+    // 已付款病歷保持鎖定與事實顯示，不隨總費用變化
+    if (consultWallet.paid) return;
+    const area = document.getElementById('walletPaymentArea');
+    const cb = document.getElementById('useWalletPayment');
+    if (!area || !cb || area.classList.contains('hidden')) return;
+    if (!walletAvailable(consultWallet.account)) return;
+    const available = walletRound2(
+      Number(consultWallet.account.balance) + Number(consultWallet.account.bonusBalance)
+    );
+    if (!(available > 0)) return;
+
+    const total = readConsultationTotal();
+    const label = cb.closest('label');
+
+    if (total > available) {
+      // 總費用高於餘額：取消選擇並反白鎖定
+      if (cb.checked || consultWallet.pendingPay) {
+        cb.checked = false;
+        consultWallet.pendingPay = false;
+      }
+      cb.disabled = true;
+      if (label) {
+        label.classList.add('opacity-50', 'cursor-not-allowed');
+        label.classList.remove('cursor-pointer');
+      }
+      consultWallet.autoLocked = true;
+      showWalletPayMessage(
+        '⚠️ 總費用 HK$' + total.toFixed(2) +
+        ' 高於儲值餘額 HK$' + available.toFixed(2) +
+        '，已取消「使用儲值餘額支付」；總費用調低至餘額以內後將自動解鎖。',
+        true
+      );
+    } else if (cb.disabled || consultWallet.autoLocked) {
+      // 總費用回落至餘額以內：解鎖欄位（維持未勾選，等待員工重新選擇）
+      cb.disabled = false;
+      if (label) {
+        label.classList.remove('opacity-50', 'cursor-not-allowed');
+        label.classList.add('cursor-pointer');
+      }
+      if (consultWallet.autoLocked) {
+        consultWallet.autoLocked = false;
+        showWalletPayMessage('', false);
+      }
+    }
+  }
+
   async function setupConsultationWallet(appointment) {
     resetConsultWalletUI();
+    // 版本限制：會員功能關閉時（如簡單版）不載入會員折扣與儲值支付
+    if (!versionFeatureEnabled('membership')) return;
     if (!appointment || !appointment.patientId) return;
     const isEdit = appointment.status === 'completed' && appointment.consultationId;
     consultWallet.patientId = String(appointment.patientId);
@@ -37452,6 +37596,8 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
         }
         consultWallet.pendingPay = true;
       };
+      // 表單開啟時若已帶入收費項目（如編輯病歷），立即依總費用鎖定／解鎖
+      syncConsultWalletAvailability();
     }
 
     // 新診症：僅「有效會員」（儲值帳戶 active 且有餘額）自動帶入折扣；
@@ -37662,6 +37808,7 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
   }
 
   window.setupConsultationWallet = setupConsultationWallet;
+  window.syncConsultWalletAvailability = syncConsultWalletAvailability;
   window.processConsultationWalletPayment = processConsultationWalletPayment;
   window.retryConsultationWalletPayment = retryConsultationWalletPayment;
   window.cancelConsultationWalletPayment = cancelConsultationWalletPayment;

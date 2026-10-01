@@ -229,9 +229,32 @@
             hadControllerAtLoad = !!navigator.serviceWorker.controller;
             registration = await navigator.serviceWorker.register('/sw.js');
             trackUpdates(registration);
+            scheduleUpdateChecks(registration);
         } catch (err) {
             console.warn('Service Worker 註冊失敗:', err);
         }
+    }
+
+    /* 主動檢查 SW 更新：
+       瀏覽器預設只在「頁面導航」時檢查 sw.js，診所分頁常整日不關，
+       部署後可能遲遲不換代。故於分頁重新聚焦／重新可見，以及每 60 分鐘
+       主動呼叫 reg.update()（sw.js 本身為 no-cache，檢查成本極低）。
+       發現新版後仍由既有 skipWaiting → controllerchange 流程自動重整。 */
+    var SW_UPDATE_THROTTLE_MS = 60 * 1000;
+    var SW_UPDATE_INTERVAL_MS = 60 * 60 * 1000;
+    function scheduleUpdateChecks(reg) {
+        if (!reg || typeof reg.update !== 'function') return;
+        var lastCheck = 0;
+        function maybeUpdate() {
+            if (document.visibilityState !== 'visible') return;
+            var now = Date.now();
+            if (now - lastCheck < SW_UPDATE_THROTTLE_MS) return;
+            lastCheck = now;
+            try { reg.update(); } catch (_e) {}
+        }
+        window.addEventListener('focus', maybeUpdate);
+        document.addEventListener('visibilitychange', maybeUpdate);
+        setInterval(maybeUpdate, SW_UPDATE_INTERVAL_MS);
     }
 
     function reloadOnceForUpdate() {
