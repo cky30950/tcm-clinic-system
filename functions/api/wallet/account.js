@@ -84,12 +84,20 @@ export async function onRequestGet(context) {
             const txRes = await queryTxPage(txLimit);
             txDocs = txRes.docs;
         } catch (error) {
-            // 複合索引尚未部署（firestore.indexes.json 需 deploy 或於
-            // Console 建立）：退回舊路徑，讀最近 300 筆再客戶端過濾，
-            // 避免索引建立空窗期令錢包畫面故障。
+            // 主路徑只是讀取優化，任何失敗都不應令錢包畫面故障：
+            // 一律退回舊路徑（讀最近 300 筆再客戶端過濾，即本次優化前嘅行為）。
+            // 常見原因是複合索引尚未部署（firestore.indexes.json 需 deploy 或於
+            // Console 建立），Firestore 回 FAILED_PRECONDITION；索引建立空窗期就靠此 fallback。
+            const firestoreStatus = String((error && error.firestoreStatus) || '').toUpperCase();
             const msg = String((error && error.message) || error).toLowerCase();
-            if (!msg.includes('index') && !msg.includes('failed_precondition')) {
-                throw error;
+            const missingIndex = firestoreStatus === 'FAILED_PRECONDITION'
+                || msg.includes('index')
+                || msg.includes('failed_precondition');
+            if (missingIndex) {
+                console.warn('錢包流水複合索引未就緒，暫用舊查詢路徑（300 筆客戶端過濾）');
+            } else {
+                // 非缺索引錯誤（例如查詢結構問題）也要在日志留下完整證據，方便修正
+                console.warn('錢包流水複合查詢發生非預期錯誤，暫用舊查詢路徑:', error);
             }
             const fallbackRes = await client.queryCollection({
                 collectionId: 'patientWalletTransactions',
