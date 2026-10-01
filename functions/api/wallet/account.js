@@ -44,27 +44,81 @@ export async function onRequestGet(context) {
         const txLimit = Number.isFinite(parsedLimit)
             ? Math.min(50, Math.max(1, parsedLimit))
             : 50;
-        // 跨診所病人需保留足夠取回筆數再過濾，故實際查詢量取兩者較大值
-        const fetchLimit = Math.max(txLimit, 300);
         const account = await client.getDocument(
             `patientWalletAccounts/${
                 encodeURIComponent(walletAccountDocId(clinicId, patientId))}`
         );
-        const txRes = await client.queryCollection({
+
+        // 慣用路徑：以 (patientId, clinicId, at DESC) 複合索引在伺服器端
+        // 過濾診所並直接 limit，每次只讀 txLimit 筆（舊路徑固定讀 300 筆
+        // 再客戶端過濾，跨診所病人會放大 6-30 倍讀取）。
+        const queryTxPage = async (limit) => client.queryCollection({
             collectionId: 'patientWalletTransactions',
             where: {
-                fieldFilter: {
-                    field: { fieldPath: 'patientId' },
-                    op: 'EQUAL',
-                    value: { stringValue: patientId }
+                compositeFilter: {
+                    op: 'AND',
+                    filters: [
+                        {
+                            fieldFilter: {
+                                field: { fieldPath: 'patientId' },
+                                op: 'EQUAL',
+                                value: { stringValue: patientId }
+                            }
+                        },
+                        {
+                            fieldFilter: {
+                                field: { fieldPath: 'clinicId' },
+                                op: 'EQUAL',
+                                value: { stringValue: String(clinicId) }
+                            }
+                        }
+                    ]
                 }
             },
             orderBy: [{ field: { fieldPath: 'at' }, direction: 'DESCENDING' }],
-            limit: fetchLimit
+            limit
         });
-        // 跨診所病人的取回筆數中可能混有他診流水，
-        // 故過濾本診所後只取最近 txLimit 筆（不新增複合索引）。
-        const transactions = txRes.docs
+
+        let txDocs = null;
+        try {
+            const txRes = await queryTxPage(txLimit);
+            txDocs = txRes.docs;
+        } catch (error) {
+            // 主路徑只是讀取優化，任何失敗都不應令錢包畫面故障：
+            // 一律退回舊路徑（讀最近 300 筆再客戶端過濾，即本次優化前嘅行為）。
+            // 常見原因是複合索引尚未部署（firestore.indexes.json 需 deploy 或於
+            // Console 建立），Firestore 回 FAILED_PRECONDITION；索引建立空窗期就靠此 fallback。
+            const firestoreStatus = String((error && error.firestoreStatus) || '').toUpperCase();
+            const msg = String((error && error.message) || error).toLowerCase();
+            const missingIndex = firestoreStatus === 'FAILED_PRECONDITION'
+                || msg.includes('index')
+                || msg.includes('failed_precondition');
+            if (missingIndex) {
+                console.warn('錢包流水複合索引未就緒，暫用舊查詢路徑（300 筆客戶端過濾）');
+            } else {
+                // 非缺索引錯誤（例如查詢結構問題）也要在日志留下完整證據，方便修正
+                console.warn('錢包流水複合查詢發生非預期錯誤，暫用舊查詢路徑:', error);
+            }
+            const fallbackRes = await client.queryCollection({
+                collectionId: 'patientWalletTransactions',
+                where: {
+                    fieldFilter: {
+                        field: { fieldPath: 'patientId' },
+                        op: 'EQUAL',
+                        value: { stringValue: patientId }
+                    }
+                },
+                orderBy: [{ field: { fieldPath: 'at' }, direction: 'DESCENDING' }],
+                limit: 300
+            });
+            txDocs = (fallbackRes.docs || []).filter((tx) => {
+                const d = tx && tx.data;
+                return d && String(d.clinicId || '') === String(clinicId);
+            }).slice(0, txLimit);
+        }
+
+        // 防衛性過濾（正常路徑伺服器已過濾，保留下來成本為零）
+        const transactions = (txDocs || [])
             .map((d) => Object.assign({ id: d.id }, d.data))
             .filter((tx) => tx && String(tx.clinicId || '') === String(clinicId))
             .slice(0, txLimit);

@@ -46,12 +46,37 @@ export class FirestoreClient {
             throw new Error(`Firestore 回應無法解析 (HTTP ${response.status}): ${text.slice(0, 300)}`);
         }
         if (!response.ok) {
-            const message = data && data.error && data.error.message
-                ? data.error.message
+            // runQuery 嘅錯誤 body 可能是標準 {error:{...}}，
+            // 也可能以串流陣列形式回傳 [{error:{...}}]，兩種都要抓到 message/status，
+            // 否則呼叫端只會看到無資訊量的「HTTP 400」而無法區分缺索引（FAILED_PRECONDITION）
+            const errPayload = (Array.isArray(data) ? data[0] && data[0].error : data && data.error) || null;
+            const message = errPayload && errPayload.message
+                ? errPayload.message
                 : `HTTP ${response.status}`;
-            throw new Error(`Firestore runQuery 失敗: ${message}`);
+            const error = new Error(
+                `Firestore runQuery 失敗 (HTTP ${response.status}${
+                    errPayload && errPayload.status ? '/' + errPayload.status : ''
+                }): ${message}`
+            );
+            error.httpStatus = response.status;
+            error.firestoreStatus = errPayload && errPayload.status ? errPayload.status : '';
+            throw error;
         }
-        return Array.isArray(data) ? data : [data];
+        const rows = Array.isArray(data) ? data : [data];
+        // runQuery 亦可能在 HTTP 200 的串流元素中夾帶 error（如缺索引 FAILED_PRECONDITION）
+        for (const row of rows) {
+            if (row && row.error) {
+                const error = new Error(
+                    `Firestore runQuery 失敗 (HTTP 200${
+                        row.error.status ? '/' + row.error.status : ''
+                    }): ${row.error.message || 'stream error'}`
+                );
+                error.httpStatus = 200;
+                error.firestoreStatus = row.error.status || '';
+                throw error;
+            }
+        }
+        return rows;
     }
 
     /**
