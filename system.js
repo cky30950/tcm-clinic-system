@@ -997,7 +997,8 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
     try {
         let records = [];
         try {
-            const res = await window.firebaseDataManager.getPatientConsultations(patientId, true);
+            // 使用快取：單病人 consultations onSnapshot 已保證跨裝置即時同步，無需每次強制全量刷新
+            const res = await window.firebaseDataManager.getPatientConsultations(patientId, false);
             if (res && res.success && Array.isArray(res.data)) {
                 records = res.data;
             }
@@ -1318,7 +1319,10 @@ const consultationHistoryPager = {
             dateIndexReady: false,
             monthDateIndexCache: {},
             // 部分月索引：true 代表該月快取只含單日補讀結果，不能當成整月索引使用
-            monthDateIndexPartial: {}
+            monthDateIndexPartial: {},
+            // 月初前累計筆數快取（asc offset 基準）：{ [monthKey]: { offset, totalCount } }
+            // 僅在 state.totalCount 未變時重用，避免翻月時重複 getCountFromServer
+            monthOffsetCache: {}
         };
     },
     dateToKey(dateObj) {
@@ -1439,6 +1443,7 @@ const consultationHistoryPager = {
         // 必須丟棄所有月索引，避免日曆沿用舊的錯位索引
         state.monthDateIndexCache = {};
         state.monthDateIndexPartial = {};
+        state.monthOffsetCache = {};
         this.rebuildDateIndexFromState(state);
         return { success: true, state };
     },
@@ -1624,24 +1629,96 @@ const consultationHistoryPager = {
         }
         return monthMap;
     },
-    // 校驗月/日索引指向的已載入槽位，其記錄日期必須與圓點日期一致。
-    // 若不一致，代表 totalCount 聚合欄位飄移或存在缺失/異常 sortDate 的病歷，
-    // 升序（日曆）與降序（翻頁）索引已錯位，分頁模式不可再用。
-    validateDateMapSlots(state, dateMap) {
-        if (!state || !Array.isArray(state.recordsByIndex)) return true;
-        const records = state.recordsByIndex;
-        const entries = dateMap ? Object.entries(dateMap) : [];
-        for (let i = 0; i < entries.length; i++) {
-            const [key, indices] = entries[i];
-            if (!Array.isArray(indices)) continue;
-            for (let j = 0; j < indices.length; j++) {
-                const rec = records[indices[j]];
-                if (rec && this.getRecordDateKey(rec) !== key) {
-                    return false;
+    // 計算月初前累計筆數（日曆 asc 索引基準）。state.totalCount 未變時可重用，
+    // 避免同一工作階段翻月時重複執行 getCountFromServer。
+    async getMonthBaseOffset(state, pid, colRef, monthStart, monthKey) {
+        if (state.monthOffsetCache &&
+            state.monthOffsetCache[monthKey] &&
+            state.monthOffsetCache[monthKey].totalCount === state.totalCount) {
+            return state.monthOffsetCache[monthKey].offset;
+        }
+        const countQuery = window.firebase.firestoreQuery(
+            colRef,
+            window.firebase.where('patientId', '==', pid),
+            window.firebase.where('sortDate', '<', monthStart)
+        );
+        const countSnap = await window.firebase.getCountFromServer(countQuery);
+        const offset = Number(countSnap && countSnap.data && countSnap.data().count) || 0;
+        if (!state.monthOffsetCache) state.monthOffsetCache = {};
+        state.monthOffsetCache[monthKey] = { offset, totalCount: state.totalCount };
+        return offset;
+    },
+    // 把全月查詢結果順手預取進 recordsByIndex 槽位（純本地操作，零額外讀取），
+    // 同時建立「日期 -> asc 索引」的月圓點 map。填充時即場校驗槽位：
+    // 槽位被其他病歷佔據（id 不同）或索引超出 totalCount 範圍，代表分頁索引已飄移。
+    // 預取後使用者點選月內任何日期都直接命中槽位，無需再發當日查詢，也不會把月索引標成 partial。
+    fillMonthDocsIntoState(state, docs, baseOffset) {
+        if (!state || !Array.isArray(state.recordsByIndex)) {
+            return { monthMap: {}, coherent: false };
+        }
+        const monthMap = {};
+        let coherent = true;
+        let ascOffset = Number(baseOffset) || 0;
+        docs.forEach((docSnap) => {
+            const rec = { id: docSnap.id, ...docSnap.data() };
+            const idx = ascOffset;
+            if (idx < 0 || idx >= state.totalCount) {
+                coherent = false;
+            } else {
+                const existing = state.recordsByIndex[idx];
+                if (existing && existing.id !== rec.id) {
+                    coherent = false;
+                } else {
+                    if (!existing) state.recordsByIndex[idx] = rec;
+                    const key = this.getRecordDateKey(rec);
+                    if (key) {
+                        if (!Array.isArray(monthMap[key])) monthMap[key] = [];
+                        monthMap[key].push(idx);
+                    }
                 }
             }
-        }
-        return true;
+            ascOffset += 1;
+        });
+        return { monthMap, coherent, endOffset: ascOffset };
+    },
+    // 分頁索引飄移的局部自愈：以伺服器端權威總數（1 次聚合 count，不讀病歷文件）
+    // 校正 totalCount，並重算當月 baseOffset、用手上已取得的全月文件重建槽位。
+    // 僅當飄移源頭是 patients.consultationCount 聚合欄位過期時可修復；
+    // 若權威總數與本地相同卻仍對不上，代表存在 sortDate 與病歷日期不一致的記錄，
+    // 回 null 交由全量模式（以有效日期排序）作最終守備。
+    async repairMonthIndexWithFreshCount(state, pid, monthDocs, monthStart, monthKey) {
+        await waitForFirebaseDb();
+        const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+        const totalQuery = window.firebase.firestoreQuery(
+            colRef,
+            window.firebase.where('patientId', '==', pid)
+        );
+        const totalSnap = await window.firebase.getCountFromServer(totalQuery);
+        const freshTotal = Number(totalSnap && totalSnap.data && totalSnap.data().count) || 0;
+        if (freshTotal === state.totalCount) return null;
+        // 聚合總數改變後，所有 asc 槽位與分頁游標都可能已位移，必須全數失效
+        state.totalCount = freshTotal;
+        state.countReady = true;
+        state.recordsByIndex = new Array(freshTotal);
+        state.descPageCache = {};
+        state.descPageCursors = {};
+        state.ascPageCache = {};
+        state.ascPageCursors = {};
+        state.monthDateIndexCache = {};
+        state.monthDateIndexPartial = {};
+        state.monthOffsetCache = {};
+        // 以新總數重新計算當月權威 baseOffset（不重用可能已過期的快取）
+        const baseCountQuery = window.firebase.firestoreQuery(
+            colRef,
+            window.firebase.where('patientId', '==', pid),
+            window.firebase.where('sortDate', '<', monthStart)
+        );
+        const baseCountSnap = await window.firebase.getCountFromServer(baseCountQuery);
+        const baseOffset = Number(baseCountSnap && baseCountSnap.data && baseCountSnap.data().count) || 0;
+        state.monthOffsetCache[monthKey] = { offset: baseOffset, totalCount: freshTotal };
+        const { monthMap, coherent } = this.fillMonthDocsIntoState(state, monthDocs, baseOffset);
+        if (!coherent) return null;
+        return monthMap;
     },
     // 強制切換到全量模式並以「有效日期」重建索引，保證日曆圓點與點擊結果一致
     async forceFullMode(patientId) {
@@ -1676,13 +1753,7 @@ const consultationHistoryPager = {
             const monthStart = new Date(targetYear, targetMonth, 1);
             const nextMonthStart = new Date(targetYear, targetMonth + 1, 1);
             const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-            const countQuery = window.firebase.firestoreQuery(
-                colRef,
-                window.firebase.where('patientId', '==', pid),
-                window.firebase.where('sortDate', '<', monthStart)
-            );
-            const countSnap = await window.firebase.getCountFromServer(countQuery);
-            let ascOffset = Number(countSnap && countSnap.data && countSnap.data().count) || 0;
+            const ascOffset = await this.getMonthBaseOffset(state, pid, colRef, monthStart, monthKey);
             const monthQuery = window.firebase.firestoreQuery(
                 colRef,
                 window.firebase.where('patientId', '==', pid),
@@ -1691,27 +1762,28 @@ const consultationHistoryPager = {
                 window.firebase.orderBy('sortDate', 'asc')
             );
             const monthSnap = await window.firebase.getDocs(monthQuery);
-            const monthMap = {};
-            monthSnap.forEach((docSnap) => {
-                const rec = { id: docSnap.id, ...docSnap.data() };
-                const key = this.getRecordDateKey(rec);
-                if (key) {
-                    if (!Array.isArray(monthMap[key])) {
-                        monthMap[key] = [];
-                    }
-                    monthMap[key].push(ascOffset);
+            // 全月文件順手預取進槽位：之後點選月內任何日期都直接命中，
+            // 無需再發「當日 count + 當日 getDocs」，也不會把月索引標成 partial。
+            const fillResult = this.fillMonthDocsIntoState(state, monthSnap.docs, ascOffset);
+            if (!fillResult.coherent) {
+                // 最常見是 patients.consultationCount 聚合欄位過期：
+                // 先以 1 次聚合 count 局部自愈，不直接全量讀取所有病歷。
+                const repairedMap = await this.repairMonthIndexWithFreshCount(
+                    state, pid, monthSnap.docs, monthStart, monthKey
+                );
+                if (!repairedMap) {
+                    // 權威總數無誤仍對不上＝存在 sortDate 與病歷日期不一致的記錄，最終守備
+                    console.warn('病歷分頁索引與日期不一致，改用全量讀取模式重建日曆索引');
+                    const fullState = await this.forceFullMode(pid);
+                    if (!fullState) return false;
+                    this.buildFullModeMonthMap(fullState, targetYear, targetMonth);
+                    return true;
                 }
-                ascOffset += 1;
-            });
-            // 已預載槽位若與日曆日期對不上，代表分頁索引已飄移，轉全量模式自愈
-            if (!this.validateDateMapSlots(state, monthMap)) {
-                console.warn('病歷分頁索引與日期不一致，改用全量讀取模式重建日曆索引');
-                const fullState = await this.forceFullMode(pid);
-                if (!fullState) return false;
-                this.buildFullModeMonthMap(fullState, targetYear, targetMonth);
+                state.monthDateIndexCache[monthKey] = repairedMap;
+                state.monthDateIndexPartial[monthKey] = false;
                 return true;
             }
-            state.monthDateIndexCache[monthKey] = monthMap;
+            state.monthDateIndexCache[monthKey] = fillResult.monthMap;
             state.monthDateIndexPartial[monthKey] = false;
             return true;
         } catch (error) {
@@ -1833,11 +1905,36 @@ const consultationHistoryPager = {
             });
         }
         if (existingIndices.length > 0 && existingIndices.every((idx) => !!state.recordsByIndex[idx])) {
-            // 槽位內容必須真的是該日期的病歷；對不上代表索引飄移，改全量模式
+            // 槽位內容必須真的是該日期的病歷；對不上代表索引飄移
             const slotsMatch = existingIndices
                 .map((idx) => this.getRecordDateKey(state.recordsByIndex[idx]))
                 .every((slotKey) => slotKey === key);
             if (!slotsMatch) {
+                // 先廢棄當月索引並局部自愈（ensureMonthDateIndex 內含權威 count 修復，
+                // 只重讀當月而非全量讀取所有病歷）；仍對不上才轉全量模式
+                const [reYear, reMonth] = key.split('-').map(v => parseInt(v, 10));
+                const reMonthKey = key.slice(0, 7);
+                delete state.monthDateIndexCache[reMonthKey];
+                state.monthDateIndexPartial[reMonthKey] = true;
+                const rebuilt = await this.ensureMonthDateIndex(pid, reYear, reMonth - 1);
+                if (rebuilt && state.mode === 'full') {
+                    // 自愈過程中已確定必須全量（日期欄不一致），dateIndexMap 已重建，直接取用
+                    return {
+                        success: true,
+                        indices: Array.isArray(state.dateIndexMap[key]) ? state.dateIndexMap[key].slice() : []
+                    };
+                }
+                if (rebuilt) {
+                    const freshIndices = this.getMonthDateIndexMap(pid, reYear, reMonth - 1)[key];
+                    const freshMatch = Array.isArray(freshIndices) && freshIndices.length > 0 &&
+                        freshIndices.every((idx) => !!state.recordsByIndex[idx]) &&
+                        freshIndices
+                            .map((idx) => this.getRecordDateKey(state.recordsByIndex[idx]))
+                            .every((slotKey) => slotKey === key);
+                    if (freshMatch) {
+                        return { success: true, indices: freshIndices.slice().sort((a, b) => a - b) };
+                    }
+                }
                 console.warn('日曆日期與已載入病歷不一致，改用全量讀取模式');
                 return await fallbackToFull();
             }
@@ -2008,6 +2105,7 @@ const consultationHistoryPager = {
             state.ascPageCursors = {};
             state.monthDateIndexCache = {};
             state.monthDateIndexPartial = {};
+            state.monthOffsetCache = {};
             this.rebuildDateIndexFromState(state);
         }
         const contexts = ['patient', 'consultation'];
@@ -22675,8 +22773,8 @@ async function searchBillingForConsultation() {
                     showToast('找不到病人資料！', 'error');
                     return;
                 }
-                // 讀取病人的診症記錄（強制刷新），避免跨裝置快取不一致
-                const consultationResult = await window.firebaseDataManager.getPatientConsultations(patient.id, true);
+                // 讀取病人的診症記錄（使用快取）：單病人 onSnapshot 已保證即時性，無需強制刷新
+                const consultationResult = await window.firebaseDataManager.getPatientConsultations(patient.id, false);
                 if (!consultationResult.success) {
                     showToast('無法讀取診症記錄！', 'error');
                     return;
@@ -22889,8 +22987,8 @@ async function searchBillingForConsultation() {
                     showToast('找不到病人資料！', 'error');
                     return;
                 }
-                // 從 Firebase 取得病人的診症記錄並按日期排序（強制刷新），避免跨裝置快取不一致
-                const consultationResult = await window.firebaseDataManager.getPatientConsultations(patient.id, true);
+                // 從 Firebase 取得病人的診症記錄並按日期排序（使用快取）：單病人 onSnapshot 已保證即時性
+                const consultationResult = await window.firebaseDataManager.getPatientConsultations(patient.id, false);
                 if (!consultationResult.success) {
                     showToast('無法讀取診症記錄！', 'error');
                     return;
@@ -31542,6 +31640,14 @@ class FirebaseDataManager {
         if (!this.isReady) return { success: false, error: 'not_ready' };
         const pid = String(patientId || '');
         if (!pid) return { success: false, error: 'missing_patient_id' };
+        // 全域回填已完成（systemMeta/sortDateBackfill 旗標）：歷史病歷已
+        // 全數補齊 sortDate，新病歷儲存時亦必定自帶，無需每個 session
+        // 第一次開病人都無 limit 全量讀取核對。forceRefresh（管理員
+        // 顯式修復）仍可重跑。
+        if (!forceRefresh && await isSortDateBackfillComplete()) {
+            this.consultationSortDateReadyPatients[pid] = true;
+            return { success: true, updatedCount: 0, skipped: 'global-backfill-complete' };
+        }
         if (!forceRefresh && this.consultationSortDateReadyPatients[pid]) {
             return { success: true, updatedCount: 0 };
         }
@@ -35276,6 +35382,247 @@ async function writeSearchKeywordsBackfillMarker(extra = {}) {
     writeSearchKeywordsBackfillCache(true, BACKFILL_POSITIVE_CACHE_MS);
 }
 
+// ============================================================
+// sortDate 回填完成旗標 → 關閉「每病人首次全量讀病歷」檢查
+// ------------------------------------------------------------
+// ensurePatientConsultationSortDates() 原本每個 session 第一次開某病人
+// 病歷時，都會無 limit 讀取該病人全部 consultations 核對 sortDate。
+// 歷史病歷經 window.backfillConsultationSortDates() 全量回填（或管理員
+// 手動標記）後，於 systemMeta/sortDateBackfill 寫入完成旗標，此後該
+// 全量核對永久關閉（新病歷儲存時必定自帶 sortDate）。
+//
+// 快取策略與 searchKeywords 旗標相同：Firestore 為單一真相來源，
+// 客戶端記憶體＋localStorage（正面 24h／負面 1h）雙層快取；
+// 異常時 fail-open 回 false（寧可多讀，不可令排序錯亂）。
+// 若日後修改 sortDate 計算邏輯（getConsultationEffectiveDate），
+// 務必遞增 SORT_DATE_BACKFILL_VERSION，版本不符視同未回填。
+// ============================================================
+const SORT_DATE_BACKFILL_VERSION = 1;
+const SORT_DATE_BACKFILL_COLLECTION = 'systemMeta';
+const SORT_DATE_BACKFILL_DOC = 'sortDateBackfill';
+const SORT_DATE_BACKFILL_LS_KEY = 'sys:sortDateBackfillV1';
+
+let _sortDateBackfillComplete = null;
+
+function readSortDateBackfillCache() {
+    try {
+        const raw = localStorage.getItem(SORT_DATE_BACKFILL_LS_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed.complete !== 'boolean') return null;
+        if (!Number.isFinite(parsed.until) || parsed.until <= Date.now()) return null;
+        return parsed.complete;
+    } catch (_e) {
+        return null;
+    }
+}
+
+function writeSortDateBackfillCache(complete, ttlMs) {
+    try {
+        localStorage.setItem(SORT_DATE_BACKFILL_LS_KEY, JSON.stringify({
+            v: SORT_DATE_BACKFILL_VERSION,
+            complete,
+            until: Date.now() + ttlMs
+        }));
+    } catch (_e) {}
+}
+
+function clearSortDateBackfillCache() {
+    _sortDateBackfillComplete = null;
+    try {
+        localStorage.removeItem(SORT_DATE_BACKFILL_LS_KEY);
+    } catch (_e) {}
+}
+
+/**
+ * sortDate 全量回填是否已完成（完成後跳過 per-patient 全量核對）。
+ * 失敗時回 false（fail-open：繼續檢查，寧可多讀也不要排序錯亂）。
+ */
+async function isSortDateBackfillComplete() {
+    if (typeof _sortDateBackfillComplete === 'boolean') {
+        return _sortDateBackfillComplete;
+    }
+
+    const cached = readSortDateBackfillCache();
+    if (typeof cached === 'boolean') {
+        _sortDateBackfillComplete = cached;
+        return cached;
+    }
+
+    try {
+        const ref = window.firebase.doc(
+            window.firebase.db,
+            SORT_DATE_BACKFILL_COLLECTION,
+            SORT_DATE_BACKFILL_DOC
+        );
+        const snap = await window.firebase.getDoc(ref);
+        const data = snap.exists() ? snap.data() : null;
+        const complete = !!data
+            && Number(data.version) === SORT_DATE_BACKFILL_VERSION
+            && !!data.completedAt;
+        _sortDateBackfillComplete = complete;
+        writeSortDateBackfillCache(
+            complete,
+            complete ? BACKFILL_POSITIVE_CACHE_MS : BACKFILL_NEGATIVE_CACHE_MS
+        );
+        return complete;
+    } catch (_e) {
+        return false;
+    }
+}
+
+async function writeSortDateBackfillMarker(extra = {}) {
+    let completedBy = '';
+    try {
+        const cur = window.firebase.auth && window.firebase.auth.currentUser
+            ? window.firebase.auth.currentUser
+            : null;
+        completedBy = (cur && (cur.email || cur.uid)) || '';
+    } catch (_e) {}
+    await window.firebase.setDoc(
+        window.firebase.doc(
+            window.firebase.db,
+            SORT_DATE_BACKFILL_COLLECTION,
+            SORT_DATE_BACKFILL_DOC
+        ),
+        Object.assign({
+            version: SORT_DATE_BACKFILL_VERSION,
+            completedAt: new Date().toISOString(),
+            completedBy
+        }, extra)
+    );
+    _sortDateBackfillComplete = true;
+    writeSortDateBackfillCache(true, BACKFILL_POSITIVE_CACHE_MS);
+}
+
+/**
+ * 一次性歷史資料回填：掃描所有 consultations，為 sortDate 缺失或
+ * 不正確的舊文檔補寫。執行方式（瀏覽器 Console，建議收工後）：
+ *   await window.backfillConsultationSortDates()
+ * 中斷續跑：await window.backfillConsultationSortDates('lastDocIdFromPrevRun')
+ *
+ * 全量掃描完成後自動寫入 systemMeta/sortDateBackfill 完成旗標（須診所
+ * 管理身份），此後客戶端最遲 24h（重新整理立即）跳過 per-patient
+ * 全量核對；非管理員寫入失敗時請管理員補跑
+ * await window.markSortDateBackfillComplete()。
+ */
+window.backfillConsultationSortDates = async function(startAfterDocId = null) {
+    await waitForFirebaseDb();
+    const PAGE_SIZE = 500;
+    const col = window.firebase.collection(window.firebase.db, 'consultations');
+
+    let cursorQuery = window.firebase.firestoreQuery(col, window.firebase.limit(PAGE_SIZE));
+    if (startAfterDocId) {
+        const startDoc = await window.firebase.getDoc(
+            window.firebase.doc(window.firebase.db, 'consultations', startAfterDocId)
+        );
+        if (startDoc.exists()) {
+            cursorQuery = window.firebase.firestoreQuery(
+                col,
+                window.firebase.startAfter(startDoc),
+                window.firebase.limit(PAGE_SIZE)
+            );
+        } else {
+            console.warn('[sortDate-backfill] startAfterDocId 不存在，從頭開始');
+        }
+    }
+
+    let totalScanned = 0;
+    let totalBackfilled = 0;
+    let lastProcessedId = null;
+
+    while (true) {
+        const snap = await window.firebase.getDocs(cursorQuery);
+        const docs = snap.docs;
+        if (docs.length === 0) break;
+
+        let batch = window.firebase.writeBatch(window.firebase.db);
+        let opCount = 0;
+        const commitBatch = async () => {
+            if (opCount > 0) {
+                await batch.commit();
+                batch = window.firebase.writeBatch(window.firebase.db);
+                opCount = 0;
+            }
+        };
+
+        for (const doc of docs) {
+            lastProcessedId = doc.id;
+            totalScanned++;
+            const data = doc.data();
+            const computedSortDate = getConsultationEffectiveDate(data, new Date(0));
+            const existingSortDate = parseConsultationDate(data.sortDate || null);
+            const computedTime = computedSortDate && !isNaN(computedSortDate.getTime())
+                ? computedSortDate.getTime() : NaN;
+            const existingTime = existingSortDate && !isNaN(existingSortDate.getTime())
+                ? existingSortDate.getTime() : NaN;
+            if (!Number.isFinite(computedTime) || existingTime === computedTime) {
+                continue;
+            }
+            batch.update(doc.ref, { sortDate: computedSortDate });
+            totalBackfilled++;
+            opCount++;
+            if (opCount >= 400) await commitBatch();
+        }
+        await commitBatch();
+
+        console.log(`[sortDate-backfill] 掃描 ${totalScanned}，回填 ${totalBackfilled}，最後處理 ${lastProcessedId}`);
+
+        if (docs.length < PAGE_SIZE) break;
+
+        cursorQuery = window.firebase.firestoreQuery(
+            col,
+            window.firebase.startAfter(docs[docs.length - 1]),
+            window.firebase.limit(PAGE_SIZE)
+        );
+    }
+
+    let markerWritten = false;
+    let markerError = '';
+    try {
+        await writeSortDateBackfillMarker({ totalScanned, totalBackfilled });
+        markerWritten = true;
+        console.log('[sortDate-backfill] 完成旗標已寫入 systemMeta/sortDateBackfill，per-patient 全量核對已關閉；其他客戶端最遲 24h 內生效（重新整理可立即檢查）');
+    } catch (e) {
+        markerError = (e && e.message) || String(e);
+        console.warn('[sortDate-backfill] 完成旗標寫入失敗（需診所管理身份）：', markerError, '。請管理員執行 await window.markSortDateBackfillComplete() 補寫');
+    }
+
+    const result = { totalScanned, totalBackfilled, lastProcessedId, markerWritten, markerError };
+    console.log('[sortDate-backfill] 完成', result);
+    return result;
+};
+
+/**
+ * 管理員手動標記 sortDate 回填完成（關閉 per-patient 全量核對）。
+ * 用於回填時旗標寫入失敗，或已確定全部病歷皆有正確 sortDate 的情境。
+ */
+window.markSortDateBackfillComplete = async function(stats = {}) {
+    await waitForFirebaseDb();
+    await writeSortDateBackfillMarker(stats || {});
+    console.log('[sortDate-backfill] 完成旗標已手動寫入，per-patient 全量核對已關閉');
+    return { ok: true };
+};
+
+/**
+ * 管理員手動清除完成旗標（重新開啟 per-patient 全量核對）。
+ * 用於發現 sortDate 回填遺漏或日期計算邏輯改動需要重跑時的逃生口。
+ * 注意：其他客戶端正面快取最久 24h；本機立即生效。
+ */
+window.clearSortDateBackfillMarker = async function() {
+    await waitForFirebaseDb();
+    await window.firebase.deleteDoc(
+        window.firebase.doc(
+            window.firebase.db,
+            SORT_DATE_BACKFILL_COLLECTION,
+            SORT_DATE_BACKFILL_DOC
+        )
+    );
+    clearSortDateBackfillCache();
+    console.log('[sortDate-backfill] 完成旗標已清除，per-patient 全量核對已重新開啟');
+    return { ok: true };
+};
+
 async function searchMedicalRecords(term, limitCount = 50) {
     try {
         await waitForFirebaseDb();
@@ -36337,7 +36684,8 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
    * 載入病人在指定診所的近期流水。
    * 走 SA 端點 /api/wallet/account：SDK 直接查 patientWalletTransactions
    * 會跨診所取回該病人全部流水，在員工跨診所隔離規則下會被整筆查詢
-   * 拒絕，故由後端以診所維度過濾後回傳（最近 50 筆）。
+   * 拒絕，故由後端以診所維度過濾後回傳（後端用 (patientId,clinicId,at)
+   * 複合索引直接 limit；最近 50 筆，病人詳情面板 10 筆）。
    */
   async function loadWalletTransactions(patientId, clinicId = '', limit = 0) {
     await waitForFirebase();
