@@ -20,7 +20,7 @@
  *   medicalAttachments  病歷附件
  * ============================================================ */
 
-window.APP_VERSION = 'simple';   // ← 在這裡切換版本：'simple'（簡單版）、'standard'（普通版）或 'advanced'（進階版）
+window.APP_VERSION = 'advanced';   // ← 在這裡切換版本：'simple'（簡單版）、'standard'（普通版）或 'advanced'（進階版）
 
 window.APP_VERSION_OPTIONS = {
     // 簡單版
