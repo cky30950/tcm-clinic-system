@@ -85,6 +85,16 @@
         console.log('[attachments]', message);
     }
 
+    // 版本開關：目前版本是否提供病歷附件（設定見 version-config.js）
+    function attachmentsEnabled() {
+        try {
+            if (typeof window.isVersionFeatureEnabled === 'function') {
+                return window.isVersionFeatureEnabled('medicalAttachments');
+            }
+        } catch (_e) {}
+        return true;
+    }
+
     function uuid() {
         if (window.crypto && typeof window.crypto.randomUUID === 'function') {
             return window.crypto.randomUUID();
@@ -366,6 +376,8 @@
     async function listForPatient(patientId, options) {
         patientId = String(patientId || '');
         if (!patientId) throw new Error('缺少病人 ID');
+        // 版本關閉時不讀取附件（病歷內嵌縮圖亦因此不顯示）
+        if (!attachmentsEnabled()) return [];
         var force = options && options.force;
         if (!force && patientCache[patientId]) return patientCache[patientId];
         if (!force && patientInflight[patientId]) return patientInflight[patientId];
@@ -443,6 +455,8 @@
      * 無暫存時直接回傳 0，不做任何查詢。
      */
     async function linkVisitUploads(params) {
+        // 版本關閉時不做任何附件歸戶
+        if (!attachmentsEnabled()) return { count: 0 };
         var appointmentId = String((params && params.appointmentId) || '');
         var patientId = String((params && params.patientId) || '');
         var consultationId = String((params && params.consultationId) || '');
@@ -1239,6 +1253,11 @@
     }
 
     async function openGallery(options) {
+        // 版本閘門：此版本未提供病歷附件
+        if (!attachmentsEnabled()) {
+            toast('目前版本未提供病歷附件功能', 'warning');
+            return;
+        }
         options = options || {};
         var scope = options.scope === 'visit' ? 'visit' : 'patient';
         var category = options.category === 'tongue' ? 'tongue' : 'all';
@@ -1382,6 +1401,8 @@
     }
 
     function openLightbox(fileId, patientId, visitKey, kind) {
+        // 版本閘門：此版本未提供病歷附件
+        if (!attachmentsEnabled()) return;
         var group = buildLightboxGroup(fileId, patientId, visitKey, kind);
         if (group.docs.length === 0) return;
         lightbox = group;
@@ -2222,6 +2243,10 @@
      * @param {string} category tongue | report（非舌象皆為醫學報告）
      */
     async function uploadVisitFile(fileOrBlob, category) {
+        // 版本閘門：此版本未提供病歷附件
+        if (!attachmentsEnabled()) {
+            throw new Error('目前版本未提供病歷附件功能');
+        }
         var ctx = resolveVisitContext({});
         if (!ctx.patientId) {
             throw new Error('目前沒有進行中的診症，無法上傳附件');
