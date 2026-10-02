@@ -69,5 +69,37 @@ export const G = {
     get setButtonLoading() { return setButtonLoading; },
     get clearButtonLoading() { return clearButtonLoading; },
     get resolveConsultationWalletBalance() { return resolveConsultationWalletBalance; },
-    get resolveConsultationPackageUseRemaining() { return resolveConsultationPackageUseRemaining; }
+    get resolveConsultationPackageUseRemaining() { return resolveConsultationPackageUseRemaining; },
+
+    /* ── auth 領域的舊依賴（Phase 3）──────────────────────────── */
+    // 可寫共享狀態：員工管理 patch/save 會回寫 users／userCache
+    get currentUser() { return currentUser; },
+    set currentUser(v) { currentUser = v; },
+    get users() { return users; },
+    set users(v) { users = v; },
+    get userCache() { return userCache; },
+    set userCache(v) { userCache = v; },
+
+    get $() { return window.$; },
+    get waitForFirebaseDb() { return waitForFirebaseDb; },
+    get waitForFirebaseDataManager() { return waitForFirebaseDataManager; },
+    get hasAccessToSection() { return hasAccessToSection; },
+    get getClinicDisplayName() { return getClinicDisplayName; },
+    get fetchUsers() { return fetchUsers; },
+    get loadUsersFromLocalStorage() { return loadUsersFromLocalStorage; },
+    get normalizeUserForClient() { return normalizeUserForClient; },
+    get getUserDisplayName() { return getUserDisplayName; },
+    get initializeSystemAfterLogin() { return initializeSystemAfterLogin; },
+    get showGlobalCopyright() { return showGlobalCopyright; },
+    get startInactivityMonitoring() { return startInactivityMonitoring; },
+    get initAcupointLibrary() { return initAcupointLibrary; },
+    get initAcupointMap() { return initAcupointMap; },
+    get initBillingItems() { return initBillingItems; },
+    get initCategoryData() { return initCategoryData; },
+    get initHerbInventory() { return initHerbInventory; },
+    get initHerbLibrary() { return initHerbLibrary; },
+    get initTemplateLibrary() { return initTemplateLibrary; },
+
+    get CLINIC_PERMISSION_POSITIONS() { return CLINIC_PERMISSION_POSITIONS; },
+    get CLINIC_SECTION_PERMISSION_OPTIONS() { return CLINIC_SECTION_PERMISSION_OPTIONS; }
 };
