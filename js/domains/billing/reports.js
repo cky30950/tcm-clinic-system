@@ -582,9 +582,6 @@ import { getApportionedCost } from './expenses.js';
             };
         }
 
-        // 個人統計：客戶端唯讀；所有寫入走 /api/personal-stats/*（SA 端）
-        const PERSONAL_STATS_SUMMARY_COLLECTION = 'personalStatisticsMonthlySummaries';
-
         export function getCurrentAuthUid() {
             try {
                 const u = window.firebase && window.firebase.auth && window.firebase.auth.currentUser;

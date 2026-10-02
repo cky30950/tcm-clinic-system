@@ -9720,6 +9720,9 @@ const FINANCIAL_SUMMARY_FIELDS = [
     'createdAt', 'updatedAt', 'syncedAt', 'isDeleted'
 ];
 
+// 個人統計：客戶端唯讀；所有寫入走 /api/personal-stats/*（SA 端）
+const PERSONAL_STATS_SUMMARY_COLLECTION = 'personalStatisticsMonthlySummaries';
+
 // Firebase 數據管理系統
 class FirebaseDataManager {
     constructor() {
