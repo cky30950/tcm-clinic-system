@@ -14,7 +14,7 @@
 // 只有在「修改 PRECACHE_URLS 預快取清單」或需強制清空所有人快取時才遞增。
 // v1.0.8：程式資源改 network-first；這一次遞增用於把殘留 v1.0.7 或更舊
 // SWR 快取的客戶端一次性換代刷新。
-const CACHE_VERSION = 'v1.0.8';
+const CACHE_VERSION = 'v1.0.9';
 const SHELL_CACHE = 'shell-' + CACHE_VERSION;
 const CDN_CACHE = 'cdn-' + CACHE_VERSION;
 
