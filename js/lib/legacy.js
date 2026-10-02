@@ -38,7 +38,25 @@ export const G = {
         return (typeof currentClinicId !== 'undefined' && currentClinicId) ? currentClinicId : '';
     },
     get billingItems() { return billingItems; },
+    set billingItems(v) { billingItems = v; },
+    // 收費項目 realtime sync（billing/items.js，Phase 5 子批 A）
+    get billingItemsLoaded() { return billingItemsLoaded; },
+    set billingItemsLoaded(v) { billingItemsLoaded = v; },
+    get billingItemsClinicUnsubscribe() { return billingItemsClinicUnsubscribe; },
+    set billingItemsClinicUnsubscribe(v) { billingItemsClinicUnsubscribe = v; },
+    get billingItemsGlobalUnsubscribe() { return billingItemsGlobalUnsubscribe; },
+    set billingItemsGlobalUnsubscribe(v) { billingItemsGlobalUnsubscribe = v; },
+    get getClinicScopedStorageKey() { return getClinicScopedStorageKey; },
+    get getLoadingButtonFromEvent() { return getLoadingButtonFromEvent; },
     get selectedBillingItems() { return selectedBillingItems; },
+    set selectedBillingItems(v) { selectedBillingItems = v; },
+    // 套票（billing/packages.js，Phase 5 子批 B）：模組會回寫所選收費列
+    get patientPackagesCache() { return patientPackagesCache; },
+    set patientPackagesCache(v) { patientPackagesCache = v; },
+    get pendingPackageChanges() { return pendingPackageChanges; },
+    set pendingPackageChanges(v) { pendingPackageChanges = v; },
+    get patientDetailClinicState() { return patientDetailClinicState; },
+    set patientDetailClinicState(v) { patientDetailClinicState = v; },
     get showConfirmation() { return showConfirmation; },
     get hasActionPermission() { return hasActionPermission; },
     get hasAdminRole() { return hasAdminRole; },
@@ -167,5 +185,16 @@ export const G = {
     get getConsultationEffectiveDate() { return getConsultationEffectiveDate; },
     get getGeneralRegistrationSourceLabel() { return getGeneralRegistrationSourceLabel; },
     get getMedicalRecordEditButtonLabel() { return getMedicalRecordEditButtonLabel; },
-    get getMedicalRecordEditWindowStatus() { return getMedicalRecordEditWindowStatus; }
+    get getMedicalRecordEditWindowStatus() { return getMedicalRecordEditWindowStatus; },
+
+    /* ── billing 支出（expenses.js，Phase 5 子批 C）────────────── */
+    get clinicSettings() { return clinicSettings; },
+    // 財務報表產生器仍在 system.js，子批 D 遷移後改走 window facade
+    get generateFinancialReport() { return window.generateFinancialReport; },
+
+    /* ── 財務報表（reports.js，Phase 5 子批 D）────────────────── */
+    get initClinics() { return initClinics; },
+    get viewMedicalRecord() { return viewMedicalRecord; },
+    get readCache() { return readCache; },
+    get writeCache() { return writeCache; }
 };
