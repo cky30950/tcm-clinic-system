@@ -31,3 +31,13 @@ export {
     attachPatientConsultationsListener,
     detachPatientConsultationsListener
 } from './store.js';
+export {
+    loadPatientListFromFirebase,
+    loadPatientList,
+    renderPatientListTable,
+    renderPatientListPage
+} from './list.js';
+export {
+    viewPatient
+} from './detail.js';
+export * from './history.js';

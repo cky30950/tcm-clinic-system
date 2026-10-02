@@ -134,7 +134,41 @@ const FACADE = {
     detachPatientListListener: Patients.detachPatientListListener,
     touchPatientsMeta: Patients.touchPatientsMeta,
     attachPatientConsultationsListener: Patients.attachPatientConsultationsListener,
-    detachPatientConsultationsListener: Patients.detachPatientConsultationsListener
+    detachPatientConsultationsListener: Patients.detachPatientConsultationsListener,
+
+    // ── patients 列表與搜尋（Phase 4 子批 A）──
+    loadPatientListFromFirebase: Patients.loadPatientListFromFirebase,
+    loadPatientList: Patients.loadPatientList,
+    renderPatientListTable: Patients.renderPatientListTable,
+    renderPatientListPage: Patients.renderPatientListPage,
+
+    // ── patients 詳情（Phase 4 子批 B）──
+    viewPatient: Patients.viewPatient,
+
+    // ── patients 病歷歷史 UI（Phase 4 子批 C）──
+    getHistoryCalendarContextPatientId: Patients.getHistoryCalendarContextPatientId,
+    getHistoryCalendarContextList: Patients.getHistoryCalendarContextList,
+    getHistoryCalendarContextPage: Patients.getHistoryCalendarContextPage,
+    renderHistoryCalendar: Patients.renderHistoryCalendar,
+    closeHistoryCalendar: Patients.closeHistoryCalendar,
+    openHistoryCalendarAtCurrentMonth: Patients.openHistoryCalendarAtCurrentMonth,
+    buildHistoryDateSelectionHtml: Patients.buildHistoryDateSelectionHtml,
+    buildHistoryCalendarHtml: Patients.buildHistoryCalendarHtml,
+    toggleHistoryCalendar: Patients.toggleHistoryCalendar,
+    changeHistoryCalendarMonth: Patients.changeHistoryCalendarMonth,
+    jumpToHistoryCalendarIndex: Patients.jumpToHistoryCalendarIndex,
+    resolveHistoryCalendarJump: Patients.resolveHistoryCalendarJump,
+    selectHistoryCalendarDate: Patients.selectHistoryCalendarDate,
+    selectHistoryCalendarRecord: Patients.selectHistoryCalendarRecord,
+    showPatientMedicalHistory: Patients.showPatientMedicalHistory,
+    getMedicalHistoryActionButtonClasses: Patients.getMedicalHistoryActionButtonClasses,
+    renderMedicalHistoryActionButton: Patients.renderMedicalHistoryActionButton,
+    renderMedicalHistoryActionButtons: Patients.renderMedicalHistoryActionButtons,
+    displayPatientMedicalHistoryPage: Patients.displayPatientMedicalHistoryPage,
+    changePatientHistoryPage: Patients.changePatientHistoryPage,
+    closePatientMedicalHistoryModal: Patients.closePatientMedicalHistoryModal,
+    viewPatientMedicalHistory: Patients.viewPatientMedicalHistory,
+    displayConsultationMedicalHistoryPage: Patients.displayConsultationMedicalHistoryPage
 };
 
 Object.assign(window, FACADE);

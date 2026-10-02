@@ -134,8 +134,36 @@ export const G = {
     get paginationSettings() { return paginationSettings; },
     get fetchDataWithCache() { return fetchDataWithCache; },
     get safeGetPatients() { return safeGetPatients; },
-    get loadPatientList() { return loadPatientList; },
+    // loadPatientList 已隨 Phase 4 子批 A 遷入 patients/list.js，改走 window facade
+    get loadPatientList() { return window.loadPatientList; },
+    // 病人列表模組（list.js）需要的共享狀態與分頁服務
+    get patientListFiltered() { return patientListFiltered; },
+    set patientListFiltered(v) { patientListFiltered = v; },
+    get ensurePaginationContainer() { return ensurePaginationContainer; },
+    get renderPagination() { return renderPagination; },
     get getConsultationEffectiveTimestamp() { return getConsultationEffectiveTimestamp; },
-    get displayPatientMedicalHistoryPage() { return displayPatientMedicalHistoryPage; },
-    get displayConsultationMedicalHistoryPage() { return displayConsultationMedicalHistoryPage; }
+    // 病歷歷史 UI 已隨 Phase 4 子批 C 遷入 patients/history.js，改走 window facade
+    get displayPatientMedicalHistoryPage() { return window.displayPatientMedicalHistoryPage; },
+    get displayConsultationMedicalHistoryPage() { return window.displayConsultationMedicalHistoryPage; },
+    // 病人詳情彈窗（detail.js）掛載診症摘要仍用 system.js 內的載入器
+    get loadPatientConsultationSummary() { return loadPatientConsultationSummary; },
+    // 病歷歷史模組（history.js）讀寫的共享分頁狀態（consultationHistoryPager 方法仍在 system.js 直接持有）
+    get currentPatientConsultations() { return currentPatientConsultations; },
+    set currentPatientConsultations(v) { currentPatientConsultations = v; },
+    get currentPatientHistoryPage() { return currentPatientHistoryPage; },
+    set currentPatientHistoryPage(v) { currentPatientHistoryPage = v; },
+    get currentConsultationConsultations() { return currentConsultationConsultations; },
+    set currentConsultationConsultations(v) { currentConsultationConsultations = v; },
+    get currentConsultationHistoryPage() { return currentConsultationHistoryPage; },
+    set currentConsultationHistoryPage(v) { currentConsultationHistoryPage = v; },
+    get clinicsList() { return clinicsList; },
+    get currentConsultingAppointmentId() { return currentConsultingAppointmentId; },
+    // 病歷歷史模組調用、仍保留在 system.js 的舊服務
+    get buildConsultationBillingDisplayHtml() { return buildConsultationBillingDisplayHtml; },
+    get canCurrentUserEditMedicalRecordEntry() { return canCurrentUserEditMedicalRecordEntry; },
+    get canCurrentUserViewConsultationEntry() { return canCurrentUserViewConsultationEntry; },
+    get getConsultationEffectiveDate() { return getConsultationEffectiveDate; },
+    get getGeneralRegistrationSourceLabel() { return getGeneralRegistrationSourceLabel; },
+    get getMedicalRecordEditButtonLabel() { return getMedicalRecordEditButtonLabel; },
+    get getMedicalRecordEditWindowStatus() { return getMedicalRecordEditWindowStatus; }
 };
