@@ -10,6 +10,7 @@
  * ============================================================ */
 
 import * as Print from './domains/print/index.js';
+import * as Wallet from './domains/wallet/index.js';
 
 const FACADE = {
     // ── print（收據／應診證明／病假紙／處方指示）──────────────
@@ -20,7 +21,36 @@ const FACADE = {
     printAttendanceCertificate: Print.printAttendanceCertificate,
     printSickLeave: Print.printSickLeave,
     printPrescriptionInstructionsFromAppointment: Print.printPrescriptionInstructionsFromAppointment,
-    printPrescriptionInstructions: Print.printPrescriptionInstructions
+    printPrescriptionInstructions: Print.printPrescriptionInstructions,
+
+    // ── wallet（會員儲值：帳戶／面板／充值退款調整／配置／診症支付）──
+    loadWalletManagement: Wallet.loadWalletManagement,
+    clearWalletCaches: Wallet.clearWalletCaches,
+    runWalletLegacyMigration: Wallet.runWalletLegacyMigration,
+    selectWalletPatient: Wallet.selectWalletPatient,
+    getWalletAccount: Wallet.getWalletAccount,
+    getRecentWalletTransactions: Wallet.getRecentWalletTransactions,
+    walletRound2: Wallet.walletRound2,
+    submitWalletTopup: Wallet.submitWalletTopup,
+    submitWalletRefund: Wallet.submitWalletRefund,
+    submitWalletAdjust: Wallet.submitWalletAdjust,
+    submitWalletStatus: Wallet.submitWalletStatus,
+    showWalletRefundForm: Wallet.showWalletRefundForm,
+    hideWalletAdminForm: Wallet.hideWalletAdminForm,
+    showWalletAdjustForm: Wallet.showWalletAdjustForm,
+    showWalletStatusForm: Wallet.showWalletStatusForm,
+    toggleWalletConfigForm: Wallet.toggleWalletConfigForm,
+    addWalletTierRow: Wallet.addWalletTierRow,
+    removeWalletTierRow: Wallet.removeWalletTierRow,
+    submitWalletConfig: Wallet.submitWalletConfig,
+    walletGoToTxPage: Wallet.walletGoToTxPage,
+    toggleWalletAdminOps: Wallet.toggleWalletAdminOps,
+    setupConsultationWallet: Wallet.setupConsultationWallet,
+    syncConsultWalletAvailability: Wallet.syncConsultWalletAvailability,
+    processConsultationWalletPayment: Wallet.processConsultationWalletPayment,
+    retryConsultationWalletPayment: Wallet.retryConsultationWalletPayment,
+    cancelConsultationWalletPayment: Wallet.cancelConsultationWalletPayment,
+    preCheckConsultationWalletPayment: Wallet.preCheckConsultationWalletPayment
 };
 
 Object.assign(window, FACADE);

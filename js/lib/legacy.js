@@ -32,6 +32,25 @@ export const G = {
     get firebase() { return window.firebase; },
     get firebaseDataManager() { return window.firebaseDataManager; },
 
+    /* ── wallet 領域的舊依賴（Phase 2）────────────────────────── */
+    // currentClinicId 在部分啟動路徑可能尚未詞法綁定，getter 自行吸收 ReferenceError
+    get currentClinicId() {
+        return (typeof currentClinicId !== 'undefined' && currentClinicId) ? currentClinicId : '';
+    },
+    get billingItems() { return billingItems; },
+    get selectedBillingItems() { return selectedBillingItems; },
+    get showConfirmation() { return showConfirmation; },
+    get hasActionPermission() { return hasActionPermission; },
+    get hasAdminRole() { return hasAdminRole; },
+    get waitForFirebase() { return waitForFirebase; },
+    get walletFetchAllDocs() { return walletFetchAllDocs; },
+    get clearAllSearchFields() { return clearAllSearchFields; },
+    get closeConsultationForm() { return closeConsultationForm; },
+    get loadTodayAppointments() { return loadTodayAppointments; },
+    get updateBillingDisplay() { return updateBillingDisplay; },
+    get updateStatistics() { return updateStatistics; },
+    get versionFeatureEnabled() { return versionFeatureEnabled; },
+
     /* ── print 領域的舊依賴（日後各該函式遷移後改為 ESM import）── */
     get parseConsultationDate() { return parseConsultationDate; },
     get getPatientByIdWithRefresh() { return getPatientByIdWithRefresh; },
