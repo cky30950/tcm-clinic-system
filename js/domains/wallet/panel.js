@@ -5,7 +5,7 @@
  * 符號經 ESM import，舊全域存取一律經 G（js/lib/legacy.js）。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { getWalletMembershipConfig, walletBonusFor } from './account.js';
+import { getWalletAccount, getWalletMembershipConfig, loadWalletTransactions, walletBonusFor } from './account.js';
 import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, currentWalletClinicId, walletAccountDocId, walletRound2 } from './shared.js';
 
   export let walletSelectedPatientId = '';
