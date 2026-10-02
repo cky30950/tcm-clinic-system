@@ -125,7 +125,9 @@ export const G = {
     get patientConsultationsListeners() { return patientConsultationsListeners; },
     get patientConsultationsCache() { return patientConsultationsCache; },
     get currentPatientHistoryPatientId() { return currentPatientHistoryPatientId; },
+    set currentPatientHistoryPatientId(v) { currentPatientHistoryPatientId = v; },
     get currentConsultationHistoryPatientId() { return currentConsultationHistoryPatientId; },
+    set currentConsultationHistoryPatientId(v) { currentConsultationHistoryPatientId = v; },
     get consultationHistoryPager() { return consultationHistoryPager; },
     // 病歷管理頁監聽（auth session 清除流程用，需一併重設）
     get medicalRecordListUnsubscribe() { return medicalRecordListUnsubscribe; },
