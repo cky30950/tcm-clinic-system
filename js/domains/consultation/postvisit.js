@@ -477,9 +477,16 @@ export async function withdrawConsultation(appointmentId) {
         // 重新載入列表和統計
         loadTodayAppointments();
         G.updateStatistics();
-        // 重新載入該病人的診療摘要，確保病歷列表和套票狀態即時更新
+        // 重新載入該病人的診療摘要，確保病歷列表和套票狀態即時更新。
+        // 僅在病人詳情面板正開啟、且顯示的就是這位病人時刷新；否則面板不存在
+        // 或顯示的是其他病人（殘留在隱藏 DOM 中），不應觸發摘要載入。
         try {
-            await loadPatientConsultationSummary(patient.id);
+            const detailModal = document.getElementById('patientDetailModal');
+            const panelOpen = detailModal && !detailModal.classList.contains('hidden');
+            const samePatient = String(G.patientDetailClinicState.patientId || '') === String(patient.id);
+            if (panelOpen && samePatient) {
+                await loadPatientConsultationSummary(patient.id);
+            }
         } catch (_e) {
             // ignore summary loading errors
         }
@@ -925,9 +932,9 @@ export function bindPackageHeaderButtons(patientId) {
 export async function loadPatientConsultationSummary(patientId) {
     const summaryContainer = document.getElementById('patientConsultationSummary');
 
-    // 如果容器尚未渲染，直接跳過，以免對 null 設定 innerHTML
+    // 如果容器尚未渲染（本次頁面工作階段尚未開過病人詳情面板），安靜跳過。
+    // 撤診入口在今日約診列，面板通常未開啟；此為正常 no-op，不印警告。
     if (!summaryContainer) {
-        console.warn('patientConsultationSummary 容器不存在，診療摘要無法載入');
         return;
     }
 
