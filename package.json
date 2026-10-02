@@ -4,7 +4,9 @@
   "type": "module",
   "description": "Dependencies for Cloudflare Pages Functions (Web Push).",
   "scripts": {
-    "test": "node --test functions/api/wallet/lib/wallet-core.test.js"
+    "test": "node --test functions/api/wallet/lib/wallet-core.test.js",
+    "deploy": "npx --yes wrangler pages deploy . --project-name=cheungec --branch=main --commit-dirty=true",
+    "deploy:preview": "npx --yes wrangler pages deploy . --project-name=cheungec --branch=preview --commit-dirty=true"
   },
   "dependencies": {
     "@block65/webcrypto-web-push": "^2.0.0"
