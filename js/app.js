@@ -12,6 +12,7 @@
 import * as Print from './domains/print/index.js';
 import * as Wallet from './domains/wallet/index.js';
 import * as Auth from './domains/auth/index.js';
+import * as Patients from './domains/patients/index.js';
 
 const FACADE = {
     // ── print（收據／應診證明／病假紙／處方指示）──────────────
@@ -106,7 +107,34 @@ const FACADE = {
     toggleUserStatus: Auth.toggleUserStatus,
     patchLocalUserRecord: Auth.patchLocalUserRecord,
     archiveUser: Auth.archiveUser,
-    restoreUser: Auth.restoreUser
+    restoreUser: Auth.restoreUser,
+
+    // ── patients 資料層（分頁快取讀取＋多人同步基礎設施）──
+    PATIENTS_CACHE_TTL_MS: Patients.PATIENTS_CACHE_TTL_MS,
+    fetchPatients: Patients.fetchPatients,
+    getPatientByIdWithRefresh: Patients.getPatientByIdWithRefresh,
+    fetchPatientsPage: Patients.fetchPatientsPage,
+    fetchPatientsPageAsc: Patients.fetchPatientsPageAsc,
+    comparePatientsByNumberDesc: Patients.comparePatientsByNumberDesc,
+    fetchPatientsPageOptimized: Patients.fetchPatientsPageOptimized,
+    getPatientsCount: Patients.getPatientsCount,
+    newSelfMetaNonce: Patients.newSelfMetaNonce,
+    isSelfMetaNonce: Patients.isSelfMetaNonce,
+    metaTimestampToMillis: Patients.metaTimestampToMillis,
+    readPatientsStorageMeta: Patients.readPatientsStorageMeta,
+    writePatientsStorageMeta: Patients.writePatientsStorageMeta,
+    stampPatientsStorageMetaTimestamp: Patients.stampPatientsStorageMetaTimestamp,
+    resetPatientPaginationCaches: Patients.resetPatientPaginationCaches,
+    adjustPatientsCountCache: Patients.adjustPatientsCountCache,
+    reloadVisiblePatientList: Patients.reloadVisiblePatientList,
+    invalidateAllPatientCaches: Patients.invalidateAllPatientCaches,
+    isPatientIdInFullCaches: Patients.isPatientIdInFullCaches,
+    handleRemotePatientMetaChange: Patients.handleRemotePatientMetaChange,
+    attachPatientListListener: Patients.attachPatientListListener,
+    detachPatientListListener: Patients.detachPatientListListener,
+    touchPatientsMeta: Patients.touchPatientsMeta,
+    attachPatientConsultationsListener: Patients.attachPatientConsultationsListener,
+    detachPatientConsultationsListener: Patients.detachPatientConsultationsListener
 };
 
 Object.assign(window, FACADE);

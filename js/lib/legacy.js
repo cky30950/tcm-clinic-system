@@ -53,7 +53,7 @@ export const G = {
 
     /* ── print 領域的舊依賴（日後各該函式遷移後改為 ESM import）── */
     get parseConsultationDate() { return parseConsultationDate; },
-    get getPatientByIdWithRefresh() { return getPatientByIdWithRefresh; },
+    get getPatientByIdWithRefresh() { return window.getPatientByIdWithRefresh; },
     get getReceiptPrintLayoutConfig() { return getReceiptPrintLayoutConfig; },
     get getClinicReceiptPaperSize() { return getClinicReceiptPaperSize; },
     get shouldHideGeneralRegistrationDoctorInfo() { return shouldHideGeneralRegistrationDoctorInfo; },
@@ -101,5 +101,41 @@ export const G = {
     get initTemplateLibrary() { return initTemplateLibrary; },
 
     get CLINIC_PERMISSION_POSITIONS() { return CLINIC_PERMISSION_POSITIONS; },
-    get CLINIC_SECTION_PERMISSION_OPTIONS() { return CLINIC_SECTION_PERMISSION_OPTIONS; }
+    get CLINIC_SECTION_PERMISSION_OPTIONS() { return CLINIC_SECTION_PERMISSION_OPTIONS; },
+
+    /* ── patients 資料層的舊依賴（Phase 4）────────────────────── */
+    // 分頁／全量快取狀態所有權仍在 system.js，store.js 經此讀寫
+    get patientCache() { return patientCache; },
+    set patientCache(v) { patientCache = v; },
+    get patientPagesCache() { return patientPagesCache; },
+    set patientPagesCache(v) { patientPagesCache = v; },
+    get patientPageCursors() { return patientPageCursors; },
+    set patientPageCursors(v) { patientPageCursors = v; },
+    get patientAscPagesCache() { return patientAscPagesCache; },
+    set patientAscPagesCache(v) { patientAscPagesCache = v; },
+    get patientAscPageCursors() { return patientAscPageCursors; },
+    set patientAscPageCursors(v) { patientAscPageCursors = v; },
+    get patientsCountCache() { return patientsCountCache; },
+    set patientsCountCache(v) { patientsCountCache = v; },
+    get patientListListenerAttached() { return patientListListenerAttached; },
+    set patientListListenerAttached(v) { patientListListenerAttached = v; },
+    get patientListUnsubscribe() { return patientListUnsubscribe; },
+    set patientListUnsubscribe(v) { patientListUnsubscribe = v; },
+    // 病歷監聽與歷史分頁（宣告仍在 system.js）
+    get patientConsultationsListeners() { return patientConsultationsListeners; },
+    get patientConsultationsCache() { return patientConsultationsCache; },
+    get currentPatientHistoryPatientId() { return currentPatientHistoryPatientId; },
+    get currentConsultationHistoryPatientId() { return currentConsultationHistoryPatientId; },
+    get consultationHistoryPager() { return consultationHistoryPager; },
+    // 病歷管理頁監聽（auth session 清除流程用，需一併重設）
+    get medicalRecordListUnsubscribe() { return medicalRecordListUnsubscribe; },
+    set medicalRecordListUnsubscribe(v) { medicalRecordListUnsubscribe = v; },
+    // 分頁設定與資料層舊服務
+    get paginationSettings() { return paginationSettings; },
+    get fetchDataWithCache() { return fetchDataWithCache; },
+    get safeGetPatients() { return safeGetPatients; },
+    get loadPatientList() { return loadPatientList; },
+    get getConsultationEffectiveTimestamp() { return getConsultationEffectiveTimestamp; },
+    get displayPatientMedicalHistoryPage() { return displayPatientMedicalHistoryPage; },
+    get displayConsultationMedicalHistoryPage() { return displayConsultationMedicalHistoryPage; }
 };

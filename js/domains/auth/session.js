@@ -5,6 +5,8 @@
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
 import { archiveStaffAuthAccount, fetchAuthorizedUserByUidOrEmail } from './claims.js';
+// Phase 4：病人監聽拆除函式已移至 patients 領域，登出／清除流程直接跨域引用
+import { detachPatientListListener } from '../patients/store.js';
 
 export function loadAccountSecurity() {
     try {
@@ -678,25 +680,24 @@ const FIRESTORE_SHUTDOWN_TIMEOUT_MS = 5000;
 export function detachAllKnownFirestoreListeners() {
     // 病人清單 metadata 監聽
     try {
-        if (typeof detachPatientListListener === 'function') {
-            detachPatientListListener();
-        }
+        detachPatientListListener();
     } catch (_e) {}
     // 單一病人病歷監聽（依病人 ID 掛載的多個實例）
     try {
-        if (typeof patientConsultationsListeners === 'object' && patientConsultationsListeners) {
-            Object.keys(patientConsultationsListeners).forEach(function (pid) {
-                const unsub = patientConsultationsListeners[pid];
+        const listeners = G.patientConsultationsListeners;
+        if (typeof listeners === 'object' && listeners) {
+            Object.keys(listeners).forEach(function (pid) {
+                const unsub = listeners[pid];
                 try { if (typeof unsub === 'function') unsub(); } catch (_e) {}
-                delete patientConsultationsListeners[pid];
+                delete listeners[pid];
             });
         }
     } catch (_e) {}
     // 病歷管理頁列表監聽
     try {
-        if (typeof medicalRecordListUnsubscribe === 'function') {
-            medicalRecordListUnsubscribe();
-            medicalRecordListUnsubscribe = null;
+        if (typeof G.medicalRecordListUnsubscribe === 'function') {
+            G.medicalRecordListUnsubscribe();
+            G.medicalRecordListUnsubscribe = null;
         }
     } catch (_e) {}
 }
