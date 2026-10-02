@@ -278,7 +278,9 @@ self.addEventListener('fetch', (event) => {
 function fetchDocument(req) {
     return fetch(req.url, {
         redirect: 'follow',
-        credentials: 'same-origin'
+        credentials: 'same-origin',
+        // network-first 不應被瀏覽器HTTP快取擋下：即使本機有新鮮回應也要向原站驗證
+        cache: 'no-cache'
     });
 }
 
@@ -370,7 +372,10 @@ function isNetworkFirst(req, url) {
 async function networkFirstWithCacheFallback(req) {
     const cache = await caches.open(SHELL_CACHE);
     try {
-        const fresh = await fetch(req);
+        // cache:'no-cache'：SW 的 network-first 必須真正回到原站驗證，
+        // 不讓「max-age 尚未到期」的瀏覽器HTTP磁碟快取回餡舊檔
+        // （2026-10-03 version-config.js 快取污染事件之防護）
+        const fresh = await fetch(req, { cache: 'no-cache' });
         if (fresh.ok) {
             // 成功取新：更新離線備份後回傳
             cache.put(req, fresh.clone());
