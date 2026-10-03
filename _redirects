@@ -1,0 +1,6 @@
+# Cloudflare Pages 跳轉／重寫規則
+# 讓舊式 .html 網址直接以 200 提供「乾淨網址」頁面，
+# 避免 Cloudflare Pages 預設 308 永久跳轉在部份手機／App 內瀏覽器出現連線錯誤。
+# 狀態碼 200 = 內部重寫（網址列維持不變、無跳轉）。
+/privacy.html  /privacy  200
+/terms.html    /terms    200
