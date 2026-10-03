@@ -2568,7 +2568,7 @@ async function fetchUsers(forceRefresh = false) {
                     buttonGroup.appendChild(note);
                 }
                 if (note) {
-                    note.textContent = '🔒 「新增診所 / 刪除目前診所」為進階版系統專屬功能（目前為普通版，僅可使用 ' + maxClinics + ' 間診所）';
+                    note.textContent = '「新增診所 / 刪除目前診所」為進階版系統專屬功能（目前為普通版，僅可使用 ' + maxClinics + ' 間診所）';
                 }
             } else {
                 if (buttonGroup) buttonGroup.classList.remove('flex-wrap');
@@ -2874,7 +2874,7 @@ async function fetchUsers(forceRefresh = false) {
                 const now = Date.now();
                 if (now - toastShownAt > 15000) {
                     toastShownAt = now;
-                    showToast(`🔧 偵測到 ${missing.size} 個雲端資料庫索引未建立，點擊右下角圖示一鍵建立`, 'warning');
+                    showToast(`偵測到 ${missing.size} 個雲端資料庫索引未建立，點擊右下角圖示一鍵建立`, 'warning');
                 }
                 buildIndicator();
             }
@@ -2885,7 +2885,7 @@ async function fetchUsers(forceRefresh = false) {
                 if (!btn) {
                     btn = document.createElement('button');
                     btn.id = 'indexMissingIndicator';
-                    btn.innerHTML = `<span>🔧</span><span class="badge">0</span>`;
+                    btn.innerHTML = `<i data-lucide="wrench" class="w-6 h-6 pointer-events-none"></i><span class="index-badge">0</span>`;
                     btn.title = '建立缺失的雲端資料庫索引';
                     btn.style.cssText = `
                         position: fixed; bottom: 24px; right: 24px; z-index: 9998;
@@ -2902,7 +2902,7 @@ async function fetchUsers(forceRefresh = false) {
                     document.body.appendChild(btn);
                 }
                 const count = missing.size;
-                const badge = btn.querySelector('.badge');
+                const badge = btn.querySelector('.index-badge');
                 if (count > 0) {
                     btn.style.display = 'flex';
                     badge.textContent = count;
@@ -2938,8 +2938,8 @@ async function fetchUsers(forceRefresh = false) {
                 `;
                 modal.innerHTML = `
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-                        <h3 style="margin:0;font-size:18px;font-weight:600;color:#1f2937;">🔧 建立雲端資料庫索引</h3>
-                        <button onclick="window.__indexManagerClose()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;">✕</button>
+                        <h3 style="margin:0;font-size:18px;font-weight:600;color:#1f2937;"><i data-lucide="wrench" class="w-5 h-5 inline-block align-text-bottom mr-1.5" style="color:#f59e0b;"></i>建立雲端資料庫索引</h3>
+                        <button onclick="window.__indexManagerClose()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;line-height:1;"><i data-lucide="x" class="w-5 h-5 pointer-events-none"></i></button>
                     </div>
                     <div id="indexManagerIntro" style="font-size:14px;color:#6b7280;margin-bottom:16px;line-height:1.6;">
                         以下是系統執行時發現缺失的資料庫索引。點擊「一鍵建立」會在新分頁打開已預填好參數的資料庫管理後台，你只需登入後按一下 <b>Create</b> 即可。
@@ -2970,7 +2970,7 @@ async function fetchUsers(forceRefresh = false) {
                 if (!listEl) return;
                 if (missing.size === 0) {
                     listEl.innerHTML = `<div style="text-align:center;color:#10b981;padding:20px;font-size:15px;">
-                        ✅ 所有索引都已建立，沒有缺失
+                        <i data-lucide="circle-check" class="w-5 h-5 inline-block align-text-bottom mr-1"></i>所有索引都已建立，沒有缺失
                     </div>`;
                     return;
                 }
@@ -2999,7 +2999,7 @@ async function fetchUsers(forceRefresh = false) {
                                 <a href="${item.url}" target="_blank" rel="noopener"
                                    style="flex:1;background:#2563eb;color:white;padding:8px 14px;border-radius:6px;
                                           text-decoration:none;font-size:13px;text-align:center;font-weight:500;">
-                                    🚀 一鍵建立（開啟資料庫管理後台）
+                                    <i data-lucide="rocket" class="w-4 h-4 inline-block align-text-bottom mr-1"></i>一鍵建立（開啟資料庫管理後台）
                                 </a>
                                 <button onclick="window.__indexManagerSkip(${i})"
                                         style="background:#e5e7eb;color:#4b5563;border:none;padding:8px 12px;border-radius:6px;
@@ -5869,29 +5869,29 @@ async function fetchJsonWithFallback(fileName) {
 
             
             const menuItems = {
-                patientManagement: { title: '病人資料管理', icon: '👥', description: '新增、查看、管理病人資料' },
-                consultationSystem: { title: '診症系統', icon: '🩺', description: '記錄症狀、診斷、開立處方' },
-                herbLibrary: { title: '中藥庫', icon: '🌿', description: '查看中藥材及方劑資料' },
+                patientManagement: { title: '病人資料管理', icon: 'users', description: '新增、查看、管理病人資料' },
+                consultationSystem: { title: '診症系統', icon: 'stethoscope', description: '記錄症狀、診斷、開立處方' },
+                herbLibrary: { title: '中藥庫', icon: 'leaf', description: '查看中藥材及方劑資料' },
                 
-                acupointLibrary: { title: '穴位庫', icon: '📌', description: '查看穴位資料' },
+                acupointLibrary: { title: '穴位庫', icon: 'map-pin', description: '查看穴位資料' },
                 
-                scheduleManagement: { title: '醫療排班', icon: '📅', description: '排班與行事曆查看' },
+                scheduleManagement: { title: '醫療排班', icon: 'calendar-days', description: '排班與行事曆查看' },
                 
-                medicalRecordManagement: { title: '病歷管理', icon: '📋', description: '查看及搜尋病歷' },
-                billingManagement: { title: '收費項目管理', icon: '💰', description: '管理診療費用及收費項目' },
-                walletManagement: { title: '會員儲值', icon: '💳', description: '充值、扣款與會員帳戶管理' },
+                medicalRecordManagement: { title: '病歷管理', icon: 'clipboard-list', description: '查看及搜尋病歷' },
+                billingManagement: { title: '收費項目管理', icon: 'wallet', description: '管理診療費用及收費項目' },
+                walletManagement: { title: '會員儲值', icon: 'credit-card', description: '充值、扣款與會員帳戶管理' },
 
-                userManagement: { title: '診所用戶管理', icon: '👤', description: '管理診所用戶權限' },
-                financialReports: { title: '財務報表', icon: '📊', description: '收入分析與財務統計' },
-                systemManagement: { title: '系統管理', icon: '⚙️', description: '統計資料、備份匯出' },
+                userManagement: { title: '診所用戶管理', icon: 'user', description: '管理診所用戶權限' },
+                financialReports: { title: '財務報表', icon: 'bar-chart-3', description: '收入分析與財務統計' },
+                systemManagement: { title: '系統管理', icon: 'settings', description: '統計資料、備份匯出' },
                 
-                personalStatistics: { title: '個人統計分析', icon: '📈', description: '統計個人用藥與穴位偏好' },
+                personalStatistics: { title: '個人統計分析', icon: 'trending-up', description: '統計個人用藥與穴位偏好' },
                 
-                personalSettings: { title: '個人設置', icon: '🔧', description: '管理慣用藥方及穴位組合' },
+                personalSettings: { title: '個人設置', icon: 'wrench', description: '管理慣用藥方及穴位組合' },
                 
-                accountSecurity: { title: '帳號安全設定', icon: '🔐', description: '變更密碼及封存帳號' },
+                accountSecurity: { title: '帳號安全設定', icon: 'lock', description: '變更密碼及封存帳號' },
                 
-                templateLibrary: { title: '模板庫', icon: '📚', description: '查看醫囑與診斷模板' }
+                templateLibrary: { title: '模板庫', icon: 'library', description: '查看醫囑與診斷模板' }
             };
 
             
@@ -5909,7 +5909,7 @@ async function fetchJsonWithFallback(fileName) {
                 button.className = 'w-full text-left p-4 rounded-lg hover:bg-gray-100 transition duration-200 border border-gray-200';
                 button.innerHTML = `
                     <div class="flex items-center">
-                        <span class="text-2xl mr-4">${item.icon}</span>
+                        <i data-lucide="${item.icon}" class="w-6 h-6 mr-4 mt-1 shrink-0 text-[#D9782B]"></i>
                         <div>
                             <div class="font-semibold text-gray-800">${item.title}</div>
                             <div class="text-sm text-gray-600">${item.description}</div>
@@ -7689,7 +7689,7 @@ async function initializeSystemAfterLogin() {
             if (!filteredItems || filteredItems.length === 0) {
                 listContainer.innerHTML = `
                     <div class="text-center py-12 text-gray-500">
-                        <div class="text-4xl mb-4">🌿</div>
+                        <div class="mb-4 flex justify-center"><i data-lucide="leaf" class="w-10 h-10 text-[#D9782B]"></i></div>
                         <div class="text-lg font-medium mb-2">沒有找到相關資料</div>
                         <div class="text-sm">請嘗試其他搜尋條件或新增中藥材/方劑</div>
                     </div>
@@ -7759,7 +7759,7 @@ async function initializeSystemAfterLogin() {
                 html += `
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                            <span class="mr-2">🌿</span>中藥材 (${totalHerbsInFiltered})
+                            <i data-lucide="leaf" class="w-5 h-5 mr-2 text-[#D9782B]"></i>中藥材 (${totalHerbsInFiltered})
                         </h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             ${herbsInPage.map(herb => createHerbCard(herb)).join('')}
@@ -7771,7 +7771,7 @@ async function initializeSystemAfterLogin() {
                 html += `
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                            <span class="mr-2">📋</span>方劑 (${totalFormulasInFiltered})
+                            <i data-lucide="clipboard-list" class="w-5 h-5 mr-2 text-blue-500"></i>方劑 (${totalFormulasInFiltered})
                         </h3>
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             ${formulasInPage.map(formula => createFormulaCard(formula)).join('')}
@@ -8351,7 +8351,7 @@ async function initializeSystemAfterLogin() {
             const meridianFiltered = currentAcupointFilter === 'all' ? searchFiltered : searchFiltered.filter(item => item.meridian === currentAcupointFilter);
             // 若無資料，顯示提示並隱藏分頁
             if (!meridianFiltered || meridianFiltered.length === 0) {
-                listContainer.innerHTML = `\n                    <div class="text-center py-12 text-gray-500">\n                        <div class="text-4xl mb-4">📌</div>\n                        <div class="text-lg font-medium mb-2">沒有找到相關穴位</div>\n                        <div class="text-sm">請嘗試其他搜尋條件</div>\n                    </div>\n                `;
+                listContainer.innerHTML = `\n                    <div class="text-center py-12 text-gray-500">\n                        <div class="mb-4 flex justify-center"><i data-lucide="map-pin" class="w-10 h-10 text-blue-500"></i></div>\n                        <div class="text-lg font-medium mb-2">沒有找到相關穴位</div>\n                        <div class="text-sm">請嘗試其他搜尋條件</div>\n                    </div>\n                `;
                 const paginEl = ensurePaginationContainer('acupointLibraryList', 'acupointLibraryPagination');
                 if (paginEl) {
                     paginEl.innerHTML = '';
@@ -8381,7 +8381,7 @@ async function initializeSystemAfterLogin() {
             Object.keys(groups).forEach(m => {
                 // 取得此經絡在搜尋條件下的總數量
                 const totalForMeridian = meridianCounts[m] || groups[m].length;
-                html += `\n                    <div class="mb-8">\n                        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">\n                            <span class="mr-2">📌</span>${window.escapeHtml(m)} (${totalForMeridian})\n                        </h3>\n                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">\n                            ${groups[m].map(ac => createAcupointCard(ac)).join('')}\n                        </div>\n                    </div>\n                `;
+                html += `\n                    <div class="mb-8">\n                        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">\n                            <i data-lucide="map-pin" class="w-5 h-5 mr-2 text-blue-500"></i>${window.escapeHtml(m)} (${totalForMeridian})\n                        </h3>\n                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">\n                            ${groups[m].map(ac => createAcupointCard(ac)).join('')}\n                        </div>\n                    </div>\n                `;
             });
             listContainer.innerHTML = html;
             // 渲染分頁控制
@@ -14901,7 +14901,7 @@ async function viewMedicalRecord(recordId, buttonEl = null) {
         let detailHtml = '';
         detailHtml += '<div class="border border-gray-200 rounded-lg overflow-hidden shadow-sm">';
         // Header 區塊
-        detailHtml += '<div class="bg-gradient-to-r from-gray-50 to-blue-50 px-6 py-4 border-b border-gray-200">';
+        detailHtml += '<div class="bg-linear-to-r from-gray-50 to-blue-50 px-6 py-4 border-b border-gray-200">';
         detailHtml += '<div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">';
         // 左側日期與表列（分兩行）
         detailHtml += '<div class="flex flex-col space-y-2">';

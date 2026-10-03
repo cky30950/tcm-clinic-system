@@ -1132,13 +1132,13 @@ import { getApportionedCost } from './expenses.js';
             const ft = (s) => (typeof t === 'function' ? t(s) : s);
             if (previous === null || previous === undefined) {
                 return current > 0
-                    ? `<span class="bg-white bg-opacity-25 text-white rounded-full px-2 py-0.5 text-xs">${ft('（新）')}</span>`
+                    ? `<span class="bg-white/25 text-white rounded-full px-2 py-0.5 text-xs">${ft('（新）')}</span>`
                     : '';
             }
             if (previous === 0) {
                 return current === 0
-                    ? `<span class="bg-white bg-opacity-25 text-white rounded-full px-2 py-0.5 text-xs">0%</span>`
-                    : `<span class="bg-white text-green-700 rounded-full px-2 py-0.5 text-xs font-semibold">✦ ${ft('（新）')}</span>`;
+                    ? `<span class="bg-white/25 text-white rounded-full px-2 py-0.5 text-xs">0%</span>`
+                    : `<span class="bg-white text-green-700 rounded-full px-2 py-0.5 text-xs font-semibold inline-flex items-center gap-0.5"><i data-lucide="sparkles" class="w-3 h-3"></i>${ft('（新）')}</span>`;
             }
             const pct = ((current - previous) / previous) * 100;
             const up = pct >= 0;

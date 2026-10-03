@@ -695,7 +695,7 @@
         item.dataset.uid = userObj.uid || '';
         
         const avatar = document.createElement('div');
-        avatar.className = 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white mr-2 flex-shrink-0';
+        avatar.className = 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white mr-2 shrink-0';
         if (isGroup) {
           avatar.textContent = '#';
           avatar.style.backgroundColor = '#6B7280'; 
@@ -721,7 +721,7 @@
         nameSpan.textContent = isGroup ? '主頻道' : (userObj.name || userObj.username || '未知用戶');
         
         const statusDot = document.createElement('span');
-        statusDot.className = 'w-2 h-2 rounded-full ml-2 flex-shrink-0';
+        statusDot.className = 'w-2 h-2 rounded-full ml-2 shrink-0';
         statusDot.style.backgroundColor = isGroup ? 'transparent' : '#9CA3AF'; 
         statusDot.dataset.statusDot = 'true';
         item.appendChild(avatar);
@@ -1084,7 +1084,7 @@
 
       if (!isSelf) {
         const avatar = document.createElement('div');
-        avatar.className = 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0';
+        avatar.className = 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0';
         const firstChar = (msg.senderName || '?').charAt(0);
         avatar.textContent = firstChar;
         const colors = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6'];
@@ -1121,7 +1121,7 @@
       wrapper.appendChild(content);
       if (isSelf) {
         const avatar = document.createElement('div');
-        avatar.className = 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ml-2';
+        avatar.className = 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ml-2';
         const nameSourceSelf = (this.currentUser && (this.currentUser.name || this.currentUser.username)) || '?';
         const firstChar = nameSourceSelf.charAt(0);
         avatar.textContent = firstChar;

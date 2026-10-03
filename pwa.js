@@ -62,8 +62,8 @@
             en: 'This device\'s old push subscription is invalid. Rebuilding the subscription and retesting automatically…'
         },
         pushTestHealedSent: {
-            zh: '舊訂閱已失效，已自動重建完成 ✓ 新訂閱的測試通知已送出，請查看通知。',
-            en: 'The old subscription was invalid and has been rebuilt automatically ✓ A test notification was sent via the new subscription. Please check your notifications.'
+            zh: '舊訂閱已失效，已自動重建完成；新訂閱的測試通知已送出，請查看通知。',
+            en: 'The old subscription was invalid and has been rebuilt automatically. A test notification was sent via the new subscription. Please check your notifications.'
         },
         pushTestHealFailed: {
             zh: '舊訂閱已失效，但自動重建失敗，請把推播開關關閉再重新開啟一次。',
@@ -1053,7 +1053,7 @@
         row.style.cssText = 'display:flex;align-items:flex-start;gap:12px;';
 
         var icon = document.createElement('div');
-        icon.textContent = '🔔';
+        icon.innerHTML = '<i data-lucide="bell" style="width:20px;height:20px;color:#D9782B;"></i>';
         icon.style.cssText =
             'flex:0 0 auto;width:40px;height:40px;border-radius:12px;' +
             'background:rgba(217,120,43,.1);display:flex;align-items:center;' +

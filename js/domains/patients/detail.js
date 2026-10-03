@@ -110,7 +110,7 @@ export async function viewPatient(id) {
                     data-patient="${window.escapeHtml(String(id))}"
                     data-patient-name="${safeName}"
                     class="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded transition duration-200">
-                    📎 <span>醫學報告及舌象圖片</span>
+                    <i data-lucide="paperclip" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i><span>醫學報告及舌象圖片</span>
                 </button>` : ''}
             </div>
             <div id="patientConsultationSummary">

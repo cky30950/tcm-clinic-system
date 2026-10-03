@@ -12,7 +12,34 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="名醫診所">
     <link rel="apple-touch-icon" href="/images/icons/apple-touch-icon.png">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5/daisyui.css">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            function refreshIcons() { if (window.lucide) { try { window.lucide.createIcons(); } catch (e) {} } }
+            var iconTimer = null;
+            function scheduleRefresh() { if (iconTimer) clearTimeout(iconTimer); iconTimer = setTimeout(refreshIcons, 30); }
+            var pending = false;
+            var mo = new MutationObserver(function (mutations) {
+                for (var i = 0; i < mutations.length; i++) {
+                    var added = mutations[i].addedNodes;
+                    for (var j = 0; j < added.length; j++) {
+                        var node = added[j];
+                        if (node.nodeType !== 1) continue;
+                        if (node.hasAttribute && node.hasAttribute("data-lucide")) { pending = true; break; }
+                        if (node.querySelector && node.querySelector("i[data-lucide]")) { pending = true; break; }
+                    }
+                    if (pending) break;
+                }
+                if (pending) { pending = false; scheduleRefresh(); }
+            });
+            mo.observe(document.documentElement, { childList: true, subtree: true });
+            refreshIcons();
+            var readyTimer = setInterval(function () { if (window.lucide) { refreshIcons(); clearInterval(readyTimer); } }, 50);
+            setTimeout(function () { clearInterval(readyTimer); }, 5000);
+        });
+    </script>
     
     <script type="module" src="firebase_init.js?v=20261001b"></script>
     
@@ -29,6 +56,28 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
+
+        /* daisyUI 5 品牌色 token（與 index.html 一致） */
+        :root {
+            --color-primary: #D9782B;
+            --color-primary-content: #ffffff;
+            --color-secondary: #B8621F;
+            --color-secondary-content: #ffffff;
+            --color-neutral: #1E1E1E;
+            --color-neutral-content: #ffffff;
+            --color-base-100: #ffffff;
+            --color-base-200: #F6EFE8;
+            --color-base-300: #E8DED5;
+            --color-base-content: #1E1E1E;
+            --radius-box: 0.625rem;
+            --radius-selector: 0.5rem;
+            --radius-field: 0.5rem;
+            --radius-badge: 0.5rem;
+        }
+        /* Tailwind v4 preflight 邊框預設改為 currentColor，統一回到淡灰 */
+        @layer base {
+            *, ::before, ::after { border-color: #e5e7eb; }
+        }
         body { font-family: 'Noto Sans TC', sans-serif; }
         .fade-in { animation: fadeIn 0.3s ease-in forwards; }
         .fade-out { animation: fadeOut 0.3s ease-out forwards; }
@@ -127,13 +176,13 @@
              * 這裡鎖定診症記錄卡片的標題區塊（使用藍灰漸層背景的容器），
              * 並覆寫 Tailwind 的 flex 排版設定。
              */
-            .bg-gradient-to-r.from-gray-50.to-blue-50 > .flex.justify-between.items-center {
+            .bg-linear-to-r.from-gray-50.to-blue-50 > .flex.justify-between.items-center {
                 flex-direction: column !important;
                 align-items: flex-start !important;
             }
 
             /* 當按鈕群組換行到下一層時，增加上邊距以區隔日期資訊與按鈕 */
-            .bg-gradient-to-r.from-gray-50.to-blue-50 > .flex.justify-between.items-center > .flex.flex-wrap {
+            .bg-linear-to-r.from-gray-50.to-blue-50 > .flex.justify-between.items-center > .flex.flex-wrap {
                 margin-top: 0.5rem !important;
             }
 
@@ -161,7 +210,7 @@
              * 診症記錄與病歷記錄卡片中的日期、醫師、病歷編號等資訊預設為橫向排列，
              * 在手機上容易造成內容被截斷。啟用 flex-wrap 並設置 gap，讓資訊能夠換行顯示。
              */
-            .bg-gradient-to-r.from-gray-50.to-blue-50 .flex.items-center.space-x-4 {
+            .bg-linear-to-r.from-gray-50.to-blue-50 .flex.items-center.space-x-4 {
                 flex-wrap: wrap !important;
                 gap: 0.5rem !important;
             }
@@ -275,7 +324,7 @@
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-green-50 to-blue-50 min-h-screen">
+<body class="bg-linear-to-br from-green-50 to-blue-50 min-h-screen">
     
     
     <div id="loginPage" class="min-h-screen flex items-center justify-center p-4">
@@ -353,7 +402,7 @@
                 
             </div>
         </div>
-        <div id="expenseImportModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div id="expenseImportModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl max-w-xl w-full">
                 <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                     <h3 class="text-xl font-bold text-gray-800">成本導入</h3>
@@ -391,7 +440,7 @@
                 </div>
             </div>
         </div>
-        <div id="expenseListModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div id="expenseListModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl max-w-xl w-full">
                 <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                     <h3 class="text-xl font-bold text-gray-800">已輸入成本</h3>
@@ -419,7 +468,7 @@
             </div>
         </div>
         
-        <div id="financialDrilldownModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div id="financialDrilldownModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full">
                 <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                     <h3 id="financialDrilldownTitle" class="text-xl font-bold text-gray-800">診症單清單</h3>
@@ -443,7 +492,7 @@
             </div>
         </div>
 
-        <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
+        <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden"></div>
         
         <nav class="bg-white shadow-lg border-b-4 border-green-500">
             <div class="max-w-7xl mx-auto px-4">
@@ -480,7 +529,7 @@
         </nav>
         
         <div id="clinicSwitchModal" class="fixed inset-0 z-50 hidden">
-            <div class="absolute inset-0 bg-black bg-opacity-50"></div>
+            <div class="absolute inset-0 bg-black/50"></div>
             <div class="relative max-w-md mx-auto mt-24 bg-white rounded-xl shadow-lg p-6">
                 <h3 class="text-lg font-semibold mb-4">切換診所</h3>
                 <select id="currentClinicSelector" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"></select>
@@ -492,7 +541,7 @@
         </div>
         
         <div id="globalLoadingOverlay" class="fixed inset-0 hidden" style="z-index: 60;">
-            <div class="absolute inset-0 bg-black bg-opacity-40"></div>
+            <div class="absolute inset-0 bg-black/40"></div>
             <div class="relative max-w-md mx-auto mt-32 bg-white rounded-xl shadow-lg p-6">
                 <h3 class="text-base font-semibold mb-4 text-gray-800">正在載入資料</h3>
                 <div class="w-full bg-gray-200 rounded h-2 overflow-hidden">
@@ -520,11 +569,11 @@
             
             <div id="patientManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800"> <span class="text-3xl mr-3">👥</span>病人資料管理</h2>
+                    <h2 class="text-2xl font-bold text-gray-800"> <i data-lucide="users" class="w-7 h-7 mr-3"></i>病人資料管理</h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchPatient" placeholder="搜尋病人編號、姓名或電話..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
-                            <span class="absolute right-3 top-2.5 text-gray-400">🔍</span>
+                            <i data-lucide="search" class="absolute right-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"></i>
                         </div>
                         <button id="showAddPatientButton" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200 whitespace-nowrap">
                             + 新增病人
@@ -532,7 +581,7 @@
                     </div>
                 </div>
                 
-                <div id="addPatientModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="addPatientModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                             <h3 id="formTitle" class="text-xl font-bold text-gray-800">新增病人資料</h3>
@@ -845,7 +894,7 @@
                     </table>
                 </div>
                 
-                <div id="patientDetailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="patientDetailModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
                             <h3 class="text-xl font-bold text-gray-800">病人詳細資料</h3>
@@ -857,7 +906,7 @@
                     </div>
                 </div>
                 
-                <div id="patientMedicalHistoryModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="patientMedicalHistoryModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                             <h3 id="patientMedicalHistoryTitle" class="text-xl font-bold text-gray-800">病歷記錄</h3>
@@ -881,15 +930,15 @@
             
             <div id="consultationSystem" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="mb-6">
-                    <h2 class="text-2xl font-bold text-gray-800"> <span class="text-3xl mr-3">🩺</span>掛號診症系統</h2>
+                    <h2 class="text-2xl font-bold text-gray-800"> <i data-lucide="stethoscope" class="w-7 h-7 mr-3"></i>掛號診症系統</h2>
                     <p class="text-gray-600 mt-2">簡潔的掛號流程管理</p>
                 </div>
                 
                 
-                <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
+                <div class="bg-linear-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
                     <div class="mb-4">
                         <h3 class="text-lg font-semibold text-gray-800 flex items-center mb-2">
-                            <span class="mr-2">🔍</span><span>搜索病人掛號</span>
+                            <i data-lucide="search" class="w-4 h-4 mr-2"></i><span>搜索病人掛號</span>
                         </h3>
                         <p class="text-sm text-gray-600">請輸入病人姓名、編號或電話進行搜索</p>
                     </div>
@@ -899,7 +948,7 @@
                             <input type="text" id="patientSearchInput" placeholder="搜尋病人姓名、編號或電話..." 
                                    class="w-full border border-gray-300 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                    autocomplete="off" autocorrect="off" autocapitalize="off">
-                            <span class="absolute right-3 top-3.5 text-gray-400">🔍</span>
+                            <i data-lucide="search" class="absolute right-3 top-3.5 w-4 h-4 text-gray-400 pointer-events-none"></i>
                         </div>
                         <button onclick="clearPatientSearch()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-3 rounded-lg transition duration-200">
                             清除
@@ -916,7 +965,7 @@
                     </div>
                 </div>
                 
-                <div id="registrationModal" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                <div id="registrationModal" class="fixed inset-0 bg-black/50 z-40 hidden flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto">
                     <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
                         <div class="bg-green-600 text-white px-6 py-4 rounded-t-xl">
                             <div class="flex justify-between items-center">
@@ -930,7 +979,7 @@
                                 <div class="space-y-4">
                                     <div class="bg-blue-50 rounded-lg p-4">
                                         <div class="flex items-center mb-2">
-                                            <span class="mr-2">👤</span>
+                                            <i data-lucide="user" class="w-4 h-4 mr-2"></i>
                                             <span class="font-semibold text-gray-700">病人資訊</span>
                                         </div>
                                         <div id="selectedPatientInfo" class="text-sm text-gray-600">
@@ -940,7 +989,7 @@
                                     
                                     <div>
                                         <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                            <span class="mr-2">👨‍⚕️</span><span>掛號醫師 *</span>
+                                            <i data-lucide="stethoscope" class="w-4 h-4 mr-2"></i><span>掛號醫師 *</span>
                                         </label>
                                         <select id="appointmentDoctor" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                             <option value="">請選擇醫師</option>
@@ -950,7 +999,7 @@
                                     
                                     <div>
                                         <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                            <span class="mr-2">⏰</span><span>掛號時間</span>
+                                            <i data-lucide="clock" class="w-4 h-4 mr-2"></i><span>掛號時間</span>
                                         </label>
                                         <input type="datetime-local" id="appointmentDateTime" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                     </div>
@@ -959,7 +1008,7 @@
                                 <div class="space-y-4">
                                     <div>
                                         <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                            <span class="mr-2">🧾</span><span>選擇問診資料</span>
+                                            <i data-lucide="clipboard-list" class="w-4 h-4 mr-2"></i><span>選擇問診資料</span>
                                         </label>
                                         <select id="inquirySelect" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                             <option value="">不使用問診資料</option>
@@ -969,7 +1018,7 @@
 
                                     <div>
                                         <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                            <span class="mr-2">📝</span><span>主訴症狀</span>
+                                            <i data-lucide="message-square" class="w-4 h-4 mr-2"></i><span>主訴症狀</span>
                                         </label>
                                         <textarea id="quickChiefComplaint" placeholder="請簡述病人的主要症狀..." rows="8" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"></textarea>
                                     </div>
@@ -995,7 +1044,7 @@
                             
                             <div class="flex items-center space-x-3">
                                 <h3 class="text-lg font-semibold text-gray-800 flex items-center">
-                                    <span class="mr-2">📅</span><span>掛號列表</span>
+                                    <i data-lucide="list" class="w-4 h-4 mr-2"></i><span>掛號列表</span>
                                 </h3>
                                 <div class="flex items-center space-x-1">
                                     <span class="whitespace-nowrap text-sm text-gray-600">日期</span>
@@ -1038,7 +1087,7 @@
                     </div>
                 </div>
                 
-                <div id="medicalHistoryModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="medicalHistoryModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                             <h3 id="medicalHistoryTitle" class="text-xl font-bold text-gray-800">診症記錄</h3>
@@ -1059,7 +1108,7 @@
                     </div>
                 </div>
 
-                <div id="consultationMedicalHistoryEditorModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="consultationMedicalHistoryEditorModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                             <div>
@@ -1093,7 +1142,7 @@
                             id="videoConsultBtn"
                             class="hidden inline-flex items-center gap-2 bg-white text-green-700 hover:bg-green-50 active:bg-green-100 font-semibold text-sm px-4 py-2 rounded-lg shadow transition duration-200 whitespace-nowrap"
                         >
-                            <span aria-hidden="true">📹</span>
+                            <i aria-hidden="true" data-lucide="video" class="w-4 h-4"></i>
                             <span>視訊診症</span>
                         </button>
                     </div>
@@ -1142,7 +1191,7 @@
                                             onclick="openConsultationMedicalHistoryEditor(event)"
                                             class="text-xs bg-red-100 hover:bg-red-200 text-red-700 border border-red-200 px-3 py-1 rounded transition duration-200"
                                         >
-                                            📝 修改既住史
+                                            <i data-lucide="file-pen" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 修改既住史
                                         </button>
                                     </div>
                                 </div>
@@ -1168,7 +1217,7 @@
                                                 onclick="openDiagnosisTemplate(event)"
                                                 class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200"
                                             >
-                                                🔍 載入診斷模板
+                                                <i data-lucide="search" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 載入診斷模板
                                             </button>
                                         </div>
                                     </div>
@@ -1188,7 +1237,7 @@
                                             data-version-feature="medicalAttachments"
                                             class="text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded transition duration-200"
                                         >
-                                            📎 <span>醫學報告</span>
+                                            <i data-lucide="paperclip" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> <span>醫學報告</span>
                                         </button>
                                     </div>
 
@@ -1206,7 +1255,7 @@
                                             data-version-feature="medicalAttachments"
                                             class="text-xs bg-pink-500 hover:bg-pink-600 text-white px-3 py-1 rounded transition duration-200"
                                         >
-                                        🧑‍🦰 <span>舌象圖片</span>
+                                        <i data-lucide="user-round" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> <span>舌象圖片</span>
                                         </button>
                                     </div>
                                     <textarea id="formTongue" placeholder="舌質、舌苔、舌形等..." rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
@@ -1237,12 +1286,12 @@
                                 <div>
                                     <div class="flex justify-between items-center mb-2">
                                         <label class="block text-sm font-semibold text-gray-700">針灸備註</label>
-                                        <button type="button" onclick="openAcupointCombo(event)" class="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded transition duration-200">📍 載入常用穴位</button>
+                                        <button type="button" onclick="openAcupointCombo(event)" class="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded transition duration-200"><i data-lucide="map-pin" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 載入常用穴位</button>
                                     </div>
                                     
                                         <div class="mb-3 bg-blue-50 rounded-lg p-3 border border-blue-200">
                                             <div class="flex items-center mb-2">
-                                                <span class="text-sm font-medium text-blue-800 mr-2">🔍 搜索穴位：</span>
+                                                <span class="text-sm font-medium text-blue-800 mr-2"><i data-lucide="search" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 搜索穴位：</span>
                                                 <div class="flex-1 relative">
                                                     <input type="text" id="acupointNotesSearch" placeholder="搜尋穴位名稱、經絡、定位或國際代碼..." 
                                                            class="w-full border border-blue-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1250,7 +1299,7 @@
                                                     <button type="button" onclick="clearAcupointNotesSearch()" class="absolute right-2 top-1 text-gray-400 hover:text-gray-600 text-sm">×</button>
                                                 </div>
                                                 
-                                                <button type="button" onclick="openAcupointMapForNotes()" class="ml-2 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200">🗺️ 穴位圖</button>
+                                                <button type="button" onclick="openAcupointMapForNotes()" class="ml-2 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200"><i data-lucide="map" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 穴位圖</button>
                                             </div>
                                         
                                         <div id="acupointNotesSearchResults" class="hidden">
@@ -1281,11 +1330,11 @@
                                         <div class="flex gap-2 items-center">
                                             <button type="button" onclick="openHerbCombo(event)" 
                                                     class="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded transition duration-200">
-                                                🌿 載入常用藥方
+                                                <i data-lucide="leaf" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 載入常用藥方
                                             </button>
                                             <button type="button" onclick="loadPreviousPrescription()" 
                                                     class="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded transition duration-200">
-                                                📋 載入上次處方
+                                                <i data-lucide="clipboard-list" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 載入上次處方
                                             </button>
                                         </div>
                                     </div>
@@ -1293,7 +1342,7 @@
                                     
                                     <div class="mb-3 bg-yellow-50 rounded-lg p-3 border border-yellow-200">
                                         <div class="flex items-center mb-2">
-                                            <span class="text-sm font-medium text-yellow-800 mr-2">🔍 搜索中藥庫：</span>
+                                            <span class="text-sm font-medium text-yellow-800 mr-2"><i data-lucide="search" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 搜索中藥庫：</span>
                                             <div class="flex-1 relative">
                                                 <input type="text" id="prescriptionSearch" placeholder="搜索中藥材、方劑名稱或功能..." 
                                                        class="w-full border border-yellow-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
@@ -1333,14 +1382,14 @@
                                         </label>
                                         <button type="button" onclick="loadPreviousBillingItems()" 
                                                 class="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded transition duration-200">
-                                            💰 載入上次收費
+                                            <i data-lucide="wallet" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 載入上次收費
                                         </button>
                                     </div>
                                     
                                     
                                     <div class="mb-3 bg-green-50 rounded-lg p-3 border border-green-200">
                                         <div class="flex items-center mb-2">
-                                            <span class="text-sm font-medium text-green-800 mr-2">💰 選擇收費項目：</span>
+                                            <span class="text-sm font-medium text-green-800 mr-2"><i data-lucide="wallet" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 選擇收費項目：</span>
                                             <div class="flex-1 relative">
                                                 <input type="text" id="billingSearch" placeholder="搜索收費項目名稱..." 
                                                        class="w-full border border-green-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -1377,7 +1426,7 @@
                                     <div id="walletPaymentArea" class="mt-2 hidden rounded-lg border border-teal-200 bg-teal-50 p-3">
                                         <label class="flex items-center text-sm text-teal-800 cursor-pointer">
                                             <input type="checkbox" id="useWalletPayment" class="mr-2 h-4 w-4 rounded border-teal-300 text-teal-600 focus:ring-teal-500">
-                                            <span>💳 使用儲值餘額支付 <span id="walletPaymentAvailable" class="font-medium"></span></span>
+                                            <span><i data-lucide="credit-card" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 使用儲值餘額支付 <span id="walletPaymentAvailable" class="font-medium"></span></span>
                                         </label>
                                         <div id="walletPaymentMessage" class="mt-2 hidden text-sm"></div>
                                     </div>
@@ -1387,7 +1436,7 @@
                                     
                                     <div class="mt-4 border border-purple-200 rounded-lg p-3 bg-purple-50">
                                       <div class="flex items-center justify-between mb-2">
-                                        <div class="text-sm font-semibold text-purple-800">🎫 病人套票</div>
+                                        <div class="text-sm font-semibold text-purple-800"><i data-lucide="ticket" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 病人套票</div>
                                         <button type="button" onclick="refreshPatientPackagesUI()"
                                                 class="text-xs px-2 py-1 bg-purple-600 text-white rounded">刷新</button>
                                       </div>
@@ -1410,7 +1459,7 @@
                                             onclick="openPrescriptionTemplate(event)"
                                             class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200"
                                         >
-                                            📋 載入醫囑模板
+                                            <i data-lucide="clipboard-list" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 載入醫囑模板
                                         </button>
                                     </div>
                                     <textarea id="formUsage" placeholder="煎煮方法、服用時間、劑量等..." rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
@@ -1502,11 +1551,11 @@
                             <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
                                 <div class="min-w-0 flex items-center gap-2">
                                     <h3 class="text-base font-bold text-gray-800 flex items-center gap-2 shrink-0">
-                                        <span>📹</span> 視訊診症
+                                        <span><i data-lucide="video" class="w-4 h-4 inline-block align-text-bottom mr-1"></i></span> 視訊診症
                                     </h3>
                                     <span id="videoConsultChannel" class="text-xs text-gray-500 truncate"></span>
                                     <span id="videoConsultConsent" class="hidden inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 border border-green-200 rounded-full px-2 py-0.5" title="病人已簽署視像診症電子同意書">
-                                        <span aria-hidden="true">📋</span>已簽同意書
+                                        <i aria-hidden="true" data-lucide="circle-check" class="w-4 h-4"></i>已簽同意書
                                     </span>
                                 </div>
                                 <div class="flex items-center gap-2 shrink-0">
@@ -1517,7 +1566,7 @@
                                         title="複製病人診間連結"
                                         class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-lg shadow-sm transition duration-200 whitespace-nowrap"
                                     >
-                                        <span aria-hidden="true">🔗</span>診間連結
+                                        <i aria-hidden="true" data-lucide="link" class="w-4 h-4"></i>診間連結
                                     </button>
                                     <button type="button" onclick="closeVideoConsultation()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none" aria-label="關閉視訊診症">×</button>
                                 </div>
@@ -1528,7 +1577,7 @@
                     </div>
                 </div>
             </div>
-            <div id="consultationAuditTrailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[1000] items-center justify-center p-4">
+            <div id="consultationAuditTrailModal" class="hidden fixed inset-0 bg-black/50 z-[1000] items-center justify-center p-4">
                 <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden">
                     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                         <h3 class="text-lg font-semibold text-gray-800">病歷審核追蹤</h3>
@@ -1542,11 +1591,11 @@
             
             <div id="herbLibrary" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800"> <span class="text-3xl mr-3">🌿</span>中藥庫</h2>
+                    <h2 class="text-2xl font-bold text-gray-800"> <i data-lucide="leaf" class="w-7 h-7 mr-3"></i>中藥庫</h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchHerb" placeholder="搜尋中藥材、方劑名稱或功能..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
-                            <span class="absolute right-3 top-2.5 text-gray-400">🔍</span>
+                            <i data-lucide="search" class="absolute right-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"></i>
                         </div>
                         
                         <select id="inventoryTypeSelect" onchange="onInventoryTypeChange(this.value)" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-auto">
@@ -1589,7 +1638,7 @@
                     </div>
                 </div>
                 
-                <div id="addHerbModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="addHerbModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                             <h3 id="herbFormTitle" class="text-xl font-bold text-gray-800">新增中藥材</h3>
@@ -1655,7 +1704,7 @@
                     </div>
                 </div>
                 
-                <div id="addFormulaModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="addFormulaModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                             <h3 id="formulaFormTitle" class="text-xl font-bold text-gray-800">新增方劑</h3>
@@ -1721,7 +1770,7 @@
                     </div>
                 </div>
                 
-                <div id="inventoryModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="inventoryModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
                         <div class="p-6">
                             <h3 id="inventoryModalTitle" class="text-xl font-bold mb-4">編輯庫存</h3>
@@ -1770,7 +1819,7 @@
                     </div>
                 </div>
                 
-                <div id="batchInventoryModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="batchInventoryModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="p-6">
                             
@@ -1798,7 +1847,7 @@
                     </div>
                 </div>
                 
-                <div id="inventoryHistoryModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="inventoryHistoryModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="p-6">
                             <div class="flex justify-between items-center mb-4">
@@ -1823,11 +1872,11 @@
             
             <div id="acupointLibrary" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800"> <span class="text-3xl mr-3">📌</span>穴位庫</h2>
+                    <h2 class="text-2xl font-bold text-gray-800"> <i data-lucide="map-pin" class="w-7 h-7 mr-3"></i>穴位庫</h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchAcupoint" placeholder="搜尋穴位、經絡、功能或國際代碼..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-64">
-                            <span class="absolute right-3 top-2.5 text-gray-400">🔍</span>
+                            <i data-lucide="search" class="absolute right-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"></i>
                         </div>
                     </div>
                 </div>
@@ -1860,11 +1909,11 @@
             
             <div id="billingManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800"> <span class="text-3xl mr-3">💰</span>收費項目管理</h2>
+                    <h2 class="text-2xl font-bold text-gray-800"> <i data-lucide="wallet" class="w-7 h-7 mr-3"></i>收費項目管理</h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchBilling" placeholder="搜尋收費項目名稱..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
-                            <span class="absolute right-3 top-2.5 text-gray-400">🔍</span>
+                            <i data-lucide="search" class="absolute right-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"></i>
                         </div>
                         <button onclick="showAddBillingItemForm()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200 whitespace-nowrap">
                             + 新增收費項目
@@ -1898,7 +1947,7 @@
                     </div>
                 </div>
                 
-                <div id="addBillingItemModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="addBillingItemModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                             <h3 id="billingItemFormTitle" class="text-xl font-bold text-gray-800">新增收費項目</h3>
@@ -1987,16 +2036,16 @@
 
             <div id="walletManagement" class="hidden bg-white rounded-xl shadow-lg p-3 lg:p-4 flex flex-col min-h-0 lg:min-h-[calc(100dvh-9rem)]">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 shrink-0 gap-4">
-                    <h2 class="text-2xl font-bold text-gray-800"> <span class="text-3xl mr-3">💳</span>會員儲值</h2>
+                    <h2 class="text-2xl font-bold text-gray-800"> <i data-lucide="credit-card" class="w-7 h-7 mr-3"></i>會員儲值</h2>
                     <div class="relative">
                         <input type="text" id="walletPatientSearch" placeholder="搜尋病人編號、姓名或電話..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
-                        <span class="absolute right-3 top-2.5 text-gray-400">🔍</span>
+                        <i data-lucide="search" class="absolute right-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"></i>
                     </div>
                 </div>
 
                 <div id="walletConfigArea" class="hidden mb-4 shrink-0 border border-teal-200 bg-teal-50 rounded-xl p-4">
                     <div class="flex justify-between items-center">
-                        <h3 class="text-base font-semibold text-teal-800">⚙️ 會員設定</h3>
+                        <h3 class="text-base font-semibold text-teal-800"><i data-lucide="settings" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 會員設定</h3>
                         <button onclick="toggleWalletConfigForm()" id="walletConfigToggle" class="text-sm text-teal-700 underline">展開</button>
                     </div>
                     <div id="walletConfigForm" class="hidden mt-4 bg-white rounded-lg p-4 border border-teal-200 max-h-[35vh] overflow-y-auto"></div>
@@ -2119,13 +2168,13 @@
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h2 class="text-2xl font-bold text-gray-800 flex items-center">
                         
-                        <span class="text-3xl mr-3">👤</span>
+                        <i data-lucide="user" class="w-7 h-7 mr-3"></i>
                         診所用戶管理
                     </h2>
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative">
                             <input type="text" id="searchUser" placeholder="搜尋用戶名稱或電子郵件..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
-                            <span class="absolute right-3 top-2.5 text-gray-400">🔍</span>
+                            <i data-lucide="search" class="absolute right-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"></i>
                         </div>
                         <button onclick="showAddUserForm()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200 whitespace-nowrap">
                             + 新增用戶
@@ -2147,7 +2196,7 @@
                     </div>
                 </div>
                 
-                <div id="addUserModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div id="addUserModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                             <h3 id="userFormTitle" class="text-xl font-bold text-gray-800">新增用戶</h3>
@@ -2248,7 +2297,7 @@
             <div id="financialReports" class="hidden bg-white rounded-xl shadow-lg p-6">
                 <div class="mb-6">
                     <h2 class="text-2xl font-bold text-gray-800 mb-2 flex items-center">
-                        <span class="mr-3">📊</span>財務報表
+                        <span class="mr-3"><i data-lucide="bar-chart-3" class="w-4 h-4 inline-block align-text-bottom mr-1"></i></span>財務報表
                     </h2>
                     <p class="text-gray-600">診所收入分析與財務統計</p>
                 </div>
@@ -2256,10 +2305,10 @@
                 <div class="bg-gray-50 rounded-lg p-4 mb-6 relative">
                     <div class="absolute top-4 right-4 space-y-2 flex flex-col items-end">
                         <button onclick="showExpenseImportModal()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center">
-                            <span class="mr-2">📦</span><span>成本導入</span>
+                            <i data-lucide="upload" class="w-4 h-4 mr-2"></i><span>成本導入</span>
                         </button>
                         <button onclick="showExpenseListModal()" class="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center">
-                            <span class="mr-2">📄</span><span>已輸入成本</span>
+                            <i data-lucide="circle-check" class="w-4 h-4 mr-2"></i><span>已輸入成本</span>
                         </button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -2305,20 +2354,20 @@
                         
                         <div class="flex items-end space-x-2">
                             <button onclick="generateFinancialReport()" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded-lg transition duration-200 flex items-center">
-                                <span class="mr-2">🔄</span><span>更新報表</span>
+                                <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i><span>更新報表</span>
                             </button>
                             <button onclick="exportFinancialReportTxt()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-1.5 rounded-lg transition duration-200 flex items-center">
-                                <span class="mr-2">📄</span><span>匯出TXT</span>
+                                <i data-lucide="file-text" class="w-4 h-4 mr-2"></i><span>匯出TXT</span>
                             </button>
                             <button onclick="exportFinancialReportExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-1.5 rounded-lg transition duration-200 flex items-center">
-                                <span class="mr-2">📊</span><span>匯出Excel</span>
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4 mr-2"></i><span>匯出Excel</span>
                             </button>
                         </div>
                     </div>
                 </div>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div class="bg-gradient-to-r from-green-400 to-green-600 text-white rounded-xl p-6 shadow-lg transform hover:scale-105 transition duration-200">
+                    <div class="bg-linear-to-r from-green-400 to-green-600 text-white rounded-xl p-6 shadow-lg transform hover:scale-105 transition duration-200">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-green-100 text-sm font-medium">總收入</p>
@@ -2328,7 +2377,7 @@
                         </div>
                     </div>
                     
-                    <div class="bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-xl p-6 shadow-lg transform hover:scale-105 transition duration-200">
+                    <div class="bg-linear-to-r from-blue-400 to-blue-600 text-white rounded-xl p-6 shadow-lg transform hover:scale-105 transition duration-200">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-blue-100 text-sm font-medium">診症人次</p>
@@ -2338,7 +2387,7 @@
                         </div>
                     </div>
                     
-                    <div class="bg-gradient-to-r from-purple-400 to-purple-600 text-white rounded-xl p-6 shadow-lg transform hover:scale-105 transition duration-200">
+                    <div class="bg-linear-to-r from-purple-400 to-purple-600 text-white rounded-xl p-6 shadow-lg transform hover:scale-105 transition duration-200">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-purple-100 text-sm font-medium">平均消費</p>
@@ -2348,7 +2397,7 @@
                         </div>
                     </div>
                     
-                    <div class="bg-gradient-to-r from-orange-400 to-orange-600 text-white rounded-xl p-6 shadow-lg transform hover:scale-105 transition duration-200">
+                    <div class="bg-linear-to-r from-orange-400 to-orange-600 text-white rounded-xl p-6 shadow-lg transform hover:scale-105 transition duration-200">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-orange-100 text-sm font-medium">活躍醫師</p>
@@ -2362,7 +2411,7 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                     <div class="bg-white border border-gray-200 rounded-lg p-4 lg:col-span-2">
                         <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
-                            <span class="mr-2">📈</span><span data-fin-i18n="每日收入趨勢">每日收入趨勢</span>
+                            <i data-lucide="trending-up" class="w-4 h-4 mr-2"></i><span data-fin-i18n="每日收入趨勢">每日收入趨勢</span>
                         </h3>
                         <div class="relative" style="height:300px;">
                             <canvas id="financialTrendChart"></canvas>
@@ -2370,7 +2419,7 @@
                     </div>
                     <div class="bg-white border border-gray-200 rounded-lg p-4">
                         <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
-                            <span class="mr-2">🥧</span><span data-fin-i18n="收入結構">收入結構</span>
+                            <i data-lucide="chart-pie" class="w-4 h-4 mr-2"></i><span data-fin-i18n="收入結構">收入結構</span>
                         </h3>
                         <div class="relative" style="height:300px;">
                             <canvas id="financialServiceChart"></canvas>
@@ -2382,7 +2431,7 @@
                     <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
                         <div class="flex justify-between items-center">
                             <h3 class="text-lg font-semibold text-gray-800 flex items-center">
-                                <span class="mr-2">📋</span><span>詳細財務報表</span>
+                                <i data-lucide="file-bar-chart" class="w-4 h-4 mr-2"></i><span>詳細財務報表</span>
                             </h3>
                             <div class="text-sm text-gray-600 flex items-center space-x-1">
                                 
@@ -2513,22 +2562,22 @@
                         
                         <div id="financialWalletContent" class="financial-tab-content hidden">
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                                <div class="bg-gradient-to-r from-teal-400 to-teal-600 text-white rounded-xl p-5 shadow">
+                                <div class="bg-linear-to-r from-teal-400 to-teal-600 text-white rounded-xl p-5 shadow">
                                     <p class="text-teal-100 text-sm">本期儲值充值</p>
                                     <h3 id="walletFinTopup" class="text-2xl font-bold mt-1">HK$0</h3>
                                     <p class="text-teal-100 text-xs mt-1">現金流入（未賺取）</p>
                                 </div>
-                                <div class="bg-gradient-to-r from-indigo-400 to-indigo-600 text-white rounded-xl p-5 shadow">
+                                <div class="bg-linear-to-r from-indigo-400 to-indigo-600 text-white rounded-xl p-5 shadow">
                                     <p class="text-indigo-100 text-sm">本期儲值消費</p>
                                     <h3 id="walletFinPayment" class="text-2xl font-bold mt-1">HK$0</h3>
                                     <p class="text-indigo-100 text-xs mt-1">已計入診症收入</p>
                                 </div>
-                                <div class="bg-gradient-to-r from-red-400 to-red-600 text-white rounded-xl p-5 shadow">
+                                <div class="bg-linear-to-r from-red-400 to-red-600 text-white rounded-xl p-5 shadow">
                                     <p class="text-red-100 text-sm">本期退款</p>
                                     <h3 id="walletFinRefund" class="text-2xl font-bold mt-1">HK$0</h3>
                                     <p class="text-red-100 text-xs mt-1">儲值退款回補</p>
                                 </div>
-                                <div class="bg-gradient-to-r from-amber-400 to-amber-600 text-white rounded-xl p-5 shadow">
+                                <div class="bg-linear-to-r from-amber-400 to-amber-600 text-white rounded-xl p-5 shadow">
                                     <p class="text-amber-100 text-sm">期末會員餘額</p>
                                     <h3 id="walletFinOutstanding" class="text-2xl font-bold mt-1">HK$0</h3>
                                     <p class="text-amber-100 text-xs mt-1">會員預存（診所負債）</p>
@@ -2597,7 +2646,7 @@
             </div>
             
             <div id="systemManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6"> <span class="text-3xl mr-3">⚙️</span>系統管理</h2>
+                <h2 class="text-2xl font-bold text-gray-800 mb-6"> <i data-lucide="settings" class="w-7 h-7 mr-3"></i>系統管理</h2>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-gray-50 rounded-lg p-6 md:col-span-2">
@@ -2832,11 +2881,11 @@
             
             <div class="bg-white rounded-xl shadow-lg p-6 text-sm">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h2 class="text-2xl font-bold text-gray-800"><span class="text-3xl mr-3">📋</span>病歷管理</h2>
+                <h2 class="text-2xl font-bold text-gray-800"><i data-lucide="clipboard-list" class="w-7 h-7 mr-3"></i>病歷管理</h2>
                 <div class="flex flex-col md:flex-row gap-3">
                     <div class="relative">
                         <input type="text" id="searchMedicalRecord" placeholder="搜尋病歷編號、病人姓名或醫師..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-64">
-                        <span class="absolute right-3 top-2.5 text-gray-400">🔍</span>
+                        <i data-lucide="search" class="absolute right-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"></i>
                     </div>
                 </div>
             </div>
@@ -2871,7 +2920,7 @@
         </div>
 
         
-        <div id="medicalRecordDetailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div id="medicalRecordDetailModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
             
             <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
                 <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
@@ -2889,7 +2938,7 @@
             
             <div>
             <h2 class="text-2xl font-bold text-amber-800 mb-6 flex items-center">
-              <span class="text-3xl mr-3">🔧</span>
+              <i data-lucide="wrench" class="w-7 h-7 mr-3"></i>
               個人設置
             </h2>
             
@@ -2897,17 +2946,17 @@
             <div class="mb-6">
               <div class="flex flex-wrap border-b border-gray-200">
                 <button class="px-6 py-3 text-amber-700 border-b-2 border-amber-500 font-medium" onclick="switchPersonalTab('herbs')" id="herbsTab">
-                  🌿 慣用中藥組合
+                  <i data-lucide="leaf" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 慣用中藥組合
                   
                   <span id="herbCount" class="ml-2 text-xs font-semibold bg-green-100 text-green-700 rounded-full px-2 py-0.5"></span>
                 </button>
                 <button class="px-6 py-3 text-gray-500 hover:text-amber-700 font-medium" onclick="switchPersonalTab('acupoints')" id="acupointsTab">
-                  📍 慣用穴位組合
+                  <i data-lucide="map-pin" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 慣用穴位組合
                   
                   <span id="acupointCount" class="ml-2 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full px-2 py-0.5"></span>
                 </button>
                 <button class="px-6 py-3 text-gray-500 hover:text-amber-700 font-medium" onclick="switchPersonalTab('diagnosisSettings')" id="diagnosisSettingsTab">
-                  🩺 診症設定
+                  <i data-lucide="stethoscope" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 診症設定
                 </button>
               </div>
             </div>
@@ -3052,7 +3101,7 @@
             <div>
             <div class="mb-6 flex items-center justify-between">
               <h2 class="text-2xl font-bold text-amber-800 flex items-center">
-                <span class="text-3xl mr-3">📈</span>
+                <i data-lucide="trending-up" class="w-7 h-7 mr-3"></i>
                 個人統計分析
               </h2>
               <div class="flex items-center gap-2">
@@ -3093,7 +3142,7 @@
               
               <div class="bg-gray-50 rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                  <span class="mr-2">📋</span>常用方劑
+                  <i data-lucide="flask-conical" class="w-4 h-4 mr-2"></i>常用方劑
                 </h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                   
@@ -3109,7 +3158,7 @@
               
               <div class="bg-gray-50 rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                  <span class="mr-2">🌿</span>常用中藥
+                  <i data-lucide="leaf" class="w-4 h-4 mr-2"></i>常用中藥
                 </h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                   <div>
@@ -3123,7 +3172,7 @@
               
               <div class="bg-gray-50 rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                  <span class="mr-2">📍</span>常用穴位
+                  <i data-lucide="map-pin" class="w-4 h-4 mr-2"></i>常用穴位
                 </h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                   <div>
@@ -3144,7 +3193,7 @@
           <div class="bg-white rounded-xl shadow-lg p-6">
             <div>
             <h2 class="text-2xl font-bold text-amber-800 mb-6 flex items-center">
-              <span class="text-3xl mr-3">🔐</span>
+              <i data-lucide="lock" class="w-7 h-7 mr-3"></i>
               帳號安全設定
             </h2>
             <p class="text-gray-600 mb-6">在此可以安全地變更您的登入密碼或封存帳號。封存後帳號將停用且無法登入，請謹慎操作。</p>
@@ -3227,7 +3276,7 @@
             
             <div>
             <h2 class="text-2xl font-bold text-amber-800 mb-6 flex items-center">
-              <span class="text-3xl mr-3">📚</span>
+              <i data-lucide="library" class="w-7 h-7 mr-3"></i>
               模板庫
             </h2>
             
@@ -3237,13 +3286,13 @@
                 
                 <button class="px-6 py-3 text-amber-700 border-b-2 border-amber-500 font-medium"
                         onclick="switchTemplateTab('diagnosis')" id="diagnosisTab">
-                  🔍 診斷模板
+                  <i data-lucide="search" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 診斷模板
                   
                   <span id="diagnosisCount" class="ml-2 text-xs font-semibold bg-orange-100 text-orange-700 rounded-full px-2 py-0.5"></span>
                 </button>
                 <button class="px-6 py-3 text-gray-500 hover:text-amber-700 font-medium"
                         onclick="switchTemplateTab('prescriptions')" id="prescriptionsTab">
-                  📋 醫囑模板
+                  <i data-lucide="clipboard-list" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 醫囑模板
                   
                   <span id="prescriptionCount" class="ml-2 text-xs font-semibold bg-purple-100 text-purple-700 rounded-full px-2 py-0.5"></span>
                 </button>
@@ -3292,7 +3341,7 @@
           </div>
         </div>
 
-        <div id="categoryModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div id="categoryModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center">
           <div class="bg-white rounded-xl p-8 max-w-md w-full mx-4">
             <div class="flex justify-between items-center mb-6">
               <h3 class="text-xl font-bold text-gray-800" id="categoryModalTitle">管理分類</h3>
@@ -3326,7 +3375,7 @@
         </div>
 
         
-        <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div id="editModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center">
           <div class="bg-white rounded-xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-6">
               <h3 class="text-xl font-bold text-gray-800" id="editModalTitle">編輯組合</h3>
@@ -3350,7 +3399,7 @@
 
         
         
-        <div id="herbComboModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div id="herbComboModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
                 <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl">
                     <h3 class="text-lg font-bold text-gray-800">常用藥方組合</h3>
@@ -3363,7 +3412,7 @@
         </div>
 
         
-        <div id="acupointComboModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div id="acupointComboModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
                 <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl">
                     <h3 class="text-lg font-bold text-gray-800">常用穴位組合</h3>
@@ -3376,7 +3425,7 @@
         </div>
 
         
-        <div id="diagnosisTemplateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div id="diagnosisTemplateModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
                 <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl">
                     <h3 class="text-lg font-bold text-gray-800">診斷模板</h3>
@@ -3389,7 +3438,7 @@
         </div>
 
         
-        <div id="prescriptionTemplateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div id="prescriptionTemplateModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
                 <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center rounded-t-xl">
                     <h3 class="text-lg font-bold text-gray-800">醫囑模板</h3>
@@ -3404,7 +3453,7 @@
         
     </div>
     
-    <div id="clinicSettingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div id="clinicSettingsModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                 <h3 class="text-xl font-bold text-gray-800">診所資料修改</h3>
@@ -3468,7 +3517,7 @@
         </div>
     </div>
 
-    <div id="addClinicModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div id="addClinicModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                 <h3 class="text-xl font-bold text-gray-800">新增診所</h3>
@@ -3997,7 +4046,6 @@
              */
             z-index: 30;
         }
-
 #scheduleManagement .staff-panel h3 {
             margin: 0 0 15px 0;
             color: #2d3748;
@@ -4367,10 +4415,10 @@
         <div class="container">
         
         <div class="header">
-            <h1><span class="text-3xl mr-3">📅 </span>醫療排班系統</h1>
+            <h1><i data-lucide="calendar-days" class="w-7 h-7 mr-3"></i>醫療排班系統</h1>
         </div>
         
-        <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
+        <div class="bg-linear-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6">
             <div class="controls">
                 <div class="nav-controls">
                     
@@ -4378,7 +4426,7 @@
                     <div class="current-date" id="currentDate"></div>
                     
                     <button class="nav-btn" onclick="scheduleNavigateCalendar(1)">下一個月</button>
-                    <button class="nav-btn" onclick="scheduleGoToToday()"><span class="text-1xl mr-1">📅 </span> 今天</button>
+                    <button class="nav-btn" onclick="scheduleGoToToday()"><span class="text-1xl mr-1"><i data-lucide="calendar-days" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> </span> 今天</button>
                 </div>
                 <div class="view-controls">
                     
@@ -4392,12 +4440,11 @@
                 </div>
                 <div class="sync-controls">
                     
-                    <button class="sync-btn" onclick="scheduleExportToICal()"><span class="text-1xl mr-1">📋</span> 匯出 iCal</button>
+                    <button class="sync-btn" onclick="scheduleExportToICal()"><i data-lucide="download" class="w-4 h-4 mr-1"></i> 匯出 iCal</button>
                     
-                    <button class="sync-btn" onclick="schedulePrintShiftTable()"><span class="text-1xl mr-1">🖨️</span> 列印更表</button>
+                    <button class="sync-btn" onclick="schedulePrintShiftTable()"><i data-lucide="printer" class="w-4 h-4 mr-1"></i> 列印更表</button>
                 </div>
             </div>
-
             
             <div class="filter-panel">
             <div class="filter-grid">
@@ -4427,8 +4474,8 @@
                 </div>
                 
                 <div class="quick-actions" id="quickActions">
-                    <button class="quick-btn" onclick="scheduleOpenFixedScheduleModal()"><span class="text-1xl mr-1">📅</span> 固定上班</button>
-                    <button class="quick-btn danger" onclick="scheduleClearAllShifts()"><span class="text-1xl mr-1">🗑️</span> 清空排班</button>
+                    <button class="quick-btn" onclick="scheduleOpenFixedScheduleModal()"><i data-lucide="calendar-check" class="w-4 h-4 mr-1"></i> 固定上班</button>
+                    <button class="quick-btn danger" onclick="scheduleClearAllShifts()"><i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> 清空排班</button>
                 </div>
             </div>
             </div>
@@ -4440,7 +4487,7 @@
 
         <div class="staff-panel">
             
-            <h3><span class="text-1xl mr-1">👨‍⚕️👩‍⚕️</span> 醫護人員 <span id="dragInstruction" style="font-size: 12px; color: #718096; font-weight: normal;">拖拽人員到行事曆新增排班</span></h3>
+            <h3><i data-lucide="users" class="w-4 h-4 mr-1"></i> 醫護人員 <span id="dragInstruction" style="font-size: 12px; color: #718096; font-weight: normal;">拖拽人員到行事曆新增排班</span></h3>
             <div class="staff-filter">
                 <button class="staff-filter-btn active" onclick="scheduleFilterStaff('all')">全部</button>
                 <button class="staff-filter-btn" onclick="scheduleFilterStaff('doctor')">醫師</button>
@@ -4930,15 +4977,15 @@
 
             // 計算時數並獲取狀態圖示
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
-            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌';
+            const statusIcon = shift.status === 'confirmed' ? '<i data-lucide="check" class="w-4 h-4 inline-block align-text-bottom mr-1"></i>' : shift.status === 'pending' ? '<i data-lucide="hourglass" class="w-4 h-4 inline-block align-text-bottom mr-1"></i>' : '<i data-lucide="circle-x" class="w-4 h-4 inline-block align-text-bottom mr-1"></i>';
 
             // 判斷是否為管理員以決定是否顯示操作按鈕
             const isAdmin = window.isAdminUser && window.isAdminUser();
             let actionsHtml = '';
             if (isAdmin) {
                 actionsHtml = `<div class="shift-actions">
-                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯">✏️</button>
-                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="刪除">🗑️</button>
+                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="編輯"><i data-lucide="pencil" class="w-4 h-4 inline-block align-text-bottom mr-1"></i></button>
+                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="刪除"><i data-lucide="trash-2" class="w-4 h-4 inline-block align-text-bottom mr-1"></i></button>
                     </div>`;
             }
 
@@ -5121,7 +5168,7 @@
 
                 card.innerHTML = `
                     <div class="staff-name">${member.name}</div>
-                    <div class="drag-hint">🖱️</div>
+                    <div class="drag-hint"><i data-lucide="mouse-pointer" class="w-3 h-3"></i></div>
                 `;
 
                 // 設定拖拽事件
@@ -5187,11 +5234,11 @@
         // 獲取人員狀態
         function getStaffStatus(staffId, todayShifts) {
             if (todayShifts.length === 0) {
-                return { class: '', icon: '✅', text: '可排班' };
+                return { class: '', icon: '<i data-lucide="circle-check" class="w-4 h-4 inline-block align-text-bottom mr-1"></i>', text: '可排班' };
             } else if (todayShifts.length === 1) {
-                return { class: 'partial', icon: '⏰', text: '已排班' };
+                return { class: 'partial', icon: '<i data-lucide="clock" class="w-4 h-4 inline-block align-text-bottom mr-1"></i>', text: '已排班' };
             } else {
-                return { class: 'busy', icon: '🔴', text: '滿班' };
+                return { class: 'busy', icon: '<i data-lucide="circle" class="w-4 h-4 inline-block align-text-bottom mr-1"></i>', text: '滿班' };
             }
         }
 
@@ -5575,7 +5622,7 @@
 
     
     <!-- 病歷附件（R2 直傳）Gallery Modal -->
-    <div id="medicalAttachmentsModal" class="fixed inset-0 bg-black bg-opacity-50 z-[1000] hidden flex items-center justify-center p-4">
+    <div id="medicalAttachmentsModal" class="fixed inset-0 bg-black/50 z-[1000] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
             <div class="flex items-start justify-between px-5 py-4 border-b border-gray-200">
                 <div class="min-w-0">
@@ -5616,24 +5663,24 @@
                 <div data-role="msg">啟動攝影機中…</div>
             </div>
             <button type="button" id="maCamClose" class="absolute top-3 right-4 text-white/80 hover:text-white text-4xl leading-none z-10">&times;</button>
-            <button type="button" id="maCamSwitch" class="hidden absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white text-sm px-3 py-2 rounded-lg z-10">🔄 <span>切換鏡頭</span></button>
+            <button type="button" id="maCamSwitch" class="hidden absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white text-sm px-3 py-2 rounded-lg z-10"><i data-lucide="refresh-cw" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> <span>切換鏡頭</span></button>
             <div id="maCamLiveCtl" class="hidden absolute bottom-8 left-0 right-0 flex justify-center z-10">
                 <button type="button" id="maCamShutter" class="w-16 h-16 p-1 rounded-full border-4 border-white/80 hover:border-white active:scale-95 transition flex items-center justify-center" aria-label="拍照">
                     <span class="block w-14 h-14 rounded-full bg-white"></span>
                 </button>
             </div>
             <div id="maCamShotCtl" class="hidden absolute bottom-8 left-0 right-0 flex justify-center gap-4 z-10">
-                <button type="button" id="maCamRetake" class="bg-white/15 hover:bg-white/25 text-white text-sm px-5 py-2.5 rounded-lg">🔁 <span>重拍</span></button>
-                <button type="button" id="maCamUse" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2.5 rounded-lg">✅ <span>使用照片</span></button>
+                <button type="button" id="maCamRetake" class="bg-white/15 hover:bg-white/25 text-white text-sm px-5 py-2.5 rounded-lg"><i data-lucide="repeat" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> <span>重拍</span></button>
+                <button type="button" id="maCamUse" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2.5 rounded-lg"><i data-lucide="circle-check" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> <span>使用照片</span></button>
             </div>
         </div>
     </div>
 
     <!-- 手機代拍 QR 連結視窗 -->
-    <div id="maRelayModal" class="fixed inset-0 bg-black bg-opacity-50 z-[1500] hidden flex items-center justify-center p-4">
+    <div id="maRelayModal" class="fixed inset-0 bg-black/50 z-[1500] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div class="flex items-start justify-between px-5 py-4 border-b border-gray-200">
-                <h3 class="text-lg font-bold text-gray-800">📱 <span>手機拍照上傳</span></h3>
+                <h3 class="text-lg font-bold text-gray-800"><i data-lucide="smartphone" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> <span>手機拍照上傳</span></h3>
                 <button type="button" id="maRelayClose" class="text-gray-400 hover:text-gray-700 text-2xl leading-none px-2">&times;</button>
             </div>
             <div class="px-5 py-4 space-y-4">

@@ -641,7 +641,7 @@ import { restorePackageUseMeta, undoPackageUse } from '../billing/packages.js';
                                     <option value="slice" ${section.mode === 'slice' ? 'selected' : ''}>${typeof window.t === 'function' ? window.t('飲片') : '飲片'}</option>
                                 </select>` : ``}
                 `;
-                const rightControls = isSingle ? `` : `<button onclick="removePrescriptionSectionAt(${sIdx})" class="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm flex items-center justify-center">✕</button>`;
+                const rightControls = isSingle ? `` : `<button onclick="removePrescriptionSectionAt(${sIdx})" class="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm flex items-center justify-center"><i data-lucide="x" class="w-4 h-4 pointer-events-none"></i></button>`;
                 const headerHtml = `
                     <div class="space-y-2">
                         <div class="flex items-center justify-between">

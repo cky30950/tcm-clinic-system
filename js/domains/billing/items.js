@@ -190,7 +190,7 @@ import { G } from '../../lib/legacy.js';
             if (filteredItems.length === 0) {
                 listContainer.innerHTML = `
                     <div class="text-center py-12 text-gray-500">
-                        <div class="text-4xl mb-4">💰</div>
+                        <div class="mb-4 flex justify-center"><i data-lucide="wallet" class="w-10 h-10 text-[#D9782B]"></i></div>
                         <div class="text-lg font-medium mb-2">沒有找到相關收費項目</div>
                         <div class="text-sm">請嘗試其他搜尋條件或新增收費項目</div>
                     </div>
@@ -210,12 +210,12 @@ import { G } from '../../lib/legacy.js';
 
             // 按類別分組顯示。每個類別包含一個中文名稱以及對應圖示。
             const billingCategories = {
-                consultation: { baseName: '診療費', icon: '🩺', items: [] },
-                medicine: { baseName: '藥費', icon: '💊', items: [] },
-                treatment: { baseName: '治療費', icon: '🔧', items: [] },
-                other: { baseName: '其他', icon: '📋', items: [] },
-                discount: { baseName: '折扣項目', icon: '💸', items: [] },
-                package: { baseName: '套票項目', icon: '🎫', items: [] }
+                consultation: { baseName: '診療費', icon: 'stethoscope', items: [] },
+                medicine: { baseName: '藥費', icon: 'pill', items: [] },
+                treatment: { baseName: '治療費', icon: 'wrench', items: [] },
+                other: { baseName: '其他', icon: 'clipboard-list', items: [] },
+                discount: { baseName: '折扣項目', icon: 'banknote', items: [] },
+                package: { baseName: '套票項目', icon: 'ticket', items: [] }
             };
 
             // 將過濾後的項目分配到對應的帳單分類中
@@ -238,7 +238,7 @@ import { G } from '../../lib/legacy.js';
                     html += `
                         <div class="mb-8">
                             <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                                <span class="mr-2">${category.icon}</span>${translatedName} (${category.items.length})
+                                <i data-lucide="${category.icon}" class="w-5 h-5 mr-2 text-[#D9782B]"></i>${translatedName} (${category.items.length})
                             </h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 ${category.items.map(item => createBillingItemCard(item)).join('')}

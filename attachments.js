@@ -994,7 +994,7 @@
         var delBtn = canDelete(doc)
             ? '<button type="button" data-ma-delete="' + esc(doc.fileId || doc.id) + '" ' +
               'class="absolute top-1 right-1 bg-red-600/90 hover:bg-red-700 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm shadow" ' +
-              'title="' + tt('刪除') + '">🗑</button>'
+              'title="' + tt('刪除') + '"><i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i></button>'
             : '';
         return '' +
             '<div class="relative bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition">' +
@@ -1006,7 +1006,7 @@
                     '<div class="w-full h-40 bg-gray-100 flex items-center justify-center">' +
                         (thumbKey
                             ? '<img data-r2-key="' + esc(thumbKey) + '" alt="' + esc(meta.label) + '" loading="lazy" class="w-full h-40 object-cover" onerror="this.classList.add(\'opacity-20\')">'
-                            : '<span class="text-3xl">🖼️</span>') +
+                            : '<i data-lucide="image" class="w-8 h-8 text-gray-400"></i>') +
                     '</div>' +
                 '</button>' +
                 delBtn +
@@ -1024,7 +1024,7 @@
         if (docs.length === 0) {
             grid.innerHTML =
                 '<div class="text-center py-12 text-gray-500">' +
-                    '<div class="text-4xl mb-3">🖼️</div>' +
+                    '<div class="mb-3 flex justify-center"><i data-lucide="image" class="w-10 h-10 text-gray-300"></i></div>' +
                     '<div class="text-base font-medium mb-1">' + tt('暫無附件') + '</div>' +
                     '<div class="text-sm">' + tt('可拍照或上傳圖片') + '</div>' +
                 '</div>';
@@ -1087,13 +1087,13 @@
         bar.innerHTML =
             '<div class="flex flex-wrap items-center gap-2 mb-3">' +
                 '<button type="button" id="maCameraBtn" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded-lg transition">' +
-                    '📷 <span>' + tt('拍照') + '</span>' +
+                    '<i data-lucide="camera" class="w-4 h-4"></i><span>' + tt('拍照') + '</span>' +
                 '</button>' +
                 '<button type="button" id="maPhoneBtn" class="inline-flex items-center gap-1 bg-violet-600 hover:bg-violet-700 text-white text-sm px-3 py-2 rounded-lg transition">' +
-                    '📱 <span>' + tt('手機拍照') + '</span>' +
+                    '<i data-lucide="smartphone" class="w-4 h-4"></i><span>' + tt('手機拍照') + '</span>' +
                 '</button>' +
                 '<button type="button" id="maFileBtn" class="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-2 rounded-lg transition">' +
-                    '🖼️ <span>' + tt('上傳圖片') + '</span>' +
+                    '<i data-lucide="image" class="w-4 h-4"></i><span>' + tt('上傳圖片') + '</span>' +
                 '</button>' +
                 '<input type="file" id="maCameraInput" accept="image/*" capture="environment" class="hidden">' +
                 '<input type="file" id="maFileInput" accept="image/jpeg,image/png,image/webp,image/gif" multiple class="hidden">' +
@@ -1739,7 +1739,7 @@
                 'data-ma-visit="' + esc(visitKey) + '" ' +
                 'data-ma-kind="' + kind + '" ' +
                 'title="' + esc(fmtDateTime(d.uploadedAt)) + '">' +
-                (thumbKey ? '<img data-r2-key="' + esc(thumbKey) + '" loading="lazy" class="w-full h-full object-cover" onerror="this.classList.add(\'opacity-20\')">' : '<span class="text-xl">🖼️</span>') +
+                (thumbKey ? '<img data-r2-key="' + esc(thumbKey) + '" loading="lazy" class="w-full h-full object-cover" onerror="this.classList.add(\'opacity-20\')">' : '<i data-lucide="image" class="w-5 h-5 text-gray-400"></i>') +
             '</button>';
         }).join('') + '</div>';
     }
@@ -2095,7 +2095,7 @@
             renderRelayReceived();
             var els = relayEls();
             els.status.textContent = readyDocs.length > 0
-                ? '✓ ' + tt('已從手機收到') + ' ' + readyDocs.length + ' ' + tt('張照片，可繼續拍攝')
+                ? tt('已從手機收到') + ' ' + readyDocs.length + ' ' + tt('張照片，可繼續拍攝')
                 : tt('等待手機掃碼連線…');
             updateRelayExpiry();
         }, function (err) {
@@ -2128,7 +2128,7 @@
             return '<div class="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 bg-gray-50">' +
                 (thumbKey
                     ? '<img data-r2-key="' + esc(thumbKey) + '" alt="" loading="lazy" class="w-full h-full object-cover">'
-                    : '<span class="text-2xl flex items-center justify-center h-full">🖼️</span>') +
+                    : '<i data-lucide="image" class="w-6 h-6 text-gray-400"></i>') +
             '</div>';
         }).join('');
     }
