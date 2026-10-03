@@ -262,8 +262,10 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
     const input = document.getElementById('walletPatientSearch');
     const panel = document.getElementById('walletPanel');
     const empty = document.getElementById('walletEmptyState');
+    const loading = document.getElementById('walletLoadingState');
     if (panel) panel.classList.add('hidden');
     if (empty) empty.classList.remove('hidden');
+    if (loading) loading.classList.add('hidden');
     // 「會員設定」僅診所管理（擁有 walletAdjust 權限）可見
     const configArea = document.getElementById('walletConfigArea');
     if (configArea) {
@@ -312,10 +314,19 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
     renderWalletMemberRows();
     const empty = document.getElementById('walletEmptyState');
     if (empty) empty.classList.add('hidden');
-    await renderWalletPanel(patientId, true);
+    // 讀取帳戶／交易期間，右欄顯示與病人資料管理一致的讀取圈，
+    // 並先隱藏詳情面板以免短暫顯示上一位會員的舊資料
+    const loading = document.getElementById('walletLoadingState');
+    const panel = document.getElementById('walletPanel');
+    if (panel) panel.classList.add('hidden');
+    if (loading) loading.classList.remove('hidden');
+    try {
+      await renderWalletPanel(patientId, true);
+    } finally {
+      if (loading) loading.classList.add('hidden');
+    }
     // 手機版右欄在下方，自動捲動到詳情
     if (window.innerWidth < 1024) {
-      const panel = document.getElementById('walletPanel');
       if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }

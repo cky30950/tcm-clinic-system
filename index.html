@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>名醫診所系統 | 香港中醫診所管理系統 (TCM Clinic System) - 專為中醫量身打造</title>
-  <meta name="description" content="名醫診所系統提供專業的中醫診所管理解決方案，包含線上預約、智慧問診、電子病歷、中藥庫存及針灸穴位地圖。專為香港診所設計，協助醫師提升 300% 營運效率。">
+  <meta name="description" content="名醫診所系統提供專業的中醫診所管理解決方案，包含線上預約、智慧問診、電子病歷、中藥庫存及針灸穴位地圖。由中醫師親自參與設計，專為香港診所打造，貼合真實診症流程。">
       <meta property="og:type" content="website">
         <meta property="og:url" content="https://drgreattcm.com/">
         <meta property="og:title" content="名醫診所系統 | 香港中醫診所管理系統">
         <meta property="og:description" content="名醫診所系統提供專業的中醫診所管理解決方案，包含線上預約、智慧問診、電子病歷、中藥庫存及針灸穴位地圖。">
-        <meta property="og:image" content="https://drgreattcm.com/images/tcmScreenshot1.png">
+        <meta property="og:image" content="https://drgreattcm.com/landing/tcmScreenshot1.png">
         
         <link rel="canonical" href="https://drgreattcm.com/">
   <link rel="icon" type="image/png" href="images/myLogo.png">
@@ -161,6 +161,68 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #8E4E19;
     }
+
+    /* FAQ 手風琴 */
+    .faq-group summary {
+      list-style: none;
+      cursor: pointer;
+    }
+    .faq-group summary::-webkit-details-marker {
+      display: none;
+    }
+    .faq-group .faq-icon {
+      transition: transform 0.3s ease;
+      flex-shrink: 0;
+    }
+    .faq-group[open] .faq-icon {
+      transform: rotate(45deg);
+    }
+    .faq-group[open] {
+      box-shadow: 0 12px 32px -14px rgba(184, 98, 31, 0.35);
+      border-color: rgba(217, 120, 43, 0.5);
+    }
+
+    /* 右下角浮動 WhatsApp */
+    .whatsapp-float {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 70;
+      width: 56px;
+      height: 56px;
+      border-radius: 9999px;
+      background-color: #25D366;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s ease;
+    }
+    .whatsapp-float::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 9999px;
+      background-color: #25D366;
+      z-index: -1;
+      animation: waPulse 2.2s infinite;
+    }
+    .whatsapp-float:hover {
+      transform: scale(1.08);
+    }
+    @keyframes waPulse {
+      0% { transform: scale(1); opacity: 0.55; }
+      70% { transform: scale(1.55); opacity: 0; }
+      100% { transform: scale(1.55); opacity: 0; }
+    }
+    @media (min-width: 640px) {
+      .whatsapp-float {
+        right: 28px;
+        bottom: 28px;
+        width: 60px;
+        height: 60px;
+      }
+    }
   </style>
   <style>body { box-sizing: border-box; }</style>
   <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
@@ -169,19 +231,80 @@
     "@context": "https://schema.org/",
     "@type": "SoftwareApplication",
     "name": "名醫診所系統",
-    "operatingSystem": "Windows, MacOS, Android, iOS",
+    "url": "https://drgreattcm.com/",
+    "description": "專為香港中醫診所打造的診所管理系統，涵蓋線上預約、智慧問診、電子病歷、中藥庫存、針灸穴位地圖、收費套票及自動備份，由中醫師親自參與設計。",
+    "operatingSystem": "Windows, macOS, Android, iOS（PWA，瀏覽器即可使用）",
     "applicationCategory": "HealthApplication",
-    "offers": {
-      "@type": "Offer",
-      "price": "4500",
-      "priceCurrency": "HKD",
-      "description": "診所系統初次架設費（基本版）"
+    "inLanguage": "zh-Hant-HK",
+    "publisher": {
+      "@type": "Organization",
+      "name": "名醫診所系統",
+      "url": "https://drgreattcm.com/"
     },
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "4.9",
-      "reviewCount": "100"
-    }
+    "offers": [
+      {
+        "@type": "Offer",
+        "name": "基本版年費",
+        "price": "1900",
+        "priceCurrency": "HKD",
+        "description": "基本版每年年費，包括伺服器租用、系統更新維護及技術支援（1 間診所）"
+      },
+      {
+        "@type": "Offer",
+        "name": "基本版系統架設費（一次性）",
+        "price": "4500",
+        "priceCurrency": "HKD",
+        "description": "基本版一次性系統架設及設定費用（1 間診所）"
+      }
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "而家嘅手寫／Excel 病歷，可唔可以過渡到系統？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "可以。系統內建「舊資料轉移」工具，支援以試算表批量匯入病人基本資料及既往診症記錄；架設階段我們會協助核對欄位及抽樣檢查，由紙本、Excel 或其他軟件過渡都唔會漏資料、唔使重新輸入。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "病人資料安全嗎？係咪符合《個人資料（私隱）條例》？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "系統按香港《個人資料（私隱）條例》（PDPO）的保障資料原則設計：只收集診症及營運所需資料，傳輸採用加密連線，診療記錄與附件儲存於設有存取管控的雲端平台，職員帳號按職級分權，公開查詢頁有人機驗證及 IP／電話雙重限速。診所是病人資料的擁有人，我們不會出售或用於推廣。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "我唔識電腦，用唔用得到？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "系統由中醫師參與設計，畫面跟隨「掛號 → 睇症 → 開方 → 收費 → 列印」的真實流程，唔使記指令。手機、電腦都可用瀏覽器開啟，並可一鍵加到主畫面，如同 App 一樣使用。架設時提供設定及操作教學，日常使用有技術支援。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "用開之後會唔會突然加價？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "收費好簡單：一次性架設費加每年年費，年費已包括伺服器、系統更新、維護及技術支援。如下一年度需要調整價格，我們會提前不少於 30 日通知現有客戶，客戶可自行決定是否續約。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "資料可否隨時匯出？如果將來唔用點算？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "可以。系統每日自動雲端備份，管理員亦可隨時手動下載完整備份檔（gzip 壓縮）並可匯入還原；病人、診症、處方及收費記錄皆屬於診所。終止服務後，你可以在合理時間內索取及匯出全部資料，備份亦會按週期輪替清除。"
+        }
+      }
+    ]
   }
   </script>
  </head>
@@ -212,27 +335,12 @@
      </div>
      <h1 id="hero-title" class="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 animate-fade-in opacity-0" style="color: #1E1E1E; animation-delay: 0.2s;">名醫診所系統：全方位香港中醫數位化管理方案</h1>
      <p id="hero-subtitle" class="text-lg sm:text-xl lg:text-2xl mb-4 animate-fade-in opacity-0" style="color: #666; animation-delay: 0.3s;">簡便 · 易用 · 高效</p>
-     <p class="text-base sm:text-lg max-w-3xl mx-auto mb-6 animate-fade-in opacity-0" style="color: #888; animation-delay: 0.4s;">將千年中醫智慧與現代科技完美結合，從「望聞問切」到「辯證論治」全面數位化<br>
-       讓您的診所管理效率提升 300%</p>
+     <p class="text-base sm:text-lg max-w-3xl mx-auto mb-6 animate-fade-in opacity-0" style="color: #888; animation-delay: 0.4s;">將千年中醫智慧與現代科技完美結合，從「望聞問切」到「辯證論治」全面數位化</p>
      <p class="font-serif text-lg sm:text-xl lg:text-2xl font-semibold max-w-3xl mx-auto mb-10 animate-fade-in opacity-0" style="color: #B8621F; animation-delay: 0.45s;">由中醫師設計的中醫診所系統，更符合中醫需要</p>
+     <!-- TODO: 登記 Cal.com / Calendly 後，把以下連結換成你真正的預約頁面網址 -->
      <div class="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in opacity-0" style="animation-delay: 0.5s;"><a href="#footer-contact" id="hero-cta-btn" class="px-8 py-4 rounded-full text-lg font-semibold text-white transition-all hover:shadow-xl hover:scale-105 inline-block" style="background-color: #D9782B;"> 聯絡我 </a>
-     </div><div class="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-16 animate-fade-in opacity-0" style="animation-delay: 0.6s;">
-      <div class="text-center">
-       <div class="stat-number text-3xl sm:text-4xl font-bold" style="color: #D9782B;">
-        100+
-       </div>
-       <div class="text-sm mt-1" style="color: #888;">
-        診所信賴使用
-       </div>
-      </div>
-      <div class="text-center">
-       <div class="stat-number text-3xl sm:text-4xl font-bold" style="color: #D9782B;">
-        10萬+
-       </div>
-       <div class="text-sm mt-1" style="color: #888;">
-        病歷記錄處理
-       </div>
-      </div>
+       <a href="https://cal.com/drgreattcm/15-min-demo" target="_blank" rel="noopener" class="px-8 py-4 rounded-full text-lg font-semibold transition-all hover:shadow-lg hover:scale-105 inline-block border-2" style="color: #B8621F; border-color: #D9782B; background-color: rgba(255,255,255,0.65);"> 🗓️ 預約 15 分鐘網上示範 </a>
+     </div><div class="grid grid-cols-2 gap-6 mt-16 max-w-2xl mx-auto animate-fade-in opacity-0" style="animation-delay: 0.6s;">
       <div class="text-center">
        <div class="stat-number text-3xl sm:text-4xl font-bold" style="color: #D9782B;">
         99.9%
@@ -371,7 +479,7 @@
      <div class="grid md:grid-cols-2 gap-8 lg:gap-12">
       <div class="group">
        <div class="rounded-2xl overflow-hidden shadow-xl transition-all duration-500 group-hover:shadow-2xl group-hover:-translate-y-2" style="border: 1px solid rgba(217, 120, 43, 0.1);">
-           <img src="images/tcmScreenshot1.png" alt="名醫診所系統 - 中醫掛號與候診管理介面" class="w-full h-auto object-cover" loading="lazy">
+           <img src="landing/tcmScreenshot1.png" alt="名醫診所系統 - 中醫掛號與候診管理介面" class="w-full h-auto object-cover" loading="lazy">
        </div>
        <div class="mt-6 text-center">
         <h4 class="font-serif text-xl font-semibold mb-2" style="color: #1E1E1E;">高效掛號診症</h4>
@@ -381,7 +489,7 @@
 
       <div class="group">
        <div class="rounded-2xl overflow-hidden shadow-xl transition-all duration-500 group-hover:shadow-2xl group-hover:-translate-y-2" style="border: 1px solid rgba(217, 120, 43, 0.1);">
-           <img src="images/tcmScreenshot2.png" alt="中醫系統互動式穴位地圖與經絡定位功能" class="w-full h-auto object-cover" loading="lazy">
+           <img src="landing/tcmScreenshot2.png" alt="中醫系統互動式穴位地圖與經絡定位功能" class="w-full h-auto object-cover" loading="lazy">
        </div>
        <div class="mt-6 text-center">
         <h4 class="font-serif text-xl font-semibold mb-2" style="color: #1E1E1E;">互動式穴位地圖</h4>
@@ -391,7 +499,7 @@
 
       <div class="group">
        <div class="rounded-2xl overflow-hidden shadow-xl transition-all duration-500 group-hover:shadow-2xl group-hover:-translate-y-2" style="border: 1px solid rgba(217, 120, 43, 0.1);">
-           <img src="images/tcmScreenshot3.png" alt="中醫診所自動化中藥庫存管理與本草綱目資料庫" class="w-full h-auto object-cover" loading="lazy">
+           <img src="landing/tcmScreenshot3.png" alt="中醫診所自動化中藥庫存管理與本草綱目資料庫" class="w-full h-auto object-cover" loading="lazy">
        </div>
        <div class="mt-6 text-center">
         <h4 class="font-serif text-xl font-semibold mb-2" style="color: #1E1E1E;">智慧中藥庫管理</h4>
@@ -401,7 +509,7 @@
 
       <div class="group">
        <div class="rounded-2xl overflow-hidden shadow-xl transition-all duration-500 group-hover:shadow-2xl group-hover:-translate-y-2" style="border: 1px solid rgba(217, 120, 43, 0.1);">
-           <img src="images/tcmScreenshot4.png" alt="名醫診所系統 - 醫護排班與多診所同步規劃" class="w-full h-auto object-cover" loading="lazy">
+           <img src="landing/tcmScreenshot4.png" alt="名醫診所系統 - 醫護排班與多診所同步規劃" class="w-full h-auto object-cover" loading="lazy">
        </div>
        <div class="mt-6 text-center">
         <h4 class="font-serif text-xl font-semibold mb-2" style="color: #1E1E1E;">專業排班規劃</h4>
@@ -1009,6 +1117,71 @@
 
      </div>
     </div>
+   </section><section id="faq" class="py-20 lg:py-32">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+     <div class="text-center mb-14">
+      <span class="inline-block px-4 py-2 rounded-full text-sm font-medium mb-4" style="background-color: rgba(184, 98, 31, 0.15); color: #B8621F;"> 💬 常見問題 </span>
+      <h2 class="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-4" style="color: #1E1E1E;">中醫診所最常問的問題</h2>
+      <p class="text-lg" style="color: #666;">仍有疑問？歡迎 WhatsApp 我們，或預約 15 分鐘網上示範親身體驗</p>
+     </div>
+     <div class="space-y-4">
+
+      <details class="faq-group bg-white rounded-2xl border" style="border-color: #E8DED5;">
+       <summary class="flex items-center justify-between gap-4 px-6 py-5">
+        <span class="font-serif text-base sm:text-lg font-semibold text-left" style="color: #1E1E1E;">而家嘅手寫／Excel 病歷，可唔可以過渡到系統？</span>
+        <svg class="faq-icon w-5 h-5" fill="none" stroke="#D9782B" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+       </summary>
+       <div class="px-6 pb-6 text-sm sm:text-base leading-7" style="color: #555;">
+        可以。系統內建「舊資料轉移」工具，支援以試算表批量匯入病人基本資料及既往診症記錄；架設階段我哋會協助核對欄位及抽樣檢查，令你由紙本、Excel 或其他軟件過渡時唔會漏資料、唔使重新輸入。過渡完成後，所有記錄會同新症一樣，可喺病人檔案內完整查閱。
+       </div>
+      </details>
+
+      <details class="faq-group bg-white rounded-2xl border" style="border-color: #E8DED5;">
+       <summary class="flex items-center justify-between gap-4 px-6 py-5">
+        <span class="font-serif text-base sm:text-lg font-semibold text-left" style="color: #1E1E1E;">病人資料安全嗎？係咪符合《個人資料（私隱）條例》？</span>
+        <svg class="faq-icon w-5 h-5" fill="none" stroke="#D9782B" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+       </summary>
+       <div class="px-6 pb-6 text-sm sm:text-base leading-7" style="color: #555;">
+        系統按香港《個人資料（私隱）條例》（PDPO）嘅保障資料原則設計：只收集診症及營運所需資料；資料傳輸採用加密連線，診療記錄與附件儲存於設有存取管控嘅雲端平台；職員帳號按職級分權；公開查詢頁有人機驗證及 IP／電話雙重限速。診所先係病人資料嘅擁有人，我哋唔會出售或用於推廣。詳情可參閱<a href="privacy.html" style="color: #B8621F; text-decoration: underline;">私隱政策</a>。
+       </div>
+      </details>
+
+      <details class="faq-group bg-white rounded-2xl border" style="border-color: #E8DED5;">
+       <summary class="flex items-center justify-between gap-4 px-6 py-5">
+        <span class="font-serif text-base sm:text-lg font-semibold text-left" style="color: #1E1E1E;">我唔識電腦，用唔用得到？</span>
+        <svg class="faq-icon w-5 h-5" fill="none" stroke="#D9782B" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+       </summary>
+       <div class="px-6 pb-6 text-sm sm:text-base leading-7" style="color: #555;">
+        系統由中醫師參與設計，畫面跟隨「掛號 → 睇症 → 開方 → 收費 → 列印」嘅真實流程，唔使記指令。手機、電腦都可以用瀏覽器開啟，並可一鍵加到主畫面，如同 App 一樣使用。架設時會提供設定及操作教學，日常使用有技術支援跟進。
+       </div>
+      </details>
+
+      <details class="faq-group bg-white rounded-2xl border" style="border-color: #E8DED5;">
+       <summary class="flex items-center justify-between gap-4 px-6 py-5">
+        <span class="font-serif text-base sm:text-lg font-semibold text-left" style="color: #1E1E1E;">用開之後會唔會突然加價？</span>
+        <svg class="faq-icon w-5 h-5" fill="none" stroke="#D9782B" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+       </summary>
+       <div class="px-6 pb-6 text-sm sm:text-base leading-7" style="color: #555;">
+        收費好簡單：一次性架設費 ＋ 每年年費，年費已包括伺服器、系統更新、維護同技術支援。如下一年度需要調整價格，我哋會提前不少於 30 日通知現有客戶，客戶可自行決定是否續約，現有年度合約期內唔會單方面加價。
+       </div>
+      </details>
+
+      <details class="faq-group bg-white rounded-2xl border" style="border-color: #E8DED5;">
+       <summary class="flex items-center justify-between gap-4 px-6 py-5">
+        <span class="font-serif text-base sm:text-lg font-semibold text-left" style="color: #1E1E1E;">資料可否隨時匯出？如果將來唔用點算？</span>
+        <svg class="faq-icon w-5 h-5" fill="none" stroke="#D9782B" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+       </summary>
+       <div class="px-6 pb-6 text-sm sm:text-base leading-7" style="color: #555;">
+        可以。系統每日自動雲端備份，管理員亦可隨時手動下載完整備份檔（gzip 壓縮），並可匯入還原；病人、診症、處方及收費記錄皆屬於診所。終止服務後，你可以喺合理時間內索取及匯出全部資料，備份亦會按週期輪替清除。
+       </div>
+      </details>
+
+     </div>
+     <div class="flex flex-col sm:flex-row gap-4 justify-center mt-12">
+      <a href="https://cal.com/drgreattcm/15-min-demo" target="_blank" rel="noopener" class="px-8 py-3.5 rounded-full text-base font-semibold text-white transition-all hover:shadow-lg hover:scale-105 text-center" style="background-color: #D9782B;"> 🗓️ 預約 15 分鐘網上示範 </a>
+      <a href="https://wa.me/85254393401?text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%83%B3%E4%BA%86%E8%A7%A3%E4%B8%AD%E9%86%AB%E8%A8%BA%E6%89%80%E7%B3%BB%E7%B5%B1%E7%A4%BA%E7%AF%84" target="_blank" rel="noopener" class="px-8 py-3.5 rounded-full text-base font-semibold text-center transition-all hover:shadow-lg border-2" style="color: #B8621F; border-color: #D9782B; background-color: #fff;"> 📞 WhatsApp 直接查詢 </a>
+     </div>
+    </div>
    </section><section class="py-20 lg:py-32 relative overflow-hidden" style="background-color: #1E1E1E;">
     <div class="absolute inset-0 opacity-10">
      <div class="absolute top-0 left-0 w-96 h-96 rounded-full" style="background-color: #D9782B; filter: blur(100px);"></div>
@@ -1017,7 +1190,7 @@
     <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
      <h2 class="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-6 text-white">準備好讓您的診所<br><span class="text-gradient">邁向數位化了嗎？</span></h2>
      <p class="text-lg mb-10" style="color: rgba(255,255,255,0.7);">立即聯繫我們，了解更多詳情</p>
-     <div class="flex flex-col sm:flex-row gap-4 justify-center" id="footer-contact"><a href="mailto:drgreattcm@gmail.com" class="px-10 py-4 rounded-full text-lg font-semibold text-white transition-all hover:shadow-xl hover:scale-105 flex items-center justify-center gap-2" style="background-color: #B8621F;"> ✉️ drgreattcm@gmail.com </a> <a href="https://wa.me/85254393401" target="_blank" class="px-10 py-4 rounded-full text-lg font-semibold transition-all hover:shadow-lg border flex items-center justify-center gap-2" style="color: white; border-color: rgba(255,255,255,0.3);"> 📞 Whatsapp: +852 54393401 </a>
+     <div class="flex flex-col sm:flex-row gap-4 justify-center" id="footer-contact"><a href="https://cal.com/drgreattcm/15-min-demo" target="_blank" rel="noopener" class="px-10 py-4 rounded-full text-lg font-semibold transition-all hover:shadow-xl hover:scale-105 flex items-center justify-center gap-2" style="background-color: #F6EFE8; color: #1E1E1E;"> 🗓️ 預約 15 分鐘網上示範 </a> <a href="https://wa.me/85254393401?text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%83%B3%E4%BA%86%E8%A7%A3%E4%B8%AD%E9%86%AB%E8%A8%BA%E6%89%80%E7%B3%BB%E7%B5%B1%E7%A4%BA%E7%AF%84" target="_blank" rel="noopener" class="px-10 py-4 rounded-full text-lg font-semibold transition-all hover:shadow-lg border flex items-center justify-center gap-2" style="color: white; border-color: rgba(255,255,255,0.3);"> 📞 WhatsApp: +852 54393401 </a> <a href="mailto:drgreattcm@gmail.com" class="px-10 py-4 rounded-full text-lg font-semibold text-white transition-all hover:shadow-xl hover:scale-105 flex items-center justify-center gap-2" style="background-color: #B8621F;"> ✉️ drgreattcm@gmail.com </a>
      </div>
     </div>
    </section><footer class="py-16" style="background-color: #131313;">
@@ -1035,11 +1208,12 @@
       <div>
        <h5 class="font-semibold text-white mb-4">產品功能</h5>
        <ul class="space-y-2">
-        <li><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">線上預約</a></li>
-        <li><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">智慧問診</a></li>
+        <li><a href="#features" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">線上預約</a></li>
+        <li><a href="#features" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">智慧問診</a></li>
         <li><a href="#tcm" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">穴位地圖</a></li>
         <li><a href="#telemedicine" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">視像診症</a></li>
-        <li><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">藥材資料庫</a></li>
+        <li><a href="#tcm" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">藥材資料庫</a></li>
+        <li><a href="#faq" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.5);">常見問題</a></li>
        </ul>
       </div>
 
@@ -1054,13 +1228,17 @@
      <div class="pt-8 border-t" style="border-color: rgba(255,255,255,0.1);">
       <div class="flex flex-col md:flex-row justify-between items-center gap-4">
        <p class="text-sm" style="color: rgba(255,255,255,0.4);">© 2025 名醫診所系統. All rights reserved.</p>
-       <div class="flex gap-6"><a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.4);">隱私政策</a> <a href="#" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.4);">服務條款</a>
+       <div class="flex gap-6"><a href="privacy.html" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.4);">隱私政策</a> <a href="terms.html" class="text-sm hover:text-white transition-colors" style="color: rgba(255,255,255,0.4);">服務條款</a>
        </div>
       </div>
      </div>
     </div>
    </footer>
   </div>
+  <!-- 固定浮動 WhatsApp 查詢 -->
+  <a class="whatsapp-float" href="https://wa.me/85254393401?text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%83%B3%E4%BA%86%E8%A7%A3%E4%B8%AD%E9%86%AB%E8%A8%BA%E6%89%80%E7%B3%BB%E7%B5%B1%E7%A4%BA%E7%AF%84" target="_blank" rel="noopener" aria-label="WhatsApp 查詢名醫診所系統">
+   <svg width="30" height="30" viewBox="0 0 32 32" fill="white" aria-hidden="true"><path d="M16 .5C7.4.5.5 7.4.5 16c0 2.8.8 5.5 2.2 7.9L.5 31.5l7.8-2.1c2.3 1.3 4.9 1.9 7.7 1.9 8.6 0 15.5-6.9 15.5-15.5S24.6.5 16 .5zm0 28.2c-2.5 0-4.8-.7-6.8-1.9l-.5-.3-4.6 1.2 1.2-4.5-.3-.5C3.8 20.6 3.1 18.3 3.1 16c0-7.1 5.8-12.9 12.9-12.9S28.9 8.9 28.9 16 23.1 28.7 16 28.7zm7.1-9.7c-.4-.2-2.3-1.1-2.6-1.3-.3-.1-.6-.2-.8.2-.2.4-.8 1.3-1 1.5-.2.2-.4.3-.8.1-.4-.2-1.6-.6-3.1-1.9-1.1-1-1.9-2.3-2.2-2.7-.2-.4 0-.6.2-.8.2-.2.4-.4.5-.7.2-.2.2-.4.4-.6.1-.2.1-.4 0-.6-.1-.2-.8-1.9-1.1-2.6-.3-.7-.5-.6-.8-.6h-.7c-.2 0-.6.1-.9.4-.3.4-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.4c.2.2 2.3 3.6 5.7 5 .8.3 1.4.5 1.9.7.8.2 1.5.2 2.1.1.6-.1 2-.8 2.2-1.6.3-.8.3-1.5.2-1.6-.1-.2-.4-.3-.8-.5z" /></svg>
+  </a>
   <script>
     // Default configuration
     const defaultConfig = {
