@@ -141,7 +141,7 @@
     'image/png': 'image/png', 'image/webp': 'image/webp', 'image/gif': 'image/gif'
   };
 
-  // WebP 輸出品質（對照片相當於 JPEG q0.9 左右的視覺品質，檔案約小 25-35%，節省 R2 容量）
+  // WebP 輸出品質（對照片相當於 JPEG q0.9 左右的視覺品質，檔案約小 25-35%，節省雲端容量）
   var WEBP_QUALITY = 0.85;
   var webpSupportCached = null; // null=未探測；true/false=探測結果
 
@@ -304,7 +304,7 @@
       var xhr = new XMLHttpRequest();
       xhr.open('PUT', url, true);
       xhr.setRequestHeader('Content-Type', contentType);
-      // 必須與後端 PUT 簽章的 SignedHeaders 完全一致，否則 R2 403
+      // 必須與後端 PUT 簽章的 SignedHeaders 完全一致，否則雲端儲存會回 403
       xhr.setRequestHeader('Cache-Control', 'private, no-store');
       if (xhr.upload) {
         xhr.upload.onprogress = function (e) {
@@ -313,7 +313,7 @@
       }
       xhr.onload = function () {
         if (xhr.status >= 200 && xhr.status < 300) resolve();
-        else reject(new Error('R2 HTTP ' + xhr.status));
+        else reject(new Error('HTTP ' + xhr.status));
       };
       xhr.onerror = function () { reject(new Error('network error')); };
       xhr.send(blob);

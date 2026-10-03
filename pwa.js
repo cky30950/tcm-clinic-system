@@ -82,8 +82,8 @@
         pushLoginNeeded: { zh: '請先登入後再設定通知', en: 'Please log in to configure notifications.' },
         pushNoSubscription: { zh: '此裝置尚未開啟推播訂閱，請先開啟開關。', en: 'This device has no push subscription yet. Please turn on the toggle first.' },
         pushServerKeyInvalid: {
-            zh: '伺服器推播金鑰未正確設定（VAPID_PUBLIC_KEY 空白或不完整），請於 Cloudflare Pages 環境變數檢查後重試。',
-            en: 'The server push key is missing or invalid (VAPID_PUBLIC_KEY). Please check Cloudflare Pages environment variables and retry.'
+            zh: '伺服器推播金鑰未正確設定，請通知管理員檢查伺服器推播設定後重試。',
+            en: 'The server push key is missing or invalid. Please ask the administrator to check the server push settings and retry.'
         },
         reload: { zh: '重新整理', en: 'Reload' },
         pushClaimOther: {

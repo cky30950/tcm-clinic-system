@@ -830,7 +830,7 @@ export async function loadTodayAppointments() {
                 // 更新本地存儲作為備份
                 localStorage.setItem('appointments', JSON.stringify(G.appointments));
             } else {
-                console.warn('無法從 Firebase 讀取掛號資料，使用本地資料');
+                console.warn('無法從雲端讀取掛號資料，使用本地資料');
             }
         } catch (error) {
             console.error('讀取掛號資料錯誤:', error);

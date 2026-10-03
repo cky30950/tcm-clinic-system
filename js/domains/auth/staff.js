@@ -235,7 +235,7 @@ export async function loadUsersFromFirebase() {
         try {
             await G.waitForFirebaseDataManager();
         } catch (e) {
-            console.warn('等待 FirebaseDataManager 就緒時發生錯誤:', e);
+            console.warn('等待雲端數據管理器就緒時發生錯誤:', e);
         }
     }
     const tbody = document.getElementById('userList');
@@ -269,7 +269,7 @@ export async function loadUsersFromFirebase() {
         } else {
             // 如果讀取失敗或無資料，使用本地 users 數據
             usersFromFirebase = G.users;
-            console.log('快取或 Firebase 讀取失敗，使用本地用戶數據');
+            console.log('快取或雲端讀取失敗，使用本地用戶數據');
         }
     } catch (error) {
         console.error('載入用戶數據錯誤:', error);
@@ -779,8 +779,12 @@ export async function saveUser() {
                     const created = await createStaffAuthAccount({ email, password, displayName: name });
                     newUid = created.uid;
                 } catch (authErr) {
-                    console.error('建立 Firebase 帳號失敗:', authErr);
-                    G.showToast('建立 Firebase 帳號失敗：' + (authErr && authErr.message ? authErr.message : ''), 'error');
+                    console.error('建立系統帳號失敗:', authErr);
+                    // SDK 原生錯誤訊息可能含供應商名稱，顯示前先遮蔽
+                    const rawAuthMsg = authErr && authErr.message ? String(authErr.message) : '';
+                    const safeAuthMsg = rawAuthMsg
+                        .replace(/firebase authentication|firebase auth|firestore|firebase|cloudflare/gi, '系統');
+                    G.showToast('建立系統帳號失敗：' + safeAuthMsg, 'error');
                     G.clearButtonLoading(saveButton);
                     return;
                 }

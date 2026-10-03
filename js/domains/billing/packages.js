@@ -230,7 +230,7 @@ export async function getPatientPackages(patientId, forceRefresh = false, clinic
     }
     // 如果仍未就緒，回傳空陣列並警告
     if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
-        console.warn('FirebaseDataManager 尚未就緒，無法取得患者套票');
+        console.warn('雲端數據管理器尚未就緒，無法取得患者套票');
         return [];
     }
     // 如果有本地緩存且不需要強制刷新，優先從 localStorage 讀取
