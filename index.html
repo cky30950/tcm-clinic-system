@@ -31,6 +31,19 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&amp;family=Noto+Sans+TC:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
   <style>
+    @layer base {
+      /* Lucide 生成的 svg 被 Tailwind v4 preflight 設為 block，還原為行內對齊 */
+      svg.lucide { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+      /* Tailwind v4 preflight 不再為 button 加上手指指標，還原可點擊元素的 cursor */
+      button:not(:disabled),
+      [role="button"]:not([aria-disabled="true"]),
+      [onclick]:not([disabled]),
+      label[for],
+      summary,
+      select:not(:disabled) { cursor: pointer; }
+      button:disabled,
+      [role="button"][aria-disabled="true"] { cursor: not-allowed; }
+    }
     :root {
       --color-jade: #D9782B;
       --color-gold: #B8621F;
