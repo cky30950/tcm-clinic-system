@@ -14946,27 +14946,27 @@ async function viewMedicalRecord(recordId, buttonEl = null) {
         // 主訴
         detailHtml += '<div>';
         detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">主訴</span>';
-        detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${rec.symptoms ? window.escapeHtml(rec.symptoms) : '無記錄'}</div>`;
+        detailHtml += `<div class="bg-white border border-gray-200 p-3 rounded-lg text-sm text-gray-900 medical-field">${rec.symptoms ? window.escapeHtml(rec.symptoms) : '無記錄'}</div>`;
         detailHtml += '</div>';
         // 現病史
         if (rec.currentHistory) {
             detailHtml += '<div>';
             detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">現病史</span>';
-            detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.currentHistory)}</div>`;
+            detailHtml += `<div class="bg-white border border-gray-200 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.currentHistory)}</div>`;
             detailHtml += '</div>';
         }
         // 舌象
         if (rec.tongue) {
             detailHtml += '<div>';
             detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">舌象</span>';
-            detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.tongue)}</div>`;
+            detailHtml += `<div class="bg-white border border-gray-200 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.tongue)}</div>`;
             detailHtml += '</div>';
         }
         // 脈象
         if (rec.pulse) {
             detailHtml += '<div>';
             detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">脈象</span>';
-            detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.pulse)}</div>`;
+            detailHtml += `<div class="bg-white border border-gray-200 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.pulse)}</div>`;
             detailHtml += '</div>';
         }
         // 中醫診斷
@@ -15065,14 +15065,14 @@ async function viewMedicalRecord(recordId, buttonEl = null) {
             if (rec.usage) {
                 medInfoHtml += `<div>${window.escapeHtml(rec.usage)}</div>`;
             }
-            detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${medInfoHtml || '無記錄'}</div>`;
+            detailHtml += `<div class="bg-white border border-gray-200 p-3 rounded-lg text-sm text-gray-900 medical-field">${medInfoHtml || '無記錄'}</div>`;
             detailHtml += '</div>';
         })();
         // 療程
         if (rec.treatmentCourse) {
             detailHtml += '<div>';
             detailHtml += '<span class="text-sm font-semibold text-gray-700 block mb-2">療程</span>';
-            detailHtml += `<div class="bg-gray-50 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.treatmentCourse)}</div>`;
+            detailHtml += `<div class="bg-white border border-gray-200 p-3 rounded-lg text-sm text-gray-900 medical-field">${window.escapeHtml(rec.treatmentCourse)}</div>`;
             detailHtml += '</div>';
         }
         // 醫囑及注意事項
@@ -18335,7 +18335,7 @@ async function deleteAcupointCombination(id) {
                     
                   </div>
                 </div>
-                <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
+                <div class="bg-white border border-gray-200 p-4 rounded-lg text-gray-700">
                   ${String(item.content || '').split('\n').map(p => '<p class="mb-2">' + window.escapeHtml(p) + '</p>').join('')}
                 </div>
               `;
@@ -18456,7 +18456,7 @@ async function deleteAcupointCombination(id) {
                     
                   </div>
                 </div>
-                <div class="bg-gray-50 p-4 rounded-lg text-gray-700">
+                <div class="bg-white border border-gray-200 p-4 rounded-lg text-gray-700">
                   ${contentHtml}
                 </div>
               `;
@@ -18674,7 +18674,7 @@ async function deleteAcupointCombination(id) {
             }
             sourceList.forEach((cat, idx) => {
               const div = document.createElement('div');
-              div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
+              div.className = 'flex justify-between items-center p-3 bg-white border border-gray-200 rounded-lg';
               // 分類名稱為可輸入內容，以 textContent 渲染；按鈕事件直接綁定
               const span = document.createElement('span');
               span.className = 'text-gray-700';
