@@ -1147,7 +1147,7 @@
         var tasks = files.map(function (file) {
             return async function () {
                 var row = document.createElement('div');
-                row.className = 'flex items-center gap-3 text-sm bg-white border border-gray-200 rounded-lg px-3 py-2';
+                row.className = 'flex items-center gap-3 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2';
                 var displayName = file.name || tt('圖片');
                 var category = fixedCategory || currentUploadCategory();
                 row.innerHTML =
