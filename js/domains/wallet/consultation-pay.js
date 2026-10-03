@@ -117,7 +117,7 @@ import { currentWalletClinicId, walletApi, walletRound2 } from './shared.js';
       }
       consultWallet.autoLocked = true;
       showWalletPayMessage(
-        '⚠️ 總費用 HK$' + total.toFixed(2) +
+        '<i data-lucide="triangle-alert" class="w-4 h-4 inline-block align-text-bottom mr-1 text-amber-500"></i>總費用 HK$' + total.toFixed(2) +
         ' 高於儲值餘額 HK$' + available.toFixed(2) +
         '，已取消「使用儲值餘額支付」；總費用調低至餘額以內後將自動解鎖。',
         true
@@ -183,7 +183,7 @@ import { currentWalletClinicId, walletApi, walletRound2 } from './shared.js';
       showWalletPayMessage(
         '此診症已以儲值餘額支付 HK$' +
         Number(existing.walletPaid).toFixed(2) +
-        '。編輯時不會自動追加差額；如需退款，請使用「💳 會員錢包」內的退款功能。',
+        '。編輯時不會自動追加差額；如需退款，請使用「<i data-lucide="credit-card" class="w-3.5 h-3.5 inline-block align-text-bottom mx-0.5"></i>會員錢包」內的退款功能。',
         false
       );
       return;
@@ -316,7 +316,7 @@ import { currentWalletClinicId, walletApi, walletRound2 } from './shared.js';
         }, { skipSideEffects: true });
       } catch (_markErr) { /* 略過 */ }
       showWalletPayMessage(
-        '⚠️ 儲值扣款失敗：' + escapeHtml(msg) +
+        '<i data-lucide="triangle-alert" class="w-4 h-4 inline-block align-text-bottom mr-1 text-amber-500"></i>儲值扣款失敗：' + escapeHtml(msg) +
         '（病歷已保存，已列入待收款追蹤）。' +
         '<div class="mt-2">' +
         '<button type="button" onclick="retryConsultationWalletPayment()" ' +
@@ -417,7 +417,7 @@ import { currentWalletClinicId, walletApi, walletRound2 } from './shared.js';
       if (!warningMsg) return true;
 
       // 有問題：toast 提示 + 顯示在儲值區塊，阻止保存
-      showWalletPayMessage('⚠️ ' + escapeHtml(warningMsg), true);
+      showWalletPayMessage('<i data-lucide="triangle-alert" class="w-4 h-4 inline-block align-text-bottom mr-1 text-amber-500"></i>' + escapeHtml(warningMsg), true);
       G.showToast(warningMsg, 'error');
       return false;
     } catch (preCheckErr) {

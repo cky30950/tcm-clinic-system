@@ -989,7 +989,7 @@
             element.dataset.shiftId = shift.id;
             
             const duration = calculateShiftDuration(shift.startTime, shift.endTime);
-            const statusIcon = shift.status === 'confirmed' ? '✓' : shift.status === 'pending' ? '⏳' : '❌';
+            const statusIcon = shift.status === 'confirmed' ? 'check' : shift.status === 'pending' ? 'hourglass' : 'x';
             
             
             
@@ -1010,8 +1010,8 @@
             let actionsHtml = '';
             if (isAdmin) {
                 actionsHtml = `
-                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="${translate('編輯')}">✏️</button>
-                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="${translate('刪除')}">🗑️</button>
+                        <button class="shift-action-btn" onclick="handleEditShift(event, ${shift.id})" title="${translate('編輯')}"><i data-lucide="pencil" class="w-4 h-4 pointer-events-none"></i></button>
+                        <button class="shift-action-btn" onclick="handleDeleteShift(event, ${shift.id})" title="${translate('刪除')}"><i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i></button>
                 `;
             }
             element.innerHTML = `
@@ -1252,7 +1252,7 @@
                 const positionLabel = member.level || translate(member.role === 'doctor' ? '醫師' : member.role === 'nurse' ? '護理師' : '');
                 card.innerHTML = `
                     <div class="staff-name">${esc(member.name)}<span class="staff-position"> ${esc(positionLabel)}</span></div>
-                    <div class="drag-hint">🖱️</div>
+                    <div class="drag-hint"><i data-lucide="mouse-pointer" class="w-3 h-3"></i></div>
                 `;
 
                 
@@ -1319,11 +1319,11 @@
         
         function getStaffStatus(staffId, todayShifts) {
             if (todayShifts.length === 0) {
-                return { class: '', icon: '✅', text: translate('可排班') };
+                return { class: '', icon: 'circle-check', text: translate('可排班') };
             } else if (todayShifts.length === 1) {
-                return { class: 'partial', icon: '⏰', text: translate('已排班') };
+                return { class: 'partial', icon: 'clock', text: translate('已排班') };
             } else {
-                return { class: 'busy', icon: '🔴', text: translate('滿班') };
+                return { class: 'busy', icon: 'circle', text: translate('滿班') };
             }
         }
 
@@ -2251,7 +2251,7 @@
                 
                 
                 const shiftTypeName = translate(getShiftTypeName(shift.type));
-                scheduleText += `📅 ${formattedDate} ${shift.startTime}-${shift.endTime} (${duration}h) - ${shiftTypeName}\n`;
+                scheduleText += `${formattedDate} ${shift.startTime}-${shift.endTime} (${duration}h) - ${shiftTypeName}\n`;
                 if (shift.notes) scheduleText += `   ${translate('備註:')} ${shift.notes}\n`;
             });
             
@@ -2274,10 +2274,10 @@
             const staffMember = findStaffById(staffId);
             
             const contactInfo = `${translate('聯絡')} ${staffMember.name}:\n\n` +
-                              `📞 ${translate('電話:')} ${staffMember.phone}\n` +
-                              `📧 ${translate('信箱:')} ${staffMember.email}\n` +
-                              `🏥 ${translate('部門:')} ${staffMember.department}\n` +
-                              `👔 ${translate('職位:')} ${staffMember.level}`;
+                              `${translate('電話:')} ${staffMember.phone}\n` +
+                              `${translate('信箱:')} ${staffMember.email}\n` +
+                              `${translate('部門:')} ${staffMember.department}\n` +
+                              `${translate('職位:')} ${staffMember.level}`;
             
             
             const confirmedCall = await showConfirmation(contactInfo + '\n\n' + translate('要撥打電話嗎？'), 'question');

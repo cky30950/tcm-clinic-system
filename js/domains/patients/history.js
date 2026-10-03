@@ -441,7 +441,7 @@ if (!patient) {
                 // there are no dynamic numbers to handle.
                 contentDiv.innerHTML = `
                     <div class="text-center py-12 text-gray-500">
-                        <div class="text-4xl mb-4">📋</div>
+                        <div class="mb-4 flex justify-center"><i data-lucide="clipboard-list" class="w-10 h-10 text-blue-400"></i></div>
                         <div class="text-lg font-medium mb-2">暫無診症記錄</div>
                         <div class="text-sm">該病人尚未有診症記錄</div>
                     </div>
@@ -554,7 +554,7 @@ if (!patient) {
                 
                 <!-- 當前病歷記錄 -->
                 <div class="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-                    <div class="bg-gradient-to-r from-gray-50 to-blue-50 px-6 py-4 border-b border-gray-200">
+                    <div class="bg-linear-to-r from-gray-50 to-blue-50 px-6 py-4 border-b border-gray-200">
                         <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                             <div class="flex flex-col space-y-2">
                                 <span class="font-semibold text-gray-900 text-lg">
@@ -909,7 +909,7 @@ export async function displayConsultationMedicalHistoryPage() {
         // language is set to English via the dictionary.
         contentDiv.innerHTML = `
             <div class="text-center py-12 text-gray-500">
-                <div class="text-4xl mb-4">📋</div>
+                <div class="mb-4 flex justify-center"><i data-lucide="clipboard-list" class="w-10 h-10 text-blue-400"></i></div>
                 <div class="text-lg font-medium mb-2">暫無診症記錄</div>
                 <div class="text-sm">該病人尚未有診症記錄</div>
             </div>
@@ -1028,7 +1028,7 @@ export async function displayConsultationMedicalHistoryPage() {
         
         <!-- 當前病歷記錄 -->
         <div class="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-            <div class="bg-gradient-to-r from-gray-50 to-blue-50 px-6 py-4 border-b border-gray-200">
+            <div class="bg-linear-to-r from-gray-50 to-blue-50 px-6 py-4 border-b border-gray-200">
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div class="flex flex-col space-y-2">
                         <span class="font-semibold text-gray-900 text-lg">

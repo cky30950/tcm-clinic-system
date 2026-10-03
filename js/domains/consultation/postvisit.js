@@ -1058,7 +1058,7 @@ export async function loadPatientConsultationSummary(patientId) {
         console.error('載入診療記錄摘要錯誤:', error);
         summaryContainer.innerHTML = `
             <div class="text-center py-8 text-gray-500">
-                <div class="text-4xl mb-2">❌</div>
+                <div class="mb-2 flex justify-center"><i data-lucide="circle-x" class="w-10 h-10 text-red-400"></i></div>
                 <div>載入診療記錄失敗</div>
             </div>
         `;

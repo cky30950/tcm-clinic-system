@@ -146,7 +146,7 @@ import { clearWalletCaches, walletApi, walletClinicDocCache, walletMembershipCon
         data: Object.assign({}, clinic.data, { membershipConfig })
       });
       walletMembershipConfigCache.set(clinic.id, membershipConfig);
-      msg.textContent = '已儲存 ✓';
+      msg.textContent = '已儲存';
       msg.className = 'text-sm text-green-600';
       G.showToast('會員設定已儲存', 'success');
     } catch (error) {
