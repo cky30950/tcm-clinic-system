@@ -275,7 +275,7 @@
             window.Swal.fire({
                 icon: 'info',
                 title: '尚未設置視訊診症',
-                html: '請打開 <b>video/agora-config.js</b>，把 Agora Console 取得的 <b>App ID</b> 填入 <code>APP_ID</code> 後重新整理頁面。<br><br>正式環境請再設定 <code>TOKEN_URL</code>（Cloudflare Pages Function）。',
+                html: '請打開 <b>video/agora-config.js</b>，把 Agora Console 取得的 <b>App ID</b> 填入 <code>APP_ID</code> 後重新整理頁面。<br><br>正式環境請再設定 <code>TOKEN_URL</code>（雲端伺服器函式）。',
                 confirmButtonText: '我知道了'
             });
         } else {

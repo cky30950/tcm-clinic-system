@@ -664,7 +664,7 @@
                     }
                 }
                 if (!window.firebase || !window.firebase.rtdb) {
-                    console.warn('Firebase Realtime Database 尚未準備就緒，無法載入排班資料');
+                    console.warn('即時同步服務尚未準備就緒，無法載入排班資料');
                     return;
                 }
                 
@@ -713,7 +713,7 @@
                     }
                 }
                 if (!window.firebase || !window.firebase.rtdb) {
-                    console.warn('Firebase Realtime Database 尚未準備就緒，無法保存排班資料');
+                    console.warn('即時同步服務尚未準備就緒，無法保存排班資料');
                     return;
                 }
                 

@@ -542,7 +542,7 @@ import { G } from '../../lib/legacy.js';
                         }
                     }
                 } catch (error) {
-                    console.error('儲存收費項目至 Firestore 失敗:', error);
+                    console.error('儲存收費項目至雲端資料庫失敗:', error);
                 }
                 hideAddBillingItemForm();
                 displayBillingItems();
@@ -585,7 +585,7 @@ import { G } from '../../lib/legacy.js';
                             );
                         }
                     } catch (error) {
-                        console.error('刪除收費項目資料至 Firestore 失敗:', error);
+                        console.error('刪除收費項目資料至雲端資料庫失敗:', error);
                     }
                     // 刪除後更新本地存儲，以便其他裝置下次載入時取得最新資料
                     try {

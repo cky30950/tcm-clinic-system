@@ -2864,7 +2864,7 @@ async function fetchUsers(forceRefresh = false) {
                 const parsed = parseIndexUrl(url);
                 missing.set(url, {
                     url,
-                    hint: hint || 'Firestore 複合索引缺失',
+                    hint: hint || '雲端資料庫複合索引缺失',
                     collection: parsed.collectionId,
                     fields: parsed.fields,
                     createdAt: Date.now()
@@ -2874,7 +2874,7 @@ async function fetchUsers(forceRefresh = false) {
                 const now = Date.now();
                 if (now - toastShownAt > 15000) {
                     toastShownAt = now;
-                    showToast(`🔧 偵測到 ${missing.size} 個 Firestore 索引未建立，點擊右下角圖示一鍵建立`, 'warning');
+                    showToast(`🔧 偵測到 ${missing.size} 個雲端資料庫索引未建立，點擊右下角圖示一鍵建立`, 'warning');
                 }
                 buildIndicator();
             }
@@ -2886,7 +2886,7 @@ async function fetchUsers(forceRefresh = false) {
                     btn = document.createElement('button');
                     btn.id = 'indexMissingIndicator';
                     btn.innerHTML = `<span>🔧</span><span class="badge">0</span>`;
-                    btn.title = '建立缺失的 Firestore 索引';
+                    btn.title = '建立缺失的雲端資料庫索引';
                     btn.style.cssText = `
                         position: fixed; bottom: 24px; right: 24px; z-index: 9998;
                         width: 52px; height: 52px; border-radius: 50%;
@@ -2938,11 +2938,11 @@ async function fetchUsers(forceRefresh = false) {
                 `;
                 modal.innerHTML = `
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-                        <h3 style="margin:0;font-size:18px;font-weight:600;color:#1f2937;">🔧 建立 Firestore 索引</h3>
+                        <h3 style="margin:0;font-size:18px;font-weight:600;color:#1f2937;">🔧 建立雲端資料庫索引</h3>
                         <button onclick="window.__indexManagerClose()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;">✕</button>
                     </div>
                     <div id="indexManagerIntro" style="font-size:14px;color:#6b7280;margin-bottom:16px;line-height:1.6;">
-                        以下是系統執行時發現缺失的資料庫索引。點擊「一鍵建立」會在新分頁打開已預填好參數的 Firebase Console，你只需登入後按一下 <b>Create</b> 即可。
+                        以下是系統執行時發現缺失的資料庫索引。點擊「一鍵建立」會在新分頁打開已預填好參數的資料庫管理後台，你只需登入後按一下 <b>Create</b> 即可。
                         <br><br>
                         索引建立需要幾分鐘（視資料量而定），完成後刷新頁面即可。
                     </div>
@@ -2999,7 +2999,7 @@ async function fetchUsers(forceRefresh = false) {
                                 <a href="${item.url}" target="_blank" rel="noopener"
                                    style="flex:1;background:#2563eb;color:white;padding:8px 14px;border-radius:6px;
                                           text-decoration:none;font-size:13px;text-align:center;font-weight:500;">
-                                    🚀 一鍵建立（開啟 Firebase Console）
+                                    🚀 一鍵建立（開啟資料庫管理後台）
                                 </a>
                                 <button onclick="window.__indexManagerSkip(${i})"
                                         style="background:#e5e7eb;color:#4b5563;border:none;padding:8px 12px;border-radius:6px;
@@ -5614,7 +5614,7 @@ window.backfillConsultationSearchKeywords = async function(startAfterDocId = nul
         console.log('[backfill] 完成旗標已寫入 systemMeta/searchKeywordsBackfill，本機 legacy fallback 已關閉；其他客戶端最遲 1 小時內生效（重新整理可立即檢查）');
     } catch (e) {
         markerError = (e && e.message) || String(e);
-        console.warn('[backfill] 完成旗標寫入失敗（需診所管理身份，且 firestore.rules 需已部署 systemMeta 規則）：', markerError, '。請管理員執行 await window.markSearchKeywordsBackfillComplete() 補寫');
+        console.warn('[backfill] 完成旗標寫入失敗（需診所管理身份，且雲端資料庫存取規則需已部署 systemMeta 規則）：', markerError, '。請管理員執行 await window.markSearchKeywordsBackfillComplete() 補寫');
     }
 
     const result = { totalScanned, totalBackfilled, lastProcessedId, markerWritten, markerError };
@@ -5660,7 +5660,7 @@ window.clearSearchKeywordsBackfillMarker = async function() {
 window.recomputeAllPatientAggregates = async function() {
     await waitForFirebaseDb();
     const dm = window.firebaseDataManager;
-    if (!dm || !dm.getPatients) { console.error('firebaseDataManager 未就緒'); return; }
+    if (!dm || !dm.getPatients) { console.error('雲端數據管理器未就緒'); return; }
 
     const patientsRes = await dm.getPatients(true);
     const patients = (patientsRes && patientsRes.success && patientsRes.data) || [];
@@ -6781,7 +6781,7 @@ async function updateStatistics() {
     try {
         // 如果 Firebase 數據管理器尚未初始化或尚未準備好，則跳過統計更新。
         if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
-            console.log('Firebase 數據管理器尚未準備就緒，統計資訊將稍後更新');
+            console.log('雲端數據管理器尚未準備就緒，統計資訊將稍後更新');
             return;
         }
         // 為避免在主頁多次從 Firebase 讀取掛號和病人資料，這裡優先使用已緩存或本地儲存的資料計算統計。
@@ -8063,7 +8063,7 @@ async function initializeSystemAfterLogin() {
                     await setHerbInventory(herb.id, herb.stock, herb.threshold, 'g');
                 }
             } catch (err) {
-                console.error('更新中藥庫存至 Firebase 失敗:', err);
+                console.error('更新中藥庫存至雲端資料庫失敗:', err);
             }
             // 不再將中藥材資料寫入 Firestore；資料僅保留於本地陣列
             hideAddHerbForm();
@@ -8144,7 +8144,7 @@ async function initializeSystemAfterLogin() {
                     await setHerbInventory(formula.id, formula.stock, formula.threshold, 'g');
                 }
             } catch (err) {
-                console.error('更新方劑庫存至 Firebase 失敗:', err);
+                console.error('更新方劑庫存至雲端資料庫失敗:', err);
             }
             // 不再將方劑資料寫入 Firestore；資料僅保留於本地陣列
             hideAddFormulaForm();
@@ -8615,7 +8615,7 @@ async function refreshCloudBackupStatus() {
                     ? '部分成功'
                     : '失敗';
             lines.push(`最近同步：${formatBackupDateTime(lastRun.at)}・${stateText}` +
-                (typeof lastRun.firestoreReads === 'number' ? `・本次 Firestore 讀取 ${lastRun.firestoreReads} 次` : ''));
+                (typeof lastRun.firestoreReads === 'number' ? `・本次雲端資料庫讀取 ${lastRun.firestoreReads} 次` : ''));
         }
         if (lastRun.status === 'partial' && Array.isArray(lastRun.failures) && lastRun.failures.length) {
             lines.push('失敗項目：' + lastRun.failures.map(f => f.source).join('、'));
@@ -8669,7 +8669,7 @@ async function syncCloudBackup(forceBaseline) {
                 const ratio = Math.round((1 - result.exportBytes / result.exportBytesUncompressed) * 100);
                 compressionInfo = `，壓縮後 ${mb(result.exportBytes)}（原 ${mb(result.exportBytesUncompressed)}，縮減 ${ratio}%）`;
             }
-            const summary = `同步完成（${result.status === 'partial' ? '部分成功' : '成功'}），本次 Firestore 讀取 ${result.firestoreReads} 次${compressionInfo}，備份檔：${result.exportFileName}`;
+            const summary = `同步完成（${result.status === 'partial' ? '部分成功' : '成功'}），本次雲端資料庫讀取 ${result.firestoreReads} 次${compressionInfo}，備份檔：${result.exportFileName}`;
             progressText.textContent = summary;
         }
         showToast(result.status === 'partial'
@@ -9752,7 +9752,7 @@ class FirebaseDataManager {
         // 等待 Firebase 初始化，使用通用等待函式
         await waitForFirebase();
         this.isReady = true;
-        console.log('Firebase 數據管理器已準備就緒');
+        console.log('雲端數據管理器已準備就緒');
     }
 
     applyPatientAggregateToCaches(patientId, aggregatePatch) {
@@ -9863,9 +9863,9 @@ class FirebaseDataManager {
         // firebase_init.js 可能被 Service Worker 快取了舊版本。
         const increment = window.firebase && window.firebase.increment;
         if (typeof increment !== 'function') {
-            console.error('[聚合計畫] Firebase increment 函數不可用！'
+            console.error('[聚合計畫] 雲端 increment 函數不可用！'
                 + ' 請強制刷新（Ctrl+F5）或清除瀏覽器快取。'
-                + ' window.firebase 鍵:', window.firebase ? Object.keys(window.firebase) : 'null');
+                + ' 雲端模組鍵:', window.firebase ? Object.keys(window.firebase) : 'null');
             // 靜默降級：返回空計畫，不中斷病歷保存主流程。
             // 病人聚合統計會在下次 add/update 時被正確覆蓋。
             return { patientOps: [], meta: null };
@@ -10157,7 +10157,7 @@ class FirebaseDataManager {
                 newPatientData
             );
 
-            console.log('病人數據已添加到 Firebase:', docRef.id);
+            console.log('病人數據已添加到雲端資料庫:', docRef.id);
             // 通知其他裝置病人列表有變更（帶本機 nonce，自己的監聽器會跳過）
             touchPatientsMeta('create', docRef.id, { nonce: newSelfMetaNonce() }).catch(() => {});
             // 樂觀就地更新本機所有快取層，不再清空後全量重讀
@@ -10342,7 +10342,7 @@ class FirebaseDataManager {
             } catch (lsErr) {
                 console.warn('保存病人資料到本地失敗:', lsErr);
             }
-            console.log('已從 Firebase 讀取病人數據:', patients.length, '筆');
+            console.log('已從雲端資料庫讀取病人數據:', patients.length, '筆');
             return { success: true, data: patients };
         } catch (error) {
             console.error('讀取病人數據失敗:', error);
@@ -10578,7 +10578,7 @@ class FirebaseDataManager {
                 console.warn('新增診症後同步財務日聚合失敗:', _finStatsErr);
             }
 
-            console.log('診症記錄已添加到 Firebase:', consRef.id);
+            console.log('診症記錄已添加到雲端資料庫:', consRef.id);
             // 新增診症後清除全域診症快取並移除本地存檔
             this.consultationsCache = null;
             try {
@@ -10759,7 +10759,7 @@ class FirebaseDataManager {
             } catch (lsErr) {
                 console.warn('保存診症記錄到本地失敗:', lsErr);
             }
-            console.log('已從 Firebase 讀取診症記錄，載入', consultations.length, '筆');
+            console.log('已從雲端資料庫讀取診症記錄，載入', consultations.length, '筆');
             return { success: true, data: consultations, hasMore: this.consultationsHasMore };
         } catch (error) {
             console.error('讀取診症記錄失敗:', error);
@@ -10939,7 +10939,7 @@ class FirebaseDataManager {
             const averageRevenue = totalConsultations > 0 ? Math.round(totalRevenue / totalConsultations) : 0;
             return { success: true, data: { totalRevenue, averageRevenue, totalConsultations } };
         } catch (error) {
-            console.warn('Firestore 聚合查詢失敗:', error && error.message);
+            console.warn('雲端資料庫聚合查詢失敗:', error && error.message);
             return { success: false, data: {}, error: error && error.message ? error.message : String(error) };
         }
     }
@@ -12021,7 +12021,7 @@ class FirebaseDataManager {
             // 授權索引 userAuthIndex 與 custom claims 統一由後端
             // /api/admin/claims/sync 以 Service Account 寫入（客戶端已被 Rules 拒絕）
 
-            console.log('用戶數據已添加到 Firebase:', docRef.id);
+            console.log('用戶數據已添加到雲端資料庫:', docRef.id);
             // 新增用戶後清除快取並移除本地存檔
             this.usersCache = null;
             try {
@@ -12118,7 +12118,7 @@ class FirebaseDataManager {
             } catch (lsErr) {
                 console.warn('保存用戶資料到本地失敗:', lsErr);
             }
-            console.log('已從 Firebase 讀取用戶數據，載入', users.length, '筆');
+            console.log('已從雲端資料庫讀取用戶數據，載入', users.length, '筆');
             return { success: true, data: users, hasMore: this.usersHasMore };
         } catch (error) {
             console.error('讀取用戶數據失敗:', error);
@@ -12288,7 +12288,7 @@ class FirebaseDataManager {
                 window.firebase.ref(window.firebase.rtdb, 'appointments/' + id),
                 { ...appointmentData }
             );
-            console.log('掛號資料已添加到 Firebase Realtime Database:', id);
+            console.log('掛號資料已添加到即時同步服務:', id);
             return { success: true, id: id };
         } catch (error) {
             console.error('添加掛號數據失敗:', error);
@@ -12307,7 +12307,7 @@ class FirebaseDataManager {
             const appointments = Object.keys(data).map(key => {
                 return { id: key, ...data[key] };
             });
-            console.log('已從 Firebase Realtime Database 讀取掛號數據:', appointments.length, '筆');
+            console.log('已從即時同步服務讀取掛號數據:', appointments.length, '筆');
             return { success: true, data: appointments };
         } catch (error) {
             console.error('讀取掛號數據失敗:', error);
@@ -12391,7 +12391,7 @@ class FirebaseDataManager {
                 }
             );
             
-            console.log('患者套票已添加到 Firebase:', docRef.id);
+            console.log('患者套票已添加到雲端資料庫:', docRef.id);
             // 在成功添加套票後，更新病人文件中的套票彙總欄位。
             try {
                 // 套票資料中應包含 patientId
@@ -17913,7 +17913,7 @@ async function deleteAcupointCombination(id) {
                 }
               );
             } catch (error) {
-              console.error('更新個人設置至 Firestore 失敗:', error);
+              console.error('更新個人設置至雲端資料庫失敗:', error);
             }
           }
 

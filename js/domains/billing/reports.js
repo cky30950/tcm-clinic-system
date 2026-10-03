@@ -355,7 +355,7 @@ import { getApportionedCost } from './expenses.js';
                 // 取消全量回退載入：避免財務報表在索引問題時掃描整個 consultations 集合。
                 consultations = [];
             } catch (error) {
-                console.error('載入 Firebase 診症資料失敗:', error);
+                console.error('載入雲端診症資料失敗:', error);
             }
         }
 

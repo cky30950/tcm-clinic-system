@@ -8,6 +8,12 @@ import { archiveStaffAuthAccount, fetchAuthorizedUserByUidOrEmail } from './clai
 // Phase 4：病人監聽拆除函式已移至 patients 領域，登出／清除流程直接跨域引用
 import { detachPatientListListener } from '../patients/store.js';
 
+// SDK 原生錯誤訊息可能含基礎服務供應商名稱，於 UI 顯示前統一遮蔽
+function maskVendorError(msg) {
+    return String(msg == null ? '' : msg)
+        .replace(/firebase authentication|firebase auth|firestore|firebase|cloudflare/gi, '系統');
+}
+
 export function loadAccountSecurity() {
     try {
         const currentInput = document.getElementById('changeCurrentPassword');
@@ -94,7 +100,7 @@ export async function changeCurrentUserPassword() {
                     errMsg = lang === 'en' ? 'New password is too weak' : '新密碼過於簡單';
                     break;
                 default:
-                    errMsg = error.message || (lang === 'en' ? 'Failed to update password' : '更新密碼失敗');
+                    errMsg = maskVendorError(error.message) || (lang === 'en' ? 'Failed to update password' : '更新密碼失敗');
             }
         } else {
             errMsg = lang === 'en' ? 'Failed to update password' : '更新密碼失敗';
@@ -164,10 +170,10 @@ export async function archiveCurrentUserAccount() {
                         errMsg = lang === 'en' ? 'Password is incorrect' : '密碼錯誤';
                         break;
                     default:
-                        errMsg = error.message || (lang === 'en' ? 'Failed to archive account' : '封存帳號失敗');
+                        errMsg = maskVendorError(error.message) || (lang === 'en' ? 'Failed to archive account' : '封存帳號失敗');
                 }
             } else {
-                errMsg = (error && error.message) || (lang === 'en' ? 'Failed to archive account' : '封存帳號失敗');
+                errMsg = maskVendorError(error && error.message) || (lang === 'en' ? 'Failed to archive account' : '封存帳號失敗');
             }
             G.showToast(errMsg, 'error');
         } finally {
@@ -177,7 +183,7 @@ export async function archiveCurrentUserAccount() {
         console.error('封存帳號錯誤:', error);
         let errMsg = lang === 'en' ? 'Failed to archive account' : '封存帳號失敗';
         if (error && error.message) {
-            errMsg = error.message;
+            errMsg = maskVendorError(error.message);
         }
         G.showToast(errMsg, 'error');
     }
@@ -228,7 +234,7 @@ export async function attemptMainLogin() {
             password
         );
 
-        console.log('Firebase 登入成功:', userCredential.user.email);
+        console.log('帳號登入成功:', userCredential.user.email);
 
         // 標記本機 IndexedDB 即將可能寫入診所／病人資料（後續會讀 users 等文件），
         // 供「未登入開頁守衛」判斷需否清除；正常登出清除成功後會撤銷此標記。
@@ -344,7 +350,7 @@ export async function attemptMainLogin() {
             try {
                 await window.firebase.signOut(window.firebase.auth);
             } catch (e) {
-                console.error('登出 Firebase 失敗:', e);
+                console.error('登出帳號認證服務失敗:', e);
             }
             // 拒絕登入一併完整清掃（localStorage＋IndexedDB）後重新整理
             wipeDeviceDataAndReload(1000);
@@ -477,9 +483,9 @@ export async function syncUserDataFromFirebase(options = {}) {
             const ok = await G.waitForFirebaseDataManager(8000);
             if (!ok) {
                 if (allowLocalFallback) {
-                    console.log('Firebase 數據管理器尚未準備就緒，使用本地用戶快取');
+                    console.log('雲端數據管理器尚未準備就緒，使用本地用戶快取');
                 } else {
-                    console.warn('Firebase 數據管理器尚未準備就緒，略過本次用戶同步');
+                    console.warn('雲端數據管理器尚未準備就緒，略過本次用戶同步');
                 }
                 return;
             }
@@ -496,20 +502,20 @@ export async function syncUserDataFromFirebase(options = {}) {
             } catch (lsErr) {
                 console.warn('保存用戶資料到本地失敗:', lsErr);
             }
-            console.log('已同步 Firebase 用戶數據到本地:', G.users.length, '筆 (使用快取)');
+            console.log('已同步雲端用戶數據到本地:', G.users.length, '筆 (使用快取)');
         } else {
             
             if (allowLocalFallback && Array.isArray(localFallback) && localFallback.length && (!Array.isArray(G.users) || G.users.length === 0)) {
                 G.users = localFallback;
             }
             if (allowLocalFallback) {
-                console.warn('無法從 Firebase 取得完整用戶列表，改使用本地快取:', Array.isArray(G.users) ? G.users.length : 0, '筆');
+                console.warn('無法從雲端取得完整用戶列表，改使用本地快取:', Array.isArray(G.users) ? G.users.length : 0, '筆');
             } else {
-                console.warn('無法從 Firebase 取得完整用戶列表，保留目前記憶體中的用戶資料');
+                console.warn('無法從雲端取得完整用戶列表，保留目前記憶體中的用戶資料');
             }
         }
     } catch (error) {
-        console.error('同步 Firebase 用戶數據失敗:', error);
+        console.error('同步雲端用戶數據失敗:', error);
     }
 }
 
@@ -725,7 +731,7 @@ export async function shutdownFirestoreAndWipePersistence() {
             termOk = true;
         }
     } catch (termErr) {
-        console.warn('終止 Firestore 實例失敗:', termErr && termErr.code ? termErr.code : termErr);
+        console.warn('終止雲端資料庫實例失敗:', termErr && termErr.code ? termErr.code : termErr);
     }
     if (!termOk) return false;
 
@@ -737,12 +743,12 @@ export async function shutdownFirestoreAndWipePersistence() {
             new Promise(function (resolve) { setTimeout(resolve, FIRESTORE_SHUTDOWN_TIMEOUT_MS); })
         ]);
         if (!cleared) {
-            console.warn('清除 Firestore 離線快取逾時（可能有其他分頁仍開啟中）');
+            console.warn('清除雲端資料庫離線快取逾時（可能有其他分頁仍開啟中）');
             return false;
         }
         return true;
     } catch (clearErr) {
-        console.warn('清除 Firestore 離線快取失敗（可能有其他分頁仍開啟中）:',
+        console.warn('清除雲端資料庫離線快取失敗（可能有其他分頁仍開啟中）:',
             clearErr && clearErr.code ? clearErr.code : clearErr);
         return false;
     }
@@ -849,7 +855,7 @@ export async function logout() {
         try {
             firestoreWiped = await shutdownFirestoreAndWipePersistence();
         } catch (fsErr) {
-            console.warn('Firestore 終止／清快取失敗:', fsErr);
+            console.warn('雲端資料庫終止／清快取失敗:', fsErr);
         }
         if (firestoreWiped) {
             try { localStorage.removeItem(IDB_PHI_MARKER); } catch (_e) {}

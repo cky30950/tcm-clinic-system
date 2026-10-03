@@ -88,7 +88,7 @@ import firebaseConfig from './firebaseConfig.js?v=20261001b';
 
 
 setPersistence(auth, browserSessionPersistence).catch((error) => {
-  console.error('設置 Firebase Auth 持久化模式失敗:', error);
+  console.error('設置帳號認證持久化模式失敗:', error);
 });
 
     /* ============================================================
@@ -245,7 +245,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
     onValue(connectedRef, (snapshot) => {
         if (snapshot.val() === true) {
             window.firebaseConnected = true;
-            console.log('Firebase 已連接');
+            console.log('雲端認證服務已連接');
             
             window.firebaseStatusInitialized = true;
             
@@ -258,7 +258,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
             }
         } else {
             window.firebaseConnected = false;
-            console.log('Firebase 連接中斷');
+            console.log('雲端認證服務連接中斷');
             
             window.firebaseStatusInitialized = true;
             
@@ -272,7 +272,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         }
     });
 
-    console.log('Firebase 初始化完成');
-    console.log('[Firebase init] increment 類型:', typeof firestoreIncrement, '| FieldValue 類型:', typeof FieldValue);
+    console.log('帳號認證模組初始化完成');
+    console.log('[auth init] increment 類型:', typeof firestoreIncrement, '| FieldValue 類型:', typeof FieldValue);
 
     

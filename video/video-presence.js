@@ -192,7 +192,7 @@
             var data = {};
             data[role] = { at: fsServerTimestampFn(), sid: sid, joined: !!joined };
             fb.setDoc(fsDocRef, data, { merge: true }).catch(function (err) {
-                console.warn('[VideoPresence] Firestore 鏡像寫入失敗:', err);
+                console.warn('[VideoPresence] 後備鏡像寫入失敗:', err);
             });
         }
 
@@ -244,11 +244,11 @@
                         onPeer(peer || {});
                     },
                     function (err) {
-                        console.warn('[VideoPresence] Firestore 橋接監聽失敗:', err);
+                        console.warn('[VideoPresence] 後備橋接監聽失敗:', err);
                     }
                 );
             }).catch(function (err) {
-                console.warn('[VideoPresence] Firestore 橋接無法使用:', err);
+                console.warn('[VideoPresence] 後備橋接無法使用:', err);
             });
         }
 
@@ -272,7 +272,7 @@
                 || typeof fb.set !== 'function' || typeof fb.onValue !== 'function'
                 || typeof fb.onDisconnect !== 'function'
                 || typeof fb.serverTimestamp === 'undefined') {
-                reject(new Error('FIREBASE_UNAVAILABLE'));
+                reject(new Error('REALTIME_SERVICE_UNAVAILABLE'));
                 return;
             }
             rtdb = fb.rtdb;

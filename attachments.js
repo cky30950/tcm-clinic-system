@@ -1320,7 +1320,7 @@
         try {
             var cfg = await ensureConfig();
             if (cfg.configured === false) {
-                noticeEl.textContent = tt('附件儲存服務尚未完成設定（R2 S3 憑證），圖片可能無法顯示，請聯絡管理員完成 Cloudflare 設定。');
+                noticeEl.textContent = tt('附件儲存服務尚未完成設定，圖片可能無法顯示，請聯絡管理員完成雲端儲存設定。');
                 noticeEl.classList.remove('hidden');
             }
             await listForPatient(ctx.patientId);
