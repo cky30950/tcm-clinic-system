@@ -110,6 +110,38 @@
             min-width: 0;
         }
 
+        /* ============================================================
+           各功能分頁版面統一
+           病歷管理／個人設置／個人統計／帳號安全／模板庫的頂層容器位於
+           contentWrapper 之外，在此讓它們擁有與 contentWrapper 完全相同的
+           外框（max-w-7xl 居中 + px-4 橫向 + py-6 縱向），使內層白卡頂部
+           與 nav 底緣啡色長線（border-b-4 #B48F79）的距離統一為 24px。
+           排班管理雖也在 contentWrapper 之外，但自帶同式 wrapper div
+           （max-w-7xl mx-auto px-4 py-6），showSection 隱藏空的 contentWrapper
+           後其距離同樣為 24px。 */
+        #medicalRecordManagement,
+        #personalSettings,
+        #personalStatistics,
+        #accountSecurity,
+        #templateLibrary {
+            max-width: 80rem;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 1.5rem 1rem;
+        }
+
+        /* 功能卡片陰影加重：覆蓋 Tailwind shadow-lg。
+           以 ID 範圍選擇器提高權重，不影響彈窗／側欄的 shadow-2xl 與一般小陰影元素 */
+        #contentWrapper > [class~="shadow-lg"],
+        #medicalRecordManagement > .bg-white,
+        #personalSettings > .bg-white,
+        #personalStatistics > .bg-white,
+        #accountSecurity > .bg-white,
+        #templateLibrary > .bg-white,
+        #scheduleManagement {
+            box-shadow: 0 12px 30px -6px rgba(0, 0, 0, 0.22), 0 6px 12px -6px rgba(0, 0, 0, 0.14);
+        }
+
         /* 彩色按鈕統一調淺 10%（顏色與白色 9:1 混合）。
            只作用於按鈕類元素（button / a / role=button），
            不影響同色 class 的非按鈕：進度條 div、通知紅點、聊天氣泡、toggle 開關等。

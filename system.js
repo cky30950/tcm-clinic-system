@@ -5941,7 +5941,11 @@ async function fetchJsonWithFallback(fileName) {
             try {
                 const wrapper = document.getElementById('contentWrapper');
                 if (wrapper) {
-                    if (sectionId === 'personalSettings' || sectionId === 'templateLibrary') {
+                    // 以下分頁的容器位於 contentWrapper 之外：顯示時需隱藏 wrapper，
+                    // 否則空 wrapper 仍以 py-6 佔用 48px，把外部分額外推遠，導致與
+                    // wrapper 內分頁的「卡片頂部～nav 啡色線」距離不一致
+                    const outsideWrapperSections = ['personalSettings', 'templateLibrary', 'medicalRecordManagement', 'personalStatistics', 'accountSecurity', 'scheduleManagement'];
+                    if (outsideWrapperSections.includes(sectionId)) {
                         wrapper.classList.add('hidden');
                     } else {
                         wrapper.classList.remove('hidden');
