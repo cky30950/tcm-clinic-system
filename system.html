@@ -77,6 +77,17 @@
         /* Tailwind v4 preflight 邊框預設改為 currentColor，統一回到淡灰 */
         @layer base {
             *, ::before, ::after { border-color: #e5e7eb; }
+            /* Lucide 生成的 svg 被 preflight 設為 block，導致標題內圖示獨佔一行；還原為行內對齊 */
+            svg.lucide { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+            /* Tailwind v4 preflight 不再為 button 加上手指指標，還原可點擊元素的 cursor */
+            button:not(:disabled),
+            [role="button"]:not([aria-disabled="true"]),
+            [onclick]:not([disabled]),
+            label[for],
+            summary,
+            select:not(:disabled) { cursor: pointer; }
+            button:disabled,
+            [role="button"][aria-disabled="true"] { cursor: not-allowed; }
         }
         body { font-family: 'Noto Sans TC', sans-serif; }
         .fade-in { animation: fadeIn 0.3s ease-in forwards; }
