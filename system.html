@@ -40,7 +40,103 @@
             setTimeout(function () { clearInterval(readyTimer); }, 5000);
         });
     </script>
-    
+
+    <script>
+    /* daisyUI 按鈕標準化（觀察動態內容，模式與上方 lucide 圖示相同）：
+       - nav「切換」「登出」已在 HTML 手動加上 btn + rounded-full（index.html nav 聯絡我樣式）
+       - #consultationSystem 內所有按鈕：btn + rounded-md + normal-case（hero 標語下聯絡我樣式），
+         僅換形狀與質感，原有尺寸／配色類別保留
+       - 其他按鈕：依原有尺寸匹配 btn-xs/btn-sm/btn/btn-lg；無底色的 × 關閉掣→btn-ghost
+         （診症內為 rounded-md 方形，其餘為 btn-circle 圓形）；無底色的分頁掣等→btn-ghost
+       - 固定全圓形的覆層控制掣（燈箱箭嘴／縮放、拍照快門等）保持原樣
+       為避免快速連續渲染時觀察批次互相覆蓋，採共享佇列，並每 2 秒做一次安全掃描 */
+    (function () {
+        var timer = null;
+        var pending = [];
+        function hasBg(c) { return /\bbg-/.test(c); }
+        function hasPad(c) { return /\b(p|px|py)-/.test(c); }
+        function hasTextSize(c) { return /\btext-(xs|sm|base|lg|xl|2xl|3xl)\b/.test(c); }
+        function isFixedCircle(c) { return /\brounded-full\b/.test(c) && /\bw-/.test(c) && /\bh-/.test(c); }
+        function isBareClose(el, c) {
+            if (hasBg(c) || hasPad(c)) return false;
+            return (el.textContent || '').trim().length <= 2;
+        }
+        function sizeVariant(c) {
+            if (/\btext-xs\b/.test(c) || /\bpy-(0\.5|1)\b/.test(c)) return 'btn-xs';
+            if (/\bpy-(3\.5|4|5)\b/.test(c) || /\btext-lg\b/.test(c)) return 'btn-lg';
+            if (/\bpy-3\b/.test(c)) return '';
+            return 'btn-sm';
+        }
+        function stripRounded(el) {
+            Array.prototype.slice.call(el.classList).forEach(function (t) {
+                if (/^rounded(-|$)/.test(t)) el.classList.remove(t);
+            });
+        }
+        function normalize(el) {
+            if (el.dataset.btnNormalized) return;
+            el.dataset.btnNormalized = '1';
+            if (el.classList.contains('btn')) return;
+            var c = el.className || '';
+            var inCons = el.closest ? !!el.closest('#consultationSystem') : false;
+            if (!inCons && isFixedCircle(c)) return;
+            var add = ['btn'];
+            if (isBareClose(el, c)) {
+                add.push('btn-ghost');
+                if (inCons) { add.push('btn-xs', 'normal-case'); }
+                else { add.push('btn-circle', 'btn-sm'); }
+            } else {
+                var sv = sizeVariant(c);
+                if (sv) add.push(sv);
+                if (!hasTextSize(c)) add.push('text-base');
+                // 無底色的一般按鈕（底線式分頁掣等）以 ghost 呈現，保留其 border 類
+                if (!hasBg(c)) add.push('btn-ghost');
+                if (inCons) add.push('normal-case');
+            }
+            if (inCons) { stripRounded(el); add.push('rounded-md'); }
+            el.classList.add.apply(el.classList, add);
+        }
+        function scan(root) {
+            if (!root || root.nodeType !== 1) return;
+            try {
+                if (root.tagName === 'BUTTON') normalize(root);
+                if (root.querySelectorAll) root.querySelectorAll('button').forEach(normalize);
+            } catch (_eScan) {}
+        }
+        function flush() {
+            timer = null;
+            var nodes = pending;
+            pending = [];
+            nodes.forEach(scan);
+            safetySweep();
+        }
+        // 安全掃描：補救任何被漏接的按鈕
+        function safetySweep() {
+            try {
+                document.querySelectorAll('button:not(.btn):not([data-btn-normalized])').forEach(normalize);
+            } catch (_eSweep) {}
+        }
+        function enqueue(nodes) {
+            for (var i = 0; i < nodes.length; i++) pending.push(nodes[i]);
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(flush, 40);
+        }
+        new MutationObserver(function (mutations) {
+            var nodes = [];
+            for (var i = 0; i < mutations.length; i++) {
+                var added = mutations[i].addedNodes;
+                for (var j = 0; j < added.length; j++) {
+                    if (added[j].nodeType === 1) nodes.push(added[j]);
+                }
+            }
+            if (nodes.length) enqueue(nodes);
+        }).observe(document.documentElement, { childList: true, subtree: true });
+        setInterval(safetySweep, 2000);
+        function start() { scan(document.documentElement); safetySweep(); }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+        else start();
+    })();
+    </script>
+
     <script type="module" src="firebase_init.js?v=20261001b"></script>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
@@ -140,6 +236,24 @@
         #templateLibrary > .bg-white,
         #scheduleManagement {
             box-shadow: 0 12px 30px -6px rgba(0, 0, 0, 0.22), 0 6px 12px -6px rgba(0, 0, 0, 0.14);
+        }
+
+        /* 按鈕標準化配套：按鈕保留原有 bg-* 配色時，隱藏 daisyUI .btn 的預設灰邊框
+           （1px 邊框仍佔位，不影響尺寸）；自帶 border-* 類的按鈕不受影響 */
+        button.btn[class*="bg-"]:not([class*="border-"]) {
+            border-color: transparent;
+        }
+        /* daisyUI 5 的 btn-xs/btn-sm 等修飾類以固定 height 收緊高度；標準化按鈕統一
+           還原為由原有 padding 決定高度（維持原本大小），圓形關閉掣（btn-circle）除外 */
+        [data-btn-normalized]:not(.btn-circle) {
+            height: auto;
+        }
+        /* 底線式分頁掣（btn-ghost + border-b-2）只保留底線、無圓角，維持原本分頁風格 */
+        button.btn.btn-ghost[class*="border-b-2"] {
+            border-left-width: 0;
+            border-right-width: 0;
+            border-top-width: 0;
+            border-radius: 0;
         }
 
         /* 彩色按鈕統一調淺 10%（顏色與白色 9:1 混合）。
@@ -605,11 +719,11 @@
                     </div>
                     <div class="flex items-center space-x-4">
                         <span id="currentClinicDisplay" class="text-sm text-gray-600">當前診所：</span>
-                        <button id="clinicSwitchButton" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                        <button id="clinicSwitchButton" class="btn btn-sm rounded-full normal-case bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 text-sm transition duration-200">
                             切換
                         </button>
                         <span id="userRole" class="text-sm text-gray-600"></span>
-                        <button id="logoutButton" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                        <button id="logoutButton" class="btn btn-sm rounded-full normal-case bg-red-500 hover:bg-red-600 text-white px-4 py-2 text-sm transition duration-200">
                             登出
                         </button>
                     </div>
@@ -5891,6 +6005,8 @@
     </div>
 
     <div id="tooltip" class="hidden pointer-events-none fixed bg-gray-800 text-white text-xs px-3 py-1 rounded-lg shadow-lg z-50 whitespace-pre-line" style="z-index: 2147483647;"></div>
+    <!-- Tailwind JIT safelist：按鈕標準化腳本動態加入的工具類 -->
+    <span class="hidden rounded-md normal-case text-base btn-xs btn-sm btn-lg btn-ghost btn-circle"></span>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@04f46c6a0708418cb7b96fc563eacae0fbf77674/qrcode.min.js"></script>
