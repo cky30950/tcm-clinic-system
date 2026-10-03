@@ -581,12 +581,13 @@ async function showManualTest(data) {
 }
 
 function buildNotificationOptions(data) {
+    // 一律只導向同源路徑，忽略伺服器 payload 可能帶來的外部或無效網址
     return {
         body: data.body || '',
         icon: '/images/icons/icon-192.png',
         badge: '/images/icons/icon-192.png',
         tag: data.tag || 'tcm-notification',
-        data: { url: data.url || '/system.html' }
+        data: { url: '/system.html' }
     };
 }
 
@@ -603,21 +604,26 @@ function isDuplicateOnDevice(key) {
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    const target =
-        (event.notification.data && event.notification.data.url) || '/system.html';
+    // 一律只導向同源路徑，忽略 notification.data.url 可能帶來的外部或無效網址
+    const target = '/system.html';
     event.waitUntil((async () => {
         const all = await self.clients.matchAll({
             type: 'window',
             includeUncontrolled: true
         });
+        // 找任何一個同源的現有視窗（不只限 /system.html），優先聚焦
+        const scopeOrigin = new URL(self.registration.scope).origin;
         for (const client of all) {
-            if (client.url.indexOf('/system.html') !== -1) {
-                // 舊分頁網址可能沒有 chat query：聚焦並以 postMessage 傳遞目標網址
-                try { client.postMessage({ type: 'tcm-deep-link', url: target }); } catch (_e) {}
-                if ('focus' in client) return client.focus();
-                return;
-            }
+            try {
+                if (new URL(client.url).origin === scopeOrigin) {
+                    // 傳遞 deep-link 訊息（target 固定同源），讓前端自行處理導航
+                    try { client.postMessage({ type: 'tcm-deep-link', url: target }); } catch (_e) {}
+                    if ('focus' in client) return client.focus();
+                    return;
+                }
+            } catch (_e) { /* client.url 解析失敗就跳過 */ }
         }
+        // 完全沒有同源視窗才開新分頁，且只開同源路徑
         return self.clients.openWindow(target);
     })());
 });
