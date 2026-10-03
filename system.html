@@ -691,7 +691,7 @@
                                 <div class="md:col-span-2 lg:col-span-3">
                                     <label class="block text-sm font-medium text-gray-700 mb-3">病史資料</label>
                                     <div class="space-y-4">
-                                        <div class="border border-gray-200 rounded-xl p-4 bg-white">
+                                        <div class="border border-gray-200 rounded-xl p-4 bg-gray-50">
                                             <div class="flex flex-col gap-1 mb-3">
                                                 <span class="font-medium text-gray-800">1. 疾病史 (Medical Conditions)</span>
                                                 <span class="text-xs text-gray-500">請剔選患者既往疾病史；如有其他情況或補充說明，請在下方備註填寫</span>
@@ -740,7 +740,7 @@
                                             </div>
                                             <textarea id="patientMedicalConditionsNotes" placeholder="其他或備註，例如：確診年份、目前控制情況、其他未列出的疾病" rows="2" class="mt-3 w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent break-all"></textarea>
                                         </div>
-                                        <div class="border border-gray-200 rounded-xl p-4 bg-white">
+                                        <div class="border border-gray-200 rounded-xl p-4 bg-gray-50">
                                             <div class="flex flex-col gap-1 mb-3">
                                                 <span class="font-medium text-gray-800">2. 手術與外傷史 (Surgical &amp; Trauma History)</span>
                                                 <span class="text-xs text-gray-500">請剔選曾接受的手術或重大外傷；如需補充年份、部位、後遺症或其他情況，請在下方備註填寫</span>
@@ -830,7 +830,7 @@
                                             </div>
                                             <textarea id="patientAllergyNotes" placeholder="其他或備註，例如：過敏反應表現、嚴重程度、其他未列出的過敏原" rows="2" class="mt-3 w-full border border-red-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent break-all"></textarea>
                                         </div>
-                                        <div class="border border-gray-200 rounded-xl p-4 bg-white">
+                                        <div class="border border-gray-200 rounded-xl p-4 bg-gray-50">
                                             <div class="flex flex-col gap-1 mb-3">
                                                 <span class="font-medium text-gray-800">4. 用藥史 (Medications)</span>
                                                 <span class="text-xs text-gray-500">請剔選現時或長期服用藥物類別；劑量、服用頻率或其他補充請在下方備註填寫</span>
@@ -2155,7 +2155,7 @@
                             <div class="text-xs text-amber-700">贈送額</div>
                             <div class="text-xl font-bold leading-tight text-amber-800" id="walletBonusView">HK$0.00</div>
                         </div>
-                        <div class="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                             <div class="text-xs text-gray-600">帳戶狀態</div>
                             <div class="text-lg font-bold leading-tight text-gray-800" id="walletStatusView">—</div>
                         </div>
@@ -2359,7 +2359,7 @@
                     <p class="text-gray-600">診所收入分析與財務統計</p>
                 </div>
                 
-                <div class="bg-white border border-gray-200 rounded-lg p-4 mb-6 relative">
+                <div class="bg-gray-50 rounded-lg p-4 mb-6 relative">
                     <div class="absolute top-4 right-4 space-y-2 flex flex-col items-end">
                         <button onclick="showExpenseImportModal()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center">
                             <i data-lucide="upload" class="w-4 h-4 mr-2"></i><span>成本導入</span>
@@ -2474,7 +2474,7 @@
                             <canvas id="financialTrendChart"></canvas>
                         </div>
                     </div>
-                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <div class="bg-gray-50 rounded-lg p-4">
                         <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
                             <i data-lucide="chart-pie" class="w-4 h-4 mr-2"></i><span data-fin-i18n="收入結構">收入結構</span>
                         </h3>
@@ -2706,7 +2706,7 @@
                 <h2 class="text-2xl font-bold text-gray-800 mb-6"> <i data-lucide="settings" class="w-7 h-7 mr-3"></i>系統管理</h2>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-white border border-gray-200 rounded-lg p-6 md:col-span-2">
+                    <div class="bg-gray-50 rounded-lg p-6 md:col-span-2">
                         <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
                             <div>
                                 <h3 class="text-lg font-semibold mb-2">診所設定</h3>
@@ -2718,7 +2718,7 @@
                             </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <div id="systemManagementClinicNameRow" class="text-sm text-gray-600 mb-4">目前診所：<span id="systemManagementClinicName">名醫診所系統</span></div>
                                 <div class="space-y-2 text-sm text-gray-700" id="clinicSettingsDisplay">
                                     <div class="font-medium flex items-center space-x-1">
@@ -2734,7 +2734,7 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
                                         <h4 class="font-semibold text-gray-800 mb-1">中藥存庫啟動</h4>
@@ -2754,7 +2754,7 @@
                             </div>
                         </div>
                     </div>
-                    <div id="permissionManagementPanel" class="bg-white border border-gray-200 rounded-lg p-6 md:col-span-2 hidden">
+                    <div id="permissionManagementPanel" class="bg-gray-50 rounded-lg p-6 md:col-span-2 hidden">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
                             <div>
                                 <h3 class="text-lg font-semibold">權限管理</h3>
@@ -2774,7 +2774,7 @@
                             </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <h4 class="font-semibold text-gray-800 mb-3">功能顯示權限</h4>
                                 <div class="space-y-2 text-sm">
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permSection_patientManagement" class="rounded border-gray-300">病人資料管理</label>
@@ -2787,7 +2787,7 @@
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permSection_templateLibrary" class="rounded border-gray-300">模板庫</label>
                                 </div>
                             </div>
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <h4 class="font-semibold text-gray-800 mb-3">細節操作權限</h4>
                                 <div class="space-y-2 text-sm">
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permAction_patientCreate" class="rounded border-gray-300">病人資料管理：新增病人</label>
@@ -2803,7 +2803,7 @@
                             <button onclick="saveSelectedPositionPermissions()" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition duration-200">儲存權限設定</button>
                         </div>
                     </div>
-                    <div class="bg-white border border-gray-200 rounded-lg p-6 md:col-span-2">
+                    <div class="bg-gray-50 rounded-lg p-6 md:col-span-2">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
                             <div>
                                 <h3 class="text-lg font-semibold">收據自定義設定</h3>
@@ -2820,7 +2820,7 @@
                             <p class="text-xs text-gray-500 mt-2">會套用到列印收據、藥單醫囑、到診證明及病假證明。</p>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <h4 class="font-semibold text-gray-800 mb-3">列印收據</h4>
                                 <div class="space-y-2 text-sm">
                                     <label class="flex items-center gap-2"><input type="checkbox" id="receiptField_receiptNo" class="rounded border-gray-300">收據編號</label>
@@ -2830,7 +2830,7 @@
                                     <label class="flex items-center gap-2"><input type="checkbox" id="receiptField_consultationTime" class="rounded border-gray-300">診療時間</label>
                                 </div>
                             </div>
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <h4 class="font-semibold text-gray-800 mb-3">藥單醫囑</h4>
                                 <div class="space-y-2 text-sm">
                                     <label class="flex items-center gap-2"><input type="checkbox" id="prescriptionField_medicalRecordNo" class="rounded border-gray-300">病歷編號</label>
@@ -2845,7 +2845,7 @@
                         </div>
                     </div>
 
-                    <div class="bg-white border border-gray-200 rounded-lg p-6 md:col-span-2">
+                    <div class="bg-gray-50 rounded-lg p-6 md:col-span-2">
                         <h3 class="text-lg font-semibold mb-4">舊資料轉移系統</h3>
                         <p class="text-sm text-gray-600 mb-4">可匯入舊診所系統的 JSON 或 CSV。支援病人與病歷資料，系統會先解析預覽，再執行遷移並回報成功/略過/失敗筆數。</p>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -2889,7 +2889,7 @@
                     </div>
 
                     
-                    <div class="bg-white border border-gray-200 rounded-lg p-6">
+                    <div class="bg-gray-50 rounded-lg p-6">
                         <h3 class="text-lg font-semibold mb-4">訂閱與付款</h3>
                         
                         <p class="text-sm text-gray-600 mb-4">您可以查看並管理系統訂閱或付款狀態。</p>
@@ -2901,7 +2901,7 @@
                         </div>
                     </div>
 
-                    <div class="bg-white border border-gray-200 rounded-lg p-6 md:col-start-2">
+                    <div class="bg-gray-50 rounded-lg p-6 md:col-start-2">
                         <h3 class="text-lg font-semibold mb-4">資料備份與還原</h3>
                         <p class="text-sm text-gray-600 mb-4">系統每日會自動將資料增量備份至雲端，並每週進行一次完整比對。您可隨時手動同步，或直接下載雲端備份檔（下載不會額外讀取雲端資料庫）。實時掛號及問診資料不包含在備份中。</p>
                         <div class="flex flex-col md:flex-row gap-4 flex-wrap">
@@ -2934,7 +2934,7 @@
         
         
         
-        <div id="medicalRecordManagement" class="hidden max-w-7xl mx-auto px-4 py-6">
+<div id="medicalRecordManagement" class="hidden">
             
             <div class="bg-white rounded-xl shadow-lg p-6 text-sm">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -2990,7 +2990,7 @@
             </div>
         </div>
 
-        <div id="personalSettings" class="hidden max-w-7xl mx-auto px-4 py-6">
+        <div id="personalSettings" class="hidden">
           <div class="bg-white rounded-xl shadow-lg p-6">
             
             <div>
@@ -3086,7 +3086,7 @@
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+                  <div class="bg-gray-50 rounded-xl border border-gray-200 p-5 space-y-4">
                     <h3 class="text-lg font-semibold text-gray-800">處方預設</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
@@ -3108,7 +3108,7 @@
                     </div>
                   </div>
 
-                  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+                  <div class="bg-gray-50 rounded-xl border border-gray-200 p-5 space-y-4">
                     <h3 class="text-lg font-semibold text-gray-800">複診與醫囑</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
@@ -3127,7 +3127,7 @@
                   </div>
                 </div>
 
-                <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+                <div class="bg-gray-50 rounded-xl border border-gray-200 p-5 space-y-4">
                   <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
                       <h3 class="text-lg font-semibold text-gray-800">預設收費項目</h3>
@@ -3153,7 +3153,7 @@
         </div>
 
         
-        <div id="personalStatistics" class="hidden max-w-7xl mx-auto px-4 py-6">
+        <div id="personalStatistics" class="hidden">
           <div class="bg-white rounded-xl shadow-lg p-6">
             <div>
             <div class="mb-6 flex items-center justify-between">
@@ -3181,15 +3181,15 @@
                 <div class="text-sm text-gray-500">診症總數</div>
                 <div id="personalStatsTotalConsultations" class="mt-1 text-2xl font-bold text-amber-800">0</div>
               </div>
-              <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <div class="bg-gray-50 rounded-lg p-4">
                 <div class="text-sm text-gray-500">方劑種類</div>
                 <div id="personalStatsFormulaKinds" class="mt-1 text-2xl font-bold text-gray-800">0</div>
               </div>
-              <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <div class="bg-gray-50 rounded-lg p-4">
                 <div class="text-sm text-gray-500">中藥種類</div>
                 <div id="personalStatsHerbKinds" class="mt-1 text-2xl font-bold text-gray-800">0</div>
               </div>
-              <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <div class="bg-gray-50 rounded-lg p-4">
                 <div class="text-sm text-gray-500">穴位種類</div>
                 <div id="personalStatsAcupointKinds" class="mt-1 text-2xl font-bold text-gray-800">0</div>
               </div>
@@ -3197,7 +3197,7 @@
 
             <div class="space-y-8">
               
-              <div class="bg-white border border-gray-200 rounded-lg p-6">
+              <div class="bg-gray-50 rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <i data-lucide="flask-conical" class="w-4 h-4 mr-2"></i>常用方劑
                 </h3>
@@ -3213,7 +3213,7 @@
                 </div>
               </div>
               
-              <div class="bg-white border border-gray-200 rounded-lg p-6">
+              <div class="bg-gray-50 rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <i data-lucide="leaf" class="w-4 h-4 mr-2"></i>常用中藥
                 </h3>
@@ -3227,7 +3227,7 @@
                 </div>
               </div>
               
-              <div class="bg-white border border-gray-200 rounded-lg p-6">
+              <div class="bg-gray-50 rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <i data-lucide="map-pin" class="w-4 h-4 mr-2"></i>常用穴位
                 </h3>
@@ -3246,7 +3246,7 @@
         </div>
 
         
-        <div id="accountSecurity" class="hidden max-w-7xl mx-auto px-4 py-6">
+        <div id="accountSecurity" class="hidden">
           <div class="bg-white rounded-xl shadow-lg p-6">
             <div>
             <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
@@ -3380,7 +3380,7 @@
                 </div>
               </div>
 
-              <div class="bg-white border border-gray-200 rounded-lg p-6">
+              <div class="bg-gray-50 rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">變更密碼</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
@@ -3423,7 +3423,7 @@
 
         
         
-        <div id="templateLibrary" class="hidden max-w-7xl mx-auto px-4 py-6">
+        <div id="templateLibrary" class="hidden">
           <div class="bg-white rounded-xl shadow-lg p-6">
             
             <div>
@@ -3726,6 +3726,7 @@
     </div>
     
 
+<div class="max-w-7xl mx-auto px-4 py-6">
 <div id="scheduleManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
     <style>
 #scheduleManagement {
@@ -4649,8 +4650,9 @@
             <div class="staff-grid" id="staffGrid"></div>
         </div>
     </div>
+</div>
 
-    
+
     <div class="modal" id="shiftModal">
         <div class="modal-content">
             <h3>新增排班</h3>
