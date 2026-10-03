@@ -24,9 +24,9 @@
     'nav.pricing': '方案价格',
 
     'cta.contact': '联系我',
-    'cta.demo': '🗓️ 预约 15 分钟网上演示',
-    'cta.wa': '📞 WhatsApp 直接咨询',
-    'cta.wa.long': '📞 WhatsApp：+852 54393401',
+    'cta.demo': '预约 15 分钟网上演示',
+    'cta.wa': 'WhatsApp 直接咨询',
+    'cta.wa.long': 'WhatsApp：+852 54393401',
 
     'hero.badge': '专为中医诊所量身打造',
     'hero.title': '名医诊所系统：全方位香港中医数字化管理方案',
@@ -102,7 +102,7 @@
     'pwa.6d': '安装仅占极小空间，不需开放大量权限，没有应用商店审查束缚，更不会有第三方推送广告。',
     'pwa.stepst': '三步完成安装',
     'pwa.ip1': '1. 使用 <strong>Safari</strong> 打开诊所网址',
-    'pwa.ip2': '2. 点击底部「分享」按钮（方框向上箭头 ⬆️）',
+    'pwa.ip2': '2. 点击底部「分享」按钮（方框向上箭头 <i data-lucide="arrow-up" class="w-4 h-4 inline-block align-[-2px]" aria-hidden="true"></i>）',
     'pwa.ip3': '3. 选择「添加到主屏幕」即可',
     'pwa.an1': '1. 用 Chrome 打开诊所网址',
     'pwa.an2': '2. 点击右上角菜单（三个点）',
@@ -297,7 +297,7 @@
     'faq.q5': '数据可以随时导出吗？如果将来不用了怎么办？',
     'faq.a5': '可以。系统每日自动云端备份，管理员也可随时手动下载完整备份文件（gzip 压缩），并可导入还原；患者、看诊、处方及收费记录均属于诊所。终止服务后，您可以在合理时间内索取及导出全部资料，备份也会按周期轮替清除。',
 
-    'final.title': '准备好让您的诊所<br><span class="text-gradient">迈向数字化了吗？</span>',
+    'final.title': '准备好让您的诊所<br>迈向数字化了吗？',
     'final.p': '立即联系我们，了解更多详情',
 
     'footer.logoalt': '名医诊所系统 Logo',
@@ -335,9 +335,9 @@
     'nav.pricing': 'Pricing',
 
     'cta.contact': 'Contact Us',
-    'cta.demo': '🗓️ Book a 15-min Online Demo',
-    'cta.wa': '📞 Chat on WhatsApp',
-    'cta.wa.long': '📞 WhatsApp: +852 54393401',
+    'cta.demo': 'Book a 15-min Online Demo',
+    'cta.wa': 'Chat on WhatsApp',
+    'cta.wa.long': 'WhatsApp: +852 54393401',
 
     'hero.badge': 'Tailor-made for TCM Clinics',
     'hero.title': 'MingYI Clinic System: A Complete Digital Management Solution for Hong Kong TCM Clinics',
@@ -413,7 +413,7 @@
     'pwa.6d': 'Takes minimal space, needs few permissions, bypasses app-store review and contains no third-party advertising.',
     'pwa.stepst': 'Install in Three Steps',
     'pwa.ip1': '1. Open your clinic URL in <strong>Safari</strong>',
-    'pwa.ip2': '2. Tap the "Share" button at the bottom (box with up arrow ⬆️)',
+    'pwa.ip2': '2. Tap the "Share" button at the bottom (box with up arrow <i data-lucide="arrow-up" class="w-4 h-4 inline-block align-[-2px]" aria-hidden="true"></i>)',
     'pwa.ip3': '3. Choose "Add to Home Screen"',
     'pwa.an1': '1. Open your clinic URL in Chrome',
     'pwa.an2': '2. Tap the menu at the top right (three dots)',
@@ -608,7 +608,7 @@
     'faq.q5': 'Can data be exported anytime? What if we stop using the system later?',
     'faq.a5': 'Yes. There are automatic daily cloud backups, and admins can download a complete gzip archive at any time and import it to restore; patients, consultations, prescriptions and charges all belong to the clinic. After termination, you can request and export all data within a reasonable period, and backups are purged on a rotating schedule.',
 
-    'final.title': 'Ready to take your clinic<br><span class="text-gradient">into the digital era?</span>',
+    'final.title': 'Ready to take your clinic<br>into the digital era?',
     'final.p': 'Contact us now to learn more',
 
     'footer.logoalt': 'MingYI Clinic System Logo',
@@ -742,6 +742,11 @@
 
     applyMeta(lang);
     updateChrome(lang);
+
+    // 語言切換會重設部分內含 Lucide 圖示標記的 innerHTML，需重新渲染圖示
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
   }
 
   function detectLang() {
