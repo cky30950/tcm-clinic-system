@@ -110,6 +110,38 @@
             min-width: 0;
         }
 
+        /* ============================================================
+           各功能分頁版面統一
+           病歷管理／個人設置／個人統計／帳號安全／模板庫的頂層容器位於
+           contentWrapper 之外，在此讓它們擁有與 contentWrapper 完全相同的
+           外框（max-w-7xl 居中 + px-4 橫向 + py-6 縱向），使內層白卡頂部
+           與 nav 底緣啡色長線（border-b-4 #B48F79）的距離統一為 24px。
+           排班管理雖也在 contentWrapper 之外，但自帶同式 wrapper div
+           （max-w-7xl mx-auto px-4 py-6），showSection 隱藏空的 contentWrapper
+           後其距離同樣為 24px。 */
+        #medicalRecordManagement,
+        #personalSettings,
+        #personalStatistics,
+        #accountSecurity,
+        #templateLibrary {
+            max-width: 80rem;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 1.5rem 1rem;
+        }
+
+        /* 功能卡片陰影加重：覆蓋 Tailwind shadow-lg。
+           以 ID 範圍選擇器提高權重，不影響彈窗／側欄的 shadow-2xl 與一般小陰影元素 */
+        #contentWrapper > [class~="shadow-lg"],
+        #medicalRecordManagement > .bg-white,
+        #personalSettings > .bg-white,
+        #personalStatistics > .bg-white,
+        #accountSecurity > .bg-white,
+        #templateLibrary > .bg-white,
+        #scheduleManagement {
+            box-shadow: 0 12px 30px -6px rgba(0, 0, 0, 0.22), 0 6px 12px -6px rgba(0, 0, 0, 0.14);
+        }
+
         /* 彩色按鈕統一調淺 10%（顏色與白色 9:1 混合）。
            只作用於按鈕類元素（button / a / role=button），
            不影響同色 class 的非按鈕：進度條 div、通知紅點、聊天氣泡、toggle 開關等。
@@ -381,7 +413,7 @@
         }
     </style>
 </head>
-<body class="bg-amber-50 min-h-screen">
+<body class="bg-white min-h-screen">
     
     
     <div id="loginPage" class="min-h-screen flex items-center justify-center p-4">
@@ -2474,7 +2506,7 @@
                             <canvas id="financialTrendChart"></canvas>
                         </div>
                     </div>
-                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <div class="bg-gray-50 rounded-lg p-4">
                         <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
                             <i data-lucide="chart-pie" class="w-4 h-4 mr-2"></i><span data-fin-i18n="收入結構">收入結構</span>
                         </h3>
@@ -2718,7 +2750,7 @@
                             </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <div id="systemManagementClinicNameRow" class="text-sm text-gray-600 mb-4">目前診所：<span id="systemManagementClinicName">名醫診所系統</span></div>
                                 <div class="space-y-2 text-sm text-gray-700" id="clinicSettingsDisplay">
                                     <div class="font-medium flex items-center space-x-1">
@@ -2734,7 +2766,7 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
                                         <h4 class="font-semibold text-gray-800 mb-1">中藥存庫啟動</h4>
@@ -2774,7 +2806,7 @@
                             </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <h4 class="font-semibold text-gray-800 mb-3">功能顯示權限</h4>
                                 <div class="space-y-2 text-sm">
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permSection_patientManagement" class="rounded border-gray-300">病人資料管理</label>
@@ -2787,7 +2819,7 @@
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permSection_templateLibrary" class="rounded border-gray-300">模板庫</label>
                                 </div>
                             </div>
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <h4 class="font-semibold text-gray-800 mb-3">細節操作權限</h4>
                                 <div class="space-y-2 text-sm">
                                     <label class="flex items-center gap-2"><input type="checkbox" id="permAction_patientCreate" class="rounded border-gray-300">病人資料管理：新增病人</label>
@@ -2820,7 +2852,7 @@
                             <p class="text-xs text-gray-500 mt-2">會套用到列印收據、藥單醫囑、到診證明及病假證明。</p>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <h4 class="font-semibold text-gray-800 mb-3">列印收據</h4>
                                 <div class="space-y-2 text-sm">
                                     <label class="flex items-center gap-2"><input type="checkbox" id="receiptField_receiptNo" class="rounded border-gray-300">收據編號</label>
@@ -2830,7 +2862,7 @@
                                     <label class="flex items-center gap-2"><input type="checkbox" id="receiptField_consultationTime" class="rounded border-gray-300">診療時間</label>
                                 </div>
                             </div>
-                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
                                 <h4 class="font-semibold text-gray-800 mb-3">藥單醫囑</h4>
                                 <div class="space-y-2 text-sm">
                                     <label class="flex items-center gap-2"><input type="checkbox" id="prescriptionField_medicalRecordNo" class="rounded border-gray-300">病歷編號</label>
@@ -2934,7 +2966,7 @@
         
         
         
-        <div id="medicalRecordManagement" class="hidden max-w-7xl mx-auto px-4 py-6">
+<div id="medicalRecordManagement" class="hidden">
             
             <div class="bg-white rounded-xl shadow-lg p-6 text-sm">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -2990,7 +3022,7 @@
             </div>
         </div>
 
-        <div id="personalSettings" class="hidden max-w-7xl mx-auto px-4 py-6">
+        <div id="personalSettings" class="hidden">
           <div class="bg-white rounded-xl shadow-lg p-6">
             
             <div>
@@ -3153,7 +3185,7 @@
         </div>
 
         
-        <div id="personalStatistics" class="hidden max-w-7xl mx-auto px-4 py-6">
+        <div id="personalStatistics" class="hidden">
           <div class="bg-white rounded-xl shadow-lg p-6">
             <div>
             <div class="mb-6 flex items-center justify-between">
@@ -3246,7 +3278,7 @@
         </div>
 
         
-        <div id="accountSecurity" class="hidden max-w-7xl mx-auto px-4 py-6">
+        <div id="accountSecurity" class="hidden">
           <div class="bg-white rounded-xl shadow-lg p-6">
             <div>
             <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
@@ -3282,6 +3314,101 @@
                 <div class="mt-4 flex justify-end">
                   <button type="button" id="pushTestButton" disabled
                           class="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg transition duration-200">傳送測試通知</button>
+                </div>
+
+                <div class="mt-5 border-t border-amber-200 pt-4">
+                  <div class="flex items-center text-sm font-semibold text-amber-800 mb-1">
+                    <i data-lucide="book-open" class="w-4 h-4 mr-2"></i>各裝置開啟推播教學
+                  </div>
+                  <p class="text-xs text-gray-500 mb-3">推播依「個別裝置＋瀏覽器」各自開啟，每台手機／電腦需分別設定一次；清除瀏覽器網站資料或移除主畫面圖示後，需重新打開開關。開啟後可按上方「傳送測試通知」確認是否成功。</p>
+                  <div class="space-y-2" id="pushDeviceGuides">
+
+                    <div class="collapse collapse-arrow bg-white/60 border border-amber-200 rounded-lg">
+                      <input type="checkbox" aria-label="展開 iPhone／iPad 推播教學">
+                      <div class="collapse-title min-h-0 py-3 px-4 text-sm font-medium text-amber-900 flex items-center gap-2">
+                        <i data-lucide="smartphone" class="w-4 h-4 text-amber-700"></i>
+                        iPhone／iPad
+                        <span class="text-[11px] leading-none bg-amber-100 text-amber-800 border border-amber-300 rounded-full px-2 py-1">iOS 16.4+</span>
+                      </div>
+                      <div class="collapse-content px-4 pb-4">
+                        <ol class="list-decimal pl-5 space-y-1.5 text-sm text-gray-700 leading-relaxed">
+                          <li>確認系統版本：「設定 → 一般 → 關於本機」，iOS 版本需為 16.4 或以上。</li>
+                          <li>必須使用 <strong>Safari</strong> 開啟診所系統並登入（不支援 Chrome、LINE／Facebook 內嵌瀏覽器）。</li>
+                          <li>點 Safari 底部的「分享」鈕（方框向上箭頭）→「加入主畫面」→ 右上角「加入」。</li>
+                          <li>離開 Safari，改從主畫面新出現的「名醫診所」圖示進入系統並登入。</li>
+                          <li>進入「帳號安全設定 → 推播通知」打開開關，於彈窗點「允許」。</li>
+                          <li>確認系統通知：「設定 → 通知 → 名醫診所」內開啟「允許通知」。</li>
+                        </ol>
+                        <div class="mt-2 flex gap-2 text-xs text-amber-800 bg-amber-100/70 rounded-lg p-2">
+                          <i data-lucide="info" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
+                          <span>iPhone 無法在一般 Safari 分頁接收推播，日後請一律從主畫面圖示進入；刪除該圖示即等同移除推播。</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="collapse collapse-arrow bg-white/60 border border-amber-200 rounded-lg">
+                      <input type="checkbox" aria-label="展開 Android 推播教學">
+                      <div class="collapse-title min-h-0 py-3 px-4 text-sm font-medium text-amber-900 flex items-center gap-2">
+                        <i data-lucide="tablet" class="w-4 h-4 text-amber-700"></i>
+                        Android 手機／平板
+                        <span class="text-[11px] leading-none bg-amber-100 text-amber-800 border border-amber-300 rounded-full px-2 py-1">Chrome／Edge</span>
+                      </div>
+                      <div class="collapse-content px-4 pb-4">
+                        <ol class="list-decimal pl-5 space-y-1.5 text-sm text-gray-700 leading-relaxed">
+                          <li>用 Chrome 開啟診所系統並登入。</li>
+                          <li>進入「帳號安全設定 → 推播通知」打開開關，瀏覽器詢問時點「允許」。</li>
+                          <li>若之前曾按「封鎖」：點網址列左邊的鎖頭圖示 → 權限 → 通知 → 改為「允許」，重新整理頁面後再試。</li>
+                          <li>確認系統層通知：「設定 → 應用程式 → Chrome（或 Edge）→ 通知」設為允許，並放寬該瀏覽器的省電／背景活動限制。</li>
+                          <li>建議：Chrome 選單 →「加入主畫面」或「安裝應用程式」，日後開啟更方便。</li>
+                        </ol>
+                        <div class="mt-2 flex gap-2 text-xs text-amber-800 bg-amber-100/70 rounded-lg p-2">
+                          <i data-lucide="info" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
+                          <span>開啟「勿擾模式」時通知會被靜音；部分品牌手機（如小米、OPPO）需另行允許 Chrome 的自啟動與通知權限。</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="collapse collapse-arrow bg-white/60 border border-amber-200 rounded-lg">
+                      <input type="checkbox" aria-label="展開 Windows 推播教學">
+                      <div class="collapse-title min-h-0 py-3 px-4 text-sm font-medium text-amber-900 flex items-center gap-2">
+                        <i data-lucide="laptop" class="w-4 h-4 text-amber-700"></i>
+                        Windows 電腦
+                        <span class="text-[11px] leading-none bg-amber-100 text-amber-800 border border-amber-300 rounded-full px-2 py-1">Chrome／Edge</span>
+                      </div>
+                      <div class="collapse-content px-4 pb-4">
+                        <ol class="list-decimal pl-5 space-y-1.5 text-sm text-gray-700 leading-relaxed">
+                          <li>用一般瀏覽視窗開啟系統（InPrivate／無痕視窗不支援推播）。</li>
+                          <li>打開推播開關，瀏覽器詢問時點「允許」。</li>
+                          <li>開啟「Windows 設定 → 系統 → 通知」：通知總開關需打開，並確認 Chrome／Edge 的個別通知為允許。</li>
+                          <li>關閉「專注輔助／勿擾」及「省電模式」，否則通知可能不彈出。</li>
+                          <li>若曾按「封鎖」：點網址列鎖頭圖示 → 網站權限 → 通知 → 允許，再重新整理頁面。</li>
+                          <li>公司電腦若仍無法開啟，請確認沒有公司群組原則封鎖瀏覽器通知。</li>
+                        </ol>
+                      </div>
+                    </div>
+
+                    <div class="collapse collapse-arrow bg-white/60 border border-amber-200 rounded-lg">
+                      <input type="checkbox" aria-label="展開 Mac 推播教學">
+                      <div class="collapse-title min-h-0 py-3 px-4 text-sm font-medium text-amber-900 flex items-center gap-2">
+                        <i data-lucide="monitor" class="w-4 h-4 text-amber-700"></i>
+                        Mac 電腦
+                        <span class="text-[11px] leading-none bg-amber-100 text-amber-800 border border-amber-300 rounded-full px-2 py-1">建議 Chrome／Edge</span>
+                      </div>
+                      <div class="collapse-content px-4 pb-4">
+                        <ol class="list-decimal pl-5 space-y-1.5 text-sm text-gray-700 leading-relaxed">
+                          <li>打開「系統設定 → 通知」，找到 Chrome（或 Edge），開啟「允許通知」。</li>
+                          <li>確認「專注模式」已關閉（選單列的月亮圖示）。</li>
+                          <li>在診所系統打開推播開關，瀏覽器詢問時點「允許」。</li>
+                          <li>若曾按「封鎖」：點網址列的網站設定，將通知改為「允許」後重新整理頁面。</li>
+                        </ol>
+                        <div class="mt-2 flex gap-2 text-xs text-amber-800 bg-amber-100/70 rounded-lg p-2">
+                          <i data-lucide="info" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
+                          <span>Safari 需 macOS 13 Ventura（Safari 16.1）以上才支援網頁推播，求穩定建議直接使用 Chrome 或 Edge。</span>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
               </div>
 
@@ -3328,7 +3455,7 @@
 
         
         
-        <div id="templateLibrary" class="hidden max-w-7xl mx-auto px-4 py-6">
+        <div id="templateLibrary" class="hidden">
           <div class="bg-white rounded-xl shadow-lg p-6">
             
             <div>
@@ -3631,6 +3758,7 @@
     </div>
     
 
+<div class="max-w-7xl mx-auto px-4 py-6">
 <div id="scheduleManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
     <style>
 #scheduleManagement {
@@ -4554,8 +4682,9 @@
             <div class="staff-grid" id="staffGrid"></div>
         </div>
     </div>
+</div>
 
-    
+
     <div class="modal" id="shiftModal">
         <div class="modal-content">
             <h3>新增排班</h3>
