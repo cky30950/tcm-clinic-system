@@ -105,12 +105,31 @@
             return;
         }
 
+        var entryBtn = document.getElementById('videoConsultBtn');
+
+        // 首次點擊需依序下載 6 個視訊腳本（含 1.57MB Agora SDK），下載期間
+        // 於按鈕顯示系統既有的讀取圈（system.js 的 setButtonLoading），
+        // 並暫時停用按鈕避免重複點擊
+        if (entryBtn && typeof window.setButtonLoading === 'function') {
+            window.setButtonLoading(entryBtn);
+        }
+
         try {
             await loadAll();
         } catch (err) {
+            if (entryBtn && typeof window.clearButtonLoading === 'function') {
+                window.clearButtonLoading(entryBtn);
+            }
             console.error('[視訊診症] 動態載入失敗:', err);
             notify(err.message || '視訊元件載入失敗，請重新整理頁面', 'error');
             return;
+        }
+
+        // 腳本就緒：先還原按鈕內容。緊接其後調用的 real openVideoConsultation
+        // 會在顯示面板時把按鈕切換為紅色「關閉視訊」（其會直接改寫按鈕內容，
+        // 故必須在此之前 clear，避免讀取圈殘留與 span 結構錯位）
+        if (entryBtn && typeof window.clearButtonLoading === 'function') {
+            window.clearButtonLoading(entryBtn);
         }
 
         // video-consultation.js 的 IIFE 載入完成後已覆寫此函式。
