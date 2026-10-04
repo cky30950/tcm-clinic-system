@@ -270,6 +270,12 @@
         #walletMemberList button.btn > div {
             width: 100%;
         }
+        /* 按鈕指住／按下一律不位移：daisyUI .btn:active 預設 translate 0 .5px（按下下沉），
+           部份模板（病人診症記錄操作掣）hover:-translate-y-0.5（上浮）。
+           統一固定位置；拍照快門等固定圓形掣沒加 .btn，不受影響。 */
+        .btn[data-btn-normalized] {
+            translate: none !important;
+        }
 
         /* 彩色按鈕統一調淺 10%（顏色與白色 9:1 混合）。
            只作用於按鈕類元素（button / a / role=button），
