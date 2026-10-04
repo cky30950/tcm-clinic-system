@@ -49,10 +49,9 @@
        - 其他按鈕：依原有尺寸匹配 btn-xs/btn-sm/btn/btn-lg；無底色的 × 關閉掣→btn-ghost
          （診症內為 rounded-md 方形，其餘為 btn-circle 圓形）；無底色的分頁掣等→btn-ghost
        - 固定全圓形的覆層控制掣（燈箱箭嘴／縮放、拍照快門等）保持原樣
-       為避免快速連續渲染時觀察批次互相覆蓋，採共享佇列，並每 2 秒做一次安全掃描 */
+       節點加入時於觀察者回呼（paint 前）立即標準化，按鈕首次顯示即為最終樣式；
+       另每 2 秒做一次安全掃描作補救 */
     (function () {
-        var timer = null;
-        var pending = [];
         // 只匹配「類別開頭」的工具類，避免把 hover:bg-* 等變體前綴誤判（類別以空格分隔）
         function hasBg(c) { return /(^|\s)bg-/.test(c); }
         function hasPad(c) { return /(^|\s)(p|px|py)-/.test(c); }
@@ -109,33 +108,21 @@
                 if (root.querySelectorAll) root.querySelectorAll('button').forEach(normalize);
             } catch (_eScan) {}
         }
-        function flush() {
-            timer = null;
-            var nodes = pending;
-            pending = [];
-            nodes.forEach(scan);
-            safetySweep();
-        }
         // 安全掃描：補救任何被漏接的按鈕
         function safetySweep() {
             try {
                 document.querySelectorAll('button:not(.btn):not([data-btn-normalized])').forEach(normalize);
             } catch (_eSweep) {}
         }
-        function enqueue(nodes) {
-            for (var i = 0; i < nodes.length; i++) pending.push(nodes[i]);
-            if (timer) clearTimeout(timer);
-            timer = setTimeout(flush, 40);
-        }
+        // 節點加入後立即標準化：回呼在該任務 paint 前執行，按鈕首次顯示即為最終樣式，
+        // 不會「先細體、數秒後變粗體／移位」（舊的 40ms 佇列在頁面持續有 mutation 時會餓死）
         new MutationObserver(function (mutations) {
-            var nodes = [];
             for (var i = 0; i < mutations.length; i++) {
                 var added = mutations[i].addedNodes;
                 for (var j = 0; j < added.length; j++) {
-                    if (added[j].nodeType === 1) nodes.push(added[j]);
+                    if (added[j].nodeType === 1) scan(added[j]);
                 }
             }
-            if (nodes.length) enqueue(nodes);
         }).observe(document.documentElement, { childList: true, subtree: true });
         setInterval(safetySweep, 2000);
         function start() { scan(document.documentElement); safetySweep(); }
@@ -234,7 +221,8 @@
         }
 
         /* 功能卡片陰影加重：覆蓋 Tailwind shadow-lg。
-           以 ID 範圍選擇器提高權重，不影響彈窗／側欄的 shadow-2xl 與一般小陰影元素 */
+           以 ID 範圍選擇器提高權重，不影響彈窗／側欄的 shadow-2xl 與一般小陰影元素。
+           y 偏移為 0：四邊陰影均等，上邊緣與其餘三邊同深（舊值向下偏移令上邊偏淺） */
         #contentWrapper > [class~="shadow-lg"],
         #medicalRecordManagement > .bg-white,
         #personalSettings > .bg-white,
@@ -242,7 +230,7 @@
         #accountSecurity > .bg-white,
         #templateLibrary > .bg-white,
         #scheduleManagement {
-            box-shadow: 0 12px 30px -6px rgba(0, 0, 0, 0.22), 0 6px 12px -6px rgba(0, 0, 0, 0.14);
+            box-shadow: 0 0 30px -6px rgba(0, 0, 0, 0.22), 0 0 12px -6px rgba(0, 0, 0, 0.14);
         }
 
         /* 按鈕標準化配套：按鈕保留原有 bg-* 配色時，隱藏 daisyUI .btn 的預設灰邊框
