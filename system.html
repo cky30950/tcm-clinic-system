@@ -53,18 +53,25 @@
     (function () {
         var timer = null;
         var pending = [];
-        function hasBg(c) { return /\bbg-/.test(c); }
-        function hasPad(c) { return /\b(p|px|py)-/.test(c); }
-        function hasTextSize(c) { return /\btext-(xs|sm|base|lg|xl|2xl|3xl)\b/.test(c); }
-        function isFixedCircle(c) { return /\brounded-full\b/.test(c) && /\bw-/.test(c) && /\bh-/.test(c); }
+        // 只匹配「類別開頭」的工具類，避免把 hover:bg-* 等變體前綴誤判（類別以空格分隔）
+        function hasBg(c) { return /(^|\s)bg-/.test(c); }
+        function hasPad(c) { return /(^|\s)(p|px|py)-/.test(c); }
+        function hasTextSize(c) { return /(^|\s)text-(xs|sm|base|lg|xl|2xl|3xl)(\s|$)/.test(c); }
+        function isFixedCircle(c) {
+            return /(^|\s)rounded-full(\s|$)/.test(c) && /(^|\s)w-/.test(c) && /(^|\s)h-/.test(c);
+        }
         function isBareClose(el, c) {
             if (hasBg(c) || hasPad(c)) return false;
-            return (el.textContent || '').trim().length <= 2;
+            var t = (el.textContent || '').trim();
+            // 僅限真正的關閉符或僅含圖示的按鈕；不可只用字數判斷（「展開」等兩字按鈕會誤中）
+            if (t === '×' || t === 'x' || t === 'X') return true;
+            if (t === '' && el.querySelector('svg')) return true;
+            return false;
         }
         function sizeVariant(c) {
-            if (/\btext-xs\b/.test(c) || /\bpy-(0\.5|1)\b/.test(c)) return 'btn-xs';
-            if (/\bpy-(3\.5|4|5)\b/.test(c) || /\btext-lg\b/.test(c)) return 'btn-lg';
-            if (/\bpy-3\b/.test(c)) return '';
+            if (/(^|\s)text-xs(\s|$)/.test(c) || /(^|\s)py-(0\.5|1)(\s|$)/.test(c)) return 'btn-xs';
+            if (/(^|\s)py-(3\.5|4|5)(\s|$)/.test(c) || /(^|\s)text-lg(\s|$)/.test(c)) return 'btn-lg';
+            if (/(^|\s)py-3(\s|$)/.test(c)) return '';
             return 'btn-sm';
         }
         function stripRounded(el) {
@@ -254,6 +261,14 @@
             border-right-width: 0;
             border-top-width: 0;
             border-radius: 0;
+        }
+        /* 側欄選單按鈕：daisyUI .btn 預設置中會令 icon 隨標題長短位移，改回靠左對齊 */
+        #sidebarMenu button.btn {
+            justify-content: flex-start;
+        }
+        /* 會員列表列：內層 div 需滿寵，兩端對齊（姓名／餘額）才不會因 .btn 的 flex 排版而塌陷 */
+        #walletMemberList button.btn > div {
+            width: 100%;
         }
 
         /* 彩色按鈕統一調淺 10%（顏色與白色 9:1 混合）。
