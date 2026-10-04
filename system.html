@@ -49,6 +49,8 @@
        - 其他按鈕：依原有尺寸匹配 btn-xs/btn-sm/btn/btn-lg；無底色的 × 關閉掣→btn-ghost
          （診症內為 rounded-md 方形，其餘為 btn-circle 圓形）；無底色的分頁掣等→btn-ghost
        - 固定全圓形的覆層控制掣（燈箱箭嘴／縮放、拍照快門等）保持原樣
+       - 模板庫（診斷／醫囑模板）、個人設置（慣用中藥／慣用穴位／診症設定）的
+         底線式分頁 tab 保持原樣（其切換函數會重置整個 className，不能加 btn）
        節點加入時於觀察者回呼（paint 前）立即標準化，按鈕首次顯示即為最終樣式；
        另每 2 秒做一次安全掃描作補救 */
     (function () {
@@ -82,6 +84,11 @@
             if (el.dataset.btnNormalized) return;
             el.dataset.btnNormalized = '1';
             if (el.classList.contains('btn')) return;
+            // 模板庫（switchTemplateTab）／個人設置（switchPersonalTab）的底線式分頁 tab
+            // 保留原樣：其切換函數會把 className 整個重置為原始類別，若首次加上 btn，
+            // 會變成「初入頁面是按鈕樣式、切過分頁後才變回原樣」的不一致
+            var onclickAttr = el.getAttribute('onclick') || '';
+            if (/switch(Personal|Template)Tab\(/.test(onclickAttr)) return;
             var c = el.className || '';
             var inCons = el.closest ? !!el.closest('#consultationSystem') : false;
             if (!inCons && isFixedCircle(c)) return;
