@@ -397,28 +397,46 @@ async function importClinicBackup(data) {
     async function replaceCollection(collectionName, items) {
         const colRef = window.firebase.collection(window.firebase.db, collectionName);
         try {
-            
-            const snap = await window.firebase.getDocs(colRef);
-            const existingIds = new Set();
-            snap.forEach((docSnap) => {
-                existingIds.add(docSnap.id);
-            });
-            
+            // 優化：若導入 items 數量 >= 現有文件數量（常見於首次或全量備份還原），
+            // 可跳過全量 getDocs（可能數千次讀取），改用「先全部 set、再補刪除」的策略。
+            // 備註：Firestore 不支援只取欄位/ID 列表，所以 getCountFromServer 是最輕量
+            // 的方式來估算現有規模（1 次讀取 vs N 次）。
+            const newItems = Array.isArray(items) ? items : [];
             const newIds = new Set();
-            if (Array.isArray(items)) {
-                items.forEach(item => {
-                    if (item && item.id !== undefined && item.id !== null) {
-                        newIds.add(String(item.id));
-                    }
-                });
-            }
-            
-            const idsToDelete = [];
-            existingIds.forEach(id => {
-                if (!newIds.has(id)) {
-                    idsToDelete.push(id);
+            newItems.forEach(item => {
+                if (item && item.id !== undefined && item.id !== null) {
+                    newIds.add(String(item.id));
                 }
             });
+
+            let existingIds = null; // null = 尚未取得，跳過刪除階段
+            try {
+                const agg = await window.firebase.getCountFromServer(colRef);
+                const existingCount = (agg && typeof agg.data?.count === 'number') ? agg.data.count : 0;
+                // 只有當「現有比導入多」才需要全量讀取找哪些要刪除
+                // 差異門檻：現有數量 < 導入數量的 80% → 視為導入更大，跳過刪除階段
+                if (existingCount > newIds.size && (existingCount - newIds.size) > Math.max(5, existingCount * 0.2)) {
+                    try {
+                        const snap = await window.firebase.getDocs(colRef);
+                        existingIds = new Set();
+                        snap.forEach((docSnap) => { existingIds.add(docSnap.id); });
+                    } catch (_eSnap) { existingIds = null; }
+                }
+            } catch (_eAgg) {
+                // 舊 SDK 或權限問題，退回全量讀取
+                try {
+                    const snap = await window.firebase.getDocs(colRef);
+                    existingIds = new Set();
+                    snap.forEach((docSnap) => { existingIds.add(docSnap.id); });
+                } catch (_eSnap) { existingIds = null; }
+            }
+
+            const idsToDelete = [];
+            if (existingIds) {
+                existingIds.forEach(id => {
+                    if (!newIds.has(id)) idsToDelete.push(id);
+                });
+            }
             
             let batch = window.firebase.writeBatch(window.firebase.db);
             let opCount = 0;
@@ -649,6 +667,10 @@ async function importClinicBackup(data) {
     if (progressCallback) progressCallback(stepCount, totalSteps);
 
     await replaceClinicBillingItems(Array.isArray(data.billingItems) ? data.billingItems : []);
+    // 觸發 billingMeta bulk 事件：兩個集合都被 replace，scope:'all'
+    if (typeof window.touchBillingMeta === 'function') {
+        try { await window.touchBillingMeta({ scope: 'all', bulk: true, operation: 'bulk-import' }); } catch (_e) {}
+    }
     stepCount++;
     if (progressCallback) progressCallback(stepCount, totalSteps);
 

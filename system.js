@@ -1973,6 +1973,17 @@ const consultationHistoryPager = {
         const pid = ctx.getPatientId();
         try { detachPatientConsultationsListener(pid); } catch (_e) {}
         ctx.setPatientId(null);
+    },
+    /** 清除指定病人的 pager 快取（由 patientsMeta/consultation 遠端事件觸發） */
+    clearPatientCache(patientId) {
+        const pid = String(patientId || '');
+        if (!pid) return;
+        // 清 pager 狀態快取
+        delete this.patientPagedCache[pid];
+        // 也清全域 G.currentPatientConsultations / G.currentConsultationConsultations
+        // 兩者都可能正顯示該病人
+        try { if (G.currentPatientHistoryPatientId === pid) G.currentPatientConsultations = []; } catch (_e) {}
+        try { if (G.currentConsultationHistoryPatientId === pid) G.currentConsultationConsultations = []; } catch (_e) {}
     }
 };
 
@@ -9987,8 +9998,16 @@ class FirebaseDataManager {
         }
 
         // patientsMeta/lastChange 全域通知旗標：同一文件於單一批次只能寫一次，
-        // 故聚合成一個最終 payload（舊路徑會連寫兩次，第二次覆蓋第一次）
-        const meta = pid ? { timestamp: new Date(), operation: 'update', patientId: pid } : null;
+        // 故聚合成一個最終 payload（舊路徑會連寫兩次，第二次覆蓋第一次）。
+        // 額外帶 kind:'consultation' 讓監聽器區分「病人基本資料變更」與「診症 CRUD」，
+        // 後者可額外觸發病歷彈窗的即時刷新。
+        const meta = pid ? {
+            timestamp: new Date(),
+            operation: (operation === 'add' || operation === 'delete') ? operation : 'update',
+            patientId: pid,
+            kind: 'consultation',
+            nonce: (typeof G.newSelfMetaNonce === 'function') ? G.newSelfMetaNonce() : undefined
+        } : null;
         return { patientOps, meta };
     }
 
@@ -10101,10 +10120,18 @@ class FirebaseDataManager {
         if (!this.isReady) return { success: false };
         try {
             try {
-                const snap = await window.firebase.getDocs(
-                    window.firebase.collection(window.firebase.db, 'clinics')
-                );
-                const count = (snap && typeof snap.size === 'number') ? snap.size : 0;
+                const clinicCol = window.firebase.collection(window.firebase.db, 'clinics');
+                let count = 0;
+                try {
+                    const agg = await window.firebase.getCountFromServer(clinicCol);
+                    count = (agg && typeof agg.data?.count === 'number') ? agg.data.count : 0;
+                } catch (_eAgg) {
+                    // 舊 SDK 或權限問題退回全量讀取（罕見）
+                    try {
+                        const snap = await window.firebase.getDocs(clinicCol);
+                        count = (snap && typeof snap.size === 'number') ? snap.size : 0;
+                    } catch (_e2) {}
+                }
                 // 診所數量上限依版本設定（version-config.js）：進階版 5 間、普通版 1 間
                 const clinicLimit = (typeof window.getMaxClinics === 'function') ? window.getMaxClinics() : 3;
                 if (count >= clinicLimit) {

@@ -30,6 +30,7 @@ export const G = {
     get t() { return window.t; },
     get escapeHtml() { return window.escapeHtml; },
     get sanitizePrintHtml() { return window.sanitizePrintHtml; },
+    get newSelfMetaNonce() { return window.newSelfMetaNonce; },
 
     get firebase() { return window.firebase; },
     get firebaseDataManager() { return window.firebaseDataManager; },
@@ -115,6 +116,8 @@ export const G = {
     get initAcupointLibrary() { return initAcupointLibrary; },
     get initAcupointMap() { return initAcupointMap; },
     get initBillingItems() { return window.initBillingItems; },
+    get loadBillingManagement() { return window.loadBillingManagement; },
+    get displayBillingItems() { return window.displayBillingItems; },
     get initCategoryData() { return initCategoryData; },
     get initHerbInventory() { return initHerbInventory; },
     get initHerbLibrary() { return initHerbLibrary; },

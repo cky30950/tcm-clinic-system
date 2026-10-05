@@ -485,6 +485,35 @@ export async function attachPatientListListener() {
 
                 // 他人（或無 nonce 的聚合更新）：單筆 patch，1 次讀取（戳記於 patch 成功後才蓋）
                 handleRemotePatientMetaChange(metaData, metaTs);
+
+                // ── 診症 CRUD 額外刷新病歷彈窗 ──────────────────────────────────
+                // system.js 的 _buildPatientAggregatePlan 會把 consultation CRUD 的 meta 帶 kind:'consultation'，
+                // 且同一 batch 已更新 patient aggregate（latestConsultationAt 等），
+                // 所以 handleRemotePatientMetaChange 已照顧到病人資料層。
+                // 這裡只額外刷新「已開啟該 pid 病歷彈窗」的 pager + 內容 DOM。
+                if (metaData.kind === 'consultation' && metaData.patientId) {
+                    const pid = String(metaData.patientId);
+                    const pager = G.consultationHistoryPager;
+                    if (!pager) { /* 該 pager 尚未掛載 */ }
+                    else {
+                        const tryRefresh = (ctx, modalId, getPidFn) => {
+                            try {
+                                const modal = document.getElementById(modalId);
+                                if (!modal || modal.classList.contains('hidden')) return;
+                                if (String(getPidFn() || '') !== pid) return; // 彈窗顯示的不是這個病人
+                                // 清快取 → 重新載入 → 刷新翻頁按鈕
+                                if (typeof pager.clearPatientCache === 'function') pager.clearPatientCache(pid);
+                                try { localStorage.removeItem('patientConsultations:' + pid); } catch (_e) {}
+                                const contentId = ctx === 'patient' ? 'patientMedicalHistoryContent' : 'medicalHistoryContent';
+                                if (typeof pager.loadForContext === 'function') {
+                                    pager.loadForContext(ctx, pid, { contentId, forceRefresh: true });
+                                }
+                            } catch (_e) { /* pager 刷新失敗，病人資料層已更新，彈窗 UI 留著舊 DOM 即可 */ }
+                        };
+                        tryRefresh('patient', 'patientMedicalHistoryModal', () => G.currentPatientHistoryPatientId);
+                        tryRefresh('consultation', 'medicalHistoryModal', () => G.currentConsultationHistoryPatientId);
+                    }
+                }
             } catch (innerErr) {
                 console.error('病人資料即時更新處理失敗:', innerErr);
             }
@@ -531,6 +560,7 @@ export async function touchPatientsMeta(operation, patientId, options) {
             operation: operation || 'update',
             patientId: patientId || null
         };
+        if (options && options.kind) payload.kind = options.kind;
         if (options && options.nonce) {
             payload.nonce = options.nonce;
             payload.clientId = PATIENT_SYNC_CLIENT_ID;

@@ -84,12 +84,15 @@ export async function ensurePatientPackagesClinicScoped(patientId) {
         if (p && p.clinicId) pkgClinicById.set(String(p.id), String(p.clinicId));
     });
 
-    // 讀取病人診症記錄作為歸屬證據（單一 where 查詢，限量由系統規模自然收斂）
+    // 讀取病人診症記錄作為歸屬證據（limit 200：超過此數量的病人極少見，
+    // 且套票使用診所證據通常集中在最近數月）
     let consultations = [];
     try {
         const q = window.firebase.firestoreQuery(
             window.firebase.collection(window.firebase.db, 'consultations'),
-            window.firebase.where('patientId', '==', String(patientId))
+            window.firebase.where('patientId', '==', String(patientId)),
+            window.firebase.orderBy('createdAt', 'desc'),
+            window.firebase.limit(200)
         );
         const snap = await window.firebase.getDocs(q);
         consultations = snap.docs.map(d => ({ id: d.id, ...d.data() }));

@@ -144,6 +144,11 @@ service cloud.firestore {
       allow read, write: if canAccess();
     }
 
+    // 收費項目變更通知 metadata（鏡像 patientsMeta 模式）
+    match /billingMeta/{document=**} {
+      allow read, write: if canAccess();
+    }
+
     // 系統級遷移狀態（如 consultations searchKeywords 回填完成旗標，
     // 旗標會關閉病歷搜尋的 legacy fallback）：員工可讀，僅管理員可寫
     match /systemMeta/{document=**} {
@@ -288,6 +293,7 @@ service cloud.firestore {
         && collectionId != 'videoConsents'
         && collectionId != 'patientsMeta'
         && collectionId != 'backupMeta'
+        && collectionId != 'billingMeta'
         && collectionId != 'patientWalletAccounts'
         && collectionId != 'patientWalletTransactions'
         && collectionId != 'walletIdempotency'
