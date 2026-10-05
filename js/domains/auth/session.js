@@ -590,59 +590,71 @@ export async function syncUserDataFromFirebase(options = {}) {
         }
 
         
-        // ── 側邊欄開合：手機觸控 click 穿透守衛 ────────────────────────
-        // sidebar 的滑入/滑出 CSS transition 為 300ms。手機觸控下一次手勢
-        // 可能產生順序為「漢堡掣 → 滑出中的遮罩/× 掣」的兩個 click（第二擊
-        // 落在因動畫位移到觸控點下方的元素，即 click 穿透）：打開后穿透一擊
-        // 落到遮罩會開完即關；關閉時遮罩又過早 hidden，底層 nav 漢堡掣重新
-        // 可點，穿透第二擊令選單彈返開——外觀就是「不斷重複彈出」。冪等只擋
-        // 得到同方向重複，擋唔到反方向穿透，故再加動畫窗口守衛：320ms 內的
-        // 反向動作請求一律視為穿透事件忽略。
+        // ── 側邊欄開合：手機觸控守衛 ───────────────────────────────────
+        // 抽屜開合狀態 class（sidebar-open／sidebar-overlay-open）由 system.html
+        // 內嘅靜態 <style> 擁有，唔依賴 Tailwind Play CDN 動態生成嘅規則。
+        // 三重保護：
+        // 1) 冪等——已開／已關嘅相同請求 no-op；
+        // 2) 動畫窗口反向守衛——300ms 滑動期間反方向請求視為同一手勢嘅穿透事件；
+        // 3) 控件喺 system.js 以 pointerdown 處理（觸控手勢目標喺手勢開始時鎖定，
+        //    唔會因動畫位移被重新指向），click 只留畀鍵盤。
         let sidebarLastOpenAt = 0;
         let sidebarLastCloseAt = 0;
         const SIDEBAR_TOGGLE_GUARD_MS = 320;
+
+        // 真機診斷：網址帶 ?sblog=1 時，system.js 會建立 window.__sbLog 環形
+        // 緩衝（連同控件事件／class 突變／transition 一齊記錄，用戶可複製回傳）
+        function sbLog(kind, detail) {
+            try {
+                if (!window.__sbLog) return;
+                const entry = { t: Date.now(), k: kind };
+                if (detail !== undefined) entry.d = detail;
+                window.__sbLog.push(entry);
+                if (window.__sbLog.length > 150) window.__sbLog.splice(0, window.__sbLog.length - 150);
+                localStorage.setItem('__sbLog', JSON.stringify(window.__sbLog));
+            } catch (_e) { /* 診斷不可影響正常操作 */ }
+        }
 
         export function openSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
             if (!sidebar) return;
-            // 冪等：已經打開就 no-op。手機觸控偶發的事件雙發（或快速連點、
-            // 初始化重複綁定）不會把選單「打開又關閉」般反覆彈跳
-            if (!sidebar.classList.contains('-translate-x-full')) {
+            if (sidebar.classList.contains('sidebar-open')) {
+                sbLog('open-skip-already-open');
                 return;
             }
-            // 反向守衛：剛關閉（關閉動畫進行中）的開啟請求，視為同一手勢
-            // 穿透到 nav 漢堡掣的第二擊，忽略
             if (Date.now() - sidebarLastCloseAt < SIDEBAR_TOGGLE_GUARD_MS) {
+                sbLog('open-blocked-guard', Date.now() - sidebarLastCloseAt);
                 return;
             }
-            sidebar.classList.remove('-translate-x-full');
-            if (overlay) overlay.classList.remove('hidden');
+            sidebar.classList.add('sidebar-open');
+            if (overlay) overlay.classList.add('sidebar-overlay-open');
             sidebarLastOpenAt = Date.now();
+            sbLog('open');
         }
 
         export function closeSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
             if (!sidebar) return;
-            // 冪等：已經關閉就 no-op，同上，避免重複事件令選單自行彈回
-            if (sidebar.classList.contains('-translate-x-full')) {
+            if (!sidebar.classList.contains('sidebar-open')) {
+                sbLog('close-skip-already-closed');
                 return;
             }
-            // 反向守衛：剛打開（滑入動畫進行中）的關閉請求，視為同一手勢
-            // 穿透到遮罩/× 掣的第二擊，忽略
             if (Date.now() - sidebarLastOpenAt < SIDEBAR_TOGGLE_GUARD_MS) {
+                sbLog('close-blocked-guard', Date.now() - sidebarLastOpenAt);
                 return;
             }
-            sidebar.classList.add('-translate-x-full');
+            sidebar.classList.remove('sidebar-open');
             sidebarLastCloseAt = Date.now();
+            sbLog('close');
             if (overlay) {
-                // 關閉動畫（300ms）期間不要立即 hidden：保留遮罩在頂層
-                // (z-40 高過 nav) 吃掉誤點擊，點它只會觸發冪等 no-op；
-                // 動畫結束且仍處關閉態（用戶沒在窗口後重新打開）才隱藏
+                // 關閉動畫（300ms）期間唔好即刻隱藏遮罩：保留喺頂層 (z-40
+                // 高過 nav) 吃掉誤點擊；動畫完且仍係關閉態先隱藏
                 setTimeout(function () {
-                    if (sidebar.classList.contains('-translate-x-full')) {
-                        overlay.classList.add('hidden');
+                    if (!sidebar.classList.contains('sidebar-open')) {
+                        overlay.classList.remove('sidebar-overlay-open');
+                        sbLog('overlay-hidden');
                     }
                 }, SIDEBAR_TOGGLE_GUARD_MS);
             }
@@ -651,10 +663,10 @@ export async function syncUserDataFromFirebase(options = {}) {
         export function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             if (!sidebar) return;
-            if (sidebar.classList.contains('-translate-x-full')) {
-                openSidebar();
-            } else {
+            if (sidebar.classList.contains('sidebar-open')) {
                 closeSidebar();
+            } else {
+                openSidebar();
             }
         }
 
@@ -926,8 +938,8 @@ export async function logout() {
                 
             }
         }
-        document.getElementById('sidebar').classList.add('-translate-x-full');
-        document.getElementById('sidebarOverlay').classList.add('hidden');
+        document.getElementById('sidebar').classList.remove('sidebar-open');
+        document.getElementById('sidebarOverlay').classList.remove('sidebar-overlay-open');
         hideAllSections();
 
         

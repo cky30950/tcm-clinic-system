@@ -457,6 +457,38 @@
 
         /*
          * ============================================
+         * 手機側邊欄（抽屜）開合狀態 —— 關鍵狀態由本靜態 <style> 擁有
+         *
+         * 開合狀態唔使用 Tailwind Play CDN 動態生成嘅 -translate-x-full／hidden
+         * 規則：CDN 偵測到 DOM 變動會重建樣式，極端時序下（登入後大量動態渲染、
+         * 手機效能較慢）規則可能短暫缺失，已關閉嘅抽屜同遮罩會「自己彈出」。
+         * #sidebar 預設關閉（translateX(-100%)），加上 .sidebar-open 先打開；
+         * 遮罩預設隱藏且不接收點擊，加 .sidebar-overlay-open 先顯示。
+         * ============================================
+         */
+        #sidebar {
+            transform: translateX(-100%);
+            transition: transform 300ms ease-in-out;
+            will-change: transform;
+        }
+        #sidebar.sidebar-open {
+            transform: translateX(0);
+        }
+        #sidebarOverlay {
+            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 200ms ease-in-out, visibility 0s linear 200ms;
+        }
+        #sidebarOverlay.sidebar-overlay-open {
+            visibility: visible;
+            opacity: 1;
+            pointer-events: auto;
+            transition: opacity 200ms ease-in-out, visibility 0s;
+        }
+
+        /*
+         * ============================================
          * 手機版排版優化
          *
          * 設置了一些媒體查詢，當螢幕寬度小於 640px（即常見手機螢幕寬度）時，
@@ -700,7 +732,7 @@
     
     <div id="mainSystem" class="hidden fade-in">
         
-        <div id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out">
+        <div id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-2xl">
             <div class="flex flex-col h-full">
                 
                 <div class="bg-[#B48F79] text-white p-6">
@@ -817,7 +849,7 @@
             </div>
         </div>
 
-        <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden"></div>
+        <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40"></div>
         
         <nav class="bg-white shadow-lg border-b-4 border-[#B48F79]">
             <div class="max-w-7xl mx-auto px-4">
@@ -6153,8 +6185,8 @@
     <script src="pwa.js?v=20260923b" defer></script>
     <script src="schedule_management.js" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
-    <script type="module" src="js/app.js?v=20261006e"></script>
-    <script src="system.js?v=20261006e" defer></script>
+    <script type="module" src="js/app.js?v=20261006f"></script>
+    <script src="system.js?v=20261006f" defer></script>
     <script src="attachments.js" defer></script>
     <script src="personalStatistics.js?v=20261005a" defer></script>
     <script src="systemmanagement.js" defer></script>

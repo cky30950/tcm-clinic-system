@@ -6003,6 +6003,7 @@ async function fetchJsonWithFallback(fileName) {
                     </div>
                 `;
                 button.onclick = () => {
+                    if (window.__sbPush) window.__sbPush('menuItem', permission);
                     showSection(permission);
                     closeSidebar();
                 };
@@ -13307,42 +13308,206 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // 側邊欄開關按鈕與遮罩：
-        // 開與關各自呼叫冪等的 openSidebar/closeSidebar（而非共用 toggle），
-        // 手機觸控事件雙發、快速連點或初始化重複執行時都不會令選單反覆彈跳。
-        // dataset.bound 防止初始化再次執行時疊加多個監聽器（同區其他按鈕同款保護）。
-        const openSidebarBtn = document.getElementById('openSidebarButton');
-        if (openSidebarBtn && !openSidebarBtn.dataset.bound) {
-            openSidebarBtn.addEventListener('click', function () {
+        // 開與關各自呼叫冪等的 openSidebar/closeSidebar（而非共用 toggle）。
+        // 控件以 pointerdown 為主事件：觸控手勢嘅目標喺手指按下時已鎖定
+        // （pointer/touch 事件唔會因之後抽屜滑動、遮罩出現而被重新指向），
+        // 由根源消除「一下觸控變成漢堡掣 + 遮罩/× 掣兩擊」嘅穿透問題；
+        // 觸控一併 preventDefault 抑制瀏覽器事後合成嘅相容性 click。
+        // click 監聽只留畀鍵盤 Enter／無指標嘅無障礙觸發（800ms 內已由
+        // pointerdown 處理過嘅 click 一律忽略）。dataset.bound 防重複綁定。
+        function bindSidebarControl(el, action, label) {
+            let handledAt = 0;
+            el.addEventListener('pointerdown', function (ev) {
+                handledAt = Date.now();
+                if (window.__sbPush) {
+                    window.__sbPush('ptr:' + label, (ev.pointerType || 'mouse') + ' ' +
+                        Math.round(ev.clientX) + ',' + Math.round(ev.clientY) +
+                        ' trusted=' + ev.isTrusted);
+                }
                 try {
-                    openSidebar();
+                    action();
                 } catch (e) {
-                    console.error('開啟側邊欄按鈕事件錯誤:', e);
+                    console.error('側邊欄控件 pointer 事件錯誤 (' + label + '):', e);
+                }
+                if (ev.pointerType === 'touch') {
+                    ev.preventDefault();
+                }
+            }, { passive: false });
+            el.addEventListener('click', function (ev) {
+                if (Date.now() - handledAt < 800) {
+                    if (window.__sbPush) window.__sbPush('click-suppressed:' + label);
+                    return;
+                }
+                if (window.__sbPush) {
+                    window.__sbPush('click-kbd:' + label, 'detail=' + ev.detail + ' trusted=' + ev.isTrusted);
+                }
+                try {
+                    action();
+                } catch (e) {
+                    console.error('側邊欄控件 click 事件錯誤 (' + label + '):', e);
                 }
             });
-            openSidebarBtn.dataset.bound = 'true';
+            el.dataset.bound = 'true';
+        }
+
+        const openSidebarBtn = document.getElementById('openSidebarButton');
+        if (openSidebarBtn && !openSidebarBtn.dataset.bound) {
+            bindSidebarControl(openSidebarBtn, function () { openSidebar(); }, 'hamburger');
         }
         const closeSidebarBtn = document.getElementById('closeSidebarButton');
         if (closeSidebarBtn && !closeSidebarBtn.dataset.bound) {
-            closeSidebarBtn.addEventListener('click', function () {
-                try {
-                    closeSidebar();
-                } catch (e) {
-                    console.error('關閉側邊欄按鈕事件錯誤:', e);
-                }
-            });
-            closeSidebarBtn.dataset.bound = 'true';
+            bindSidebarControl(closeSidebarBtn, function () { closeSidebar(); }, 'close-x');
         }
         const sidebarOverlay = document.getElementById('sidebarOverlay');
         if (sidebarOverlay && !sidebarOverlay.dataset.bound) {
-            sidebarOverlay.addEventListener('click', function () {
-                try {
-                    closeSidebar();
-                } catch (e) {
-                    console.error('點擊遮罩錯誤:', e);
-                }
-            });
-            sidebarOverlay.dataset.bound = 'true';
+            bindSidebarControl(sidebarOverlay, function () { closeSidebar(); }, 'overlay');
         }
+
+        // ── 真機診斷記錄器（只喺網址帶 ?sblog=1 時啟用，正常使用零影響）─────
+        // 經過多輪桌面合成事件測試仍無法喺真機重現「選單不斷彈出」，故加入
+        // 被動記錄：四個控件嘅指標／點擊事件（含座標、pointerType、isTrusted、
+        // 觸控點當下嘅元素）、#sidebar class 突變與實際 transform、過渡事件、
+        // 頁面生命週期。環形緩衝 150 筆，持久化 localStorage，左下角 SB 圓鈕
+        // 可複製文字回報。
+        (function setupSidebarDiagnostics() {
+            try {
+                if (!/[?&]sblog=1(?:&|$)/.test(window.location.search)) return;
+                let arr;
+                try {
+                    arr = JSON.parse(localStorage.getItem('__sbLog')) || [];
+                } catch (_e) {
+                    arr = [];
+                }
+                window.__sbLog = arr;
+                window.__sbPush = function (kind, detail) {
+                    arr.push({ t: Date.now(), k: String(kind), d: detail === undefined ? '' : String(detail) });
+                    if (arr.length > 150) arr.splice(0, arr.length - 150);
+                    try {
+                        localStorage.setItem('__sbLog', JSON.stringify(arr));
+                    } catch (_e) { /* 儲存失敗唔影響記憶體內記錄 */ }
+                };
+                window.__sbPush('diag-start', window.innerWidth + 'x' + window.innerHeight +
+                    ' dpr=' + window.devicePixelRatio + ' ua=' + navigator.userAgent.slice(0, 80));
+
+                const SEL = '#openSidebarButton,#closeSidebarButton,#sidebarOverlay,#sidebarMenu,#sidebar';
+                function describeEl(node) {
+                    if (!node) return '(null)';
+                    return node.id ? '#' + node.id : (node.tagName + (node.className && typeof node.className === 'string' ? '.' + node.className.split(' ')[0] : ''));
+                }
+                document.addEventListener('pointerdown', function (ev) {
+                    const hit = ev.target && ev.target.closest ? ev.target.closest(SEL) : null;
+                    if (!hit) return;
+                    let atPoint = null;
+                    try {
+                        atPoint = document.elementFromPoint(ev.clientX, ev.clientY);
+                    } catch (_e) { /* 跨域或隱藏框架時可能擋住 */ }
+                    window.__sbPush('cap-ptr ' + describeEl(hit), JSON.stringify({
+                        p: ev.pointerType || 'mouse',
+                        x: Math.round(ev.clientX), y: Math.round(ev.clientY),
+                        point: describeEl(atPoint),
+                        trusted: ev.isTrusted
+                    }));
+                }, true);
+                document.addEventListener('click', function (ev) {
+                    const hit = ev.target && ev.target.closest ? ev.target.closest(SEL) : null;
+                    if (!hit) return;
+                    window.__sbPush('cap-click ' + describeEl(hit), JSON.stringify({
+                        x: Math.round(ev.clientX), y: Math.round(ev.clientY),
+                        detail: ev.detail, trusted: ev.isTrusted
+                    }));
+                }, true);
+
+                const diagSidebar = document.getElementById('sidebar');
+                if (diagSidebar) {
+                    new MutationObserver(function (mutations) {
+                        mutations.forEach(function (m) {
+                            if (m.attributeName !== 'class') return;
+                            const cs = window.getComputedStyle(diagSidebar);
+                            window.__sbPush('MO-class', JSON.stringify({
+                                old: m.oldValue || '',
+                                now: diagSidebar.className,
+                                tf: (cs.transform || '').slice(0, 48)
+                            }));
+                        });
+                    }).observe(diagSidebar, { attributes: true, attributeOldValue: true });
+                    ['transitionrun', 'transitionstart', 'transitioncancel', 'transitionend'].forEach(function (name) {
+                        diagSidebar.addEventListener(name, function (ev) {
+                            if (ev.propertyName === 'transform') window.__sbPush(name, '');
+                        });
+                    });
+                }
+                document.addEventListener('visibilitychange', function () {
+                    window.__sbPush('visibility', document.visibilityState);
+                });
+                window.addEventListener('pageshow', function (ev) {
+                    window.__sbPush('pageshow', 'persisted=' + ev.persisted);
+                });
+                let lastResizeAt = 0;
+                window.addEventListener('resize', function () {
+                    const now = Date.now();
+                    if (now - lastResizeAt < 400) return;
+                    lastResizeAt = now;
+                    window.__sbPush('resize', window.innerWidth + 'x' + window.innerHeight);
+                });
+
+                function renderLogText() {
+                    return arr.map(function (e) {
+                        const pad = String(e.t % 1000).padStart(3, '0');
+                        const time = new Date(e.t).toLocaleTimeString('zh-HK', { hour12: false }) + '.' + pad;
+                        return time + '  ' + e.k + (e.d ? '  ' + e.d : '');
+                    }).join('\n');
+                }
+                const btnStyle = 'margin-left:6px;padding:2px 8px;border:0;border-radius:4px;background:#fff;color:#333;font-size:11px;';
+                const panel = document.createElement('div');
+                panel.style.cssText = 'position:fixed;left:8px;bottom:56px;z-index:99999;display:none;' +
+                    'flex-direction:column;gap:6px;width:min(88vw,360px);max-height:46vh;padding:8px;' +
+                    'border-radius:8px;background:rgba(0,0,0,.85);color:#8f8;font:11px/1.4 monospace;';
+                panel.innerHTML =
+                    '<div style="color:#fff;white-space:nowrap">SB LOG（最近' + arr.length + '筆）' +
+                    '<button id="__sbCopy" style="' + btnStyle + '">複製</button>' +
+                    '<button id="__sbClear" style="' + btnStyle + '">清除</button>' +
+                    '<button id="__sbPanelClose" style="' + btnStyle + '">×</button></div>' +
+                    '<textarea id="__sbText" readonly style="width:100%;height:150px;resize:vertical;' +
+                    'font:10px/1.4 monospace;padding:4px;box-sizing:border-box"></textarea>';
+                const fab = document.createElement('button');
+                fab.textContent = 'SB';
+                fab.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;width:42px;height:42px;' +
+                    'border-radius:50%;border:0;background:#D9782B;color:#fff;font-weight:bold;font-size:13px;';
+                fab.title = '側邊欄診斷記錄';
+                fab.addEventListener('click', function () {
+                    panel.style.display = 'flex';
+                    document.getElementById('__sbText').value = renderLogText();
+                });
+                panel.addEventListener('click', function (ev) {
+                    if (ev.target.id === '__sbPanelClose') {
+                        panel.style.display = 'none';
+                    } else if (ev.target.id === '__sbClear') {
+                        arr.length = 0;
+                        localStorage.removeItem('__sbLog');
+                        document.getElementById('__sbText').value = '';
+                    } else if (ev.target.id === '__sbCopy') {
+                        const text = renderLogText();
+                        const ta = document.getElementById('__sbText');
+                        ta.value = text;
+                        ta.select();
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(text).then(function () {
+                                ev.target.textContent = '已複製';
+                                setTimeout(function () { ev.target.textContent = '複製'; }, 1500);
+                            }).catch(function () {
+                                try { document.execCommand('copy'); } catch (_e) {}
+                            });
+                        } else {
+                            try { document.execCommand('copy'); } catch (_e) {}
+                        }
+                    }
+                });
+                document.body.appendChild(panel);
+                document.body.appendChild(fab);
+            } catch (e) {
+                console.error('側邊欄診斷記錄器啟用失敗:', e);
+            }
+        })();
 
         // 登出按鈕（頂部與側邊欄）：點擊後調用 logout
         const logoutBtn = document.getElementById('logoutButton');
@@ -21047,7 +21212,7 @@ function hideGlobalCopyright() {
         // 無彈窗時：Esc 只會關閉已打開的側邊欄（不做切換，避免在已關閉
         // 狀態下因重複按鍵事件把選單自行叫出）
         const sidebar = document.getElementById('sidebar');
-        if (sidebar && !sidebar.classList.contains('-translate-x-full') && typeof closeSidebar === 'function') {
+        if (sidebar && sidebar.classList.contains('sidebar-open') && typeof closeSidebar === 'function') {
           closeSidebar();
           ev.preventDefault();
           ev.stopPropagation();
