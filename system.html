@@ -262,6 +262,15 @@
             border-top-width: 0;
             border-radius: 0;
         }
+        /* 病歷／診症記錄「較舊／較新」翻頁掣：到盡頭禁用時保證反白。
+           daisyUI .btn:disabled 背景與 Tailwind disabled:bg-gray-300 權重相同、勝出不穩，
+           以容器限定 + :disabled 提高權重（文字維持白色） */
+        #patientMedicalHistoryContent button.btn:disabled,
+        #medicalHistoryContent button.btn:disabled {
+            background-color: #d1d5db;
+            color: #ffffff;
+            cursor: not-allowed;
+        }
         /* 側欄選單按鈕：daisyUI .btn 預設置中會令 icon 隨標題長短位移，改回靠左對齊 */
         #sidebarMenu button.btn {
             justify-content: flex-start;
