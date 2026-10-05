@@ -7927,7 +7927,7 @@ async function initializeSystemAfterLogin() {
             const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
             const canEditInventory = hasActionPermission('herbInventoryEdit');
             const editInventoryButtonHtml = canEditInventory
-                ? `<button onclick="openInventoryModal('${herb.id}')" class="mt-2 sm:mt-0 sm:ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>`
+                ? `<button onclick="openInventoryModal('${herb.id}')" class="mt-2 sm:mt-0 sm:ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 rounded" style="padding:3px 6px;font-size:10px;line-height:1.25;">編輯庫存</button>`
                 : '';
             const inventoryHtml = `
                 <div class="mt-2 flex flex-col sm:flex-row items-center text-xs gap-x-3 gap-y-1">
@@ -8024,7 +8024,7 @@ async function initializeSystemAfterLogin() {
             const stockColor = qty <= thr ? 'text-red-600 font-bold' : 'text-green-600';
             const canEditInventory = hasActionPermission('herbInventoryEdit');
             const editInventoryButtonHtml = canEditInventory
-                ? `<button onclick="openInventoryModal('${formula.id}')" class="mt-2 sm:mt-0 sm:ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded">編輯庫存</button>`
+                ? `<button onclick="openInventoryModal('${formula.id}')" class="mt-2 sm:mt-0 sm:ml-auto bg-blue-100 hover:bg-blue-200 text-blue-700 rounded" style="padding:3px 6px;font-size:10px;line-height:1.25;">編輯庫存</button>`
                 : '';
             const inventoryHtml = `
                 <div class="mt-2 flex flex-col sm:flex-row items-center text-xs gap-x-3 gap-y-1">

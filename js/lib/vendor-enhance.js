@@ -46,7 +46,9 @@
 #walletTxGrid{tabulator:unset;}
 #walletTxGrid .tabulator{font-size:0.9375rem;border:1px solid #e5e7eb;border-radius:0.5rem;background:#fff;}
 #walletTxGrid .tabulator-header{background:#f9fafb;color:#4b5563;font-weight:600;border-bottom:1px solid #e5e7eb;}
-#walletTxGrid .tabulator-header .tabulator-col{border-right:1px solid #f3f4f6;height:44px;padding:0 8px;}
+#walletTxGrid .tabulator-header .tabulator-col{border-right:1px solid #f3f4f6;min-height:44px;padding:0 8px;}
+#walletTxGrid .tabulator-col-content{padding:4px 0;}
+#walletTxGrid .tabulator-header-filter{margin:4px 0 0;}
 #walletTxGrid .tabulator-row{min-height:42px;border-bottom:1px solid #f3f4f6;}
 #walletTxGrid .tabulator-row.tabulator-selected{background:#f0fdfa;}
 #walletTxGrid .tabulator-row:hover{background:#f9fafb !important;}

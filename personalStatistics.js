@@ -264,10 +264,11 @@ function renderPersonalStatistics(stats) {
         if (oldInstance && typeof oldInstance.destroy === 'function') {
             try { oldInstance.destroy(); } catch (_e) {}
         }
-        // 橫向長條圖：中文名稱不重疊；反轉使第 1 名顯示在最上方
-        const ordered = rows.slice().reverse();
-        const labels = ordered.map(r => r.label);
-        const dataVals = ordered.map(r => r.value);
+        // 橫向長條圖：中文名稱不重疊。
+        // rows 已按使用次數降序（第 1 名排先）；現行 Chart.js 類目軸由上
+        // 至下照陣列順序排列，故原序即「上面最多、下面最少」，不再反轉。
+        const labels = rows.map(r => r.label);
+        const dataVals = rows.map(r => r.value);
         const ctx = canvas.getContext('2d');
         return new Chart(ctx, {
             type: 'bar',
