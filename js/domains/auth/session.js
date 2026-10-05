@@ -615,7 +615,7 @@ export async function syncUserDataFromFirebase(options = {}) {
             } catch (_e) { /* 診斷不可影響正常操作 */ }
         }
 
-        export function openSidebar() {
+        export function openSidebar(options) {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
             if (!sidebar) return;
@@ -623,9 +623,13 @@ export async function syncUserDataFromFirebase(options = {}) {
                 sbLog('open-skip-already-open');
                 return;
             }
-            if (Date.now() - sidebarLastCloseAt < SIDEBAR_TOGGLE_GUARD_MS) {
-                sbLog('open-blocked-guard', Date.now() - sidebarLastCloseAt);
-                return;
+            // 反向守衛只針對觸控控件（預設）；鍵盤 Esc 為有意識嘅明確切換，
+            // 以 { bypassGuard: true } 繞過，唔會被快速連按卡住在 320ms 窗口
+            if (!options || !options.bypassGuard) {
+                if (Date.now() - sidebarLastCloseAt < SIDEBAR_TOGGLE_GUARD_MS) {
+                    sbLog('open-blocked-guard', Date.now() - sidebarLastCloseAt);
+                    return;
+                }
             }
             sidebar.classList.add('sidebar-open');
             if (overlay) overlay.classList.add('sidebar-overlay-open');
@@ -633,7 +637,7 @@ export async function syncUserDataFromFirebase(options = {}) {
             sbLog('open');
         }
 
-        export function closeSidebar() {
+        export function closeSidebar(options) {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
             if (!sidebar) return;
@@ -641,9 +645,11 @@ export async function syncUserDataFromFirebase(options = {}) {
                 sbLog('close-skip-already-closed');
                 return;
             }
-            if (Date.now() - sidebarLastOpenAt < SIDEBAR_TOGGLE_GUARD_MS) {
-                sbLog('close-blocked-guard', Date.now() - sidebarLastOpenAt);
-                return;
+            if (!options || !options.bypassGuard) {
+                if (Date.now() - sidebarLastOpenAt < SIDEBAR_TOGGLE_GUARD_MS) {
+                    sbLog('close-blocked-guard', Date.now() - sidebarLastOpenAt);
+                    return;
+                }
             }
             sidebar.classList.remove('sidebar-open');
             sidebarLastCloseAt = Date.now();

@@ -2804,6 +2804,8 @@ async function fetchUsers(forceRefresh = false) {
                     cssAnimationStyle: 'from-right',
                     useIcon: true,
                     closeButton: false,
+                    // 點擊通知本體即關閉（所有類型適用；超時自動消失照舊）
+                    clickToClose: true,
                     pauseOnHover: true,
                     // 訊息安全由 showToast 的 htmlToastToPlainText 統一
                     // escape 後再交付（plainText:false 時 Notiflix 僅做一次
@@ -2880,6 +2882,7 @@ async function fetchUsers(forceRefresh = false) {
                 closeButton: true,
                 progressBar: true,
                 positionClass: 'toast-top-right',
+                tapToDismiss: true,
                 timeOut: timeout,
                 extendedTimeOut: timeout + 1000
             };
@@ -21209,14 +21212,21 @@ function hideGlobalCopyright() {
         ev.preventDefault();
         ev.stopPropagation();
       } else {
-        // 無彈窗時：Esc 只會關閉已打開的側邊欄（不做切換，避免在已關閉
-        // 狀態下因重複按鍵事件把選單自行叫出）
-        const sidebar = document.getElementById('sidebar');
-        if (sidebar && sidebar.classList.contains('sidebar-open') && typeof closeSidebar === 'function') {
-          closeSidebar();
-          ev.preventDefault();
-          ev.stopPropagation();
+        // 無彈窗時：Esc 切換側邊欄（關住→打開、打開→關閉）。
+        // ev.repeat：按住 Esc 嘅瀏覽器自動重複 keydown 一律忽略，否則每
+        // ~30ms 一次重複會不斷開合；冪等＋320ms 反向守衛為雙保險。
+        if (ev.repeat) {
+          return;
         }
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar) return;
+        if (sidebar.classList.contains('sidebar-open')) {
+          if (typeof closeSidebar === 'function') closeSidebar({ bypassGuard: true });
+        } else {
+          if (typeof openSidebar === 'function') openSidebar({ bypassGuard: true });
+        }
+        ev.preventDefault();
+        ev.stopPropagation();
       }
       return;
     }
