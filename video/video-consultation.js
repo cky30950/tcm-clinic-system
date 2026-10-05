@@ -325,7 +325,11 @@
             blob = await shotApi.capture();
         } catch (e) {
             console.warn('[視訊診症] 擷取病人影像失敗:', e);
-            notify('目前沒有病人的影像畫面，無法截圖（請確認病人已加入診間並開啟鏡頭）', 'error');
+            if (e && e.message === 'REMOTE_VIDEO_OFF') {
+                notify('病人目前未開啟鏡頭，請病人開啟鏡頭後再截圖', 'error');
+            } else {
+                notify('目前沒有病人的影像畫面，無法截圖（請確認病人已加入診間並開啟鏡頭）', 'error');
+            }
             return;
         }
 

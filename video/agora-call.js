@@ -441,28 +441,51 @@
             return best;
         }
 
+        // 等待遠端影像就緒：對方可能剛開鏡頭或影格尚在解碼（videoWidth 暫為 0），
+        // 於短暫時間窗內重試，避免使用者按下當下因一時空窗而直接失敗
+        function waitForRemoteVideo(timeoutMs) {
+            return new Promise(function (resolve) {
+                var deadline = Date.now() + timeoutMs;
+                (function tick() {
+                    var video = findRemoteVideo();
+                    if (video) {
+                        resolve(video);
+                        return;
+                    }
+                    if (Date.now() >= deadline) {
+                        resolve(null);
+                        return;
+                    }
+                    setTimeout(tick, 150);
+                })();
+            });
+        }
+
         function captureRemoteFrame() {
-            return new Promise(function (resolve, reject) {
-                var video = findRemoteVideo();
-                if (!video) {
-                    reject(new Error('NO_REMOTE_VIDEO'));
-                    return;
-                }
-                var w = video.videoWidth;
-                var h = video.videoHeight;
-                var canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                try {
-                    canvas.getContext('2d').drawImage(video, 0, 0, w, h);
-                } catch (err) {
-                    reject(err);
-                    return;
-                }
-                canvas.toBlob(function (blob) {
-                    if (blob) resolve(blob);
-                    else reject(new Error('CAPTURE_BLOB_FAILED'));
-                }, 'image/jpeg', 0.92);
+            return waitForRemoteVideo(1500).then(function (video) {
+                return new Promise(function (resolve, reject) {
+                    if (!video) {
+                        // 有遠端 tile 但無影像＝對方未開鏡頭；連 tile 都沒有＝尚未加入
+                        var hasRemoteTile = root.querySelectorAll('.av-tile:not(.av-local)').length > 0;
+                        reject(new Error(hasRemoteTile ? 'REMOTE_VIDEO_OFF' : 'NO_REMOTE_VIDEO'));
+                        return;
+                    }
+                    var w = video.videoWidth;
+                    var h = video.videoHeight;
+                    var canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    try {
+                        canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+                    } catch (err) {
+                        reject(err);
+                        return;
+                    }
+                    canvas.toBlob(function (blob) {
+                        if (blob) resolve(blob);
+                        else reject(new Error('CAPTURE_BLOB_FAILED'));
+                    }, 'image/jpeg', 0.92);
+                });
             });
         }
 
