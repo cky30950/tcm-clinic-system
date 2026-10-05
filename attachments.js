@@ -1242,12 +1242,18 @@
         delete button.dataset.maLoading;
     }
 
-    /** 由按鈕觸發開啟 Gallery：按鈕顯示讀取圈直到附件清單載入完成 */
+    /** 由按鈕觸發開啟 Gallery：按鈕顯示讀取圈直到附件清單載入完成。
+        讀取圈保證最少顯示 400ms（快取命中時也清晰可見，模式同「載入診斷模板」） */
     async function openGalleryFromTrigger(button, options) {
+        var startedAt = Date.now();
         try {
             if (button) setBtnLoading(button);
             await openGallery(options);
         } finally {
+            var elapsed = Date.now() - startedAt;
+            if (elapsed < 400) {
+                await new Promise(function (resolve) { setTimeout(resolve, 400 - elapsed); });
+            }
             if (button) clearBtnLoading(button);
         }
     }
@@ -1315,8 +1321,8 @@
         var noticeEl = document.getElementById('maConfigNotice');
         noticeEl.classList.add('hidden');
 
-        document.getElementById('medicalAttachmentsModal').classList.remove('hidden');
-
+        // 彈窗延至資料載入完成後才開啟：讀取期間由觸發按鈕顯示讀取圈
+        // （同「載入診斷模板」），避免彈窗提前打開、用黑底遮蓋按鈕回饋
         try {
             var cfg = await ensureConfig();
             if (cfg.configured === false) {
@@ -1330,6 +1336,8 @@
                 '<div class="text-center py-10 text-red-600 text-sm">' +
                 esc((err && err.message) || '載入附件失敗') + '</div>';
         }
+
+        document.getElementById('medicalAttachmentsModal').classList.remove('hidden');
     }
 
     function closeGallery() {

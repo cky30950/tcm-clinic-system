@@ -239,6 +239,11 @@
         #scheduleManagement {
             box-shadow: 0 0 30px -6px rgba(0, 0, 0, 0.22), 0 0 12px -6px rgba(0, 0, 0, 0.14);
         }
+        /* 登入卡片：Tailwind shadow-2xl 預設向下偏移（0 25px 50px -12px）令上邊偏淺，
+           y 偏移改 0，頂部與其餘三邊同深，其餘深淺／模糊維持 shadow-2xl 等級 */
+        #loginPage > .bg-white {
+            box-shadow: 0 0 50px -12px rgba(0, 0, 0, 0.25);
+        }
 
         /* 按鈕標準化配套：按鈕保留原有 bg-* 配色時，隱藏 daisyUI .btn 的預設灰邊框
            （1px 邊框仍佔位，不影響尺寸）；自帶 border-* 類的按鈕不受影響 */
@@ -268,8 +273,16 @@
         /* 按鈕指住／按下一律不位移：daisyUI .btn:active 預設 translate 0 .5px（按下下沉），
            部份模板（病人診症記錄操作掣）hover:-translate-y-0.5（上浮）。
            統一固定位置；拍照快門等固定圓形掣沒加 .btn，不受影響。 */
-        .btn[data-btn-normalized] {
+        .btn,
+        [data-btn-normalized] {
             translate: none !important;
+        }
+        /* 所有按鈕的「按下」回饋：稍微變暗 + 向內陰影，只有質感變化、不改尺寸與位置，
+           不影響排版（不用 translate／margin）；disabled 按鈕不套用 */
+        button:not(:disabled):active,
+        [role="button"]:not([aria-disabled="true"]):active {
+            filter: brightness(0.9);
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.25);
         }
 
         /* 彩色按鈕統一調淺 10%（顏色與白色 9:1 混合）。
