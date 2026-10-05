@@ -12,8 +12,23 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="名醫診所">
     <link rel="apple-touch-icon" href="/images/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5/daisyui.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.7.47/daisyui.css">
+    <!-- daisyUI 5 全套 35 個內建主題（本地釘版本，配合帳號安全設定內的主題切換器） -->
+    <link rel="stylesheet" href="js/vendor/daisyui/themes.css?v=20261006a">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script>
+        /* 主題偏好（只存本裝置 localStorage）：喺首次繪製前套用 data-theme，避免畫面閃一下預設色。
+           無偏好時唔加 data-theme，保留品牌橙啡 token。 */
+        (function () {
+            try {
+                var t = localStorage.getItem('tcm-theme');
+                /* 只接受主題名格式，完整白名單由 system.js 啟動時再驗；非法值一律唔加屬性 */
+                if (t && /^[a-z0-9_-]{1,20}$/.test(t)) {
+                    document.documentElement.setAttribute('data-theme', t);
+                }
+            } catch (e) { }
+        })();
+    </script>
     <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -164,8 +179,10 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
 
-        /* daisyUI 5 品牌色 token（與 index.html 一致） */
-        :root {
+        /* daisyUI 5 品牌色 token（與 index.html 一致）。
+           只喺「未選用 daisyUI 主題」（<html> 冇 data-theme）時生效；
+           一旦設了 data-theme，[data-theme=x] 主題變數（權重相同但來源於主題樣式表）接管。 */
+        :root:not([data-theme]) {
             --color-primary: #D9782B;
             --color-primary-content: #ffffff;
             --color-secondary: #B8621F;
@@ -197,6 +214,34 @@
             [role="button"][aria-disabled="true"] { cursor: not-allowed; }
         }
         body { font-family: 'Noto Sans TC', sans-serif; }
+        /* 啟用 daisyUI 主題時頁面底色跟隨主題（白卡／導航等寫死區塊保持原色，深色主題下仍清晰可讀）；
+           html[data-theme] body 權重 (0,1,1) 高過 body.bg-white 工具類 (0,1,0) */
+        html[data-theme] body { background-color: var(--color-base-200); }
+
+        /* 主題切換器預覽磚（靜態 class，唔依賴 Tailwind Play CDN 對動態 DOM 生成規則） */
+        .theme-swatch {
+            display: block; width: 100%; text-align: left;
+            border: 2px solid var(--color-base-300);
+            background: var(--color-base-100); color: var(--color-base-content);
+            border-radius: 0.75rem; padding: 0.6rem 0.7rem;
+            transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+        }
+        .theme-swatch:hover { transform: translateY(-1px); }
+        .theme-swatch:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+        .theme-swatch[aria-pressed="true"] {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 2px var(--color-primary);
+        }
+        .theme-swatch-dots { display: flex; gap: 6px; margin-bottom: 8px; }
+        .theme-dot { width: 16px; height: 16px; border-radius: 9999px; border: 1px solid rgba(128,128,128,.35); }
+        .theme-swatch-name { font-size: 12px; font-weight: 600; line-height: 1.25; word-break: break-word; }
+        #themeResetButton:disabled { opacity: .45; cursor: not-allowed; }
+        /* 主題磚排版用獨立 class 接管：全站 <640px 媒體查詢會將 .grid-cols-* !important 壓成單欄，
+           36 個磚單欄太長，呢度手機維持 2 欄，闊屏遞增到 3/4/5 欄 */
+        #themePicker { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        @media (min-width: 640px) { #themePicker { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (min-width: 768px) { #themePicker { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+        @media (min-width: 1024px) { #themePicker { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
         .fade-in { animation: fadeIn 0.3s ease-in forwards; }
         .fade-out { animation: fadeOut 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -3687,6 +3732,17 @@
               </div>
 
               <div class="bg-gray-50 rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-1">介面主題</h3>
+                <p class="text-sm text-gray-500 mb-4">daisyUI 內建 35 個現成主題，一按即時預覽。偏好只儲存於本機瀏覽器，唔會同步到其他裝置。</p>
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <p class="text-sm text-gray-600 m-0">目前主題：<span id="themeCurrentName" class="font-semibold text-gray-800">系統預設</span></p>
+                  <button type="button" id="themeResetButton" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-100 text-gray-700 transition duration-200">還原系統預設</button>
+                </div>
+                <div id="themePicker"></div>
+                <p class="text-xs text-gray-400 mt-3 mb-0">備註：系統部分版面使用固定配色，主題主要改變按鈕、輸入框等 daisyUI 元件同頁面底色。</p>
+              </div>
+
+              <div class="bg-gray-50 rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">變更密碼</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
@@ -6186,7 +6242,7 @@
     <script src="schedule_management.js" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
     <script type="module" src="js/app.js?v=20261006h"></script>
-    <script src="system.js?v=20261006h" defer></script>
+    <script src="system.js?v=20261006i" defer></script>
     <script src="attachments.js" defer></script>
     <script src="personalStatistics.js?v=20261005a" defer></script>
     <script src="systemmanagement.js" defer></script>

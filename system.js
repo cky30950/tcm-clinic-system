@@ -13512,6 +13512,114 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })();
 
+        // ── 介面主題切換器（帳號安全設定）：daisyUI 5 全套 35 個內建主題 ─────
+        // 切換只改 <html data-theme> 並持久化到本機 localStorage（key: tcm-theme）；
+        // 無偏好時移除屬性，保留品牌橙啡 token（system.html head 會喺繪製前先套用）。
+        try {
+            const THEME_STORAGE_KEY = 'tcm-theme';
+            const DAISY_THEMES = [
+                'light', 'dark', 'cupcake', 'bumblebee', 'emerald', 'corporate',
+                'synthwave', 'retro', 'cyberpunk', 'valentine', 'halloween', 'garden',
+                'forest', 'aqua', 'lofi', 'pastel', 'fantasy', 'wireframe', 'black',
+                'luxury', 'dracula', 'cmyk', 'autumn', 'business', 'acid', 'lemonade',
+                'night', 'coffee', 'winter', 'dim', 'nord', 'sunset', 'caramellatte',
+                'abyss', 'silk'
+            ];
+            // 「系統預設」磚嘅品牌色直接凍結喺元素上，唔俾當前主題變數滲入預覽
+            const BRAND_THEME_VARS = {
+                '--color-primary': '#D9782B',
+                '--color-secondary': '#B8621F',
+                '--color-accent': '#B48F79',
+                '--color-base-100': '#ffffff',
+                '--color-base-200': '#F6EFE8',
+                '--color-base-300': '#E8DED5',
+                '--color-base-content': '#1E1E1E'
+            };
+
+            function readStoredTheme() {
+                try { return localStorage.getItem(THEME_STORAGE_KEY) || ''; } catch (e) { return ''; }
+            }
+            function isValidTheme(name) { return !!name && DAISY_THEMES.indexOf(name) !== -1; }
+            function getActiveTheme() {
+                const attr = document.documentElement.getAttribute('data-theme');
+                return isValidTheme(attr) ? attr : '';
+            }
+
+            window.applyUiTheme = function (name) {
+                const root = document.documentElement;
+                if (isValidTheme(name)) {
+                    root.setAttribute('data-theme', name);
+                    try { localStorage.setItem(THEME_STORAGE_KEY, name); } catch (e) {}
+                } else {
+                    root.removeAttribute('data-theme');
+                    try { localStorage.removeItem(THEME_STORAGE_KEY); } catch (e) {}
+                }
+                syncThemePickerState();
+            };
+
+            function syncThemePickerState() {
+                const active = getActiveTheme();
+                const box = document.getElementById('themePicker');
+                if (box) {
+                    box.querySelectorAll('.theme-swatch').forEach(function (b) {
+                        b.setAttribute('aria-pressed', (b.dataset.themeName || '') === active ? 'true' : 'false');
+                    });
+                }
+                const label = document.getElementById('themeCurrentName');
+                if (label) label.textContent = active ? active : '系統預設（品牌橙啡）';
+                const resetBtn = document.getElementById('themeResetButton');
+                if (resetBtn) resetBtn.disabled = !active;
+            }
+
+            function makeSwatch(themeName, displayName, frozenVars) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'theme-swatch';
+                btn.dataset.themeName = themeName || '';
+                btn.setAttribute('aria-pressed', 'false');
+                if (themeName) btn.setAttribute('data-theme', themeName);
+                if (frozenVars) {
+                    Object.keys(frozenVars).forEach(function (k) { btn.style.setProperty(k, frozenVars[k]); });
+                }
+                btn.innerHTML =
+                    '<span class="theme-swatch-dots">' +
+                        '<span class="theme-dot" style="background:var(--color-primary)"></span>' +
+                        '<span class="theme-dot" style="background:var(--color-secondary)"></span>' +
+                        '<span class="theme-dot" style="background:var(--color-accent)"></span>' +
+                    '</span>' +
+                    '<span class="theme-swatch-name"></span>';
+                btn.querySelector('.theme-swatch-name').textContent = displayName;
+                btn.addEventListener('click', function () { window.applyUiTheme(themeName); });
+                return btn;
+            }
+
+            function initThemePicker() {
+                const box = document.getElementById('themePicker');
+                if (!box || box.dataset.built) return;
+                box.dataset.built = '1';
+                box.appendChild(makeSwatch('', '系統預設', BRAND_THEME_VARS));
+                DAISY_THEMES.forEach(function (name) { box.appendChild(makeSwatch(name, name, null)); });
+                const resetBtn = document.getElementById('themeResetButton');
+                if (resetBtn && !resetBtn.dataset.bound) {
+                    resetBtn.dataset.bound = '1';
+                    resetBtn.addEventListener('click', function () { window.applyUiTheme(''); });
+                }
+            }
+
+            // 容器係靜態 HTML，script 載入時已喺 DOM；順便修正 head 早期套用時可能存在嘅非法值
+            (function initThemeSwitcher() {
+                const stored = readStoredTheme();
+                if (stored && !isValidTheme(stored)) {
+                    document.documentElement.removeAttribute('data-theme');
+                    try { localStorage.removeItem(THEME_STORAGE_KEY); } catch (e) {}
+                }
+                initThemePicker();
+                syncThemePickerState();
+            })();
+        } catch (e) {
+            console.error('主題切換器初始化失敗:', e);
+        }
+
         // 登出按鈕（頂部與側邊欄）：點擊後調用 logout
         const logoutBtn = document.getElementById('logoutButton');
         if (logoutBtn) {
