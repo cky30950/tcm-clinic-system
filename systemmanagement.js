@@ -1208,6 +1208,47 @@ function buildLegacyMigrationSummaryHtml(parsed) {
     `;
 }
 
+/**
+ * 以 SheetJS 解析舊系統 Excel 匯入檔：逐個工作表讀取列（首列為標題），
+ * 依「資料類型」選項或自動推斷分流為病人／病歷物件，後續沿用
+ * normalizeLegacy* 正規化流程。日期/數字一律取格式化字串，空白列略過。
+ * @param {File} file 使用者選擇的 .xlsx/.xls 檔案
+ * @param {string} selectedType auto|patients|consultations|mixed
+ * @returns {Promise<{patientItems: Array, consultationItems: Array}>}
+ */
+async function parseLegacyXlsxFile(file, selectedType) {
+    const buf = await file.arrayBuffer();
+    const workbook = window.XLSX.read(buf, { type: 'array' });
+    const patientItems = [];
+    const consultationItems = [];
+    (workbook.SheetNames || []).forEach(function (sheetName) {
+        const ws = workbook.Sheets[sheetName];
+        if (!ws) return;
+        let rows = [];
+        try {
+            rows = window.XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+        } catch (_e) {
+            return;
+        }
+        // 過濾全空白列（sheet_to_json 可能產生所有值皆為 '' 的物件）
+        const objects = (rows || []).filter(function (row) {
+            return row && Object.keys(row).some(function (k) {
+                return String(row[k] == null ? '' : row[k]).trim() !== '';
+            });
+        });
+        if (!objects.length) return;
+        const inferredType = selectedType === 'auto' || selectedType === 'mixed'
+            ? inferArrayType(objects)
+            : selectedType;
+        if (inferredType === 'consultations') {
+            consultationItems.push.apply(consultationItems, objects);
+        } else {
+            patientItems.push.apply(patientItems, objects);
+        }
+    });
+    return { patientItems: patientItems, consultationItems: consultationItems };
+}
+
 async function handleLegacyMigrationFile(file) {
     if (!file) return;
     const fileInfo = document.getElementById('legacyMigrationFileInfo');
@@ -1220,17 +1261,27 @@ async function handleLegacyMigrationFile(file) {
         const typeSelect = document.getElementById('legacyMigrationDataType');
         const selectedFormat = formatSelect ? formatSelect.value : 'auto';
         const selectedType = typeSelect ? typeSelect.value : 'auto';
-        const text = await file.text();
         const ext = String(file.name || '').toLowerCase().split('.').pop();
-        const format = selectedFormat === 'auto' ? (ext === 'csv' ? 'csv' : 'json') : selectedFormat;
+        const format = selectedFormat === 'auto'
+            ? (ext === 'csv' ? 'csv' : ((ext === 'xlsx' || ext === 'xls') ? 'xlsx' : 'json'))
+            : selectedFormat;
         let patientItems = [];
         let consultationItems = [];
-        if (format === 'csv') {
+        if (format === 'xlsx') {
+            if (!window.XLSX || typeof window.XLSX.read !== 'function') {
+                throw new Error('Excel 解析程式庫未載入');
+            }
+            const parsedXlsx = await parseLegacyXlsxFile(file, selectedType);
+            patientItems = parsedXlsx.patientItems;
+            consultationItems = parsedXlsx.consultationItems;
+        } else if (format === 'csv') {
+            const text = await file.text();
             const objects = parseCsvTextToObjects(text);
             const inferredType = selectedType === 'auto' ? inferArrayType(objects) : selectedType;
             if (inferredType === 'consultations') consultationItems = objects;
             else patientItems = objects;
         } else {
+            const text = await file.text();
             const jsonData = JSON.parse(text);
             const collected = collectLegacyRawData(jsonData, selectedType);
             patientItems = collected.patientItems;
@@ -1269,7 +1320,7 @@ async function handleLegacyMigrationFile(file) {
             summary.innerHTML = '';
         }
         console.error('解析舊資料檔案失敗:', error);
-        showToast('解析失敗，請確認檔案格式（JSON/CSV）', 'error');
+        showToast('解析失敗，請確認檔案格式（JSON/CSV/Excel）', 'error');
     }
 }
 

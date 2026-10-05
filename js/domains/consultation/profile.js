@@ -410,6 +410,7 @@ import { G } from '../../lib/legacy.js';
                 return;
             }
 
+            const startedAt = Date.now();
             try {
                 if (triggerButton) {
                     G.setButtonLoading(triggerButton, '載入中...');
@@ -436,6 +437,11 @@ import { G } from '../../lib/legacy.js';
                 console.error('開啟診症既住史編輯器失敗:', error);
                 G.showToast('開啟既住史編輯器失敗', 'error');
             } finally {
+                // 讀取圈保證最少顯示 400ms：病人已快取時載入過快，否則讀取圈一閃而過
+                const elapsed = Date.now() - startedAt;
+                if (elapsed < 400) {
+                    await new Promise(resolve => setTimeout(resolve, 400 - elapsed));
+                }
                 if (triggerButton) {
                     G.clearButtonLoading(triggerButton);
                 }

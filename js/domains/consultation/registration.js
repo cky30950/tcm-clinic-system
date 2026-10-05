@@ -50,6 +50,12 @@ import { G } from '../../lib/legacy.js';
                 picker.min = localToday;
                 // 每次進入診症系統都預設跳回今天
                 picker.value = localToday;
+                // flatpickr 不監聽 min 屬性的程式化變更，需顯式同步下限
+                try {
+                    if (typeof window.setFlatpickrBounds === 'function') {
+                        window.setFlatpickrBounds(picker, localToday);
+                    }
+                } catch (_fpE) {}
                 
                 if (!picker.dataset.bound) {
                     picker.addEventListener('change', function () {

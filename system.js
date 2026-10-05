@@ -15342,8 +15342,8 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
    * @param {string} html 未受信任的針灸備註 HTML
    * @returns {string} 淨化後的安全 HTML
    */
-  window.sanitizeAcupunctureNotesHtml = function(html) {
-    const source = String(html == null ? '' : html);
+  // 手寫白名單實作：改為內部函式，作為 DOMPurify 之後的第二道關卡與 fail-open 備援
+  function legacySanitizeAcupunctureNotesHtml(source) {
     if (!source) return '';
     // 穴位方塊的固定樣式（與 addAcupointToNotes 保持一致）
     const ACU_SPAN_CLASS = 'inline-flex items-center justify-center bg-blue-100 border border-blue-200 rounded text-sm text-blue-800 px-1 py-0.5 mr-1 cursor-pointer';
@@ -15413,6 +15413,31 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
         return '';
       }
     }
+  }
+
+  /**
+   * 針灸備註淨化入口：第一層交由 DOMPurify（持續維護的 XSS 特徵庫）
+   * 中立化所有非白名單標記／事件／危險協定，第二層再交既有手寫白名單
+   * 遞迴重建，外部行為與正規化結果與舊版完全一致；DOMPurify 缺失或
+   * 例外時無縫退回手寫實作（fail-open 到同等嚴格的防護，不是不設防）。
+   * @param {string} html 未受信任的針灸備註 HTML
+   * @returns {string} 淨化後的安全 HTML
+   */
+  window.sanitizeAcupunctureNotesHtml = function (html) {
+    const source = String(html == null ? '' : html);
+    if (!source) return '';
+    if (window.DOMPurify) {
+      try {
+        const pre = window.DOMPurify.sanitize(source, {
+          ALLOWED_TAGS: ['br', 'span'],
+          ALLOWED_ATTR: ['data-acupoint-name', 'data-tooltip', 'class', 'contenteditable'],
+          ALLOW_DATA_ATTR: false,
+          KEEP_CONTENT: true
+        });
+        return legacySanitizeAcupunctureNotesHtml(pre);
+      } catch (_e) { /* 例外時退回手寫實作 */ }
+    }
+    return legacySanitizeAcupunctureNotesHtml(source);
   };
 
   /**
@@ -15423,8 +15448,8 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
    * @param {string} html 將要寫入列印視窗的完整 HTML
    * @returns {string} 淨化後的 HTML
    */
-  window.sanitizePrintHtml = function (html) {
-    const source = String(html == null ? '' : html);
+  // 手寫 DOMParser 黑名單實作：改為內部函式，作為 DOMPurify 版的 fail-open 備援
+  function legacySanitizePrintHtml(source) {
     let doc;
     try {
       doc = new DOMParser().parseFromString(source, 'text/html');
@@ -15471,6 +15496,60 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
     });
 
     return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+  }
+
+  /**
+   * 列印文件淨化入口：以 DOMPurify 為底層（WHOLE_DOCUMENT 保留完整排版），
+   * 危險標籤／srcdoc 走 FORBID 設定，on* 事件由 DOMPurify 內建移除；
+   * 另以掛鈎逐條保留舊版自訂加強：meta[http-equiv] 整節移除、URL 屬性
+   * 先做控制字元正規化再比對危險協定（含 data: 僅允許圖片）。
+   * 掛鈎在呼叫前註冊、呼叫後立刻移除，避免污染全域 DOMPurify singleton。
+   * DOMPurify 缺失或例外時無縫退回手寫 DOMParser 版本。
+   * @param {string} html 將要寫入列印視窗的完整 HTML
+   * @returns {string} 淨化後的 HTML
+   */
+  window.sanitizePrintHtml = function (html) {
+    const source = String(html == null ? '' : html);
+    const D = window.DOMPurify;
+    if (D) {
+      try {
+        // 與舊版完全相同的控制字元集合與危險協定判斷
+        const CTRL_RE = /[\u0000-\u0020\u007f-\u009f\u00ad\u200b-\u200f\u2028\u2029\ufeff]/g;
+        const isDangerousUrl = function (raw) {
+          const v = String(raw == null ? '' : raw).replace(CTRL_RE, '').toLowerCase();
+          if (/^(javascript|vbscript|livescript|file|data:text\/html|mocha):/.test(v)) return true;
+          if (/^data:(?!image\/(png|jpeg|jpg|gif|webp|bmp);)/i.test(v)) return true;
+          return false;
+        };
+        const URL_ATTRS = { href: 1, src: 1, 'xlink:href': 1, poster: 1, background: 1, formaction: 1, cite: 1, longdesc: 1, manifest: 1 };
+        const onMetaHook = function (node) {
+          if (node.nodeType === 1 && node.nodeName === 'META' && node.hasAttribute('http-equiv')) {
+            this.forceRemove(node);
+          }
+        };
+        const onAttrHook = function (_node, data) {
+          if (data && URL_ATTRS[String(data.attrName).toLowerCase()] && isDangerousUrl(data.attrValue)) {
+            data.keepAttr = false;
+          }
+        };
+        D.addHook('beforeSanitizeElements', onMetaHook);
+        D.addHook('uponSanitizeAttribute', onAttrHook);
+        let clean;
+        try {
+          clean = D.sanitize(source, {
+            WHOLE_DOCUMENT: true,
+            FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'applet', 'base', 'form', 'link'],
+            FORBID_ATTR: ['srcdoc']
+          });
+        } finally {
+          D.removeHook('beforeSanitizeElements', onMetaHook);
+          D.removeHook('uponSanitizeAttribute', onAttrHook);
+        }
+        // DOMPurify 可能自行加上 doctype，先移除再補上本系統固定版本
+        return '<!DOCTYPE html>\n' + String(clean).replace(/^\s*<!DOCTYPE[^>]*>/i, '');
+      } catch (_e) { /* 例外時退回手寫實作 */ }
+    }
+    return legacySanitizePrintHtml(source);
   };
 
   // ============================================================

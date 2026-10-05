@@ -2509,6 +2509,130 @@ export async function exportFinancialReportTxt() {
 
 export async function exportFinancialReportExcel() {
     const data = await buildFinancialExportPayload();
+    const ft = (s) => (typeof window.t === 'function' ? window.t(s) : s);
+    // 優先使用 SheetJS 產生真正的 .xlsx；程式庫缺失或失敗時退回舊式 HTML 偽 Excel
+    if (window.XLSX && typeof window.XLSX.write === 'function') {
+        try {
+            exportFinancialReportXlsx(data, ft);
+            return;
+        } catch (error) {
+            console.error('產生 XLSX 財務報表失敗，改用舊格式：', error);
+        }
+    }
+    exportFinancialReportExcelHtml(data, ft);
+}
+
+/**
+ * 以 SheetJS 輸出多工作表真實 .xlsx：摘要／醫師／服務分類／每日／成本／
+ * 會員儲值摘要／每日儲值明細。數字欄位以數值型別寫入，方便 Excel 計算。
+ */
+function exportFinancialReportXlsx(data, ft) {
+    const X = window.XLSX;
+    const { startDate, endDate, doctorFilter, clinicFilter, clinicName, stats, totalCost, byType } = data;
+    const wb = X.utils.book_new();
+    const num = function (v) { return Number(v) || 0; };
+
+    const addSheet = function (name, aoa, widths) {
+        const ws = X.utils.aoa_to_sheet(aoa);
+        if (widths) ws['!cols'] = widths.map(function (wch) { return { wch: wch }; });
+        X.utils.book_append_sheet(wb, ws, name);
+    };
+
+    // ── 摘要 ──
+    addSheet(ft('摘要'), [
+        [ft('欄位'), ft('內容')],
+        [ft('期間'), `${startDate} ${ft('至')} ${endDate}`],
+        [ft('生成時間'), data.generatedAt],
+        [ft('選擇醫師'), doctorFilter || ft('全部醫師')],
+        [ft('選擇診所'), clinicFilter ? clinicName : ft('全部診所')],
+        [ft('總收入(未扣成本)'), num(stats.totalRevenue)],
+        [ft('總成本'), num(totalCost)],
+        [ft('成本計算'), data.costProrated ? ft('部分月份按天數分攤') : ft('整月實際成本')],
+        [ft('淨收入'), num(stats.totalRevenue) - num(totalCost)],
+        [ft('總診症數'), num(stats.totalConsultations)],
+        [ft('平均收入'), Math.round(num(stats.averageRevenue))],
+        [ft('有效醫師數'), num(stats.activeDoctors)]
+    ], [22, 36]);
+
+    // ── 醫師統計 ──
+    const doctorAoa = [[ft('醫師'), ft('次數'), ft('收入')]];
+    Object.keys(stats.doctorStats).forEach(function (key) {
+        const d = stats.doctorStats[key];
+        doctorAoa.push([key || ft('未知醫師'), num(d.count), num(d.revenue)]);
+    });
+    if (doctorAoa.length === 1) doctorAoa.push([ft('無資料'), '', '']);
+    addSheet(ft('醫師統計'), doctorAoa, [20, 10, 14]);
+
+    // ── 服務分類統計 ──
+    const serviceAoa = [[ft('服務類型'), ft('次數'), ft('收入')]];
+    Object.values(stats.serviceStats).forEach(function (item) {
+        serviceAoa.push([item.name, num(item.count), num(item.revenue)]);
+    });
+    if (serviceAoa.length === 1) serviceAoa.push([ft('無資料'), '', '']);
+    addSheet(ft('服務分類統計'), serviceAoa, [28, 10, 14]);
+
+    // ── 每日統計（依日期遞增） ──
+    const dailyAoa = [[ft('日期'), ft('次數'), ft('收入')]];
+    Object.keys(stats.dailyStats).sort().forEach(function (dateKey) {
+        const d = stats.dailyStats[dateKey];
+        dailyAoa.push([dateKey, num(d.count), num(d.revenue)]);
+    });
+    if (dailyAoa.length === 1) dailyAoa.push([ft('無資料'), '', '']);
+    addSheet(ft('每日統計'), dailyAoa, [14, 10, 14]);
+
+    // ── 成本統計 ──
+    const costAoa = [[ft('成本類型'), ft('金額')]];
+    Object.keys(byType).forEach(function (type) {
+        costAoa.push([type, num(byType[type])]);
+    });
+    if (costAoa.length === 1) costAoa.push([ft('無資料'), '']);
+    addSheet(ft('成本統計'), costAoa, [24, 14]);
+
+    // ── 會員儲值統計 ──
+    const w = data.walletStats;
+    if (w) {
+        addSheet(ft('儲值摘要'), [
+            [ft('項目'), ft('金額'), ft('筆數'), ft('備註')],
+            [ft('儲值充值(本金)'), num(w.topupPrincipal), num(w.topupCount), ft('屬預存，非營業收入')],
+            [ft('充值贈送額'), num(w.bonusIssued), num(w.bonusCount), ft('診所贈送')],
+            [ft('儲值消費－本金'), -num(w.payPrincipal), num(w.payCount), ft('沖銷本金')],
+            [ft('儲值消費－贈送'), -num(w.payBonus), '', ft('沖銷贈送額')],
+            [ft('退款'), -(num(w.refundPrincipal) + num(w.refundBonus)), num(w.refundCount), ft('退回會員帳戶')],
+            [ft('人工調整（淨額）'), num(w.adjustNet), num(w.adjustCount), ft('正＝補入／負＝扣減')],
+            [ft('期末餘額－本金'), num(w.outstandingPrincipal), '', ft('診所負債')],
+            [ft('期末餘額－贈送'), num(w.outstandingBonus), '', ft('診所負債')]
+        ], [22, 14, 10, 24]);
+
+        const walletDailyAoa = [[ft('日期'), ft('充值筆數'), ft('充值金額'), ft('消費筆數'), ft('消費金額'), ft('退款金額')]];
+        Object.keys(w.daily).sort().reverse().forEach(function (day) {
+            const r = w.daily[day];
+            walletDailyAoa.push([
+                day,
+                num(r.topupCount), num(r.topupAmount),
+                num(r.payCount), num(r.payAmount), num(r.refundAmount)
+            ]);
+        });
+        if (walletDailyAoa.length === 1) walletDailyAoa.push([ft('無資料'), '', '', '', '', '']);
+        addSheet(ft('每日儲值明細'), walletDailyAoa, [14, 10, 14, 10, 14, 14]);
+    }
+
+    const out = X.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${ft('財務報表')}_${startDate}_${endDate}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    G.showToast(ft('財務報表 Excel 已匯出！'), 'success');
+}
+
+/**
+ * 舊式「HTML 表格字串＋.xls」匯出，僅作為 SheetJS 無法使用時的降級備援。
+ */
+function exportFinancialReportExcelHtml(data, ft) {
     const { startDate, endDate, doctorFilter, clinicFilter, clinicName, stats, totalCost, byType } = data;
     const esc = (value) => {
         const str = String(value == null ? '' : value);
@@ -2519,7 +2643,6 @@ export async function exportFinancialReportExcel() {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
     };
-    const ft = (s) => (typeof window.t === 'function' ? window.t(s) : s);
     const doctorRows = Object.keys(stats.doctorStats).map(key => {
         const d = stats.doctorStats[key];
         return `<tr><td>${esc(key || ft('未知醫師'))}</td><td>${d.count}</td><td>${d.revenue}</td></tr>`;

@@ -1347,12 +1347,20 @@
                 staff.forEach(member => {
                     const option = document.createElement('option');
                     option.value = member.id;
-                    
+
                     const roleLabelFixed = member.role === 'doctor' ? translate('醫師') : translate('護理師');
                     option.textContent = `${member.name} (${roleLabelFixed}) - ${member.department}`;
                     fixedSelect.appendChild(option);
                 });
             }
+
+            // Tom Select 預設不監聽底層 <select> 的 option 重建，需手動同步選項與選值
+            try {
+                if (typeof window.syncTomSelect === 'function') {
+                    window.syncTomSelect(select);
+                    if (fixedSelect) window.syncTomSelect(fixedSelect);
+                }
+            } catch (_tsE) {}
         }
 
         
@@ -1384,7 +1392,15 @@
             }
             
             if (staffId) {
-                document.getElementById('staffSelect').value = staffId;
+                try {
+                    if (typeof window.setTomSelectValue === 'function') {
+                        window.setTomSelectValue('staffSelect', staffId);
+                    } else {
+                        document.getElementById('staffSelect').value = staffId;
+                    }
+                } catch (_tsE) {
+                    document.getElementById('staffSelect').value = staffId;
+                }
             }
             
             
@@ -1783,7 +1799,15 @@
             if (!shift) return;
 
             
-            document.getElementById('staffSelect').value = shift.staffId;
+            try {
+                if (typeof window.setTomSelectValue === 'function') {
+                    window.setTomSelectValue('staffSelect', shift.staffId);
+                } else {
+                    document.getElementById('staffSelect').value = shift.staffId;
+                }
+            } catch (_tsE) {
+                document.getElementById('staffSelect').value = shift.staffId;
+            }
             document.getElementById('shiftDate').value = shift.date;
             document.getElementById('startTime').value = shift.startTime;
             document.getElementById('endTime').value = shift.endTime;

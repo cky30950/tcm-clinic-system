@@ -493,6 +493,14 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
     const tbody = document.getElementById('walletTxTable');
     const pager = document.getElementById('walletTxPager');
     if (!tbody) return;
+    // Tabulator 試點：程式庫可用且容器存在時改渲染互動表格（內建排序/篩選/分頁）
+    if (window.Tabulator && document.getElementById('walletTxGrid')) {
+      if (renderWalletTxGrid()) return;
+    }
+    const legacyWrap = document.getElementById('walletTxLegacy');
+    const gridWrap = document.getElementById('walletTxGrid');
+    if (legacyWrap) legacyWrap.classList.remove('hidden');
+    if (gridWrap) gridWrap.classList.add('hidden');
     if (!walletLastTxs.length) {
       tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">尚無交易記錄</td></tr>';
       if (pager) pager.classList.add('hidden');
@@ -522,6 +530,120 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
     if (next === walletTxPage) return;
     walletTxPage = next;
     renderWalletTxRows();
+  }
+
+  // ── Tabulator 互動交易表（試點） ──────────────────────────────────
+  let walletTxGrid = null;
+
+  // 將交易列轉為表格資料；顯示文字與 walletTxRowHtml 規格一致
+  function walletTxRowData(tx) {
+    const amount = walletRound2(tx.amount);
+    const isPayment = tx.type === 'payment' || amount < 0;
+    let atText = '';
+    try {
+      atText = new Date(tx.at).toLocaleString('zh-HK', { hour12: false });
+    } catch (_e) { atText = tx.at || ''; }
+    let typeText = WALLET_TYPE_LABELS[tx.type] || tx.type;
+    if (tx.type === 'topup' && tx.paymentMethod) {
+      const methodLabel = WALLET_METHOD_LABELS[tx.paymentMethod] || tx.paymentMethod;
+      typeText += `（${methodLabel}）`;
+    }
+    if (tx.type === 'statusChange' && tx.toStatus) {
+      const fromL = WALLET_STATUS_LABELS[tx.fromStatus] || tx.fromStatus || '運作中';
+      const toL = WALLET_STATUS_LABELS[tx.toStatus] || tx.toStatus;
+      typeText += `（${fromL}→${toL}）`;
+    }
+    return {
+      at: tx.at || '',
+      atText: atText,
+      typeText: typeText,
+      note: tx.note || '',
+      amount: amount,
+      isPayment: isPayment,
+      isZero: tx.type === 'statusChange' || amount === 0
+    };
+  }
+
+  // 渲染（或更新）Tabulator；成功回 true，任何例外回 false 由呼叫端退回原生表
+  function renderWalletTxGrid() {
+    const gridEl = document.getElementById('walletTxGrid');
+    const legacyWrap = document.getElementById('walletTxLegacy');
+    if (!gridEl || !window.Tabulator) return false;
+    const esc = (s) => (typeof window.escapeHtml === 'function'
+      ? window.escapeHtml(s)
+      : String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c])));
+    const rows = (walletLastTxs || []).map(walletTxRowData);
+    try {
+      gridEl.classList.remove('hidden');
+      if (legacyWrap) legacyWrap.classList.add('hidden');
+
+      if (!walletTxGrid) {
+        walletTxGrid = new window.Tabulator(gridEl, {
+          data: rows,
+          layout: 'fitColumns',
+          placeholder: '尚無交易記錄',
+          pagination: true,
+          paginationMode: 'local',
+          paginationSize: WALLET_TX_PAGE_SIZE,
+          initialSort: [{ column: 'atText', dir: 'desc' }],
+          locale: 'zh-hant',
+          langs: {
+            'zh-hant': {
+              pagination: {
+                page_size: '每頁筆數',
+                first: '«', first_title: '第一頁',
+                prev: '上一頁', prev_title: '上一頁',
+                next: '下一頁', next_title: '下一頁',
+                last: '»', last_title: '最後一頁',
+                all: '全部',
+                counter: { showing: '顯示', of: '／共', rows: '筆', pages: '頁' },
+                button_tip: (page) => `第 ${page} 頁`
+              }
+            }
+          },
+          columns: [
+            {
+              title: '時間', field: 'atText', widthGrow: 2,
+              headerFilter: 'input', headerFilterPlaceholder: '篩選時間…',
+              formatter: (cell) => esc(cell.getData().atText),
+              // 顯示欄是本地化字串，排序仍以原始 ISO 時間為準
+              sorter: (a, b, aRow, bRow) => String(aRow.getData().at).localeCompare(String(bRow.getData().at))
+            },
+            {
+              title: '類型', field: 'typeText', widthGrow: 2,
+              headerFilter: 'input', headerFilterPlaceholder: '篩選類型…',
+              formatter: (cell) => esc(cell.getValue() || '')
+            },
+            {
+              title: '金額', field: 'amount', width: 112, hozAlign: 'right', sorter: 'number',
+              formatter: (cell) => {
+                const d = cell.getData();
+                if (d.isZero) return '<span class="text-gray-400">—</span>';
+                const cls = d.isPayment ? 'text-red-600' : 'text-green-600';
+                return `<span class="${cls}">${d.isPayment ? '-' : ''}HK$${Math.abs(Number(cell.getValue()) || 0).toFixed(2)}</span>`;
+              }
+            },
+            {
+              title: '說明', field: 'note', widthGrow: 3,
+              headerFilter: 'input', headerFilterPlaceholder: '篩選說明…',
+              formatter: (cell) => esc(cell.getValue() || '')
+            }
+          ]
+        });
+      } else {
+        walletTxGrid.setData(rows);
+        try { if (typeof walletTxGrid.clearHeaderFilter === 'function') walletTxGrid.clearHeaderFilter(); } catch (_e) {}
+        try { walletTxGrid.setPage(1); } catch (_e) {}
+        try { walletTxGrid.redraw(true); } catch (_e) {}
+      }
+      return true;
+    } catch (error) {
+      console.warn('Tabulator 錢包交易表初始化失敗，退回原生表格：', error);
+      walletTxGrid = null;
+      gridEl.classList.add('hidden');
+      if (legacyWrap) legacyWrap.classList.remove('hidden');
+      return false;
+    }
   }
 
   // 管理員操作區收合

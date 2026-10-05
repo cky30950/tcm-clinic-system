@@ -150,7 +150,13 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+
+    <!-- 本地第三方 UI 插件（釘版本；SW 對同源 JS/CSS 採 network-first＋離線備援） -->
+    <link rel="stylesheet" href="js/vendor/flatpickr/flatpickr.min.css?v=20261005a">
+    <link rel="stylesheet" href="js/vendor/flatpickr/monthSelect.css?v=20261005a">
+    <link rel="stylesheet" href="js/vendor/tom-select/tom-select.bootstrap5.min.css?v=20261005a">
+    <link rel="stylesheet" href="js/vendor/tabulator/tabulator.min.css?v=20261005a">
+
     <script src="acupointIntegration.js"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -691,7 +697,7 @@
                 <div class="p-6 space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">月份</label>
-                        <input type="month" id="expenseMonth" onchange="loadClinicExpensesForSelectedMonth()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                        <input type="month" id="expenseMonth" data-fp="month" onchange="loadClinicExpensesForSelectedMonth()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">成本類型</label>
@@ -729,7 +735,7 @@
                 <div class="p-6 space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">月份</label>
-                        <input type="month" id="expenseListMonth" onchange="loadClinicExpensesForListMonth()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                        <input type="month" id="expenseListMonth" data-fp="month" onchange="loadClinicExpensesForListMonth()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full">
@@ -905,7 +911,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">出生日期 *</label>
-                                    <input type="date" id="patientBirthDate" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent" onchange="updatePatientAge()">
+                                    <input type="date" id="patientBirthDate" data-fp="date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent" onchange="updatePatientAge()">
                                 </div>
                                 <div class="md:col-span-2 lg:col-span-3">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">聯絡地址</label>
@@ -1281,7 +1287,7 @@
                                         <label class="block text-sm font-semibold text-gray-700 mb-2">
                                             <i data-lucide="clock" class="w-4 h-4 mr-2"></i><span>掛號時間</span>
                                         </label>
-                                        <input type="datetime-local" id="appointmentDateTime" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                        <input type="datetime-local" id="appointmentDateTime" data-fp="datetime" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                     </div>
                                 </div>
 
@@ -1331,6 +1337,7 @@
                                     <input
                                         type="date"
                                         id="appointmentDatePicker"
+                                        data-fp="date"
                                         class="border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-700 text-sm"
                                     />
                                 </div>
@@ -1768,7 +1775,7 @@
                                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                                         複診時間
                                     </label>
-                                    <input type="datetime-local" id="formFollowUpDate" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <input type="datetime-local" id="formFollowUpDate" data-fp="datetime" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                     <p class="text-xs text-gray-500 mt-1">建議病人下次回診的時間</p>
                                 </div>
                                 
@@ -1776,7 +1783,7 @@
                                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                                         到診時間
                                     </label>
-                                    <input type="datetime-local" id="formVisitTime" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <input type="datetime-local" id="formVisitTime" data-fp="datetime" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                     <p class="text-xs text-gray-500 mt-1">實際到診的時間（用於證明書）</p>
                                 </div>
                                 
@@ -1787,11 +1794,11 @@
                                     <div class="space-y-2">
                                         <div class="flex items-center space-x-2">
                                             <label class="text-xs text-gray-600 w-12">開始：</label>
-                                            <input type="date" id="formRestStartDate" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" onchange="updateRestPeriod()">
+                                            <input type="date" id="formRestStartDate" data-fp="date" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" onchange="updateRestPeriod()">
                                         </div>
                                         <div class="flex items-center space-x-2">
                                             <label class="text-xs text-gray-600 w-12">結束：</label>
-                                            <input type="date" id="formRestEndDate" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" onchange="updateRestPeriod()">
+                                            <input type="date" id="formRestEndDate" data-fp="date" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" onchange="updateRestPeriod()">
                                         </div>
                                         <div class="text-center">
                                             <span id="restPeriodDisplay" class="text-sm text-gray-500 font-medium">請選擇開始和結束日期</span>
@@ -2423,6 +2430,9 @@
                     <div class="shrink-0 flex flex-col">
                         <h3 class="text-sm font-semibold text-gray-800 mb-1.5 shrink-0">最近交易</h3>
                         <div class="border border-gray-200 rounded-lg">
+                            <!-- Tabulator 互動表格試點（載入成功時使用；失敗則隱藏退回下方原生表格） -->
+                            <div id="walletTxGrid" class="hidden text-sm"></div>
+                            <div id="walletTxLegacy">
                             <div class="overflow-auto">
                                 <table class="min-w-full text-sm">
                                     <thead class="bg-gray-50 text-gray-600 sticky top-0">
@@ -2437,6 +2447,7 @@
                                 </table>
                             </div>
                             <div id="walletTxPager" class="hidden px-3 py-2 border-t border-gray-200 flex items-center justify-between gap-2 text-sm"></div>
+                            </div>
                         </div>
                     </div>
                         </div>
@@ -2610,12 +2621,12 @@
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">開始日期</label>
-                            <input type="date" id="startDate" onchange="scheduleFinancialReportRefresh()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                            <input type="date" id="startDate" data-fp="date" onchange="scheduleFinancialReportRefresh()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                         </div>
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">結束日期</label>
-                            <input type="date" id="endDate" onchange="scheduleFinancialReportRefresh()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                            <input type="date" id="endDate" data-fp="date" onchange="scheduleFinancialReportRefresh()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                         </div>
                     </div>
                     
@@ -3070,7 +3081,7 @@
 
                     <div class="bg-gray-50 rounded-lg p-6 md:col-span-2">
                         <h3 class="text-lg font-semibold mb-4">舊資料轉移系統</h3>
-                        <p class="text-sm text-gray-600 mb-4">可匯入舊診所系統的 JSON 或 CSV。支援病人與病歷資料，系統會先解析預覽，再執行遷移並回報成功/略過/失敗筆數。</p>
+                        <p class="text-sm text-gray-600 mb-4">可匯入舊診所系統的 JSON、CSV 或 Excel（.xlsx）。支援病人與病歷資料，系統會先解析預覽，再執行遷移並回報成功/略過/失敗筆數。</p>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">匯入檔案格式</label>
@@ -3078,6 +3089,7 @@
                                     <option value="auto" selected>自動判斷</option>
                                     <option value="json">JSON</option>
                                     <option value="csv">CSV</option>
+                                    <option value="xlsx">Excel (.xlsx)</option>
                                 </select>
                             </div>
                             <div>
@@ -3101,7 +3113,7 @@
                             </button>
                             <div id="legacyMigrationFileInfo" class="text-sm text-gray-600 flex items-center">尚未選擇檔案</div>
                         </div>
-                        <input type="file" id="legacyMigrationFileInput" accept=".json,.csv,text/csv,application/json" class="hidden" onchange="handleLegacyMigrationFile(this.files[0])">
+                        <input type="file" id="legacyMigrationFileInput" accept=".json,.csv,.xlsx,.xls,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="hidden" onchange="handleLegacyMigrationFile(this.files[0])">
                         <div id="legacyMigrationSummary" class="hidden rounded-lg bg-white border border-gray-200 p-4 text-sm text-gray-700 mb-4"></div>
                         <div id="legacyMigrationProgressContainer" class="hidden">
                             <div class="w-full bg-gray-200 rounded-full h-2.5">
@@ -4882,19 +4894,19 @@
             <form id="shiftForm">
                 <div class="form-group">
                     <label class="form-label">人員</label>
-                    <select class="form-select" id="staffSelect" required></select>
+                    <select class="form-select" id="staffSelect" data-tom-select required></select>
                 </div>
                 <div class="form-group">
                     <label class="form-label">日期</label>
-                    <input type="date" class="form-input" id="shiftDate" required>
+                    <input type="date" class="form-input" id="shiftDate" data-fp="date" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">開始時間</label>
-                    <input type="time" class="form-input" id="startTime" required>
+                    <input type="time" class="form-input" id="startTime" data-fp="time" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">結束時間</label>
-                    <input type="time" class="form-input" id="endTime" required>
+                    <input type="time" class="form-input" id="endTime" data-fp="time" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">班別</label>
@@ -4925,7 +4937,7 @@
             <form id="fixedScheduleForm">
                 <div class="form-group">
                     <label class="form-label">選擇人員</label>
-                    <select class="form-select" id="fixedStaffSelect" required></select>
+                    <select class="form-select" id="fixedStaffSelect" data-tom-select required></select>
                 </div>
                 <div class="form-group">
                     <label class="form-label">固定班別</label>
@@ -4940,11 +4952,11 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div>
                             <label class="form-label">開始時間</label>
-                            <input type="time" class="form-input" id="fixedStartTime">
+                            <input type="time" class="form-input" id="fixedStartTime" data-fp="time">
                         </div>
                         <div>
                             <label class="form-label">結束時間</label>
-                            <input type="time" class="form-input" id="fixedEndTime">
+                            <input type="time" class="form-input" id="fixedEndTime" data-fp="time">
                         </div>
                     </div>
                 </div>
@@ -4987,11 +4999,11 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div>
                             <label class="form-label">開始日期</label>
-                            <input type="date" class="form-input" id="rangeStartDate">
+                            <input type="date" class="form-input" id="rangeStartDate" data-fp="date">
                         </div>
                         <div>
                             <label class="form-label">結束日期</label>
-                            <input type="date" class="form-input" id="rangeEndDate">
+                            <input type="date" class="form-input" id="rangeEndDate" data-fp="date">
                         </div>
                     </div>
                 </div>
@@ -6087,6 +6099,15 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@04f46c6a0708418cb7b96fc563eacae0fbf77674/qrcode.min.js"></script>
+
+    <!-- 本地第三方插件（釘版本；全部 defer，按此順序在 app.js/system.js 前就緒） -->
+    <script src="js/vendor/dompurify/purify.min.js?v=20261005a" defer></script>
+    <script src="js/vendor/xlsx/xlsx.full.min.js?v=20261005a" defer></script>
+    <script src="js/vendor/flatpickr/flatpickr.min.js?v=20261005a" defer></script>
+    <script src="js/vendor/flatpickr/monthSelect.js?v=20261005a" defer></script>
+    <script src="js/vendor/tom-select/tom-select.complete.min.js?v=20261005a" defer></script>
+    <script src="js/vendor/tabulator/tabulator.min.js?v=20261005a" defer></script>
+    <script src="js/lib/vendor-enhance.js?v=20261005a" defer></script>
 
     <script src="version-config.js?v=20261003a" defer></script>
     <script src="pwa.js?v=20260923b" defer></script>
