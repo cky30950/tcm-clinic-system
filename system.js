@@ -6004,7 +6004,7 @@ async function fetchJsonWithFallback(fileName) {
                 `;
                 button.onclick = () => {
                     showSection(permission);
-                    toggleSidebar();
+                    closeSidebar();
                 };
                 menuContainer.appendChild(button);
             });
@@ -13306,36 +13306,42 @@ document.addEventListener('DOMContentLoaded', function() {
             loginPasswordInput.addEventListener('keypress', loginKeyListener);
         }
 
-        // 側邊欄開關按鈕與遮罩：點擊時切換側邊欄狀態
+        // 側邊欄開關按鈕與遮罩：
+        // 開與關各自呼叫冪等的 openSidebar/closeSidebar（而非共用 toggle），
+        // 手機觸控事件雙發、快速連點或初始化重複執行時都不會令選單反覆彈跳。
+        // dataset.bound 防止初始化再次執行時疊加多個監聽器（同區其他按鈕同款保護）。
         const openSidebarBtn = document.getElementById('openSidebarButton');
-        if (openSidebarBtn) {
+        if (openSidebarBtn && !openSidebarBtn.dataset.bound) {
             openSidebarBtn.addEventListener('click', function () {
                 try {
-                    toggleSidebar();
+                    openSidebar();
                 } catch (e) {
                     console.error('開啟側邊欄按鈕事件錯誤:', e);
                 }
             });
+            openSidebarBtn.dataset.bound = 'true';
         }
         const closeSidebarBtn = document.getElementById('closeSidebarButton');
-        if (closeSidebarBtn) {
+        if (closeSidebarBtn && !closeSidebarBtn.dataset.bound) {
             closeSidebarBtn.addEventListener('click', function () {
                 try {
-                    toggleSidebar();
+                    closeSidebar();
                 } catch (e) {
                     console.error('關閉側邊欄按鈕事件錯誤:', e);
                 }
             });
+            closeSidebarBtn.dataset.bound = 'true';
         }
         const sidebarOverlay = document.getElementById('sidebarOverlay');
-        if (sidebarOverlay) {
+        if (sidebarOverlay && !sidebarOverlay.dataset.bound) {
             sidebarOverlay.addEventListener('click', function () {
                 try {
-                    toggleSidebar();
+                    closeSidebar();
                 } catch (e) {
                     console.error('點擊遮罩錯誤:', e);
                 }
             });
+            sidebarOverlay.dataset.bound = 'true';
         }
 
         // 登出按鈕（頂部與側邊欄）：點擊後調用 logout
@@ -21038,10 +21044,11 @@ function hideGlobalCopyright() {
         ev.preventDefault();
         ev.stopPropagation();
       } else {
-        // 無彈窗時切換側邊欄：開啟或關閉
+        // 無彈窗時：Esc 只會關閉已打開的側邊欄（不做切換，避免在已關閉
+        // 狀態下因重複按鍵事件把選單自行叫出）
         const sidebar = document.getElementById('sidebar');
-        if (sidebar && typeof toggleSidebar === 'function') {
-          toggleSidebar();
+        if (sidebar && !sidebar.classList.contains('-translate-x-full') && typeof closeSidebar === 'function') {
+          closeSidebar();
           ev.preventDefault();
           ev.stopPropagation();
         }
