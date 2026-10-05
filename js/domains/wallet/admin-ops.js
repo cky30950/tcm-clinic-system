@@ -6,7 +6,7 @@
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
 import { getWalletMembershipConfig, invalidateWalletAccount, walletBonusFor } from './account.js';
-import { renderWalletPanel, syncWalletListEntry, walletLastPatientInfo, walletLastTxs, walletSelectedPatientId } from './panel.js';
+import { renderWalletPanel, syncWalletListEntry, walletLastPatientInfo, walletLastTxs, walletSelectedPatientId } from './panel.js?v=20261005w';
 import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, walletRound2 } from './shared.js';
 
   export async function submitWalletTopup() {

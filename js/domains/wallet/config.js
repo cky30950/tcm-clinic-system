@@ -6,7 +6,7 @@
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
 import { getWalletClinicDoc } from './account.js';
-import { loadWalletMemberList } from './panel.js';
+import { loadWalletMemberList } from './panel.js?v=20261005w';
 import { clearWalletCaches, walletApi, walletClinicDocCache, walletMembershipConfigCache } from './shared.js';
 
   export async function toggleWalletConfigForm() {

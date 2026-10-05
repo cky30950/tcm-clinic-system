@@ -582,6 +582,10 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
           data: rows,
           layout: 'fitColumns',
           placeholder: '尚無交易記錄',
+          // Tabulator 唔指定 height 會自動撐高，現由外層 flex 約束保底；
+          // 此兩參數讓 Tabulator 內建垂直捲軸生效，內容超長時唔會壓扁 header filter
+          height: 'auto',
+          maxHeight: '55vh',
           pagination: true,
           paginationMode: 'local',
           paginationSize: WALLET_TX_PAGE_SIZE,

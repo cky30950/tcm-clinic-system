@@ -44,16 +44,16 @@
 
 /* Tabulator：錢包交易試算表試點（其餘頁面不套用排版） */
 #walletTxGrid{tabulator:unset;}
-#walletTxGrid .tabulator{font-size:0.8125rem;border:1px solid #e5e7eb;border-radius:0.5rem;background:#fff;}
+#walletTxGrid .tabulator{font-size:0.9375rem;border:1px solid #e5e7eb;border-radius:0.5rem;background:#fff;}
 #walletTxGrid .tabulator-header{background:#f9fafb;color:#4b5563;font-weight:600;border-bottom:1px solid #e5e7eb;}
-#walletTxGrid .tabulator-header .tabulator-col{border-right:1px solid #f3f4f6;height:38px;}
-#walletTxGrid .tabulator-row{min-height:34px;border-bottom:1px solid #f3f4f6;}
+#walletTxGrid .tabulator-header .tabulator-col{border-right:1px solid #f3f4f6;height:44px;padding:0 8px;}
+#walletTxGrid .tabulator-row{min-height:42px;border-bottom:1px solid #f3f4f6;}
 #walletTxGrid .tabulator-row.tabulator-selected{background:#f0fdfa;}
 #walletTxGrid .tabulator-row:hover{background:#f9fafb !important;}
 #walletTxGrid .tabulator-header-filter input{
-  border:1px solid #d1d5db;border-radius:0.375rem;padding:3px 8px;font-size:0.75rem;width:100%;
+  border:1px solid #d1d5db;border-radius:0.375rem;padding:4px 10px;font-size:0.875rem;width:100%;
 }
-#walletTxGrid .tabulator-paginator{font-size:0.75rem;color:#6b7280;padding:6px;}
+#walletTxGrid .tabulator-paginator{font-size:0.875rem;color:#6b7280;padding:8px 10px;}
 
 /* Notiflix：3.2.8 訊息採純文字插入，換行靠 \n + pre-line 呈現（見 system.js showToast） */
 .notiflix-notify .nx-message{white-space:pre-line;word-break:break-word;}

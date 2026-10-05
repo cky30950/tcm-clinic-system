@@ -6,7 +6,7 @@
  * ============================================================ */
 export { clearWalletCaches, walletRound2 } from './shared.js';
 export { getWalletAccount, getRecentWalletTransactions } from './account.js';
-export { loadWalletManagement, selectWalletPatient, walletGoToTxPage, toggleWalletAdminOps } from './panel.js';
+export { loadWalletManagement, selectWalletPatient, walletGoToTxPage, toggleWalletAdminOps } from './panel.js?v=20261005w';
 export { submitWalletTopup, submitWalletRefund, submitWalletAdjust, submitWalletStatus, showWalletRefundForm, hideWalletAdminForm, showWalletAdjustForm, showWalletStatusForm } from './admin-ops.js';
 export { runWalletLegacyMigration, toggleWalletConfigForm, addWalletTierRow, removeWalletTierRow, submitWalletConfig } from './config.js';
 export { setupConsultationWallet, syncConsultWalletAvailability, processConsultationWalletPayment, retryConsultationWalletPayment, cancelConsultationWalletPayment, preCheckConsultationWalletPayment } from './consultation-pay.js';
