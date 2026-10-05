@@ -88,7 +88,10 @@
             // 保留原樣：其切換函數會把 className 整個重置為原始類別，若首次加上 btn，
             // 會變成「初入頁面是按鈕樣式、切過分頁後才變回原樣」的不一致
             var onclickAttr = el.getAttribute('onclick') || '';
-            if (/switch(Personal|Template)Tab\(/.test(onclickAttr)) return;
+            // 會把 className 整個重置為原始類別的按鈕一律跳過：
+            // 若先加 btn，首次點擊後類別被清掉會縮小／移位。分頁 tab 與各列表
+            // 篩選掣（中藥庫 filterHerbLibrary、收費項目 filterBillingItems）皆屬此類
+            if (/switch(Personal|Template)Tab\(|filterHerbLibrary\(|filterBillingItems\(/.test(onclickAttr)) return;
             var c = el.className || '';
             var inCons = el.closest ? !!el.closest('#consultationSystem') : false;
             if (!inCons && isFixedCircle(c)) return;
@@ -292,6 +295,14 @@
         [role="button"]:not([aria-disabled="true"]):active {
             filter: brightness(0.9);
             box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.25);
+        }
+
+        /* 垂直捲軸固定保留空間：列表篩選（全部↔已停用等）令內容長度改變時，
+           捲軸出現／消失會把整個版面橫向推開約 15px。scrollbar-gutter
+           使空間常駐，版面不再橫向跳動（手機瀏覽器為覆蓋式捲軸，不受影響）。
+           須設於 body：視窗的捲軸屬性由 body 傳播至視埠，設於 html 無效 */
+        body {
+            scrollbar-gutter: stable;
         }
 
         /* 所有按鈕統一正常字重：daisyUI .btn 預設 font-weight:600，
