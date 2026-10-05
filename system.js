@@ -2775,8 +2775,69 @@ async function fetchUsers(forceRefresh = false) {
         }
         
         
+        // Notiflix.Notify 全站通知層：僅初始化一次，設定與舊 toastr 外觀對齊
+        // （右上角、內建圖示、hover 暫停）；Notiflix 缺失時無縫退回 toastr。
+        let notiflixNotifyReady = false;
+        const NOTIFLIX_TYPE_MAP = { success: 'success', error: 'failure', warning: 'warning', info: 'info' };
+        function ensureNotiflixNotify() {
+            if (notiflixNotifyReady) return true;
+            if (!window.Notiflix || !window.Notiflix.Notify) return false;
+            try {
+                window.Notiflix.Notify.init({
+                    width: '320px',
+                    position: 'right-top',
+                    distance: '12px',
+                    opacity: 0.96,
+                    borderRadius: '8px',
+                    fontFamily: 'inherit',
+                    cssAnimationStyle: 'from-right',
+                    useIcon: true,
+                    closeButton: false,
+                    pauseOnHover: true,
+                    // 訊息安全由 showToast 的 htmlToastToPlainText 統一
+                    // escape 後再交付（plainText:false 時 Notiflix 僅做一次
+                    // innerHTML 解析）；切勿用預設 plainText:true——該模式會
+                    // 先 decode 實體再 innerHTML，令含「<」的文字被二次解析。
+                    plainText: false,
+                    // 預設 110 字會截斷中文提示；舊 toastr 無長度限制
+                    messageMaxLength: 10000,
+                    // 全域預設逾時；實際每條以 message 長度動態傳入 timeout
+                    timeout: 3000,
+                    zindex: 4001
+                });
+                notiflixNotifyReady = true;
+                return true;
+            } catch (e) {
+                console.warn('[Notiflix] Notify.init 失敗，退回 toastr：', e);
+                return false;
+            }
+        }
+
+        // 把 showToast 收到的訊息正規化為「純文字的 HTML 編碼」再送入 Notiflix。
+        // 背景：Notiflix 3.2.8 內部以 HTML 解析訊息（實測未 escape 的
+        // <img onerror> 會被執行），而 pwa.js 路徑會先 escapeHtml 再把 \n
+        // 換成 <br>。故：<br> 還原為真實換行（配合 CSS pre-line 顯示），
+        // 其餘內容經 textarea 解碼為純文字後統一重新 escape，既還原實體
+        // 顯示（&amp; → &），也保證任何 < > 只作文字呈現，無 XSS 風險。
+        function htmlToastToPlainText(value) {
+            const withNewlines = String(value == null ? '' : value).replace(/<br\s*\/?\s*>/gi, '\n');
+            let plain;
+            try {
+                const decoder = document.createElement('textarea');
+                decoder.innerHTML = withNewlines;
+                plain = decoder.value;
+            } catch (_e) {
+                plain = withNewlines;
+            }
+            return plain
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
         function showToast(message, type = 'info') {
-            
             try {
                 if (window.t) {
                     message = window.t(message);
@@ -2790,6 +2851,20 @@ async function fetchUsers(forceRefresh = false) {
             }
             
             const timeout = Math.max(3000, (message || '').length * 100);
+
+            // 優先使用 Notiflix（本地託管、無 jQuery 依賴、RWD）
+            if (ensureNotiflixNotify()) {
+                const kind = NOTIFLIX_TYPE_MAP[type] || 'info';
+                try {
+                    // Notiflix 3.2.8 內部以 HTML 解析訊息，故送入前統一
+                    // 正規化：<br> 還原為換行（pre-line 顯示）、實體解碼後
+                    // 重新 escape，純文字內容不變且可免疫未 escape 的標籤。
+                    const nxMessage = htmlToastToPlainText(message);
+                    window.Notiflix.Notify[kind](nxMessage, { timeout: timeout });
+                    return;
+                } catch (e) { console.warn('[Notiflix] 通知發送失敗，改用 toastr：', e); }
+            }
+
             toastr.options = {
                 closeButton: true,
                 progressBar: true,

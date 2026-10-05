@@ -54,6 +54,9 @@
   border:1px solid #d1d5db;border-radius:0.375rem;padding:3px 8px;font-size:0.75rem;width:100%;
 }
 #walletTxGrid .tabulator-paginator{font-size:0.75rem;color:#6b7280;padding:6px;}
+
+/* Notiflix：3.2.8 訊息採純文字插入，換行靠 \n + pre-line 呈現（見 system.js showToast） */
+.notiflix-notify .nx-message{white-space:pre-line;word-break:break-word;}
 `;
         const style = document.createElement('style');
         style.id = 'tcm-vendor-style';
