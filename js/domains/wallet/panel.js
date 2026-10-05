@@ -416,13 +416,13 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
       adminArea.classList.add('hidden');
     }
 
-    // 交易表：每頁最多 10 筆，超出的於分頁列切換頁面
+    // 交易表：每頁最多 20 筆，超出的於分頁列切換頁面
     walletLastTxs = txs;
     walletTxPage = 1;
     renderWalletTxRows();
   }
 
-  export const WALLET_TX_PAGE_SIZE = 10;
+  export const WALLET_TX_PAGE_SIZE = 20;
   export let walletLastTxs = [];
   export let walletTxPage = 1;
   export let walletLastPatientInfo = null;
@@ -565,6 +565,22 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
   }
 
   // 渲染（或更新）Tabulator；成功回 true，任何例外回 false 由呼叫端退回原生表
+  let walletTxGridRO = null;
+
+  // 交易區為多層 flex 結構（#walletPanel overflow-y-auto 在內），
+  // Tabulator 的 height:'100%' 依賴每層祖先有明確高度、實測會失效退為
+  // 內容高度（列少時縮頂留白、列多時被外層 overflow-hidden 裁切）。
+  // 故直接以容器實際像素高度 setHeight，並用 ResizeObserver 跟隨版面
+  // （視窗縮放、管理員區展開等）即時貼合。
+  function fitWalletTxGridHeight() {
+    const el = document.getElementById('walletTxGrid');
+    if (!walletTxGrid || !el) return;
+    const h = el.clientHeight;
+    if (h >= 220) {
+      try { walletTxGrid.setHeight(h); } catch (_e) {}
+    }
+  }
+
   function renderWalletTxGrid() {
     const gridEl = document.getElementById('walletTxGrid');
     const legacyWrap = document.getElementById('walletTxLegacy');
@@ -582,10 +598,9 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
           data: rows,
           layout: 'fitColumns',
           placeholder: '尚無交易記錄',
-          // Tabulator 唔指定 height 會自動撐高，現由外層 flex 約束保底；
-          // 此兩參數讓 Tabulator 內建垂直捲軸生效，內容超長時唔會壓扁 header filter
-          height: 'auto',
-          maxHeight: '55vh',
+          // 初始高度取容器實際像素（容器有 min-h 保底 220）；隱藏期間
+          // clientHeight 為 0 時用 220，顯示後由 ResizeObserver 修正
+          height: Math.max(220, gridEl.clientHeight || 0),
           pagination: true,
           paginationMode: 'local',
           paginationSize: WALLET_TX_PAGE_SIZE,
@@ -640,9 +655,17 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
         try { walletTxGrid.setPage(1); } catch (_e) {}
         try { walletTxGrid.redraw(true); } catch (_e) {}
       }
+      // 容器首次可見可能在下一帧（hidden 移除後 reflow），先貼一次高度；
+      // ResizeObserver 再處理後續所有版面變化
+      requestAnimationFrame(fitWalletTxGridHeight);
+      if (!walletTxGridRO && typeof ResizeObserver === 'function') {
+        walletTxGridRO = new ResizeObserver(fitWalletTxGridHeight);
+        walletTxGridRO.observe(gridEl);
+      }
       return true;
     } catch (error) {
       console.warn('Tabulator 錢包交易表初始化失敗，退回原生表格：', error);
+      if (walletTxGridRO) { try { walletTxGridRO.disconnect(); } catch (_e) {} walletTxGridRO = null; }
       walletTxGrid = null;
       gridEl.classList.add('hidden');
       if (legacyWrap) legacyWrap.classList.remove('hidden');
