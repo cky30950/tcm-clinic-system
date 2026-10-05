@@ -15045,7 +15045,7 @@ async function viewMedicalRecord(recordId, buttonEl = null) {
             })();
         detailHtml += '</div>'; // 關閉左側信息（兩行）
         // 右側按鈕
-        detailHtml += '<div class="flex flex-wrap gap-2 xl:justify-end">';
+        detailHtml += '<div class="medical-history-actions">';
         detailHtml += renderMedicalHistoryActionButtons(rec, { includeSickLeave: true });
         detailHtml += '</div>'; // 按鈕區塊結束
         detailHtml += '</div>'; // flex 容器結束

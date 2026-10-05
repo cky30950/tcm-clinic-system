@@ -431,6 +431,28 @@
         }
 
         /*
+         * 病歷記錄／診症記錄右上角操作按鈕群（修改病歷、審核追蹤、列印收據、
+         * 藥單醫囑、到診證明、病假證明等）：固定三欄排列，即「三個上、三個下」，
+         * 各裝置（含手機）皆維持三欄，故不使用 .grid-cols-3（<640px 會被
+         * 下方手機媒體查詢強制併成單欄），亦不依賴 Tailwind Play CDN 對
+         * JS 動態內容嘅即時 class 生成。
+         */
+        .medical-history-actions {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.5rem;
+            width: 100%;
+        }
+        @media (min-width: 1280px) {
+            /* xl 以上按鈕群位於標題列右側：固定約 30rem 闊並靠右 */
+            .medical-history-actions {
+                width: 30rem;
+                flex: 0 0 auto;
+                margin-left: auto;
+            }
+        }
+
+        /*
          * ============================================
          * 手機版排版優化
          *
@@ -1207,13 +1229,13 @@
                 </div>
                 
                 <div id="patientMedicalHistoryModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
-                    <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-                        <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
+                    <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full h-[90vh] flex flex-col overflow-hidden">
+                        <div class="shrink-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                             <h3 id="patientMedicalHistoryTitle" class="text-xl font-bold text-gray-800">病歷記錄</h3>
                             <button onclick="closePatientMedicalHistoryModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
                         </div>
-                        
-                        <div class="p-6">
+
+                        <div class="p-6 flex-1 min-h-0 overflow-y-auto">
                             
                             <div id="patientMedicalHistoryPatientInfo" class="bg-blue-50 rounded-lg p-4 mb-6">
                                 
@@ -1389,13 +1411,13 @@
                 </div>
                 
                 <div id="medicalHistoryModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
-                    <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-                        <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
+                    <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full h-[90vh] flex flex-col overflow-hidden">
+                        <div class="shrink-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
                             <h3 id="medicalHistoryTitle" class="text-xl font-bold text-gray-800">診症記錄</h3>
                             <button onclick="closeMedicalHistoryModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
                         </div>
-                        
-                        <div class="p-6">
+
+                        <div class="p-6 flex-1 min-h-0 overflow-y-auto">
                             
                             <div id="medicalHistoryPatientInfo" class="bg-blue-50 rounded-lg p-4 mb-6">
                                 
@@ -6128,8 +6150,8 @@
     <script src="pwa.js?v=20260923b" defer></script>
     <script src="schedule_management.js" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
-    <script type="module" src="js/app.js?v=20261006a"></script>
-    <script src="system.js?v=20261006a" defer></script>
+    <script type="module" src="js/app.js?v=20261006b"></script>
+    <script src="system.js?v=20261006b" defer></script>
     <script src="attachments.js" defer></script>
     <script src="personalStatistics.js?v=20261005a" defer></script>
     <script src="systemmanagement.js" defer></script>

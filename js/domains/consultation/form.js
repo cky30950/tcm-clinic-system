@@ -989,16 +989,24 @@ import { restorePackageUseMeta, undoPackageUse } from '../billing/packages.js';
             const startDateInput = document.getElementById('formRestStartDate');
             const endDateInput = document.getElementById('formRestEndDate');
             const displaySpan = document.getElementById('restPeriodDisplay');
-            
+
             if (!startDateInput || !endDateInput || !displaySpan) return;
-            
-            const startDate = startDateInput.value;
-            const endDate = endDateInput.value;
-            
+
+            let startDate = startDateInput.value;
+            let endDate = endDateInput.value;
+
+            // 結束日期不得早於開始日期：若開始日被改到結束日之後（或直接選了
+            // 過早的結束日），自動把結束日同步為開始日（el.value 指派經
+            // vendor-enhance 的 value hook 自動同步 flatpickr 內部狀態）
+            if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+                endDateInput.value = startDate;
+                endDate = startDate;
+            }
+
             if (startDate && endDate) {
                 const start = new Date(startDate);
                 const end = new Date(endDate);
-                
+
                 if (end >= start) {
                     const timeDiff = end.getTime() - start.getTime();
                     const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1; // 包含開始和結束日期
