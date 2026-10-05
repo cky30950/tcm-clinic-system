@@ -168,6 +168,8 @@ const FACADE = {
     getMedicalHistoryActionButtonClasses: Patients.getMedicalHistoryActionButtonClasses,
     renderMedicalHistoryActionButton: Patients.renderMedicalHistoryActionButton,
     renderMedicalHistoryActionButtons: Patients.renderMedicalHistoryActionButtons,
+    fetchMedicalRecordEdited: Patients.fetchMedicalRecordEdited,
+    primeMedicalRecordAuditStatus: Patients.primeMedicalRecordAuditStatus,
     displayPatientMedicalHistoryPage: Patients.displayPatientMedicalHistoryPage,
     changePatientHistoryPage: Patients.changePatientHistoryPage,
     closePatientMedicalHistoryModal: Patients.closePatientMedicalHistoryModal,

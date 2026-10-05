@@ -8,6 +8,38 @@ import { G } from '../../lib/legacy.js';
 import { getPatientByIdWithRefresh } from './store.js';
 import { printAttendanceCertificate, printConsultationRecord, printPrescriptionInstructions, printSickLeave } from '../print/index.js';
 
+        // 病歷是否「曾被修改」一律以審核日誌（consultationAuditLogs）為準：
+        // 新建病歷儲存時 updatedAt 就已存在，錢包收款／財務回寫等無關編輯
+        // 也會更新 updatedAt，故不能用 updatedAt 作為「已修改」判據。
+        // 病歷分頁每頁只顯示一條記錄，每次僅需一次 limit 1 查詢，並附工作階段快取。
+        const medicalRecordAuditStatusCache = new Map();
+
+        export async function fetchMedicalRecordEdited(consultation) {
+            const id = consultation && consultation.id != null ? String(consultation.id) : '';
+            if (!id) return false;
+            if (medicalRecordAuditStatusCache.has(id)) {
+                return medicalRecordAuditStatusCache.get(id);
+            }
+            let edited = false;
+            try {
+                if (window.firebaseDataManager && typeof window.firebaseDataManager.getConsultationAuditLogs === 'function') {
+                    const result = await window.firebaseDataManager.getConsultationAuditLogs(id, 1);
+                    edited = !!(result && result.success && Array.isArray(result.data) && result.data.length > 0);
+                }
+            } catch (_e) {
+                edited = false;
+            }
+            medicalRecordAuditStatusCache.set(id, edited);
+            return edited;
+        }
+
+        // 病歷編輯成功或開過審核追蹤後預熱／校正快取，避免同工作階段看到過期結果
+        export function primeMedicalRecordAuditStatus(consultationId, edited = true) {
+            const id = consultationId != null ? String(consultationId) : '';
+            if (!id) return;
+            medicalRecordAuditStatusCache.set(id, !!edited);
+        }
+
         // 病人資料管理頁面的病歷查看功能
         const historyCalendarState = {
             patient: { open: false, year: null, month: null, selectedDateKey: null },
@@ -357,7 +389,7 @@ if (!patient) {
         }
 
         export function renderMedicalHistoryActionButtons(consultation, options = {}) {
-            const { includeSickLeave = false } = options;
+            const { includeSickLeave = false, isModified = false } = options;
             if (!G.canCurrentUserViewConsultationEntry(consultation)) {
                 return '';
             }
@@ -388,7 +420,9 @@ if (!patient) {
                 }));
             }
 
-            if (consultation.updatedAt) {
+            // 「審核追蹤」只在病歷曾被實質修改（有審核日誌）時顯示；
+            // 首次完成、從未修改的病歷不顯示。
+            if (isModified) {
                 buttons.push(renderMedicalHistoryActionButton({
                     label: '審核追蹤',
                     onclick: `openConsultationAuditTrail('${consultation.id}', '${consultation.patientId || ''}')`,
@@ -478,6 +512,8 @@ if (!patient) {
                 consultation,
                 (typeof G.currentPatientHistoryPatientId !== 'undefined' && G.currentPatientHistoryPatientId) || consultation.patientId || ''
             );
+            // 病歷是否曾被實質修改（以審核日誌為準）：驅動「已修改」標籤與「審核追蹤」按鈕
+            const isMedicalRecordModified = await fetchMedicalRecordEdited(consultation);
             // 判斷本次診症是否有開藥；沒有開藥時隱藏處方內容與服用方法欄位
             const hasPrescription = G.consultationHasPrescription(consultation);
 
@@ -598,7 +634,7 @@ if (!patient) {
                                 <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border border-white/80 shadow-sm">
                                             ${clinicLabel}${window.escapeHtml(clinicName || '未設定')}
                                 </span>
-                                ${consultation.updatedAt ? `
+                                ${isMedicalRecordModified ? `
                                     <span class="text-xs text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-100">
                                         已修改
                                     </span>
@@ -607,7 +643,7 @@ if (!patient) {
                                 })()}
                             </div>
                             <div class="medical-history-actions">
-                                ${renderMedicalHistoryActionButtons(consultation, { includeSickLeave: true })}
+                                ${renderMedicalHistoryActionButtons(consultation, { includeSickLeave: true, isModified: isMedicalRecordModified })}
                             </div>
                         </div>
                     </div>
@@ -946,6 +982,8 @@ export async function displayConsultationMedicalHistoryPage() {
         consultation,
         (typeof G.currentConsultationHistoryPatientId !== 'undefined' && G.currentConsultationHistoryPatientId) || consultation.patientId || ''
     );
+    // 病歷是否曾被實質修改（以審核日誌為準）：驅動「已修改」標籤與「審核追蹤」按鈕
+    const isMedicalRecordModified = await fetchMedicalRecordEdited(consultation);
     // 判斷本次診症是否有開藥；沒有開藥時隱藏處方內容與服用方法欄位
     const hasPrescription = G.consultationHasPrescription(consultation);
 
@@ -1063,7 +1101,7 @@ export async function displayConsultationMedicalHistoryPage() {
                                 <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border border-white/80 shadow-sm">
                                     ${clinicLabel}${window.escapeHtml(clinicName || '未設定')}
                                 </span>
-                                ${consultation.updatedAt ? `
+                                ${isMedicalRecordModified ? `
                                     <span class="text-xs text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-100">
                                         已修改
                                     </span>
@@ -1072,7 +1110,7 @@ export async function displayConsultationMedicalHistoryPage() {
                         })()}
                     </div>
                     <div class="medical-history-actions">
-                        ${renderMedicalHistoryActionButtons(consultation, { includeSickLeave: true })}
+                        ${renderMedicalHistoryActionButtons(consultation, { includeSickLeave: true, isModified: isMedicalRecordModified })}
                     </div>
                 </div>
             </div>

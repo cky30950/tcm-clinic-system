@@ -15286,6 +15286,9 @@ async function viewMedicalRecord(recordId, buttonEl = null) {
         );
         // 判斷本次診症是否有開藥；沒有開藥時隱藏處方內容與服用方法欄位
         const hasPrescription = consultationHasPrescription(rec);
+        // 病歷是否曾被實質修改（以審核日誌為準）：驅動「已修改」標籤與「審核追蹤」按鈕；
+        // 不能用 rec.updatedAt（新建病歷與錢包收款都會更新它）
+        const recIsModified = await fetchMedicalRecordEdited(rec);
         let detailHtml = '';
         detailHtml += '<div class="border border-gray-200 rounded-lg overflow-hidden shadow-sm">';
         // Header 區塊
@@ -15315,14 +15318,14 @@ async function viewMedicalRecord(recordId, buttonEl = null) {
                     hideDoctorInfo ? '' : `<span class="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border border-white/80 shadow-sm">${window.escapeHtml(doctorLabel)}${window.escapeHtml(doctorName)}</span>`,
                     `<span class="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border border-white/80 shadow-sm">${window.escapeHtml(recordNumberLabel)}${window.escapeHtml(rec.medicalRecordNumber || rec.id)}</span>`,
                     `<span class="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border border-white/80 shadow-sm">${window.escapeHtml(clinicLabel)}${window.escapeHtml(clinicName || '未設定')}</span>`,
-                    rec.updatedAt ? '<span class="text-xs text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-100">已修改</span>' : ''
+                    recIsModified ? '<span class="text-xs text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-100">已修改</span>' : ''
                 ].join('');
                 detailHtml += `<div class="flex flex-wrap items-center gap-2">${row}</div>`;
             })();
         detailHtml += '</div>'; // 關閉左側信息（兩行）
         // 右側按鈕
         detailHtml += '<div class="medical-history-actions">';
-        detailHtml += renderMedicalHistoryActionButtons(rec, { includeSickLeave: true });
+        detailHtml += renderMedicalHistoryActionButtons(rec, { includeSickLeave: true, isModified: recIsModified });
         detailHtml += '</div>'; // 按鈕區塊結束
         detailHtml += '</div>'; // flex 容器結束
         detailHtml += '</div>'; // header 結束

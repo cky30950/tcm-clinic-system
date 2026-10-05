@@ -684,6 +684,12 @@ export async function showConsultationForm(appointment) {
                 }
 
                 const logs = Array.isArray(result.data) ? result.data : [];
+                // 以實際查詢結果校正病歷修改狀態快取
+                try {
+                    if (typeof G.primeMedicalRecordAuditStatus === 'function') {
+                        G.primeMedicalRecordAuditStatus(finalConsultationId, logs.length > 0);
+                    }
+                } catch (_primeErr) {}
                 if (logs.length === 0) {
                     listEl.innerHTML = '<div class="text-sm text-gray-500">目前沒有病歷修改紀錄。</div>';
                     return;
@@ -1431,7 +1437,7 @@ export async function saveConsultation() {
                     sortDate: G.getConsultationEffectiveDate({ ...(existing || {}), ...consultationData, updatedAt }, updatedAt) || updatedAt
                 };
                 try {
-                    await window.firebaseDataManager.addConsultationAuditLog({
+                    const auditWriteResult = await window.firebaseDataManager.addConsultationAuditLog({
                         consultationId: String(appointment.consultationId),
                         appointmentId: String((existing && existing.appointmentId) || (appointment && !appointment.isDirectConsultationEdit ? appointment.id : '') || ''),
                         patientId: String(appointment.patientId || ''),
@@ -1441,6 +1447,15 @@ export async function saveConsultation() {
                         beforeData: existing || {},
                         afterData: updatedSnapshot
                     });
+                    // 有實質變更才會寫入審核日誌（skipped 代表無欄位變更）；
+                    // 同步預熱病歷修改狀態快取，令「已修改」標籤與「審核追蹤」按鈕即時出現
+                    if (auditWriteResult && auditWriteResult.success && !auditWriteResult.skipped) {
+                        try {
+                            if (typeof G.primeMedicalRecordAuditStatus === 'function') {
+                                G.primeMedicalRecordAuditStatus(String(appointment.consultationId), true);
+                            }
+                        } catch (_primeErr) {}
+                    }
                 } catch (auditErr) {
                     console.error('寫入病歷審核追蹤失敗:', auditErr);
                 }

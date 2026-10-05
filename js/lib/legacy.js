@@ -192,6 +192,8 @@ export const G = {
     get getGeneralRegistrationSourceLabel() { return window.getGeneralRegistrationSourceLabel; },
     get getMedicalRecordEditButtonLabel() { return window.getMedicalRecordEditButtonLabel; },
     get getMedicalRecordEditWindowStatus() { return window.getMedicalRecordEditWindowStatus; },
+    // 病歷修改狀態快取（patients/history.js），save.js 編輯成功後預熱用
+    get primeMedicalRecordAuditStatus() { return window.primeMedicalRecordAuditStatus; },
 
     /* ── billing 支出（expenses.js，Phase 5 子批 C）────────────── */
     get clinicSettings() { return clinicSettings; },

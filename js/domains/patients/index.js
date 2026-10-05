@@ -40,4 +40,4 @@ export {
 export {
     viewPatient
 } from './detail.js';
-export * from './history.js?v=20261006e';
+export * from './history.js?v=20261006j';
