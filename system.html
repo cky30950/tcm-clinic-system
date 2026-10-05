@@ -435,18 +435,18 @@
          * 藥單醫囑、到診證明、病假證明等）：固定三欄排列，即「三個上、三個下」，
          * 各裝置（含手機）皆維持三欄，故不使用 .grid-cols-3（<640px 會被
          * 下方手機媒體查詢強制併成單欄），亦不依賴 Tailwind Play CDN 對
-         * JS 動態內容嘅即時 class 生成。
+         * JS 動態內容嘅即時 class 生成。按鈕貼合文字闊度（max-content），
+         * 整組靠右對齊，不撐滿整列。
          */
         .medical-history-actions {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(3, max-content);
+            justify-content: end;
             gap: 0.5rem;
-            width: 100%;
         }
         @media (min-width: 1280px) {
-            /* xl 以上按鈕群位於標題列右側：固定約 30rem 闊並靠右 */
+            /* xl 以上按鈕群位於標題列右側 */
             .medical-history-actions {
-                width: 30rem;
                 flex: 0 0 auto;
                 margin-left: auto;
             }
@@ -6150,7 +6150,7 @@
     <script src="pwa.js?v=20260923b" defer></script>
     <script src="schedule_management.js" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
-    <script type="module" src="js/app.js?v=20261006b"></script>
+    <script type="module" src="js/app.js?v=20261006c"></script>
     <script src="system.js?v=20261006b" defer></script>
     <script src="attachments.js" defer></script>
     <script src="personalStatistics.js?v=20261005a" defer></script>

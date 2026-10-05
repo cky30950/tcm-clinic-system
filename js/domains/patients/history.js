@@ -328,7 +328,7 @@ if (!patient) {
         }
         
         export function getMedicalHistoryActionButtonClasses(variant, disabled = false) {
-            const baseClasses = 'w-full inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold leading-none whitespace-nowrap transition-all duration-200';
+            const baseClasses = 'inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold leading-none whitespace-nowrap transition-all duration-200';
             if (disabled) {
                 return `${baseClasses} border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed`;
             }
