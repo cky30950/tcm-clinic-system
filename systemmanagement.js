@@ -409,13 +409,14 @@ async function importClinicBackup(data) {
                 }
             });
 
-            let existingIds = null; // null = 尚未取得，跳過刪除階段
+            let existingIds = null; // null = 跳過刪除階段
             try {
                 const agg = await window.firebase.getCountFromServer(colRef);
                 const existingCount = (agg && typeof agg.data?.count === 'number') ? agg.data.count : 0;
-                // 只有當「現有比導入多」才需要全量讀取找哪些要刪除
-                // 差異門檻：現有數量 < 導入數量的 80% → 視為導入更大，跳過刪除階段
-                if (existingCount > newIds.size && (existingCount - newIds.size) > Math.max(5, existingCount * 0.2)) {
+                // restore 語義：當前狀態 = 備份狀態
+                // - 導入數量 >= 現有數量 → 備份包含了現有所有 ID → 現有沒有遺漏要清理 → 跳過刪除
+                // - 導入數量 < 現有數量 → 現有裡有備份裡不存在的 → 必須全量讀取找哪些要刪除
+                if (newIds.size < existingCount) {
                     try {
                         const snap = await window.firebase.getDocs(colRef);
                         existingIds = new Set();

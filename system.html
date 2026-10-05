@@ -315,6 +315,16 @@
             min-height: calc(100vh + 1px);
         }
 
+        /* SweetAlert2 開彈窗（如「切換診所」）時會把 body 設為 overflow:hidden，
+           並按捲軸寬度為 body 加 inline padding-right 作補償。本站已用
+           scrollbar-gutter:stable 常駐捲軸位；body 被設 overflow:hidden 後
+           自身仍會保留 stable gutter，Swal 再疊加 15px padding 便變雙重扣位，
+           令 nav 等所有文檔流內容即時左移約 15px、關閉時跳回。
+           故停用 Swal 的多餘補償（inline style 需 !important 壓過）。 */
+        body.swal2-shown {
+            padding-right: 0 !important;
+        }
+
         /* 所有按鈕統一正常字重：daisyUI .btn 預設 font-weight:600，
            少數按鈕另加 font-semibold／font-bold，一併還原為 400 */
         button,
