@@ -590,16 +590,36 @@ export async function syncUserDataFromFirebase(options = {}) {
         }
 
         
-        export function toggleSidebar() {
+        export function openSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
-            
+            if (!sidebar) return;
+            // 冪等：已經打開就 no-op。手機觸控偶發的事件雙發（或快速連點、
+            // 初始化重複綁定）不會把選單「打開又關閉」般反覆彈跳
             if (sidebar.classList.contains('-translate-x-full')) {
                 sidebar.classList.remove('-translate-x-full');
-                overlay.classList.remove('hidden');
-            } else {
+                if (overlay) overlay.classList.remove('hidden');
+            }
+        }
+
+        export function closeSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (!sidebar) return;
+            // 冪等：已經關閉就 no-op，同上，避免重複事件令選單自行彈回
+            if (!sidebar.classList.contains('-translate-x-full')) {
                 sidebar.classList.add('-translate-x-full');
-                overlay.classList.add('hidden');
+                if (overlay) overlay.classList.add('hidden');
+            }
+        }
+
+        export function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            if (!sidebar) return;
+            if (sidebar.classList.contains('-translate-x-full')) {
+                openSidebar();
+            } else {
+                closeSidebar();
             }
         }
 

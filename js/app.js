@@ -69,6 +69,8 @@ const FACADE = {
     reloadPageSoon: Auth.reloadPageSoon,
     wipeDeviceDataAndReload: Auth.wipeDeviceDataAndReload,
     logout: Auth.logout,
+    openSidebar: Auth.openSidebar,
+    closeSidebar: Auth.closeSidebar,
     toggleSidebar: Auth.toggleSidebar,
     IDB_PHI_MARKER: Auth.IDB_PHI_MARKER,
     IDB_WIPE_ATTEMPTED: Auth.IDB_WIPE_ATTEMPTED,
