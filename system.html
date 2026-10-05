@@ -2431,26 +2431,26 @@
                         </div>
                     </div>
 
-                    <div class="shrink-0 flex flex-col">
-                        <h3 class="text-sm font-semibold text-gray-800 mb-1.5 shrink-0">最近交易</h3>
-                        <div class="border border-gray-200 rounded-lg">
+                    <div class="flex-1 min-h-[240px] flex flex-col min-h-0 overflow-hidden">
+                        <h3 class="text-base font-semibold text-gray-800 mb-1.5 shrink-0">最近交易</h3>
+                        <div class="border border-gray-200 rounded-lg flex-1 min-h-0 flex flex-col overflow-hidden">
                             <!-- Tabulator 互動表格試點（載入成功時使用；失敗則隱藏退回下方原生表格） -->
-                            <div id="walletTxGrid" class="hidden text-sm"></div>
-                            <div id="walletTxLegacy">
-                            <div class="overflow-auto">
-                                <table class="min-w-full text-sm">
+                            <div id="walletTxGrid" class="hidden flex-1 min-h-[220px]"></div>
+                            <div id="walletTxLegacy" class="flex-1 min-h-0 flex flex-col">
+                            <div class="overflow-auto flex-1 min-h-0 max-h-[55vh]">
+                                <table class="min-w-full text-base">
                                     <thead class="bg-gray-50 text-gray-600 sticky top-0">
                                         <tr>
-                                            <th class="px-3 py-2 text-left">時間</th>
-                                            <th class="px-3 py-2 text-left">類型</th>
-                                            <th class="px-3 py-2 text-right">金額</th>
-                                            <th class="px-3 py-2 text-left">說明</th>
+                                            <th class="px-4 py-2.5 text-left">時間</th>
+                                            <th class="px-4 py-2.5 text-left">類型</th>
+                                            <th class="px-4 py-2.5 text-right">金額</th>
+                                            <th class="px-4 py-2.5 text-left">說明</th>
                                         </tr>
                                     </thead>
                                     <tbody id="walletTxTable"></tbody>
                                 </table>
                             </div>
-                            <div id="walletTxPager" class="hidden px-3 py-2 border-t border-gray-200 flex items-center justify-between gap-2 text-sm"></div>
+                            <div id="walletTxPager" class="hidden px-4 py-2.5 border-t border-gray-200 flex items-center justify-between gap-2 text-base shrink-0"></div>
                             </div>
                         </div>
                     </div>
@@ -6112,7 +6112,7 @@
     <script src="js/vendor/tom-select/tom-select.complete.min.js?v=20261005a" defer></script>
     <script src="js/vendor/tabulator/tabulator.min.js?v=20261005a" defer></script>
     <script src="js/vendor/notiflix/notiflix.min.js?v=20261005a" defer></script>
-    <script src="js/lib/vendor-enhance.js?v=20261005b" defer></script>
+    <script src="js/lib/vendor-enhance.js?v=20261005c" defer></script>
 
     <script src="version-config.js?v=20261003a" defer></script>
     <script src="pwa.js?v=20260923b" defer></script>

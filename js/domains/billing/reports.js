@@ -680,10 +680,16 @@ import { getApportionedCost } from './expenses.js';
                     id: String(item.consultationId || item.id || ''),
                     consultationId: String(item.consultationId || item.id || ''),
                     date: dateStr,
+                    dateKey: item.dateKey || '',
                     doctor: item.doctor || '',
                     status: item.status || '',
                     clinicId: item.clinicId !== undefined ? item.clinicId : null,
                     clinicName: item.clinicName || '',
+                    patientId: item.patientId || '',
+                    patientName: item.patientName || '',
+                    paymentStatus: item.paymentStatus || '',
+                    pendingAmount: item.pendingAmount !== undefined ? item.pendingAmount : null,
+                    walletPaySkipped: !!item.walletPaySkipped,
                     financialSummaryItems: cloneFinancialSummaryItems(item.summaryItems),
                     financialTotalAmount: Number(item.totalAmount) || 0,
                     createdAt: item.createdAt || null,
@@ -2429,6 +2435,47 @@ export async function buildFinancialExportPayload() {
     } catch (_e) {
         walletStats = null;
     }
+    // 明細紀錄：優先用報表快取中已載入的完整紀錄；聚合模式（快取只有統計）
+    // 時改查財務摘要集合（含病人／項目明細的輕量投影）；再不行用本地全域資料。
+    let detailRecords = [];
+    if (cachedEntry && Array.isArray(cachedEntry.records) && cachedEntry.records.length > 0) {
+        detailRecords = cachedEntry.records.slice();
+    } else {
+        try {
+            if (window.firebaseDataManager
+                && typeof window.firebaseDataManager.getConsultationFinancialSummariesByRangeAndDoctor === 'function') {
+                const detailRes = await window.firebaseDataManager
+                    .getConsultationFinancialSummariesByRangeAndDoctor(
+                        startDate, endDate, doctorFilter || null, true, clinicFilter || null);
+                if (detailRes && detailRes.success && Array.isArray(detailRes.data)) {
+                    detailRecords = detailRes.data
+                        .map(normalizeFinancialRecordForReport)
+                        .filter(Boolean)
+                        .filter(c => c.status === 'completed');
+                }
+            }
+        } catch (_detailErr) {
+            console.warn('匯出：載入診症明細失敗，改用本地資料', _detailErr);
+        }
+        if (!detailRecords.length) {
+            detailRecords = filterFinancialConsultations(startDate, endDate, doctorFilter, clinicFilter);
+        }
+    }
+    // 應收款清單（畫面同款查詢，內含短快取）
+    let receivables = { rows: [], total: 0, truncated: false };
+    try {
+        if (G.versionFeatureEnabled('membership')) {
+            const recvRes = await loadWalletReceivables(startDate, endDate, clinicFilter || null);
+            const rows = (recvRes && Array.isArray(recvRes.rows)) ? recvRes.rows : [];
+            receivables = {
+                rows,
+                total: Math.round(rows.reduce((sum, c) => sum + (Number(c.pendingAmount) || 0), 0) * 100) / 100,
+                truncated: !!(recvRes && recvRes.truncated)
+            };
+        }
+    } catch (_recvErr) {
+        console.warn('匯出：載入應收款清單失敗', _recvErr);
+    }
     return {
         startDate,
         endDate,
@@ -2440,41 +2487,237 @@ export async function buildFinancialExportPayload() {
         byType,
         costProrated,
         walletStats,
+        detailRecords,
+        receivables,
         generatedAt: new Date().toLocaleString('zh-TW')
     };
+}
+
+// ============================================================
+// 匯出專用輔助：明細解析、名稱對照、同名項目彙總、排序
+// ============================================================
+const FIN_EXPORT_CATEGORY_ORDER = ['consultation', 'medicine', 'treatment', 'other', 'package', 'packageUse', 'discount'];
+
+function finReportT(s) {
+    return typeof window.t === 'function' ? window.t(s) : s;
+}
+
+// 收入佔比（含一位小數）
+function finExportPct(part, whole) {
+    const w = Number(whole) || 0;
+    if (w <= 0) return 0;
+    return Math.round((Number(part) || 0) / w * 1000) / 10;
+}
+
+// 明細紀錄的香港日曆日 key
+function finRecordDateKey(c) {
+    return (c && c.dateKey) || getFinancialDateKey(c && c.date);
+}
+
+// 明細紀錄的香港時間 HH:MM
+function finRecordTimeText(c) {
+    try {
+        const d = G.parseConsultationDate(c && c.date);
+        if (d && !isNaN(d.getTime())) {
+            return new Intl.DateTimeFormat('zh-HK', {
+                timeZone: 'Asia/Hong_Kong', hour: '2-digit', minute: '2-digit', hour12: false
+            }).format(d);
+        }
+    } catch (_e) {}
+    return '';
+}
+
+function finDoctorExportName(username) {
+    const key = username || '';
+    if (!key) return finReportT('未知醫師');
+    try {
+        if (typeof G.getDoctorDisplayName === 'function') return G.getDoctorDisplayName(key);
+    } catch (_e) {}
+    return String(key);
+}
+
+function finClinicExportName(c) {
+    if (!c) return '';
+    if (c.clinicName) return String(c.clinicName);
+    const cid = (c.clinicId !== undefined && c.clinicId !== null) ? c.clinicId : '';
+    if (cid !== '' && Array.isArray(G.clinicsList)) {
+        const clinic = G.clinicsList.find(x => String(x.id) === String(cid));
+        if (clinic) {
+            try {
+                if (typeof G.getClinicDisplayName === 'function') return G.getClinicDisplayName(clinic);
+            } catch (_e) {}
+            return clinic.chineseName || clinic.englishName || String(cid);
+        }
+        return String(cid);
+    }
+    return '';
+}
+
+// 與報表相同口徑解析單張診症的收費項目
+function finRecordParsedItems(c) {
+    if (Array.isArray(c && c.financialSummaryItems)) {
+        return {
+            items: cloneFinancialSummaryItems(c.financialSummaryItems),
+            totalAmount: Number(c.financialTotalAmount) || 0
+        };
+    }
+    return parseFinancialBillingItems(c);
+}
+
+// 跨診症單把「同名＋同類別」收費項目彙總
+function buildFinItemNameAgg(records) {
+    const map = new Map();
+    (Array.isArray(records) ? records : []).forEach(c => {
+        const parsed = finRecordParsedItems(c);
+        (parsed.items || []).forEach(item => {
+            const category = normalizeFinancialCategory(item.category) || 'other';
+            const name = item.name ? String(item.name) : '';
+            const key = category + '||' + name;
+            let row = map.get(key);
+            if (!row) {
+                row = { category, name, quantity: 0, revenue: 0 };
+                map.set(key, row);
+            }
+            row.quantity += Number(item.quantity) || 0;
+            row.revenue += Number(item.totalAmount) || 0;
+        });
+    });
+    return Array.from(map.values());
+}
+
+// 明細依日期、時間降冪排序
+function sortFinDetailRecords(records) {
+    return (Array.isArray(records) ? records : []).slice().sort((a, b) => {
+        const ka = finRecordDateKey(a);
+        const kb = finRecordDateKey(b);
+        if (ka !== kb) return ka < kb ? 1 : -1;
+        const ta = finRecordTimeText(a);
+        const tb = finRecordTimeText(b);
+        if (ta !== tb) return ta < tb ? 1 : -1;
+        return String(a.id || '') < String(b.id || '') ? 1 : -1;
+    });
+}
+
+// 當日金額最高的服務類別名稱
+function finDailyMainService(services) {
+    const entries = Object.entries(services || {});
+    if (!entries.length) return '—';
+    return getFinancialCategoryDisplayName(entries.sort((a, b) => b[1] - a[1])[0][0]);
 }
 
 export async function exportFinancialReportTxt() {
     const data = await buildFinancialExportPayload();
     const { startDate, endDate, doctorFilter, clinicFilter, clinicName, stats, totalCost, byType } = data;
     const ft = (s) => (typeof window.t === 'function' ? window.t(s) : s);
-    const doctorLines = Object.keys(stats.doctorStats).map(key => {
-        const d = stats.doctorStats[key];
-        const doctorName = key || ft('未知醫師');
-        return `${doctorName}: ${ft('次數')} ${d.count.toLocaleString()}，${ft('收入')} HK$${d.revenue.toLocaleString()}`;
+    const money = (n) => `HK$${Math.round((Number(n) || 0) * 100) / 100}`;
+    const sortedDoctors = Object.entries(stats.doctorStats).sort((a, b) => b[1].revenue - a[1].revenue);
+    const doctorLines = sortedDoctors.map(([key, d]) => {
+        const avg = d.count > 0 ? Math.round(d.revenue / d.count) : 0;
+        return `${finDoctorExportName(key)}: ${ft('次數')} ${d.count.toLocaleString()}，${ft('收入')} ${money(d.revenue)}`
+            + `，${ft('平均單價')} ${money(avg)}，${ft('收入佔比')} ${finExportPct(d.revenue, stats.totalRevenue)}%`;
     }).join('\n');
-    const serviceLines = Object.values(stats.serviceStats).map(item => `${item.name}: ${ft('次數')} ${item.count.toLocaleString()}，${ft('收入')} HK$${item.revenue.toLocaleString()}`).join('\n');
-    const dailyLines = Object.keys(stats.dailyStats).map(dateKey => {
+    const serviceLines = Object.values(stats.serviceStats)
+        .sort((a, b) => b.revenue - a.revenue)
+        .map(item => {
+            const avg = item.count > 0 ? Math.round(item.revenue / item.count) : 0;
+            return `${item.name}: ${ft('數量')} ${item.count.toLocaleString()}，${ft('收入')} ${money(item.revenue)}`
+                + `，${ft('平均單價')} ${money(avg)}，${ft('收入佔比')} ${finExportPct(item.revenue, stats.totalRevenue)}%`;
+        }).join('\n');
+    // 每日統計：補齊期間內所有日曆日（無診症顯示 0）
+    const allDates = enumerateFinancialDates(startDate, endDate);
+    const dailyLines = allDates.map(dateKey => {
         const d = stats.dailyStats[dateKey];
-        return `${dateKey}: ${ft('次數')} ${d.count.toLocaleString()}，${ft('收入')} HK$${d.revenue.toLocaleString()}`;
+        if (!d) return `${dateKey}: ${ft('次數')} 0，${ft('收入')} HK$0`;
+        const avg = d.count > 0 ? Math.round(d.revenue / d.count) : 0;
+        return `${dateKey}: ${ft('次數')} ${d.count.toLocaleString()}，${ft('收入')} ${money(d.revenue)}`
+            + `，${ft('平均消費')} ${money(avg)}，${ft('主要服務')} ${finDailyMainService(d.services)}`;
     }).join('\n');
+    // 收入分類（與畫面收入摘要相同的七個類別）
+    const categoryLines = FIN_EXPORT_CATEGORY_ORDER.map(cat => {
+        const s = stats.serviceStats[cat];
+        const revenue = s ? Number(s.revenue) || 0 : 0;
+        return `${getFinancialCategoryDisplayName(cat)}: ${ft('收入')} ${money(revenue)}，${ft('收入佔比')} ${finExportPct(revenue, stats.totalRevenue)}%`;
+    }).join('\n');
+    // 同名收費項目彙總
+    const itemAggLines = buildFinItemNameAgg(data.detailRecords)
+        .sort((a, b) => {
+            const ca = FIN_EXPORT_CATEGORY_ORDER.indexOf(a.category);
+            const cb = FIN_EXPORT_CATEGORY_ORDER.indexOf(b.category);
+            const oa = ca < 0 ? 99 : ca;
+            const ob = cb < 0 ? 99 : cb;
+            return oa !== ob ? oa - ob : b.revenue - a.revenue;
+        })
+        .map(r => {
+            const avg = r.quantity > 0 ? Math.round(r.revenue / r.quantity) : 0;
+            return `${getFinancialCategoryDisplayName(r.category)}｜${r.name || ft('（未命名）')}: `
+                + `${ft('數量')} ${r.quantity.toLocaleString()}，${ft('收入')} ${money(r.revenue)}，${ft('平均單價')} ${money(avg)}`;
+        }).join('\n');
+
     let textReport = '';
-    if (doctorFilter) textReport += `${ft('選擇醫師')}: ${doctorFilter}\n`;
+    if (doctorFilter) textReport += `${ft('選擇醫師')}: ${finDoctorExportName(doctorFilter)}\n`;
     if (clinicFilter) textReport += `${ft('選擇診所')}: ${clinicName}\n`;
     textReport += `${ft('期間')}: ${startDate} ${ft('至')} ${endDate}\n`;
     textReport += `${ft('生成時間')}: ${data.generatedAt}\n`;
-    textReport += `${ft('總收入(未扣成本)')}: HK$${stats.totalRevenue.toLocaleString()}\n`;
-    textReport += `${ft('總成本')}: HK$${totalCost.toLocaleString()}\n`;
+    textReport += `${ft('總收入(未扣成本)')}: ${money(stats.totalRevenue)}\n`;
+    textReport += `${ft('總成本')}: ${money(totalCost)}（${ft('成本率')} ${finExportPct(totalCost, stats.totalRevenue)}%）\n`;
     textReport += `${ft('成本計算')}: ${data.costProrated ? ft('部分月份按天數分攤') : ft('整月實際成本')}\n`;
-    textReport += `${ft('淨收入')}: HK$${(stats.totalRevenue - totalCost).toLocaleString()}\n`;
+    textReport += `${ft('淨收入')}: ${money(stats.totalRevenue - totalCost)}（${ft('利潤率')} ${finExportPct(stats.totalRevenue - totalCost, stats.totalRevenue)}%）\n`;
     textReport += `${ft('總診症數')}: ${stats.totalConsultations.toLocaleString()}\n`;
-    textReport += `${ft('平均收入')}: HK$${Math.round(stats.averageRevenue).toLocaleString()}\n`;
-    textReport += `${ft('有效醫師數')}: ${stats.activeDoctors.toLocaleString()}\n\n`;
+    textReport += `${ft('平均收入')}: ${money(Math.round(stats.averageRevenue))}\n`;
+    textReport += `${ft('有效醫師數')}: ${stats.activeDoctors.toLocaleString()}\n`;
+
+    // 環比（背景載入完成時才有）
+    const prev = stats.prevPeriod;
+    if (prev) {
+        const chg = (cur, pv) => {
+            if (pv === null || pv === undefined) return cur > 0 ? ft('（新）') : '';
+            if (pv === 0) return cur === 0 ? '0%' : ft('（新）');
+            return `${(((cur - pv) / pv) * 100).toFixed(1)}%`;
+        };
+        textReport += `\n${ft('環比分析（上期')} ${prev.startDate} ${ft('至')} ${prev.endDate}）:\n`;
+        textReport += `${ft('總收入(未扣成本)')}: ${money(prev.totalRevenue)}（${chg(stats.totalRevenue, prev.totalRevenue)}）\n`;
+        textReport += `${ft('總診症數')}: ${prev.totalConsultations.toLocaleString()}（${chg(stats.totalConsultations, prev.totalConsultations)}）\n`;
+        textReport += `${ft('平均收入')}: ${money(Math.round(prev.averageRevenue))}（${chg(stats.averageRevenue, prev.averageRevenue)}）\n`;
+        textReport += `${ft('有效醫師數')}: ${prev.activeDoctors.toLocaleString()}（${chg(stats.activeDoctors, prev.activeDoctors)}）\n`;
+    }
+
+    // 待收款
+    const rv = data.receivables;
+    if (rv && Array.isArray(rv.rows) && rv.rows.length) {
+        textReport += `\n${ft('待收款')}: ${rv.rows.length.toLocaleString()} ${ft('筆')}，${ft('金額')} ${money(rv.total)}`
+            + (rv.truncated ? `（${ft('部分資料未包含（超過五千筆）')}）` : '') + '\n';
+        rv.rows.forEach(c => {
+            const note = c.walletPaySkipped ? ft('已改用其他方式，待核銷') : ft('儲值扣款失敗');
+            textReport += `${getFinancialDateKey(c.date)} | ${c.patientName || ft('未知病人')} | `
+                + `${finClinicExportName({ clinicId: c.clinicId, clinicName: c.clinicName }) || '—'} | `
+                + `${money(c.pendingAmount)} | ${note}\n`;
+        });
+    }
+
+    textReport += `\n${ft('收入分類')}:\n${categoryLines}\n\n`;
     textReport += `${ft('醫師統計')}:\n${doctorLines || ft('無資料')}\n\n`;
     textReport += `${ft('服務分類統計')}:\n${serviceLines || ft('無資料')}\n\n`;
+    textReport += `${ft('服務項目彙總')}:\n${itemAggLines || ft('無資料')}\n\n`;
     textReport += `${ft('每日統計')}:\n${dailyLines || ft('無資料')}\n`;
-    const costLines = Object.keys(byType).map(tp => `${tp}: HK$${Number(byType[tp] || 0).toLocaleString()}`).join('\n');
+    const costLines = Object.keys(byType).map(tp => `${tp}: ${money(byType[tp])}`).join('\n');
     textReport += `\n${ft('成本統計')}:\n${costLines || ft('無資料')}\n`;
+
+    // 診症明細（每張診症單＋其收費項目）
+    const sortedDetails = sortFinDetailRecords(data.detailRecords);
+    textReport += `\n${ft('診症明細')}（${sortedDetails.length.toLocaleString()} ${ft('筆')}）:\n`;
+    if (!sortedDetails.length) {
+        textReport += `${ft('無資料')}\n`;
+    } else {
+        sortedDetails.forEach(c => {
+            const parsed = finRecordParsedItems(c);
+            textReport += `${finRecordDateKey(c)} ${finRecordTimeText(c)} | ${c.patientName || ft('未知病人')} | `
+                + `${finDoctorExportName(c.doctor)} | ${finClinicExportName(c) || '—'} | ${money(parsed.totalAmount)}\n`;
+            (parsed.items || []).forEach(item => {
+                textReport += `    - ${item.name || ft('（未命名）')} x${item.quantity} @${Math.round((Number(item.unitPrice) || 0) * 100) / 100}`
+                    + ` = ${money(item.totalAmount)}［${getFinancialCategoryDisplayName(item.category)}］\n`;
+            });
+        });
+    }
 
     // 會員儲值統計
     const w = data.walletStats;
@@ -2523,14 +2766,20 @@ export async function exportFinancialReportExcel() {
 }
 
 /**
- * 以 SheetJS 輸出多工作表真實 .xlsx：摘要／醫師／服務分類／每日／成本／
- * 會員儲值摘要／每日儲值明細。數字欄位以數值型別寫入，方便 Excel 計算。
+ * 以 SheetJS 輸出多工作表真實 .xlsx：
+ * 摘要（收入分類／財務指標／待收款／環比）、醫師統計、服務分類統計、
+ * 服務項目彙總、每日統計（連續日曆日）、診症明細、收費項目明細、
+ * 成本統計、儲值摘要、每日儲值明細、應收款明細。
+ * 數字欄位以數值型別寫入，方便 Excel 計算。
  */
 function exportFinancialReportXlsx(data, ft) {
     const X = window.XLSX;
     const { startDate, endDate, doctorFilter, clinicFilter, clinicName, stats, totalCost, byType } = data;
     const wb = X.utils.book_new();
-    const num = function (v) { return Number(v) || 0; };
+    // 金額統一圓整到 2 位小數，避免浮点尾數
+    const num = function (v) { return Math.round((Number(v) || 0) * 100) / 100; };
+    const avg0 = function (sum, count) { return count > 0 ? Math.round((Number(sum) || 0) / count) : 0; };
+    const pctOf = function (part, whole) { return finExportPct(part, whole); };
 
     const addSheet = function (name, aoa, widths) {
         const ws = X.utils.aoa_to_sheet(aoa);
@@ -2538,54 +2787,202 @@ function exportFinancialReportXlsx(data, ft) {
         X.utils.book_append_sheet(wb, ws, name);
     };
 
-    // ── 摘要 ──
-    addSheet(ft('摘要'), [
+    const totalRevenue = num(stats.totalRevenue);
+    const netRevenue = totalRevenue - num(totalCost);
+    const sortedDetails = sortFinDetailRecords(data.detailRecords);
+
+    // ── 摘要（多區塊單表） ──
+    const summaryAoa = [
+        [ft('財務報表')],
         [ft('欄位'), ft('內容')],
         [ft('期間'), `${startDate} ${ft('至')} ${endDate}`],
         [ft('生成時間'), data.generatedAt],
-        [ft('選擇醫師'), doctorFilter || ft('全部醫師')],
+        [ft('選擇醫師'), doctorFilter ? finDoctorExportName(doctorFilter) : ft('全部醫師')],
         [ft('選擇診所'), clinicFilter ? clinicName : ft('全部診所')],
-        [ft('總收入(未扣成本)'), num(stats.totalRevenue)],
-        [ft('總成本'), num(totalCost)],
-        [ft('成本計算'), data.costProrated ? ft('部分月份按天數分攤') : ft('整月實際成本')],
-        [ft('淨收入'), num(stats.totalRevenue) - num(totalCost)],
-        [ft('總診症數'), num(stats.totalConsultations)],
-        [ft('平均收入'), Math.round(num(stats.averageRevenue))],
-        [ft('有效醫師數'), num(stats.activeDoctors)]
-    ], [22, 36]);
-
-    // ── 醫師統計 ──
-    const doctorAoa = [[ft('醫師'), ft('次數'), ft('收入')]];
-    Object.keys(stats.doctorStats).forEach(function (key) {
-        const d = stats.doctorStats[key];
-        doctorAoa.push([key || ft('未知醫師'), num(d.count), num(d.revenue)]);
+        [],
+        [ft('收入分類'), ft('金額'), ft('收入佔比')]
+    ];
+    FIN_EXPORT_CATEGORY_ORDER.forEach(function (cat) {
+        const s = stats.serviceStats[cat];
+        const revenue = s ? num(s.revenue) : 0;
+        summaryAoa.push([getFinancialCategoryDisplayName(cat), revenue, pctOf(revenue, totalRevenue)]);
     });
-    if (doctorAoa.length === 1) doctorAoa.push([ft('無資料'), '', '']);
-    addSheet(ft('醫師統計'), doctorAoa, [20, 10, 14]);
+    summaryAoa.push(
+        [ft('總收入(未扣成本)'), totalRevenue, totalRevenue > 0 ? 100 : 0],
+        [],
+        [ft('財務指標'), ft('數值'), ft('比率／備註')],
+        [ft('總成本'), num(totalCost), `${ft('成本率')} ${pctOf(totalCost, totalRevenue)}%`],
+        [ft('淨收入'), netRevenue, `${ft('利潤率')} ${pctOf(netRevenue, totalRevenue)}%`],
+        [ft('總診症數'), num(stats.totalConsultations), ''],
+        [ft('平均收入'), Math.round(num(stats.averageRevenue)), ''],
+        [ft('有效醫師數'), num(stats.activeDoctors), ''],
+        [ft('成本計算'), data.costProrated ? ft('部分月份按天數分攤') : ft('整月實際成本'), '']
+    );
 
-    // ── 服務分類統計 ──
-    const serviceAoa = [[ft('服務類型'), ft('次數'), ft('收入')]];
-    Object.values(stats.serviceStats).forEach(function (item) {
-        serviceAoa.push([item.name, num(item.count), num(item.revenue)]);
-    });
-    if (serviceAoa.length === 1) serviceAoa.push([ft('無資料'), '', '']);
-    addSheet(ft('服務分類統計'), serviceAoa, [28, 10, 14]);
+    // 待收款摘要
+    const rv = data.receivables;
+    if (rv && Array.isArray(rv.rows) && rv.rows.length) {
+        summaryAoa.push(
+            [],
+            [ft('待收款'), ft('筆數'), ft('金額')],
+            [ft('本期待收款診症單'), num(rv.rows.length), num(rv.total)]
+        );
+        if (rv.truncated) summaryAoa.push([ft('部分資料未包含（超過五千筆）'), '', '']);
+    }
 
-    // ── 每日統計（依日期遞增） ──
-    const dailyAoa = [[ft('日期'), ft('次數'), ft('收入')]];
-    Object.keys(stats.dailyStats).sort().forEach(function (dateKey) {
+    // 環比（背景載入完成才有）
+    const prev = stats.prevPeriod;
+    if (prev) {
+        const changeText = function (cur, pv) {
+            if (pv === null || pv === undefined) return cur > 0 ? ft('（新）') : '';
+            if (pv === 0) return cur === 0 ? '0%' : ft('（新）');
+            return `${(((Number(cur) || 0) - (Number(pv) || 0)) / pv * 100).toFixed(1)}%`;
+        };
+        summaryAoa.push(
+            [],
+            [ft('環比分析（上一等長期間）'), ft('本期'), ft('上期'), ft('增減')],
+            [ft('上期期間'), `${prev.startDate} ${ft('至')} ${prev.endDate}`, '', ''],
+            [ft('總收入(未扣成本)'), totalRevenue, num(prev.totalRevenue), changeText(totalRevenue, prev.totalRevenue)],
+            [ft('總診症數'), num(stats.totalConsultations), num(prev.totalConsultations), changeText(stats.totalConsultations, prev.totalConsultations)],
+            [ft('平均收入'), Math.round(num(stats.averageRevenue)), Math.round(num(prev.averageRevenue)), changeText(stats.averageRevenue, prev.averageRevenue)],
+            [ft('有效醫師數'), num(stats.activeDoctors), num(prev.activeDoctors), changeText(stats.activeDoctors, prev.activeDoctors)]
+        );
+    }
+    addSheet(ft('摘要'), summaryAoa, [26, 26, 22, 14]);
+
+    // ── 醫師統計（依收入降冪＋合計） ──
+    const doctorAoa = [[ft('醫師'), ft('診症次數'), ft('收入'), ft('平均單價'), ft('收入佔比')]];
+    Object.entries(stats.doctorStats)
+        .sort(function (a, b) { return b[1].revenue - a[1].revenue; })
+        .forEach(function (entry) {
+            const key = entry[0];
+            const d = entry[1];
+            doctorAoa.push([
+                finDoctorExportName(key),
+                num(d.count), num(d.revenue),
+                avg0(d.revenue, d.count),
+                pctOf(d.revenue, totalRevenue)
+            ]);
+        });
+    if (doctorAoa.length === 1) {
+        doctorAoa.push([ft('無資料'), '', '', '', '']);
+    } else {
+        doctorAoa.push([ft('合計'), num(stats.totalConsultations), totalRevenue,
+            avg0(totalRevenue, stats.totalConsultations), totalRevenue > 0 ? 100 : 0]);
+    }
+    addSheet(ft('醫師統計'), doctorAoa, [20, 12, 14, 14, 12]);
+
+    // ── 服務分類統計（依收入降冪＋合計） ──
+    const serviceAoa = [[ft('服務類型'), ft('數量'), ft('收入'), ft('平均單價'), ft('收入佔比')]];
+    let svcCount = 0;
+    let svcRevenue = 0;
+    Object.values(stats.serviceStats)
+        .sort(function (a, b) { return b.revenue - a.revenue; })
+        .forEach(function (item) {
+            const c = num(item.count);
+            const r = num(item.revenue);
+            serviceAoa.push([item.name, c, r, avg0(r, c), pctOf(r, totalRevenue)]);
+            svcCount += c;
+            svcRevenue += r;
+        });
+    if (serviceAoa.length === 1) {
+        serviceAoa.push([ft('無資料'), '', '', '', '']);
+    } else {
+        serviceAoa.push([ft('合計'), svcCount, svcRevenue, avg0(svcRevenue, svcCount), pctOf(svcRevenue, totalRevenue)]);
+    }
+    addSheet(ft('服務分類統計'), serviceAoa, [22, 12, 14, 14, 12]);
+
+    // ── 服務項目彙總（同名＋同類別跨診症單加總） ──
+    const itemAggAoa = [[ft('費用類別'), ft('項目名稱'), ft('數量'), ft('收入'), ft('平均單價')]];
+    buildFinItemNameAgg(data.detailRecords)
+        .sort(function (a, b) {
+            const ca = FIN_EXPORT_CATEGORY_ORDER.indexOf(a.category);
+            const cb = FIN_EXPORT_CATEGORY_ORDER.indexOf(b.category);
+            const oa = ca < 0 ? 99 : ca;
+            const ob = cb < 0 ? 99 : cb;
+            if (oa !== ob) return oa - ob;
+            return b.revenue - a.revenue;
+        })
+        .forEach(function (r) {
+            const q = num(r.quantity);
+            const amount = num(r.revenue);
+            itemAggAoa.push([
+                getFinancialCategoryDisplayName(r.category),
+                r.name || ft('（未命名）'),
+                q, amount, avg0(amount, q)
+            ]);
+        });
+    if (itemAggAoa.length === 1) itemAggAoa.push([ft('無資料'), '', '', '', '']);
+    addSheet(ft('服務項目彙總'), itemAggAoa, [16, 32, 10, 14, 14]);
+
+    // ── 每日統計（補齊期間所有日曆日） ──
+    const dailyAoa = [[ft('日期'), ft('診症人次'), ft('收入金額'), ft('平均消費'), ft('主要服務')]];
+    const allDates = enumerateFinancialDates(startDate, endDate);
+    allDates.forEach(function (dateKey) {
         const d = stats.dailyStats[dateKey];
-        dailyAoa.push([dateKey, num(d.count), num(d.revenue)]);
+        if (d) {
+            dailyAoa.push([
+                dateKey, num(d.count), num(d.revenue),
+                avg0(d.revenue, d.count), finDailyMainService(d.services)
+            ]);
+        } else {
+            dailyAoa.push([dateKey, 0, 0, 0, '—']);
+        }
     });
-    if (dailyAoa.length === 1) dailyAoa.push([ft('無資料'), '', '']);
-    addSheet(ft('每日統計'), dailyAoa, [14, 10, 14]);
+    if (allDates.length === 0) dailyAoa.push([ft('無資料'), '', '', '', '']);
+    addSheet(ft('每日統計'), dailyAoa, [14, 12, 14, 14, 16]);
 
-    // ── 成本統計 ──
-    const costAoa = [[ft('成本類型'), ft('金額')]];
-    Object.keys(byType).forEach(function (type) {
-        costAoa.push([type, num(byType[type])]);
+    // ── 診症明細（每張診症單一列） ──
+    const detailAoa = [[ft('日期'), ft('時間'), ft('病人'), ft('醫師'), ft('診所'), ft('金額'), ft('診症單ID')]];
+    sortedDetails.forEach(function (c) {
+        const parsed = finRecordParsedItems(c);
+        detailAoa.push([
+            finRecordDateKey(c),
+            finRecordTimeText(c),
+            c.patientName || ft('未知病人'),
+            finDoctorExportName(c.doctor),
+            finClinicExportName(c),
+            num(parsed.totalAmount),
+            String(c.id || c.consultationId || '')
+        ]);
     });
-    if (costAoa.length === 1) costAoa.push([ft('無資料'), '']);
+    if (detailAoa.length === 1) detailAoa.push([ft('無資料'), '', '', '', '', '', '']);
+    addSheet(ft('診症明細'), detailAoa, [12, 8, 16, 16, 18, 12, 26]);
+
+    // ── 收費項目明細（每個收費項目一列） ──
+    const lineAoa = [[ft('日期'), ft('時間'), ft('病人'), ft('醫師'), ft('診所'), ft('費用類別'), ft('項目名稱'), ft('數量'), ft('單價'), ft('小計')]];
+    sortedDetails.forEach(function (c) {
+        const parsed = finRecordParsedItems(c);
+        const dateKey = finRecordDateKey(c);
+        const timeText = finRecordTimeText(c);
+        const patient = c.patientName || ft('未知病人');
+        const doctor = finDoctorExportName(c.doctor);
+        const clinic = finClinicExportName(c);
+        (parsed.items || []).forEach(function (item) {
+            lineAoa.push([
+                dateKey, timeText, patient, doctor, clinic,
+                getFinancialCategoryDisplayName(item.category),
+                item.name || ft('（未命名）'),
+                num(item.quantity), num(item.unitPrice), num(item.totalAmount)
+            ]);
+        });
+    });
+    if (lineAoa.length === 1) lineAoa.push([ft('無資料'), '', '', '', '', '', '', '', '', '']);
+    addSheet(ft('收費項目明細'), lineAoa, [12, 8, 16, 16, 18, 14, 30, 8, 10, 12]);
+
+    // ── 成本統計（＋合計） ──
+    const costAoa = [[ft('成本類型'), ft('金額')]];
+    let costSum = 0;
+    Object.keys(byType).forEach(function (type) {
+        const amount = num(byType[type]);
+        costAoa.push([type, amount]);
+        costSum += amount;
+    });
+    if (costAoa.length === 1) {
+        costAoa.push([ft('無資料'), '']);
+    } else {
+        costAoa.push([ft('合計'), costSum]);
+    }
     addSheet(ft('成本統計'), costAoa, [24, 14]);
 
     // ── 會員儲值統計 ──
@@ -2616,6 +3013,23 @@ function exportFinancialReportXlsx(data, ft) {
         addSheet(ft('每日儲值明細'), walletDailyAoa, [14, 10, 14, 10, 14, 14]);
     }
 
+    // ── 應收款明細 ──
+    if (rv && Array.isArray(rv.rows) && rv.rows.length) {
+        const recvAoa = [[ft('日期'), ft('病人'), ft('診所'), ft('待收金額'), ft('備註')]];
+        rv.rows.forEach(function (c) {
+            recvAoa.push([
+                getFinancialDateKey(c.date),
+                c.patientName || ft('未知病人'),
+                finClinicExportName({ clinicId: c.clinicId, clinicName: c.clinicName }),
+                num(c.pendingAmount),
+                c.walletPaySkipped ? ft('已改用其他方式，待核銷') : ft('儲值扣款失敗')
+            ]);
+        });
+        recvAoa.push([ft('合計'), '', '', num(rv.total),
+            rv.truncated ? ft('部分資料未包含（超過五千筆）') : '']);
+        addSheet(ft('應收款明細'), recvAoa, [14, 16, 18, 14, 26]);
+    }
+
     const out = X.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
@@ -2643,21 +3057,88 @@ function exportFinancialReportExcelHtml(data, ft) {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
     };
-    const doctorRows = Object.keys(stats.doctorStats).map(key => {
-        const d = stats.doctorStats[key];
-        return `<tr><td>${esc(key || ft('未知醫師'))}</td><td>${d.count}</td><td>${d.revenue}</td></tr>`;
+    const num = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const avg0 = (sum, count) => count > 0 ? Math.round((Number(sum) || 0) / count) : 0;
+    const pct = (part, whole) => finExportPct(part, whole);
+    const totalRevenue = num(stats.totalRevenue);
+    const sortedDetails = sortFinDetailRecords(data.detailRecords);
+
+    // 收入分類
+    const categoryRows = FIN_EXPORT_CATEGORY_ORDER.map(cat => {
+        const s = stats.serviceStats[cat];
+        const revenue = s ? num(s.revenue) : 0;
+        return `<tr><td>${esc(getFinancialCategoryDisplayName(cat))}</td><td>${revenue}</td><td>${pct(revenue, totalRevenue)}%</td></tr>`;
     }).join('');
-    const serviceRows = Object.values(stats.serviceStats).map(item => {
-        return `<tr><td>${esc(item.name)}</td><td>${item.count}</td><td>${item.revenue}</td></tr>`;
-    }).join('');
-    const dailyRows = Object.keys(stats.dailyStats).map(dateKey => {
+
+    const doctorRows = Object.entries(stats.doctorStats)
+        .sort((a, b) => b[1].revenue - a[1].revenue)
+        .map(([key, d]) => {
+            return `<tr><td>${esc(finDoctorExportName(key))}</td><td>${num(d.count)}</td><td>${num(d.revenue)}</td>`
+                + `<td>${avg0(d.revenue, d.count)}</td><td>${pct(d.revenue, totalRevenue)}%</td></tr>`;
+        }).join('');
+    const serviceRows = Object.values(stats.serviceStats)
+        .sort((a, b) => b.revenue - a.revenue)
+        .map(item => {
+            return `<tr><td>${esc(item.name)}</td><td>${num(item.count)}</td><td>${num(item.revenue)}</td>`
+                + `<td>${avg0(item.revenue, item.count)}</td><td>${pct(item.revenue, totalRevenue)}%</td></tr>`;
+        }).join('');
+
+    // 服務項目彙總
+    const itemAggRows = buildFinItemNameAgg(data.detailRecords)
+        .sort((a, b) => {
+            const ca = FIN_EXPORT_CATEGORY_ORDER.indexOf(a.category);
+            const cb = FIN_EXPORT_CATEGORY_ORDER.indexOf(b.category);
+            const oa = ca < 0 ? 99 : ca;
+            const ob = cb < 0 ? 99 : cb;
+            return oa !== ob ? oa - ob : b.revenue - a.revenue;
+        })
+        .map(r => `<tr><td>${esc(getFinancialCategoryDisplayName(r.category))}</td><td>${esc(r.name || ft('（未命名）'))}</td>`
+            + `<td>${num(r.quantity)}</td><td>${num(r.revenue)}</td><td>${avg0(r.revenue, r.quantity)}</td></tr>`)
+        .join('');
+
+    // 每日統計（連續日曆日）
+    const dailyRows = enumerateFinancialDates(startDate, endDate).map(dateKey => {
         const d = stats.dailyStats[dateKey];
-        return `<tr><td>${esc(dateKey)}</td><td>${d.count}</td><td>${d.revenue}</td></tr>`;
+        if (!d) return `<tr><td>${esc(dateKey)}</td><td>0</td><td>0</td><td>0</td><td>—</td></tr>`;
+        return `<tr><td>${esc(dateKey)}</td><td>${num(d.count)}</td><td>${num(d.revenue)}</td>`
+            + `<td>${avg0(d.revenue, d.count)}</td><td>${esc(finDailyMainService(d.services))}</td></tr>`;
     }).join('');
+
+    // 診症明細＋收費項目明細
+    const detailRows = [];
+    const lineRows = [];
+    sortedDetails.forEach(c => {
+        const parsed = finRecordParsedItems(c);
+        const dateKey = esc(finRecordDateKey(c));
+        const timeText = esc(finRecordTimeText(c));
+        const patient = esc(c.patientName || ft('未知病人'));
+        const doctor = esc(finDoctorExportName(c.doctor));
+        const clinic = esc(finClinicExportName(c));
+        detailRows.push(`<tr><td>${dateKey}</td><td>${timeText}</td><td>${patient}</td><td>${doctor}</td>`
+            + `<td>${clinic}</td><td>${num(parsed.totalAmount)}</td><td>${esc(String(c.id || c.consultationId || ''))}</td></tr>`);
+        (parsed.items || []).forEach(item => {
+            lineRows.push(`<tr><td>${dateKey}</td><td>${timeText}</td><td>${patient}</td><td>${doctor}</td><td>${clinic}</td>`
+                + `<td>${esc(getFinancialCategoryDisplayName(item.category))}</td><td>${esc(item.name || ft('（未命名）'))}</td>`
+                + `<td>${num(item.quantity)}</td><td>${num(item.unitPrice)}</td><td>${num(item.totalAmount)}</td></tr>`);
+        });
+    });
+
     const costRows = Object.keys(byType).map(type => {
-        const amount = Number(byType[type] || 0);
+        const amount = num(byType[type]);
         return `<tr><td>${esc(type)}</td><td>${amount}</td></tr>`;
     }).join('');
+
+    // 應收款
+    const rv = data.receivables;
+    let receivableRows = '';
+    if (rv && Array.isArray(rv.rows) && rv.rows.length) {
+        receivableRows = rv.rows.map(c => {
+            const note = c.walletPaySkipped ? ft('已改用其他方式，待核銷') : ft('儲值扣款失敗');
+            return `<tr><td>${esc(getFinancialDateKey(c.date))}</td><td>${esc(c.patientName || ft('未知病人'))}</td>`
+                + `<td>${esc(finClinicExportName({ clinicId: c.clinicId, clinicName: c.clinicName }))}</td>`
+                + `<td>${num(c.pendingAmount)}</td><td>${esc(note)}</td></tr>`;
+        }).join('') + `<tr><td>${esc(ft('合計'))}</td><td>${rv.rows.length}</td><td></td><td>${num(rv.total)}</td><td></td></tr>`;
+    }
 
     // 會員儲值段落
     const w = data.walletStats;
@@ -2699,28 +3180,38 @@ h2, h3 { margin: 8px 0; }
 <tr><th>${ft('欄位')}</th><th>${ft('內容')}</th></tr>
 <tr><td>${ft('期間')}</td><td>${esc(startDate)} ${ft('至')} ${esc(endDate)}</td></tr>
 <tr><td>${ft('生成時間')}</td><td>${esc(data.generatedAt)}</td></tr>
-<tr><td>${ft('選擇醫師')}</td><td>${esc(doctorFilter || ft('全部醫師'))}</td></tr>
+<tr><td>${ft('選擇醫師')}</td><td>${esc(doctorFilter ? finDoctorExportName(doctorFilter) : ft('全部醫師'))}</td></tr>
 <tr><td>${ft('選擇診所')}</td><td>${esc(clinicFilter ? clinicName : ft('全部診所'))}</td></tr>
-<tr><td>${ft('總收入(未扣成本)')}</td><td>${stats.totalRevenue}</td></tr>
-<tr><td>${ft('總成本')}</td><td>${totalCost}</td></tr>
+<tr><td>${ft('總收入(未扣成本)')}</td><td>${totalRevenue}</td></tr>
+<tr><td>${ft('總成本')}</td><td>${num(totalCost)}（${ft('成本率')} ${pct(totalCost, totalRevenue)}%）</td></tr>
 <tr><td>${ft('成本計算')}</td><td>${data.costProrated ? ft('部分月份按天數分攤') : ft('整月實際成本')}</td></tr>
-<tr><td>${ft('淨收入')}</td><td>${stats.totalRevenue - totalCost}</td></tr>
-<tr><td>${ft('總診症數')}</td><td>${stats.totalConsultations}</td></tr>
-<tr><td>${ft('平均收入')}</td><td>${Math.round(stats.averageRevenue)}</td></tr>
-<tr><td>${ft('有效醫師數')}</td><td>${stats.activeDoctors}</td></tr>
+<tr><td>${ft('淨收入')}</td><td>${num(totalRevenue - totalCost)}（${ft('利潤率')} ${pct(totalRevenue - totalCost, totalRevenue)}%）</td></tr>
+<tr><td>${ft('總診症數')}</td><td>${num(stats.totalConsultations)}</td></tr>
+<tr><td>${ft('平均收入')}</td><td>${Math.round(num(stats.averageRevenue))}</td></tr>
+<tr><td>${ft('有效醫師數')}</td><td>${num(stats.activeDoctors)}</td></tr>
 </table>
+<h3>${ft('收入分類')}</h3>
+<table><tr><th>${ft('項目')}</th><th>${ft('金額')}</th><th>${ft('收入佔比')}</th></tr>${categoryRows || `<tr><td colspan="3">${ft('無資料')}</td></tr>`}</table>
 <h3>${ft('醫師統計')}</h3>
-<table><tr><th>${ft('醫師')}</th><th>${ft('次數')}</th><th>${ft('收入')}</th></tr>${doctorRows || `<tr><td colspan="3">${ft('無資料')}</td></tr>`}</table>
+<table><tr><th>${ft('醫師')}</th><th>${ft('次數')}</th><th>${ft('收入')}</th><th>${ft('平均單價')}</th><th>${ft('收入佔比')}</th></tr>${doctorRows || `<tr><td colspan="5">${ft('無資料')}</td></tr>`}</table>
 <h3>${ft('服務分類統計')}</h3>
-<table><tr><th>${ft('服務類型')}</th><th>${ft('次數')}</th><th>${ft('收入')}</th></tr>${serviceRows || `<tr><td colspan="3">${ft('無資料')}</td></tr>`}</table>
+<table><tr><th>${ft('服務類型')}</th><th>${ft('數量')}</th><th>${ft('收入')}</th><th>${ft('平均單價')}</th><th>${ft('收入佔比')}</th></tr>${serviceRows || `<tr><td colspan="5">${ft('無資料')}</td></tr>`}</table>
+<h3>${ft('服務項目彙總')}</h3>
+<table><tr><th>${ft('費用類型')}</th><th>${ft('項目名稱')}</th><th>${ft('數量')}</th><th>${ft('收入')}</th><th>${ft('平均單價')}</th></tr>${itemAggRows || `<tr><td colspan="5">${ft('無資料')}</td></tr>`}</table>
 <h3>${ft('每日統計')}</h3>
-<table><tr><th>${ft('日期')}</th><th>${ft('次數')}</th><th>${ft('收入')}</th></tr>${dailyRows || `<tr><td colspan="3">${ft('無資料')}</td></tr>`}</table>
+<table><tr><th>${ft('日期')}</th><th>${ft('次數')}</th><th>${ft('收入')}</th><th>${ft('平均消費')}</th><th>${ft('主要服務')}</th></tr>${dailyRows || `<tr><td colspan="5">${ft('無資料')}</td></tr>`}</table>
+<h3>${ft('診症明細')}</h3>
+<table><tr><th>${ft('日期')}</th><th>${ft('時間')}</th><th>${ft('病人')}</th><th>${ft('醫師')}</th><th>${ft('診所')}</th><th>${ft('金額')}</th><th>${ft('診症單ID')}</th></tr>${detailRows.join('') || `<tr><td colspan="7">${ft('無資料')}</td></tr>`}</table>
+<h3>${ft('收費項目明細')}</h3>
+<table><tr><th>${ft('日期')}</th><th>${ft('時間')}</th><th>${ft('病人')}</th><th>${ft('醫師')}</th><th>${ft('診所')}</th><th>${ft('費用類別')}</th><th>${ft('項目名稱')}</th><th>${ft('數量')}</th><th>${ft('單價')}</th><th>${ft('小計')}</th></tr>${lineRows.join('') || `<tr><td colspan="10">${ft('無資料')}</td></tr>`}</table>
 <h3>${ft('成本統計')}</h3>
 <table><tr><th>${ft('成本類型')}</th><th>${ft('金額')}</th></tr>${costRows || `<tr><td colspan="2">${ft('無資料')}</td></tr>`}</table>
 <h3>${ft('會員儲值統計')}</h3>
 <table><tr><th>${ft('項目')}</th><th>${ft('金額')}</th><th>${ft('筆數')}</th><th>${ft('備註')}</th></tr>${walletSummaryRows || `<tr><td colspan="4">${ft('無資料')}</td></tr>`}</table>
 <h3>${ft('每日儲值明細')}</h3>
 <table><tr><th>${ft('日期')}</th><th>${ft('充值筆數')}</th><th>${ft('充值金額')}</th><th>${ft('消費筆數')}</th><th>${ft('消費金額')}</th><th>${ft('退款金額')}</th></tr>${walletDailyRows || `<tr><td colspan="6">${ft('無資料')}</td></tr>`}</table>
+<h3>${ft('應收款明細')}</h3>
+<table><tr><th>${ft('日期')}</th><th>${ft('病人')}</th><th>${ft('診所')}</th><th>${ft('待收金額')}</th><th>${ft('備註')}</th></tr>${receivableRows || `<tr><td colspan="5">${ft('無資料')}</td></tr>`}</table>
 </body>
 </html>`;
     const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
