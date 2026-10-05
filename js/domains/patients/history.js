@@ -364,6 +364,19 @@ if (!patient) {
             const buttons = [];
             const isGeneralRegistration = G.isGeneralRegistrationConsultation(consultation);
 
+            // 「載入病歷」只在醫師正在診症、且該病歷屬於當前病人時出現；
+            // 按使用順序放在「修改病歷」左邊（按鈕群最前）
+            if (G.currentConsultingAppointmentId) {
+                const currentAppointment = G.appointments.find(apt => apt && String(apt.id) === String(G.currentConsultingAppointmentId));
+                if (currentAppointment && String(currentAppointment.patientId) === String(consultation.patientId)) {
+                    buttons.push(renderMedicalHistoryActionButton({
+                        label: '載入病歷',
+                        onclick: `loadMedicalRecordToCurrentConsultation('${consultation.id}')`,
+                        variant: 'load'
+                    }));
+                }
+            }
+
             if (G.canCurrentUserEditMedicalRecordEntry(consultation, null)) {
                 const editWindowStatus = G.getMedicalRecordEditWindowStatus(consultation, null);
                 buttons.push(renderMedicalHistoryActionButton({
@@ -405,17 +418,6 @@ if (!patient) {
                         label: '病假證明',
                         onclick: `printSickLeave('${consultation.id}')`,
                         variant: 'sickLeave'
-                    }));
-                }
-            }
-
-            if (G.currentConsultingAppointmentId) {
-                const currentAppointment = G.appointments.find(apt => apt && String(apt.id) === String(G.currentConsultingAppointmentId));
-                if (currentAppointment && String(currentAppointment.patientId) === String(consultation.patientId)) {
-                    buttons.push(renderMedicalHistoryActionButton({
-                        label: '載入病歷',
-                        onclick: `loadMedicalRecordToCurrentConsultation('${consultation.id}')`,
-                        variant: 'load'
                     }));
                 }
             }
