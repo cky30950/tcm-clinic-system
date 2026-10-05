@@ -89,9 +89,9 @@
             // 會變成「初入頁面是按鈕樣式、切過分頁後才變回原樣」的不一致
             var onclickAttr = el.getAttribute('onclick') || '';
             // 會把 className 整個重置為原始類別的按鈕一律跳過：
-            // 若先加 btn，首次點擊後類別被清掉會縮小／移位。分頁 tab 與各列表
-            // 篩選掣（中藥庫 filterHerbLibrary、收費項目 filterBillingItems）皆屬此類
-            if (/switch(Personal|Template)Tab\(|filterHerbLibrary\(|filterBillingItems\(/.test(onclickAttr)) return;
+            // 若先加 btn，首次點擊後類別被清掉會縮小／移位。分頁 tab、各列表
+            // 篩選掣（中藥庫、穴位庫、收費項目、個人設置、模板庫、財務報表、用戶管理）皆屬此類
+            if (/switch(Personal|Template|Financial)Tab\(|filterHerbLibrary\(|filterBillingItems\(|filterAcupointLibrary\(|filterUsers\(/.test(onclickAttr)) return;
             var c = el.className || '';
             var inCons = el.closest ? !!el.closest('#consultationSystem') : false;
             if (!inCons && isFixedCircle(c)) return;
@@ -305,11 +305,14 @@
         }
 
         /* 垂直捲軸固定保留空間：列表篩選（全部↔已停用等）令內容長度改變時，
-           捲軸出現／消失會把整個版面橫向推開約 15px。scrollbar-gutter
-           使空間常駐，版面不再橫向跳動（手機瀏覽器為覆蓋式捲軸，不受影響）。
-           須設於 body：視窗的捲軸屬性由 body 傳播至視埠，設於 html 無效 */
-        body {
+           捲軸出現／消失會把整個版面橫向推開約 15px。scrollbar-gutter: stable
+           會在有捲軸需求時預留空間；搭配 html/body min-height: calc(100vh + 1px)
+           強迫頁面永遠略高於視窗，gutter 因而常駐，版面不再橫向跳動。
+           同時設於 html 與 body：當兩者皆為 overflow:visible 時捲軸設於 html，
+           而 min-height 在 body 上也需要，避免某些容器自身的捲軸造成同樣問題 */
+        html, body {
             scrollbar-gutter: stable;
+            min-height: calc(100vh + 1px);
         }
 
         /* 所有按鈕統一正常字重：daisyUI .btn 預設 font-weight:600，

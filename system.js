@@ -18747,13 +18747,14 @@ async function deleteAcupointCombination(id) {
                 renderDiagnosisSettingsForm(true);
               }
             }
+            // 統一保留底部邊框 2px（非 active 以透明色填充），避免切換時高度差 2px 造成版面移位
             const tabButtons = ['herbsTab', 'acupointsTab', 'diagnosisSettingsTab'];
             tabButtons.forEach(buttonId => {
               const button = document.getElementById(buttonId);
               if (buttonId === tabId + 'Tab') {
                 button.className = 'px-6 py-3 text-amber-700 border-b-2 border-amber-500 font-medium';
               } else {
-                button.className = 'px-6 py-3 text-gray-500 hover:text-amber-700 font-medium';
+                button.className = 'px-6 py-3 text-gray-500 hover:text-amber-700 border-b-2 border-transparent font-medium';
               }
             });
           }
@@ -18767,13 +18768,14 @@ async function deleteAcupointCombination(id) {
             } else if (tabId === 'diagnosis') {
               document.getElementById('diagnosisContent').classList.remove('hidden');
             }
+            // 統一保留底部邊框 2px（非 active 以透明色填充），避免切換時高度差 2px 造成版面移位
             const tabButtons = ['prescriptionsTab', 'diagnosisTab'];
             tabButtons.forEach(buttonId => {
               const button = document.getElementById(buttonId);
               if (buttonId === tabId + 'Tab') {
                 button.className = 'px-6 py-3 text-amber-700 border-b-2 border-amber-500 font-medium';
               } else {
-                button.className = 'px-6 py-3 text-gray-500 hover:text-amber-700 font-medium';
+                button.className = 'px-6 py-3 text-gray-500 hover:text-amber-700 border-b-2 border-transparent font-medium';
               }
             });
 
