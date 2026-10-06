@@ -3086,16 +3086,13 @@
                             </div>
                         </div>
                     </div>
-                    <div class="bg-gray-50 rounded-lg p-6 md:col-span-2">
+                    <div class="bg-gray-50 rounded-lg p-6 md:col-span-2" data-version-feature="membership">
                         <div id="walletConfigArea">
-                            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-4">
-                                <div>
-                                    <h3 class="text-lg font-semibold">會員設定</h3>
-                                    <p class="text-sm text-gray-600">目前診所：<span id="walletConfigClinicName">名醫診所系統</span>。啟用會員功能、會員折扣項目、扣款順序及充值贈送級距均按所選診所儲存，切換診所後會同步更新。</p>
-                                </div>
-                                <button onclick="toggleWalletConfigForm()" id="walletConfigToggle" class="text-sm text-teal-700 underline shrink-0">展開</button>
+                            <div class="mb-4">
+                                <h3 class="text-lg font-semibold">會員設定</h3>
+                                <p class="text-sm text-gray-600">目前診所：<span id="walletConfigClinicName">名醫診所系統</span>。啟用會員功能、會員折扣項目、扣款順序及充值贈送級距均按所選診所儲存，切換診所後會同步更新。</p>
                             </div>
-                            <div id="walletConfigForm" class="hidden bg-white rounded-lg p-4 border border-teal-200"></div>
+                            <div id="walletConfigForm" class="bg-white rounded-lg p-4 border border-teal-200"></div>
                         </div>
                     </div>
                     <div id="permissionManagementPanel" class="bg-gray-50 rounded-lg p-6 md:col-span-2 hidden">

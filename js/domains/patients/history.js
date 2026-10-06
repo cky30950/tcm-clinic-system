@@ -297,25 +297,46 @@ import { printAttendanceCertificate, printConsultationRecord, printPrescriptionI
         }
         
         export async function showPatientMedicalHistory(patientId) {
+    const modal = document.getElementById('patientMedicalHistoryModal');
+    const contentDiv = document.getElementById('patientMedicalHistoryContent');
+    const titleEl = document.getElementById('patientMedicalHistoryTitle');
+    const patientInfoEl = document.getElementById('patientMedicalHistoryPatientInfo');
+
+    // 先顯示 modal 與讀取圈
+    if (titleEl) titleEl.textContent = '病歷記錄';
+    if (patientInfoEl) patientInfoEl.innerHTML = '';
+    if (contentDiv) {
+        contentDiv.innerHTML = `
+            <div class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                <div class="mt-2 text-sm text-gray-600">載入病歷中...</div>
+            </div>
+        `;
+    }
+    if (modal) modal.classList.remove('hidden');
+
     try {
-const patient = await getPatientByIdWithRefresh(patientId);
-if (!patient) {
-    G.showToast('找不到病人資料！', 'error');
-    return;
-}
+        const patient = await getPatientByIdWithRefresh(patientId);
+        if (!patient) {
+            G.showToast('找不到病人資料！', 'error');
+            if (modal) modal.classList.add('hidden');
+            return;
+        }
             
-            // 透過共用 pager 載入並同步狀態
-            const consultationResult = await G.consultationHistoryPager.loadForContext('patient', patientId);
-            if (!consultationResult.success) {
-                G.showToast('無法讀取診症記錄！', 'error');
-                return;
-            }
+        // 透過共用 pager 載入並同步狀態
+        const consultationResult = await G.consultationHistoryPager.loadForContext('patient', patientId);
+        if (!consultationResult.success) {
+            G.showToast('無法讀取診症記錄！', 'error');
+            if (modal) modal.classList.add('hidden');
+            return;
+        }
             
-            // 設置標題
-            document.getElementById('patientMedicalHistoryTitle').textContent = `${patient.name} 的病歷記錄`;
+        // 設置標題
+        if (titleEl) titleEl.textContent = `${patient.name} 的病歷記錄`;
             
-            // 顯示病人基本資訊
-            document.getElementById('patientMedicalHistoryPatientInfo').innerHTML = `
+        // 顯示病人基本資訊
+        if (patientInfoEl) {
+            patientInfoEl.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     <div>
                         <span class="font-medium text-gray-700">病人編號：</span>
@@ -346,16 +367,16 @@ if (!patient) {
                     ` : ''}
                 </div>
             `;
+        }
             
-            G.currentPatientHistoryPatientId = patientId;
-            closeHistoryCalendar('patient');
-            // 顯示分頁病歷記錄
-            displayPatientMedicalHistoryPage();
-            
-            document.getElementById('patientMedicalHistoryModal').classList.remove('hidden');
-            } catch (error) {
+        G.currentPatientHistoryPatientId = patientId;
+        closeHistoryCalendar('patient');
+        // 顯示分頁病歷記錄
+        displayPatientMedicalHistoryPage();
+    } catch (error) {
         console.error('讀取病人資料錯誤:', error);
         G.showToast('讀取病人資料失敗', 'error');
+        if (modal) modal.classList.add('hidden');
     }
         }
         
@@ -860,10 +881,30 @@ export async function viewPatientMedicalHistory(patientId) {
     if (loadingButton) {
         G.setButtonLoading(loadingButton, '讀取中...');
     }
+
+    const modal = document.getElementById('medicalHistoryModal');
+    const contentDiv = document.getElementById('medicalHistoryContent');
+    const titleEl = document.getElementById('medicalHistoryTitle');
+    const patientInfoEl = document.getElementById('medicalHistoryPatientInfo');
+
+    // 先顯示 modal 與讀取圈
+    if (titleEl) titleEl.textContent = '診症記錄';
+    if (patientInfoEl) patientInfoEl.innerHTML = '';
+    if (contentDiv) {
+        contentDiv.innerHTML = `
+            <div class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                <div class="mt-2 text-sm text-gray-600">載入病歷中...</div>
+            </div>
+        `;
+    }
+    if (modal) modal.classList.remove('hidden');
+
     try {
         const patient = await getPatientByIdWithRefresh(patientId);
         if (!patient) {
             G.showToast('找不到病人資料', 'error');
+            if (modal) modal.classList.add('hidden');
             return;
         }
         
@@ -871,55 +912,56 @@ export async function viewPatientMedicalHistory(patientId) {
         const consultationResult = await G.consultationHistoryPager.loadForContext('consultation', patientId);
         if (!consultationResult.success) {
             G.showToast('無法讀取診症記錄', 'error');
+            if (modal) modal.classList.add('hidden');
             return;
         }
         
         // 設置標題（轉義使用者輸入，避免 XSS）
-        document.getElementById('medicalHistoryTitle').textContent = `${window.escapeHtml(patient.name)} 的診症記錄`;
+        if (titleEl) titleEl.textContent = `${window.escapeHtml(patient.name)} 的診症記錄`;
         
         // 顯示病人基本資訊
-        document.getElementById('medicalHistoryPatientInfo').innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                <div>
-                    <span class="font-medium text-gray-700">病人編號：</span>
-            <span class="text-blue-600 font-semibold">${window.escapeHtml(patient.patientNumber)}</span>
+        if (patientInfoEl) {
+            patientInfoEl.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    <div>
+                        <span class="font-medium text-gray-700">病人編號：</span>
+                <span class="text-blue-600 font-semibold">${window.escapeHtml(patient.patientNumber)}</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-700">姓名：</span>
+                <span class="font-semibold">${window.escapeHtml(patient.name)}</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-700">年齡：</span>
+                <span>${window.escapeHtml(G.formatAge(patient.birthDate))}</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-700">性別：</span>
+                <span>${window.escapeHtml(patient.gender)}</span>
+                    </div>
+                    ${patient.history ? `
+                    <div class="md:col-span-1 lg:col-span-2">
+                        <span class="font-medium text-gray-700">病史及備註：</span>
+                        <span class="medical-field text-gray-700">${window.escapeHtml(patient.history)}</span>
+                    </div>
+                    ` : ''}
+                    ${patient.allergies ? `
+                    <div class="md:col-span-1 lg:col-span-2">
+                        <span class="medical-field text-red-700 bg-red-50 px-2 py-1 rounded">${window.escapeHtml(patient.allergies)}</span>
+                    </div>
+                    ` : ''}
                 </div>
-                <div>
-                    <span class="font-medium text-gray-700">姓名：</span>
-            <span class="font-semibold">${window.escapeHtml(patient.name)}</span>
-                </div>
-                <div>
-                    <span class="font-medium text-gray-700">年齡：</span>
-            <span>${window.escapeHtml(G.formatAge(patient.birthDate))}</span>
-                </div>
-                <div>
-                    <span class="font-medium text-gray-700">性別：</span>
-            <span>${window.escapeHtml(patient.gender)}</span>
-                </div>
-                ${patient.history ? `
-                <div class="md:col-span-1 lg:col-span-2">
-                    <span class="font-medium text-gray-700">病史及備註：</span>
-                    <span class="medical-field text-gray-700">${window.escapeHtml(patient.history)}</span>
-                </div>
-                ` : ''}
-                ${patient.allergies ? `
-                <div class="md:col-span-1 lg:col-span-2">
-                    <span class="medical-field text-red-700 bg-red-50 px-2 py-1 rounded">${window.escapeHtml(patient.allergies)}</span>
-                </div>
-                ` : ''}
-            </div>
-        `;
+            `;
+        }
         
         G.currentConsultationHistoryPatientId = patientId;
         closeHistoryCalendar('consultation');
         // 顯示分頁病歷記錄
         displayConsultationMedicalHistoryPage();
-        
-        document.getElementById('medicalHistoryModal').classList.remove('hidden');
-        
     } catch (error) {
         console.error('查看病人診症記錄錯誤:', error);
         G.showToast('讀取病人資料失敗', 'error');
+        if (modal) modal.classList.add('hidden');
     } finally {
         // 清除按鈕的讀取狀態
         if (loadingButton) {

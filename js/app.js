@@ -43,6 +43,7 @@ const FACADE = {
     showWalletAdjustForm: Wallet.showWalletAdjustForm,
     showWalletStatusForm: Wallet.showWalletStatusForm,
     toggleWalletConfigForm: Wallet.toggleWalletConfigForm,
+    renderWalletConfigForm: Wallet.renderWalletConfigForm,
     addWalletTierRow: Wallet.addWalletTierRow,
     removeWalletTierRow: Wallet.removeWalletTierRow,
     submitWalletConfig: Wallet.submitWalletConfig,

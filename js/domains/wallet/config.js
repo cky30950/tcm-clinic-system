@@ -11,15 +11,12 @@ import { walletClinicDocCache, walletMembershipConfigCache } from './shared.js';
 
   export async function toggleWalletConfigForm() {
     const form = document.getElementById('walletConfigForm');
-    const toggle = document.getElementById('walletConfigToggle');
     if (!form) return;
     if (!form.classList.contains('hidden')) {
       form.classList.add('hidden');
-      toggle.textContent = '展開';
       return;
     }
     form.classList.remove('hidden');
-    toggle.textContent = '收合';
     await renderWalletConfigForm();
   }
 
@@ -64,7 +61,7 @@ import { walletClinicDocCache, walletMembershipConfigCache } from './shared.js';
     const deductFirst = cfg.deductBonusFirst !== false;
     const discountId = String(cfg.discountItemId || '');
     const tiers = Array.isArray(cfg.topupBonusTiers) ? cfg.topupBonusTiers : [];
-    const discountItems = (Array.isArray(G.billingItems) ? billingItems : [])
+    const discountItems = (Array.isArray(G.billingItems) ? G.billingItems : [])
       .filter((b) => b && b.category === 'discount');
 
     form.innerHTML = `
@@ -127,7 +124,7 @@ import { walletClinicDocCache, walletMembershipConfigCache } from './shared.js';
         }
       });
       if (discountItemId) {
-        const valid = (Array.isArray(G.billingItems) ? billingItems : [])
+        const valid = (Array.isArray(G.billingItems) ? G.billingItems : [])
           .some((b) => String(b.id) === discountItemId && b.category === 'discount');
         if (!valid) throw new Error('所選折扣項目不存在或類型不符');
       }

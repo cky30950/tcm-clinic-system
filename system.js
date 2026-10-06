@@ -6092,6 +6092,11 @@ async function fetchJsonWithFallback(fileName) {
                 try {
                     loadPermissionManagementPanel();
                 } catch (_eLoadPermissionPanel) {}
+                try {
+                    if (versionFeatureEnabled('membership') && typeof renderWalletConfigForm === 'function') {
+                        renderWalletConfigForm();
+                    }
+                } catch (_eRenderWalletConfig) {}
             } else if (sectionId === 'userManagement') {
                 loadUserManagement();
             } else if (sectionId === 'personalSettings') {
@@ -7501,6 +7506,11 @@ async function initializeSystemAfterLogin() {
             }
             if (walletConfigClinicNameEl) {
                 walletConfigClinicNameEl.textContent = activeClinicName;
+            }
+            // 診所切換時同步重新載入會員設定
+            const walletConfigFormEl = document.getElementById('walletConfigForm');
+            if (walletConfigFormEl && versionFeatureEnabled('membership') && typeof renderWalletConfigForm === 'function') {
+                renderWalletConfigForm();
             }
             
             // 更新登入頁面的診所名稱
@@ -15212,6 +15222,20 @@ async function searchMedicalRecordsLegacy(term, limitCount, out, seen) {
  */
 async function viewMedicalRecord(recordId, buttonEl = null) {
     const loadingButton = buttonEl || null;
+    const modal = document.getElementById('medicalRecordDetailModal');
+    const content = document.getElementById('medicalRecordDetailContent');
+
+    // 先顯示 modal 與讀取圈
+    if (content) {
+        content.innerHTML = `
+            <div class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                <div class="mt-2 text-sm text-gray-600">載入病歷中...</div>
+            </div>
+        `;
+    }
+    if (modal) modal.classList.remove('hidden');
+
     try {
         if (loadingButton) {
             setButtonLoading(loadingButton, '讀取中...');
@@ -15500,18 +15524,14 @@ async function viewMedicalRecord(recordId, buttonEl = null) {
         detailHtml += '</div>'; // grid 結束
         detailHtml += '</div>'; // p-6 結束
         detailHtml += '</div>'; // 卡片容器結束
-        // 將內容插入彈窗並顯示
-        const modal = document.getElementById('medicalRecordDetailModal');
-        const content = document.getElementById('medicalRecordDetailContent');
+        // 將內容插入彈窗（modal 已在函式開頭顯示）
         if (content) {
             content.innerHTML = detailHtml;
-        }
-        if (modal) {
-            modal.classList.remove('hidden');
         }
     } catch (error) {
         console.error('檢視病歷記錄錯誤:', error);
         showToast('讀取病歷失敗', 'error');
+        if (modal) modal.classList.add('hidden');
     } finally {
         if (loadingButton) {
             clearButtonLoading(loadingButton);
