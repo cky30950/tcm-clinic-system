@@ -1226,14 +1226,16 @@ export async function loadConsultationForEdit(consultationId) {
             console.error('讀取診療記錄錯誤:', error);
         }
         if (consultation) {
-            // 記錄已保存病歷的時間戳，供恢復草稿時判斷本機草稿是否已過期
+            // 記錄已保存病歷的時間戳，供恢復草稿時判斷本機草稿是否已過期。
+            // 若所有日期欄位都解析失敗，以 Date.now() fallback，確保本機草稿一定被視為「不晚於已保存記錄」，
+            // 避免舊草稿覆蓋剛從 Firebase 載入的病歷內容。
             try {
                 const savedDate = parseConsultationDate(consultation.updatedAt)
                     || parseConsultationDate(consultation.date)
                     || getConsultationEffectiveDate(consultation);
-                G.consultationSymptomsDraftState.loadedRecordUpdatedAt = savedDate ? savedDate.getTime() : 0;
+                G.consultationSymptomsDraftState.loadedRecordUpdatedAt = savedDate ? savedDate.getTime() : Date.now();
             } catch (_tsErr) {
-                G.consultationSymptomsDraftState.loadedRecordUpdatedAt = 0;
+                G.consultationSymptomsDraftState.loadedRecordUpdatedAt = Date.now();
             }
             // 載入診症記錄內容
             document.getElementById('formSymptoms').value = consultation.symptoms || '';

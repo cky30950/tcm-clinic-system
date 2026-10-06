@@ -16,12 +16,87 @@ const PAGE_SIZE = 300;
 // 與前端 exportClinicBackup 排除嘅 RTDB 節點一致（即時掛號／問診）
 const RTDB_EXCLUDED_KEYS = ['appointments', 'consultations', 'consultation', 'onlineConsultations'];
 
+// Worker 每個 isolate 一份快取；發現一次後所有 FirestoreClient 實例復用
+let _rtdbDiscoveryCache = new Map(); // projectId → Promise<string>
+
+/**
+ * 自動發現 RTDB 根 URL。
+ *   1. env 有 FIREBASE_RTDB_URL → 直接返回
+ *   2. 否則先試經典域名 .firebaseio.com（us-central1 與舊專案），
+ *      若回 404 並附 correctUrl 就用 Firebase 告知的正確地址
+ *   3. 再 fallback 幾個常見地區的 firebasedatabase.app 域名
+ *
+ * 結果按 projectId 快取，同 isolate 內只探測一次。
+ *
+ * @param {object} [env] Cloudflare Pages env（用來讀 FIREBASE_RTDB_URL）
+ * @param {string} projectId Firebase project ID
+ * @param {string} accessToken Service Account OAuth2 access token
+ * @returns {Promise<string>} RTDB 根 URL（尾無斜線）
+ */
+export async function discoverRtdbUrl(env, projectId, accessToken) {
+    // env 明確指定 → 優先
+    if (env && env.FIREBASE_RTDB_URL) {
+        return String(env.FIREBASE_RTDB_URL).replace(/\/$/, '');
+    }
+    const pid = String(projectId || '');
+    if (!pid) throw new Error('discoverRtdbUrl 缺少 projectId');
+    if (_rtdbDiscoveryCache.has(pid)) {
+        return _rtdbDiscoveryCache.get(pid);
+    }
+    const promise = (async () => {
+        const candidates = [
+            `https://${pid}-default-rtdb.firebaseio.com`,                       // us-central1 / 舊專案
+            `https://${pid}-default-rtdb.asia-southeast1.firebasedatabase.app`, // 新加坡
+            `https://${pid}-default-rtdb.us-central1.firebasedatabase.app`,     // 美國（新格式）
+            `https://${pid}-default-rtdb.europe-west1.firebasedatabase.app`,   // 歐洲
+        ];
+        const headers = accessToken
+            ? { 'Authorization': `Bearer ${accessToken}` }
+            : {};
+        for (const url of candidates) {
+            try {
+                const res = await fetch(`${url}/.json`, { headers });
+                if (res.ok) return url;
+                if (res.status === 404) {
+                    try {
+                        const data = await res.json();
+                        if (data && data.correctUrl) {
+                            const clean = String(data.correctUrl)
+                                .replace(/`/g, '')
+                                .replace(/\/$/, '')
+                                .replace(/\/\.json$/, '');
+                            if (/^https?:\/\//.test(clean)) return clean;
+                        }
+                    } catch (_) {}
+                }
+            } catch (_) {}
+        }
+        // 全部失敗，至少回傳經典域名讓後續請求顯示原始錯誤
+        return candidates[0];
+    })();
+    _rtdbDiscoveryCache.set(pid, promise);
+    return promise;
+}
+
 export class FirestoreClient {
     constructor(accessToken, projectId, rtdbUrl) {
         this.token = accessToken;
         this.projectId = projectId;
-        this.rtdbUrl = rtdbUrl
-            || `https://${projectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
+        // 注意：rtdbUrl 可能是空字串（多個呼叫點傳 env.FIREBASE_RTDB_URL || ''）。
+        // 若未明確指定（或為空），延遲到首次需要時才自動發現（見 getRtdbUrl）。
+        this._explicitRtdb = (typeof rtdbUrl === 'string' && rtdbUrl.trim())
+            ? rtdbUrl.replace(/\/$/, '')
+            : null;
+        this._rtdbPromise = null;
+    }
+
+    /** 取得 RTDB 根 URL；首次呼叫時若未明確指定則自動探測並快取。 */
+    async getRtdbUrl() {
+        if (this._explicitRtdb) return this._explicitRtdb;
+        if (!this._rtdbPromise) {
+            this._rtdbPromise = discoverRtdbUrl(null, this.projectId, this.token);
+        }
+        return this._rtdbPromise;
     }
 
     documentsPath() {
@@ -311,7 +386,8 @@ export class FirestoreClient {
      * 讀取 RTDB 根節點並排除即時掛號／問診資料。
      */
     async fetchRtdbSnapshot() {
-        const url = `${this.rtdbUrl.replace(/\/$/, '')}/.json`;
+        const base = await this.getRtdbUrl();
+        const url = `${base}/.json`;
         const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${this.token}` }
         });

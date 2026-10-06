@@ -14,7 +14,7 @@
  * ============================================================ */
 
 import { getAccessToken } from '../../backup/lib/google-auth.js';
-import { FirestoreClient } from '../../backup/lib/firestore.js';
+import { FirestoreClient, discoverRtdbUrl } from '../../backup/lib/firestore.js';
 import { DEFAULT_EVENTS } from './events.js';
 
 const COLLECTION = 'pushSubscriptions';
@@ -167,13 +167,11 @@ export async function listSubscriptions(env) {
 }
 
 /**
- * RTDB 根 URL（env 優先，否則預設 asia-southeast1）。
+ * RTDB 根 URL：透過共用 discoverRtdbUrl 自動探測正確地區。
  */
 async function getRtdbBase(env) {
   const auth = await getAccessToken(env);
-  const base = (env.FIREBASE_RTDB_URL
-      || `https://${auth.projectId}-default-rtdb.asia-southeast1.firebasedatabase.app`)
-      .replace(/\/$/, '');
+  const base = await discoverRtdbUrl(env, auth.projectId, auth.token);
   return { base, token: auth.token };
 }
 

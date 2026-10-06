@@ -30,7 +30,6 @@ const FACADE = {
     // ── wallet（會員儲值：帳戶／面板／充值退款調整／配置／診症支付）──
     loadWalletManagement: Wallet.loadWalletManagement,
     clearWalletCaches: Wallet.clearWalletCaches,
-    runWalletLegacyMigration: Wallet.runWalletLegacyMigration,
     selectWalletPatient: Wallet.selectWalletPatient,
     getWalletAccount: Wallet.getWalletAccount,
     getRecentWalletTransactions: Wallet.getRecentWalletTransactions,
@@ -44,6 +43,7 @@ const FACADE = {
     showWalletAdjustForm: Wallet.showWalletAdjustForm,
     showWalletStatusForm: Wallet.showWalletStatusForm,
     toggleWalletConfigForm: Wallet.toggleWalletConfigForm,
+    renderWalletConfigForm: Wallet.renderWalletConfigForm,
     addWalletTierRow: Wallet.addWalletTierRow,
     removeWalletTierRow: Wallet.removeWalletTierRow,
     submitWalletConfig: Wallet.submitWalletConfig,

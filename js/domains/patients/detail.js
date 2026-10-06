@@ -35,12 +35,28 @@ export async function viewPatient(id) {
         const birthDateString = patient.birthDate ? new Date(patient.birthDate).toLocaleDateString('zh-TW') : '';
         
         const createdAtStr = patient.createdAt ? (() => {
-            const d = new Date(patient.createdAt.seconds * 1000);
-            return d.toLocaleString('zh-TW', { hour12: false });
+            let d;
+            if (typeof patient.createdAt.seconds !== 'undefined') {
+                d = new Date(patient.createdAt.seconds * 1000);
+            } else {
+                d = new Date(patient.createdAt);
+            }
+            if (d instanceof Date && !isNaN(d)) {
+                return d.toLocaleString('zh-TW', { hour12: false });
+            }
+            return '未知';
         })() : '未知';
         const updatedAtStr = patient.updatedAt ? (() => {
-            const d = new Date(patient.updatedAt.seconds * 1000);
-            return d.toLocaleString('zh-TW', { hour12: false });
+            let d;
+            if (typeof patient.updatedAt.seconds !== 'undefined') {
+                d = new Date(patient.updatedAt.seconds * 1000);
+            } else {
+                d = new Date(patient.updatedAt);
+            }
+            if (d instanceof Date && !isNaN(d)) {
+                return d.toLocaleString('zh-TW', { hour12: false });
+            }
+            return '';
         })() : '';
         
         

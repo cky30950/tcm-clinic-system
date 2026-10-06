@@ -11,6 +11,7 @@
  * ============================================================ */
 
 import { getAccessToken } from '../../backup/lib/google-auth.js';
+import { discoverRtdbUrl } from '../../backup/lib/firestore.js';
 
 /**
  * 判定單一 presence 節點是否代表在線。
@@ -31,9 +32,7 @@ function isEntryOnline(info) {
  */
 export async function getOnlineUserIds(env) {
     const auth = await getAccessToken(env);
-    const base = (env.FIREBASE_RTDB_URL
-        || `https://${auth.projectId}-default-rtdb.asia-southeast1.firebasedatabase.app`)
-        .replace(/\/$/, '');
+    const base = await discoverRtdbUrl(env, auth.projectId, auth.token);
 
     const response = await fetch(`${base}/presence.json`, {
         headers: { 'Authorization': `Bearer ${auth.token}` }

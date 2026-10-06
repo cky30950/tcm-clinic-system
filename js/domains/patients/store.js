@@ -486,33 +486,53 @@ export async function attachPatientListListener() {
                 // 他人（或無 nonce 的聚合更新）：單筆 patch，1 次讀取（戳記於 patch 成功後才蓋）
                 handleRemotePatientMetaChange(metaData, metaTs);
 
-                // ── 診症 CRUD 額外刷新病歷彈窗 ──────────────────────────────────
+                // ── 診症 CRUD：清除所有層級的病歷快取並刷新已開啟的彈窗 ─────────
                 // system.js 的 _buildPatientAggregatePlan 會把 consultation CRUD 的 meta 帶 kind:'consultation'，
                 // 且同一 batch 已更新 patient aggregate（latestConsultationAt 等），
                 // 所以 handleRemotePatientMetaChange 已照顧到病人資料層。
-                // 這裡只額外刷新「已開啟該 pid 病歷彈窗」的 pager + 內容 DOM。
+                // 但 consultation 集合本身的快取（patientConsultationsCache、consultations 陣列）
+                // 不會自動失效，需在此主動清除，否則稍後開啟病歷彈窗時會吃到已被撤回的舊記錄。
                 if (metaData.kind === 'consultation' && metaData.patientId) {
                     const pid = String(metaData.patientId);
+                    // 1. 清除單筆病人診症快取（被 detach 時會觸發 onSnapshot 重讀，但快取 map 本身要先清）
+                    try { delete G.patientConsultationsCache[pid]; } catch (_e) {}
+                    // 2. 清除 localStorage 的該病人病歷快取
+                    try { localStorage.removeItem('patientConsultations:' + pid); } catch (_e) {}
+                    // 3. 從全域 consultations 陣列中移除屬於該病人的記錄，並同步到 localStorage
+                    try {
+                        if (Array.isArray(G.consultations)) {
+                            G.consultations = G.consultations.filter(c => !(c && String(c.patientId || '') === pid));
+                            try { localStorage.setItem('consultations', JSON.stringify(G.consultations)); } catch (_lsErr) {}
+                        }
+                    } catch (_e) {}
+
                     const pager = G.consultationHistoryPager;
-                    if (!pager) { /* 該 pager 尚未掛載 */ }
-                    else {
+                    // 4. 刷新「已開啟該 pid 病歷彈窗」的 pager + 內容 DOM
+                    if (pager) {
                         const tryRefresh = (ctx, modalId, getPidFn) => {
                             try {
                                 const modal = document.getElementById(modalId);
                                 if (!modal || modal.classList.contains('hidden')) return;
-                                if (String(getPidFn() || '') !== pid) return; // 彈窗顯示的不是這個病人
-                                // 清快取 → 重新載入 → 刷新翻頁按鈕
+                                if (String(getPidFn() || '') !== pid) return;
                                 if (typeof pager.clearPatientCache === 'function') pager.clearPatientCache(pid);
-                                try { localStorage.removeItem('patientConsultations:' + pid); } catch (_e) {}
                                 const contentId = ctx === 'patient' ? 'patientMedicalHistoryContent' : 'medicalHistoryContent';
                                 if (typeof pager.loadForContext === 'function') {
                                     pager.loadForContext(ctx, pid, { contentId, forceRefresh: true });
                                 }
-                            } catch (_e) { /* pager 刷新失敗，病人資料層已更新，彈窗 UI 留著舊 DOM 即可 */ }
+                            } catch (_e) {}
                         };
                         tryRefresh('patient', 'patientMedicalHistoryModal', () => G.currentPatientHistoryPatientId);
                         tryRefresh('consultation', 'medicalHistoryModal', () => G.currentConsultationHistoryPatientId);
                     }
+                    // 5. 如果病人詳情面板正開啟且顯示的就是這個病人，一併刷新診療摘要
+                    try {
+                        const detailModal = document.getElementById('patientDetailModal');
+                        const panelOpen = detailModal && !detailModal.classList.contains('hidden');
+                        const samePatient = String(G.patientDetailClinicState && G.patientDetailClinicState.patientId || '') === pid;
+                        if (panelOpen && samePatient && typeof G.loadPatientConsultationSummary === 'function') {
+                            G.loadPatientConsultationSummary(pid).catch(() => {});
+                        }
+                    } catch (_e) {}
                 }
             } catch (innerErr) {
                 console.error('病人資料即時更新處理失敗:', innerErr);

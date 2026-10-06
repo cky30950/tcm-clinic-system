@@ -38,8 +38,67 @@
       "collectionGroup": "patientWalletTransactions",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "ASCENDING" },
+        { "fieldPath": "fromBalance", "order": "ASCENDING" },
+        { "fieldPath": "fromBonus", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "patientWalletTransactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "ASCENDING" },
+        { "fieldPath": "amount", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "patientWalletTransactions",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "type", "order": "ASCENDING" },
         { "fieldPath": "at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "patientWalletTransactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "ASCENDING" },
+        { "fieldPath": "fromBalance", "order": "ASCENDING" },
+        { "fieldPath": "fromBonus", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "patientWalletTransactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "ASCENDING" },
+        { "fieldPath": "amount", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "patientWalletAccounts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "balance", "order": "ASCENDING" },
+        { "fieldPath": "bonusBalance", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "patientWalletAccounts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "walletMigratedAt", "order": "ASCENDING" },
+        { "fieldPath": "balance", "order": "ASCENDING" },
+        { "fieldPath": "bonusBalance", "order": "ASCENDING" }
       ]
     },
 
@@ -53,6 +112,24 @@
       ]
     },
     {
+      "collectionGroup": "patientPackageHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "patientId", "order": "ASCENDING" },
+        { "fieldPath": "operatedAt", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "patientPackages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "patientId", "order": "ASCENDING" },
+        { "fieldPath": "remainingUses", "order": "ASCENDING" }
+      ]
+    },
+
+    {
       "collectionGroup": "consultations",
       "queryScope": "COLLECTION",
       "fields": [
@@ -89,49 +166,31 @@
       ]
     },
     {
-      "collectionGroup": "consultationFinancialSummaries",
+      "collectionGroup": "consultations",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "sortDate", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "consultationFinancialSummaries",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "doctor", "order": "ASCENDING" },
         { "fieldPath": "sortDate", "order": "ASCENDING" }
       ]
     },
     {
-      "collectionGroup": "consultationFinancialSummaries",
+      "collectionGroup": "consultations",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "clinicId", "order": "ASCENDING" },
         { "fieldPath": "sortDate", "order": "ASCENDING" }
       ]
     },
     {
-      "collectionGroup": "consultationFinancialSummaries",
+      "collectionGroup": "consultations",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "doctor", "order": "ASCENDING" },
         { "fieldPath": "clinicId", "order": "ASCENDING" },
         { "fieldPath": "sortDate", "order": "ASCENDING" }
       ]
     },
-    {
-      "collectionGroup": "clinicExpenses",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "month", "order": "ASCENDING" },
-        { "fieldPath": "clinicId", "order": "ASCENDING" }
-      ]
-    },
+
     {
       "collectionGroup": "consultations",
       "queryScope": "COLLECTION",
@@ -141,12 +200,188 @@
       ]
     },
     {
-      "collectionGroup": "consultationFinancialSummaries",
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "doctor", "order": "ASCENDING" },
         { "fieldPath": "clinicId", "order": "ASCENDING" },
-        { "fieldPath": "syncedAt", "order": "ASCENDING" }
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]
     },
 
@@ -174,32 +409,7 @@
         { "fieldPath": "sortDate", "order": "ASCENDING" }
       ]
     },
-    {
-      "collectionGroup": "consultations",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "doctor", "order": "ASCENDING" },
-        { "fieldPath": "date", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "consultations",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "doctor", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "consultations",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "doctor", "order": "ASCENDING" },
-        { "fieldPath": "clinicId", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt", "order": "ASCENDING" }
-      ]
-    },
+
     {
       "collectionGroup": "inquiries",
       "queryScope": "COLLECTION",
@@ -213,6 +423,137 @@
       "collectionGroup": "consultationFinancialSummaries",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" },
+        { "fieldPath": "financialTotalAmount", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" },
+        { "fieldPath": "financialTotalAmount", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" },
+        { "fieldPath": "financialTotalAmount", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" },
+        { "fieldPath": "financialTotalAmount", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "dateKey", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "dateKey", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "dateKey", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "dateKey", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "doctor", "order": "ASCENDING" },
@@ -222,25 +563,46 @@
     },
 
     {
-      "collectionGroup": "dailyFinancialStats",
+      "collectionGroup": "consultationFinancialSummaries",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "sortDate", "order": "ASCENDING" }
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "syncedAt", "order": "ASCENDING" }
       ]
     },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctor", "order": "ASCENDING" },
+        { "fieldPath": "syncedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consultationFinancialSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "syncedAt", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "clinicExpenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "month", "order": "ASCENDING" },
+        { "fieldPath": "clinicId", "order": "ASCENDING" }
+      ]
+    },
+
     {
       "collectionGroup": "dailyFinancialStats",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "clinicId", "order": "ASCENDING" },
         { "fieldPath": "sortDate", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "dailyFinancialStats",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "syncedAt", "order": "DESCENDING" }
       ]
     }
   ],

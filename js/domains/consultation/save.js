@@ -179,11 +179,13 @@ export function restoreConsultationSymptomsDraft(appointment, patient) {
     // （可能是上次異常退出、或切換病人時被誤寫入的空白/他人內容），不得覆蓋剛從
     // 資料庫載入的處方、收費與其他欄位，直接丟棄 v2/v1 兩個暫存鍵。
     // 只有在保存後又繼續編輯而未儲存的真正新草稿（updatedAt 較新）才會恢復。
+    // 雙重保障：savedRecordAt === 0（表示載入階段未能正確取得病歷時間戳）時，
+    // 一律視為過期，避免任何草稿覆蓋剛載入的內容。
     const isEditModeDraft = !!(appointment && appointment.status === 'completed' && appointment.consultationId);
     if (isEditModeDraft) {
         const draftUpdatedAt = Number(draft && draft.updatedAt) || 0;
         const savedRecordAt = Number(G.consultationSymptomsDraftState.loadedRecordUpdatedAt) || 0;
-        const isStaleDraft = !draftUpdatedAt || (savedRecordAt > 0 && draftUpdatedAt <= savedRecordAt);
+        const isStaleDraft = !draftUpdatedAt || savedRecordAt === 0 || (savedRecordAt > 0 && draftUpdatedAt <= savedRecordAt);
         if (isStaleDraft) {
             try {
                 clearConsultationSymptomsDraft(key);
@@ -422,7 +424,15 @@ export async function showConsultationForm(appointment) {
         const isEditingMode = appointment.status === 'completed' && appointment.consultationId;
         updateConsultationCancelButtonLabel(!!isEditingMode);
         if (appointment.status === 'completed' && appointment.consultationId) {
-            // 編輯模式：從 Firebase 載入現有診症記錄
+            // 編輯模式：先清空任何殘留的收費項目/處方狀態，再從 Firebase 載入現有診症記錄。
+            // 這可避免上一個診次殘留的 selectedBillingItems 或 prescriptions 在載入過程中被
+            // 某個非同步回調（如 renderPatientPackages）誤觸發 updateBillingDisplay/updatePrescriptionDisplay，
+            // 導致新載入的內容在渲染前被舊狀態短暫覆蓋。
+            G.selectedBillingItems = [];
+            G.prescriptions = [{ name: '處方', items: [], days: 5, freq: 2, mode: (G.currentInventoryMode === 'slice' ? 'slice' : 'granule') }];
+            G.activePrescriptionIndex = 0;
+            G.selectedPrescriptionItems = G.prescriptions[0].items;
+            G.pendingPackageChanges = [];
             await G.loadConsultationForEdit(appointment.consultationId);
         } else {
             // 新診症模式：使用空白表單
