@@ -10024,7 +10024,7 @@ class FirebaseDataManager {
             operation: (operation === 'add' || operation === 'delete') ? operation : 'update',
             patientId: pid,
             kind: 'consultation',
-            nonce: (typeof G.newSelfMetaNonce === 'function') ? G.newSelfMetaNonce() : undefined
+            nonce: (typeof newSelfMetaNonce === 'function') ? newSelfMetaNonce() : undefined
         } : null;
         return { patientOps, meta };
     }
@@ -11052,6 +11052,7 @@ class FirebaseDataManager {
             ];
             if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
             if (clinicFilter) parts.push(window.firebase.where('clinicId', '==', clinicFilter));
+            parts.push(window.firebase.orderBy('sortDate', 'asc'));
             const q = window.firebase.firestoreQuery(colRef, ...parts);
             const agg = await window.firebase.getAggregateFromServer(q, {
                 totalRevenue: window.firebase.sum('financialTotalAmount'),
