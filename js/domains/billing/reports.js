@@ -1785,6 +1785,7 @@ import { getApportionedCost } from './expenses.js';
                     c.push(fb.where('at', '>=', startIso));
                     c.push(fb.where('at', '<=', endIso));
                     c.push(fb.where('type', '==', type));
+                    c.push(fb.orderBy('at', 'asc'));
                     return fb.firestoreQuery(col, ...c);
                 };
 
@@ -1879,7 +1880,8 @@ import { getApportionedCost } from './expenses.js';
                 txResult = await walletFetchAllDocs('patientWalletTransactions', [
                     fb.where('clinicId', '==', cid),
                     fb.where('at', '>=', startIso),
-                    fb.where('at', '<=', endIso)
+                    fb.where('at', '<=', endIso),
+                    fb.orderBy('at', 'asc')
                 ], { pageSize: 300, maxDocs: 10000 });
             } else {
                 txResult = await walletFetchAllDocs('patientWalletTransactions', [
