@@ -3,10 +3,7 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
-  "database": [
-    {
-      "instance": "system-1e90a-default-rtdb",
-      "rules": "database.rules.json"
-    }
-  ]
+  "database": {
+    "rules": "database.rules.json"
+  }
 }
