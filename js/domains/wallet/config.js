@@ -1,13 +1,13 @@
 /* ============================================================
- * wallet/config.js — 會員配置維護、級距編輯、舊資料遷移
+ * wallet/config.js — 會員配置維護、級距編輯
  * ------------------------------------------------------------
  * Phase 2 自 system.js IIFE 原樣拆分，邏輯零改動；跨檔共享
  * 符號經 ESM import，舊全域存取一律經 G（js/lib/legacy.js）。
+ * 會員設定面板已移至「系統管理」頁。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
 import { getWalletClinicDoc } from './account.js';
-import { loadWalletMemberList } from './panel.js?v=20261005w3';
-import { clearWalletCaches, walletApi, walletClinicDocCache, walletMembershipConfigCache } from './shared.js';
+import { walletClinicDocCache, walletMembershipConfigCache } from './shared.js';
 
   export async function toggleWalletConfigForm() {
     const form = document.getElementById('walletConfigForm');
@@ -154,90 +154,3 @@ import { clearWalletCaches, walletApi, walletClinicDocCache, walletMembershipCon
       msg.className = 'text-sm text-red-600';
     }
   }
-
-  /* ============================================================
-   * 舊制單一錢包 → 每診所獨立錢包 遷移工具（僅管理員）
-   * 先 dryRun 預覽，使用者確認後才真正寫入
-   * ============================================================ */
-  /* ============================================================
-   * 舊制單一錢包 → 每診所獨立錢包 遷移工具（僅管理員）
-   * 先 dryRun 預覽，使用者確認後才真正寫入
-   * ============================================================ */
-  export function walletMigrateReportHtml(r) {
-    const li = (x) => {
-      const pid = window.escapeHtml(String(x.patientId || x.id || ''));
-      const parts = [];
-      if (Number.isFinite(Number(x.balance))) parts.push('本金 HK$' + Number(x.balance).toFixed(2));
-      if (Number.isFinite(Number(x.bonusBalance))) parts.push('贈送 HK$' + Number(x.bonusBalance).toFixed(2));
-      if (x.clinics && Array.isArray(x.clinics)) {
-        parts.push('診所：' + x.clinics.map((c) => window.escapeHtml(String(c.clinicId || c))).join('、'));
-      }
-      return `<li class="py-0.5">${pid}${parts.length ? ' — ' + window.escapeHtml(parts.join('；')) : ''}</li>`;
-    };
-    const section = (title, arr) => (!arr || !arr.length) ? '' : `
-      <div class="mt-2">
-        <div class="font-semibold text-gray-700">${title}（${arr.length}）</div>
-        <ul class="list-disc pl-5 text-gray-600 max-h-32 overflow-y-auto">${arr.slice(0, 50).map(li).join('')}</ul>
-      </div>`;
-    return `
-      <div class="font-semibold ${r.dryRun ? 'text-amber-800' : 'text-green-700'}">
-        ${r.dryRun ? '遷移預覽（尚未寫入）' : '遷移完成'}
-      </div>
-      <div class="mt-1 text-gray-700">
-        掃描舊帳戶：${Number(r.scanned) || 0}　|　
-        可遷移：${(r.migrated || []).length}　|　
-        未分組餘額：${(r.unassigned || []).length}　|　
-        未知診所：${(r.unknownClinic || []).length}　|　
-        跳過（已遷移）：${(r.skipped || []).length}
-      </div>
-      ${r.capped ? '<div class="mt-1 text-red-600">數量超過單次上限，請再次執行以繼續餘下帳戶。</div>' : ''}
-      ${section('可遷移帳戶', r.migrated)}
-      ${section('未能歸屬診所（餘額會留在舊帳戶，請人工處理）', r.unassigned)}
-      ${section('參考到未知診所', r.unknownClinic)}`;
-  }
-
-  export async function runWalletLegacyMigration(execute) {
-    if (!G.hasAdminRole()) {
-      G.showToast('只有管理員可執行資料遷移', 'error');
-      return;
-    }
-    const reportEl = document.getElementById('walletMigrateReport');
-    const dryRun = !execute;
-    try {
-      if (!dryRun) {
-        const confirmed = await G.showConfirmation(
-          '確認正式執行遷移？\n系統會把舊帳戶結存按診所拆入獨立錢包，舊帳戶會標記為已遷移（不會刪除）。\n建議先完成備份。',
-          'question'
-        );
-        if (!confirmed) return;
-      }
-      const r = await walletApi('migrate', { dryRun });
-      if (reportEl) {
-        reportEl.classList.remove('hidden');
-        let html = walletMigrateReportHtml(r);
-        if (dryRun && (r.migrated || []).length) {
-          html += `
-            <div class="mt-3">
-              <button type="button" onclick="runWalletLegacyMigration(true)"
-                class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg">
-                確認正式遷移 ${r.migrated.length} 個帳戶
-              </button>
-            </div>`;
-        }
-        reportEl.innerHTML = html;
-      }
-      if (!dryRun) {
-        clearWalletCaches();
-        G.showToast('舊儲值資料遷移完成', 'success');
-        try { loadWalletMemberList(); } catch (_e) {}
-      }
-    } catch (error) {
-      if (reportEl) {
-        reportEl.classList.remove('hidden');
-        reportEl.innerHTML = '<div class="text-red-600">遷移失敗：'
-          + window.escapeHtml((error && error.message) || '未知錯誤') + '</div>';
-      }
-    }
-  }
-
-  // 病人詳情面板用：取指定診所最近 N 筆交易（預設 5）

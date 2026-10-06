@@ -266,18 +266,7 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
     if (panel) panel.classList.add('hidden');
     if (empty) empty.classList.remove('hidden');
     if (loading) loading.classList.add('hidden');
-    // 「會員設定」僅診所管理（擁有 walletAdjust 權限）可見
-    const configArea = document.getElementById('walletConfigArea');
-    if (configArea) {
-      configArea.classList.toggle('hidden', !G.hasActionPermission('walletAdjust'));
-    }
-    const configForm = document.getElementById('walletConfigForm');
-    if (configForm) {
-      configForm.classList.add('hidden');
-      configForm.innerHTML = '';
-    }
-    const configToggle = document.getElementById('walletConfigToggle');
-    if (configToggle) configToggle.textContent = '展開';
+    // 「會員設定」已移至系統管理頁（見 system.html 系統管理區塊）
     walletSelectedPatientId = '';
     if (input) {
       input.value = '';

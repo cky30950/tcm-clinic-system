@@ -7476,6 +7476,7 @@ async function initializeSystemAfterLogin() {
             const herbClinicNameEl = document.getElementById('systemManagementHerbClinicName');
             const permissionClinicNameEl = document.getElementById('permissionClinicName');
             const receiptClinicNameEl = document.getElementById('receiptCustomizationClinicName');
+            const walletConfigClinicNameEl = document.getElementById('walletConfigClinicName');
             
             if (chineseNameSpan) {
                 chineseNameSpan.textContent = clinicSettings.chineseName || '名醫診所系統';
@@ -7497,6 +7498,9 @@ async function initializeSystemAfterLogin() {
             }
             if (receiptClinicNameEl) {
                 receiptClinicNameEl.textContent = activeClinicName;
+            }
+            if (walletConfigClinicNameEl) {
+                walletConfigClinicNameEl.textContent = activeClinicName;
             }
             
             // 更新登入頁面的診所名稱
