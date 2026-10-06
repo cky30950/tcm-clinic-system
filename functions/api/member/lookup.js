@@ -455,10 +455,11 @@ async function buildPatientEntry(client, token, patientDoc, clinicNameMap, clini
     const operatorUids = Array.from(new Set(legacyTxs
         .map((tx) => tx.operatorUid)
         .filter((id) => id)));
+    const rtdbUrl = await client.getRtdbUrl();
     const [consMap, apptDataList, operatorDocMap] = await Promise.all([
         fetchDocMap(client, 'consultations', consultationIds),
         Promise.all(appointmentIds.map((id) =>
-            fetchRtdbAppointment(client.rtdbUrl, token, id))),
+            fetchRtdbAppointment(rtdbUrl, token, id))),
         fetchDocMap(client, 'userAuthIndex', operatorUids)
     ]);
     const apptMap = new Map();

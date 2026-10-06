@@ -143,13 +143,18 @@ export async function ipRateAllow(env, ip, max) {
 
 /* ---------------- RTDB REST ---------------- */
 
-function rtdbBaseOf(clientOrUrl) {
-    const url = typeof clientOrUrl === 'string' ? clientOrUrl : clientOrUrl.rtdbUrl;
-    return String(url || '').replace(/\/$/, '');
+async function rtdbBaseOf(clientOrUrl) {
+    if (typeof clientOrUrl === 'string') {
+        return String(clientOrUrl || '').replace(/\/$/, '');
+    }
+    if (clientOrUrl && typeof clientOrUrl.getRtdbUrl === 'function') {
+        return String(await clientOrUrl.getRtdbUrl()).replace(/\/$/, '');
+    }
+    return String(clientOrUrl && clientOrUrl.rtdbUrl || '').replace(/\/$/, '');
 }
 
 async function rtdbRequest(clientOrUrl, token, path, init = {}) {
-    const base = rtdbBaseOf(clientOrUrl);
+    const base = await rtdbBaseOf(clientOrUrl);
     let url = `${base}/${path}.json`;
     if (init.query) {
         const qs = Object.entries(init.query)
