@@ -476,19 +476,16 @@ export async function attachPatientListListener() {
             try {
                 const metaData = snapshot && snapshot.data ? (snapshot.data() || {}) : {};
                 const metaTs = metaTimestampToMillis(metaData.timestamp);
-                console.log('[meta-debug] onSnapshot fired:', JSON.stringify({ kind: metaData.kind, operation: metaData.operation, patientId: metaData.patientId, nonce: metaData.nonce ? metaData.nonce.slice(0, 20) + '...' : null }));
 
                 if (isInitialSnapshot) {
                     // 首次回調為監聽器建立時的現有狀態：不替本地快取蓋戳背書
                     // （快取可能早於這個 meta），新鮮度交由 getPatients 冷啟動驗證把關
                     isInitialSnapshot = false;
-                    console.log('[meta-debug] skipping initial snapshot');
                     return;
                 }
 
                 // 自己觸發的事件：本機 CRUD 已同步就地更新快取，蓋戳後跳過
                 if (isSelfMetaNonce(metaData.nonce)) {
-                    console.log('[meta-debug] skipping self-triggered event');
                     if (metaTs != null) stampPatientsStorageMetaTimestamp(metaTs);
                     return;
                 }
@@ -502,7 +499,6 @@ export async function attachPatientListListener() {
                 // 所以 handleRemotePatientMetaChange 已照顧到病人資料層。
                 // 但 consultation 集合本身的快取（patientConsultationsCache、consultations 陣列）
                 // 不會自動失效，需在此主動清除，否則稍後開啟病歷彈窗時會吃到已被撤回的舊記錄。
-                console.log('[meta-debug] checking kind==consultation:', metaData.kind === 'consultation', 'patientId:', !!metaData.patientId);
                 if (metaData.kind === 'consultation' && metaData.patientId) {
                     const pid = String(metaData.patientId);
                     // 1. 清除單筆病人診症快取（被 detach 時會觸發 onSnapshot 重讀，但快取 map 本身要先清）
@@ -528,15 +524,8 @@ export async function attachPatientListListener() {
                         const tryRefresh = async (ctx, modalId, getPidFn) => {
                             try {
                                 const modal = document.getElementById(modalId);
-                                if (!modal || modal.classList.contains('hidden')) {
-                                    console.log('[meta-debug] tryRefresh skip:', ctx, 'modal hidden or missing');
-                                    return;
-                                }
-                                if (String(getPidFn() || '') !== pid) {
-                                    console.log('[meta-debug] tryRefresh skip:', ctx, 'pid mismatch:', getPidFn(), 'vs', pid);
-                                    return;
-                                }
-                                console.log('[meta-debug] tryRefresh:', ctx, 'refreshing...');
+                                if (!modal || modal.classList.contains('hidden')) return;
+                                if (String(getPidFn() || '') !== pid) return;
                                 // 先清快取，確保 loadForContext 重建 state 時拿到的是最新數據
                                 if (typeof pager.clearPatientCache === 'function') {
                                     pager.clearPatientCache(pid);
@@ -554,8 +543,7 @@ export async function attachPatientListListener() {
                                         G.displayConsultationMedicalHistoryPage();
                                     }
                                 }
-                                console.log('[meta-debug] tryRefresh:', ctx, 'done');
-                            } catch (_e) { console.error('[meta-debug] tryRefresh error:', ctx, _e); }
+                            } catch (_e) {}
                         };
                         tryRefresh('patient', 'patientMedicalHistoryModal', () => G.currentPatientHistoryPatientId);
                         tryRefresh('consultation', 'medicalHistoryModal', () => G.currentConsultationHistoryPatientId);

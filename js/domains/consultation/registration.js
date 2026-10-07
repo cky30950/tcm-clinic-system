@@ -1323,6 +1323,8 @@ export async function loadConsultationForEdit(consultationId) {
             }
             
             // 載入處方內容
+            // 確保中藥庫已載入，避免 updatePrescriptionDisplay 因 G.herbLibrary 為空而出現不穩定行為
+            try { if (typeof G.initHerbLibrary === 'function') await G.initHerbLibrary(); } catch (_e) {}
             try {
                 if (consultation.multiPrescriptions) {
                     const mp = JSON.parse(consultation.multiPrescriptions);
@@ -1412,7 +1414,11 @@ export async function loadConsultationForEdit(consultationId) {
             }
             
             // 載入收費項目
+            // 確保收費項目庫已載入，否則 G.billingItems.find 全部返回 null，所有收費項目的 name/價格/類別等
+            // 都只能靠 raw fallback，若 raw 也缺 name 則會被 filter(item => item && item.name) 過濾掉 → 顯示空白
+            try { if (typeof G.initBillingItems === 'function') await G.initBillingItems(); } catch (_e) {}
             G.selectedBillingItems = [];
+            try {
             if (consultation.billingItemsStructured) {
                 let loadedFromStructured = false;
                 try {
@@ -1443,7 +1449,7 @@ export async function loadConsultationForEdit(consultationId) {
                                     : null,
                                 isHistorical: !!(raw && raw.isHistorical)
                             };
-                        }).filter(item => item && item.name);
+                        }).filter(item => item && (item.name || item.id || item.price));
                         G.selectedBillingItems = mapped;
                         loadedFromStructured = G.selectedBillingItems.length > 0;
                     }
@@ -1480,6 +1486,9 @@ export async function loadConsultationForEdit(consultationId) {
                 // 更新顯示
                 updateBillingDisplay();
                 try { syncMedicationDaysWithMedicineFee(); } catch (_e) {}
+            }
+            } catch (_billingErr) {
+                console.error('載入收費項目時發生錯誤:', _billingErr);
             }
             
             // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
