@@ -8980,6 +8980,10 @@ async function exportClinicBackupFromCloud() {
         // onAuthStateChanged 註冊後會立即以目前狀態（含已還原的 currentUser）回補一次
         fb.onAuthStateChanged(fb.auth, (user) => {
             if (user) {
+                // 登入後立即 attach patientsMeta 監聽器，確保不論使用者在哪個頁面
+                // 都能收到跨裝置的病人資料／診症 CRUD 通知。
+                // 函數內有 G.patientListListenerAttached 守護，重複調用安全。
+                try { if (typeof attachPatientListListener === 'function') attachPatientListListener(); } catch (_e) {}
                 refreshCloudBackupStatus();
             } else {
                 setBackupCloudStatus('登入後可查看雲端備份狀態');
