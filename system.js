@@ -8980,10 +8980,12 @@ async function exportClinicBackupFromCloud() {
         // onAuthStateChanged 註冊後會立即以目前狀態（含已還原的 currentUser）回補一次
         fb.onAuthStateChanged(fb.auth, (user) => {
             if (user) {
-                // 登入後立即 attach patientsMeta 監聽器，確保不論使用者在哪個頁面
-                // 都能收到跨裝置的病人資料／診症 CRUD 通知。
-                // 函數內有 G.patientListListenerAttached 守護，重複調用安全。
+                // 登入後立即 attach 兩個 meta 監聽器：
+                // 1. patientsMeta：病人資料 CRUD 通知（含 kind:'consultation' 時的聚合欄位刷新）
+                // 2. consultationsMeta：獨立的診症 CRUD 通知，解決已開啟彈窗即時刷新
+                // 兩個函數內部都有 attached 守護，重複調用安全。
                 try { if (typeof attachPatientListListener === 'function') attachPatientListListener(); } catch (_e) {}
+                try { if (typeof attachConsultationsMetaListener === 'function') attachConsultationsMetaListener(); } catch (_e) {}
                 refreshCloudBackupStatus();
             } else {
                 setBackupCloudStatus('登入後可查看雲端備份狀態');
@@ -10091,7 +10093,7 @@ class FirebaseDataManager {
      *
      * @returns {{patientOps: Array<{pid:string, patch:object, cachePatch:object}>, meta: object|null}}
      */
-    _buildPatientAggregatePlan(patientId, operation, consultation, prevPatientId) {
+    _buildPatientAggregatePlan(patientId, operation, consultation, prevPatientId, consultationId) {
         const pid = String(patientId || '');
         const patientOps = [];
         // Firebase v12 modular SDK 只有頂級 increment() 函數，FieldValue 類別
@@ -10104,7 +10106,7 @@ class FirebaseDataManager {
                 + ' 雲端模組鍵:', window.firebase ? Object.keys(window.firebase) : 'null');
             // 靜默降級：返回空計畫，不中斷病歷保存主流程。
             // 病人聚合統計會在下次 add/update 時被正確覆蓋。
-            return { patientOps: [], meta: null };
+            return { patientOps: [], meta: null, consultationMeta: null };
         }
 
         // 先處理舊病人（update 時病人 ID 變更的情況）
@@ -10154,7 +10156,20 @@ class FirebaseDataManager {
             kind: 'consultation',
             nonce: (typeof newSelfMetaNonce === 'function') ? newSelfMetaNonce() : undefined
         } : null;
-        return { patientOps, meta };
+
+        // consultationsMeta/lastChange：獨立的診症 CRUD 通知，比 patientsMeta 更精確
+        // 解決 patientsMeta 混入多種 kind 時語義模糊的問題。攜帶 consultationId 方便
+        // 未來擴展。nonce 與 patientsMeta 共用（同一批次觸發的兩個 meta 用同一個 nonce）。
+        const cid = consultationId ? String(consultationId) : (consultation && consultation.id ? String(consultation.id) : '');
+        const consultationMeta = pid ? {
+            timestamp: new Date(),
+            operation: (operation === 'add' || operation === 'delete') ? operation : 'update',
+            patientId: pid,
+            consultationId: cid || null,
+            nonce: (typeof newSelfMetaNonce === 'function') ? newSelfMetaNonce() : undefined
+        } : null;
+
+        return { patientOps, meta, consultationMeta };
     }
 
     /** 把聚合計畫的 Firestore 寫入加入既有批次。 */
@@ -10167,6 +10182,14 @@ class FirebaseDataManager {
             batch.set(
                 window.firebase.doc(window.firebase.db, 'patientsMeta', 'lastChange'),
                 plan.meta,
+                { merge: true }
+            );
+        }
+        // 獨立 consultationsMeta：與 patientsMeta 一起寫入同一批次，確保原子性
+        if (plan.consultationMeta) {
+            batch.set(
+                window.firebase.doc(window.firebase.db, 'consultationsMeta', 'lastChange'),
+                plan.consultationMeta,
                 { merge: true }
             );
         }
@@ -10850,7 +10873,9 @@ class FirebaseDataManager {
                     aggregatePlan = this._buildPatientAggregatePlan(
                         aggPid,
                         'add',
-                        { ...dataToWrite, createdAt, sortDate, createdBy: currentUser }
+                        { ...dataToWrite, createdAt, sortDate, createdBy: currentUser },
+                        null,
+                        consRef.id
                     );
                     this._appendPatientAggregateToBatch(batch, aggregatePlan);
                 }
@@ -11968,11 +11993,12 @@ class FirebaseDataManager {
                                 updatedAt,
                                 sortDate: sortDate || updatedAt
                             },
-                            oldPid && oldPid !== newPid ? oldPid : null
+                            oldPid && oldPid !== newPid ? oldPid : null,
+                            consultationId
                         );
                     } else if (oldPid) {
                         // 邊緣情況：診症被清除了病人 ID（只更新 patientsMeta）
-                        aggregatePlan = this._buildPatientAggregatePlan(oldPid, 'update', null);
+                        aggregatePlan = this._buildPatientAggregatePlan(oldPid, 'update', null, null, consultationId);
                     }
                     if (aggregatePlan) {
                         this._appendPatientAggregateToBatch(batch, aggregatePlan);
@@ -12080,7 +12106,7 @@ class FirebaseDataManager {
             try {
                 const pid = existingRecord && existingRecord.patientId ? String(existingRecord.patientId) : '';
                 if (pid) {
-                    aggregatePlan = this._buildPatientAggregatePlan(pid, 'delete');
+                    aggregatePlan = this._buildPatientAggregatePlan(pid, 'delete', null, null, idStr);
                     this._appendPatientAggregateToBatch(batch, aggregatePlan);
                 }
             } catch (_planErr) {
