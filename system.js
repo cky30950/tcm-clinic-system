@@ -1204,22 +1204,6 @@ const consultationHistoryPager = {
             return { success: true, state };
         }
         try {
-            const patient = await getPatientByIdWithRefresh(pid);
-            const aggregateCount = patient && typeof patient.consultationCount === 'number' && patient.consultationCount >= 0
-                ? Math.max(0, Number(patient.consultationCount) || 0)
-                : null;
-            const hasReliableAggregate = aggregateCount !== null && aggregateCount > 0 && !!patient.latestConsultationAt;
-            if (hasReliableAggregate) {
-                const total = aggregateCount;
-                state.totalCount = total;
-                state.countReady = true;
-                state.recordsByIndex = new Array(total);
-                state.mode = 'paged';
-                state.allLoaded = false;
-                return { success: true, state };
-            }
-        } catch (_patientAggregateError) {}
-        try {
             if (window.firebaseDataManager && typeof window.firebaseDataManager.ensurePatientConsultationSortDates === 'function') {
                 const backfillResult = await window.firebaseDataManager.ensurePatientConsultationSortDates(pid);
                 if (!backfillResult || !backfillResult.success) {
