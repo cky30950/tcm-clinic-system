@@ -6591,7 +6591,7 @@ async function generatePatientNumberFromFirebase() {
  * @returns {{total:number, fixed:number, skipped:number, errors:Array}}
  */
 async function backfillPatientFields(options = {}) {
-    const { dryRun = false } = options || {};
+    const { dryRun = false, verbose = false } = options || {};
     if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
         console.error('Firebase 尚未就緒');
         return;
@@ -6601,27 +6601,55 @@ async function backfillPatientFields(options = {}) {
     const snap = await window.firebase.getDocs(colRef);
     const results = { total: snap.size, fixed: 0, skipped: 0, errors: [] };
 
-    // 先算出需要補多少個編號，一次性跑 transaction 預留
     const needNumber = [];
     const needKeywords = [];
+    const diagnoseSamples = [];
     snap.forEach(docSnap => {
         const data = docSnap.data();
-        if (!data.patientNumber || typeof data.patientNumber !== 'string' || !data.patientNumber.trim()) {
-            needNumber.push(docSnap.id);
-        }
-        if (!Array.isArray(data.searchKeywords) || data.searchKeywords.length === 0) {
+        const missingNumber = !data.patientNumber || typeof data.patientNumber !== 'string' || !data.patientNumber.trim();
+        const missingKeywords = !Array.isArray(data.searchKeywords) || data.searchKeywords.length === 0;
+        if (missingNumber) needNumber.push(docSnap.id);
+        if (missingKeywords) {
             needKeywords.push(docSnap.id);
+            if (verbose && diagnoseSamples.length < 5) {
+                diagnoseSamples.push({
+                    id: docSnap.id,
+                    patientNumber: JSON.stringify(data.patientNumber),
+                    name: JSON.stringify(data.name),
+                    phone: JSON.stringify(data.phone),
+                    hasIdCard: !!data.idCard
+                });
+            }
         }
     });
 
     console.log(`[回填] 共 ${results.total} 筆病人；`
         + `${needNumber.length} 筆缺 patientNumber；`
         + `${needKeywords.length} 筆缺 searchKeywords；`
-        + `dryRun=${dryRun}`);
+        + `dryRun=${dryRun}${verbose ? ', verbose=on' : ''}`);
+    if (diagnoseSamples.length > 0) {
+        console.log('[回填診斷] 缺 searchKeywords 的樣本:', diagnoseSamples);
+    }
 
     if (dryRun) {
-        return { ...results, needNumber: needNumber.length, needKeywords: needKeywords.length };
+        return { ...results, needNumber: needNumber.length, needKeywords: needKeywords.length, samples: diagnoseSamples };
     }
+
+    // 保底：從 Set 取出非空 keywords；若全空（病人無 name/phone/idCard），
+    // 至少把 patientNumber 和 documentId 加入，確保能被搜尋到
+    const finalizeKeywords = (patientId, data, generatedSet) => {
+        const set = generatedSet instanceof Set ? generatedSet : new Set();
+        if (set.size === 0) {
+            const pn = data && data.patientNumber;
+            if (pn && typeof pn === 'string' && pn.trim()) {
+                const norm = pn.trim().toLowerCase();
+                set.add(norm);
+                if (norm.length >= 4) set.add(norm.slice(-4));
+            }
+            set.add(patientId.toLowerCase());
+        }
+        return Array.from(set);
+    };
 
     // 1. 批量補 searchKeywords（不涉及編號分配，逐筆 update）
     const needBoth = new Set(needNumber);
@@ -6631,11 +6659,13 @@ async function backfillPatientFields(options = {}) {
             const docSnap = await window.firebase.getDoc(window.firebase.doc(window.firebase.db, 'patients', pid));
             if (!docSnap.exists()) continue;
             const data = docSnap.data();
-            const keywords = generateSearchKeywords({ ...data, patientNumber: data.patientNumber });
-            const patch = {};
-            if (keywords.size > 0) patch.searchKeywords = Array.from(keywords);
-            if (Object.keys(patch).length > 0) {
-                await window.firebase.updateDoc(window.firebase.doc(window.firebase.db, 'patients', pid), patch);
+            const generated = generateSearchKeywords({ ...data, patientNumber: data.patientNumber });
+            const finalArray = finalizeKeywords(pid, data, generated);
+            if (finalArray.length > 0) {
+                await window.firebase.updateDoc(
+                    window.firebase.doc(window.firebase.db, 'patients', pid),
+                    { searchKeywords: finalArray }
+                );
                 results.fixed++;
             } else {
                 results.skipped++;
@@ -6652,10 +6682,11 @@ async function backfillPatientFields(options = {}) {
             const docSnap = await window.firebase.getDoc(window.firebase.doc(window.firebase.db, 'patients', pid));
             if (!docSnap.exists()) continue;
             const data = docSnap.data();
-            const keywords = generateSearchKeywords({ ...data, patientNumber: number });
+            const generated = generateSearchKeywords({ ...data, patientNumber: number });
+            const finalArray = finalizeKeywords(pid, { ...data, patientNumber: number }, generated);
             const patch = { patientNumber: number };
             if (!Array.isArray(data.searchKeywords) || data.searchKeywords.length === 0) {
-                patch.searchKeywords = Array.from(keywords);
+                patch.searchKeywords = finalArray;
             }
             await window.firebase.updateDoc(window.firebase.doc(window.firebase.db, 'patients', pid), patch);
             results.fixed++;
