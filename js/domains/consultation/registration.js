@@ -1226,6 +1226,9 @@ export async function loadConsultationForEdit(consultationId) {
             console.error('讀取診療記錄錯誤:', error);
         }
         if (consultation) {
+            // #region debug-point D1:raw-record
+            try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"D",location:"registration.js:loadConsultationForEdit:record",msg:"[DEBUG] consultation loaded for edit",data:{seq:window.__dbgSeq,hasMulti:!!consultation.multiPrescriptions,multiLen:consultation.multiPrescriptions?String(consultation.multiPrescriptions).length:0,hasStruct:!!consultation.billingItemsStructured,structLen:consultation.billingItemsStructured?String(consultation.billingItemsStructured).length:0,hasBillingText:!!consultation.billingItems,updatedAt:consultation.updatedAt?String(consultation.updatedAt):null},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
+            // #endregion
             // 記錄已保存病歷的時間戳，供恢復草稿時判斷本機草稿是否已過期。
             // 若所有日期欄位都解析失敗，以 Date.now() fallback，確保本機草稿一定被視為「不晚於已保存記錄」，
             // 避免舊草稿覆蓋剛從 Firebase 載入的病歷內容。
@@ -1481,7 +1484,10 @@ export async function loadConsultationForEdit(consultationId) {
                 updateBillingDisplay();
                 try { syncMedicationDaysWithMedicineFee(); } catch (_e) {}
             }
-            
+            // #region debug-point A3:post-billing-block
+            try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"A",location:"registration.js:post-billing-block",msg:"[DEBUG] billing block finished",data:{seq:window.__dbgSeq,sections:G.prescriptions.length,presItems:(G.prescriptions||[]).reduce((n,p)=>n+((p&&p.items)?p.items.length:0),0),billingCount:(G.selectedBillingItems||[]).length},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
+            // #endregion
+
             // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
             const saveButtonTextEl = document.getElementById('consultationSaveButtonText');
             if (saveButtonTextEl) {
@@ -1504,6 +1510,9 @@ export async function loadConsultationForEdit(consultationId) {
         }
     } catch (error) {
         console.error('載入診症記錄錯誤:', error);
+        // #region debug-point C1:outer-catch
+        try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"C",location:"registration.js:outer-catch",msg:"[DEBUG] loadConsultationForEdit outer catch",data:{seq:window.__dbgSeq,errorName:error&&error.name,errorMsg:error&&error.message,stack:error&&error.stack?String(error.stack).slice(0,600):null},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
+        // #endregion
         G.showToast('載入診症記錄失敗，將使用空白表單', 'warning');
         clearConsultationForm();
     }

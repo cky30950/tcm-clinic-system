@@ -589,6 +589,9 @@ import { restorePackageUseMeta, undoPackageUse } from '../billing/packages.js';
         
         // 更新處方顯示
         export function updatePrescriptionDisplay() {
+            // #region debug-point A1:prescription-render
+            try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"A",location:"form.js:updatePrescriptionDisplay",msg:"[DEBUG] updatePrescriptionDisplay called",data:{seq:window.__dbgSeq,sections:G.prescriptions.length,items:(G.prescriptions||[]).reduce((n,p)=>n+((p&&p.items)?p.items.length:0),0),formHidden:(function(){const f=document.getElementById('consultationForm');return f?f.classList.contains('hidden'):null;})()},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
+            // #endregion
             const containerAll = document.getElementById('prescriptionsContainer');
             const hiddenTextarea = document.getElementById('formPrescription');
             if (!containerAll) return;
@@ -1393,6 +1396,9 @@ export async function searchBillingForConsultation() {
         
         // 更新收費項目顯示
         export function updateBillingDisplay() {
+            // #region debug-point A2:billing-render
+            try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"A",location:"form.js:updateBillingDisplay",msg:"[DEBUG] updateBillingDisplay called",data:{seq:window.__dbgSeq,billingCount:(G.selectedBillingItems||[]).length,formHidden:(function(){const f=document.getElementById('consultationForm');return f?f.classList.contains('hidden'):null;})()},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
+            // #endregion
             const container = document.getElementById('selectedBillingItems');
             const hiddenTextarea = document.getElementById('formBillingItems');
             const totalAmountSpan = document.getElementById('totalBillingAmount');

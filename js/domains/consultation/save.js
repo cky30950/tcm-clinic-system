@@ -186,6 +186,9 @@ export function restoreConsultationSymptomsDraft(appointment, patient) {
         const draftUpdatedAt = Number(draft && draft.updatedAt) || 0;
         const savedRecordAt = Number(G.consultationSymptomsDraftState.loadedRecordUpdatedAt) || 0;
         const isStaleDraft = !draftUpdatedAt || savedRecordAt === 0 || (savedRecordAt > 0 && draftUpdatedAt <= savedRecordAt);
+        // #region debug-point B1:draft-stale-decision
+        try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"B",location:"save.js:draft-stale-decision",msg:"[DEBUG] draft stale check in edit mode",data:{seq:window.__dbgSeq,draftUpdatedAt,savedRecordAt,isStaleDraft,draftSections:Array.isArray(draft.multiPrescriptions)?draft.multiPrescriptions.length:null,draftPresItems:Array.isArray(draft.multiPrescriptions)?draft.multiPrescriptions.reduce((n,s)=>n+((s&&s.items)?s.items.length:0),0):null,draftBilling:Array.isArray(draft.billingItemsStructured)?draft.billingItemsStructured.length:null},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
+        // #endregion
         if (isStaleDraft) {
             try {
                 clearConsultationSymptomsDraft(key);
@@ -245,6 +248,9 @@ export function restoreConsultationSymptomsDraft(appointment, patient) {
         }
 
         if (!isBillingOnlyEdit && Object.prototype.hasOwnProperty.call(draft, 'multiPrescriptions')) {
+            // #region debug-point B2:draft-apply-prescriptions
+            try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"B",location:"save.js:draft-apply-prescriptions",msg:"[DEBUG] draft overwrites prescriptions",data:{seq:window.__dbgSeq,draftSections:Array.isArray(draft.multiPrescriptions)?draft.multiPrescriptions.length:null,draftPresItems:Array.isArray(draft.multiPrescriptions)?draft.multiPrescriptions.reduce((n,s)=>n+((s&&s.items)?s.items.length:0),0):null},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
+            // #endregion
             const draftSections = Array.isArray(draft.multiPrescriptions) ? draft.multiPrescriptions : [];
             if (draftSections.length > 0) {
                 G.prescriptions = draftSections.map((section, index) => ({
@@ -285,6 +291,9 @@ export function restoreConsultationSymptomsDraft(appointment, patient) {
         }
 
         if (Object.prototype.hasOwnProperty.call(draft, 'billingItemsStructured')) {
+            // #region debug-point B3:draft-apply-billing
+            try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"B",location:"save.js:draft-apply-billing",msg:"[DEBUG] draft overwrites billing",data:{seq:window.__dbgSeq,draftBilling:Array.isArray(draft.billingItemsStructured)?draft.billingItemsStructured.length:null},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
+            // #endregion
             G.selectedBillingItems = Array.isArray(draft.billingItemsStructured)
                 ? draft.billingItemsStructured.map(item => ({ ...item }))
                 : [];
@@ -583,6 +592,9 @@ export async function showConsultationForm(appointment) {
         G.setConsultationEditRestrictionState(appointment, null);
 
         document.getElementById('consultationForm').classList.remove('hidden');
+        // #region debug-point A4:form-shown-final
+        try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"A",location:"save.js:form-shown",msg:"[DEBUG] form shown, final state",data:{seq:window.__dbgSeq,sections:G.prescriptions.length,presItems:(G.prescriptions||[]).reduce((n,p)=>n+((p&&p.items)?p.items.length:0),0),billingCount:(G.selectedBillingItems||[]).length},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
+        // #endregion
 
         // 滾動到表單位置
         document.getElementById('consultationForm').scrollIntoView({ behavior: 'smooth' });
