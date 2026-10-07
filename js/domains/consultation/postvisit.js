@@ -448,6 +448,13 @@ export async function withdrawConsultation(appointmentId) {
             G.patientConsultationsCache[patient.id] = G.patientConsultationsCache[patient.id].filter(c => String(c.id) !== String(consultation.id));
         }
     } catch (_err) {}
+    // 同步清除 pager 快取，確保本機稍後開啟病歷時不會吃到已撤回的舊記錄
+    try {
+        const pager = G.consultationHistoryPager;
+        if (pager && typeof pager.clearPatientCache === 'function') {
+            pager.clearPatientCache(patient.id);
+        }
+    } catch (_pagerErr) {}
 
     // 將掛號狀態改回已掛號
     appointment.status = 'registered';

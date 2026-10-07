@@ -519,16 +519,29 @@ export async function attachPatientListListener() {
                     if (pager && typeof pager.clearPatientCache === 'function') {
                         pager.clearPatientCache(pid);
                     }
-                    // 5. 若該病人的病歷彈窗已開啟，同步刷新 DOM 內容
+                    // 5. 若該病人的病歷彈窗已開啟，清除 pager 快取後重載 state 並刷新 DOM
                     if (pager) {
-                        const tryRefresh = (ctx, modalId, getPidFn) => {
+                        const tryRefresh = async (ctx, modalId, getPidFn) => {
                             try {
                                 const modal = document.getElementById(modalId);
                                 if (!modal || modal.classList.contains('hidden')) return;
                                 if (String(getPidFn() || '') !== pid) return;
-                                const contentId = ctx === 'patient' ? 'patientMedicalHistoryContent' : 'medicalHistoryContent';
+                                // 先清快取，確保 loadForContext 重建 state 時拿到的是最新數據
+                                if (typeof pager.clearPatientCache === 'function') {
+                                    pager.clearPatientCache(pid);
+                                }
                                 if (typeof pager.loadForContext === 'function') {
-                                    pager.loadForContext(ctx, pid, { contentId, forceRefresh: true });
+                                    await pager.loadForContext(ctx, pid);
+                                }
+                                // loadForContext 只更新了 state + context 陣列，DOM 需手動刷新
+                                if (ctx === 'patient') {
+                                    if (typeof G.displayPatientMedicalHistoryPage === 'function') {
+                                        G.displayPatientMedicalHistoryPage();
+                                    }
+                                } else {
+                                    if (typeof G.displayConsultationMedicalHistoryPage === 'function') {
+                                        G.displayConsultationMedicalHistoryPage();
+                                    }
                                 }
                             } catch (_e) {}
                         };
