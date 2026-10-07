@@ -1027,6 +1027,8 @@ export function subscribeToAppointments(forceToday) {
             const toNotify = [];
             // 判斷是否有病人狀態變更為完成診症需要通知診所助理
             const completedNotify = [];
+            // 判斷是否有診症被撤回（狀態從 completed 變為 registered/waiting）
+            const withdrawnNotify = [];
             for (const apt of newAppointments) {
                 const prevStatus = window.previousAppointmentStatuses[apt.id];
                 // 當前狀態為候診中且與先前狀態不同，視為新的候診事件
@@ -1037,8 +1039,55 @@ export function subscribeToAppointments(forceToday) {
                 if (prevStatus !== undefined && prevStatus !== apt.status && apt.status === 'completed') {
                     completedNotify.push(apt);
                 }
+                // 若狀態從 completed 變為 registered 或 waiting，表示其他裝置撤回了診症
+                if (prevStatus !== undefined && prevStatus === 'completed' && apt.status !== 'completed') {
+                    withdrawnNotify.push(apt);
+                }
                 // 更新狀態紀錄
                 window.previousAppointmentStatuses[apt.id] = apt.status;
+            }
+
+            // ---- 跨裝置同步：撤回診症後清除 consultation 快取並刷新 UI ----
+            if (withdrawnNotify.length > 0) {
+                for (const apt of withdrawnNotify) {
+                    const pid = String(apt.patientId || '');
+                    if (!pid) continue;
+                    try {
+                        // 1. 清除該病人的診症快取
+                        try { delete G.patientConsultationsCache[pid]; } catch (_e) {}
+                        try { localStorage.removeItem('patientConsultations:' + pid); } catch (_e) {}
+                        // 2. 從全域 consultations 陣列中移除該病人的記錄
+                        if (Array.isArray(G.consultations)) {
+                            G.consultations = G.consultations.filter(c => !(c && String(c.patientId || '') === pid));
+                            try { localStorage.setItem('consultations', JSON.stringify(G.consultations)); } catch (_e) {}
+                        }
+                        // 3. 清除 pager 快取並刷新已開啟的病歷彈窗
+                        const pager = G.consultationHistoryPager;
+                        if (pager) {
+                            const tryRefresh = (ctx, modalId, getPidFn) => {
+                                try {
+                                    const modal = document.getElementById(modalId);
+                                    if (!modal || modal.classList.contains('hidden')) return;
+                                    if (String(getPidFn() || '') !== pid) return;
+                                    if (typeof pager.clearPatientCache === 'function') pager.clearPatientCache(pid);
+                                    const contentId = ctx === 'patient' ? 'patientMedicalHistoryContent' : 'medicalHistoryContent';
+                                    if (typeof pager.loadForContext === 'function') {
+                                        pager.loadForContext(ctx, pid, { contentId, forceRefresh: true });
+                                    }
+                                } catch (_e) {}
+                            };
+                            tryRefresh('patient', 'patientMedicalHistoryModal', () => G.currentPatientHistoryPatientId);
+                            tryRefresh('consultation', 'medicalHistoryModal', () => G.currentConsultationHistoryPatientId);
+                        }
+                        // 4. 如果病人詳情面板開啟且顯示的就是這個病人，刷新診療摘要
+                        const detailModal = document.getElementById('patientDetailModal');
+                        const panelOpen = detailModal && !detailModal.classList.contains('hidden');
+                        const samePatient = String(G.patientDetailClinicState && G.patientDetailClinicState.patientId || '') === pid;
+                        if (panelOpen && samePatient && typeof G.loadPatientConsultationSummary === 'function') {
+                            await G.loadPatientConsultationSummary(pid).catch(() => {});
+                        }
+                    } catch (_e) {}
+                }
             }
 
             // ---- 推播通知：不論觀看者角色皆觸發，由後端依訂閱事件篩選收件人；失敗僅警告 ----
