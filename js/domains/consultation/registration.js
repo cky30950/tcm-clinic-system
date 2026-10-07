@@ -1027,8 +1027,6 @@ export function subscribeToAppointments(forceToday) {
             const toNotify = [];
             // 判斷是否有病人狀態變更為完成診症需要通知診所助理
             const completedNotify = [];
-            // 判斷是否有診症被撤回（狀態從 completed 變為 registered/waiting）
-            const withdrawnNotify = [];
             for (const apt of newAppointments) {
                 const prevStatus = window.previousAppointmentStatuses[apt.id];
                 // 當前狀態為候診中且與先前狀態不同，視為新的候診事件
@@ -1039,55 +1037,8 @@ export function subscribeToAppointments(forceToday) {
                 if (prevStatus !== undefined && prevStatus !== apt.status && apt.status === 'completed') {
                     completedNotify.push(apt);
                 }
-                // 若狀態從 completed 變為 registered 或 waiting，表示其他裝置撤回了診症
-                if (prevStatus !== undefined && prevStatus === 'completed' && apt.status !== 'completed') {
-                    withdrawnNotify.push(apt);
-                }
                 // 更新狀態紀錄
                 window.previousAppointmentStatuses[apt.id] = apt.status;
-            }
-
-            // ---- 跨裝置同步：撤回診症後清除 consultation 快取並刷新 UI ----
-            if (withdrawnNotify.length > 0) {
-                for (const apt of withdrawnNotify) {
-                    const pid = String(apt.patientId || '');
-                    if (!pid) continue;
-                    try {
-                        // 1. 清除該病人的診症快取
-                        try { delete G.patientConsultationsCache[pid]; } catch (_e) {}
-                        try { localStorage.removeItem('patientConsultations:' + pid); } catch (_e) {}
-                        // 2. 從全域 consultations 陣列中移除該病人的記錄
-                        if (Array.isArray(G.consultations)) {
-                            G.consultations = G.consultations.filter(c => !(c && String(c.patientId || '') === pid));
-                            try { localStorage.setItem('consultations', JSON.stringify(G.consultations)); } catch (_e) {}
-                        }
-                        // 3. 清除 pager 快取並刷新已開啟的病歷彈窗
-                        const pager = G.consultationHistoryPager;
-                        if (pager) {
-                            const tryRefresh = (ctx, modalId, getPidFn) => {
-                                try {
-                                    const modal = document.getElementById(modalId);
-                                    if (!modal || modal.classList.contains('hidden')) return;
-                                    if (String(getPidFn() || '') !== pid) return;
-                                    if (typeof pager.clearPatientCache === 'function') pager.clearPatientCache(pid);
-                                    const contentId = ctx === 'patient' ? 'patientMedicalHistoryContent' : 'medicalHistoryContent';
-                                    if (typeof pager.loadForContext === 'function') {
-                                        pager.loadForContext(ctx, pid, { contentId, forceRefresh: true });
-                                    }
-                                } catch (_e) {}
-                            };
-                            tryRefresh('patient', 'patientMedicalHistoryModal', () => G.currentPatientHistoryPatientId);
-                            tryRefresh('consultation', 'medicalHistoryModal', () => G.currentConsultationHistoryPatientId);
-                        }
-                        // 4. 如果病人詳情面板開啟且顯示的就是這個病人，刷新診療摘要
-                        const detailModal = document.getElementById('patientDetailModal');
-                        const panelOpen = detailModal && !detailModal.classList.contains('hidden');
-                        const samePatient = String(G.patientDetailClinicState && G.patientDetailClinicState.patientId || '') === pid;
-                        if (panelOpen && samePatient && typeof G.loadPatientConsultationSummary === 'function') {
-                            await G.loadPatientConsultationSummary(pid).catch(() => {});
-                        }
-                    } catch (_e) {}
-                }
             }
 
             // ---- 推播通知：不論觀看者角色皆觸發，由後端依訂閱事件篩選收件人；失敗僅警告 ----
@@ -1275,9 +1226,6 @@ export async function loadConsultationForEdit(consultationId) {
             console.error('讀取診療記錄錯誤:', error);
         }
         if (consultation) {
-            // #region debug-point D1:raw-record
-            try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"D",location:"registration.js:loadConsultationForEdit:record",msg:"[DEBUG] consultation loaded for edit",data:{seq:window.__dbgSeq,hasMulti:!!consultation.multiPrescriptions,multiLen:consultation.multiPrescriptions?String(consultation.multiPrescriptions).length:0,hasStruct:!!consultation.billingItemsStructured,structLen:consultation.billingItemsStructured?String(consultation.billingItemsStructured).length:0,hasBillingText:!!consultation.billingItems,updatedAt:consultation.updatedAt?String(consultation.updatedAt):null},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
-            // #endregion
             // 記錄已保存病歷的時間戳，供恢復草稿時判斷本機草稿是否已過期。
             // 若所有日期欄位都解析失敗，以 Date.now() fallback，確保本機草稿一定被視為「不晚於已保存記錄」，
             // 避免舊草稿覆蓋剛從 Firebase 載入的病歷內容。
@@ -1533,10 +1481,7 @@ export async function loadConsultationForEdit(consultationId) {
                 updateBillingDisplay();
                 try { syncMedicationDaysWithMedicineFee(); } catch (_e) {}
             }
-            // #region debug-point A3:post-billing-block
-            try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"A",location:"registration.js:post-billing-block",msg:"[DEBUG] billing block finished",data:{seq:window.__dbgSeq,sections:G.prescriptions.length,presItems:(G.prescriptions||[]).reduce((n,p)=>n+((p&&p.items)?p.items.length:0),0),billingCount:(G.selectedBillingItems||[]).length},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
-            // #endregion
-
+            
             // 安全獲取診症儲存按鈕文本元素，避免為 null 時出錯
             const saveButtonTextEl = document.getElementById('consultationSaveButtonText');
             if (saveButtonTextEl) {
@@ -1559,9 +1504,6 @@ export async function loadConsultationForEdit(consultationId) {
         }
     } catch (error) {
         console.error('載入診症記錄錯誤:', error);
-        // #region debug-point C1:outer-catch
-        try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"C",location:"registration.js:outer-catch",msg:"[DEBUG] loadConsultationForEdit outer catch",data:{seq:window.__dbgSeq,errorName:error&&error.name,errorMsg:error&&error.message,stack:error&&error.stack?String(error.stack).slice(0,600):null},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
-        // #endregion
         G.showToast('載入診症記錄失敗，將使用空白表單', 'warning');
         clearConsultationForm();
     }

@@ -186,9 +186,6 @@ export function restoreConsultationSymptomsDraft(appointment, patient) {
         const draftUpdatedAt = Number(draft && draft.updatedAt) || 0;
         const savedRecordAt = Number(G.consultationSymptomsDraftState.loadedRecordUpdatedAt) || 0;
         const isStaleDraft = !draftUpdatedAt || savedRecordAt === 0 || (savedRecordAt > 0 && draftUpdatedAt <= savedRecordAt);
-        // #region debug-point B1:draft-stale-decision
-        try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"B",location:"save.js:draft-stale-decision",msg:"[DEBUG] draft stale check in edit mode",data:{seq:window.__dbgSeq,draftUpdatedAt,savedRecordAt,isStaleDraft,draftSections:Array.isArray(draft.multiPrescriptions)?draft.multiPrescriptions.length:null,draftPresItems:Array.isArray(draft.multiPrescriptions)?draft.multiPrescriptions.reduce((n,s)=>n+((s&&s.items)?s.items.length:0),0):null,draftBilling:Array.isArray(draft.billingItemsStructured)?draft.billingItemsStructured.length:null},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
-        // #endregion
         if (isStaleDraft) {
             try {
                 clearConsultationSymptomsDraft(key);
@@ -248,19 +245,8 @@ export function restoreConsultationSymptomsDraft(appointment, patient) {
         }
 
         if (!isBillingOnlyEdit && Object.prototype.hasOwnProperty.call(draft, 'multiPrescriptions')) {
-            // #region debug-point B2:draft-apply-prescriptions
-            try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"B",location:"save.js:draft-apply-prescriptions",msg:"[DEBUG] draft overwrites prescriptions",data:{seq:window.__dbgSeq,draftSections:Array.isArray(draft.multiPrescriptions)?draft.multiPrescriptions.length:null,draftPresItems:Array.isArray(draft.multiPrescriptions)?draft.multiPrescriptions.reduce((n,s)=>n+((s&&s.items)?s.items.length:0),0):null},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
-            // #endregion
             const draftSections = Array.isArray(draft.multiPrescriptions) ? draft.multiPrescriptions : [];
-            // 保護機制：只有當草稿本身有實際項目，或當前載入的處方為空時，才應用草稿。
-            // 防止空草稿覆蓋已正確載入的病歷處方，但保留用戶合法的未保存修改。
-            const currentPrescriptionItemsCount = G.prescriptions && Array.isArray(G.prescriptions)
-                ? G.prescriptions.reduce((n, p) => n + ((p && p.items && Array.isArray(p.items)) ? p.items.length : 0), 0)
-                : 0;
-            const hasLoadedPrescriptions = currentPrescriptionItemsCount > 0;
-            const draftHasActualItems = draftSections.some(s => s && Array.isArray(s.items) && s.items.length > 0);
-            const shouldApplyDraft = draftHasActualItems || !hasLoadedPrescriptions;
-            if (draftSections.length > 0 && shouldApplyDraft) {
+            if (draftSections.length > 0) {
                 G.prescriptions = draftSections.map((section, index) => ({
                     name: section && section.name ? String(section.name) : (index === 0 ? '處方' : `處方${index + 1}`),
                     items: Array.isArray(section && section.items) ? JSON.parse(JSON.stringify(section.items)) : [],
@@ -299,23 +285,13 @@ export function restoreConsultationSymptomsDraft(appointment, patient) {
         }
 
         if (Object.prototype.hasOwnProperty.call(draft, 'billingItemsStructured')) {
-            // #region debug-point B3:draft-apply-billing
-            try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"B",location:"save.js:draft-apply-billing",msg:"[DEBUG] draft overwrites billing",data:{seq:window.__dbgSeq,draftBilling:Array.isArray(draft.billingItemsStructured)?draft.billingItemsStructured.length:null},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
-            // #endregion
-            // 保護機制：只有當草稿本身有項目，或當前載入的收費項目為空時，才應用草稿。
-            // 防止空草稿覆蓋已正確載入的病歷收費項目，但保留用戶合法的未保存修改。
-            const hasLoadedBillingItems = Array.isArray(G.selectedBillingItems) && G.selectedBillingItems.length > 0;
-            const draftHasBillingItems = Array.isArray(draft.billingItemsStructured) && draft.billingItemsStructured.length > 0;
-            const shouldApplyDraft = draftHasBillingItems || !hasLoadedBillingItems;
-            if (shouldApplyDraft) {
-                G.selectedBillingItems = Array.isArray(draft.billingItemsStructured)
-                    ? draft.billingItemsStructured.map(item => ({ ...item }))
-                    : [];
-                if (typeof updateBillingDisplay === 'function') {
-                    updateBillingDisplay();
-                }
-                restored = true;
+            G.selectedBillingItems = Array.isArray(draft.billingItemsStructured)
+                ? draft.billingItemsStructured.map(item => ({ ...item }))
+                : [];
+            if (typeof updateBillingDisplay === 'function') {
+                updateBillingDisplay();
             }
+            restored = true;
         } else if (Object.prototype.hasOwnProperty.call(draft, 'billingItems')) {
             const billingEl = document.getElementById('formBillingItems');
             if (billingEl && String(billingEl.value || '') !== String(draft.billingItems || '')) {
@@ -441,8 +417,8 @@ export async function showConsultationForm(appointment) {
             genderEl.textContent = patient.gender || '未知';
         }
         G.renderConsultationPatientMedicalInfo(patient);
-        // 渲染病人療程/套餐資訊（加上 await 避免與後續 loadConsultationForEdit 產生競態）
-        await renderPatientPackages(patient.id);
+        // 渲染病人療程/套餐資訊
+        renderPatientPackages(patient.id);
         
         // 檢查是否為編輯模式
         const isEditingMode = appointment.status === 'completed' && appointment.consultationId;
@@ -607,9 +583,6 @@ export async function showConsultationForm(appointment) {
         G.setConsultationEditRestrictionState(appointment, null);
 
         document.getElementById('consultationForm').classList.remove('hidden');
-        // #region debug-point A4:form-shown-final
-        try { window.__dbgSeq = (window.__dbgSeq || 0) + 1; fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"edit-record-blank-load",runId:"pre",hypothesisId:"A",location:"save.js:form-shown",msg:"[DEBUG] form shown, final state",data:{seq:window.__dbgSeq,sections:G.prescriptions.length,presItems:(G.prescriptions||[]).reduce((n,p)=>n+((p&&p.items)?p.items.length:0),0),billingCount:(G.selectedBillingItems||[]).length},ts:Date.now()})}).catch((_e)=>{}); } catch(_e){}
-        // #endregion
 
         // 滾動到表單位置
         document.getElementById('consultationForm').scrollIntoView({ behavior: 'smooth' });
@@ -903,12 +876,6 @@ export async function showConsultationForm(appointment) {
         // 關閉診症表單
         export async function closeConsultationForm() {
             stopConsultationSymptomsDraftAutosave();
-            // 清除殘留的草稿，避免下次開啟時誤覆蓋已保存的病歷內容
-            try {
-                if (G.consultationSymptomsDraftState && G.consultationSymptomsDraftState.key) {
-                    clearConsultationSymptomsDraft(G.consultationSymptomsDraftState.key);
-                }
-            } catch (_e) {}
             updateConsultationCancelButtonLabel(false);
             G.setConsultationEditRestrictionState(null, null);
             // 在關閉表單前，如有暫存的套票使用變更且尚未保存，嘗試回復。
