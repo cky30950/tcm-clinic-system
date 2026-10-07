@@ -1,6 +1,7 @@
 {
   "projects": {
-    "test": "clinic-bb064"
+    "test": "clinic-bb064",
+    "cheungec": "system-1e90a"
   },
   "targets": {},
   "etags": {}

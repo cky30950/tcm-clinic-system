@@ -129,8 +129,6 @@ export async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
             ? G.paginationSettings.patientList.itemsPerPage
             : 10;
         
-        // 雙欄排序：patientNumber 主排序 + documentId 次排序，保證即使
-        // patientNumber 重複或缺失（null），排序也是確定的，cursor 不會跳過文件
         let q = window.firebase.firestoreQuery(
             window.firebase.collection(window.firebase.db, 'patients'),
             window.firebase.orderBy('patientNumber', 'desc'),
