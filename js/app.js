@@ -139,10 +139,6 @@ const FACADE = {
     touchPatientsMeta: Patients.touchPatientsMeta,
     attachPatientConsultationsListener: Patients.attachPatientConsultationsListener,
     detachPatientConsultationsListener: Patients.detachPatientConsultationsListener,
-    touchConsultationsMeta: Patients.touchConsultationsMeta,
-    attachConsultationsMetaListener: Patients.attachConsultationsMetaListener,
-    detachConsultationsMetaListener: Patients.detachConsultationsMetaListener,
-    getLastConsultationsMetaTs: Patients.getLastConsultationsMetaTs,
 
     // ── patients 列表與搜尋（Phase 4 子批 A）──
     loadPatientListFromFirebase: Patients.loadPatientListFromFirebase,

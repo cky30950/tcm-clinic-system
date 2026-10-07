@@ -29,11 +29,7 @@ export {
     detachPatientListListener,
     touchPatientsMeta,
     attachPatientConsultationsListener,
-    detachPatientConsultationsListener,
-    touchConsultationsMeta,
-    attachConsultationsMetaListener,
-    detachConsultationsMetaListener,
-    getLastConsultationsMetaTs
+    detachPatientConsultationsListener
 } from './store.js';
 export {
     loadPatientListFromFirebase,
