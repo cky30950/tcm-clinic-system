@@ -24,6 +24,7 @@ import {
   ,
   
   writeBatch,
+  FieldPath,
   FieldValue,
   increment as firestoreIncrement,
   serverTimestamp as firestoreServerTimestamp,
@@ -175,6 +176,8 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         
         writeBatch: trackedWriteBatch,
         
+        FieldPath,
+        documentId: FieldPath.documentId,
         FieldValue,
         increment: firestoreIncrement,
 

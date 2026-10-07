@@ -6540,6 +6540,7 @@ async function generatePatientNumberFromFirebase() {
             const latestQuery = window.firebase.firestoreQuery(
                 window.firebase.collection(window.firebase.db, 'patients'),
                 window.firebase.orderBy('patientNumber', 'desc'),
+                window.firebase.orderBy(window.firebase.documentId(), 'desc'),
                 window.firebase.limit(1)
             );
             const latestSnap = await window.firebase.getDocs(latestQuery);
@@ -6571,8 +6572,113 @@ async function generatePatientNumberFromFirebase() {
         return formatPatientNumber(nextNumber);
     } catch (error) {
         console.error('生成病人編號失敗:', error);
-        return `P${Date.now().toString().slice(-6)}`; 
+        return `P${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`;
     }
+}
+
+/**
+ * 一次性回填腳本：掃描所有病人文件，補上缺失的 patientNumber 和 searchKeywords。
+ * 可在瀏覽器 console 執行：await window.backfillPatientFields()
+ *
+ * 問題背景：
+ *   1. Firestore 的 orderBy('patientNumber') 會排除缺少此欄位的文件，
+ *      導致分頁查詢跳過舊病人，但 getCountFromServer 算上他們，
+ *      造成分頁計算錯亂（頁面顯示空白、部分病人看不到）。
+ *   2. searchPatients 的主力查詢用 where('searchKeywords', 'array-contains', ...)，
+ *      缺少 searchKeywords 的舊病人不會被返回。
+ *
+ * @param {{dryRun?: boolean}} [options] dryRun=true 時只列舉問題不寫入
+ * @returns {{total:number, fixed:number, skipped:number, errors:Array}}
+ */
+async function backfillPatientFields(options = {}) {
+    const { dryRun = false } = options || {};
+    if (!window.firebaseDataManager || !window.firebaseDataManager.isReady) {
+        console.error('Firebase 尚未就緒');
+        return;
+    }
+    await waitForFirebaseDb();
+    const colRef = window.firebase.collection(window.firebase.db, 'patients');
+    const snap = await window.firebase.getDocs(colRef);
+    const results = { total: snap.size, fixed: 0, skipped: 0, errors: [] };
+
+    // 先算出需要補多少個編號，一次性跑 transaction 預留
+    const needNumber = [];
+    const needKeywords = [];
+    snap.forEach(docSnap => {
+        const data = docSnap.data();
+        if (!data.patientNumber || typeof data.patientNumber !== 'string' || !data.patientNumber.trim()) {
+            needNumber.push(docSnap.id);
+        }
+        if (!Array.isArray(data.searchKeywords) || data.searchKeywords.length === 0) {
+            needKeywords.push(docSnap.id);
+        }
+    });
+
+    console.log(`[回填] 共 ${results.total} 筆病人；`
+        + `${needNumber.length} 筆缺 patientNumber；`
+        + `${needKeywords.length} 筆缺 searchKeywords；`
+        + `dryRun=${dryRun}`);
+
+    if (dryRun) {
+        return { ...results, needNumber: needNumber.length, needKeywords: needKeywords.length };
+    }
+
+    // 1. 批量補 searchKeywords（不涉及編號分配，逐筆 update）
+    const needBoth = new Set(needNumber);
+    const needKeywordsOnly = needKeywords.filter(id => !needBoth.has(id));
+    for (const pid of needKeywordsOnly) {
+        try {
+            const docSnap = await window.firebase.getDoc(window.firebase.doc(window.firebase.db, 'patients', pid));
+            if (!docSnap.exists()) continue;
+            const data = docSnap.data();
+            const keywords = generateSearchKeywords({ ...data, patientNumber: data.patientNumber });
+            const patch = {};
+            if (keywords.size > 0) patch.searchKeywords = Array.from(keywords);
+            if (Object.keys(patch).length > 0) {
+                await window.firebase.updateDoc(window.firebase.doc(window.firebase.db, 'patients', pid), patch);
+                results.fixed++;
+            } else {
+                results.skipped++;
+            }
+        } catch (err) {
+            results.errors.push({ patientId: pid, error: String(err) });
+        }
+    }
+
+    // 2. 補 patientNumber + 同時補 searchKeywords（需要 transaction 分配唯一編號）
+    for (const pid of needNumber) {
+        try {
+            const number = await generatePatientNumberFromFirebase();
+            const docSnap = await window.firebase.getDoc(window.firebase.doc(window.firebase.db, 'patients', pid));
+            if (!docSnap.exists()) continue;
+            const data = docSnap.data();
+            const keywords = generateSearchKeywords({ ...data, patientNumber: number });
+            const patch = { patientNumber: number };
+            if (!Array.isArray(data.searchKeywords) || data.searchKeywords.length === 0) {
+                patch.searchKeywords = Array.from(keywords);
+            }
+            await window.firebase.updateDoc(window.firebase.doc(window.firebase.db, 'patients', pid), patch);
+            results.fixed++;
+            console.log(`[回填] patientId=${pid}  →  patientNumber=${number}`);
+        } catch (err) {
+            results.errors.push({ patientId: pid, error: String(err) });
+        }
+    }
+
+    // 3. 刷新快取
+    if (typeof invalidateAllPatientCaches === 'function') {
+        invalidateAllPatientCaches();
+    }
+    if (typeof reloadVisiblePatientList === 'function') {
+        reloadVisiblePatientList();
+    }
+    console.log(`[回填] 完成：fixed=${results.fixed}, skipped=${results.skipped}, errors=${results.errors.length}`);
+    return results;
+}
+
+// 掛載到 window，供管理員從 console 調用
+if (typeof window !== 'undefined') {
+    window.backfillPatientFields = backfillPatientFields;
 }
 
 
@@ -10556,7 +10662,7 @@ class FirebaseDataManager {
             // 透過 searchKeywords 進行查詢（主力，精簡且高效）
             try {
                 const colRef = window.firebase.collection(window.firebase.db, 'patients');
-                const q = window.firebase.query(
+                const q = window.firebase.firestoreQuery(
                     colRef,
                     window.firebase.where('searchKeywords', 'array-contains', searchTerm),
                     window.firebase.limit(limit)
@@ -10571,31 +10677,26 @@ class FirebaseDataManager {
 
             /*
              * 本地補強搜尋：只有當 searchKeywords 結果不足時才執行。
-             * 先嘗試用現有快取（非強制刷新）做本地補強；若快取不存在再考慮遠端讀取。
-             * 這避免每次搜尋都觸發全量 getPatients(true)。
+             * 先嘗試用現有快取做本地補強；若快取不存在或補完仍不足，
+             * 則直接從 Firestore 遠端讀取補足，確保缺失 searchKeywords
+             * 的舊病人也能被搜到（主力查詢只匹配有 searchKeywords 的）。
              */
             if (results.length < limit) {
                 let localPatients = [];
+                let usedCache = false;
                 try {
                     const hasCache = Array.isArray(this.patientsCache) && this.patientsCache.length > 0;
                     if (hasCache) {
-                        // 有快取 → 直接用，不強制刷新
                         localPatients = this.patientsCache;
-                    } else {
-                        // 無快取 → 用非強制模式（優先用 localStorage），失敗才遠端讀取
-                        const patientRes = await this.getPatients(false);
-                        if (patientRes && patientRes.success && Array.isArray(patientRes.data)) {
-                            localPatients = patientRes.data;
-                        }
+                        usedCache = true;
                     }
-                } catch (cacheErr) {
-                    console.error('讀取病人快取時發生錯誤:', cacheErr);
-                    localPatients = Array.isArray(this.patientsCache) ? this.patientsCache : [];
-                }
-                // 在本地資料中補強搜尋，避免重複加入已在 results 中的病人。
+                } catch (_e) {}
+
+                const seen = new Set(results.map(p => String(p.id)));
+                const low = searchTerm;
+
+                // 先在已有的 localPatients（快取）中補強
                 if (Array.isArray(localPatients) && localPatients.length > 0) {
-                    const seen = new Set(results.map(p => String(p.id)));
-                    const low = searchTerm;
                     for (const p of localPatients) {
                         if (results.length >= limit) break;
                         if (seen.has(String(p.id))) continue;
@@ -10606,6 +10707,61 @@ class FirebaseDataManager {
                         if (nameMatch || phoneMatch || idMatch || numberMatch) {
                             results.push(p);
                             seen.add(String(p.id));
+                        }
+                    }
+                }
+
+                // 快取補完仍不足 → 用 Firestore 範圍查詢補足（不掃描全量）
+                // Firestore 不支援 contains，改做 name / phone / patientNumber 的 startsWith 範圍查詢
+                // 每個欄位各讀最多 limit 筆，遠低於全量掃描
+                if (results.length < limit) {
+                    const colRef2 = window.firebase.collection(window.firebase.db, 'patients');
+                    const rangeQueries = [];
+                    const termTrim = searchTerm.trim();
+                    // 名字開頭匹配（最常見搜尋）
+                    if (termTrim) {
+                        const safe = termTrim.toLowerCase();
+                        rangeQueries.push(
+                            window.firebase.firestoreQuery(
+                                colRef2,
+                                window.firebase.where('name', '>=', safe),
+                                window.firebase.where('name', '<=', safe + '\uf8ff'),
+                                window.firebase.limit(limit)
+                            )
+                        );
+                        // 病人編號開頭匹配（支援搜尋 P000001 格式）
+                        rangeQueries.push(
+                            window.firebase.firestoreQuery(
+                                colRef2,
+                                window.firebase.where('patientNumber', '>=', safe),
+                                window.firebase.where('patientNumber', '<=', safe + '\uf8ff'),
+                                window.firebase.limit(limit)
+                            )
+                        );
+                        // 電話號碼開頭匹配
+                        rangeQueries.push(
+                            window.firebase.firestoreQuery(
+                                colRef2,
+                                window.firebase.where('phone', '>=', safe),
+                                window.firebase.where('phone', '<=', safe + '\uf8ff'),
+                                window.firebase.limit(limit)
+                            )
+                        );
+                    }
+                    // 逐個範圍查詢，有一個找到足夠結果就停
+                    for (const rq of rangeQueries) {
+                        if (results.length >= limit) break;
+                        try {
+                            const snap = await window.firebase.getDocs(rq);
+                            snap.forEach(doc => {
+                                if (results.length >= limit) return;
+                                const p = { id: doc.id, ...doc.data() };
+                                if (seen.has(String(p.id))) return;
+                                results.push(p);
+                                seen.add(String(p.id));
+                            });
+                        } catch (_rqErr) {
+                            // 單個欄位可能沒有 index（例如 phone 有 index 但 name 沒有），跳過即可
                         }
                     }
                 }
