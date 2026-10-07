@@ -514,14 +514,18 @@ export async function attachPatientListListener() {
                     } catch (_e) {}
 
                     const pager = G.consultationHistoryPager;
-                    // 4. 刷新「已開啟該 pid 病歷彈窗」的 pager + 內容 DOM
+                    // 4. 無條件清除 pager 快取：確保之後打開病歷時 ensurePatientState
+                    //    不會因 state.countReady=true 而返回過期的總數與索引。
+                    if (pager && typeof pager.clearPatientCache === 'function') {
+                        pager.clearPatientCache(pid);
+                    }
+                    // 5. 若該病人的病歷彈窗已開啟，同步刷新 DOM 內容
                     if (pager) {
                         const tryRefresh = (ctx, modalId, getPidFn) => {
                             try {
                                 const modal = document.getElementById(modalId);
                                 if (!modal || modal.classList.contains('hidden')) return;
                                 if (String(getPidFn() || '') !== pid) return;
-                                if (typeof pager.clearPatientCache === 'function') pager.clearPatientCache(pid);
                                 const contentId = ctx === 'patient' ? 'patientMedicalHistoryContent' : 'medicalHistoryContent';
                                 if (typeof pager.loadForContext === 'function') {
                                     pager.loadForContext(ctx, pid, { contentId, forceRefresh: true });
@@ -531,7 +535,7 @@ export async function attachPatientListListener() {
                         tryRefresh('patient', 'patientMedicalHistoryModal', () => G.currentPatientHistoryPatientId);
                         tryRefresh('consultation', 'medicalHistoryModal', () => G.currentConsultationHistoryPatientId);
                     }
-                    // 5. 如果病人詳情面板正開啟且顯示的就是這個病人，一併刷新診療摘要
+                    // 6. 如果病人詳情面板正開啟且顯示的就是這個病人，一併刷新診療摘要
                     try {
                         const detailModal = document.getElementById('patientDetailModal');
                         const panelOpen = detailModal && !detailModal.classList.contains('hidden');
