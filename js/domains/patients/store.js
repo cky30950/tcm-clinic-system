@@ -132,9 +132,12 @@ export async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
         let q = window.firebase.firestoreQuery(
             window.firebase.collection(window.firebase.db, 'patients'),
             window.firebase.orderBy('patientNumber', 'desc'),
-            window.firebase.orderBy(window.firebase.documentId(), 'desc'),
-            window.firebase.limit(pageSize),
         );
+        // 如果 documentId FieldPath 可用，加入穩定次排序；不可用時退回單一排序
+        if (window.firebase.documentId) {
+            q = window.firebase.firestoreQuery(q, window.firebase.orderBy(window.firebase.documentId, 'desc'));
+        }
+        q = window.firebase.firestoreQuery(q, window.firebase.limit(pageSize));
         
         if (pageNumber > 1) {
             const prevCursor = G.patientPageCursors[pageNumber - 1];
@@ -190,9 +193,11 @@ export async function fetchPatientsPageAsc(ascPageNumber = 1, forceRefresh = fal
         let q = window.firebase.firestoreQuery(
             window.firebase.collection(window.firebase.db, 'patients'),
             window.firebase.orderBy('patientNumber', 'asc'),
-            window.firebase.orderBy(window.firebase.documentId(), 'asc'),
-            window.firebase.limit(pageSize),
         );
+        if (window.firebase.documentId) {
+            q = window.firebase.firestoreQuery(q, window.firebase.orderBy(window.firebase.documentId, 'asc'));
+        }
+        q = window.firebase.firestoreQuery(q, window.firebase.limit(pageSize));
         if (ascPageNumber > 1) {
             const prevCursor = G.patientAscPageCursors[ascPageNumber - 1];
             if (prevCursor) {

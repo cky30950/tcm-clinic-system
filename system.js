@@ -6537,10 +6537,13 @@ async function generatePatientNumberFromFirebase() {
         const counterRef = window.firebase.doc(window.firebase.db, 'systemCounters', 'patientNumber');
         let bootstrapMax = 0;
         try {
+            const orderParts = [window.firebase.orderBy('patientNumber', 'desc')];
+            if (window.firebase.documentId) {
+                orderParts.push(window.firebase.orderBy(window.firebase.documentId, 'desc'));
+            }
             const latestQuery = window.firebase.firestoreQuery(
                 window.firebase.collection(window.firebase.db, 'patients'),
-                window.firebase.orderBy('patientNumber', 'desc'),
-                window.firebase.orderBy(window.firebase.documentId(), 'desc'),
+                ...orderParts,
                 window.firebase.limit(1)
             );
             const latestSnap = await window.firebase.getDocs(latestQuery);

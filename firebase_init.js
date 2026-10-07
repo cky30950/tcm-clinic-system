@@ -177,7 +177,30 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         writeBatch: trackedWriteBatch,
         
         FieldPath,
-        documentId: () => FieldPath.documentId(),
+        // documentId 是特殊 FieldPath，代表 document 的 __name__ 欄位
+        // 不同 SDK 版本暴露方式不同：有些是靜態 getter（直接讀屬性），
+        // 有些是函數（要調用）。這裡用 try-catch 偵測當前版本的正確用法。
+        documentId: (() => {
+            try {
+                // Firebase v12 getter：FieldPath.documentId 返回 FieldPath('__name__') 物件
+                const v = FieldPath.documentId;
+                console.log('[firestore] FieldPath.documentId 類型:', typeof v, v && typeof v === 'object' ? '(FieldPath 物件)' : '');
+                if (v && typeof v === 'object') return v;
+            } catch (_e) { console.warn('[firestore] FieldPath.documentId getter 失敗:', _e.message); }
+            try {
+                // fallback: 某些版本是函數
+                if (typeof FieldPath.documentId === 'function') return FieldPath.documentId();
+            } catch (_e) { console.warn('[firestore] FieldPath.documentId() 失敗:', _e.message); }
+            try {
+                // 最終 fallback: 手動 new FieldPath('__name__')
+                const v = new FieldPath('__name__');
+                console.log('[firestore] fallback 到 new FieldPath("__name__") 成功');
+                return v;
+            } catch (_e) {
+                console.error('[firestore] 無法獲取 documentId FieldPath:', _e.message);
+                return null;
+            }
+        })(),
         FieldValue,
         increment: firestoreIncrement,
 
