@@ -323,6 +323,12 @@ import { printAttendanceCertificate, printConsultationRecord, printPrescriptionI
             return;
         }
             
+        // 清除 pager 快取，確保跨裝置撤回/新增診症後能拿到最新數據
+        // （meta 通知路徑僅負責已開啟彈窗的即時刷新，這裡的快取清除兜住未開啟時的場景）
+        if (G.consultationHistoryPager && typeof G.consultationHistoryPager.clearPatientCache === 'function') {
+            G.consultationHistoryPager.clearPatientCache(patientId);
+        }
+            
         // 透過共用 pager 載入並同步狀態
         const consultationResult = await G.consultationHistoryPager.loadForContext('patient', patientId);
         if (!consultationResult.success) {
@@ -906,6 +912,11 @@ export async function viewPatientMedicalHistory(patientId) {
             G.showToast('找不到病人資料', 'error');
             if (modal) modal.classList.add('hidden');
             return;
+        }
+        
+        // 清除 pager 快取，確保跨裝置撤回/新增診症後能拿到最新數據
+        if (G.consultationHistoryPager && typeof G.consultationHistoryPager.clearPatientCache === 'function') {
+            G.consultationHistoryPager.clearPatientCache(patientId);
         }
         
         // 透過共用 pager 載入並同步狀態
