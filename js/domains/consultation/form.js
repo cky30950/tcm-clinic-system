@@ -918,6 +918,10 @@ import { restorePackageUseMeta, undoPackageUse } from '../billing/packages.js';
             );
             
             if (existingMedicineFeeIndex !== -1) {
+                // 如果藥費天數沒有變化，不更新也不顯示通知
+                if (G.selectedBillingItems[existingMedicineFeeIndex].quantity === days) {
+                    return;
+                }
                 // 更新現有藥費項目的數量為天數
                 G.selectedBillingItems[existingMedicineFeeIndex].quantity = days;
                 updateBillingDisplay();
