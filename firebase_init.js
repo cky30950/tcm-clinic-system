@@ -177,7 +177,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         writeBatch: trackedWriteBatch,
         
         FieldPath,
-        documentId: FieldPath.documentId,
+        documentId: () => FieldPath.documentId(),
         FieldValue,
         increment: firestoreIncrement,
 
