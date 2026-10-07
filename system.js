@@ -1958,6 +1958,32 @@ const consultationHistoryPager = {
         try { detachPatientConsultationsListener(pid); } catch (_e) {}
         ctx.setPatientId(null);
     },
+    /**
+     * 開啟病歷彈窗前的新穎度把關（取代「每次點擊都無條件清快取」）：
+     * 只跑 1 次 count 查詢與快取總數比對——計數不變就直接沿用快取（0 次文件讀取），
+     * 計數有變（遠端撤回／新增／刪除必改變計數）才清快取重讀。
+     * count 查詢按索引條數計費（每 1000 筆 1 read、最低 1 read），成本恒定。
+     * 比對失敗時保守清除快取，維持與舊行為（無條件清除）相同的新鮮度保證。
+     */
+    async ensureFreshByCount(patientId) {
+        const pid = String(patientId || '');
+        if (!pid) return;
+        const state = this.getCachedPatientState(pid);
+        // 沒有可比對的快取：交由 ensurePatientState 正常初始化（本來就會跑 count）
+        if (!state || !state.countReady) return;
+        try {
+            await waitForFirebaseDb();
+            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+            const q = window.firebase.firestoreQuery(colRef, window.firebase.where('patientId', '==', pid));
+            const countSnap = await window.firebase.getCountFromServer(q);
+            const fresh = Number(countSnap && countSnap.data && countSnap.data().count) || 0;
+            if (fresh !== state.totalCount) {
+                this.clearPatientCache(pid);
+            }
+        } catch (_e) {
+            this.clearPatientCache(pid);
+        }
+    },
     /** 清除指定病人的 pager 快取（由 patientsMeta/consultation 遠端事件觸發） */
     clearPatientCache(patientId) {
         const pid = String(patientId || '');

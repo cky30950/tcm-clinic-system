@@ -323,12 +323,12 @@ import { printAttendanceCertificate, printConsultationRecord, printPrescriptionI
             return;
         }
             
-        // 清除 pager 快取，確保跨裝置撤回/新增診症後能拿到最新數據
-        // （meta 通知路徑僅負責已開啟彈窗的即時刷新，這裡的快取清除兜住未開啟時的場景）
-        if (G.consultationHistoryPager && typeof G.consultationHistoryPager.clearPatientCache === 'function') {
-            G.consultationHistoryPager.clearPatientCache(patientId);
+        // 新穎度把關：以 1 次 count 查詢與快取總數比對，計數有變（跨裝置撤回/新增/刪除）才清快取重讀；
+        // 計數不變則直接沿用快取（0 次文件讀取）。推送層（patientsMeta）仍負責已開啟彈窗的即時刷新。
+        if (G.consultationHistoryPager && typeof G.consultationHistoryPager.ensureFreshByCount === 'function') {
+            await G.consultationHistoryPager.ensureFreshByCount(patientId);
         }
-            
+
         // 透過共用 pager 載入並同步狀態
         const consultationResult = await G.consultationHistoryPager.loadForContext('patient', patientId);
         if (!consultationResult.success) {
@@ -914,9 +914,10 @@ export async function viewPatientMedicalHistory(patientId) {
             return;
         }
         
-        // 清除 pager 快取，確保跨裝置撤回/新增診症後能拿到最新數據
-        if (G.consultationHistoryPager && typeof G.consultationHistoryPager.clearPatientCache === 'function') {
-            G.consultationHistoryPager.clearPatientCache(patientId);
+        // 新穎度把關：以 1 次 count 查詢與快取總數比對，計數有變（跨裝置撤回/新增/刪除）才清快取重讀；
+        // 計數不變則直接沿用快取（0 次文件讀取）。推送層（patientsMeta）仍負責已開啟彈窗的即時刷新。
+        if (G.consultationHistoryPager && typeof G.consultationHistoryPager.ensureFreshByCount === 'function') {
+            await G.consultationHistoryPager.ensureFreshByCount(patientId);
         }
         
         // 透過共用 pager 載入並同步狀態
