@@ -366,8 +366,9 @@ export async function withdrawConsultation(appointmentId) {
         );
         // 觸發 patientsMeta 通知其他裝置；kind:'consultation' 會額外刷新病歷彈窗
         const retractPid = String(appointment?.patientId || consultation?.patientId || '');
+        console.log('[meta-debug] withdrawConsultation pid:', retractPid, 'has nonce:', typeof G.newSelfMetaNonce === 'function');
         if (retractPid) {
-            try { await touchPatientsMeta('delete', retractPid, { kind: 'consultation', nonce: (typeof G.newSelfMetaNonce === 'function') ? G.newSelfMetaNonce() : undefined }); } catch (_e) {}
+            try { await touchPatientsMeta('delete', retractPid, { kind: 'consultation', nonce: (typeof G.newSelfMetaNonce === 'function') ? G.newSelfMetaNonce() : undefined }); console.log('[meta-debug] touchPatientsMeta OK for withdraw'); } catch (_e) { console.error('[meta-debug] touchPatientsMeta FAILED for withdraw:', _e); }
         }
         // 從本地集合中移除該診症記錄
         const consultationIndex = G.consultations.findIndex(
