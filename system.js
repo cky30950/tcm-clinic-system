@@ -21841,6 +21841,20 @@ function hideGlobalCopyright() {
    * @param {Set<string>} existingSet 已存在於備註中的穴位名稱集合
    */
   function initAcupointSelectionMapForNotes(containerId, selectedNames, existingSet) {
+    // 確保 Leaflet 已載入（lazy-load）
+    if (typeof window.L === 'undefined') {
+      if (window.TCMLazy) {
+        window.TCMLazy.load('leaflet').then(function () {
+          initAcupointSelectionMapForNotes(containerId, selectedNames, existingSet);
+        }).catch(function (err) {
+          console.error('[AcupointMap] Leaflet 載入失敗:', err);
+        });
+      } else {
+        console.error('[AcupointMap] TCMLazy 不存在，無法載入 Leaflet');
+      }
+      return;
+    }
+
     try {
       const container = document.getElementById(containerId);
       if (!container) return;
