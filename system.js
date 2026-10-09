@@ -10124,13 +10124,22 @@ class FirebaseDataManager {
         // 在此版本沒有靜態 increment 方法。如果 increment 不可用，說明
         // firebase_init.js 可能被 Service Worker 快取了舊版本。
         const increment = window.firebase && window.firebase.increment;
+
+        // 先生成 meta——不依賴 increment，確保即使 increment 不可用時
+        // 跨裝置的 patientsMeta 通知仍能正常寫入。
+        const meta = pid ? {
+            timestamp: new Date(),
+            operation: (operation === 'add' || operation === 'delete') ? operation : 'update',
+            patientId: pid,
+            kind: 'consultation',
+            nonce: (typeof newSelfMetaNonce === 'function') ? newSelfMetaNonce() : undefined
+        } : null;
+
         if (typeof increment !== 'function') {
-            console.error('[聚合計畫] 雲端 increment 函數不可用！'
-                + ' 請強制刷新（Ctrl+F5）或清除瀏覽器快取。'
-                + ' 雲端模組鍵:', window.firebase ? Object.keys(window.firebase) : 'null');
-            // 靜默降級：返回空計畫，不中斷病歷保存主流程。
-            // 病人聚合統計會在下次 add/update 時被正確覆蓋。
-            return { patientOps: [], meta: null };
+            console.warn('[聚合計畫] increment 不可用（' + Object.keys(window.firebase || {}).length + ' keys），'
+                + '但 meta 仍會寫入以確保跨裝置同步。');
+            // increment 不可用時跳過病人聚合寫入，但 meta 已生成會正常寫入
+            return { patientOps: [], meta };
         }
 
         // 先處理舊病人（update 時病人 ID 變更的情況）
@@ -10169,17 +10178,7 @@ class FirebaseDataManager {
             patientOps.push({ pid, patch, cachePatch: patch });
         }
 
-        // patientsMeta/lastChange 全域通知旗標：同一文件於單一批次只能寫一次，
-        // 故聚合成一個最終 payload（舊路徑會連寫兩次，第二次覆蓋第一次）。
-        // 額外帶 kind:'consultation' 讓監聽器區分「病人基本資料變更」與「診症 CRUD」，
-        // 後者可額外觸發病歷彈窗的即時刷新。
-        const meta = pid ? {
-            timestamp: new Date(),
-            operation: (operation === 'add' || operation === 'delete') ? operation : 'update',
-            patientId: pid,
-            kind: 'consultation',
-            nonce: (typeof newSelfMetaNonce === 'function') ? newSelfMetaNonce() : undefined
-        } : null;
+        // meta 已在函數頂部生成，確保 increment 不可用時仍能寫入 patientsMeta
         return { patientOps, meta };
     }
 
