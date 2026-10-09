@@ -10129,8 +10129,6 @@ class FirebaseDataManager {
         } : null;
 
         if (typeof increment !== 'function') {
-            console.warn('[聚合計畫] increment 不可用（' + Object.keys(window.firebase || {}).length + ' keys），'
-                + '但 meta 仍會寫入以確保跨裝置同步。');
             // increment 不可用時跳過病人聚合寫入，但 meta 已生成會正常寫入
             return { patientOps: [], meta };
         }
@@ -12000,16 +11998,12 @@ class FirebaseDataManager {
                         aggregatePlan = this._buildPatientAggregatePlan(oldPid, 'update', null);
                     }
                     if (aggregatePlan) {
-                        console.log('[updateConsultation] aggregatePlan meta=', !!aggregatePlan.meta,
-                            aggregatePlan.meta ? ('kind=' + aggregatePlan.meta.kind + ' op=' + aggregatePlan.meta.operation) : 'null');
                         this._appendPatientAggregateToBatch(batch, aggregatePlan);
                     }
                 } catch (_planErr) {
                     console.warn('建構病人診症彙總計畫失敗:', _planErr);
                 }
-                console.log('[updateConsultation] 即將 batch.commit()，aggregatePlan=', !!aggregatePlan);
                 await batch.commit();
-                console.log('[updateConsultation] batch.commit() 完成');
                 if (aggregatePlan) {
                     this._applyPatientAggregatePlanCaches(aggregatePlan);
                 }
