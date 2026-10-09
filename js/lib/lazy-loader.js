@@ -25,15 +25,6 @@
         'js/vendor/xlsx/xlsx.full.min.js?v=20261005a'
     ], function () { return !!window.XLSX; });
 
-    define('chart.js', [
-        'https://cdn.jsdelivr.net/npm/chart.js'
-    ], function () { return !!window.Chart; });
-
-    define('tabulator', [
-        'js/vendor/tabulator/tabulator.min.css?v=20261005a',
-        'js/vendor/tabulator/tabulator.min.js?v=20261005a'
-    ], function () { return !!window.Tabulator; });
-
     define('qrcode', [
         'https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@04f46c6a0708418cb7b96fc563eacae0fbf77674/qrcode.min.js'
     ], function () { return !!window.QRCode; });
@@ -153,7 +144,7 @@
         } catch (_e) { return; }
         if (!hasAuth) return;
 
-        var WARMUP_TARGETS = ['xlsx', 'chart.js', 'tabulator', 'qrcode'];
+        var WARMUP_TARGETS = ['xlsx', 'qrcode'];
         var queue = WARMUP_TARGETS.slice();
 
         function warmupNext() {

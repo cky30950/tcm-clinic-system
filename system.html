@@ -160,11 +160,11 @@
     <script type="module" src="firebase_init.js?v=20261007a"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
-    <!-- Leaflet（穴位圖）：CSS 立即載入，JS 加 defer 不阻塞解析 -->
+    <!-- Leaflet（穴位圖）：恢復原始阻塞載入，確保 head 內聯代碼能同步使用 -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- 本地第三方 UI 插件（釘版本；SW 對同源 JS/CSS 採 network-first＋離線備援） -->
     <link rel="stylesheet" href="js/vendor/flatpickr/flatpickr.min.css?v=20261005a">
@@ -173,9 +173,9 @@
     <link rel="stylesheet" href="js/vendor/tabulator/tabulator.min.css?v=20261005a">
     <link rel="stylesheet" href="js/vendor/notiflix/notiflix.min.css?v=20261005a">
 
-    <script src="acupointIntegration.js" defer></script>
+    <script src="acupointIntegration.js"></script>
     
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
 
@@ -6214,14 +6214,18 @@
     <!-- Tailwind JIT safelist：按鈕標準化腳本動態加入的工具類 -->
     <span class="hidden rounded-md normal-case text-base btn-xs btn-sm btn-lg btn-ghost btn-circle"></span>
 
-    <!-- 延遲載入器：大庫（xlsx/leaflet/chart.js/tabulator/QRCode）改為用到才載入 -->
+    <!-- 延遲載入器：xlsx / qrcode 等真的少用的大庫 -->
     <script src="js/lib/lazy-loader.js?v=20261009a" defer></script>
 
-    <!-- 本地第三方插件（釘版本；全部 defer，按此順序在 app.js/system.js 前就緒） -->
+    <!-- chart.js + tabulator：恢復首屏載入（在 body 底部，DOM 快結束了） -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- 本地第三方插件（釘版本；tabulator 已恢復首屏載入；全部 defer，按此順序在 app.js/system.js 前就緒） -->
     <script src="js/vendor/dompurify/purify.min.js?v=20261005a" defer></script>
     <script src="js/vendor/flatpickr/flatpickr.min.js?v=20261005a" defer></script>
     <script src="js/vendor/flatpickr/monthSelect.js?v=20261005a" defer></script>
     <script src="js/vendor/tom-select/tom-select.complete.min.js?v=20261005a" defer></script>
+    <script src="js/vendor/tabulator/tabulator.min.js?v=20261005a" defer></script>
     <script src="js/vendor/notiflix/notiflix.min.js?v=20261005a" defer></script>
     <script src="js/lib/vendor-enhance.js?v=20261005d" defer></script>
 
