@@ -369,7 +369,7 @@ export async function withdrawConsultation(appointmentId) {
         if (retractPid) {
             try { await touchPatientsMeta('delete', retractPid, { kind: 'consultation', nonce: (typeof G.newSelfMetaNonce === 'function') ? G.newSelfMetaNonce() : undefined }); } catch (_e) {}
             // 本地 CRUD 後主動刷新已開啟的病歷彈窗與病人詳情面板
-            try { refreshOpenConsultationHistory(retractPid); } catch (_refreshErr) {}
+            try { refreshOpenConsultationHistory(retractPid, 'delete'); } catch (_refreshErr) {}
         }
         // 從本地集合中移除該診症記錄
         const consultationIndex = G.consultations.findIndex(

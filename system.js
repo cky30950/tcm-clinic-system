@@ -10947,7 +10947,7 @@ class FirebaseDataManager {
             try {
                 const rcPid = String(consultationData && consultationData.patientId || '');
                 if (rcPid && typeof window.refreshOpenConsultationHistory === 'function') {
-                    window.refreshOpenConsultationHistory(rcPid);
+                    window.refreshOpenConsultationHistory(rcPid, 'add');
                 }
             } catch (_e5) {}
             return { success: true, id: consRef.id };
@@ -12084,7 +12084,7 @@ class FirebaseDataManager {
                         .map((id) => String(id))
                 ));
                 if (typeof window.refreshOpenConsultationHistory === 'function') {
-                    affectedPatientIds.forEach((pid) => window.refreshOpenConsultationHistory(pid));
+                    affectedPatientIds.forEach((pid) => window.refreshOpenConsultationHistory(pid, 'update'));
                 }
             } catch (_e5) {}
             return { success: true };
@@ -12185,7 +12185,7 @@ class FirebaseDataManager {
             try {
                 const rcPid = String(existingRecord && existingRecord.patientId || '');
                 if (rcPid && typeof window.refreshOpenConsultationHistory === 'function') {
-                    window.refreshOpenConsultationHistory(rcPid);
+                    window.refreshOpenConsultationHistory(rcPid, 'delete');
                 }
             } catch (_e5) {}
             return { success: true };

@@ -465,8 +465,13 @@ export async function handleRemotePatientMetaChange(meta, metaTs) {
  *   - patientsMeta 監聽器收到遠端 consultation CRUD
  *   - 本地 consultation CRUD（add/update/retract）完成後
  * 兩者共用同一套快取失效與彈窗刷新邏輯。
+ *
+ * @param {string} patientId 病人 ID
+ * @param {'add'|'update'|'delete'|string} [operation] 操作類型：
+ *   - 'delete' 時會從全域 G.consultations 陣列移除該病人的記錄
+ *   - 'add' / 'update' 時跳過移除（記錄仍存在，只是新增或修改）
  */
-export function refreshOpenConsultationHistory(patientId) {
+export function refreshOpenConsultationHistory(patientId, operation) {
     const pid = String(patientId || '');
     if (!pid) return;
 
@@ -475,12 +480,15 @@ export function refreshOpenConsultationHistory(patientId) {
     // 2. 清除 localStorage 的該病人病歷快取
     try { localStorage.removeItem('patientConsultations:' + pid); } catch (_e) {}
     // 3. 從全域 consultations 陣列中移除屬於該病人的記錄，並同步到 localStorage
-    try {
-        if (Array.isArray(G.consultations)) {
-            G.consultations = G.consultations.filter(c => !(c && String(c.patientId || '') === pid));
-            try { localStorage.setItem('consultations', JSON.stringify(G.consultations)); } catch (_lsErr) {}
-        }
-    } catch (_e) {}
+    //    僅在 delete 時執行——add/update 時記錄仍存在，不能移除
+    if (operation === 'delete') {
+        try {
+            if (Array.isArray(G.consultations)) {
+                G.consultations = G.consultations.filter(c => !(c && String(c.patientId || '') === pid));
+                try { localStorage.setItem('consultations', JSON.stringify(G.consultations)); } catch (_lsErr) {}
+            }
+        } catch (_e) {}
+    }
 
     const pager = G.consultationHistoryPager;
     // 4. 無條件清除 pager 快取：確保之後打開病歷時 ensurePatientState
@@ -571,7 +579,8 @@ export async function attachPatientListListener() {
                 // 但 consultation 集合本身的快取（patientConsultationsCache、consultations 陣列）
                 // 不會自動失效，需在此主動清除，否則稍後開啟病歷彈窗時會吃到已被撤回的舊記錄。
                 if (metaData.kind === 'consultation' && metaData.patientId) {
-                    refreshOpenConsultationHistory(metaData.patientId);
+                    console.log('[patientsMeta] 收到 consultation 變更，operation=', metaData.operation, 'patientId=', metaData.patientId);
+                    refreshOpenConsultationHistory(metaData.patientId, metaData.operation);
                 }
             } catch (innerErr) {
                 console.error('病人資料即時更新處理失敗:', innerErr);
