@@ -12,10 +12,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="名醫診所">
     <link rel="apple-touch-icon" href="/images/icons/apple-touch-icon.png">
+    <!-- Tailwind CSS v4 預編譯靜態 CSS（取代 browser CDN 即時編譯器，消除手機端 CPU 掃描） -->
+    <link rel="stylesheet" href="/css/tailwind.css?v=20261009a">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.7.47/daisyui.css">
     <!-- daisyUI 5 全套 35 個內建主題（本地釘版本，配合帳號安全設定內的主題切換器） -->
     <link rel="stylesheet" href="js/vendor/daisyui/themes.css?v=20261006a">
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script>
         /* 主題偏好（只存本裝置 localStorage）：喺首次繪製前套用 data-theme，避免畫面閃一下預設色。
            無偏好時唔加 data-theme，保留品牌橙啡 token。 */
