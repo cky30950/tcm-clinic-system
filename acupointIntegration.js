@@ -1218,7 +1218,7 @@
             mapContainer.dataset.initialized = 'true';
             
             const img = new Image();
-            img.src = 'images/combined_three.png';
+            img.src = 'images/combined_three.webp';
             img.onload = function() {
                 applyAcupointCoordinates();
                 
