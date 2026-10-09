@@ -1325,6 +1325,12 @@ export async function loadConsultationForEdit(consultationId) {
             // 載入處方內容
             // 確保中藥庫已載入，避免 updatePrescriptionDisplay 因 G.herbLibrary 為空而出現不穩定行為
             try { if (typeof G.initHerbLibrary === 'function') await G.initHerbLibrary(); } catch (_e) {}
+            // 保護性重試：如果 loaded flag 已設但陣列仍為空（例如 localStorage 存了空陣列），
+            // 強制重跑一次 init，確保拿到真實資料
+            try {
+                const hlEmpty = !Array.isArray(G.herbLibrary) || G.herbLibrary.length === 0;
+                if (hlEmpty && typeof G.initHerbLibrary === 'function') await G.initHerbLibrary(true);
+            } catch (_e) {}
             try {
                 if (consultation.multiPrescriptions) {
                     const mp = JSON.parse(consultation.multiPrescriptions);
@@ -1417,6 +1423,11 @@ export async function loadConsultationForEdit(consultationId) {
             // 確保收費項目庫已載入，否則 G.billingItems.find 全部返回 null，所有收費項目的 name/價格/類別等
             // 都只能靠 raw fallback，若 raw 也缺 name 則會被 filter(item => item && item.name) 過濾掉 → 顯示空白
             try { if (typeof G.initBillingItems === 'function') await G.initBillingItems(); } catch (_e) {}
+            // 保護性重試：如果 init 完畢但 G.billingItems 仍為空，強制從 Firestore 重抓一次
+            try {
+                const biEmpty = !Array.isArray(G.billingItems) || G.billingItems.length === 0;
+                if (biEmpty && typeof G.initBillingItems === 'function') await G.initBillingItems(true);
+            } catch (_e) {}
             G.selectedBillingItems = [];
             try {
             if (consultation.billingItemsStructured) {

@@ -5338,7 +5338,12 @@ async function recordInventoryHistory(type, entries, extra = {}) {
         async function initHerbLibrary(forceRefresh = false) {
             
             if (herbLibraryLoaded && !forceRefresh) {
-                return;
+                // loaded=true 但陣列為空（可能是之前 JSON 返回空物件），強制重試
+                if (!Array.isArray(herbLibrary) || herbLibrary.length === 0) {
+                    herbLibraryLoaded = false;
+                } else {
+                    return;
+                }
             }
             
             try {
@@ -5347,7 +5352,12 @@ async function recordInventoryHistory(type, entries, extra = {}) {
                 const herbList = Array.isArray(herbData.herbLibrary) ? herbData.herbLibrary : [];
                 const formulaList = Array.isArray(formulaData.herbLibrary) ? formulaData.herbLibrary : [];
                 herbLibrary = [...herbList, ...formulaList];
-                herbLibraryLoaded = true;
+                // 只有真正拿到資料才設 loaded=true，避免返回空陣列後永遠不重試
+                if (herbLibrary.length > 0) {
+                    herbLibraryLoaded = true;
+                } else {
+                    console.warn('initHerbLibrary 載入失敗：JSON 中找不到有效資料');
+                }
             } catch (error) {
                 console.error('讀取本地 JSON 中藥庫資料失敗:', error);
             }

@@ -231,8 +231,13 @@ export async function ensureBillingItemsRealtimeSync() {
 
 export async function initBillingItems(forceRefresh = false) {
     if (G.billingItemsLoaded && !forceRefresh) {
-        try { await ensureBillingItemsRealtimeSync(); } catch (_syncErr) {}
-        return;
+        // loaded=true 但陣列為空（可能是之前 localStorage 存了空陣列），強制重跑
+        if (Array.isArray(G.billingItems) && G.billingItems.length === 0) {
+            G.billingItemsLoaded = false;
+        } else {
+            try { await ensureBillingItemsRealtimeSync(); } catch (_syncErr) {}
+            return;
+        }
     }
     // 非強制刷新：先嘗試 localStorage 快取 → 成功則只掛監聽，不再 getDocs
     if (!forceRefresh) {
@@ -242,7 +247,7 @@ export async function initBillingItems(forceRefresh = false) {
             const clinicId = localStorage.getItem('currentClinicId') || (typeof G.currentClinicId !== 'undefined' ? G.currentClinicId : 'local-default');
             if (stored && isBootstrapFresh(bsMeta) && String(bsMeta.cid || '') === String(clinicId)) {
                 const localData = JSON.parse(stored);
-                if (Array.isArray(localData)) {
+                if (Array.isArray(localData) && localData.length > 0) {
                     G.billingItems = localData;
                     G.billingItemsLoaded = true;
                     // 重建兩個 Map（避免 remote patch 時 map 為空）
