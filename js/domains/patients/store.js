@@ -459,6 +459,77 @@ export async function handleRemotePatientMetaChange(meta, metaTs) {
     }
 }
 
+/**
+ * 清除指定病人的所有病歷快取層，並在該病人的病歷彈窗／病人詳情面板
+ * 已開啟時即時重載與刷新 DOM。供：
+ *   - patientsMeta 監聽器收到遠端 consultation CRUD
+ *   - 本地 consultation CRUD（add/update/retract）完成後
+ * 兩者共用同一套快取失效與彈窗刷新邏輯。
+ */
+export function refreshOpenConsultationHistory(patientId) {
+    const pid = String(patientId || '');
+    if (!pid) return;
+
+    // 1. 清除單筆病人診症快取
+    try { delete G.patientConsultationsCache[pid]; } catch (_e) {}
+    // 2. 清除 localStorage 的該病人病歷快取
+    try { localStorage.removeItem('patientConsultations:' + pid); } catch (_e) {}
+    // 3. 從全域 consultations 陣列中移除屬於該病人的記錄，並同步到 localStorage
+    try {
+        if (Array.isArray(G.consultations)) {
+            G.consultations = G.consultations.filter(c => !(c && String(c.patientId || '') === pid));
+            try { localStorage.setItem('consultations', JSON.stringify(G.consultations)); } catch (_lsErr) {}
+        }
+    } catch (_e) {}
+
+    const pager = G.consultationHistoryPager;
+    // 4. 無條件清除 pager 快取：確保之後打開病歷時 ensurePatientState
+    //    不會因 state.countReady=true 而返回過期的總數與索引。
+    if (pager && typeof pager.clearPatientCache === 'function') {
+        pager.clearPatientCache(pid);
+    }
+
+    // 5. 若該病人的病歷彈窗已開啟，清除 pager 快取後重載 state 並刷新 DOM
+    if (pager) {
+        const tryRefresh = async (ctx, modalId, getPidFn) => {
+            try {
+                const modal = document.getElementById(modalId);
+                if (!modal || modal.classList.contains('hidden')) return;
+                if (String(getPidFn() || '') !== pid) return;
+                // 先清快取，確保 loadForContext 重建 state 時拿到的是最新數據
+                if (typeof pager.clearPatientCache === 'function') {
+                    pager.clearPatientCache(pid);
+                }
+                if (typeof pager.loadForContext === 'function') {
+                    await pager.loadForContext(ctx, pid);
+                }
+                // loadForContext 只更新了 state + context 陣列，DOM 需手動刷新
+                if (ctx === 'patient') {
+                    if (typeof G.displayPatientMedicalHistoryPage === 'function') {
+                        G.displayPatientMedicalHistoryPage();
+                    }
+                } else {
+                    if (typeof G.displayConsultationMedicalHistoryPage === 'function') {
+                        G.displayConsultationMedicalHistoryPage();
+                    }
+                }
+            } catch (_e) {}
+        };
+        tryRefresh('patient', 'patientMedicalHistoryModal', () => G.currentPatientHistoryPatientId);
+        tryRefresh('consultation', 'medicalHistoryModal', () => G.currentConsultationHistoryPatientId);
+    }
+
+    // 6. 如果病人詳情面板正開啟且顯示的就是這個病人，一併刷新診療摘要
+    try {
+        const detailModal = document.getElementById('patientDetailModal');
+        const panelOpen = detailModal && !detailModal.classList.contains('hidden');
+        const samePatient = String(G.patientDetailClinicState && G.patientDetailClinicState.patientId || '') === pid;
+        if (panelOpen && samePatient && typeof G.loadPatientConsultationSummary === 'function') {
+            G.loadPatientConsultationSummary(pid).catch(() => {});
+        }
+    } catch (_e) {}
+}
+
 export async function attachPatientListListener() {
     try {
 
@@ -500,63 +571,7 @@ export async function attachPatientListListener() {
                 // 但 consultation 集合本身的快取（patientConsultationsCache、consultations 陣列）
                 // 不會自動失效，需在此主動清除，否則稍後開啟病歷彈窗時會吃到已被撤回的舊記錄。
                 if (metaData.kind === 'consultation' && metaData.patientId) {
-                    const pid = String(metaData.patientId);
-                    // 1. 清除單筆病人診症快取（被 detach 時會觸發 onSnapshot 重讀，但快取 map 本身要先清）
-                    try { delete G.patientConsultationsCache[pid]; } catch (_e) {}
-                    // 2. 清除 localStorage 的該病人病歷快取
-                    try { localStorage.removeItem('patientConsultations:' + pid); } catch (_e) {}
-                    // 3. 從全域 consultations 陣列中移除屬於該病人的記錄，並同步到 localStorage
-                    try {
-                        if (Array.isArray(G.consultations)) {
-                            G.consultations = G.consultations.filter(c => !(c && String(c.patientId || '') === pid));
-                            try { localStorage.setItem('consultations', JSON.stringify(G.consultations)); } catch (_lsErr) {}
-                        }
-                    } catch (_e) {}
-
-                    const pager = G.consultationHistoryPager;
-                    // 4. 無條件清除 pager 快取：確保之後打開病歷時 ensurePatientState
-                    //    不會因 state.countReady=true 而返回過期的總數與索引。
-                    if (pager && typeof pager.clearPatientCache === 'function') {
-                        pager.clearPatientCache(pid);
-                    }
-                    // 5. 若該病人的病歷彈窗已開啟，清除 pager 快取後重載 state 並刷新 DOM
-                    if (pager) {
-                        const tryRefresh = async (ctx, modalId, getPidFn) => {
-                            try {
-                                const modal = document.getElementById(modalId);
-                                if (!modal || modal.classList.contains('hidden')) return;
-                                if (String(getPidFn() || '') !== pid) return;
-                                // 先清快取，確保 loadForContext 重建 state 時拿到的是最新數據
-                                if (typeof pager.clearPatientCache === 'function') {
-                                    pager.clearPatientCache(pid);
-                                }
-                                if (typeof pager.loadForContext === 'function') {
-                                    await pager.loadForContext(ctx, pid);
-                                }
-                                // loadForContext 只更新了 state + context 陣列，DOM 需手動刷新
-                                if (ctx === 'patient') {
-                                    if (typeof G.displayPatientMedicalHistoryPage === 'function') {
-                                        G.displayPatientMedicalHistoryPage();
-                                    }
-                                } else {
-                                    if (typeof G.displayConsultationMedicalHistoryPage === 'function') {
-                                        G.displayConsultationMedicalHistoryPage();
-                                    }
-                                }
-                            } catch (_e) {}
-                        };
-                        tryRefresh('patient', 'patientMedicalHistoryModal', () => G.currentPatientHistoryPatientId);
-                        tryRefresh('consultation', 'medicalHistoryModal', () => G.currentConsultationHistoryPatientId);
-                    }
-                    // 6. 如果病人詳情面板正開啟且顯示的就是這個病人，一併刷新診療摘要
-                    try {
-                        const detailModal = document.getElementById('patientDetailModal');
-                        const panelOpen = detailModal && !detailModal.classList.contains('hidden');
-                        const samePatient = String(G.patientDetailClinicState && G.patientDetailClinicState.patientId || '') === pid;
-                        if (panelOpen && samePatient && typeof G.loadPatientConsultationSummary === 'function') {
-                            G.loadPatientConsultationSummary(pid).catch(() => {});
-                        }
-                    } catch (_e) {}
+                    refreshOpenConsultationHistory(metaData.patientId);
                 }
             } catch (innerErr) {
                 console.error('病人資料即時更新處理失敗:', innerErr);

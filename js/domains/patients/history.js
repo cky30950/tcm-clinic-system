@@ -323,13 +323,11 @@ import { printAttendanceCertificate, printConsultationRecord, printPrescriptionI
             return;
         }
             
-        // 新穎度把關：以 1 次 count 查詢與快取總數比對，計數有變（跨裝置撤回/新增/刪除）才清快取重讀；
-        // 計數不變則直接沿用快取（0 次文件讀取）。推送層（patientsMeta）仍負責已開啟彈窗的即時刷新。
-        if (G.consultationHistoryPager && typeof G.consultationHistoryPager.ensureFreshByCount === 'function') {
-            await G.consultationHistoryPager.ensureFreshByCount(patientId);
-        }
-
         // 透過共用 pager 載入並同步狀態
+        // 快取失效由三層保證：
+        //   1. 本地 consultation CRUD（add/update/retract）後主動呼叫 refreshOpenConsultationHistory
+        //   2. 跨裝置 patientsMeta/lastChange 監聽器收到 kind:'consultation' 變更後自動清除
+        //   3. pager.loadForContext 在快取不存在時會自動初始化（count + 分頁讀取）
         const consultationResult = await G.consultationHistoryPager.loadForContext('patient', patientId);
         if (!consultationResult.success) {
             G.showToast('無法讀取診症記錄！', 'error');
@@ -914,13 +912,11 @@ export async function viewPatientMedicalHistory(patientId) {
             return;
         }
         
-        // 新穎度把關：以 1 次 count 查詢與快取總數比對，計數有變（跨裝置撤回/新增/刪除）才清快取重讀；
-        // 計數不變則直接沿用快取（0 次文件讀取）。推送層（patientsMeta）仍負責已開啟彈窗的即時刷新。
-        if (G.consultationHistoryPager && typeof G.consultationHistoryPager.ensureFreshByCount === 'function') {
-            await G.consultationHistoryPager.ensureFreshByCount(patientId);
-        }
-        
         // 透過共用 pager 載入並同步狀態
+        // 快取失效由三層保證：
+        //   1. 本地 consultation CRUD（add/update/retract）後主動呼叫 refreshOpenConsultationHistory
+        //   2. 跨裝置 patientsMeta/lastChange 監聽器收到 kind:'consultation' 變更後自動清除
+        //   3. pager.loadForContext 在快取不存在時會自動初始化（count + 分頁讀取）
         const consultationResult = await G.consultationHistoryPager.loadForContext('consultation', patientId);
         if (!consultationResult.success) {
             G.showToast('無法讀取診症記錄', 'error');

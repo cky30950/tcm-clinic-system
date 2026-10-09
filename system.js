@@ -10943,6 +10943,13 @@ class FirebaseDataManager {
                     }
                 } catch (_e4) {}
             }
+            // 本地 CRUD 後主動刷新已開啟的病歷彈窗與病人詳情面板
+            try {
+                const rcPid = String(consultationData && consultationData.patientId || '');
+                if (rcPid && typeof window.refreshOpenConsultationHistory === 'function') {
+                    window.refreshOpenConsultationHistory(rcPid);
+                }
+            } catch (_e5) {}
             return { success: true, id: consRef.id };
         } catch (error) {
             console.error('添加診症記錄失敗:', error);
@@ -12069,6 +12076,17 @@ class FirebaseDataManager {
                     }
                 } catch (_e4) {}
             }
+            // 本地 CRUD 後主動刷新已開啟的病歷彈窗與病人詳情面板
+            try {
+                const affectedPatientIds = Array.from(new Set(
+                    [existingRecord && existingRecord.patientId, consultationData && consultationData.patientId]
+                        .filter((id) => String(id || '').trim() !== '')
+                        .map((id) => String(id))
+                ));
+                if (typeof window.refreshOpenConsultationHistory === 'function') {
+                    affectedPatientIds.forEach((pid) => window.refreshOpenConsultationHistory(pid));
+                }
+            } catch (_e5) {}
             return { success: true };
         } catch (error) {
             console.error('更新診症記錄失敗:', error);
@@ -12163,6 +12181,13 @@ class FirebaseDataManager {
                     }
                 } catch (_e4) {}
             }
+            // 本地 CRUD 後主動刷新已開啟的病歷彈窗與病人詳情面板
+            try {
+                const rcPid = String(existingRecord && existingRecord.patientId || '');
+                if (rcPid && typeof window.refreshOpenConsultationHistory === 'function') {
+                    window.refreshOpenConsultationHistory(rcPid);
+                }
+            } catch (_e5) {}
             return { success: true };
         } catch (error) {
             console.error('刪除診症記錄失敗:', error);

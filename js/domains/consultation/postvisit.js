@@ -4,7 +4,7 @@
  * （Phase 6 子批 D2）。共享狀態經 G；套票/儲存/權限走 window facade。
  ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { touchPatientsMeta } from '../patients/store.js';
+import { touchPatientsMeta, refreshOpenConsultationHistory } from '../patients/store.js';
 
         export async function changeConsultationHistoryPage(direction, evt) {
             let loadingButton = null;
@@ -368,6 +368,8 @@ export async function withdrawConsultation(appointmentId) {
         const retractPid = String(appointment?.patientId || consultation?.patientId || '');
         if (retractPid) {
             try { await touchPatientsMeta('delete', retractPid, { kind: 'consultation', nonce: (typeof G.newSelfMetaNonce === 'function') ? G.newSelfMetaNonce() : undefined }); } catch (_e) {}
+            // 本地 CRUD 後主動刷新已開啟的病歷彈窗與病人詳情面板
+            try { refreshOpenConsultationHistory(retractPid); } catch (_refreshErr) {}
         }
         // 從本地集合中移除該診症記錄
         const consultationIndex = G.consultations.findIndex(

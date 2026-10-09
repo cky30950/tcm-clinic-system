@@ -25,6 +25,7 @@ export {
     invalidateAllPatientCaches,
     isPatientIdInFullCaches,
     handleRemotePatientMetaChange,
+    refreshOpenConsultationHistory,
     attachPatientListListener,
     detachPatientListListener,
     touchPatientsMeta,

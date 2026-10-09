@@ -134,6 +134,7 @@ const FACADE = {
     invalidateAllPatientCaches: Patients.invalidateAllPatientCaches,
     isPatientIdInFullCaches: Patients.isPatientIdInFullCaches,
     handleRemotePatientMetaChange: Patients.handleRemotePatientMetaChange,
+    refreshOpenConsultationHistory: Patients.refreshOpenConsultationHistory,
     attachPatientListListener: Patients.attachPatientListListener,
     detachPatientListListener: Patients.detachPatientListListener,
     touchPatientsMeta: Patients.touchPatientsMeta,
