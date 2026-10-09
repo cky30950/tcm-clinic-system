@@ -6169,13 +6169,6 @@ async function fetchJsonWithFallback(fileName) {
                     }
                 }
                 
-                if (id === 'patientManagement') {
-                    try {
-                        detachPatientListListener();
-                    } catch (err) {
-                        console.error('離開病人管理時取消病人監聽失敗:', err);
-                    }
-                }
                 if (id === 'medicalRecordManagement') {
                     try {
                         detachMedicalRecordListListener();
