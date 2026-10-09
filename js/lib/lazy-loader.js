@@ -5,9 +5,11 @@
  * 每個庫只會下載一次（Promise cache），後續請求直接複用。
  *
  * 使用方式：
- *   // 在任何 JS 中呼叫：
  *   await window.TCMLazy.load('xlsx');
  *   // 之後即可用 window.XLSX
+ *
+ * 注意：Leaflet 已改回 system.html <head> 載入（defer），
+ *       不在 lazy-loader 管理範圍內。
  * ============================================================ */
 
 (function () {
@@ -19,16 +21,9 @@
         LOADERS[name] = { urls: urls, test: test, promise: null };
     }
 
-    /* 各庫的 test 函數：檢查是否已存在於 window（可能已被其他腳本載入） */
-
     define('xlsx', [
         'js/vendor/xlsx/xlsx.full.min.js?v=20261005a'
     ], function () { return !!window.XLSX; });
-
-    define('leaflet', [
-        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-    ], function () { return !!window.L; });
 
     define('chart.js', [
         'https://cdn.jsdelivr.net/npm/chart.js'
@@ -63,7 +58,9 @@
         'js/vendor/dompurify/purify.min.js?v=20261005a'
     ], function () { return !!window.DOMPurify; });
 
-    /* 動態插入一個 <script> 或 <link> 標籤，回傳 Promise */
+    /* 插入一個 <script> 或 <link>，回傳 Promise
+     * 注意：<link rel=stylesheet>.onload 在 Safari 上不可靠，
+     * 所以對 CSS 加 3 秒 timeout fallback（不阻塞後續 JS 載入）*/
     function insert(url) {
         return new Promise(function (resolve, reject) {
             var isCss = /\.css(\?|$)/i.test(url);
@@ -75,18 +72,30 @@
             } else {
                 el = document.createElement('script');
                 el.src = url;
-                el.async = false; // 保持順序
+                el.async = false;
             }
-            el.onload = resolve;
-            el.onerror = function () {
-                reject(new Error('載入失敗: ' + url));
+            var done = false;
+            var timeout = setTimeout(function () {
+                if (!done) {
+                    done = true;
+                    // CSS 就算 onload 沒觸發也繼續（不阻塞）
+                    if (isCss) resolve();
+                    else reject(new Error('載入 timeout: ' + url));
+                }
+            }, isCss ? 3000 : 10000);
+
+            el.onload = function () {
+                if (!done) { done = true; clearTimeout(timeout); resolve(); }
             };
+            el.onerror = function () {
+                if (!done) { done = true; clearTimeout(timeout); reject(new Error('載入失敗: ' + url)); }
+            };
+
             var head = document.head || document.getElementsByTagName('head')[0];
             head.appendChild(el);
         });
     }
 
-    /* 主入口：載入指定庫名（可單一或陣列） */
     function load(names) {
         if (!names) return Promise.resolve();
         if (!Array.isArray(names)) names = [names];
@@ -96,15 +105,12 @@
             if (!cfg) {
                 return Promise.reject(new Error('未知的庫: ' + name));
             }
-            // 已載入
             if (cfg.test()) return Promise.resolve();
-            // 已在載入中
             if (cfg.promise) return cfg.promise;
 
             cfg.promise = cfg.urls.reduce(function (chain, url) {
                 return chain.then(function () { return insert(url); });
             }, Promise.resolve()).then(function () {
-                // 最後等一幀讓瀏覽器執行註冊到 window
                 return new Promise(function (r) { setTimeout(r, 10); });
             }).then(function () {
                 if (!cfg.test()) {
@@ -121,7 +127,6 @@
 
     window.TCMLazy = {
         load: load,
-        /* 方便 debug：列出所有庫的當前狀態 */
         status: function () {
             var result = {};
             Object.keys(LOADERS).forEach(function (n) {
@@ -132,36 +137,34 @@
         }
     };
 
-    /* ── 自動預熱：首屏載入完成後，在瀏覽器閒時間自動下載大庫到快取 ─────
-     *
-     * 策略：首屏只載入必要腳本 → 登入後 requestIdleCallback 一個一個載入
-     * 好處：首屏 4G 上少 ~400KB 即時下載 → 登入後幾秒就快取好
-     *       用戶真的點到財務報表/穴位圖時，從 SW cache-first 命中幾乎零延遲
-     */
+    /* ── 自動預熱：登入後，在瀏覽器閒時間自動下載大庫 ──────────────────── */
     function autoWarmup() {
-        // 只有登錄後（localStorage 有 uid）才預熱，遊客不需要
+        // 檢查登入狀態（Firebase Auth currentUser 存在即表示已登入）
+        var hasAuth = false;
         try {
-            var hasAuth = !!(localStorage.getItem('authUserUid') || localStorage.getItem('staffUid'));
-            if (!hasAuth) return;
-        } catch (e) { return; }
+            hasAuth = !!(window.firebase && window.firebase.auth && window.firebase.auth.currentUser);
+            // 備援：localStorage['users'] 有資料
+            if (!hasAuth && localStorage.getItem('users')) {
+                try {
+                    var users = JSON.parse(localStorage.getItem('users'));
+                    hasAuth = !!(users && Object.keys(users).length > 0);
+                } catch (_e) {}
+            }
+        } catch (_e) { return; }
+        if (!hasAuth) return;
 
-        var WARMUP_TARGETS = ['xlsx', 'chart.js', 'tabulator', 'qrcode', 'leaflet'];
+        var WARMUP_TARGETS = ['xlsx', 'chart.js', 'tabulator', 'qrcode'];
         var queue = WARMUP_TARGETS.slice();
 
         function warmupNext() {
             if (queue.length === 0) return;
             var name = queue.shift();
-            // 已載入就跳過
-            if (LOADERS[name].test()) {
-                warmupNext();
-                return;
-            }
+            if (LOADERS[name].test()) { warmupNext(); return; }
             load(name).then(function () {
-                // 下一個空閒時間再載下一個
                 scheduleIdle(warmupNext, 2000);
             }).catch(function () {
                 console.warn('[lazy-loader] 預熱失敗: ' + name);
-                scheduleIdle(warmupNext, 10000); // 失敗等久一點再試
+                scheduleIdle(warmupNext, 10000);
             });
         }
 
@@ -176,11 +179,10 @@
             if (delay) setTimeout(start, delay); else start();
         }
 
-        // 登入後 1-2 秒開始預熱
-        scheduleIdle(warmupNext, 1500);
+        // 登入後 2 秒開始預熱
+        scheduleIdle(warmupNext, 2000);
     }
 
-    // DOM 就緒後啟動
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', autoWarmup, { once: true });
     } else {

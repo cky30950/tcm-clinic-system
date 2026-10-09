@@ -162,7 +162,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" defer></script>
 
-    <!-- Leaflet（穴位圖）改為延遲載入，避免阻塞首屏 -->
+    <!-- Leaflet（穴位圖）：CSS 立即載入，JS 加 defer 不阻塞解析 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
     <!-- 本地第三方 UI 插件（釘版本；SW 對同源 JS/CSS 採 network-first＋離線備援） -->
     <link rel="stylesheet" href="js/vendor/flatpickr/flatpickr.min.css?v=20261005a">

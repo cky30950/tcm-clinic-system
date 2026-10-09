@@ -1209,17 +1209,8 @@
     }
 
     
-    window.initAcupointMap = async function() {
+    window.initAcupointMap = function() {
         try {
-            // 確保 Leaflet 已載入（lazy-load）
-            if (typeof window.L === 'undefined' && window.TCMLazy) {
-                await window.TCMLazy.load('leaflet');
-            }
-            if (typeof window.L === 'undefined') {
-                console.error('[AcupointMap] Leaflet 載入失敗');
-                return;
-            }
-
             const mapContainer = document.getElementById('acupointMap');
             if (!mapContainer || mapContainer.dataset.initialized) {
                 return;
