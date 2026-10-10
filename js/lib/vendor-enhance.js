@@ -215,14 +215,19 @@
         });
     }
     function scheduleScan(root) {
-        pendingNodes.push(root);
+        if (root && root.nodeType === 1 && root.querySelectorAll) {
+            // 只保留 document 作為唯一 root，下一個 rAF 再掃一次
+            // 避免多個 root 造成重複 querySelectorAll
+            pendingNodes.push(root);
+        }
         if (scanScheduled) return;
         scanScheduled = true;
-        // 微工作批次：同週期大量插入（分頁表格重建）只掃一次
-        Promise.resolve().then(function () {
+        // rAF debounce：跟其他三個 subtree observer（i18n / attachments /
+        // system.js inline handler）錯開執行，避免同步 CPU 峰值
+        (requestAnimationFrame || setTimeout)(function () {
             scanScheduled = false;
-            const nodes = pendingNodes.splice(0);
-            nodes.forEach(scan);
+            pendingNodes.length = 0;
+            scan(document);
         });
     }
 

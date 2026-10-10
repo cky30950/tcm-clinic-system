@@ -321,18 +321,19 @@
     }
 
     var imgObserver = null;
+    var imgScanScheduled = false;
     function initImageHydrator() {
         if (imgObserver || typeof MutationObserver === 'undefined' || !document.body) return;
         imgObserver = new MutationObserver(function (mutations) {
-            for (var i = 0; i < mutations.length; i++) {
-                var added = mutations[i].addedNodes;
-                for (var j = 0; j < added.length; j++) {
-                    var node = added[j];
-                    if (node.nodeType !== 1) continue;
-                    if (node.tagName === 'IMG' && node.hasAttribute('data-r2-key')) hydrateImage(node);
-                    scanHydrate(node);
-                }
-            }
+            if (imgScanScheduled) return;
+            imgScanScheduled = true;
+            // rAF debounce：多個 DOM 變化合併一次處理，跟其他 subtree
+            // observer（i18n / vendor-enhance / system.js inline handler）
+            // 錯開執行，避免同步 CPU 峰值
+            (requestAnimationFrame || setTimeout)(function () {
+                imgScanScheduled = false;
+                scanHydrate(document);
+            });
         });
         imgObserver.observe(document.body, { childList: true, subtree: true });
         scanHydrate(document);

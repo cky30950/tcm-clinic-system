@@ -14130,101 +14130,93 @@ document.addEventListener('DOMContentLoaded', function() {
              * 有些按鈕會在執行期間動態插入（例如搜尋結果列表），若不在此
              * 監聽，將會導致內嵌事件仍然存在。透過 MutationObserver 監
              * 看新增的節點，並對其及其子孫節點執行相同的綁定邏輯。
+             * 
+             * 使用 rAF debounce：多個 DOM 變化（如 innerHTML 一次插入
+             * 幾十個元素）會被合併在同一個 frame 裡處理，避免跟 i18n.js /
+             * attachments.js / vendor-enhance.js 另外三個 subtree observer
+             * 同時同步執行造成 CPU 峰值。
              */
-            const observer = new MutationObserver(function (mutationsList) {
-                mutationsList.forEach(function (mutation) {
-                    mutation.addedNodes.forEach(function (node) {
-                        if (node.nodeType !== 1) return;
-                        // 對新增節點及其子孫節點處理
-                        [node, ...node.querySelectorAll('[onclick], [onchange]')].forEach(function (el) {
-                            if (el.hasAttribute && el.hasAttribute('onclick')) {
-                                const code = el.getAttribute('onclick');
-                                el.removeAttribute('onclick');
-                                // 若已有事件監聽，避免重複綁定（透過 dataset 標記）
-                                if (!el.dataset.inlineClickBound) {
-                                    el.dataset.inlineClickBound = 'true';
-                                    el.addEventListener('click', function (event) {
-                                        try {
-                                            const match = code.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
-                                            if (!match) return;
-                                            const fnName = match[1].trim();
-                                            const argsStr = match[2];
-                                            const args = parseArgs(argsStr, event, el);
-                                            if (fnName.indexOf('.') >= 0) {
-                                                const parts = fnName.split('.');
-                                                let target;
-                                                if (parts[0] === 'this') {
-                                                    target = el;
-                                                    parts.shift();
-                                                } else {
-                                                    target = window[parts.shift()];
-                                                }
-                                                let prop;
-                                                while (parts.length > 1 && target) {
-                                                    prop = parts.shift();
-                                                    target = target[prop];
-                                                }
-                                                const methodName = parts.shift();
-                                                if (target && typeof target[methodName] === 'function') {
-                                                    target[methodName].apply(target, args);
-                                                }
-                                            } else {
-                                                const fn = window[fnName];
-                                                if (typeof fn === 'function') {
-                                                    fn.apply(el, args);
-                                                }
-                                            }
-                                        } catch (err) {
-                                            console.error('執行動態 inline 事件處理器錯誤:', code, err);
-                                        }
-                                    });
+            function bindInlineHandlersOnNode(root) {
+                if (!root || !root.querySelectorAll) return;
+                root.querySelectorAll('[onclick], [onchange]').forEach(function (el) {
+                    // onclick
+                    if (el.hasAttribute && el.hasAttribute('onclick') && !el.dataset.inlineClickBound) {
+                        const code = el.getAttribute('onclick');
+                        el.removeAttribute('onclick');
+                        el.dataset.inlineClickBound = 'true';
+                        el.addEventListener('click', function (event) {
+                            try {
+                                const match = code.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
+                                if (!match) return;
+                                const fnName = match[1].trim();
+                                const args = parseArgs(match[2], event, el);
+                                let target;
+                                if (fnName.indexOf('.') >= 0) {
+                                    const parts = fnName.split('.');
+                                    if (parts[0] === 'this') { target = el; parts.shift(); }
+                                    else { target = window[parts.shift()]; }
+                                    while (parts.length > 1 && target) target = target[parts.shift()];
+                                    const methodName = parts.shift();
+                                    if (target && typeof target[methodName] === 'function') target[methodName].apply(target, args);
+                                } else {
+                                    const fn = window[fnName];
+                                    if (typeof fn === 'function') fn.apply(el, args);
                                 }
-                            }
-                            if (el.hasAttribute && el.hasAttribute('onchange')) {
-                                const code = el.getAttribute('onchange');
-                                el.removeAttribute('onchange');
-                                if (!el.dataset.inlineChangeBound) {
-                                    el.dataset.inlineChangeBound = 'true';
-                                    el.addEventListener('change', function (event) {
-                                        try {
-                                            const match = code.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
-                                            if (!match) return;
-                                            const fnName = match[1].trim();
-                                            const argsStr = match[2];
-                                            const args = parseArgs(argsStr, event, el);
-                                            if (fnName.indexOf('.') >= 0) {
-                                                const parts = fnName.split('.');
-                                                let target;
-                                                if (parts[0] === 'this') {
-                                                    target = el;
-                                                    parts.shift();
-                                                } else {
-                                                    target = window[parts.shift()];
-                                                }
-                                                let prop;
-                                                while (parts.length > 1 && target) {
-                                                    prop = parts.shift();
-                                                    target = target[prop];
-                                                }
-                                                const methodName = parts.shift();
-                                                if (target && typeof target[methodName] === 'function') {
-                                                    target[methodName].apply(target, args);
-                                                }
-                                            } else {
-                                                const fn = window[fnName];
-                                                if (typeof fn === 'function') {
-                                                    fn.apply(el, args);
-                                                }
-                                            }
-                                        } catch (err) {
-                                            console.error('執行動態 inline 事件處理器錯誤:', code, err);
-                                        }
-                                    });
-                                }
+                            } catch (err) {
+                                console.error('執行動態 inline click 處理器錯誤:', code, err);
                             }
                         });
-                    });
+                    }
+                    // onchange
+                    if (el.hasAttribute && el.hasAttribute('onchange') && !el.dataset.inlineChangeBound) {
+                        const code = el.getAttribute('onchange');
+                        el.removeAttribute('onchange');
+                        el.dataset.inlineChangeBound = 'true';
+                        el.addEventListener('change', function (event) {
+                            try {
+                                const match = code.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
+                                if (!match) return;
+                                const fnName = match[1].trim();
+                                const args = parseArgs(match[2], event, el);
+                                let target;
+                                if (fnName.indexOf('.') >= 0) {
+                                    const parts = fnName.split('.');
+                                    if (parts[0] === 'this') { target = el; parts.shift(); }
+                                    else { target = window[parts.shift()]; }
+                                    while (parts.length > 1 && target) target = target[parts.shift()];
+                                    const methodName = parts.shift();
+                                    if (target && typeof target[methodName] === 'function') target[methodName].apply(target, args);
+                                } else {
+                                    const fn = window[fnName];
+                                    if (typeof fn === 'function') fn.apply(el, args);
+                                }
+                            } catch (err) {
+                                console.error('執行動態 inline change 處理器錯誤:', code, err);
+                            }
+                        });
+                    }
                 });
+            }
+            let pendingInlineBindRoots = [];
+            let inlineBindScheduled = false;
+            function scheduleInlineBind(node) {
+                if (node && node.nodeType === 1) pendingInlineBindRoots.push(node);
+                if (inlineBindScheduled) return;
+                inlineBindScheduled = true;
+                (requestAnimationFrame || setTimeout)(function () {
+                    inlineBindScheduled = false;
+                    bindInlineHandlersOnNode(document);
+                });
+            }
+            const observer = new MutationObserver(function (mutationsList) {
+                for (let i = 0; i < mutationsList.length; i++) {
+                    const mutation = mutationsList[i];
+                    const added = mutation.addedNodes;
+                    for (let j = 0; j < added.length; j++) {
+                        const node = added[j];
+                        if (node.nodeType === 1) scheduleInlineBind(node);
+                    }
+                }
             });
             observer.observe(document.body, { childList: true, subtree: true });
         })();
