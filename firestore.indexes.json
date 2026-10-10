@@ -195,6 +195,17 @@
       "collectionGroup": "consultations",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "clinicId", "order": "ASCENDING" },
+        { "fieldPath": "syncedAt", "order": "ASCENDING" },
+        { "fieldPath": "sortDate", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "paymentStatus", "order": "ASCENDING" },
         { "fieldPath": "date", "order": "ASCENDING" }
       ]
