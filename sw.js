@@ -12,8 +12,9 @@
 // 日常部署（改 JS/CSS/HTML/資料檔）無需再手動遞增此版本號：
 // 程式類資源已改為 network-first，部署後客戶端下次載入即取新版。
 // 只有在「修改 PRECACHE_URLS 預快取清單」或需強制清空所有人快取時才遞增。
-// v1.1.10：版本化同源資源改為 cache-first（之前一律 network-first，
-// 每次 RTT 驗證），大幅提升手機載入速度。
+// v1.0.8：程式資源改 network-first；這一次遞增用於把殘留 v1.0.7 或更舊
+// SWR 快取的客戶端一次性換代刷新。
+// v1.1.10：程式資源改回 stale-while-revalidate（解決手機 network-first 每次驗證 RTT 瓶頸）
 const CACHE_VERSION = 'v1.1.10';
 const SHELL_CACHE = 'shell-' + CACHE_VERSION;
 const CDN_CACHE = 'cdn-' + CACHE_VERSION;
@@ -342,113 +343,29 @@ function fetchWithTimeout(fetchFactory, ms) {
     });
 }
 
-/* ---------- 同源靜態資源 ---------- */
+/* ---------- 同源靜態資源：統一 stale-while-revalidate ---------- */
 
-/* 版本化查詢參數：URL 帶 ?v=xxx 時，表示這是固定版本的資源，
-   部署時更新版本號即換新 URL，cache-first 自然生效（新 URL 無快取）。
-   這類資源不走 network-first，避免每次 RTT 驗證開銷。 */
-function hasVersionQuery(url) {
-    for (const [k, v] of url.searchParams) {
-        if (k === 'v' || k === 'ver' || k === 'version') return !!v;
-    }
-    return false;
-}
+/* 2026-10-10 改為 stale-while-revalidate（SWR）：
+   先前用 network-first 每次載入都向 Cloudflare 驗證（_headers 設 no-cache），
+   桌面 RTT ≈ 10ms 沒感覺，但手機 4G/5G RTT ≈ 50-150ms，15+ 個同源 JS/CSS
+   全部要等網路回應才能載入，總延遲秒級。
+   
+   現場所有同源 JS/CSS/資料檔都已加 `?v=` 版本查詢參數（如 system.js?v=20261006j），
+   部署時改版本號即讓 URL 變化 → SWR 視為新資源從伺服器下載，
+   之後載入直接命中快取、零延遲。
+   
+   文件（HTML）仍走 handleDocument 的 network-first，確保每次導航取最新 HTML。
+   詞庫 JSON（/data/*.json）無版本參數，背景更新後下次載入生效，
+   對詞庫更新場景可接受延遲一次載入。
+   
+   cache:'no-cache'：向原站驗證時繞過瀏覽器 HTTP 快取，
+   但 SWR 不等待驗證完成就先回快取，驗證失敗（離線）也直接用快取。 */
 
-/* 以下路徑／目標一律 network-first（無版本化查詢參數或內容經常變動）：
-   - /firebase_init.js 等 SDK 入口（內容可能隨 Firebase 配置變動）
-   - /version-config.js 版本配置
-   - /data/ 詞庫／範本 JSON（內容經常更新，無版本號）
-   - script/style/font/manifest 但沒有版本化查詢參數的
-   其餘有版本號的 script/style 走 cache-first（版本號變了 URL 自然變）。 */
-const NETWORK_FIRST_PATHS = new Set([
-    '/firebase_init.js',
-    '/version-config.js',
-    '/firebaseConfig.js',
-    '/sw.js'  // 已在 fetch handler 開頭排除，這裡是雙保險
-]);
-
-/* /data/ 下的 JSON 詞庫／範本（無版本號，內容經常變） */
-const NETWORK_FIRST_DESTINATIONS = new Set(['script', 'style', 'font', 'manifest']);
-
-function isNetworkFirst(req, url) {
-    // 明確列入 network-first 的路徑優先（即使帶版本號也不變）：
-    // 這些檔案的內容可能在不更新版本號的情況下變動
-    if (NETWORK_FIRST_PATHS.has(url.pathname)) return true;
-    // /data/ 下的應用資料（無版本號，內容經常變）
-    if (url.pathname.startsWith('/data/')) return true;
-    // 有版本化查詢參數 → cache-first（版本號即更新機制）
-    if (hasVersionQuery(url)) return false;
-    // script/style/font/manifest 無版本號 → network-first
-    if (NETWORK_FIRST_DESTINATIONS.has(req.destination || '')) return true;
-    return false;
-}
-
-/* cache-first + 網路備援：用於版本化同源資源
-   快取命中 → 秒回傳（零網路請求）
-   快取未命中 → fetch 寫入快取後回傳 */
-async function cacheFirstWithFallback(req) {
-    const cache = await caches.open(SHELL_CACHE);
-    const cached = await cache.match(req);
-    if (cached) return cached;
-
-    try {
-        const fresh = await fetch(req);
-        if (fresh && fresh.ok) {
-            cache.put(req, fresh.clone());
-            return fresh;
-        }
-        // fetch 成功但非 2xx（如 404），嘗試快取備援
-        return cached;
-    } catch (_e) {
-        // 網路完全失敗：離線
-        return cached;
-    }
-}
-
-async function networkFirstWithCacheFallback(req) {
-    const cache = await caches.open(SHELL_CACHE);
-    try {
-        // cache:'no-cache'：SW 的 network-first 必須真正回到原站驗證，
-        // 不讓「max-age 尚未到期」的瀏覽器HTTP磁碟快取回餡舊檔
-        // （2026-10-03 version-config.js 快取污染事件之防護）
-        const fresh = await fetch(req, { cache: 'no-cache' });
-        if (fresh.ok) {
-            // 成功取新：更新離線備份後回傳
-            cache.put(req, fresh.clone());
-            return fresh;
-        }
-    } catch (_e) {
-        // 網路錯誤（離線）：落入快取備援
-    }
-    const cached = await cache.match(req);
-    if (cached) return cached;
-    throw new Error('Network and cache both failed for ' + new URL(req.url).pathname);
-}
-
-async function handleSameOriginStatic(req) {
-    const url = new URL(req.url);
-
-    // NETWORK_FIRST_PATHS / /data/ 優先（即使帶版本號也走 network-first，
-    // 因為這些檔案內容可能在不更新版本號的情況下變動）
-    if (NETWORK_FIRST_PATHS.has(url.pathname) || url.pathname.startsWith('/data/')) {
-        return networkFirstWithCacheFallback(req);
-    }
-
-    // 有版本化查詢參數 → cache-first（快取命中秒回傳，零 RTT）
-    // 版本號更新即換新 URL，快取自然失效重下載
-    if (hasVersionQuery(url)) {
-        return cacheFirstWithFallback(req);
-    }
-
-    // 無版本號的 script/style/font/manifest → network-first
-    if (NETWORK_FIRST_DESTINATIONS.has(req.destination || '')) {
-        return networkFirstWithCacheFallback(req);
-    }
-
-    // 其餘資源（圖片等）：stale-while-revalidate，先給快取再背景更新
+async function staleWhileRevalidate(req) {
     const cache = await caches.open(SHELL_CACHE);
     const cachedPromise = cache.match(req);
-    const networkPromise = fetch(req)
+    
+    const networkPromise = fetch(req, { cache: 'no-cache' })
         .then((res) => {
             if (res && res.ok) {
                 cache.put(req, res.clone());
@@ -458,7 +375,14 @@ async function handleSameOriginStatic(req) {
         .catch(() => null);
 
     const cached = await cachedPromise;
+    // 快取命中直接回應（手機零延遲），背景 networkPromise 繼續驗證更新
+    // 快取 miss 才等網路（首次載入或版本參數變化）
     return cached || networkPromise;
+}
+
+async function handleSameOriginStatic(req) {
+    // 所有同源靜態資源（JS/CSS/字體/manifest/圖片/資料檔）統一 SWR
+    return staleWhileRevalidate(req);
 }
 
 /* ---------- 白名單 CDN：cache-first + 天期/數量封頂 ---------- */

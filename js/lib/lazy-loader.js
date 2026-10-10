@@ -144,19 +144,6 @@
         } catch (_e) { return; }
         if (!hasAuth) return;
 
-        // Network Information API：低速網路（2G/slow-2g）直接跳過預熱，
-        // 避免跟頁面資源競爭頻寬造成首屏更慢
-        try {
-            var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-            if (conn) {
-                var eff = conn.effectiveType;
-                if (eff === '2g' || eff === 'slow-2g') {
-                    console.info('[lazy-loader] 低速網路 (' + eff + ')，跳過自動預熱');
-                    return;
-                }
-            }
-        } catch (_e) {}
-
         var WARMUP_TARGETS = ['xlsx', 'qrcode'];
         var queue = WARMUP_TARGETS.slice();
 
@@ -165,34 +152,26 @@
             var name = queue.shift();
             if (LOADERS[name].test()) { warmupNext(); return; }
             load(name).then(function () {
-                scheduleIdle(warmupNext, 3000);
+                scheduleIdle(warmupNext, 2000);
             }).catch(function () {
                 console.warn('[lazy-loader] 預熱失敗: ' + name);
-                scheduleIdle(warmupNext, 15000);
+                scheduleIdle(warmupNext, 10000);
             });
         }
 
         function scheduleIdle(fn, delay) {
             var start = function () {
                 if ('requestIdleCallback' in window) {
-                    requestIdleCallback(fn, { timeout: 10000 });
+                    requestIdleCallback(fn, { timeout: 5000 });
                 } else {
-                    setTimeout(fn, delay || 1500);
+                    setTimeout(fn, delay || 1000);
                 }
             };
             if (delay) setTimeout(start, delay); else start();
         }
 
-        // 等 window.load（頁面所有資源載入完成）後再延遲 3 秒開始預熱，
-        // 避免跟首屏的 leaflet / tabulator / chart.js 等資源競爭頻寬
-        function onLoad() {
-            scheduleIdle(warmupNext, 3000);
-        }
-        if (document.readyState === 'complete') {
-            onLoad();
-        } else {
-            window.addEventListener('load', onLoad, { once: true });
-        }
+        // 登入後 2 秒開始預熱
+        scheduleIdle(warmupNext, 2000);
     }
 
     if (document.readyState === 'loading') {

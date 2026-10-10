@@ -160,19 +160,22 @@
     <script type="module" src="firebase_init.js?v=20261007a"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" defer></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
-    <!-- Leaflet CSS 留在 <head>（樣式立即可用），JS 移到 body 底部 defer 載入 -->
+    <!-- Leaflet（穴位圖）：defer 載入，避免阻塞 HTML 解析 -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-    <!-- 本地第三方 UI 插件（釘版本；SW 對同源 JS/CSS 採 network-first＋離線備援） -->
+    <!-- 本地第三方 UI 插件（釘版本；SW 對同源 JS/CSS 採 stale-while-revalidate 快取策略） -->
     <link rel="stylesheet" href="js/vendor/flatpickr/flatpickr.min.css?v=20261005a">
     <link rel="stylesheet" href="js/vendor/flatpickr/monthSelect.css?v=20261005a">
     <link rel="stylesheet" href="js/vendor/tom-select/tom-select.bootstrap5.min.css?v=20261005a">
     <link rel="stylesheet" href="js/vendor/tabulator/tabulator.min.css?v=20261005a">
     <link rel="stylesheet" href="js/vendor/notiflix/notiflix.min.css?v=20261005a">
+
+    <script defer src="acupointIntegration.js?v=20261010a"></script>
     
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
 
@@ -6214,9 +6217,7 @@
     <!-- 延遲載入器：xlsx / qrcode 等真的少用的大庫 -->
     <script src="js/lib/lazy-loader.js?v=20261009a" defer></script>
 
-    <!-- Leaflet + 穴位圖 + chart.js：全部 defer，不阻塞 HTML 解析 -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-    <script src="acupointIntegration.js" defer></script>
+    <!-- chart.js + tabulator：恢復首屏載入（在 body 底部，DOM 快結束了） -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 
     <!-- 本地第三方插件（釘版本；tabulator 已恢復首屏載入；全部 defer，按此順序在 app.js/system.js 前就緒） -->
@@ -6230,17 +6231,17 @@
 
     <script src="version-config.js?v=20261003a" defer></script>
     <script src="pwa.js?v=20260923b" defer></script>
-    <script src="schedule_management.js" defer></script>
+    <script src="schedule_management.js?v=20261010a" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
     <script type="module" src="js/app.js?v=20261006j"></script>
     <script src="system.js?v=20261006j" defer></script>
-    <script src="attachments.js" defer></script>
+    <script src="attachments.js?v=20261010a" defer></script>
     <script src="personalStatistics.js?v=20261005a" defer></script>
-    <script src="systemmanagement.js" defer></script>
-    <script src="chat_module.js" defer></script>
-    <script src="i18n.js" defer></script>
+    <script src="systemmanagement.js?v=20261010a" defer></script>
+    <script src="chat_module.js?v=20261010a" defer></script>
+    <script src="i18n.js?v=20261010a" defer></script>
 
     <!-- 視訊診症延遲載入器：只有醫師點擊「視訊診症」時才動態下載 Agora SDK -->
-    <script src="video/video-loader.js" defer></script>
+    <script src="video/video-loader.js?v=20261010a" defer></script>
 </body>
 </html>
