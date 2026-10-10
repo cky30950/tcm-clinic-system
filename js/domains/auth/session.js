@@ -8,45 +8,6 @@ import { archiveStaffAuthAccount, fetchAuthorizedUserByUidOrEmail } from './clai
 // Phase 4：病人監聽拆除函式已移至 patients 領域，登出／清除流程直接跨域引用
 import { detachPatientListListener } from '../patients/store.js';
 
-/* ===== 登入後才載入的非關鍵 CSS（登入畫面不需要，延遲到登入後插入以加速首次渲染） =====
-   2026-10-10 優化：登入前原本有 10+ 個 <link rel="stylesheet"> 阻塞 HTML 解析，
-   手機上每多一個跨域 RTT 就多 50-150ms，全部延遲到登入後用 requestIdleCallback
-   批次插入，登入畫面只剩 tailwind.css 一個關鍵 CSS。 */
-let deferredCssLoaded = false;
-function loadDeferredCss() {
-    if (deferredCssLoaded) return;
-    deferredCssLoaded = true;
-    const cssUrls = [
-        // daisyUI（登入畫面完全沒用到 daisyUI btn 樣式，全部是 Tailwind class）
-        'https://cdn.jsdelivr.net/npm/daisyui@5.7.47/daisyui.css',
-        'js/vendor/daisyui/themes.css?v=20261006a',
-        // 第三方 UI 插件 CSS
-        'https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css',
-        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-        'js/vendor/flatpickr/flatpickr.min.css?v=20261005a',
-        'js/vendor/flatpickr/monthSelect.css?v=20261005a',
-        'js/vendor/tom-select/tom-select.bootstrap5.min.css?v=20261005a',
-        'js/vendor/tabulator/tabulator.min.css?v=20261005a',
-        'js/vendor/notiflix/notiflix.min.css?v=20261005a',
-    ];
-    function insertLinks() {
-        cssUrls.forEach(url => {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = url;
-            link.setAttribute('data-deferred-css', '1');
-            document.head.appendChild(link);
-        });
-    }
-    if ('requestIdleCallback' in window) {
-        requestIdleCallback(insertLinks, { timeout: 2000 });
-    } else {
-        setTimeout(insertLinks, 100);
-    }
-}
-// 掛到全域讓任何登入完成路徑（session.js 內部、system.js、onAuthStateChanged 回補）都能安全調用
-window.loadDeferredCss = loadDeferredCss;
-
 // SDK 原生錯誤訊息可能含基礎服務供應商名稱，於 UI 顯示前統一遮蔽
 function maskVendorError(msg) {
     return String(msg == null ? '' : msg)
@@ -571,8 +532,6 @@ export async function syncUserDataFromFirebase(options = {}) {
             G.currentUser = user.username;
             G.currentUserData = user;
             
-            // 登入後載入非關鍵 CSS（daisyUI、toastr、leaflet、flatpickr 等）
-            if (typeof window.loadDeferredCss === 'function') window.loadDeferredCss();
             
             document.getElementById('loginPage').classList.add('hidden');
             document.getElementById('mainSystem').classList.remove('hidden');

@@ -12,31 +12,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="名醫診所">
     <link rel="apple-touch-icon" href="/images/icons/apple-touch-icon.png">
-
-    <!-- ===== 臨界資源 preconnect：讓瀏覽器在解析 HTML 時就建立 TLS 連線 ===== -->
-    <!-- Firebase SDK modules from gstatic（登入前須下載） -->
-    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-    <!-- daisyUI CSS CDN（登入畫面不需要，登入後才載入，但 preconnect 先建好連線） -->
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <!-- Fonts CDN -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- lucide / leaflet / chart.js / swal2 / tabulator 等 CDN -->
-    <link rel="preconnect" href="https://unpkg.com" crossorigin>
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-
-    <!-- Tailwind CSS v4 預編譯靜態 CSS（唯一阻塞登入畫面渲染的 CSS） -->
+    <!-- Tailwind CSS v4 預編譯靜態 CSS（取代 browser CDN 即時編譯器，消除手機端 CPU 掃描） -->
     <link rel="stylesheet" href="/css/tailwind.css?v=20261009a">
-
-    <!-- ===== daisyUI 延遲載入：登入畫面完全沒用到 daisyUI 樣式，
-         等登入後 mainSystem 顯示時才動態插入 <link> 標籤，
-         節省登入前下載 daisyUI + themes.css 的 RTT 時間 =====
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.7.47/daisyui.css">
+    <!-- daisyUI 5 全套 35 個內建主題（本地釘版本，配合帳號安全設定內的主題切換器） -->
     <link rel="stylesheet" href="js/vendor/daisyui/themes.css?v=20261006a">
-    -->
-
-    <!-- Google Fonts：display=swap 確保不會阻塞文字渲染 -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap">
     <script>
         /* 主題偏好（只存本裝置 localStorage）：喺首次繪製前套用 data-theme，避免畫面閃一下預設色。
            無偏好時唔加 data-theme，保留品牌橙啡 token。 */
@@ -179,25 +159,26 @@
 
     <script type="module" src="firebase_init.js?v=20261007a"></script>
 
-    <!-- ===== 以下 CSS 登入畫面不需要，延遲到登入後動態載入 =====
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+    <!-- Leaflet（穴位圖）：defer 載入，避免阻塞 HTML 解析 -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+
+    <!-- 本地第三方 UI 插件（釘版本；SW 對同源 JS/CSS 採 stale-while-revalidate 快取策略） -->
     <link rel="stylesheet" href="js/vendor/flatpickr/flatpickr.min.css?v=20261005a">
     <link rel="stylesheet" href="js/vendor/flatpickr/monthSelect.css?v=20261005a">
     <link rel="stylesheet" href="js/vendor/tom-select/tom-select.bootstrap5.min.css?v=20261005a">
     <link rel="stylesheet" href="js/vendor/tabulator/tabulator.min.css?v=20261005a">
     <link rel="stylesheet" href="js/vendor/notiflix/notiflix.min.css?v=20261005a">
-    -->
-
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
-
-    <!-- Leaflet（穴位圖） -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
     <script defer src="acupointIntegration.js?v=20261010a"></script>
     
     <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
+
         /* daisyUI 5 品牌色 token（與 index.html 一致）。
            只喺「未選用 daisyUI 主題」（<html> 冇 data-theme）時生效；
            一旦設了 data-theme，[data-theme=x] 主題變數（權重相同但來源於主題樣式表）接管。 */
