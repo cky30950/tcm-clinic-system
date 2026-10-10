@@ -157,6 +157,10 @@ export async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
         }
         
         G.patientPagesCache[pageNumber] = docs;
+        // 緩存大小保護：超過上限時自動清理
+        if (typeof window.trimCache === 'function') {
+            window.trimCache(G.patientPagesCache, 50);
+        }
         return docs;
     } catch (error) {
         console.error('分頁讀取病人資料失敗:', error);
@@ -215,6 +219,10 @@ export async function fetchPatientsPageAsc(ascPageNumber = 1, forceRefresh = fal
         }
         docs.sort(comparePatientsByNumberDesc);
         G.patientAscPagesCache[ascPageNumber] = docs;
+        // 緩存大小保護：超過上限時自動清理
+        if (typeof window.trimCache === 'function') {
+            window.trimCache(G.patientAscPagesCache, 50);
+        }
         return docs;
     } catch (error) {
         console.error('升序分頁讀取病人資料失敗:', error);

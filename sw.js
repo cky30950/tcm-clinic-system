@@ -15,7 +15,9 @@
 // v1.0.8：程式資源改 network-first；這一次遞增用於把殘留 v1.0.7 或更舊
 // SWR 快取的客戶端一次性換代刷新。
 // v1.1.10：程式資源改回 stale-while-revalidate（解決手機 network-first 每次驗證 RTT 瓶頸）
-const CACHE_VERSION = 'v1.1.10';
+// v1.1.11：CPU/記憶體優化 — 縮小 MutationObserver 觀察範圍、移除永不停止 setInterval、
+//          靜默 console.log、Firebase IndexedDB 緩存限為 20MB
+const CACHE_VERSION = 'v1.1.11';
 const SHELL_CACHE = 'shell-' + CACHE_VERSION;
 const CDN_CACHE = 'cdn-' + CACHE_VERSION;
 

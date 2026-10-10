@@ -12,6 +12,27 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="名醫診所">
     <link rel="apple-touch-icon" href="/images/icons/apple-touch-icon.png">
+    <script>
+        /* ============================================================
+         * 生產環境 console 靜默：保留 console.error/warn（可見錯誤），
+         * 但靜默 console.log/info/debug/trace 以避免長期運行 SPA 的
+         * console buffer 無限增長導致記憶體洩漏。
+         *
+         * 開發時可透過 localStorage.setItem('tcm-debug', '1') 重新開啟。
+         * ============================================================ */
+        (function () {
+            try {
+                var DEBUG = localStorage.getItem('tcm-debug') === '1';
+                if (!DEBUG && console && console.log) {
+                    var noop = function () {};
+                    console.log = noop;
+                    console.info = noop;
+                    console.debug = noop;
+                    console.trace = noop;
+                }
+            } catch (_e) {}
+        })();
+    </script>
     <!-- Tailwind CSS v4 預編譯靜態 CSS（取代 browser CDN 即時編譯器，消除手機端 CPU 掃描） -->
     <link rel="stylesheet" href="/css/tailwind.css?v=20261009a">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.7.47/daisyui.css">
@@ -32,132 +53,146 @@
     </script>
     <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            function refreshIcons() { if (window.lucide) { try { window.lucide.createIcons(); } catch (e) {} } }
-            var iconTimer = null;
-            function scheduleRefresh() { if (iconTimer) clearTimeout(iconTimer); iconTimer = setTimeout(refreshIcons, 30); }
-            var pending = false;
-            var mo = new MutationObserver(function (mutations) {
+        /* ============================================================
+         * 全局 MutationObserver 管理器：
+         * - Lucide 圖標刷新
+         * - DaisyUI 按鈕標準化
+         *
+         * 登入前只掃描靜態登入頁；登入後由 session.js 主動調用
+         * window._attachSystemObservers() 掛載到 #mainSystem + nav。
+         * 另有 setInterval 後備確保不失誤。
+         * ============================================================ */
+        (function () {
+            if (window._systemObserversAttached) return;
+            window._systemObserversAttached = false;
+
+            // ── Lucide 圖標觀察器 ──
+            var iconMo = new MutationObserver(function (mutations) {
                 for (var i = 0; i < mutations.length; i++) {
                     var added = mutations[i].addedNodes;
                     for (var j = 0; j < added.length; j++) {
                         var node = added[j];
                         if (node.nodeType !== 1) continue;
-                        if (node.hasAttribute && node.hasAttribute("data-lucide")) { pending = true; break; }
-                        if (node.querySelector && node.querySelector("i[data-lucide]")) { pending = true; break; }
+                        if (node.hasAttribute && node.hasAttribute("data-lucide")) { _iconPending = true; break; }
+                        if (node.querySelector && node.querySelector("i[data-lucide]")) { _iconPending = true; break; }
                     }
-                    if (pending) break;
+                    if (_iconPending) break;
                 }
-                if (pending) { pending = false; scheduleRefresh(); }
+                if (_iconPending) { _iconPending = false; _scheduleIconRefresh(); }
             });
-            mo.observe(document.documentElement, { childList: true, subtree: true });
-            refreshIcons();
-            var readyTimer = setInterval(function () { if (window.lucide) { refreshIcons(); clearInterval(readyTimer); } }, 50);
-            setTimeout(function () { clearInterval(readyTimer); }, 5000);
-        });
+            var _iconPending = false;
+            var _iconTimer = null;
+            function _refreshIcons() { if (window.lucide) { try { window.lucide.createIcons(); } catch (_e) {} } }
+            function _scheduleIconRefresh() { if (_iconTimer) clearTimeout(_iconTimer); _iconTimer = setTimeout(_refreshIcons, 30); }
+
+            // ── DaisyUI 按鈕標準化觀察器 ──
+            var btnMo = new MutationObserver(function (mutations) {
+                for (var i = 0; i < mutations.length; i++) {
+                    var added = mutations[i].addedNodes;
+                    for (var j = 0; j < added.length; j++) {
+                        if (added[j].nodeType === 1) _scanBtn(added[j]);
+                    }
+                }
+            });
+            function _hasBg(c) { return /(^|\s)bg-/.test(c); }
+            function _hasPad(c) { return /(^|\s)(p|px|py)-/.test(c); }
+            function _hasTextSize(c) { return /(^|\s)text-(xs|sm|base|lg|xl|2xl|3xl)(\s|$)/.test(c); }
+            function _isFixedCircle(c) {
+                return /(^|\s)rounded-full(\s|$)/.test(c) && /(^|\s)w-/.test(c) && /(^|\s)h-/.test(c);
+            }
+            function _isBareClose(el, c) {
+                if (_hasBg(c) || _hasPad(c)) return false;
+                var t = (el.textContent || '').trim();
+                if (t === '×' || t === 'x' || t === 'X') return true;
+                if (t === '' && el.querySelector('svg')) return true;
+                return false;
+            }
+            function _sizeVariant(c) {
+                if (/(^|\s)text-xs(\s|$)/.test(c) || /(^|\s)py-(0\.5|1)(\s|$)/.test(c)) return 'btn-xs';
+                if (/(^|\s)py-(3\.5|4|5)(\s|$)/.test(c) || /(^|\s)text-lg(\s|$)/.test(c)) return 'btn-lg';
+                if (/(^|\s)py-3(\s|$)/.test(c)) return '';
+                return 'btn-sm';
+            }
+            function _stripRounded(el) {
+                Array.prototype.slice.call(el.classList).forEach(function (t) {
+                    if (/^rounded(-|$)/.test(t)) el.classList.remove(t);
+                });
+            }
+            function _normalizeBtn(el) {
+                if (el.dataset.btnNormalized) return;
+                el.dataset.btnNormalized = '1';
+                if (el.classList.contains('btn')) return;
+                var onclickAttr = el.getAttribute('onclick') || '';
+                if (/switch(Personal|Template|Financial)Tab\(|filterHerbLibrary\(|filterBillingItems\(|filterAcupointLibrary\(|filterUsers\(/.test(onclickAttr)) return;
+                var c = el.className || '';
+                var inCons = el.closest ? !!el.closest('#consultationSystem') : false;
+                if (_isFixedCircle(c)) return;
+                var add = ['btn'];
+                if (_isBareClose(el, c)) {
+                    add.push('btn-ghost');
+                    if (inCons) { add.push('btn-xs', 'normal-case'); }
+                    else { add.push('btn-circle', 'btn-sm'); }
+                } else {
+                    var sv = _sizeVariant(c);
+                    if (sv) add.push(sv);
+                    if (!_hasTextSize(c)) add.push('text-base');
+                    if (!_hasBg(c)) add.push('btn-ghost');
+                    if (inCons) add.push('normal-case');
+                }
+                if (inCons) { _stripRounded(el); add.push('rounded-md'); }
+                el.classList.add.apply(el.classList, add);
+            }
+            function _scanBtn(root) {
+                if (!root || root.nodeType !== 1) return;
+                try {
+                    if (root.tagName === 'BUTTON') _normalizeBtn(root);
+                    if (root.querySelectorAll) root.querySelectorAll('button').forEach(_normalizeBtn);
+                } catch (_eScan) {}
+            }
+
+            // ── 暴露給 session.js 的掛載函數 ──
+            window._attachSystemObservers = function () {
+                if (window._systemObserversAttached) return;
+                var mainSystem = document.getElementById('mainSystem');
+                if (!mainSystem) return;
+                window._systemObserversAttached = true;
+                // 掛載觀察器
+                iconMo.observe(mainSystem, { childList: true, subtree: true });
+                btnMo.observe(mainSystem, { childList: true, subtree: true });
+                var nav = document.querySelector('nav');
+                if (nav) {
+                    iconMo.observe(nav, { childList: true, subtree: true });
+                    btnMo.observe(nav, { childList: true, subtree: true });
+                }
+                // 立即掃描一次剛顯示的內容
+                _scanBtn(document.documentElement);
+                _refreshIcons();
+            };
+
+            // ── 初始化：掃描登入頁靜態內容 ──
+            function _initStatic() {
+                _refreshIcons();
+                _scanBtn(document.documentElement);
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _initStatic);
+            else _initStatic();
+
+            // ── 後備：setInterval 等 #mainSystem 出現後自動掛載（最多 10 秒） ──
+            var _tryAttach = setInterval(function () {
+                if (document.getElementById('mainSystem')) {
+                    window._attachSystemObservers();
+                    clearInterval(_tryAttach);
+                }
+            }, 100);
+            setTimeout(function () { clearInterval(_tryAttach); }, 10000);
+
+            // Lucide SDK 載入後立即刷新
+            var _readyTimer = setInterval(function () { if (window.lucide) { _refreshIcons(); clearInterval(_readyTimer); } }, 50);
+            setTimeout(function () { clearInterval(_readyTimer); }, 5000);
+        })();
     </script>
 
-    <script>
-    /* daisyUI 按鈕標準化（觀察動態內容，模式與上方 lucide 圖示相同）：
-       - nav「切換」「登出」已在 HTML 手動加上 btn + rounded-full（index.html nav 聯絡我樣式）
-       - #consultationSystem 內所有按鈕：btn + rounded-md + normal-case（hero 標語下聯絡我樣式），
-         僅換形狀與質感，原有尺寸／配色類別保留
-       - 其他按鈕：依原有尺寸匹配 btn-xs/btn-sm/btn/btn-lg；無底色的 × 關閉掣→btn-ghost
-         （診症內為 rounded-md 方形，其餘為 btn-circle 圓形）；無底色的分頁掣等→btn-ghost
-       - 固定全圓形的覆層控制掣（燈箱箭嘴／縮放、拍照快門等）保持原樣
-       - 模板庫（診斷／醫囑模板）、個人設置（慣用中藥／慣用穴位／診症設定）的
-         底線式分頁 tab 保持原樣（其切換函數會重置整個 className，不能加 btn）
-       節點加入時於觀察者回呼（paint 前）立即標準化，按鈕首次顯示即為最終樣式；
-       另每 2 秒做一次安全掃描作補救 */
-    (function () {
-        // 只匹配「類別開頭」的工具類，避免把 hover:bg-* 等變體前綴誤判（類別以空格分隔）
-        function hasBg(c) { return /(^|\s)bg-/.test(c); }
-        function hasPad(c) { return /(^|\s)(p|px|py)-/.test(c); }
-        function hasTextSize(c) { return /(^|\s)text-(xs|sm|base|lg|xl|2xl|3xl)(\s|$)/.test(c); }
-        function isFixedCircle(c) {
-            return /(^|\s)rounded-full(\s|$)/.test(c) && /(^|\s)w-/.test(c) && /(^|\s)h-/.test(c);
-        }
-        function isBareClose(el, c) {
-            if (hasBg(c) || hasPad(c)) return false;
-            var t = (el.textContent || '').trim();
-            // 僅限真正的關閉符或僅含圖示的按鈕；不可只用字數判斷（「展開」等兩字按鈕會誤中）
-            if (t === '×' || t === 'x' || t === 'X') return true;
-            if (t === '' && el.querySelector('svg')) return true;
-            return false;
-        }
-        function sizeVariant(c) {
-            if (/(^|\s)text-xs(\s|$)/.test(c) || /(^|\s)py-(0\.5|1)(\s|$)/.test(c)) return 'btn-xs';
-            if (/(^|\s)py-(3\.5|4|5)(\s|$)/.test(c) || /(^|\s)text-lg(\s|$)/.test(c)) return 'btn-lg';
-            if (/(^|\s)py-3(\s|$)/.test(c)) return '';
-            return 'btn-sm';
-        }
-        function stripRounded(el) {
-            Array.prototype.slice.call(el.classList).forEach(function (t) {
-                if (/^rounded(-|$)/.test(t)) el.classList.remove(t);
-            });
-        }
-        function normalize(el) {
-            if (el.dataset.btnNormalized) return;
-            el.dataset.btnNormalized = '1';
-            if (el.classList.contains('btn')) return;
-            // 模板庫（switchTemplateTab）／個人設置（switchPersonalTab）的底線式分頁 tab
-            // 保留原樣：其切換函數會把 className 整個重置為原始類別，若首次加上 btn，
-            // 會變成「初入頁面是按鈕樣式、切過分頁後才變回原樣」的不一致
-            var onclickAttr = el.getAttribute('onclick') || '';
-            // 會把 className 整個重置為原始類別的按鈕一律跳過：
-            // 若先加 btn，首次點擊後類別被清掉會縮小／移位。分頁 tab、各列表
-            // 篩選掣（中藥庫、穴位庫、收費項目、個人設置、模板庫、財務報表、用戶管理）皆屬此類
-            if (/switch(Personal|Template|Financial)Tab\(|filterHerbLibrary\(|filterBillingItems\(|filterAcupointLibrary\(|filterUsers\(/.test(onclickAttr)) return;
-            var c = el.className || '';
-            var inCons = el.closest ? !!el.closest('#consultationSystem') : false;
-            if (isFixedCircle(c)) return;
-            var add = ['btn'];
-            if (isBareClose(el, c)) {
-                add.push('btn-ghost');
-                if (inCons) { add.push('btn-xs', 'normal-case'); }
-                else { add.push('btn-circle', 'btn-sm'); }
-            } else {
-                var sv = sizeVariant(c);
-                if (sv) add.push(sv);
-                if (!hasTextSize(c)) add.push('text-base');
-                // 無底色的一般按鈕（底線式分頁掣等）以 ghost 呈現，保留其 border 類
-                if (!hasBg(c)) add.push('btn-ghost');
-                if (inCons) add.push('normal-case');
-            }
-            if (inCons) { stripRounded(el); add.push('rounded-md'); }
-            el.classList.add.apply(el.classList, add);
-        }
-        function scan(root) {
-            if (!root || root.nodeType !== 1) return;
-            try {
-                if (root.tagName === 'BUTTON') normalize(root);
-                if (root.querySelectorAll) root.querySelectorAll('button').forEach(normalize);
-            } catch (_eScan) {}
-        }
-        // 安全掃描：補救任何被漏接的按鈕
-        function safetySweep() {
-            try {
-                document.querySelectorAll('button:not(.btn):not([data-btn-normalized])').forEach(normalize);
-            } catch (_eSweep) {}
-        }
-        // 節點加入後立即標準化：回呼在該任務 paint 前執行，按鈕首次顯示即為最終樣式，
-        // 不會「先細體、數秒後變粗體／移位」（舊的 40ms 佇列在頁面持續有 mutation 時會餓死）
-        new MutationObserver(function (mutations) {
-            for (var i = 0; i < mutations.length; i++) {
-                var added = mutations[i].addedNodes;
-                for (var j = 0; j < added.length; j++) {
-                    if (added[j].nodeType === 1) scan(added[j]);
-                }
-            }
-        }).observe(document.documentElement, { childList: true, subtree: true });
-        setInterval(safetySweep, 2000);
-        function start() { scan(document.documentElement); safetySweep(); }
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-        else start();
-    })();
-    </script>
-
-    <script type="module" src="firebase_init.js?v=20261007a"></script>
+    <script type="module" src="firebase_init.js?v=20261010b"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
@@ -6234,7 +6269,7 @@
     <script src="schedule_management.js?v=20261010a" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
     <script type="module" src="js/app.js?v=20261006j"></script>
-    <script src="system.js?v=20261006j" defer></script>
+    <script src="system.js?v=20261010b" defer></script>
     <script src="attachments.js?v=20261010a" defer></script>
     <script src="personalStatistics.js?v=20261005a" defer></script>
     <script src="systemmanagement.js?v=20261010a" defer></script>

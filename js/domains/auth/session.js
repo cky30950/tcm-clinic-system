@@ -536,6 +536,11 @@ export async function syncUserDataFromFirebase(options = {}) {
             document.getElementById('loginPage').classList.add('hidden');
             document.getElementById('mainSystem').classList.remove('hidden');
             
+            // 掛載 MutationObserver（Lucide 圖標刷新 + DaisyUI 按鈕標準化）到主系統範圍
+            if (typeof window._attachSystemObservers === 'function') {
+                try { window._attachSystemObservers(); } catch (_e) {}
+            }
+            
             if (typeof G.showGlobalCopyright === 'function') {
                 try {
                     G.showGlobalCopyright();

@@ -1998,6 +1998,35 @@ const consultationHistoryPager = {
 };
 
 
+/* ============================================================
+ * 簡單的緩存大小管理：為沒有 LRU 的對象緩存提供上限保護。
+ * 當鍵數量超過 maxKeys 時，移除最舊的一半鍵。
+ * 只在寫入時調用，讀取不受影響。
+ * 掛到 window 上以讓 ESM 模組（js/domains/*）也能調用。
+ * ============================================================ */
+function trimCache(obj, maxKeys) {
+    if (!obj || typeof obj !== 'object') return;
+    var keys = Object.keys(obj);
+    if (keys.length <= maxKeys) return;
+    // 移除最舊的一半（利用 JS 對象鍵的插入順序）
+    var removeCount = Math.ceil(keys.length / 2);
+    for (var i = 0; i < removeCount; i++) {
+        delete obj[keys[i]];
+    }
+}
+window.trimCache = trimCache;
+
+// 各緩存的最大鍵數上限（超過時自動清理）
+const CACHE_MAX_KEYS = {
+    patientPagesCache: 50,
+    patientAscPagesCache: 50,
+    medicalRecordPageCache: 30,
+    medicalRecordAscPageCache: 30,
+    medicalRecordSearchCache: 20,
+    patientConsultationsCache: 100
+};
+window.CACHE_MAX_KEYS = CACHE_MAX_KEYS;
+
 
 
 let patientPagesCache = {};
@@ -12337,6 +12366,8 @@ class FirebaseDataManager {
             });
             // 儲存至快取以供後續使用
             patientConsultationsCache[patientId] = patientConsultations;
+            // 緩存大小保護
+            trimCache(patientConsultationsCache, 100);
             try {
                 localStorage.setItem('patientConsultations:' + String(patientId), JSON.stringify(patientConsultations));
             } catch (_lsErr) {}
@@ -14498,7 +14529,10 @@ async function displayMedicalRecords(pageChange = false) {
         let res = medicalRecordSearchCache[term] || null;
         if (!Array.isArray(res)) {
             res = await searchMedicalRecords(rawTerm, 50);
-            if (Array.isArray(res)) medicalRecordSearchCache[term] = res;
+            if (Array.isArray(res)) {
+                medicalRecordSearchCache[term] = res;
+                trimCache(medicalRecordSearchCache, 20);
+            }
         }
         medicalRecords = Array.isArray(res) ? res : [];
         await ensureMedicalRecordPatientLookupForRecords(medicalRecords);
@@ -14741,6 +14775,7 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
                 arrLast = sortMedicalRecordsBySortDateDesc(arrLast);
             } catch (_e) {}
             medicalRecordPageCache[page] = arrLast;
+            trimCache(medicalRecordPageCache, 30);
             return arrLast;
         }
         if (page === 1) {
@@ -14757,6 +14792,7 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             } catch (_e) {}
             medicalRecordPageCache[1] = arr;
             medicalRecordPageCursors[1] = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            trimCache(medicalRecordPageCache, 30);
             return arr;
         }
         // 確保擁有上一頁游標，若沒有則逐頁計算
@@ -14787,6 +14823,7 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         } catch (_e) {}
         medicalRecordPageCache[page] = arr2;
         medicalRecordPageCursors[page] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : medicalRecordPageCursors[prevPage];
+        trimCache(medicalRecordPageCache, 30);
         return arr2;
     } catch (_err) {
         return [];
@@ -14815,6 +14852,7 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             } catch (_e) {}
             medicalRecordAscPageCache[1] = arr;
             medicalRecordAscPageCursors[1] = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+            trimCache(medicalRecordAscPageCache, 30);
             return arr;
         }
         let prev = ascIndex - 1;
@@ -14844,6 +14882,7 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
         } catch (_e) {}
         medicalRecordAscPageCache[ascIndex] = arr2;
         medicalRecordAscPageCursors[ascIndex] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : medicalRecordAscPageCursors[prev];
+        trimCache(medicalRecordAscPageCache, 30);
         return arr2;
     } catch (_err) {
         return [];
