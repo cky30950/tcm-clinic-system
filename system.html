@@ -3,6 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 診斷追蹤器：記錄頁面生命週期關鍵點耗時，console 輸入 TCM_DIAG.report() 查看 -->
+    <script>
+    (function(){
+        window.TCM_DIAG = {
+            start: performance.now(),
+            marks: {},
+            mark: function(name){ this.marks[name] = performance.now(); },
+            report: function(){
+                const start = this.start;
+                console.log('%c[TCM 效能診斷]', 'font-size:14px;font-weight:bold;color:#2563eb');
+                console.log('頁面開始:', start.toFixed(0), 'ms (performance.timeOrigin)');
+                for (const [name, t] of Object.entries(this.marks)) {
+                    const delta = t - start;
+                    console.log(' +', name.padEnd(30), '→', delta.toFixed(0) + 'ms (+' + (Object.keys(this.marks).length > 1 ? (t - Object.values(this.marks)[Object.keys(this.marks).indexOf(name)-1]).toFixed(0) + 'ms' : '0ms') + ')');
+                }
+                console.log(' marks:', JSON.stringify(Object.fromEntries(Object.entries(this.marks).map(([k,v]) => [k, (v-start).toFixed(0)+'ms']))));
+            }
+        };
+        window.TCM_DIAG.mark('html-parsed');
+    })();
     <title>名醫診所系統</title>
     
     <link rel="icon" type="image/png" href="images/myLogo.png">
@@ -6243,5 +6263,31 @@
 
     <!-- 視訊診症延遲載入器：只有醫師點擊「視訊診症」時才動態下載 Agora SDK -->
     <script src="video/video-loader.js" defer></script>
+    <!-- 診斷自動標記：追蹤頁面生命週期 + Firebase Auth 狀態 -->
+    <script>
+    (function(){
+        var D = window.TCM_DIAG;
+        if (!D) return;
+        document.addEventListener('DOMContentLoaded', function(){ D.mark('DOMContentLoaded'); });
+        window.addEventListener('load', function(){ D.mark('window-load'); });
+        // Hook Firebase Auth — 追蹤登入狀態變化
+        var tryHookAuth = function(){
+            try {
+                var fb = window.firebase;
+                if (fb && fb.auth && fb.onAuthStateChanged) {
+                    fb.onAuthStateChanged(fb.auth, function(user){
+                        D.mark(user ? 'auth-signed-in' : 'auth-signed-out');
+                    });
+                    return true;
+                }
+            } catch(e) {}
+            return false;
+        };
+        // 輪詢等 Firebase 就緒（最遲 15 秒）
+        var tries = 0, iv = setInterval(function(){
+            if (tryHookAuth() || ++tries > 150) clearInterval(iv);
+        }, 100);
+    })();
+    </script>
 </body>
 </html>

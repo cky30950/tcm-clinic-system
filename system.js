@@ -14442,6 +14442,7 @@ function detachMedicalRecordListListener() {
  */
 async function loadMedicalRecordManagement() {
     try {
+        console.time('[診症記錄] 總耗時');
         // 確保分頁設定存在並重置當前頁
         if (!paginationSettings.medicalRecordList) {
             paginationSettings.medicalRecordList = { currentPage: 1, itemsPerPage: 10 };
@@ -14464,10 +14465,16 @@ async function loadMedicalRecordManagement() {
             searchInput.addEventListener('input', listener);
             searchInput._medicalRecordListener = listener;
         }
+        console.time('[診症記錄] getCount');
         const countRes = await getConsultationsCount();
+        console.timeEnd('[診症記錄] getCount');
         medicalRecordTotalCount = (countRes && typeof countRes.count === 'number') ? countRes.count : 0;
+        console.time('[診症記錄] display+fetch');
         await displayMedicalRecords(false);
+        console.timeEnd('[診症記錄] display+fetch');
+        console.timeEnd('[診症記錄] 總耗時');
     } catch (error) {
+        console.timeEnd('[診症記錄] 總耗時');
         console.error('初始化病歷管理時發生錯誤:', error);
     }
 }
@@ -14717,9 +14724,12 @@ async function getConsultationsCount() {
     try {
         await waitForFirebaseDb();
         const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+        const t0 = performance.now();
         const snapshot = await window.firebase.getCountFromServer(colRef);
+        console.log('[診症記錄] getCountFromServer 耗時:', (performance.now() - t0).toFixed(1) + 'ms');
         return { count: snapshot.data().count || 0 };
     } catch (_err) {
+        console.warn('[診症記錄] getCountFromServer 失敗:', _err && _err.message);
         return { count: 0 };
     }
 }
