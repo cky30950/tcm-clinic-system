@@ -3,7 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 診斷追蹤器：記錄頁面生命週期關鍵點耗時，console 輸入 TCM_DIAG.report() 查看 -->
+    <!-- 浮動 Console 面板：URL 加 ?debug=1 或 localStorage['tcm-debug']='1' 啟用 -->
+    <script>
+    (function(){
+        var urlParams = new URLSearchParams(location.search);
+        var enabled = urlParams.get('debug') === '1' || localStorage.getItem('tcm-debug') === '1';
+        if (!enabled) return;
+        // 確保 debug 模式持久化（除非用戶清除）
+        if (urlParams.get('debug') === '1') localStorage.setItem('tcm-debug', '1');
+
+        var logs = [];
+        var maxLogs = 200;
+        var origConsole = { log: console.log, warn: console.warn, error: console.error, info: console.info };
+        function capture(type, args) {
+            var text = Array.from(args).map(function(a){
+                if (a === null) return 'null';
+                if (a === undefined) return 'undefined';
+                if (typeof a === 'object') { try { return JSON.stringify(a, null, 0); } catch(_){ return String(a); } }
+                return String(a);
+            }).join(' ');
+            logs.push({ type: type, text: text, time: new Date().toLocaleTimeString() });
+            if (logs.length > maxLogs) logs.shift();
+            renderLog({ type: type, text: text, time: logs[logs.length-1].time });
+        }
+        console.log = function(){ capture('log', arguments); origConsole.log.apply(console, arguments); };
+        console.warn = function(){ capture('warn', arguments); origConsole.warn.apply(console, arguments); };
+        console.error = function(){ capture('error', arguments); origConsole.error.apply(console, arguments); };
+        console.info = function(){ capture('info', arguments); origConsole.info.apply(console, arguments); };
+
+        // 注入面板樣式
+        var style = document.createElement('style');
+        style.textContent = [
+            '#tcm-fc{position:fixed;bottom:0;left:0;right:0;max-height:45vh;background:rgba(15,23,42,0.95);color:#e2e8f0;font:12px/1.4 -apple-system,Menlo,monospace;z-index:2147483647;display:flex;flex-direction:column;border-top:2px solid #3b82f6;backdrop-filter:blur(8px);}',
+            '#tcm-fc.hidden{max-height:36px;overflow:hidden}',
+            '#tcm-fc header{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#1e293b;cursor:pointer;user-select:none;flex-shrink:0;border-bottom:1px solid #334155;}',
+            '#tcm-fc header .dot{width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;}',
+            '#tcm-fc header .title{flex:1;font-weight:600;color:#94a3b8;font-size:11px;}',
+            '#tcm-fc header .count{background:#3b82f6;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;}',
+            '#tcm-fc header button{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;}',
+            '#tcm-fc header button:active{background:#334155;}',
+            '#tcm-fc .body{overflow-y:auto;flex:1;padding:6px 10px;}',
+            '#tcm-fc .body::-webkit-scrollbar{width:4px;}',
+            '#tcm-fc .body::-webkit-scrollbar-thumb{background:#475569;border-radius:2px;}',
+            '#tcm-fc .entry{padding:3px 0;border-bottom:1px solid #1e293b;word-break:break-all;}',
+            '#tcm-fc .entry:last-child{border-bottom:none;}',
+            '#tcm-fc .entry .t{color:#64748b;margin-right:6px;font-size:10px;}',
+            '#tcm-fc .entry.info{color:#38bdf8;}',
+            '#tcm-fc .entry.warn{color:#fbbf24;}',
+            '#tcm-fc .entry.error{color:#f87171;background:rgba(248,113,113,0.08);}',
+            '#tcm-fc .entry.log{color:#cbd5e1;}'
+        ].join('\n');
+        document.head.appendChild(style);
+
+        // 建立面板
+        var panel = document.createElement('div');
+        panel.id = 'tcm-fc';
+        panel.innerHTML = '' +
+            '<header>' +
+                '<span class="dot"></span>' +
+                '<span class="title">🔍 TCM Debug Console</span>' +
+                '<span class="count" id="tcm-fc-count">0</span>' +
+                '<button id="tcm-fc-diag" title="效能診斷">⏱️</button>' +
+                '<button id="tcm-fc-clear" title="清除">🗑️</button>' +
+                '<button id="tcm-fc-close" title="收合">▼</button>' +
+            '</header>' +
+            '<div class="body" id="tcm-fc-body"></div>';
+        document.body.appendChild(panel);
+
+        var body = panel.querySelector('#tcm-fc-body');
+        var countEl = panel.querySelector('#tcm-fc-count');
+        var closeBtn = panel.querySelector('#tcm-fc-close');
+        var clearBtn = panel.querySelector('#tcm-fc-clear');
+        var diagBtn = panel.querySelector('#tcm-fc-diag');
+        var header = panel.querySelector('header');
+
+        function renderLog(entry) {
+            var div = document.createElement('div');
+            div.className = 'entry ' + entry.type;
+            div.innerHTML = '<span class="t">' + entry.time + '</span>' + escapeHtml(entry.text);
+            body.appendChild(div);
+            countEl.textContent = body.children.length;
+            // 自動滾到底
+            requestAnimationFrame(function(){ body.scrollTop = body.scrollHeight; });
+        }
+        function escapeHtml(s) {
+            return s.replace(/[&<>]/g, function(c){ return { '&':'&amp;','<':'&lt;','>':'&gt;' }[c]; });
+        }
+
+        closeBtn.addEventListener('click', function(e){
+            e.stopPropagation();
+            panel.classList.toggle('hidden');
+            closeBtn.textContent = panel.classList.contains('hidden') ? '▲' : '▼';
+        });
+        header.addEventListener('click', function(){
+            panel.classList.toggle('hidden');
+            closeBtn.textContent = panel.classList.contains('hidden') ? '▲' : '▼';
+        });
+        clearBtn.addEventListener('click', function(e){
+            e.stopPropagation();
+            body.innerHTML = '';
+            logs = [];
+            countEl.textContent = '0';
+        });
+        diagBtn.addEventListener('click', function(e){
+            e.stopPropagation();
+            capture('info', ['═══ 效能診斷 ═══']);
+            if (window.TCM_DIAG && typeof TCM_DIAG.report === 'function') {
+                var start = TCM_DIAG.start;
+                var entries = Object.entries(TCM_DIAG.marks);
+                capture('info', ['頁面開始:', start.toFixed(0) + 'ms']);
+                var prevT = start;
+                for (var i = 0; i < entries.length; i++) {
+                    var name = entries[i][0], t = entries[i][1];
+                    var total = (t - start).toFixed(0) + 'ms';
+                    var step = (t - prevT).toFixed(0) + 'ms';
+                    capture('info', [' + ' + name + ' → 總計 ' + total + ' (+' + step + ')']);
+                    prevT = t;
+                }
+            } else {
+                capture('warn', ['TCM_DIAG 未就緒，請稍後再試']);
+            }
+        });
+
+        // 也重定向 TCM_DIAG.report()
+        var origReport = window.TCM_DIAG && window.TCM_DIAG.report;
+        if (origReport) {
+            window.TCM_DIAG.report = function(){ origConsole.log.apply(console, arguments); diagBtn.click(); };
+        }
+
+        // 把之前已 console 的也補進來（有些錯誤可能在面板建立前就發生了）
+        origConsole.info('🔍 TCM Debug Console 已啟用 — URL 加 ?debug=1 或清除 localStorage[tcm-debug] 可關閉');
+    })();
+    <!-- 效能診斷追蹤器 -->
     <script>
     (function(){
         window.TCM_DIAG = {
@@ -11,14 +142,18 @@
             marks: {},
             mark: function(name){ this.marks[name] = performance.now(); },
             report: function(){
-                const start = this.start;
+                var start = this.start;
+                var entries = Object.entries(this.marks);
                 console.log('%c[TCM 效能診斷]', 'font-size:14px;font-weight:bold;color:#2563eb');
-                console.log('頁面開始:', start.toFixed(0), 'ms (performance.timeOrigin)');
-                for (const [name, t] of Object.entries(this.marks)) {
-                    const delta = t - start;
-                    console.log(' +', name.padEnd(30), '→', delta.toFixed(0) + 'ms (+' + (Object.keys(this.marks).length > 1 ? (t - Object.values(this.marks)[Object.keys(this.marks).indexOf(name)-1]).toFixed(0) + 'ms' : '0ms') + ')');
+                console.log('頁面開始:', start.toFixed(0) + 'ms');
+                var prevT = start;
+                for (var i = 0; i < entries.length; i++) {
+                    var name = entries[i][0], t = entries[i][1];
+                    var total = (t - start).toFixed(0) + 'ms';
+                    var step = (t - prevT).toFixed(0) + 'ms';
+                    console.log(' +', name.padEnd(28), '→', total + 'ms (+' + step + ')');
+                    prevT = t;
                 }
-                console.log(' marks:', JSON.stringify(Object.fromEntries(Object.entries(this.marks).map(([k,v]) => [k, (v-start).toFixed(0)+'ms']))));
             }
         };
         window.TCM_DIAG.mark('html-parsed');
