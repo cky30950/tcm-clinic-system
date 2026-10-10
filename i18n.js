@@ -3046,18 +3046,25 @@ function setLanguage(lang) {
 
 
 const observer = new MutationObserver(mutations => {
-    
+    /* isTranslating 保護：translateNode 設 textContent/nodeValue 會造成
+     * 新的 DOM mutations（移除舊子節點、新增新文字節點），這些會再次觸發
+     * observer。設保護旗標防止反饋循環造成多輪無謂重排（手機上看起來像
+     * 按鈕不停跳動）。 */
     if (isTranslating) return;
-    const lang = localStorage.getItem('lang') || 'zh';
-    const dict = window.translations[lang] || {};
-    mutations.forEach(m => {
-        if (m.addedNodes && m.addedNodes.length > 0) {
-            m.addedNodes.forEach(node => {
-                
-                translateNode(node, dict, lang);
-            });
-        }
-    });
+    isTranslating = true;
+    try {
+        const lang = localStorage.getItem('lang') || 'zh';
+        const dict = window.translations[lang] || {};
+        mutations.forEach(m => {
+            if (m.addedNodes && m.addedNodes.length > 0) {
+                m.addedNodes.forEach(node => {
+                    translateNode(node, dict, lang);
+                });
+            }
+        });
+    } finally {
+        isTranslating = false;
+    }
 });
 
 

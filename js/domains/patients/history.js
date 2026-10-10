@@ -385,7 +385,10 @@ import { printAttendanceCertificate, printConsultationRecord, printPrescriptionI
         }
         
         export function getMedicalHistoryActionButtonClasses(variant, disabled = false) {
-            const baseClasses = 'inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold leading-none whitespace-nowrap transition-all duration-200';
+            /* transition-colors：只過渡顏色變化，不影響 transform/box-shadow/版面重排。
+               transition-all 在手機上配合 i18n observer 的多輪 DOM 更新會造成版面
+               重排也被加上 200ms 動畫 → 看起來像按鈕不停跳動。 */
+            const baseClasses = 'inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold leading-none whitespace-nowrap transition-colors duration-200';
             if (disabled) {
                 return `${baseClasses} border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed`;
             }
