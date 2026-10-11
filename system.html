@@ -588,11 +588,14 @@
          * 手機版排版優化
          *
          * 設置了一些媒體查詢，當螢幕寬度小於 640px（即常見手機螢幕寬度）時，
-         * 將會覆寫部分 Tailwind 的固定寬度或最大寬度設定，並允許文字換行，
-         * 以避免版面橫向溢出造成需要左右捲動。
+         * 將會覆寫部分 Tailwind 的固定寬度或最大寬度設定，以避免版面橫向溢出。
          *
-         * 這裡覆寫常見的 max-w-* 與 w-* 類別，使其在小螢幕上擴充為 100%，
-         * 同時亦將 whitespace-nowrap 改為 normal，使按鈕或標題可自動換行。
+         * 注意：以下規則只針對「實際會溢出的具體元件」微調，不再作全域轟炸：
+         * - 不強制 .whitespace-nowrap 換行：表格操作欄（掛號／病人列表）的按鈕
+         *   刻意單行排列並置於 .overflow-x-auto 容器，強制換行會令按鈕逐字斷行、
+         *   同列按鈕高低不一。
+         * - 不強制所有 .grid-cols-* 轉單欄：現有版面幾乎已用 grid-cols-1 md:…
+         *   響應式寫法，全域規則只會誤傷刻意保留 2 欄的版面（如個人統計磚）。
          *
          * 另外也調整 toast 提示的寬度與位置，使其在手機上不會超出螢幕範圍。
          */
@@ -604,19 +607,61 @@
                 width: 100% !important;
             }
 
-            /* 常用固定寬度類別在手機上設為 100% 寬，避免橫向溢出 */
-            .w-64, .w-72, .w-80, .w-96 {
-                width: 100% !important;
+            /* 側邊抽屜：手機上不要全螢幕，改為佔視窗 85%（上限 320px）。
+               注意不可用 .w-64 { width:100% } 全域規則：一來會令抽屜變全螢幕，
+               二來 w-full md:w-64 這類響應式類的元素在大螢幕才應套用 w-64，
+               類名本身常駐於 DOM，全域規則會誤判。 */
+            #sidebar {
+                width: 85vw !important;
+                max-width: 320px;
             }
 
-            /* 允許按鈕等元素內文換行 */
-            .whitespace-nowrap {
-                white-space: normal !important;
+            /* ==============================================
+             * 頂部 nav 防擠壓
+             *
+             * 右側「當前診所：xxx」+ 登出鈕與左側標題在 390px 下互相搶位，
+             * 標題被擠到 80px 後逐字斷行，與右側文字視覺重疊。
+             * 手機上隱藏診所全名（切換診所鈕僅多診所帳號才出現）與英文副標，
+             * 標題保持單行不縮排，兩側不再碰撞。
+             * ============================================== */
+            #systemTitle {
+                font-size: 1.05rem;
+                white-space: nowrap;
+            }
+            #systemEnglishTitle,
+            #currentClinicDisplay {
+                display: none;
+            }
+            nav .flex.justify-between.items-center {
+                flex-wrap: wrap;
+                gap: 0.25rem 0.5rem;
+            }
+            nav .flex.justify-between.items-center > .flex.items-center.space-x-4 {
+                gap: 0.5rem;
+            }
+            /* nav 按鈕維持單行，避免窄空間下「登出」等按鈕逐字斷行變高 */
+            nav button {
+                white-space: nowrap;
             }
 
-            /* 將具有多欄的 Grid 強制成單欄顯示，減少橫向擁擠 */
-            .grid-cols-2, .grid-cols-3, .grid-cols-4, .grid-cols-5, .grid-cols-6 {
-                grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+            /* ==============================================
+             * 寬表格：手機上以橫向滑動取代逐字斷行
+             *
+             * table 寬度 100% 時，未設 nowrap 的一般儲存格會被壓到最小內容寬度，
+             * 中文標題（序號／病人姓名）與內容（陳大文）逐字直排，視覺上如同
+             * 文字重疊錯位。表格既已放在 .overflow-x-auto 容器，統一讓儲存格
+             * 保持單行，由容器承擔橫滑；需要截斷的長文字欄位自帶 truncate 類別，
+             * 照常顯示省略號。
+             * ============================================== */
+            .overflow-x-auto > table th,
+            .overflow-x-auto > table td {
+                white-space: nowrap;
+            }
+            /* daisyUI 按鈕維持單行：實際版面的按鈕群容器（flex-wrap 工具列、
+               表格操作欄）已自行決定換行時機，不應由按鈕內部逐字斷行，否則
+               同列按鈕會高低不一 */
+            .btn {
+                white-space: nowrap;
             }
 
             /* 移除舊的 .toast 手機樣式，使用 Toastr 預設樣式即可 */
@@ -710,19 +755,22 @@
             /*
              * 下拉選單樣式調整
              *
-             * 在手機版面中，許多 <select> 元素會因為預設寬度或選項文字較長而超出容器，
-             * 導致橫向滾動或被截斷。為了改善在小螢幕上的呈現，
-             * 將所有 select（排除語言切換器 #languageSelector）設定為 100% 寬度、
-             * 同時將最小寬度設為 0，確保它們可以隨容器縮放。這能避免因內容過長而溢出框外。
+             * 所有 select 先統一設防溢出（max-width:100%、min-width:0），
+             * 但「寬度 100%」只套用在直接父層為一般區塊（div/label）的表單選單；
+             * flex 工具列（如篩選列）中的 select 必須維持自然寬度，否則一個
+             * 全寬選單會把同行按鈕擠走、換行，造成按鈕大小不一與走位。
+             * 篩選列專用的 .filter-select 同樣排除（由下方 ID 規則按需要處理）。
              *
              * 另外，某些選單在桌面版使用 ml-auto 將其推到容器的右側，
              * 在窄螢幕換行後會造成難以預料的位置偏移。透過移除 margin-left，讓
              * 排序選單在換行時保持靠左對齊。
              */
             select:not(#languageSelector) {
-                width: 100% !important;
                 max-width: 100% !important;
                 min-width: 0 !important;
+            }
+            :is(div:not(.flex), label) > select:not(#languageSelector):not(.filter-select) {
+                width: 100% !important;
             }
             #herbSortSelect {
                 margin-left: 0 !important;
@@ -6287,7 +6335,7 @@
     <script src="schedule_management.js?v=20261011a" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
     <script type="module" src="js/app.js?v=20261011a"></script>
-    <script src="system.js?v=20261011b" defer></script>
+    <script src="system.js?v=20261012a" defer></script>
     <script src="attachments.js?v=20261011c" defer></script>
     <script src="personalStatistics.js?v=20261011a" defer></script>
     <script src="systemmanagement.js?v=20261010a" defer></script>

@@ -20,7 +20,10 @@
 // v1.1.12：進一步優化 — consultation 列表/搜尋緩存 projection（移除大型嵌套欄位，
 //          記憶體減少 80-90%）、停用 autoWarmup、Chart.js/Tabulator 改功能級懶加載、
 //          修正 i18n/attachments/vendor-enhance 三個 MutationObserver 觀察範圍
-const CACHE_VERSION = 'v1.1.12';
+// v1.1.13：修復殘留舊版用戶的手機排版崩壞——遞增版本以清空 Play CDN 時代遺留的
+//          shell 快取（舊 HTML 無 daisyUI、按鈕尺寸全亂）；文件導航因逾時／斷網
+//          而回放舊快取後，改為背景補刷新，避免慢網路用戶每次都反覆載入過時頁面
+const CACHE_VERSION = 'v1.1.13';
 const SHELL_CACHE = 'shell-' + CACHE_VERSION;
 const CDN_CACHE = 'cdn-' + CACHE_VERSION;
 
@@ -260,7 +263,7 @@ self.addEventListener('fetch', (event) => {
                 event.respondWith(handleSensitiveDocument(req));
                 return;
             }
-            event.respondWith(handleDocument(req));
+            event.respondWith(handleDocument(req, event));
             return;
         }
         event.respondWith(handleSameOriginStatic(req));
@@ -290,7 +293,7 @@ function fetchDocument(req) {
     });
 }
 
-async function handleDocument(req) {
+async function handleDocument(req, event) {
     const cache = await caches.open(SHELL_CACHE);
     try {
         const fresh = await fetchWithTimeout(function () { return fetchDocument(req); }, DOCUMENT_NETWORK_TIMEOUT_MS);
@@ -299,17 +302,47 @@ async function handleDocument(req) {
             return fresh;
         }
         const cachedOnError = await cache.match(req);
-        if (cachedOnError) return cachedOnError;
+        if (cachedOnError) {
+            // 伺服器錯誤回放快取時，背景補試一次網路（成功即更新快取），
+            // 令下一次導航不再依賴過時內容
+            refreshDocumentInBackground(cache, req, event);
+            return cachedOnError;
+        }
         return fresh;
     } catch (_err) {
         const cached = await cache.match(req);
-        if (cached) return cached;
+        if (cached) {
+            // 逾時／斷網：本次先回放舊快取保證可用，但必須在背景補刷新——
+            // 否則手機網路每次都剛好逾時時，用戶會無限期看到同一過時頁面
+            // （曾發生用戶殘留 Tailwind Play CDN 時代 HTML，手機排版整個崩壞）
+            refreshDocumentInBackground(cache, req, event);
+            return cached;
+        }
         const fallback = await caches.match('/offline');
         if (fallback) return fallback;
         return new Response('您目前離線', {
             status: 503,
             headers: { 'Content-Type': 'text/plain; charset=utf-8' }
         });
+    }
+}
+
+/* 背景補刷新文件快取：不阻塞本次回應，成功才寫入。
+   透過 event.waitUntil 延長 SW 生命週期，避免背景請求被中斷；
+   並作跨請求去重，避免多分頁同時回放時重複打網路。 */
+const docRefreshInflight = new Set();
+function refreshDocumentInBackground(cache, req, event) {
+    const key = req.url;
+    if (docRefreshInflight.has(key)) return;
+    docRefreshInflight.add(key);
+    const job = fetchDocument(req)
+        .then((res) => {
+            if (res && res.ok) return cache.put(req, res);
+        })
+        .catch(() => {})
+        .finally(() => { docRefreshInflight.delete(key); });
+    if (event && typeof event.waitUntil === 'function') {
+        try { event.waitUntil(job); } catch (_e) {}
     }
 }
 

@@ -19870,7 +19870,7 @@ ${(Array.isArray(item.points) ? item.points : []).map(pt => {
                     <label class="block text-gray-700 font-medium mb-2">模板名稱 *</label>
                     <input type="text" id="prescriptionNameInput" value="${esc(item.name || '')}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                   </div>
-                  <div class="grid grid-cols-2 gap-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">分類</label>
                       <select id="prescriptionCategorySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
@@ -19882,7 +19882,7 @@ ${(Array.isArray(item.points) ? item.points : []).map(pt => {
                       <input type="text" id="prescriptionDurationInput" value="${esc(item.duration || '')}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-400 focus:outline-none">
                     </div>
                   </div>
-                  <div class="grid grid-cols-2 gap-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">複診時間</label>
                       <div class="flex gap-2">
@@ -19926,7 +19926,7 @@ ${(Array.isArray(item.points) ? item.points : []).map(pt => {
                     <label class="block text-gray-700 font-medium mb-2">現病史</label>
                     <textarea id="diagnosisCurrentHistoryInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="6">${esc(item.currentHistory || '')}</textarea>
                   </div>
-                  <div class="grid grid-cols-2 gap-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">舌象</label>
                       <textarea id="diagnosisTongueInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${esc(item.tongue || '')}</textarea>
@@ -19936,7 +19936,7 @@ ${(Array.isArray(item.points) ? item.points : []).map(pt => {
                       <textarea id="diagnosisPulseInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${esc(item.pulse || '')}</textarea>
                     </div>
                   </div>
-                  <div class="grid grid-cols-2 gap-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-gray-700 font-medium mb-2">中醫診斷</label>
                       <textarea id="diagnosisTcmDiagnosisInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2">${esc(item.tcmDiagnosis || '')}</textarea>
