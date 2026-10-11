@@ -280,7 +280,18 @@
                 });
             }
         });
-        observer.observe(document.documentElement, { childList: true, subtree: true });
+        // 觀察範圍縮小到登入頁 + 主系統區域，避免頁面其他區域（如 service
+        // worker 注入、瀏覽器擴充套件節點）的變化觸發不必要的全頁掃描。
+        // 登入前只有 #loginPage；登入後 #mainSystem 接管；兩者都觀察不影響。
+        const observeTargets = [];
+        const lp = document.getElementById('loginPage');
+        const ms = document.getElementById('mainSystem');
+        if (lp) observeTargets.push(lp);
+        if (ms) observeTargets.push(ms);
+        if (!observeTargets.length) observeTargets.push(document.documentElement);
+        observeTargets.forEach(function (el) {
+            observer.observe(el, { childList: true, subtree: true });
+        });
     }
 
     if (document.readyState === 'loading') {

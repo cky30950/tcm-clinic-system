@@ -471,6 +471,14 @@ async function loadPersonalStatistics() {
     bindPersonalStatsLanguageHook();
     const tr = (text) => (typeof window.t === 'function' ? window.t(text) : text);
     try {
+        // 動態加載 Chart.js（原在首屏加載，改為功能級懶加載）
+        if (window.TCMLazy && typeof window.TCMLazy.load === 'function') {
+            await window.TCMLazy.load('chartjs').catch(() => {});
+        }
+        if (!window.Chart) {
+            setPersonalStatsMessage('error', tr('圖表函式庫載入失敗，請檢查網路連線。'));
+            return;
+        }
         // owner 身份為 Firebase Auth uid（舊版曾用 username，已全面改 uid）
         let doctor = '';
         try {

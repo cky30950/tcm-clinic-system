@@ -335,7 +335,17 @@
                 scanHydrate(document);
             });
         });
-        imgObserver.observe(document.body, { childList: true, subtree: true });
+        // 觀察範圍縮小到登入頁 + 主系統區域，避免頁面其他區域的變化
+        // （如 service worker 注入、瀏覽器擴充套件節點）觸發不必要的掃描
+        const observeTargets = [];
+        const lp = document.getElementById('loginPage');
+        const ms = document.getElementById('mainSystem');
+        if (lp) observeTargets.push(lp);
+        if (ms) observeTargets.push(ms);
+        if (!observeTargets.length) observeTargets.push(document.body);
+        observeTargets.forEach(function (el) {
+            imgObserver.observe(el, { childList: true, subtree: true });
+        });
         scanHydrate(document);
     }
     if (document.body) initImageHydrator();

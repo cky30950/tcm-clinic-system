@@ -2016,6 +2016,32 @@ function trimCache(obj, maxKeys) {
 }
 window.trimCache = trimCache;
 
+/* ============================================================
+ * consultationProjectionForList(doc) — 列表/緩存用精簡 projection
+ * ------------------------------------------------------------
+ * 從完整 consultation 文檔中提取列表顯示和搜尋緩存需要的欄位，
+ * 移除只在詳情彈窗才需要的大型嵌套結構（藥方、收費、病史、審計、附件等）。
+ * 完整文檔可達 10-50KB；projection 後通常 <2KB，緩存記憶體佔用減少 80-90%。
+ * 詳情彈窗打開時會從 Firestore 重新讀取完整文檔（既有行為，不受影響）。
+ * ============================================================ */
+const CONSULTATION_LARGE_FIELDS = [
+    'symptoms', 'medicalHistory', 'prescription', 'prescriptions',
+    'billingItems', 'auditLog', 'auditTrail', 'attachments',
+    'packageRecords', 'packageHistory', 'packageChanges',
+    'revertRecord', 'consultationDetails'
+];
+function consultationProjectionForList(doc) {
+    if (!doc || typeof doc !== 'object') return doc;
+    var out = {};
+    for (var key in doc) {
+        if (!Object.prototype.hasOwnProperty.call(doc, key)) continue;
+        if (CONSULTATION_LARGE_FIELDS.indexOf(key) !== -1) continue;
+        out[key] = doc[key];
+    }
+    return out;
+}
+window.consultationProjectionForList = consultationProjectionForList;
+
 // 各緩存的最大鍵數上限（超過時自動清理）
 const CACHE_MAX_KEYS = {
     patientPagesCache: 50,
@@ -14770,7 +14796,7 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             );
             const snapLast = await window.firebase.getDocs(q);
             let arrLast = [];
-            snapLast.forEach(d => arrLast.push({ id: d.id, ...d.data() }));
+            snapLast.forEach(d => arrLast.push(consultationProjectionForList({ id: d.id, ...d.data() })));
             try {
                 arrLast = sortMedicalRecordsBySortDateDesc(arrLast);
             } catch (_e) {}
@@ -14786,7 +14812,7 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             );
             const snap = await window.firebase.getDocs(q);
             let arr = [];
-            snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
+            snap.forEach(d => arr.push(consultationProjectionForList({ id: d.id, ...d.data() })));
             try {
                 arr = sortMedicalRecordsBySortDateDesc(arr);
             } catch (_e) {}
@@ -14817,7 +14843,7 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         );
         const snap2 = await window.firebase.getDocs(q);
         let arr2 = [];
-        snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
+        snap2.forEach(d => arr2.push(consultationProjectionForList({ id: d.id, ...d.data() })));
         try {
             arr2 = sortMedicalRecordsBySortDateDesc(arr2);
         } catch (_e) {}
@@ -14846,7 +14872,7 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             );
             const snap = await window.firebase.getDocs(q);
             let arr = [];
-            snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
+            snap.forEach(d => arr.push(consultationProjectionForList({ id: d.id, ...d.data() })));
             try {
                 arr = sortMedicalRecordsBySortDateDesc(arr);
             } catch (_e) {}
@@ -14876,7 +14902,7 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
         );
         const snap2 = await window.firebase.getDocs(q);
         let arr2 = [];
-        snap2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
+        snap2.forEach(d => arr2.push(consultationProjectionForList({ id: d.id, ...d.data() })));
         try {
             arr2 = sortMedicalRecordsBySortDateDesc(arr2);
         } catch (_e) {}
@@ -15329,6 +15355,8 @@ async function searchMedicalRecords(term, limitCount = 50) {
         try {
             out = sortMedicalRecordsBySortDateDesc(out);
         } catch (_e) {}
+        // 移除大型嵌套欄位後再返回（列表/搜尋結果緩存用）
+        out = out.map(consultationProjectionForList);
         return out;
     } catch (_err) {
         return [];

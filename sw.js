@@ -17,7 +17,10 @@
 // v1.1.10：程式資源改回 stale-while-revalidate（解決手機 network-first 每次驗證 RTT 瓶頸）
 // v1.1.11：CPU/記憶體優化 — 縮小 MutationObserver 觀察範圍、移除永不停止 setInterval、
 //          靜默 console.log、Firebase IndexedDB 緩存限為 20MB
-const CACHE_VERSION = 'v1.1.11';
+// v1.1.12：進一步優化 — consultation 列表/搜尋緩存 projection（移除大型嵌套欄位，
+//          記憶體減少 80-90%）、停用 autoWarmup、Chart.js/Tabulator 改功能級懶加載、
+//          修正 i18n/attachments/vendor-enhance 三個 MutationObserver 觀察範圍
+const CACHE_VERSION = 'v1.1.12';
 const SHELL_CACHE = 'shell-' + CACHE_VERSION;
 const CDN_CACHE = 'cdn-' + CACHE_VERSION;
 

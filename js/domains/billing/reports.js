@@ -131,6 +131,11 @@ import { getApportionedCost } from './expenses.js';
         
         // 載入財務報表頁面
         export async function loadFinancialReports() {
+            // 動態加載 Chart.js（原在首屏加載，改為功能級懶加載）
+            if (window.TCMLazy && typeof window.TCMLazy.load === 'function') {
+                await window.TCMLazy.load('chartjs').catch(() => {});
+            }
+
             // 設置預設日期範圍（本月）
             const today = new Date();
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);

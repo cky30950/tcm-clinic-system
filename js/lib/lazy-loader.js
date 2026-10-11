@@ -49,6 +49,14 @@
         'js/vendor/dompurify/purify.min.js?v=20261005a'
     ], function () { return !!window.DOMPurify; });
 
+    define('chartjs', [
+        'https://cdn.jsdelivr.net/npm/chart.js'
+    ], function () { return !!window.Chart; });
+
+    define('tabulator', [
+        'js/vendor/tabulator/tabulator.min.js?v=20261005a'
+    ], function () { return !!window.Tabulator; });
+
     /* 插入一個 <script> 或 <link>，回傳 Promise
      * 注意：<link rel=stylesheet>.onload 在 Safari 上不可靠，
      * 所以對 CSS 加 3 秒 timeout fallback（不阻塞後續 JS 載入）*/
@@ -128,55 +136,12 @@
         }
     };
 
-    /* ── 自動預熱：登入後，在瀏覽器閒時間自動下載大庫 ──────────────────── */
-    function autoWarmup() {
-        // 檢查登入狀態（Firebase Auth currentUser 存在即表示已登入）
-        var hasAuth = false;
-        try {
-            hasAuth = !!(window.firebase && window.firebase.auth && window.firebase.auth.currentUser);
-            // 備援：localStorage['users'] 有資料
-            if (!hasAuth && localStorage.getItem('users')) {
-                try {
-                    var users = JSON.parse(localStorage.getItem('users'));
-                    hasAuth = !!(users && Object.keys(users).length > 0);
-                } catch (_e) {}
-            }
-        } catch (_e) { return; }
-        if (!hasAuth) return;
+    /* ── 自動預熱：已停用 — 登入後不自動下載任何大庫，
+       避免閒置時默默消耗記憶體與頻寬。需要時以功能點擊觸發即可。
+       若未來想恢復，取消以下代碼註解並改 requestIdleCallback。 */
+    // function autoWarmup() { ... }
+    // if (document.readyState === 'loading') { ... }
 
-        var WARMUP_TARGETS = ['xlsx', 'qrcode'];
-        var queue = WARMUP_TARGETS.slice();
-
-        function warmupNext() {
-            if (queue.length === 0) return;
-            var name = queue.shift();
-            if (LOADERS[name].test()) { warmupNext(); return; }
-            load(name).then(function () {
-                scheduleIdle(warmupNext, 2000);
-            }).catch(function () {
-                console.warn('[lazy-loader] 預熱失敗: ' + name);
-                scheduleIdle(warmupNext, 10000);
-            });
-        }
-
-        function scheduleIdle(fn, delay) {
-            var start = function () {
-                if ('requestIdleCallback' in window) {
-                    requestIdleCallback(fn, { timeout: 5000 });
-                } else {
-                    setTimeout(fn, delay || 1000);
-                }
-            };
-            if (delay) setTimeout(start, delay); else start();
-        }
-
-        // 登入後 2 秒開始預熱
-        scheduleIdle(warmupNext, 2000);
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', autoWarmup, { once: true });
-    } else {
-        autoWarmup();
-    }
+    /* 保留 TCMLazy.load() 手動調用入口 */
+    window._disableAutoWarmup = true;
 })();

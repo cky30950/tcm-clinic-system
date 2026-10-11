@@ -348,6 +348,11 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
     const panel = document.getElementById('walletPanel');
     if (!panel) return;
 
+    // 動態加載 Tabulator（原在首屏加載，改為功能級懶加載）
+    if (window.TCMLazy && typeof window.TCMLazy.load === 'function') {
+      await window.TCMLazy.load('tabulator').catch(() => {});
+    }
+
     const account = await getWalletAccount(patientId, !!force);
     let txs = [];
     if (account) txs = await loadWalletTransactions(patientId);
