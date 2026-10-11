@@ -271,12 +271,13 @@
 
     function showSetupGuide() {
         var message = '請先在 video/agora-config.js 填入 Agora App ID（測試模式），重新整理後再試。';
-        if (window.Swal) {
-            window.Swal.fire({
-                icon: 'info',
+        if (window.TCMDialog) {
+            window.TCMDialog.nxAlert({
+                kind: 'info',
                 title: '尚未設置視訊診症',
+                // 內容全為固定開發者字串，無用戶輸入
                 html: '請打開 <b>video/agora-config.js</b>，把 Agora Console 取得的 <b>App ID</b> 填入 <code>APP_ID</code> 後重新整理頁面。<br><br>正式環境請再設定 <code>TOKEN_URL</code>（雲端伺服器函式）。',
-                confirmButtonText: '我知道了'
+                okText: '我知道了'
             });
         } else {
             notify(message, 'error');
@@ -336,23 +337,21 @@
         var objectUrl = URL.createObjectURL(blob);
         var confirmed = false;
         try {
-            if (window.Swal) {
-                var result = await window.Swal.fire({
+            if (window.TCMDialog) {
+                // objectUrl 為本機 URL.createObjectURL 產生的 blob: 網址，非外部輸入
+                var result = await window.TCMDialog.confirm({
                     title: '舌象截圖',
-                    text: '確認將此畫面上傳到本次病歷的舌象圖片？',
-                    imageUrl: objectUrl,
-                    imageAlt: '舌象截圖預覽',
-                    showCancelButton: true,
-                    confirmButtonText: '上傳到本次病歷',
-                    cancelButtonText: '取消重拍',
-                    focusCancel: true
+                    html: '<div class="mb-3">確認將此畫面上傳到本次病歷的舌象圖片？</div>' +
+                        '<img src="' + objectUrl + '" alt="舌象截圖預覽" class="max-h-[50vh] mx-auto rounded-lg border border-gray-200">',
+                    okText: '上傳到本次病歷',
+                    cancelText: '取消重拍'
                 });
                 confirmed = !!(result && result.isConfirmed);
             } else {
                 confirmed = window.confirm('將此舌象截圖上傳到本次病歷？');
             }
         } finally {
-            // Swal 會把圖片複製進自身 DOM；對話框關閉後即可釋放
+            // 對話框關閉後 DOM 已移除，延遲釋放影像資源
             setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 2000);
         }
         if (!confirmed) return;

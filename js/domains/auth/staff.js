@@ -1024,18 +1024,16 @@ export async function archiveUser(id) {
     const safeName = window.escapeHtml(user.name || '');
     const safePosition = window.escapeHtml(user.position || '');
     const safeEmail = window.escapeHtml(user.email || (lang === 'en' ? 'Not set' : '未設定'));
-    const swalResult = await Swal.fire({
-        icon: 'warning',
+    const swalResult = await window.TCMDialog.prompt({
         title: lang === 'en' ? 'Archive user (resigned)?' : '封存用戶（離職）？',
+        input: 'text',
+        placeholder: lang === 'en' ? 'Resignation reason (optional)' : '離職原因（選填）',
         html: lang === 'en'
             ? `User: <b>${safeName}</b><br/>Position: ${safePosition}<br/>Email: ${safeEmail}<br/><br/>The account will be disabled and cannot log in. Records are retained for audit and can be restored later.`
             : `用戶：<b>${safeName}</b><br/>職位：${safePosition}<br/>電子郵件：${safeEmail}<br/><br/>封存後該帳號將停用且無法登入，資料保留供日後審計，可隨時復職。`,
-        input: 'text',
-        inputPlaceholder: lang === 'en' ? 'Resignation reason (optional)' : '離職原因（選填）',
-        showCancelButton: true,
-        confirmButtonText: lang === 'en' ? 'Archive' : '確定封存',
-        cancelButtonText: lang === 'en' ? 'Cancel' : '取消',
-        focusConfirm: false
+        okText: lang === 'en' ? 'Archive' : '確定封存',
+        cancelText: lang === 'en' ? 'Cancel' : '取消',
+        danger: true
     });
     if (!swalResult || !swalResult.isConfirmed) return;
     const reason = String(swalResult.value || '').trim().slice(0, 200);

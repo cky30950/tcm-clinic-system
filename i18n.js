@@ -3017,23 +3017,31 @@ function translateNode(node, dict, lang) {
 }
 
 
+// 本次工作階段是否曾切到非 zh 語言。zh 為原始語言，初次載入時 DOM 即
+// 中文原文，zh→zh 的全頁走訪純屬浪費；但若曾譯成 en 再切回 zh，則須重跑
+// translateNode 以 __originalText 還原中文。
+var everTranslatedAway = false;
+
 function applyTranslations() {
-    
+
     if (isTranslating) return;
+    const lang = localStorage.getItem('lang') || 'zh';
+    if (lang !== 'zh') everTranslatedAway = true;
+    if (lang === 'zh' && !everTranslatedAway) return;
     isTranslating = true;
     try {
-        const lang = localStorage.getItem('lang') || 'zh';
         const dict = window.translations[lang] || {};
-        
+
         translateNode(document.body, dict, lang);
     } finally {
-        
+
         isTranslating = false;
     }
 }
 
 
 function setLanguage(lang) {
+    if (lang !== 'zh') everTranslatedAway = true;
     localStorage.setItem('lang', lang);
     applyTranslations();
 }
@@ -3051,9 +3059,32 @@ const observer = new MutationObserver(mutations => {
      * observer。設保護旗標防止反饋循環造成多輪無謂重排（手機上看起來像
      * 按鈕不停跳動）。 */
     if (isTranslating) return;
+    const lang = localStorage.getItem('lang') || 'zh';
+    // zh 為原始語言：新增節點本身即中文，逐文字節點走訪＋regex 比對純浪費。
+    // 例外：子樹帶有非 zh 的 data-last-lang 標記（如 cloneNode 複製的已翻譯
+    // 節點），仍需進 translateNode 處理。
+    if (lang === 'zh') {
+        for (const m of mutations) {
+            if (!m.addedNodes || m.addedNodes.length === 0) continue;
+            for (const node of m.addedNodes) {
+                if (node.nodeType !== 1) continue;
+                const selfTagged = node.dataset && node.dataset.lastLang && node.dataset.lastLang !== 'zh';
+                const childTagged = node.querySelector
+                    && node.querySelector('[data-last-lang]:not([data-last-lang="zh"])');
+                if (selfTagged || childTagged) {
+                    isTranslating = true;
+                    try {
+                        translateNode(node, window.translations.zh || {}, 'zh');
+                    } finally {
+                        isTranslating = false;
+                    }
+                }
+            }
+        }
+        return;
+    }
     isTranslating = true;
     try {
-        const lang = localStorage.getItem('lang') || 'zh';
         const dict = window.translations[lang] || {};
         mutations.forEach(m => {
             if (m.addedNodes && m.addedNodes.length > 0) {

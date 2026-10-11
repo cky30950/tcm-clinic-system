@@ -930,19 +930,17 @@ export async function createManualPatientPackage(patientId, clinicId = null) {
             G.showToast(isEn ? 'No package items in billing settings' : '收費項目中沒有可用的套票項目', 'warning');
             return;
         }
-        const options = {};
-        packageItems.forEach(item => {
-            const label = `${item.name || ''} (${Number(item.packageUses) || 0}次 / ${Number(item.validityDays) || 0}天)`;
-            options[String(item.id)] = window.escapeHtml(label);
-        });
-        const pickResult = await Swal.fire({
+        const options = packageItems.map(item => ({
+            value: String(item.id),
+            label: `${item.name || ''} (${Number(item.packageUses) || 0}次 / ${Number(item.validityDays) || 0}天)`
+        }));
+        const pickResult = await window.TCMDialog.prompt({
             title: isEn ? 'Select package item' : '選擇套票項目',
             input: 'select',
-            inputOptions: options,
-            inputPlaceholder: isEn ? 'Please select' : '請選擇',
-            showCancelButton: true,
-            confirmButtonText: isEn ? 'Confirm' : '確定',
-            cancelButtonText: isEn ? 'Cancel' : '取消'
+            options: options,
+            placeholder: isEn ? 'Please select' : '請選擇',
+            okText: isEn ? 'Confirm' : '確定',
+            cancelText: isEn ? 'Cancel' : '取消'
         });
         if (!pickResult || !pickResult.isConfirmed) {
             return;
@@ -992,13 +990,12 @@ export async function updatePatientPackageExpiry(patientId, packageRecordId, cli
         }
         const exp = new Date(pkg.expiresAt);
         const defaultDate = Number.isNaN(exp.getTime()) ? '' : exp.toISOString().slice(0, 10);
-        const dateResult = await Swal.fire({
+        const dateResult = await window.TCMDialog.prompt({
             title: isEn ? 'Update expiry date' : '修改套票有效期',
             input: 'date',
-            inputValue: defaultDate,
-            showCancelButton: true,
-            confirmButtonText: isEn ? 'Update' : '更新',
-            cancelButtonText: isEn ? 'Cancel' : '取消'
+            value: defaultDate,
+            okText: isEn ? 'Update' : '更新',
+            cancelText: isEn ? 'Cancel' : '取消'
         });
         if (!dateResult || !dateResult.isConfirmed) return;
         const dateText = String(dateResult.value || '').trim();
@@ -1102,17 +1099,14 @@ export async function updatePatientPackageRemainingUses(patientId, packageRecord
         }
         const totalUses = Number(pkg.totalUses);
         const currentRemaining = Number(pkg.remainingUses);
-        const inputResult = await Swal.fire({
+        const inputResult = await window.TCMDialog.prompt({
             title: isEn ? 'Update remaining uses' : '修改剩餘次數',
             input: 'number',
-            inputValue: Number.isFinite(currentRemaining) ? String(currentRemaining) : '0',
-            inputAttributes: {
-                min: '0',
-                step: '1'
-            },
-            showCancelButton: true,
-            confirmButtonText: isEn ? 'Update' : '更新',
-            cancelButtonText: isEn ? 'Cancel' : '取消'
+            value: Number.isFinite(currentRemaining) ? String(currentRemaining) : '0',
+            min: '0',
+            step: '1',
+            okText: isEn ? 'Update' : '更新',
+            cancelText: isEn ? 'Cancel' : '取消'
         });
         if (!inputResult || !inputResult.isConfirmed) return;
         const nextRemaining = parseInt(String(inputResult.value || '').trim(), 10);
@@ -1232,8 +1226,11 @@ export async function showPatientPackageHistory(patientId, clinicId = '') {
     const subtitleHtml = clinicName
         ? `${isEn ? 'Package Records' : '套票記錄'} · ${window.escapeHtml(clinicName)}`
         : (isEn ? 'Package Records' : '套票記錄');
-    await Swal.fire({
-        titleText: String(isEn ? 'Package Records' : '套票記錄'),
+    await window.TCMDialog.open({
+        title: String(isEn ? 'Package Records' : '套票記錄'),
+        widthClass: 'max-w-3xl',
+        okText: isEn ? 'Close' : '關閉',
+        cancelText: null,
         html: `
             <div class="text-left">
                 <div class="mb-3 text-sm text-gray-600">${subtitleHtml}</div>
@@ -1251,9 +1248,7 @@ export async function showPatientPackageHistory(patientId, clinicId = '') {
                 </div>
             </div>
         `,
-        width: 760,
-        confirmButtonText: isEn ? 'Close' : '關閉',
-        didOpen: () => {
+        onOpen: function () {
             const prevBtn = document.getElementById('patientPackageHistoryPrevBtn');
             const nextBtn = document.getElementById('patientPackageHistoryNextBtn');
             if (prevBtn) {

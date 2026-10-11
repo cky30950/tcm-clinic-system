@@ -202,22 +202,32 @@
 
     const pendingNodes = [];
     let scanScheduled = false;
+    function enhanceOne(el) {
+        if (el.hasAttribute && el.hasAttribute('data-fp') && !el.hasAttribute('data-fp-init')) {
+            el.setAttribute('data-fp-init', '1');
+            enhanceFlatpickr(el);
+        }
+        if (el.hasAttribute && el.hasAttribute('data-tom-select') && !el.hasAttribute('data-ts-init')) {
+            el.setAttribute('data-ts-init', '1');
+            enhanceTomSelect(el);
+        }
+    }
+    // 只掃指定 root（含 root 自身），不再走訪全 document
     function scan(root) {
         if (!root || root.nodeType !== 1 && root.nodeType !== 9) return;
-        const scope = root.querySelectorAll ? root : document;
-        scope.querySelectorAll('[data-fp]:not([data-fp-init])').forEach(function (el) {
+        if (root.nodeType === 1) enhanceOne(root);
+        if (!root.querySelectorAll) return;
+        root.querySelectorAll('[data-fp]:not([data-fp-init])').forEach(function (el) {
             el.setAttribute('data-fp-init', '1');
             enhanceFlatpickr(el);
         });
-        scope.querySelectorAll('[data-tom-select]:not([data-ts-init])').forEach(function (el) {
+        root.querySelectorAll('[data-tom-select]:not([data-ts-init])').forEach(function (el) {
             el.setAttribute('data-ts-init', '1');
             enhanceTomSelect(el);
         });
     }
     function scheduleScan(root) {
         if (root && root.nodeType === 1 && root.querySelectorAll) {
-            // 只保留 document 作為唯一 root，下一個 rAF 再掃一次
-            // 避免多個 root 造成重複 querySelectorAll
             pendingNodes.push(root);
         }
         if (scanScheduled) return;
@@ -226,8 +236,22 @@
         // system.js inline handler）錯開執行，避免同步 CPU 峰值
         (requestAnimationFrame || setTimeout)(function () {
             scanScheduled = false;
-            pendingNodes.length = 0;
-            scan(document);
+            // 本輪突變節點逐根掃描；被其他待處理祖先包含的子節點跳過，
+            // 已脫離 DOM 的節點跳過——避免全頁 querySelectorAll
+            const roots = pendingNodes.splice(0);
+            for (let i = 0; i < roots.length; i++) {
+                const node = roots[i];
+                if (!node.isConnected) continue;
+                let covered = false;
+                for (let j = 0; j < roots.length; j++) {
+                    if (j !== i && roots[j] !== node && roots[j].contains
+                        && roots[j].contains(node) && roots[j].isConnected) {
+                        covered = true;
+                        break;
+                    }
+                }
+                if (!covered) scan(node);
+            }
         });
     }
 

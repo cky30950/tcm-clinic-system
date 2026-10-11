@@ -12,7 +12,7 @@
  *   linkVisitUploads({ appointmentId, patientId, consultationId, consultationDate })
  *
  * 依賴全域：window.firebase（Firestore/Auth）、window.escapeHtml、
- *          showToast、Swal（SweetAlert2），以及 system.js 的
+ *          showToast、TCMDialog（Notiflix 對話框封裝），以及 system.js 的
  *          currentConsultingAppointmentId / appointments /
  *          currentConsultationEditContext / currentUserData。
  * ============================================================ */
@@ -313,6 +313,11 @@
 
     function scanHydrate(root) {
         var scope = root && root.querySelectorAll ? root : document;
+        // 新增節點本身可能就是待 hydration 的 <img>
+        if (scope.nodeType === 1 && scope.tagName === 'IMG'
+            && scope.hasAttribute('data-r2-key') && !scope.hasAttribute('data-r2-state')) {
+            hydrateImage(scope);
+        }
         var imgs;
         try {
             imgs = scope.querySelectorAll('img[data-r2-key]:not([data-r2-state])');
@@ -322,17 +327,37 @@
 
     var imgObserver = null;
     var imgScanScheduled = false;
+    var imgPendingNodes = [];
     function initImageHydrator() {
         if (imgObserver || typeof MutationObserver === 'undefined' || !document.body) return;
         imgObserver = new MutationObserver(function (mutations) {
+            for (var k = 0; k < mutations.length; k++) {
+                var added = mutations[k].addedNodes;
+                for (var n = 0; n < added.length; n++) {
+                    if (added[n].nodeType === 1) imgPendingNodes.push(added[n]);
+                }
+            }
             if (imgScanScheduled) return;
             imgScanScheduled = true;
             // rAF debounce：多個 DOM 變化合併一次處理，跟其他 subtree
             // observer（i18n / vendor-enhance / system.js inline handler）
-            // 錯開執行，避免同步 CPU 峰值
+            // 錯開執行，避免同步 CPU 峰值；只掃本輪突變新增節點，不走全 document
             (requestAnimationFrame || setTimeout)(function () {
                 imgScanScheduled = false;
-                scanHydrate(document);
+                var roots = imgPendingNodes.splice(0, imgPendingNodes.length);
+                for (var i = 0; i < roots.length; i++) {
+                    var node = roots[i];
+                    if (!node.isConnected) continue;
+                    var covered = false;
+                    for (var j = 0; j < roots.length; j++) {
+                        if (j !== i && roots[j] !== node && roots[j].contains
+                            && roots[j].contains(node) && roots[j].isConnected) {
+                            covered = true;
+                            break;
+                        }
+                    }
+                    if (!covered) scanHydrate(node);
+                }
             });
         });
         // 觀察範圍縮小到登入頁 + 主系統區域，避免頁面其他區域的變化
@@ -885,19 +910,16 @@
     async function confirmDelete(doc) {
         var label = (CATEGORY_META[doc.category] || {}).label || '附件';
         var time = fmtDateTime(doc.uploadedAt);
-        if (window.Swal) {
-            var result = await window.Swal.fire({
-                title: tt('刪除附件？'),
-                text: '將刪除「' + label + '」（' + time + '），此動作無法復原。',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: tt('刪除'),
-                cancelButtonText: tt('取消'),
-                confirmButtonColor: '#dc2626'
-            });
-            return !!(result && result.isConfirmed);
-        }
-        return window.confirm(tt('刪除附件？') + '\n' + label + ' ' + time);
+        // 改用 Notiflix.Confirm；label/time 為分類名與時間字串，統一 escape
+        var esc = window.escapeHtml || function (s) { return String(s); };
+        var html = '將刪除「' + esc(label) + '」（' + esc(time) + '），此動作無法復原。';
+        return await window.TCMDialog.nxConfirm({
+            title: tt('刪除附件？'),
+            html: html,
+            okText: tt('刪除'),
+            cancelText: tt('取消'),
+            danger: true
+        });
     }
 
     async function deleteAttachment(doc) {

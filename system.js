@@ -3206,15 +3206,19 @@ async function fetchUsers(forceRefresh = false) {
             const lang = localStorage.getItem('lang') || 'zh';
             const okLabel = lang === 'en' ? 'OK' : '確定';
             const cancelLabel = lang === 'en' ? 'Cancel' : '取消';
-            const result = await Swal.fire({
-                icon: type || 'warning',
-                html: (message || '').replace(/\n/g, '<br/>'),
-                showCancelButton: true,
-                confirmButtonText: okLabel,
-                cancelButtonText: cancelLabel,
-                focusConfirm: false
+            // 改用 Notiflix.Confirm（封裝於 js/lib/dialog.js）。
+            // 訊息為純文字：先 escapeHtml 再把換行轉成 <br>。
+            const safeHtml = (window.escapeHtml ? window.escapeHtml(message || '') : String(message || ''))
+                .replace(/\n/g, '<br/>');
+            const danger = type === 'warning';
+            const confirmed = await window.TCMDialog.nxConfirm({
+                title: lang === 'en' ? 'Please confirm' : '請確認',
+                html: safeHtml,
+                okText: okLabel,
+                cancelText: cancelLabel,
+                danger: danger
             });
-            return !!(result && result.isConfirmed);
+            return !!confirmed;
         }
         if (!window.showConfirmation) {
             window.showConfirmation = showConfirmation;
@@ -13951,25 +13955,25 @@ document.addEventListener('DOMContentLoaded', function() {
                         try { if (typeof populateClinicSelectors === 'function') populateClinicSelectors(); } catch (_e) {}
                         const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
                         const isEn = lang && lang.toLowerCase().startsWith('en');
-                        const options = {};
+                        const options = [];
                         const availableClinics = Array.isArray(clinicsList) ? clinicsList : [];
                         availableClinics.forEach(c => {
                             if (!c || !c.id) return;
-                            options[String(c.id)] = window.escapeHtml(getClinicDisplayName(c));
+                            // TCMDialog 以 textContent 寫入選項文字，傳原始字串即可
+                            options.push({ value: String(c.id), label: getClinicDisplayName(c) });
                         });
-                        if (Object.keys(options).length === 0) {
+                        if (options.length === 0) {
                             showToast(isEn ? 'No clinic available' : '目前沒有可切換的診所', 'warning');
                             return;
                         }
-                        const picked = await Swal.fire({
+                        const picked = await window.TCMDialog.prompt({
                             title: isEn ? 'Switch clinic' : '切換診所',
                             input: 'select',
-                            inputOptions: options,
-                            inputValue: currentClinicId ? String(currentClinicId) : '',
-                            inputPlaceholder: isEn ? 'Please select' : '請選擇',
-                            showCancelButton: true,
-                            confirmButtonText: isEn ? 'Switch' : '切換',
-                            cancelButtonText: isEn ? 'Cancel' : '取消'
+                            options: options,
+                            value: currentClinicId ? String(currentClinicId) : '',
+                            placeholder: isEn ? 'Please select' : '請選擇',
+                            okText: isEn ? 'Switch' : '切換',
+                            cancelText: isEn ? 'Cancel' : '取消'
                         });
                         if (!picked || !picked.isConfirmed) return;
                         const targetClinicId = String(picked.value || '');
@@ -14193,66 +14197,74 @@ document.addEventListener('DOMContentLoaded', function() {
              * attachments.js / vendor-enhance.js 另外三個 subtree observer
              * 同時同步執行造成 CPU 峰值。
              */
+            function bindOneInlineEl(el) {
+                if (!el || el.nodeType !== 1 || !el.hasAttribute) return;
+                // onclick
+                if (el.hasAttribute('onclick') && !el.dataset.inlineClickBound) {
+                    const code = el.getAttribute('onclick');
+                    el.removeAttribute('onclick');
+                    el.dataset.inlineClickBound = 'true';
+                    el.addEventListener('click', function (event) {
+                        try {
+                            const match = code.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
+                            if (!match) return;
+                            const fnName = match[1].trim();
+                            const args = parseArgs(match[2], event, el);
+                            let target;
+                            if (fnName.indexOf('.') >= 0) {
+                                const parts = fnName.split('.');
+                                if (parts[0] === 'this') { target = el; parts.shift(); }
+                                else { target = window[parts.shift()]; }
+                                while (parts.length > 1 && target) target = target[parts.shift()];
+                                const methodName = parts.shift();
+                                if (target && typeof target[methodName] === 'function') target[methodName].apply(target, args);
+                            } else {
+                                const fn = window[fnName];
+                                if (typeof fn === 'function') fn.apply(el, args);
+                            }
+                        } catch (err) {
+                            console.error('執行動態 inline click 處理器錯誤:', code, err);
+                        }
+                    });
+                }
+                // onchange
+                if (el.hasAttribute('onchange') && !el.dataset.inlineChangeBound) {
+                    const code = el.getAttribute('onchange');
+                    el.removeAttribute('onchange');
+                    el.dataset.inlineChangeBound = 'true';
+                    el.addEventListener('change', function (event) {
+                        try {
+                            const match = code.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
+                            if (!match) return;
+                            const fnName = match[1].trim();
+                            const args = parseArgs(match[2], event, el);
+                            let target;
+                            if (fnName.indexOf('.') >= 0) {
+                                const parts = fnName.split('.');
+                                if (parts[0] === 'this') { target = el; parts.shift(); }
+                                else { target = window[parts.shift()]; }
+                                while (parts.length > 1 && target) target = target[parts.shift()];
+                                const methodName = parts.shift();
+                                if (target && typeof target[methodName] === 'function') target[methodName].apply(target, args);
+                            } else {
+                                const fn = window[fnName];
+                                if (typeof fn === 'function') fn.apply(el, args);
+                            }
+                        } catch (err) {
+                            console.error('執行動態 inline change 處理器錯誤:', code, err);
+                        }
+                    });
+                }
+            }
             function bindInlineHandlersOnNode(root) {
-                if (!root || !root.querySelectorAll) return;
-                root.querySelectorAll('[onclick], [onchange]').forEach(function (el) {
-                    // onclick
-                    if (el.hasAttribute && el.hasAttribute('onclick') && !el.dataset.inlineClickBound) {
-                        const code = el.getAttribute('onclick');
-                        el.removeAttribute('onclick');
-                        el.dataset.inlineClickBound = 'true';
-                        el.addEventListener('click', function (event) {
-                            try {
-                                const match = code.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
-                                if (!match) return;
-                                const fnName = match[1].trim();
-                                const args = parseArgs(match[2], event, el);
-                                let target;
-                                if (fnName.indexOf('.') >= 0) {
-                                    const parts = fnName.split('.');
-                                    if (parts[0] === 'this') { target = el; parts.shift(); }
-                                    else { target = window[parts.shift()]; }
-                                    while (parts.length > 1 && target) target = target[parts.shift()];
-                                    const methodName = parts.shift();
-                                    if (target && typeof target[methodName] === 'function') target[methodName].apply(target, args);
-                                } else {
-                                    const fn = window[fnName];
-                                    if (typeof fn === 'function') fn.apply(el, args);
-                                }
-                            } catch (err) {
-                                console.error('執行動態 inline click 處理器錯誤:', code, err);
-                            }
-                        });
-                    }
-                    // onchange
-                    if (el.hasAttribute && el.hasAttribute('onchange') && !el.dataset.inlineChangeBound) {
-                        const code = el.getAttribute('onchange');
-                        el.removeAttribute('onchange');
-                        el.dataset.inlineChangeBound = 'true';
-                        el.addEventListener('change', function (event) {
-                            try {
-                                const match = code.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
-                                if (!match) return;
-                                const fnName = match[1].trim();
-                                const args = parseArgs(match[2], event, el);
-                                let target;
-                                if (fnName.indexOf('.') >= 0) {
-                                    const parts = fnName.split('.');
-                                    if (parts[0] === 'this') { target = el; parts.shift(); }
-                                    else { target = window[parts.shift()]; }
-                                    while (parts.length > 1 && target) target = target[parts.shift()];
-                                    const methodName = parts.shift();
-                                    if (target && typeof target[methodName] === 'function') target[methodName].apply(target, args);
-                                } else {
-                                    const fn = window[fnName];
-                                    if (typeof fn === 'function') fn.apply(el, args);
-                                }
-                            } catch (err) {
-                                console.error('執行動態 inline change 處理器錯誤:', code, err);
-                            }
-                        });
-                    }
-                });
+                if (!root || root.nodeType !== 1 && root.nodeType !== 9) return;
+                // querySelectorAll 不含 root 自身：root 帶 inline 屬性時要一併處理
+                if (root.nodeType === 1 && root.matches && root.matches('[onclick],[onchange]')) {
+                    bindOneInlineEl(root);
+                }
+                if (root.querySelectorAll) {
+                    root.querySelectorAll('[onclick], [onchange]').forEach(bindOneInlineEl);
+                }
             }
             let pendingInlineBindRoots = [];
             let inlineBindScheduled = false;
@@ -14262,7 +14274,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 inlineBindScheduled = true;
                 (requestAnimationFrame || setTimeout)(function () {
                     inlineBindScheduled = false;
-                    bindInlineHandlersOnNode(document);
+                    const roots = pendingInlineBindRoots;
+                    pendingInlineBindRoots = [];
+                    // 只掃描本輪新增節點；被其他待處理祖先包含者跳過
+                    // （子樹會隨祖先一併掃描），避免每次渲染全頁 querySelectorAll
+                    for (let i = 0; i < roots.length; i++) {
+                        const r = roots[i];
+                        if (!r || r.isConnected === false) continue;
+                        let contained = false;
+                        for (let j = 0; j < roots.length; j++) {
+                            const o = roots[j];
+                            if (o !== r && o && o.nodeType === 1 && typeof o.contains === 'function' && o.contains(r)) {
+                                contained = true;
+                                break;
+                            }
+                        }
+                        if (!contained) bindInlineHandlersOnNode(r);
+                    }
                 });
             }
             const observer = new MutationObserver(function (mutationsList) {
@@ -21854,40 +21882,37 @@ function hideGlobalCopyright() {
       const title = isEn ? 'Select Acupoints' : '選擇穴位';
       const confirmText = isEn ? 'Confirm' : '確定';
       const cancelText = isEn ? 'Cancel' : '取消';
-      // 開啟彈窗
-      await Swal.fire({
+      // 開啟彈窗（TCMDialog：Notiflix 無法承載 Leaflet 地圖）
+      const result = await window.TCMDialog.open({
         title: title,
         html: '<div id="acupointSelectMapContainer" style="width:100%;height:420px;"></div>',
-        width: '80%',
-        showCancelButton: true,
-        confirmButtonText: confirmText,
-        cancelButtonText: cancelText,
-        focusConfirm: false,
-        didOpen: () => {
+        widthClass: 'max-w-4xl',
+        okText: confirmText,
+        cancelText: cancelText,
+        onOpen: function () {
           initAcupointSelectionMapForNotes('acupointSelectMapContainer', selectedNames, existingSet);
         },
-        preConfirm: () => {
+        getValue: function () {
           return selectedNames.slice();
         }
-      }).then(result => {
-        try {
-          if (result && result.value && Array.isArray(result.value)) {
-            result.value.forEach(name => {
-              if (!existingSet.has(name)) {
-                try {
-                  if (typeof addAcupointToNotes === 'function') {
-                    addAcupointToNotes(name);
-                  }
-                } catch (_addErr) {
-                  console.error('加入穴位到備註失敗：', _addErr);
-                }
-              }
-            });
-          }
-        } catch (_resErr) {
-          console.error('處理穴位選取結果時發生錯誤：', _resErr);
-        }
       });
+      try {
+        if (result && result.isConfirmed && result.value && Array.isArray(result.value)) {
+          result.value.forEach(name => {
+            if (!existingSet.has(name)) {
+              try {
+                if (typeof addAcupointToNotes === 'function') {
+                  addAcupointToNotes(name);
+                }
+              } catch (_addErr) {
+                console.error('加入穴位到備註失敗：', _addErr);
+              }
+            }
+          });
+        }
+      } catch (_resErr) {
+        console.error('處理穴位選取結果時發生錯誤：', _resErr);
+      }
     } catch (err) {
       console.error('開啟穴位圖彈窗失敗：', err);
     }

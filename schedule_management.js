@@ -1900,11 +1900,11 @@
                     `${esc(translate('備註：'))}${esc(shift.notes || translate('無'))}<br>` +
                     `${esc(translate('聯絡電話：'))}${esc(staffMember.phone)}<br>` +
                     `${esc(translate('電子郵件：'))}${esc(staffMember.email)}`;
-                await Swal.fire({
-                    icon: 'info',
+                await window.TCMDialog.nxAlert({
+                    kind: 'info',
                     title: translate('排班詳情：'),
                     html: html,
-                    confirmButtonText: okLabel
+                    okText: okLabel
                 });
             } catch (_err) {
                 
@@ -2283,10 +2283,11 @@
                 const langOk = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
                 const okLabel = langOk === 'en' ? 'OK' : '確定';
                 const scheduleHtml = esc(scheduleText).replace(/\n/g, '<br/>');
-                await Swal.fire({
-                    icon: 'info',
+                await window.TCMDialog.nxAlert({
+                    kind: 'info',
+                    title: translate('排班總覽'),
                     html: scheduleHtml,
-                    confirmButtonText: okLabel
+                    okText: okLabel
                 });
             } catch (_err) {
                 alert(scheduleText);

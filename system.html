@@ -66,24 +66,51 @@
             if (window._systemObserversAttached) return;
             window._systemObserversAttached = false;
 
-            // ── Lucide 圖標觀察器 ──
+            // ── Lucide 圖標觀察器（只刷新本輪突變節點，不再全 document createIcons） ──
+            var _iconPendingRoots = [];
+            var _iconTimer = null;
+            function _refreshIcons() { if (window.lucide) { try { window.lucide.createIcons(); } catch (_e) {} } }
+            function _runIconRefresh() {
+                if (!window.lucide) { _iconPendingRoots.length = 0; return; }
+                var roots = _iconPendingRoots.splice(0, _iconPendingRoots.length);
+                var targets = [];
+                for (var i = 0; i < roots.length; i++) {
+                    var node = roots[i];
+                    if (!node.isConnected) continue;
+                    var covered = false;
+                    for (var j = 0; j < roots.length; j++) {
+                        if (j !== i && roots[j] !== node && roots[j].contains
+                            && roots[j].contains(node) && roots[j].isConnected) { covered = true; break; }
+                    }
+                    if (covered) continue;
+                    // createIcons 內以 querySelectorAll 掃 root（不含 root 自身）；
+                    // 若新增節點本身就是 <i data-lucide>，改用其父節點掃描
+                    var target = (node.tagName === "I" && node.hasAttribute("data-lucide"))
+                        ? (node.parentElement || document)
+                        : node;
+                    if (targets.indexOf(target) === -1) targets.push(target);
+                }
+                for (var k = 0; k < targets.length; k++) {
+                    try { window.lucide.createIcons({ root: targets[k] }); } catch (_e) {}
+                }
+            }
+            function _scheduleIconRefresh() { if (_iconTimer) clearTimeout(_iconTimer); _iconTimer = setTimeout(_runIconRefresh, 30); }
             var iconMo = new MutationObserver(function (mutations) {
+                var found = false;
                 for (var i = 0; i < mutations.length; i++) {
                     var added = mutations[i].addedNodes;
                     for (var j = 0; j < added.length; j++) {
                         var node = added[j];
                         if (node.nodeType !== 1) continue;
-                        if (node.hasAttribute && node.hasAttribute("data-lucide")) { _iconPending = true; break; }
-                        if (node.querySelector && node.querySelector("i[data-lucide]")) { _iconPending = true; break; }
+                        // 只認 <i data-lucide> 佔位元素。lucide 替換後產生的
+                        // <svg class="lucide" data-lucide> 不可再當新節點處理：
+                        // createIcons 非冪等，重入會不斷重建 SVG 形成循環。
+                        if (node.tagName === "I" && node.hasAttribute("data-lucide")) { _iconPendingRoots.push(node); found = true; }
+                        else if (node.querySelector && node.querySelector("i[data-lucide]")) { _iconPendingRoots.push(node); found = true; }
                     }
-                    if (_iconPending) break;
                 }
-                if (_iconPending) { _iconPending = false; _scheduleIconRefresh(); }
+                if (found) _scheduleIconRefresh();
             });
-            var _iconPending = false;
-            var _iconTimer = null;
-            function _refreshIcons() { if (window.lucide) { try { window.lucide.createIcons(); } catch (_e) {} } }
-            function _scheduleIconRefresh() { if (_iconTimer) clearTimeout(_iconTimer); _iconTimer = setTimeout(_refreshIcons, 30); }
 
             // ── DaisyUI 按鈕標準化觀察器 ──
             var btnMo = new MutationObserver(function (mutations) {
@@ -209,8 +236,7 @@
     <link rel="stylesheet" href="js/vendor/notiflix/notiflix.min.css?v=20261005a">
 
     <script defer src="acupointIntegration.js?v=20261010a"></script>
-    
-    <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
 
@@ -393,16 +419,6 @@
         html, body {
             scrollbar-gutter: stable;
             min-height: calc(100vh + 1px);
-        }
-
-        /* SweetAlert2 開彈窗（如「切換診所」）時會把 body 設為 overflow:hidden，
-           並按捲軸寬度為 body 加 inline padding-right 作補償。本站已用
-           scrollbar-gutter:stable 常駐捲軸位；body 被設 overflow:hidden 後
-           自身仍會保留 stable gutter，Swal 再疊加 15px padding 便變雙重扣位，
-           令 nav 等所有文檔流內容即時左移約 15px、關閉時跳回。
-           故停用 Swal 的多餘補償（inline style 需 !important 壓過）。 */
-        body.swal2-shown {
-            padding-right: 0 !important;
         }
 
         /* 所有按鈕統一正常字重：daisyUI .btn 預設 font-weight:600，
@@ -6251,6 +6267,8 @@
 
     <!-- 延遲載入器：xlsx / qrcode 等真的少用的大庫 -->
     <script src="js/lib/lazy-loader.js?v=20261011a" defer></script>
+    <!-- 對話框輔助庫（取代 SweetAlert2：Notiflix 確認/提示 + 輸入/HTML 彈窗） -->
+    <script src="js/lib/dialog.js?v=20261011a" defer></script>
 
     <!-- chart.js + tabulator：改由 lazy-loader 動態載入（個人統計/財務報表/錢包面板） -->
 
@@ -6262,19 +6280,19 @@
     <!-- tabulator.min.js 已改由 lazy-loader 動態載入，保留 CSS -->
     <link rel="stylesheet" href="js/vendor/tabulator/tabulator.min.css?v=20261005a">
     <script src="js/vendor/notiflix/notiflix.min.js?v=20261005a" defer></script>
-    <script src="js/lib/vendor-enhance.js?v=20261011a" defer></script>
+    <script src="js/lib/vendor-enhance.js?v=20261011b" defer></script>
 
     <script src="version-config.js?v=20261003a" defer></script>
     <script src="pwa.js?v=20260923b" defer></script>
-    <script src="schedule_management.js?v=20261010a" defer></script>
+    <script src="schedule_management.js?v=20261011a" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
-    <script type="module" src="js/app.js?v=20261006j"></script>
-    <script src="system.js?v=20261011a" defer></script>
-    <script src="attachments.js?v=20261011a" defer></script>
+    <script type="module" src="js/app.js?v=20261011a"></script>
+    <script src="system.js?v=20261011b" defer></script>
+    <script src="attachments.js?v=20261011c" defer></script>
     <script src="personalStatistics.js?v=20261011a" defer></script>
     <script src="systemmanagement.js?v=20261010a" defer></script>
     <script src="chat_module.js?v=20261010a" defer></script>
-    <script src="i18n.js?v=20261011a" defer></script>
+    <script src="i18n.js?v=20261011b" defer></script>
 
     <!-- 視訊診症延遲載入器：只有醫師點擊「視訊診症」時才動態下載 Agora SDK -->
     <script src="video/video-loader.js?v=20261010a" defer></script>
