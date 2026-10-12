@@ -1465,6 +1465,36 @@ import { getApportionedCost } from './expenses.js';
             }
         }
 
+        // 舊版 consultationFinancialSummaries 可能只存了 patientId、
+        // 未存 patientName（早期樣本），鑽取清單會一律顯示「未知病人」。
+        // 對缺名但有 ID 的列，用病人主檔快取/即時查詢補回姓名。
+        async function resolveDrilldownPatientNames(rows) {
+            if (!Array.isArray(rows) || !rows.length) return rows;
+            if (typeof G.getPatientByIdWithRefresh !== 'function') return rows;
+            const missingIds = Array.from(new Set(
+                rows
+                    .map(r => (r && !r.patientName && r.patientId) ? String(r.patientId) : '')
+                    .filter(Boolean)
+            ));
+            if (!missingIds.length) return rows;
+            const nameMap = new Map();
+            await Promise.all(missingIds.map(async (pid) => {
+                try {
+                    const p = await G.getPatientByIdWithRefresh(pid);
+                    const name = p && (p.name || p.patientName || p.fullName || p.displayName || p.chineseName || p.englishName || '');
+                    if (name) nameMap.set(pid, String(name));
+                } catch (_e) {}
+            }));
+            if (nameMap.size) {
+                rows.forEach((r) => {
+                    if (r && !r.patientName && r.patientId && nameMap.has(String(r.patientId))) {
+                        r.patientName = nameMap.get(String(r.patientId));
+                    }
+                });
+            }
+            return rows;
+        }
+
         export async function openFinancialDrilldown(type, key, label) {
             const modal = document.getElementById('financialDrilldownModal');
             const titleEl = document.getElementById('financialDrilldownTitle');
@@ -1497,6 +1527,9 @@ import { getApportionedCost } from './expenses.js';
                     return;
                 }
             }
+
+            // 補回摘要文件缺失的病人姓名（有 patientId 時查病人主檔）
+            await resolveDrilldownPatientNames(rows);
 
             if (titleEl) {
                 titleEl.textContent = `${label}｜${ft('診症單')} ${rows.length} ${ft('筆')}`;

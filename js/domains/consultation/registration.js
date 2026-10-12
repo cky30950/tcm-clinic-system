@@ -73,6 +73,23 @@ import { G } from '../../lib/legacy.js';
                     picker.dataset.bound = 'true';
                 }
 
+                // 「今日」按鈕：一鍵返回今日掛號。
+                // picker.value 賦值會經 vendor-enhance 的 value 同步鉤子更新
+                // flatpickr 內部狀態，再補發 change 事件觸發列表重新載入。
+                const todayButton = document.getElementById('appointmentTodayButton');
+                if (todayButton && !todayButton.dataset.bound) {
+                    todayButton.addEventListener('click', function () {
+                        try {
+                            if (picker.value === localToday) return;
+                            picker.value = localToday;
+                            picker.dispatchEvent(new Event('change', { bubbles: true }));
+                        } catch (_err) {
+                            console.error('返回今日掛號失敗：', _err);
+                        }
+                    });
+                    todayButton.dataset.bound = 'true';
+                }
+
                 // setup 在 subscribeToAppointments() 之後被呼叫，這裡再同步一次監聽日期為今天
                 if (typeof subscribeToAppointments === 'function') {
                     subscribeToAppointments();
