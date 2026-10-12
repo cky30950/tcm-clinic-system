@@ -10938,6 +10938,12 @@ class FirebaseDataManager {
             if (aggregatePlan) {
                 this._applyPatientAggregatePlanCaches(aggregatePlan);
             }
+            // 本機新增成功：直接失效病歷管理列表快取；頁面正開著則立即重載。
+            // 不等 meta 監聽器（ESM store.js 可能仍被 SW 快取為舊版）。
+            try {
+                const locPid = consultationData && consultationData.patientId ? String(consultationData.patientId) : '';
+                invalidateMedicalRecordListCache({ patientId: locPid, reloadIfVisible: true });
+            } catch (_invErr) {}
             // 個人統計 / 財務日聚合寫入在 SA 端，無法與客戶端批次合併，
             // 於主批次成功後以 best-effort 方式同步。
             try {
@@ -12028,6 +12034,12 @@ class FirebaseDataManager {
             if (skipSideEffects) {
                 // 局部欄位回寫：單次 updateDoc，不觸發任何連鎖寫入。
                 await window.firebase.updateDoc(consRef, corePatch);
+                // 本機回寫仍要讓開著的病歷管理列表即時反映（如收款狀態）
+                try {
+                    const locPid = String((consultationData && consultationData.patientId)
+                        || (existingRecord && existingRecord.patientId) || '');
+                    invalidateMedicalRecordListCache({ patientId: locPid, reloadIfVisible: true });
+                } catch (_invErr) {}
             } else {
                 // 完整編輯：病歷主文件 + 財務摘要 + 病人聚合 + patientsMeta 單一批次原子提交。
                 const batch = window.firebase.writeBatch(window.firebase.db);
@@ -12068,7 +12080,13 @@ class FirebaseDataManager {
                 if (aggregatePlan) {
                     this._applyPatientAggregatePlanCaches(aggregatePlan);
                 }
-                // 個人統計 / 財務日聚合在 SA 端，主批次成功後 best-effort 同步。
+                // 本機完整編輯成功：直接失效病歷管理列表快取；頁面正開著則立即重載。
+                try {
+                    const locPid = String((consultationData && consultationData.patientId)
+                        || (existingRecord && existingRecord.patientId) || '');
+                    invalidateMedicalRecordListCache({ patientId: locPid, reloadIfVisible: true });
+                } catch (_invErr) {}
+                // 個人統計 / 財務日聚合在 SA 端，主批次成功後以 best-effort 同步。
                 try {
                     await this.syncConsultationPersonalStatsSummaries(
                         existingRecord ? { id: String(consultationId), ...existingRecord } : null,
@@ -12185,7 +12203,11 @@ class FirebaseDataManager {
             if (aggregatePlan) {
                 this._applyPatientAggregatePlanCaches(aggregatePlan);
             }
-            // 個人統計 / 財務日聚合在 SA 端，主批次成功後 best-effort 同步。
+            // 本機刪除成功：直接失效病歷管理列表快取；頁面正開著則立即重載。
+            try {
+                const locPid = existingRecord && existingRecord.patientId ? String(existingRecord.patientId) : '';
+                invalidateMedicalRecordListCache({ patientId: locPid, reloadIfVisible: true });
+            } catch (_invErr) {}
             try {
                 await this.syncConsultationPersonalStatsSummaries(
                     existingRecord ? { ...existingRecord } : null,
@@ -14509,6 +14531,10 @@ function invalidateConsultationDetailCacheForPatient(patientId) {
  */
 function invalidateMedicalRecordListCache(options = {}) {
     try {
+        // 本機 CRUD 已直接觸發過一次重載且正在執行時，後到的 meta 回聲
+        // （同一次寫入的 self-nonce snapshot）不需再清快取／重排，
+        // 否則會把重取中剛寫入的分頁快取清掉。
+        if (medicalRecordRefreshInFlight) return;
         clearMedicalRecordListPersistedCache();
         resetMedicalRecordManagementCaches();
         const pid = options.patientId ? String(options.patientId) : '';

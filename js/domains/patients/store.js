@@ -571,19 +571,12 @@ export async function attachPatientListListener() {
                     return;
                 }
 
-                // 自己觸發的事件：本機 CRUD 已同步就地更新病人快取，蓋戳後跳過病人層邏輯。
-                // 但病歷管理列表／詳情快取仍需失效（本機新增/編輯/撤回病歷後，
-                // 下次進病歷管理或再次檢視該病歷要拿到最新狀態）。
+                // 自己觸發的事件：本機 CRUD 已同步就地更新快取，蓋戳後跳過。
+                // 病歷管理列表的失效由各 CRUD 路徑（add/update/deleteConsultation、
+                // 撤回）在寫入成功後直接呼叫 invalidateMedicalRecordListCache，
+                // 不依賴這個 snapshot 回聲（且避免回聲造成二次重載）。
                 if (isSelfMetaNonce(metaData.nonce)) {
                     if (metaTs != null) stampPatientsStorageMetaTimestamp(metaTs);
-                    if (metaData.kind === 'consultation') {
-                        if (typeof G.invalidateMedicalRecordListCache === 'function') {
-                            G.invalidateMedicalRecordListCache({
-                                patientId: metaData.patientId,
-                                reloadIfVisible: true
-                            });
-                        }
-                    }
                     return;
                 }
 

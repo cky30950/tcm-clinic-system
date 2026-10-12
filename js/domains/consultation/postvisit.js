@@ -370,6 +370,8 @@ export async function withdrawConsultation(appointmentId) {
             try { await touchPatientsMeta('delete', retractPid, { kind: 'consultation', nonce: (typeof G.newSelfMetaNonce === 'function') ? G.newSelfMetaNonce() : undefined }); } catch (_e) {}
             // 本地 CRUD 後主動刷新已開啟的病歷彈窗與病人詳情面板
             try { refreshOpenConsultationHistory(retractPid, 'delete'); } catch (_refreshErr) {}
+            // 直接失效病歷管理列表快取（不靠 meta 監聽器，避免 ESM SWR 舊快取漏接）
+            try { if (typeof G.invalidateMedicalRecordListCache === 'function') G.invalidateMedicalRecordListCache({ patientId: retractPid, reloadIfVisible: true }); } catch (_invErr) {}
         }
         // 從本地集合中移除該診症記錄
         const consultationIndex = G.consultations.findIndex(
