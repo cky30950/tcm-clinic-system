@@ -619,28 +619,75 @@
             /* ==============================================
              * 頂部 nav 防擠壓
              *
-             * 右側「當前診所：xxx」+ 登出鈕與左側標題在 390px 下互相搶位，
-             * 標題被擠到 80px 後逐字斷行，與右側文字視覺重疊。
-             * 手機上隱藏診所全名（切換診所鈕僅多診所帳號才出現）與英文副標，
-             * 標題保持單行不縮排，兩側不再碰撞。
+             * 390px 下左側標題與右側「當前診所／切換／用戶／登出」互搶寬度，
+             * 標題被擠到逐字斷行、與右側文字視覺重疊。
+             * 手機上保留當前診所名稱（縮小字體＋截斷），英文副標隱藏，
+             * 按鈕與間距全面縮小；仍放不下時整列允許換到第二行。
              * ============================================== */
             #systemTitle {
-                font-size: 1.05rem;
+                font-size: 0.95rem;
+                line-height: 1.2;
                 white-space: nowrap;
             }
-            #systemEnglishTitle,
-            #currentClinicDisplay {
+            #systemEnglishTitle {
                 display: none;
+            }
+            nav .max-w-7xl {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
             }
             nav .flex.justify-between.items-center {
                 flex-wrap: wrap;
                 gap: 0.25rem 0.5rem;
+                padding-top: 0.4rem;
+                padding-bottom: 0.4rem;
+            }
+            #openSidebarButton {
+                padding: 0.25rem;
+                margin-right: 0.3rem;
+            }
+            nav .flex.justify-between.items-center > .flex.items-center:first-child .mr-3 {
+                margin-right: 0.4rem;
+            }
+            nav img.h-6 {
+                height: 1.25rem;
             }
             nav .flex.justify-between.items-center > .flex.items-center.space-x-4 {
-                gap: 0.5rem;
+                /* 右側資訊群獨佔第二行（左側標題行保持單行），
+                   對齊右側；診所名稱可取用該行剩餘寬度，不需截斷 */
+                flex-basis: 100%;
+                justify-content: flex-end;
+                gap: 0.3rem;
+                max-width: 100%;
+                min-width: 0;
             }
-            /* nav 按鈕維持單行，避免窄空間下「登出」等按鈕逐字斷行變高 */
-            nav button {
+            /* 覆寫 space-x-4 的 1rem 子元素左外距 */
+            nav .flex.justify-between.items-center > .flex.items-center.space-x-4 > * + * {
+                margin-left: 0.2rem;
+            }
+            #currentClinicDisplay,
+            #userRole {
+                font-size: 0.68rem;
+                line-height: 1.15;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 55vw;
+                min-width: 0;
+            }
+            /* 診所名稱吃掉按鈕群左側所有剩餘空間並靠右貼齊，
+               名稱較長時在自己的空間內截斷，不會壓到按鈕 */
+            #currentClinicDisplay {
+                flex: 1 1 auto;
+                text-align: right;
+            }
+            #clinicSwitchButton,
+            #logoutButton {
+                font-size: 0.68rem;
+                padding: 0.15rem 0.55rem;
+                min-height: 0;
+                height: auto;
+                flex-shrink: 0;
                 white-space: nowrap;
             }
 
@@ -657,6 +704,15 @@
             .overflow-x-auto > table td {
                 white-space: nowrap;
             }
+            /* 病人資料管理表格用 w-full table-fixed + 百分比欄寬，手機上
+               8% 欄（年齡／性別）只有二十多像素，中文逐字直排且內容溢出
+               儲存格與隔壁欄重疊。手機改為 auto 配置、內容決定欄寬，
+               最低撐滿容器，超出時由 .overflow-x-auto 橫滑。 */
+            .overflow-x-auto > table.table-fixed {
+                table-layout: auto;
+                width: auto;
+                min-width: 100%;
+            }
             /* daisyUI 按鈕維持單行：實際版面的按鈕群容器（flex-wrap 工具列、
                表格操作欄）已自行決定換行時機，不應由按鈕內部逐字斷行，否則
                同列按鈕會高低不一 */
@@ -664,7 +720,67 @@
                 white-space: nowrap;
             }
 
+            /* ==============================================
+             * 病歷翻頁器（診症記錄／病歷彈窗）
+             *
+             * 窄屏時「日曆｜← 較舊｜x/y｜較新 →」一整排超出彈窗寬度、
+             * 按鈕突出範圍。改為垂直排列：日曆、頁碼在上，
+             * 「較舊」鈕在上、「較新」鈕在下，按鈕撐滿方便點擊。
+             * DOM 順序為日曆(1)、較舊(2)、頁碼(3)、較新(4)，
+             * 以 order 調成 日曆 → 頁碼 → 較舊 → 較新。
+             * ============================================== */
+            .history-pager {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.5rem;
+            }
+            .history-pager > .flex.items-center.space-x-4 {
+                flex-wrap: wrap;
+                gap: 0.25rem 0.5rem;
+            }
+            .history-pager-actions {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.375rem;
+            }
+            .history-pager-actions > * + * {
+                margin-left: 0 !important;
+            }
+            .history-pager-actions > :nth-child(1) { order: 1; }
+            .history-pager-actions > :nth-child(3) { order: 2; }
+            .history-pager-actions > :nth-child(2) { order: 3; }
+            .history-pager-actions > :nth-child(4) { order: 4; }
+            .history-pager-actions button {
+                width: 100%;
+            }
+
+            /* ==============================================
+             * 收費項目數量加減掣
+             *
+             * 窄屏時收費列被內容壓縮，「- 數量 +」一排放不開。
+             * 改為垂直排列：減號在上、數量居中、加號在下，
+             * 並消除 space-x-2 留下的左外距。
+             * ============================================== */
+            .billing-qty {
+                flex-direction: column;
+                gap: 2px;
+                margin-right: 0.5rem;
+            }
+            .billing-qty > * + * {
+                margin-left: 0 !important;
+            }
+
             /* 移除舊的 .toast 手機樣式，使用 Toastr 預設樣式即可 */
+
+            /* 切換診所彈窗／全域載入層的卡片：這兩個彈窗不用 flex 居中容器，
+               卡片靠 max-w-md + mx-auto 定位；被上面的 max-w-* 全寬規則
+               套中後會貼到螢幕邊緣。保留 1rem 左右邊距。 */
+            #clinicSwitchModal .relative,
+            #globalLoadingOverlay .relative {
+                width: auto !important;
+                margin-left: 1rem;
+                margin-right: 1rem;
+            }
 
             /*
              * 手機檢視時，診症記錄卡片的日期／醫師資訊與列印按鈕等操作無法全部水平顯示，
@@ -1843,7 +1959,6 @@
                                     
                                     <div class="mb-3 bg-yellow-50 rounded-lg p-3 border border-yellow-200">
                                         <div class="flex items-center mb-2">
-                                            <span class="text-sm font-medium text-yellow-800 mr-2"><i data-lucide="search" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 搜索中藥庫：</span>
                                             <div class="flex-1 relative">
                                                 <input type="text" id="prescriptionSearch" placeholder="搜索中藥材、方劑名稱或功能..." 
                                                        class="w-full border border-yellow-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
@@ -1890,7 +2005,6 @@
                                     
                                     <div class="mb-3 bg-green-50 rounded-lg p-3 border border-green-200">
                                         <div class="flex items-center mb-2">
-                                            <span class="text-sm font-medium text-green-800 mr-2"><i data-lucide="wallet" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> 選擇收費項目：</span>
                                             <div class="flex-1 relative">
                                                 <input type="text" id="billingSearch" placeholder="搜索收費項目名稱..." 
                                                        class="w-full border border-green-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -6334,7 +6448,7 @@
     <script src="pwa.js?v=20260923b" defer></script>
     <script src="schedule_management.js?v=20261011a" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
-    <script type="module" src="js/app.js?v=20261011a"></script>
+    <script type="module" src="js/app.js?v=20261012a"></script>
     <script src="system.js?v=20261012a" defer></script>
     <script src="attachments.js?v=20261011c" defer></script>
     <script src="personalStatistics.js?v=20261011a" defer></script>

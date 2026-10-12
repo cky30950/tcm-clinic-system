@@ -585,7 +585,7 @@ import { printAttendanceCertificate, printConsultationRecord, printPrescriptionI
 
             contentDiv.innerHTML = `
                 <!-- 分頁導航 -->
-                <div class="mb-6 flex justify-between items-center bg-gray-50 rounded-lg p-4">
+                <div class="history-pager mb-6 flex justify-between items-center bg-gray-50 rounded-lg p-4">
                     <div class="flex items-center space-x-4">
                         <h4 class="text-lg font-semibold text-gray-800">${recordTitle}</h4>
                         <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
@@ -596,7 +596,7 @@ import { printAttendanceCertificate, printConsultationRecord, printPrescriptionI
                         </span>
                     </div>
                     
-                    <div class="flex items-center space-x-2">
+                    <div class="history-pager-actions flex items-center space-x-2">
                         <button onclick="toggleHistoryCalendar('patient', event)"
                                 class="px-3 py-1 bg-white text-blue-700 border border-blue-200 rounded hover:bg-blue-50 text-sm">
                             日曆
@@ -1086,7 +1086,7 @@ export async function displayConsultationMedicalHistoryPage() {
     // constructed above.
     contentDiv.innerHTML = `
         <!-- 分頁導航 -->
-        <div class="mb-6 flex justify-between items-center bg-gray-50 rounded-lg p-4">
+        <div class="history-pager mb-6 flex justify-between items-center bg-gray-50 rounded-lg p-4">
             <div class="flex items-center space-x-4">
                 <h4 class="text-lg font-semibold text-gray-800">${recordTitle}</h4>
                 <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
@@ -1097,7 +1097,7 @@ export async function displayConsultationMedicalHistoryPage() {
                 </span>
             </div>
             
-            <div class="flex items-center space-x-2">
+            <div class="history-pager-actions flex items-center space-x-2">
                 <button onclick="toggleHistoryCalendar('consultation', event)"
                         class="px-3 py-1 bg-white text-blue-700 border border-blue-200 rounded hover:bg-blue-50 text-sm">
                     日曆

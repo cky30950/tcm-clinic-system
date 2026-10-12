@@ -1538,7 +1538,7 @@ export async function searchBillingForConsultation() {
                         } else {
                             // 其他類別項目可增減數量
                             quantityControls = `
-                                <div class="flex items-center space-x-2 mr-3">
+                                <div class="billing-qty flex items-center space-x-2 mr-3">
                                     <button onclick="updateBillingQuantity(${originalIndex}, -1)" class="w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition duration-200">-</button>
                                     <span class="w-8 text-center font-semibold">${item.quantity}</span>
                                     <button onclick="updateBillingQuantity(${originalIndex}, 1)" class="w-6 h-6 bg-green-500 text-white rounded-full text-xs hover:bg-green-600 transition duration-200">+</button>
