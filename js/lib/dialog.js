@@ -66,6 +66,18 @@
     function defaultOk() { return isEn() ? 'OK' : '確定'; }
     function defaultCancel() { return isEn() ? 'Cancel' : '取消'; }
 
+    /* Notiflix Confirm/Report 使用固定外層 ID（NotiflixConfirmWrap /
+       NotiflixReportWrap），點擊後先執行按鈕回調、等 300ms 淡出動畫
+       結束才移除舊 DOM；期間若再呼叫一次 Confirm/Report（例如刪除
+       診所的雙重確認），會因 ID 已存在而被整個靜默丟棄——新彈窗不
+       顯示、Promise 永久 pending。回調裡先主動移除外層即可避開。 */
+    function dismissNotiflixWrap(id) {
+        try {
+            var old = document.getElementById(id);
+            if (old && old.parentNode) old.parentNode.removeChild(old);
+        } catch (_e) {}
+    }
+
     function el(tag, className, text) {
         var node = document.createElement(tag);
         if (className) node.className = className;
@@ -277,8 +289,14 @@
                         opts.html || '',
                         opts.okText || defaultOk(),
                         opts.cancelText || defaultCancel(),
-                        function () { resolve(true); },
-                        function () { resolve(false); },
+                        function () {
+                            dismissNotiflixWrap('NotiflixConfirmWrap');
+                            resolve(true);
+                        },
+                        function () {
+                            dismissNotiflixWrap('NotiflixConfirmWrap');
+                            resolve(false);
+                        },
                         options
                     );
                 });
@@ -303,7 +321,10 @@
                         opts.title || (isEn() ? 'Information' : '提示'),
                         opts.html || '',
                         opts.okText || defaultOk(),
-                        function () { resolve(); },
+                        function () {
+                            dismissNotiflixWrap('NotiflixReportWrap');
+                            resolve();
+                        },
                         {
                             plainText: false,
                             width: '360px',
