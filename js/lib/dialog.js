@@ -22,6 +22,30 @@
     var Z_INDEX = 4000;
     var openCount = 0;
 
+    /* 臨界顏色自帶樣式，不依賴 Tailwind 預編譯覆蓋——
+       曾發生 bg-emerald-600 未被編進 css/tailwind.css，
+       導致確認鈕白字白底、整顆按鈕隱形（桌面及手機同發）。 */
+    function injectDialogStyle() {
+        if (document.getElementById('tcm-dialog-style')) return;
+        var css =
+            '.tcm-btn{display:inline-flex;align-items:center;justify-content:center;' +
+            'border-radius:0.375rem;padding:0.5rem 1rem;font-size:1rem;line-height:1.25;' +
+            'border:1px solid transparent;cursor:pointer;white-space:nowrap;}' +
+            '.tcm-btn-ok{background:#059669;color:#fff;}' +
+            '.tcm-btn-ok:hover{background:#047857;}' +
+            '.tcm-btn-danger{background:#dc2626;color:#fff;}' +
+            '.tcm-btn-danger:hover{background:#b91c1c;}' +
+            '.tcm-btn-cancel{background:#fff;color:#374151;border-color:#d1d5db;}' +
+            '.tcm-btn-cancel:hover{background:#f3f4f6;}' +
+            '.tcm-prompt-input:focus{outline:none;border-color:#10b981;' +
+            'box-shadow:0 0 0 2px rgba(16,185,129,.3);}';
+        var style = document.createElement('style');
+        style.id = 'tcm-dialog-style';
+        style.textContent = css;
+        document.head.appendChild(style);
+    }
+    injectDialogStyle();
+
     function lockBody() {
         openCount++;
         if (openCount === 1) document.body.style.overflow = 'hidden';
@@ -142,7 +166,7 @@
                 var footer = el('div', 'flex justify-end gap-2 px-5 py-4 bg-gray-50');
                 if (hasCancel) {
                     var cancelBtn = el('button',
-                        'px-4 py-2 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-base font-normal',
+                        'tcm-btn tcm-btn-cancel px-4 py-2 rounded-md text-base font-normal',
                         opts.cancelText || defaultCancel());
                     cancelBtn.type = 'button';
                     cancelBtn.style.touchAction = 'manipulation';
@@ -150,10 +174,9 @@
                     footer.appendChild(cancelBtn);
                 }
                 if (hasOk) {
-                    var okCls = opts.danger
-                        ? 'bg-red-600 hover:bg-red-700 text-white'
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white';
-                    var okBtn = el('button', 'px-4 py-2 rounded-md text-base font-normal ' + okCls,
+                    var okCls = opts.danger ? 'tcm-btn-danger' : 'tcm-btn-ok';
+                    var okBtn = el('button', 'tcm-btn ' + okCls +
+                        ' px-4 py-2 rounded-md text-base font-normal',
                         opts.okText || defaultOk());
                     okBtn.type = 'button';
                     okBtn.style.touchAction = 'manipulation';

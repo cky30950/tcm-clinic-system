@@ -34,7 +34,7 @@
         })();
     </script>
     <!-- Tailwind CSS v4 預編譯靜態 CSS（取代 browser CDN 即時編譯器，消除手機端 CPU 掃描） -->
-    <link rel="stylesheet" href="/css/tailwind.css?v=20261009a">
+    <link rel="stylesheet" href="/css/tailwind.css?v=20261013a">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.7.47/daisyui.css">
     <!-- daisyUI 5 全套 35 個內建主題（本地釘版本，配合帳號安全設定內的主題切換器） -->
     <link rel="stylesheet" href="js/vendor/daisyui/themes.css?v=20261006a">
@@ -619,17 +619,19 @@
             /* ==============================================
              * 頂部 nav 防擠壓
              *
-             * 390px 下左側標題與右側「當前診所／切換／用戶／登出」互搶寬度，
-             * 標題被擠到逐字斷行、與右側文字視覺重疊。
-             * 手機上保留當前診所名稱（縮小字體＋截斷），英文副標隱藏，
-             * 按鈕與間距全面縮小；仍放不下時整列允許換到第二行。
+             * 390px 下左側標題與右側「當前診所／切換／用戶／登出」互搶寬度。
+             * 手機版只保留「切換」「登出」兩顆按鈕，當前診所名稱與用戶身份
+             * 隱藏（電腦版不受此媒體查詢影響，維持完整顯示）；
+             * 英文副標隱藏，標題單行、按鈕與間距縮小。
              * ============================================== */
             #systemTitle {
                 font-size: 0.95rem;
                 line-height: 1.2;
                 white-space: nowrap;
             }
-            #systemEnglishTitle {
+            #systemEnglishTitle,
+            #currentClinicDisplay,
+            #userRole {
                 display: none;
             }
             nav .max-w-7xl {
@@ -637,8 +639,7 @@
                 padding-right: 0.5rem;
             }
             nav .flex.justify-between.items-center {
-                flex-wrap: wrap;
-                gap: 0.25rem 0.5rem;
+                flex-wrap: nowrap;
                 padding-top: 0.4rem;
                 padding-bottom: 0.4rem;
             }
@@ -653,33 +654,12 @@
                 height: 1.25rem;
             }
             nav .flex.justify-between.items-center > .flex.items-center.space-x-4 {
-                /* 右側資訊群獨佔第二行（左側標題行保持單行），
-                   對齊右側；診所名稱可取用該行剩餘寬度，不需截斷 */
-                flex-basis: 100%;
-                justify-content: flex-end;
                 gap: 0.3rem;
-                max-width: 100%;
                 min-width: 0;
             }
             /* 覆寫 space-x-4 的 1rem 子元素左外距 */
             nav .flex.justify-between.items-center > .flex.items-center.space-x-4 > * + * {
-                margin-left: 0.2rem;
-            }
-            #currentClinicDisplay,
-            #userRole {
-                font-size: 0.68rem;
-                line-height: 1.15;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                max-width: 55vw;
-                min-width: 0;
-            }
-            /* 診所名稱吃掉按鈕群左側所有剩餘空間並靠右貼齊，
-               名稱較長時在自己的空間內截斷，不會壓到按鈕 */
-            #currentClinicDisplay {
-                flex: 1 1 auto;
-                text-align: right;
+                margin-left: 0.3rem;
             }
             #clinicSwitchButton,
             #logoutButton {
@@ -768,6 +748,37 @@
             }
             .billing-qty > * + * {
                 margin-left: 0 !important;
+            }
+
+            /* ==============================================
+             * 財務報表
+             *
+             * 1)「成本導入／已輸入成本」桌面用 absolute 置頂右，手機上會
+             *    壓住「報表類型」選擇欄——改回正常流向，排在表單上方。
+             * 2) 醫師／診所兩個下拉在手機直排，避免互相壓縮。
+             * 3) 更新報表／匯出按鈕列允許換行（類別已加 flex-wrap）。
+             * 4) 詳細報表的分頁（服務分析／會員儲值等 5 個）超出寬度，
+             *    外層已改 overflow-x-auto，按鈕保持單行由容器橫滑。
+             * ============================================== */
+            .financial-cost-actions {
+                position: static !important;
+                flex-direction: row;
+                justify-content: flex-end;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                margin-bottom: 0.75rem;
+            }
+            #financialReports .bg-gray-50.relative .grid .flex.gap-4 {
+                flex-direction: column;
+            }
+            #financialReports .bg-gray-50.relative .grid .flex.gap-4 > select {
+                width: 100%;
+            }
+            .financial-report-actions button {
+                white-space: nowrap;
+            }
+            .financial-tabs button {
+                white-space: nowrap;
             }
 
             /* 移除舊的 .toast 手機樣式，使用 Toastr 預設樣式即可 */
@@ -2904,7 +2915,7 @@
                 </div>
                 
                 <div class="bg-gray-50 rounded-lg p-4 mb-6 relative">
-                    <div class="absolute top-4 right-4 space-y-2 flex flex-col items-end">
+                    <div class="financial-cost-actions absolute top-4 right-4 space-y-2 flex flex-col items-end">
                         <button onclick="showExpenseImportModal()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center">
                             <i data-lucide="upload" class="w-4 h-4 mr-2"></i><span>成本導入</span>
                         </button>
@@ -2953,7 +2964,7 @@
                             </div>
                         </div>
                         
-                        <div class="flex items-end space-x-2">
+                        <div class="financial-report-actions flex items-end space-x-2 flex-wrap gap-y-2">
                             <button onclick="generateFinancialReport()" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded-lg transition duration-200 flex items-center">
                                 <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i><span>更新報表</span>
                             </button>
@@ -3043,8 +3054,8 @@
                     </div>
                     
                     
-                    <div class="border-b border-gray-200">
-                        <nav class="flex space-x-8 px-6" role="tablist">
+                    <div class="border-b border-gray-200 overflow-x-auto">
+                        <nav class="financial-tabs flex space-x-8 px-6 min-w-max" role="tablist">
                             <button onclick="switchFinancialTab('summary')" id="financialSummaryTab" class="py-4 px-1 border-b-2 border-green-500 text-green-600 font-medium text-sm transition duration-200">
                                 收入摘要
                             </button>
@@ -5034,15 +5045,42 @@
 #scheduleManagement .controls {
                 flex-direction: column;
                 align-items: stretch;
+                gap: 10px;
             }
 
 #scheduleManagement .nav-controls, #scheduleManagement .view-controls, #scheduleManagement .sync-controls {
                 justify-content: center;
+                flex-wrap: wrap;
+            }
+
+#scheduleManagement .nav-controls {
+                gap: 6px;
             }
 
 #scheduleManagement .current-date {
-                margin: 10px 0;
+                margin: 0 6px;
                 text-align: center;
+                font-size: 15px;
+                flex-basis: 100%;
+                order: -1;
+            }
+
+#scheduleManagement .nav-btn,
+#scheduleManagement .sync-btn {
+                font-size: 0.68rem;
+                padding: 4px 8px;
+            }
+
+#scheduleManagement .sync-controls {
+                gap: 6px;
+            }
+
+#scheduleManagement .view-controls select {
+                max-width: 100%;
+            }
+
+#scheduleManagement .bg-linear-to-r {
+                padding: 0.75rem !important;
             }
 
 #scheduleManagement .calendar-grid.month-view {
@@ -6430,7 +6468,7 @@
     <!-- 延遲載入器：xlsx / qrcode 等真的少用的大庫 -->
     <script src="js/lib/lazy-loader.js?v=20261011a" defer></script>
     <!-- 對話框輔助庫（取代 SweetAlert2：Notiflix 確認/提示 + 輸入/HTML 彈窗） -->
-    <script src="js/lib/dialog.js?v=20261011a" defer></script>
+    <script src="js/lib/dialog.js?v=20261013a" defer></script>
 
     <!-- chart.js + tabulator：改由 lazy-loader 動態載入（個人統計/財務報表/錢包面板） -->
 
