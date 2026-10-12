@@ -6153,11 +6153,11 @@ async function fetchJsonWithFallback(fileName) {
                     }
                 }
             } else if (sectionId === 'medicalRecordManagement') {
-                
+
                 if (typeof loadMedicalRecordManagement === 'function') {
                     loadMedicalRecordManagement();
                 }
-                attachMedicalRecordListListener();
+                // 即時更新改由全域 patientsMeta 監聽器＋invalidateMedicalRecordListCache 處理
             } else if (sectionId === 'billingManagement') {
                 loadBillingManagement();
             } else if (sectionId === 'walletManagement') {
@@ -6235,14 +6235,6 @@ async function fetchJsonWithFallback(fileName) {
                         }
                     } catch (err) {
                         console.error('切換頁面時處理掛號監聽失敗:', err);
-                    }
-                }
-                
-                if (id === 'medicalRecordManagement') {
-                    try {
-                        detachMedicalRecordListListener();
-                    } catch (err) {
-                        console.error('離開病歷管理時取消病歷監聽失敗:', err);
                     }
                 }
                 const el = document.getElementById(id);
@@ -14321,10 +14313,22 @@ let medicalRecordPageCache = {};   // { pageNumber: Array<consultation> }
 let medicalRecordSearchCache = {}; // { term: Array<consultation> }
 let medicalRecordAscPageCursors = {}; // { ascIndex: lastDocSnapshot }
 let medicalRecordAscPageCache = {};   // { ascIndex: Array<consultation> }
-let medicalRecordListListenerAttached = false;
-let medicalRecordListUnsubscribe = null;
 let medicalRecordRefreshInFlight = null;
-let medicalRecordListenerDebounceTimer = null;
+
+// ============================================================
+// 病歷管理列表持久化快取（鏡像病人列表的 patientsMeta 戳記模式）
+// ------------------------------------------------------------
+// 只持久化第一頁投影＋總數＋ patientsMeta/lastChange 戳記。
+// 進入頁面時以 1 次 meta getDoc 驗證：戳記相同直接渲染（0 次列表讀取），
+// 不同才 count() ＋重取第一頁。任何病歷 CRUD（含跨裝置）都會寫同一個
+// meta 文檔（kind:'consultation'），由全域監聽器呼叫
+// invalidateMedicalRecordListCache() 丟棄這份快取。
+// ============================================================
+const MEDICAL_RECORD_LIST_CACHE_KEY = 'medicalRecordListCacheV1';
+const MEDICAL_RECORD_LIST_CACHE_TTL_MS = 12 * 3600 * 1000;
+let medicalRecordRestoredFirstPage = null; // 冷啟動從 localStorage 還原的第一頁投影（無 cursor）
+let medicalRecordListMetaTimestamp = null;
+let medicalRecordListInvalidateTimer = null;
 
 function getMedicalRecordSortRawValue(record) {
     if (!record || typeof record !== 'object') return null;
@@ -14352,6 +14356,51 @@ function resetMedicalRecordManagementCaches() {
     medicalRecordSearchCache = {};
     medicalRecordAscPageCursors = {};
     medicalRecordAscPageCache = {};
+}
+
+function writeMedicalRecordListCacheBundle(metaTimestamp) {
+    try {
+        // 只持久化第一頁投影；cursor 是 Firestore DocumentSnapshot，無法序列化，
+        // 翻到第二頁時由網路鏈自然重建
+        const page1 = Array.isArray(medicalRecordPageCache[1]) ? medicalRecordPageCache[1] : null;
+        if (!Array.isArray(page1) || typeof medicalRecordTotalCount !== 'number') return;
+        const bundle = {
+            v: 1,
+            fetchedAt: Date.now(),
+            metaTimestamp: metaTimestamp == null ? null : Number(metaTimestamp),
+            totalCount: medicalRecordTotalCount,
+            page1: page1
+        };
+        localStorage.setItem(MEDICAL_RECORD_LIST_CACHE_KEY, JSON.stringify(bundle));
+        medicalRecordListMetaTimestamp = bundle.metaTimestamp;
+    } catch (_e) {
+        // localStorage 容量不足或被停用：靜默略過，退回每次網路讀取
+    }
+}
+
+function clearMedicalRecordListPersistedCache() {
+    try { localStorage.removeItem(MEDICAL_RECORD_LIST_CACHE_KEY); } catch (_e) {}
+    medicalRecordListMetaTimestamp = null;
+    medicalRecordRestoredFirstPage = null;
+}
+
+/**
+ * 還原持久化的第一頁投影與總數。通過 TTL 與結構檢查才採用，
+ * 並把投影放進 medicalRecordRestoredFirstPage（不進 pageCache，
+ * 因為沒有 cursor）。回傳 bundle 或 null。
+ */
+function restoreMedicalRecordListCacheBundle() {
+    let raw = null;
+    try { raw = localStorage.getItem(MEDICAL_RECORD_LIST_CACHE_KEY); } catch (_e) { return null; }
+    if (!raw) return null;
+    let bundle;
+    try { bundle = JSON.parse(raw); } catch (_e) { return null; }
+    if (!bundle || bundle.v !== 1 || !Array.isArray(bundle.page1)) return null;
+    if (!bundle.fetchedAt || (Date.now() - Number(bundle.fetchedAt) > MEDICAL_RECORD_LIST_CACHE_TTL_MS)) return null;
+    medicalRecordRestoredFirstPage = bundle.page1;
+    if (typeof bundle.totalCount === 'number') medicalRecordTotalCount = bundle.totalCount;
+    medicalRecordListMetaTimestamp = (bundle.metaTimestamp == null ? null : Number(bundle.metaTimestamp));
+    return bundle;
 }
 
 function updateMedicalRecordPatientLookup(patients) {
@@ -14396,20 +14445,24 @@ async function refreshMedicalRecordManagementData(preservePage = true, options =
     }
     medicalRecordRefreshInFlight = (async () => {
         const refreshCount = options.refreshCount !== false;
+        medicalRecordRestoredFirstPage = null;
         resetMedicalRecordManagementCaches();
-        try {
-            if (window.firebaseDataManager && typeof window.firebaseDataManager.consultationsCache !== 'undefined') {
-                window.firebaseDataManager.consultationsCache = null;
-            }
-        } catch (_cacheErr) {}
-        try {
-            localStorage.removeItem('consultations');
-        } catch (_lsErr) {}
+        // 注意：不再清空 consultationsCache / localStorage('consultations')——
+        // 那是「檢視病歷」的完整文件快取，與分頁投影快取分開管理，
+        // 其失效由 invalidateConsultationDetailCacheForPatient 精準處理。
         if (refreshCount) {
             const countRes = await getConsultationsCount();
             medicalRecordTotalCount = (countRes && typeof countRes.count === 'number') ? countRes.count : 0;
         }
         await displayMedicalRecords(preservePage);
+        // 重取完成後蓋上當前 meta 戳記，下次進入即可沿用
+        try {
+            let metaTs = null;
+            if (window.firebaseDataManager && typeof window.firebaseDataManager.fetchCurrentPatientsMetaTimestamp === 'function') {
+                metaTs = await window.firebaseDataManager.fetchCurrentPatientsMetaTimestamp();
+            }
+            writeMedicalRecordListCacheBundle(metaTs);
+        } catch (_metaErr) {}
     })();
     try {
         await medicalRecordRefreshInFlight;
@@ -14418,101 +14471,62 @@ async function refreshMedicalRecordManagementData(preservePage = true, options =
     }
 }
 
-async function attachMedicalRecordListListener() {
+/**
+ * 丟棄指定病人在「完整病歷詳情」快取層的記錄（記憶體＋localStorage），
+ * 讓之後「檢視病歷」重新從 Firestore 讀取。add/update/delete 皆丟棄：
+ * update 內容可能已變；delete 後快取裡不應殘留。
+ */
+function invalidateConsultationDetailCacheForPatient(patientId) {
+    const pid = String(patientId || '');
+    if (!pid) return;
     try {
-        await waitForFirebaseDb();
-        if (medicalRecordListListenerAttached) return;
-        const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-        let isInitialSnapshot = true;
-        let q;
-        try {
-            q = window.firebase.firestoreQuery(
-                colRef,
-                window.firebase.orderBy('sortDate', 'desc'),
-                window.firebase.limit(1)
+        const dm = window.firebaseDataManager;
+        if (dm && Array.isArray(dm.consultationsCache)) {
+            dm.consultationsCache = dm.consultationsCache.filter(
+                c => String(c && c.patientId || '') !== pid
             );
-        } catch (_e) {
-            try {
-                q = window.firebase.firestoreQuery(
-                    colRef,
-                    window.firebase.orderBy('createdAt', 'desc'),
-                    window.firebase.limit(1)
-                );
-            } catch (_e2) {
-                try {
-                    q = window.firebase.firestoreQuery(
-                        colRef,
-                        window.firebase.orderBy('date', 'desc'),
-                        window.firebase.limit(1)
-                    );
-                } catch (_fallbackErr) {
-                    q = colRef;
-                }
+        }
+    } catch (_e) {}
+    try {
+        if (Array.isArray(consultations)) {
+            const next = consultations.filter(c => String(c && c.patientId || '') !== pid);
+            if (next.length !== consultations.length) {
+                consultations = next;
+                try { localStorage.setItem('consultations', JSON.stringify(consultations)); } catch (_e) {}
             }
         }
-        medicalRecordListUnsubscribe = window.firebase.onSnapshot(q, (snapshot) => {
-            try {
-                if (isInitialSnapshot) {
-                    isInitialSnapshot = false;
-                    return;
-                }
-                const addedChanges = snapshot && typeof snapshot.docChanges === 'function'
-                    ? snapshot.docChanges().filter(change => change && change.type === 'added')
-                    : [];
-                if (!addedChanges.length) {
-                    return;
-                }
-                resetMedicalRecordManagementCaches();
-                if (typeof medicalRecordTotalCount === 'number' && medicalRecordTotalCount >= 0) {
-                    medicalRecordTotalCount += addedChanges.length;
-                }
-                if (!isMedicalRecordManagementVisible() || hasMedicalRecordSearchTerm()) {
-                    return;
-                }
-                const currentPage = paginationSettings.medicalRecordList && paginationSettings.medicalRecordList.currentPage
-                    ? paginationSettings.medicalRecordList.currentPage
-                    : 1;
-                if (currentPage !== 1) {
-                    return;
-                }
-                if (medicalRecordListenerDebounceTimer) {
-                    clearTimeout(medicalRecordListenerDebounceTimer);
-                }
-                medicalRecordListenerDebounceTimer = setTimeout(() => {
-                    medicalRecordListenerDebounceTimer = null;
-                    refreshMedicalRecordManagementData(true, { refreshCount: false }).catch((err) => {
-                        console.error('病歷管理即時更新處理失敗:', err);
-                    });
-                }, 400);
-            } catch (innerErr) {
-                console.error('病歷管理即時更新處理失敗:', innerErr);
-            }
-        }, (err) => {
-            console.error('監聽病歷管理資料失敗:', err);
-        });
-        medicalRecordListListenerAttached = true;
-    } catch (outerErr) {
-        console.error('附加病歷管理監聽失敗:', outerErr);
-    }
+    } catch (_e) {}
 }
 
-function detachMedicalRecordListListener() {
-    if (medicalRecordListListenerAttached) {
-        try {
-            if (typeof medicalRecordListUnsubscribe === 'function') {
-                medicalRecordListUnsubscribe();
-            }
-        } catch (err) {
-            console.error('取消病歷管理監聽失敗:', err);
+/**
+ * 病歷列表快取失效入口，由全域 patientsMeta/lastChange 監聽器於
+ * kind:'consultation' 通知時呼叫（本機 CRUD 的 self-nonce 與跨裝置 CRUD
+ * 都會呼叫）：
+ *   1. 丟棄持久化第一頁與記憶體分頁快取（無條件，不論頁面是否開著）；
+ *   2. 丟棄該病人的完整病歷詳情快取；
+ *   3. 頁面正開啟且非搜尋狀態時，debounce 重數總數＋重取當前頁。
+ * 取代舊式 top-1 集合監聽器（只抓得到 added，編輯／刪除會漏）。
+ */
+function invalidateMedicalRecordListCache(options = {}) {
+    try {
+        clearMedicalRecordListPersistedCache();
+        resetMedicalRecordManagementCaches();
+        const pid = options.patientId ? String(options.patientId) : '';
+        if (pid) invalidateConsultationDetailCacheForPatient(pid);
+        if (options.reloadIfVisible && isMedicalRecordManagementVisible() && !hasMedicalRecordSearchTerm()) {
+            if (medicalRecordListInvalidateTimer) clearTimeout(medicalRecordListInvalidateTimer);
+            medicalRecordListInvalidateTimer = setTimeout(() => {
+                medicalRecordListInvalidateTimer = null;
+                refreshMedicalRecordManagementData(true, { refreshCount: true }).catch((err) => {
+                    console.error('病歷管理即時更新處理失敗:', err);
+                });
+            }, 400);
         }
-        medicalRecordListListenerAttached = false;
-        medicalRecordListUnsubscribe = null;
-    }
-    if (medicalRecordListenerDebounceTimer) {
-        clearTimeout(medicalRecordListenerDebounceTimer);
-        medicalRecordListenerDebounceTimer = null;
+    } catch (err) {
+        console.error('病歷列表快取失效處理失敗:', err);
     }
 }
+window.invalidateMedicalRecordListCache = invalidateMedicalRecordListCache;
 
 /**
  * 載入病歷管理頁面：重置搜尋欄、讀取診症記錄與病人資料，並綁定搜尋事件。
@@ -14525,7 +14539,8 @@ async function loadMedicalRecordManagement() {
         }
         paginationSettings.medicalRecordList.currentPage = 1;
         paginationSettings.medicalRecordList.itemsPerPage = 10;
-        resetMedicalRecordManagementCaches();
+        // 不再無條件清空記憶體快取：先嘗試沿用持久化的第一頁投影，
+        // 新鮮度由 patientsMeta 戳記把關。
         const searchInput = document.getElementById('searchMedicalRecord');
         if (searchInput) {
             searchInput.value = '';
@@ -14541,9 +14556,33 @@ async function loadMedicalRecordManagement() {
             searchInput.addEventListener('input', listener);
             searchInput._medicalRecordListener = listener;
         }
+
+        // 新鮮度門禁：1 次 meta 讀取決定是否需要重讀列表。
+        const bundle = restoreMedicalRecordListCacheBundle();
+        let serverTs = null;
+        try {
+            if (window.firebaseDataManager && typeof window.firebaseDataManager.fetchCurrentPatientsMetaTimestamp === 'function') {
+                serverTs = await window.firebaseDataManager.fetchCurrentPatientsMetaTimestamp();
+            }
+        } catch (_metaErr) { serverTs = null; }
+        // serverTs == null：伺服器從未 CRUD（或網路失敗），TTL 內沿用快取（與病人列表同口徑）
+        const stampMatch = !!bundle && (
+            serverTs == null ||
+            bundle.metaTimestamp === serverTs
+        );
+        if (stampMatch) {
+            // 0 次列表讀取：直接以還原的第一頁投影渲染
+            await displayMedicalRecords(false);
+            return;
+        }
+
+        // 戳記不同／無快取：重數總數＋重取第一頁，成功後蓋戳持久化
+        medicalRecordRestoredFirstPage = null;
+        resetMedicalRecordManagementCaches();
         const countRes = await getConsultationsCount();
         medicalRecordTotalCount = (countRes && typeof countRes.count === 'number') ? countRes.count : 0;
         await displayMedicalRecords(false);
+        writeMedicalRecordListCacheBundle(serverTs);
     } catch (error) {
         console.error('初始化病歷管理時發生錯誤:', error);
     }
@@ -14945,6 +14984,11 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
 
 async function fetchMedicalRecordPageOptimized(page = 1, pageSize = 10) {
     try {
+        // 冷啟動從 localStorage 還原的第一頁投影（沒有 Firestore cursor）：
+        // 僅供第 1 頁直接渲染；一旦要取其他頁，正常網路鏈會重取第 1 頁取得 cursor。
+        if (page === 1 && !medicalRecordPageCache[1] && Array.isArray(medicalRecordRestoredFirstPage)) {
+            return medicalRecordRestoredFirstPage;
+        }
         const totalItems = typeof medicalRecordTotalCount === 'number' ? medicalRecordTotalCount : null;
         const totalPages = totalItems ? Math.ceil(totalItems / pageSize) : null;
         if (!totalPages) {
@@ -15559,7 +15603,10 @@ async function viewMedicalRecord(recordId, buttonEl = null) {
         }
         let rec = null;
         if (window.firebaseDataManager && typeof window.firebaseDataManager.getConsultationById === 'function') {
-            const singleRes = await window.firebaseDataManager.getConsultationById(String(recordId), true);
+            // 快取優先：同一筆重複檢視不重複讀取。快取的新鮮度由
+            // patientsMeta(kind:'consultation') 監聽器觸發
+            // invalidateConsultationDetailCacheForPatient() 把關。
+            const singleRes = await window.firebaseDataManager.getConsultationById(String(recordId), false);
             if (singleRes && singleRes.success && singleRes.data) {
                 rec = singleRes.data;
             }
@@ -15982,7 +16029,9 @@ async function deleteMedicalRecord(recordId, buttonEl = null) {
         } catch (_err) {
             // 忽略錯誤
         }
-        // 重新計算總數並清除頁面快取
+        // 重新計算總數並清除頁面快取（記憶體＋持久化；持久化也會由
+        // 本次刪除觸發的 patientsMeta self-nonce 通知清除，這裡雙保險）
+        clearMedicalRecordListPersistedCache();
         medicalRecordPageCache = {};
         medicalRecordPageCursors = {};
         medicalRecordSearchCache = {};

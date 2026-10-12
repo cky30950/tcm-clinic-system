@@ -695,6 +695,7 @@ const LOCAL_CLINIC_DATA_KEYS = Object.freeze([
     'patientsCacheMeta',
     'appointments',
     'consultations',
+    'medicalRecordListCacheV1',
     'users',
     'clinics',
     'clinicSettings',
@@ -777,13 +778,7 @@ export function detachAllKnownFirestoreListeners() {
             });
         }
     } catch (_e) {}
-    // 病歷管理頁列表監聽
-    try {
-        if (typeof G.medicalRecordListUnsubscribe === 'function') {
-            G.medicalRecordListUnsubscribe();
-            G.medicalRecordListUnsubscribe = null;
-        }
-    } catch (_e) {}
+    // 病歷管理頁已改由全域 patientsMeta 監聽器統一處理（隨病人監聽一併拆除）
 }
 
 /**

@@ -571,9 +571,19 @@ export async function attachPatientListListener() {
                     return;
                 }
 
-                // 自己觸發的事件：本機 CRUD 已同步就地更新快取，蓋戳後跳過
+                // 自己觸發的事件：本機 CRUD 已同步就地更新病人快取，蓋戳後跳過病人層邏輯。
+                // 但病歷管理列表／詳情快取仍需失效（本機新增/編輯/撤回病歷後，
+                // 下次進病歷管理或再次檢視該病歷要拿到最新狀態）。
                 if (isSelfMetaNonce(metaData.nonce)) {
                     if (metaTs != null) stampPatientsStorageMetaTimestamp(metaTs);
+                    if (metaData.kind === 'consultation') {
+                        if (typeof G.invalidateMedicalRecordListCache === 'function') {
+                            G.invalidateMedicalRecordListCache({
+                                patientId: metaData.patientId,
+                                reloadIfVisible: true
+                            });
+                        }
+                    }
                     return;
                 }
 
@@ -588,6 +598,14 @@ export async function attachPatientListListener() {
                 // 不會自動失效，需在此主動清除，否則稍後開啟病歷彈窗時會吃到已被撤回的舊記錄。
                 if (metaData.kind === 'consultation' && metaData.patientId) {
                     refreshOpenConsultationHistory(metaData.patientId, metaData.operation);
+                    // 病歷管理列表持久化/分頁快取失效，頁面開著則 debounce 重載；
+                    // 同時丟棄該病人的完整病歷詳情快取（編輯內容或撤回）。
+                    if (typeof G.invalidateMedicalRecordListCache === 'function') {
+                        G.invalidateMedicalRecordListCache({
+                            patientId: metaData.patientId,
+                            reloadIfVisible: true
+                        });
+                    }
                 }
             } catch (innerErr) {
                 console.error('病人資料即時更新處理失敗:', innerErr);

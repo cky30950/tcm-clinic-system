@@ -152,9 +152,6 @@ export const G = {
     get currentConsultationHistoryPatientId() { return currentConsultationHistoryPatientId; },
     set currentConsultationHistoryPatientId(v) { currentConsultationHistoryPatientId = v; },
     get consultationHistoryPager() { return consultationHistoryPager; },
-    // 病歷管理頁監聽（auth session 清除流程用，需一併重設）
-    get medicalRecordListUnsubscribe() { return medicalRecordListUnsubscribe; },
-    set medicalRecordListUnsubscribe(v) { medicalRecordListUnsubscribe = v; },
     // 分頁設定與資料層舊服務
     get paginationSettings() { return paginationSettings; },
     get fetchDataWithCache() { return fetchDataWithCache; },
@@ -203,6 +200,8 @@ export const G = {
     /* ── 財務報表（reports.js，Phase 5 子批 D）────────────────── */
     get initClinics() { return initClinics; },
     get viewMedicalRecord() { return viewMedicalRecord; },
+    // 病歷管理列表 meta 失效（patients/store.js 監聽器呼叫）
+    get invalidateMedicalRecordListCache() { return window.invalidateMedicalRecordListCache; },
     get readCache() { return readCache; },
     get writeCache() { return writeCache; },
 
