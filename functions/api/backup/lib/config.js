@@ -23,11 +23,8 @@ export const EXPORT_PREFIX = 'exports/';
 // 備份檔保留期限由 R2 Object lifecycle rule 管理（目前設為 2 個月），
 // 程式不再主動刪除 exports/ 內舊檔。
 
-// 刪除墓碑集合名稱（記錄硬刪除文件的 sourceKey 與 docId，驅動 R2 快照增量刪除）
-export const TOMBSTONE_COLLECTION = 'deletionTombstones';
-
-// 大集合全量 baseline 間隔（90 日防漂移保險值；日常已由墓碑機制達成永久純增量，無需每週全量掃描）
-export const BASELINE_INTERVAL_MS = 90 * 24 * 60 * 60 * 1000;
+// 大集合全量 baseline 間隔（7 日）
+export const BASELINE_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // 單集合快照保險上限（筆數），超過只跳過組裝並警告，不影響同步
 export const EXPORT_DOC_SOFT_LIMIT = 200000;

@@ -10,7 +10,6 @@ export {
     getPatientByIdWithRefresh,
     fetchPatientsPage,
     fetchPatientsPageAsc,
-    comparePatientsByCreatedAtDesc,
     comparePatientsByNumberDesc,
     fetchPatientsPageOptimized,
     getPatientsCount,

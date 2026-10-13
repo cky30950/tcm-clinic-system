@@ -396,49 +396,37 @@ export async function withdrawConsultation(appointmentId) {
                 if (!change || typeof change.delta !== 'number') continue;
                 const patientIdForPkg = change.patientId;
                 const packageRecordIdForPkg = change.packageRecordId;
-                const restoreDelta = -change.delta;
-                if (!restoreDelta) continue;
-
-                if (window.firebaseDataManager && typeof window.firebaseDataManager.applyPatientPackageChangeWithTransaction === 'function') {
-                    await window.firebaseDataManager.applyPatientPackageChangeWithTransaction(
-                        patientIdForPkg,
-                        packageRecordIdForPkg,
-                        restoreDelta,
-                        {
-                            source: 'consultationBillingReturn',
-                            type: 'restoreUse'
-                        }
-                    );
+                // 強制刷新，取得最新套票資料
+                const pkgs = await getPatientPackages(patientIdForPkg, true);
+                const pkg = pkgs.find(p => String(p.id) === String(packageRecordIdForPkg));
+                if (!pkg) continue;
+                // 在撤回時將用量加回（反向處理 delta）
+                let newRemaining = (pkg.remainingUses || 0) - change.delta;
+                if (typeof pkg.totalUses === 'number') {
+                    newRemaining = Math.max(0, Math.min(pkg.totalUses, newRemaining));
                 } else {
-                    const pkgs = await getPatientPackages(patientIdForPkg, true);
-                    const pkg = pkgs.find(p => String(p.id) === String(packageRecordIdForPkg));
-                    if (!pkg) continue;
-                    let newRemaining = (pkg.remainingUses || 0) + restoreDelta;
-                    if (typeof pkg.totalUses === 'number') {
-                        newRemaining = Math.max(0, Math.min(pkg.totalUses, newRemaining));
-                    } else {
-                        newRemaining = Math.max(0, newRemaining);
-                    }
-                    const updatedPackage = { ...pkg, remainingUses: newRemaining };
-                    await window.firebaseDataManager.updatePatientPackage(packageRecordIdForPkg, updatedPackage);
-                    await recordPatientPackageHistory(buildPatientPackageHistoryRecord({
-                        patientId: patientIdForPkg,
-                        packageId: packageRecordIdForPkg,
-                        packageName: pkg.name,
-                        source: 'consultationBillingReturn',
-                        type: 'restoreUse',
-                        fromRemainingUses: Number(pkg.remainingUses) || 0,
-                        toRemainingUses: newRemaining,
-                        changeCount: Math.abs(Number(change.delta) || 0)
-                    }));
-                    if (G.patientPackagesCache && Array.isArray(G.patientPackagesCache[patientIdForPkg])) {
-                        G.patientPackagesCache[patientIdForPkg] = G.patientPackagesCache[patientIdForPkg].map(p => {
-                            if (String(p.id) === String(packageRecordIdForPkg)) {
-                                return { ...p, ...updatedPackage };
-                            }
-                            return p;
-                        });
-                    }
+                    newRemaining = Math.max(0, newRemaining);
+                }
+                const updatedPackage = { ...pkg, remainingUses: newRemaining };
+                await window.firebaseDataManager.updatePatientPackage(packageRecordIdForPkg, updatedPackage);
+                await recordPatientPackageHistory(buildPatientPackageHistoryRecord({
+                    patientId: patientIdForPkg,
+                    packageId: packageRecordIdForPkg,
+                    packageName: pkg.name,
+                    source: 'consultationBillingReturn',
+                    type: 'restoreUse',
+                    fromRemainingUses: Number(pkg.remainingUses) || 0,
+                    toRemainingUses: newRemaining,
+                    changeCount: Math.abs(Number(change.delta) || 0)
+                }));
+                // 更新本地快取
+                if (G.patientPackagesCache && Array.isArray(G.patientPackagesCache[patientIdForPkg])) {
+                    G.patientPackagesCache[patientIdForPkg] = G.patientPackagesCache[patientIdForPkg].map(p => {
+                        if (String(p.id) === String(packageRecordIdForPkg)) {
+                            return { ...p, ...updatedPackage };
+                        }
+                        return p;
+                    });
                 }
             }
         }

@@ -274,17 +274,6 @@ service cloud.firestore {
     }
 
     // ============================================================
-    // 刪除墓碑（R2 增量備份同步專用）
-    // ------------------------------------------------------------
-    // 活躍員工可寫入墓碑（deleteDoc 自動登記），僅管理員可手動清除墓碑；
-    // 後端 Service Account 繞過 Rules 自動增量消費與過期清除。
-    // ============================================================
-    match /deletionTombstones/{tombstoneId} {
-      allow read, create: if canAccess();
-      allow update, delete: if canAdmin();
-    }
-
-    // ============================================================
     // Catch-all：其他業務集合（consultations、clinics、
     // clinicExpenses、globalBillingItems 等）。
     // 必須持有活躍員工身份（claims 或過渡索引）才可讀寫。
@@ -313,8 +302,7 @@ service cloud.firestore {
         && collectionId != 'patientPackages'
         && collectionId != 'personalStatisticsMonthlySummaries'
         && collectionId != 'personalStatisticsSummaryStates'
-        && collectionId != 'dailyFinancialStats'
-        && collectionId != 'deletionTombstones';
+        && collectionId != 'dailyFinancialStats';
     }
   }
 }

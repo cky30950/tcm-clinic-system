@@ -333,41 +333,6 @@ export class FirestoreClient {
         });
     }
 
-    /**
-     * 增量查詢刪除墓碑：deletedAt >= watermark.ts，並以 __name__ 做同分秒排序。
-     * 若 watermark 為空，則取全部現存墓碑。
-     */
-    async queryTombstonesSince(watermark) {
-        const orderBy = [
-            { field: { fieldPath: 'deletedAt' }, direction: 'ASCENDING' },
-            { field: { fieldPath: '__name__' }, direction: 'ASCENDING' }
-        ];
-        const where = (watermark && watermark.ts)
-            ? {
-                fieldFilter: {
-                    field: { fieldPath: 'deletedAt' },
-                    op: 'GREATER_THAN_OR_EQUAL',
-                    value: { timestampValue: watermark.ts }
-                }
-            }
-            : null;
-        const startAt = (watermark && watermark.ts && watermark.name)
-            ? {
-                before: false,
-                values: [
-                    { timestampValue: watermark.ts },
-                    { referenceValue: watermark.name }
-                ]
-            }
-            : null;
-        return this.queryCollection({
-            collectionId: 'deletionTombstones',
-            where,
-            orderBy,
-            startAt
-        });
-    }
-
     _buildOrderCursor(orderBy, lastDoc) {
         const values = [];
         for (const order of orderBy) {
@@ -380,10 +345,6 @@ export class FirestoreClient {
                 values.push({ timestampValue: raw });
             } else if (fieldPath === 'createdAt') {
                 const raw = lastDoc._rawCreatedAt;
-                if (!raw) return null;
-                values.push({ timestampValue: raw });
-            } else if (fieldPath === 'deletedAt') {
-                const raw = lastDoc._rawDeletedAt;
                 if (!raw) return null;
                 values.push({ timestampValue: raw });
             } else {
@@ -462,8 +423,7 @@ export function normalizeDocument(document) {
         name: document.name,
         data,
         _rawUpdatedAt: (document.fields && document.fields.updatedAt && document.fields.updatedAt.timestampValue) || null,
-        _rawCreatedAt: (document.fields && document.fields.createdAt && document.fields.createdAt.timestampValue) || null,
-        _rawDeletedAt: (document.fields && document.fields.deletedAt && document.fields.deletedAt.timestampValue) || null
+        _rawCreatedAt: (document.fields && document.fields.createdAt && document.fields.createdAt.timestampValue) || null
     };
 }
 

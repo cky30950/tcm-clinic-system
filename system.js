@@ -2092,6 +2092,7 @@ let pendingPackagePurchases = [];
 
 async function commitPendingPackageChanges() {
     try {
+        
         const aggregated = {};
         for (const change of pendingPackageChanges) {
             if (!change || !change.patientId || !change.packageRecordId || typeof change.delta !== 'number') continue;
@@ -2104,56 +2105,45 @@ async function commitPendingPackageChanges() {
         
         for (const key in aggregated) {
             const { patientId, packageRecordId, delta } = aggregated[key];
+            
             if (!delta) continue;
             try {
-                if (window.firebaseDataManager && typeof window.firebaseDataManager.applyPatientPackageChangeWithTransaction === 'function') {
-                    const txRes = await window.firebaseDataManager.applyPatientPackageChangeWithTransaction(
-                        patientId,
-                        packageRecordId,
-                        delta,
-                        {
-                            source: delta < 0 ? 'consultationBillingUse' : 'consultationBillingReturn',
-                            type: delta < 0 ? 'consume' : 'restoreUse'
-                        }
-                    );
-                    if (!txRes.success) {
-                        console.error('套票原子變更失敗:', txRes.error);
-                        if (typeof showToast === 'function') {
-                            showToast(txRes.error || '套票扣減失敗', 'error');
-                        }
-                    }
+                
+                
+                
+                let packages = await getPatientPackages(patientId, true);
+                
+                const pkg = packages.find(p => String(p.id) === String(packageRecordId));
+                if (!pkg) continue;
+                let newRemaining = (pkg.remainingUses || 0) + delta;
+                
+                if (typeof pkg.totalUses === 'number') {
+                    newRemaining = Math.max(0, Math.min(pkg.totalUses, newRemaining));
                 } else {
-                    let packages = await getPatientPackages(patientId, true);
-                    const pkg = packages.find(p => String(p.id) === String(packageRecordId));
-                    if (!pkg) continue;
-                    let newRemaining = (pkg.remainingUses || 0) + delta;
-                    if (typeof pkg.totalUses === 'number') {
-                        newRemaining = Math.max(0, Math.min(pkg.totalUses, newRemaining));
-                    } else {
-                        newRemaining = Math.max(0, newRemaining);
-                    }
-                    const updatedPackage = { ...pkg, remainingUses: newRemaining };
-                    await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
-                    if (typeof recordPatientPackageHistory === 'function' && typeof buildPatientPackageHistoryRecord === 'function') {
-                        await recordPatientPackageHistory(buildPatientPackageHistoryRecord({
-                            patientId,
-                            packageId: packageRecordId,
-                            packageName: pkg.name,
-                            source: delta < 0 ? 'consultationBillingUse' : 'consultationBillingReturn',
-                            type: delta < 0 ? 'consume' : 'restoreUse',
-                            fromRemainingUses: Number(pkg.remainingUses) || 0,
-                            toRemainingUses: newRemaining,
-                            changeCount: Math.abs(delta)
-                        }));
-                    }
-                    if (patientPackagesCache && Array.isArray(patientPackagesCache[patientId])) {
-                        patientPackagesCache[patientId] = patientPackagesCache[patientId].map(p => {
-                            if (String(p.id) === String(packageRecordId)) {
-                                return { ...p, ...updatedPackage };
-                            }
-                            return p;
-                        });
-                    }
+                    newRemaining = Math.max(0, newRemaining);
+                }
+                
+                const updatedPackage = { ...pkg, remainingUses: newRemaining };
+                
+                await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
+                await recordPatientPackageHistory(buildPatientPackageHistoryRecord({
+                    patientId,
+                    packageId: packageRecordId,
+                    packageName: pkg.name,
+                    source: delta < 0 ? 'consultationBillingUse' : 'consultationBillingReturn',
+                    type: delta < 0 ? 'consume' : 'restoreUse',
+                    fromRemainingUses: Number(pkg.remainingUses) || 0,
+                    toRemainingUses: newRemaining,
+                    changeCount: Math.abs(delta)
+                }));
+                
+                if (patientPackagesCache && Array.isArray(patientPackagesCache[patientId])) {
+                    patientPackagesCache[patientId] = patientPackagesCache[patientId].map(p => {
+                        if (String(p.id) === String(packageRecordId)) {
+                            return { ...p, ...updatedPackage };
+                        }
+                        return p;
+                    });
                 }
             } catch (err) {
                 console.error('套用暫存套票變更時發生錯誤:', err);
@@ -6202,20 +6192,6 @@ async function fetchJsonWithFallback(fileName) {
                 if (typeof loadAccountSecurity === 'function') {
                     loadAccountSecurity();
                 }
-            } else if (sectionId === 'templateLibrary') {
-                if (typeof initTemplateLibrary === 'function') {
-                    initTemplateLibrary();
-                } else {
-                    if (typeof refreshTemplateCategoryFilters === 'function') {
-                        refreshTemplateCategoryFilters();
-                    }
-                    if (typeof renderPrescriptionTemplates === 'function') {
-                        renderPrescriptionTemplates();
-                    }
-                    if (typeof renderDiagnosisTemplates === 'function') {
-                        renderDiagnosisTemplates();
-                    }
-                }
             }
         }
         // 暴露給外層作用域（病人詳情面板跳轉會員儲值用）
@@ -6623,88 +6599,47 @@ async function generatePatientNumberFromFirebase() {
             return Number.isFinite(parsed) ? parsed : 0;
         };
         const counterRef = window.firebase.doc(window.firebase.db, 'systemCounters', 'patientNumber');
-
-        // 1. 一次性校正檢查：若雲端計數器未校正或殘留先前 bug 的異常大數（例如 >= 10000），
-        //    從 1 往後升序掃描找出第一個真正未使用的空缺號碼，並初始化計數器（僅在首次跑一次）
-        let counterSnap = null;
+        let bootstrapMax = 0;
         try {
-            counterSnap = await window.firebase.getDoc(counterRef);
-        } catch (_cErr) {}
-
-        const counterData = (counterSnap && counterSnap.exists()) ? (counterSnap.data() || {}) : {};
-        const isCalibrated = counterData.calibrated === true && Number(counterData.current || 0) < 10000;
-
-        if (!isCalibrated) {
-            let startNum = 1;
-            let foundGap = false;
-            let guard = 0;
-            while (!foundGap && guard < 20) {
-                guard++;
-                const ascQuery = window.firebase.firestoreQuery(
-                    window.firebase.collection(window.firebase.db, 'patients'),
-                    window.firebase.where('patientNumber', '>=', formatPatientNumber(startNum)),
-                    window.firebase.orderBy('patientNumber', 'asc'),
-                    window.firebase.limit(100)
-                );
-                const snap = await window.firebase.getDocs(ascQuery);
-                if (snap.empty) {
-                    foundGap = true;
-                    break;
-                }
-                let expected = startNum;
-                for (const d of snap.docs) {
-                    const val = parsePatientNumber(d.data() && d.data().patientNumber);
-                    if (val === expected) {
-                        expected++;
-                    } else if (val > expected) {
-                        startNum = expected;
-                        foundGap = true;
-                        break;
-                    }
-                }
-                if (!foundGap) {
-                    if (snap.size < 100) {
-                        startNum = expected;
-                        foundGap = true;
-                        break;
-                    }
-                    searchNum = expected;
-                }
+            const orderParts = [window.firebase.orderBy('patientNumber', 'desc')];
+            if (window.firebase.documentId) {
+                orderParts.push(window.firebase.orderBy(window.firebase.documentId, 'desc'));
             }
-
-            // 初始化雲端計數器為「第一個空缺號碼的前一號」
-            const initialBase = Math.max(0, startNum - 1);
-            try {
-                await window.firebase.setDoc(counterRef, {
-                    current: initialBase,
-                    calibrated: true,
-                    updatedAt: new Date()
-                }, { merge: true });
-            } catch (_initErr) {
-                console.warn('初始化病人編號計數器失敗:', _initErr);
+            const latestQuery = window.firebase.firestoreQuery(
+                window.firebase.collection(window.firebase.db, 'patients'),
+                ...orderParts,
+                window.firebase.limit(1)
+            );
+            const latestSnap = await window.firebase.getDocs(latestQuery);
+            latestSnap.forEach((docSnap) => {
+                const data = docSnap.data ? docSnap.data() : {};
+                bootstrapMax = Math.max(bootstrapMax, parsePatientNumber(data && data.patientNumber));
+            });
+        } catch (queryErr) {
+            console.warn('讀取最新病人編號失敗，回退至全量掃描初始化 counter:', queryErr);
+            const result = await safeGetPatients(true);
+            if (result && result.success && Array.isArray(result.data)) {
+                bootstrapMax = result.data.reduce((max, patient) => {
+                    return Math.max(max, parsePatientNumber(patient && patient.patientNumber));
+                }, 0);
             }
         }
-
-        // 2. 雲端 Transaction 原子排隊遞增：多裝置同時點擊時，由 Firestore 事務鎖嚴格序列化，絕不撞號
-        //    校正後每次新增病人僅耗費 1 次讀取 + 1 次寫入
-        const allocated = await window.firebase.runTransaction(window.firebase.db, async (transaction) => {
-            const snap = await transaction.get(counterRef);
-            const data = (snap && snap.exists()) ? (snap.data() || {}) : {};
-            let current = Number(data.current) || 0;
-            if (current >= 10000) current = 0;
-            const next = current + 1;
+        const nextNumber = await window.firebase.runTransaction(window.firebase.db, async (transaction) => {
+            const counterSnap = await transaction.get(counterRef);
+            const currentNumber = counterSnap && counterSnap.exists()
+                ? Math.max(bootstrapMax, Number(counterSnap.data().current) || 0)
+                : bootstrapMax;
+            const newNumber = currentNumber + 1;
             transaction.set(counterRef, {
-                current: next,
-                calibrated: true,
+                current: newNumber,
                 updatedAt: new Date()
             }, { merge: true });
-            return next;
+            return newNumber;
         });
-
-        return formatPatientNumber(allocated);
+        return formatPatientNumber(nextNumber);
     } catch (error) {
         console.error('生成病人編號失敗:', error);
-        throw new Error('無法生成病人編號，請稍後再試');
+        return `P${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`;
     }
 }
 
@@ -9410,17 +9345,12 @@ async function importClinicBackup(data) {
                         if (sortDate && !isNaN(sortDate.getTime())) {
                             dataToWrite.sortDate = sortDate;
                         }
-                        if (typeof generateConsultationSearchKeywords === 'function' && (!Array.isArray(dataToWrite.searchKeywords) || dataToWrite.searchKeywords.length === 0)) {
-                            dataToWrite.searchKeywords = generateConsultationSearchKeywords(dataToWrite);
-                        }
                     }
                     if (collectionName === 'patients') {
-                        if (typeof generateSearchKeywords === 'function' && (!Array.isArray(dataToWrite.searchKeywords) || dataToWrite.searchKeywords.length === 0)) {
-                            dataToWrite.searchKeywords = generateSearchKeywords({
-                                ...dataToWrite,
-                                patientNumber: dataToWrite.patientNumber
-                            });
-                        }
+                        dataToWrite.searchKeywords = generateSearchKeywords({
+                            ...dataToWrite,
+                            patientNumber: dataToWrite.patientNumber
+                        });
                     }
                     batch.set(docRef, dataToWrite);
                     opCount++;
@@ -12983,137 +12913,6 @@ class FirebaseDataManager {
         }
     }
 
-    /**
-     * 使用 Firestore runTransaction 原子扣減/歸還套票次數並寫入流水
-     * 1. 讀取最新套票文檔（防快取不一致）
-     * 2. 嚴格校驗剩餘次數，防止超扣（扣成負數）
-     * 3. 在同一事務內原子更新 patientPackages 並寫入 patientPackageHistory
-     * 4. 同步更新本地快取、病患套票彙總與流水快取
-     */
-    async applyPatientPackageChangeWithTransaction(patientId, packageRecordId, delta, options = {}) {
-        if (!this.isReady) return { success: false, error: 'Database not ready' };
-        if (!packageRecordId || typeof delta !== 'number' || delta === 0) {
-            return { success: false, error: 'Invalid parameters' };
-        }
-        try {
-            await waitForFirebaseDb();
-            const pkgRef = window.firebase.doc(window.firebase.db, 'patientPackages', String(packageRecordId));
-            const historyColRef = window.firebase.collection(window.firebase.db, 'patientPackageHistory');
-            const newHistoryRef = window.firebase.doc(historyColRef);
-
-            const txResult = await window.firebase.runTransaction(window.firebase.db, async (transaction) => {
-                const pkgSnap = await transaction.get(pkgRef);
-                if (!pkgSnap.exists()) {
-                    throw new Error('套票記錄不存在或已被刪除');
-                }
-                const pkgData = pkgSnap.data() || {};
-                const currentRemaining = Number(pkgData.remainingUses) || 0;
-                const changeCount = Math.abs(delta);
-
-                // 扣減防超扣校驗
-                if (delta < 0 && currentRemaining < changeCount) {
-                    throw new Error(`【${pkgData.name || '套票'}】剩餘次數不足（現有 ${currentRemaining} 次，欲扣除 ${changeCount} 次）`);
-                }
-
-                let newRemaining = currentRemaining + delta;
-                if (typeof pkgData.totalUses === 'number') {
-                    newRemaining = Math.max(0, Math.min(pkgData.totalUses, newRemaining));
-                } else {
-                    newRemaining = Math.max(0, newRemaining);
-                }
-
-                const now = new Date();
-                const opUser = (currentUserData && currentUserData.username)
-                    ? String(currentUserData.username)
-                    : (currentUser || 'system');
-
-                // 1. 在事務內更新套票
-                transaction.update(pkgRef, {
-                    remainingUses: newRemaining,
-                    updatedAt: now,
-                    updatedBy: opUser
-                });
-
-                // 2. 在同一事務內新增歷史流水
-                const resolvedClinicId = String(
-                    options.clinicId
-                    || pkgData.clinicId
-                    || (typeof currentPackageClinicId === 'function' ? currentPackageClinicId() : '')
-                    || ''
-                );
-                const historyRecord = {
-                    patientId: String(patientId || pkgData.patientId || ''),
-                    clinicId: resolvedClinicId,
-                    packageId: String(packageRecordId),
-                    packageName: String(pkgData.name || ''),
-                    source: options.source || (delta < 0 ? 'consultationBillingUse' : 'consultationBillingReturn'),
-                    type: options.type || (delta < 0 ? 'consume' : 'restoreUse'),
-                    fromRemainingUses: currentRemaining,
-                    toRemainingUses: newRemaining,
-                    changeCount: changeCount,
-                    operatedAt: now.toISOString(),
-                    operatedBy: opUser,
-                    createdAt: now,
-                    createdBy: opUser
-                };
-                transaction.set(newHistoryRef, historyRecord);
-
-                return { pkgData, currentRemaining, newRemaining };
-            });
-
-            const pidStr = String(patientId || txResult.pkgData.patientId || '');
-            const updatedPackage = {
-                ...txResult.pkgData,
-                id: String(packageRecordId),
-                remainingUses: txResult.newRemaining
-            };
-
-            // 更新記憶體快取與 localStorage
-            try {
-                if (pidStr && patientPackagesCache && Array.isArray(patientPackagesCache[pidStr])) {
-                    patientPackagesCache[pidStr] = patientPackagesCache[pidStr].map(p => {
-                        if (String(p.id) === String(packageRecordId)) {
-                            return { ...p, ...updatedPackage };
-                        }
-                        return p;
-                    });
-                    try {
-                        const localKey = `patientPackages_${pidStr}`;
-                        localStorage.setItem(localKey, JSON.stringify(patientPackagesCache[pidStr]));
-                    } catch (_lsErr) {}
-                }
-            } catch (cacheErr) {
-                console.warn('更新套票本地快取失敗:', cacheErr);
-            }
-
-            // 更新病人套票彙總
-            try {
-                if (pidStr) {
-                    await this._schedulePatientPackageAggregate(pidStr);
-                }
-            } catch (aggErr) {
-                console.error('更新套票彙總欄位失敗:', aggErr);
-            }
-
-            // 失效歷史分頁快取
-            try {
-                if (pidStr && typeof invalidatePatientPackageHistoryCaches === 'function') {
-                    invalidatePatientPackageHistoryCaches(pidStr);
-                }
-            } catch (_invErr) {}
-
-            return {
-                success: true,
-                fromRemaining: txResult.currentRemaining,
-                toRemaining: txResult.newRemaining,
-                package: updatedPackage
-            };
-        } catch (error) {
-            console.error('以 runTransaction 變更套票次數失敗:', error);
-            return { success: false, error: error.message };
-        }
-    }
-
     async deletePatientPackage(packageId, patientId = '') {
         try {
             await window.firebase.deleteDoc(
@@ -15006,7 +14805,7 @@ async function displayMedicalRecords(pageChange = false) {
             // 改用 data-* 屬性傳參，避免病人姓名含單引號（如 O'Brien）截斷
             // onclick 屬性造成注入；屬性值一律 escapeHtml
             const deleteButtonHtml = canDeleteMedicalRecord
-                ? `<button type="button" class="${deleteButtonClasses}" data-action="delete-medical-record" data-record-id="${window.escapeHtml(recordId)}" data-record-number="${window.escapeHtml(recordNumDisplay)}" data-patient-name="${window.escapeHtml(patientName)}">${window.escapeHtml(deleteLabel)}</button>`
+                ? `<button type="button" class="${deleteButtonClasses}" data-action="delete-medical-record" data-record-id="${window.escapeHtml(recordId)}" data-patient-name="${window.escapeHtml(patientName)}">${window.escapeHtml(deleteLabel)}</button>`
                 : '';
             tbody.innerHTML += `
                 <tr>
@@ -15035,8 +14834,7 @@ async function displayMedicalRecords(pageChange = false) {
                 confirmDeleteMedicalRecord(
                     this.getAttribute('data-record-id'),
                     this.getAttribute('data-patient-name'),
-                    this,
-                    this.getAttribute('data-record-number')
+                    this
                 );
             });
         });
@@ -16148,7 +15946,7 @@ function closeMedicalRecordDetail() {
  * @param {string} patientName - 病人名稱，用於提示中顯示
  * @param {HTMLButtonElement|null} buttonEl - 觸發按鈕
  */
-async function confirmDeleteMedicalRecord(recordId, patientName, buttonEl = null, recordNumber = '') {
+async function confirmDeleteMedicalRecord(recordId, patientName, buttonEl = null) {
     if (!hasActionPermission('medicalRecordDelete')) {
         showToast('權限不足，無法刪除病歷', 'error');
         return;
@@ -16158,18 +15956,13 @@ async function confirmDeleteMedicalRecord(recordId, patientName, buttonEl = null
         if (loadingButton) {
             setButtonLoading(loadingButton, '刪除中...');
         }
-        let displayRecordNum = recordNumber;
-        if (!displayRecordNum) {
-            const foundRec = Array.isArray(consultations) ? consultations.find(c => c && String(c.id) === String(recordId)) : null;
-            displayRecordNum = (foundRec && foundRec.medicalRecordNumber) || recordId;
-        }
         const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
         let message;
         if (lang === 'en') {
-            message = `Are you sure you want to delete the record for ${patientName} (${displayRecordNum})?\nThis action cannot be undone.`;
+            message = `Are you sure you want to delete the record for ${patientName} (ID: ${recordId})?\nThis action cannot be undone.`;
         } else {
             // 中文提示
-            message = `確定要刪除病歷「${patientName} - ${displayRecordNum}」嗎？\n此動作無法恢復！`;
+            message = `確定要刪除病歷「${patientName} - ${recordId}」嗎？\n此動作無法恢復！`;
         }
         const confirmed = await showConfirmation(message, 'warning');
         if (!confirmed) {
@@ -17687,8 +17480,8 @@ function _oldSelectPrescriptionTemplate(id) {
           let categories = {
             herbs: ['感冒類', '消化系統', '婦科調理', '補益類', '清熱類'],
             acupoints: ['頭面部', '胸腹部', '四肢部', '背腰部', '內科疾病', '婦科疾病'],
-            prescriptions: ['用藥指導', '生活調理', '飲食建議', '運動指導', '慢性病管理', '婦科調理', '復健指導', '心理指導', '外治與針灸護理', '五官科護理', '男科調理', '兒科護理'],
-            diagnosis: ['內科', '婦科', '兒科', '皮膚科', '骨傷科', '五官科', '男科', '針灸科']
+            prescriptions: ['用藥指導', '生活調理', '飲食建議', '運動指導', '慢性病管理', '婦科調理'],
+            diagnosis: ['內科', '婦科', '兒科', '皮膚科', '骨傷科']
           };
 
           // 將分類資料公開到全域，讓其他模組能夠讀取與更新
@@ -18125,16 +17918,9 @@ function refreshTemplateCategoryFilters() {
       defaultOpt.value = '全部類別';
       defaultOpt.textContent = '全部類別';
       pFilter.appendChild(defaultOpt);
-      // 加入所有醫囑分類（結合 categories.prescriptions 及實際模板分類）
-      const pCatsSet = new Set((categories && Array.isArray(categories.prescriptions)) ? categories.prescriptions : []);
-      if (typeof prescriptionTemplates !== 'undefined' && Array.isArray(prescriptionTemplates)) {
-        prescriptionTemplates.forEach(t => {
-          if (t && t.category && String(t.category).trim()) {
-            pCatsSet.add(String(t.category).trim());
-          }
-        });
-      }
-      pCatsSet.forEach(cat => {
+      // 加入所有醫囑分類
+      const pCats = (categories && Array.isArray(categories.prescriptions)) ? categories.prescriptions : [];
+      pCats.forEach(cat => {
         const opt = document.createElement('option');
         opt.value = cat;
         opt.textContent = cat;
@@ -18157,16 +17943,8 @@ function refreshTemplateCategoryFilters() {
       defaultOpt2.value = '全部科別';
       defaultOpt2.textContent = '全部科別';
       dFilter.appendChild(defaultOpt2);
-      // 動態彙總預設科別及實際診斷模板中存在的所有科別（確保 男科、五官科、針灸科 等必出現）
-      const dCatsSet = new Set((categories && Array.isArray(categories.diagnosis)) ? categories.diagnosis : []);
-      if (typeof diagnosisTemplates !== 'undefined' && Array.isArray(diagnosisTemplates)) {
-        diagnosisTemplates.forEach(t => {
-          if (t && t.category && String(t.category).trim()) {
-            dCatsSet.add(String(t.category).trim());
-          }
-        });
-      }
-      dCatsSet.forEach(cat => {
+      const dCats = (categories && Array.isArray(categories.diagnosis)) ? categories.diagnosis : [];
+      dCats.forEach(cat => {
         const opt = document.createElement('option');
         opt.value = cat;
         opt.textContent = cat;
@@ -18198,13 +17976,8 @@ function refreshTemplateCategoryFilters() {
               if (localData && typeof localData === 'object') {
                 if (Array.isArray(localData.herbs)) categories.herbs = localData.herbs;
                 if (Array.isArray(localData.acupoints)) categories.acupoints = localData.acupoints;
-                if (Array.isArray(localData.prescriptions)) {
-                  categories.prescriptions = Array.from(new Set([...categories.prescriptions, ...localData.prescriptions]));
-                }
-                if (Array.isArray(localData.diagnosis)) {
-                  categories.diagnosis = Array.from(new Set([...categories.diagnosis, ...localData.diagnosis]));
-                }
-                persistCategoriesLocally();
+                if (Array.isArray(localData.prescriptions)) categories.prescriptions = localData.prescriptions;
+                if (Array.isArray(localData.diagnosis)) categories.diagnosis = localData.diagnosis;
                 // 更新全域引用
                 window.categories = categories;
                 // 更新模板庫分類篩選下拉選單，以顯示最新的醫囑與診斷分類
@@ -18244,12 +18017,11 @@ function refreshTemplateCategoryFilters() {
                   categories.acupoints = data.acupoints;
                 }
                 if (Array.isArray(data.prescriptions)) {
-                  categories.prescriptions = Array.from(new Set([...categories.prescriptions, ...data.prescriptions]));
+                  categories.prescriptions = data.prescriptions;
                 }
                 if (Array.isArray(data.diagnosis)) {
-                  categories.diagnosis = Array.from(new Set([...categories.diagnosis, ...data.diagnosis]));
+                  categories.diagnosis = data.diagnosis;
                 }
-                persistCategoriesLocally();
               }
             } else {
               // 若文件不存在，初始化一份包含當前分類的文檔

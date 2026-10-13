@@ -476,25 +476,6 @@ async function importClinicBackup(data) {
                     // 備份 JSON 內 updatedAt 非 Firestore Timestamp，還原時移除，
                     // 由 writeBatch 攔截器補上 serverTimestamp，維持增量備份一致
                     try { delete dataToWrite.updatedAt; } catch (_e) {}
-                    if (collectionName === 'consultations') {
-                        const sortDate = (typeof getConsultationEffectiveDate === 'function')
-                            ? getConsultationEffectiveDate(dataToWrite, new Date(0))
-                            : null;
-                        if (sortDate && !isNaN(sortDate.getTime())) {
-                            dataToWrite.sortDate = sortDate;
-                        }
-                        if (typeof generateConsultationSearchKeywords === 'function' && (!Array.isArray(dataToWrite.searchKeywords) || dataToWrite.searchKeywords.length === 0)) {
-                            dataToWrite.searchKeywords = generateConsultationSearchKeywords(dataToWrite);
-                        }
-                    }
-                    if (collectionName === 'patients') {
-                        if (typeof generateSearchKeywords === 'function' && (!Array.isArray(dataToWrite.searchKeywords) || dataToWrite.searchKeywords.length === 0)) {
-                            dataToWrite.searchKeywords = generateSearchKeywords({
-                                ...dataToWrite,
-                                patientNumber: dataToWrite.patientNumber
-                            });
-                        }
-                    }
                     batch.set(docRef, dataToWrite);
                     opCount++;
                     if (opCount >= 500) {

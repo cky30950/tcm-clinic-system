@@ -131,7 +131,7 @@ export async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
         
         let q = window.firebase.firestoreQuery(
             window.firebase.collection(window.firebase.db, 'patients'),
-            window.firebase.orderBy('createdAt', 'desc'),
+            window.firebase.orderBy('patientNumber', 'desc'),
         );
         // 如果 documentId FieldPath 可用，加入穩定次排序；不可用時退回單一排序
         if (window.firebase.documentId) {
@@ -196,7 +196,7 @@ export async function fetchPatientsPageAsc(ascPageNumber = 1, forceRefresh = fal
             : 10;
         let q = window.firebase.firestoreQuery(
             window.firebase.collection(window.firebase.db, 'patients'),
-            window.firebase.orderBy('createdAt', 'asc'),
+            window.firebase.orderBy('patientNumber', 'asc'),
         );
         if (window.firebase.documentId) {
             q = window.firebase.firestoreQuery(q, window.firebase.orderBy(window.firebase.documentId, 'asc'));
@@ -217,7 +217,7 @@ export async function fetchPatientsPageAsc(ascPageNumber = 1, forceRefresh = fal
             const lastDoc = snapshot.docs[snapshot.docs.length - 1];
             G.patientAscPageCursors[ascPageNumber] = lastDoc;
         }
-        docs.sort(comparePatientsByCreatedAtDesc);
+        docs.sort(comparePatientsByNumberDesc);
         G.patientAscPagesCache[ascPageNumber] = docs;
         // 緩存大小保護：超過上限時自動清理
         if (typeof window.trimCache === 'function') {
@@ -230,45 +230,19 @@ export async function fetchPatientsPageAsc(ascPageNumber = 1, forceRefresh = fal
     }
 }
 
-export function parsePatientCreatedAtMillis(patient) {
-    if (!patient || !patient.createdAt) return 0;
-    const val = patient.createdAt;
-    if (typeof val.toMillis === 'function') {
-        try { return val.toMillis(); } catch (_e) {}
-    }
-    if (typeof val.seconds === 'number') {
-        return val.seconds * 1000 + Math.floor((val.nanoseconds || 0) / 1000000);
-    }
-    if (val instanceof Date) {
-        return isNaN(val.getTime()) ? 0 : val.getTime();
-    }
-    if (typeof val === 'number') {
-        return val;
-    }
-    const parsed = Date.parse(val);
-    return Number.isFinite(parsed) ? parsed : 0;
-}
-
-export function comparePatientsByCreatedAtDesc(a, b) {
-    const timeA = parsePatientCreatedAtMillis(a);
-    const timeB = parsePatientCreatedAtMillis(b);
-    if (timeB !== timeA) {
-        return timeB - timeA;
-    }
+export function comparePatientsByNumberDesc(a, b) {
     const numA = (() => {
-        const pn = a && a.patientNumber ? String(a.patientNumber) : "";
+        const pn = a && a.patientNumber ? String(a.patientNumber) : '';
         const match = pn.match(/\d+/);
         return match ? parseInt(match[0], 10) : 0;
     })();
     const numB = (() => {
-        const pn = b && b.patientNumber ? String(b.patientNumber) : "";
+        const pn = b && b.patientNumber ? String(b.patientNumber) : '';
         const match = pn.match(/\d+/);
         return match ? parseInt(match[0], 10) : 0;
     })();
     return numB - numA;
 }
-
-export const comparePatientsByNumberDesc = comparePatientsByCreatedAtDesc;
 
 export async function fetchPatientsPageOptimized(pageNumber = 1, forceRefresh = false, knownTotalItems = null) {
     const pageSize = G.paginationSettings && G.paginationSettings.patientList && G.paginationSettings.patientList.itemsPerPage
