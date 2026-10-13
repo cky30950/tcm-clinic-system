@@ -6192,6 +6192,20 @@ async function fetchJsonWithFallback(fileName) {
                 if (typeof loadAccountSecurity === 'function') {
                     loadAccountSecurity();
                 }
+            } else if (sectionId === 'templateLibrary') {
+                if (typeof initTemplateLibrary === 'function') {
+                    initTemplateLibrary();
+                } else {
+                    if (typeof refreshTemplateCategoryFilters === 'function') {
+                        refreshTemplateCategoryFilters();
+                    }
+                    if (typeof renderPrescriptionTemplates === 'function') {
+                        renderPrescriptionTemplates();
+                    }
+                    if (typeof renderDiagnosisTemplates === 'function') {
+                        renderDiagnosisTemplates();
+                    }
+                }
             }
         }
         // 暴露給外層作用域（病人詳情面板跳轉會員儲值用）
@@ -14846,7 +14860,7 @@ async function displayMedicalRecords(pageChange = false) {
             // 改用 data-* 屬性傳參，避免病人姓名含單引號（如 O'Brien）截斷
             // onclick 屬性造成注入；屬性值一律 escapeHtml
             const deleteButtonHtml = canDeleteMedicalRecord
-                ? `<button type="button" class="${deleteButtonClasses}" data-action="delete-medical-record" data-record-id="${window.escapeHtml(recordId)}" data-patient-name="${window.escapeHtml(patientName)}">${window.escapeHtml(deleteLabel)}</button>`
+                ? `<button type="button" class="${deleteButtonClasses}" data-action="delete-medical-record" data-record-id="${window.escapeHtml(recordId)}" data-record-number="${window.escapeHtml(recordNumDisplay)}" data-patient-name="${window.escapeHtml(patientName)}">${window.escapeHtml(deleteLabel)}</button>`
                 : '';
             tbody.innerHTML += `
                 <tr>
@@ -14875,7 +14889,8 @@ async function displayMedicalRecords(pageChange = false) {
                 confirmDeleteMedicalRecord(
                     this.getAttribute('data-record-id'),
                     this.getAttribute('data-patient-name'),
-                    this
+                    this,
+                    this.getAttribute('data-record-number')
                 );
             });
         });
@@ -15987,7 +16002,7 @@ function closeMedicalRecordDetail() {
  * @param {string} patientName - 病人名稱，用於提示中顯示
  * @param {HTMLButtonElement|null} buttonEl - 觸發按鈕
  */
-async function confirmDeleteMedicalRecord(recordId, patientName, buttonEl = null) {
+async function confirmDeleteMedicalRecord(recordId, patientName, buttonEl = null, recordNumber = '') {
     if (!hasActionPermission('medicalRecordDelete')) {
         showToast('權限不足，無法刪除病歷', 'error');
         return;
@@ -15997,13 +16012,18 @@ async function confirmDeleteMedicalRecord(recordId, patientName, buttonEl = null
         if (loadingButton) {
             setButtonLoading(loadingButton, '刪除中...');
         }
+        let displayRecordNum = recordNumber;
+        if (!displayRecordNum) {
+            const foundRec = Array.isArray(consultations) ? consultations.find(c => c && String(c.id) === String(recordId)) : null;
+            displayRecordNum = (foundRec && foundRec.medicalRecordNumber) || recordId;
+        }
         const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
         let message;
         if (lang === 'en') {
-            message = `Are you sure you want to delete the record for ${patientName} (ID: ${recordId})?\nThis action cannot be undone.`;
+            message = `Are you sure you want to delete the record for ${patientName} (${displayRecordNum})?\nThis action cannot be undone.`;
         } else {
             // 中文提示
-            message = `確定要刪除病歷「${patientName} - ${recordId}」嗎？\n此動作無法恢復！`;
+            message = `確定要刪除病歷「${patientName} - ${displayRecordNum}」嗎？\n此動作無法恢復！`;
         }
         const confirmed = await showConfirmation(message, 'warning');
         if (!confirmed) {
@@ -17521,8 +17541,8 @@ function _oldSelectPrescriptionTemplate(id) {
           let categories = {
             herbs: ['感冒類', '消化系統', '婦科調理', '補益類', '清熱類'],
             acupoints: ['頭面部', '胸腹部', '四肢部', '背腰部', '內科疾病', '婦科疾病'],
-            prescriptions: ['用藥指導', '生活調理', '飲食建議', '運動指導', '慢性病管理', '婦科調理'],
-            diagnosis: ['內科', '婦科', '兒科', '皮膚科', '骨傷科']
+            prescriptions: ['用藥指導', '生活調理', '飲食建議', '運動指導', '慢性病管理', '婦科調理', '復健指導', '心理指導', '外治與針灸護理', '五官科護理', '男科調理', '兒科護理'],
+            diagnosis: ['內科', '婦科', '兒科', '皮膚科', '骨傷科', '五官科', '男科', '針灸科']
           };
 
           // 將分類資料公開到全域，讓其他模組能夠讀取與更新
@@ -17959,9 +17979,16 @@ function refreshTemplateCategoryFilters() {
       defaultOpt.value = '全部類別';
       defaultOpt.textContent = '全部類別';
       pFilter.appendChild(defaultOpt);
-      // 加入所有醫囑分類
-      const pCats = (categories && Array.isArray(categories.prescriptions)) ? categories.prescriptions : [];
-      pCats.forEach(cat => {
+      // 加入所有醫囑分類（結合 categories.prescriptions 及實際模板分類）
+      const pCatsSet = new Set((categories && Array.isArray(categories.prescriptions)) ? categories.prescriptions : []);
+      if (typeof prescriptionTemplates !== 'undefined' && Array.isArray(prescriptionTemplates)) {
+        prescriptionTemplates.forEach(t => {
+          if (t && t.category && String(t.category).trim()) {
+            pCatsSet.add(String(t.category).trim());
+          }
+        });
+      }
+      pCatsSet.forEach(cat => {
         const opt = document.createElement('option');
         opt.value = cat;
         opt.textContent = cat;
@@ -17984,8 +18011,16 @@ function refreshTemplateCategoryFilters() {
       defaultOpt2.value = '全部科別';
       defaultOpt2.textContent = '全部科別';
       dFilter.appendChild(defaultOpt2);
-      const dCats = (categories && Array.isArray(categories.diagnosis)) ? categories.diagnosis : [];
-      dCats.forEach(cat => {
+      // 動態彙總預設科別及實際診斷模板中存在的所有科別（確保 男科、五官科、針灸科 等必出現）
+      const dCatsSet = new Set((categories && Array.isArray(categories.diagnosis)) ? categories.diagnosis : []);
+      if (typeof diagnosisTemplates !== 'undefined' && Array.isArray(diagnosisTemplates)) {
+        diagnosisTemplates.forEach(t => {
+          if (t && t.category && String(t.category).trim()) {
+            dCatsSet.add(String(t.category).trim());
+          }
+        });
+      }
+      dCatsSet.forEach(cat => {
         const opt = document.createElement('option');
         opt.value = cat;
         opt.textContent = cat;
@@ -18017,8 +18052,13 @@ function refreshTemplateCategoryFilters() {
               if (localData && typeof localData === 'object') {
                 if (Array.isArray(localData.herbs)) categories.herbs = localData.herbs;
                 if (Array.isArray(localData.acupoints)) categories.acupoints = localData.acupoints;
-                if (Array.isArray(localData.prescriptions)) categories.prescriptions = localData.prescriptions;
-                if (Array.isArray(localData.diagnosis)) categories.diagnosis = localData.diagnosis;
+                if (Array.isArray(localData.prescriptions)) {
+                  categories.prescriptions = Array.from(new Set([...categories.prescriptions, ...localData.prescriptions]));
+                }
+                if (Array.isArray(localData.diagnosis)) {
+                  categories.diagnosis = Array.from(new Set([...categories.diagnosis, ...localData.diagnosis]));
+                }
+                persistCategoriesLocally();
                 // 更新全域引用
                 window.categories = categories;
                 // 更新模板庫分類篩選下拉選單，以顯示最新的醫囑與診斷分類
@@ -18058,11 +18098,12 @@ function refreshTemplateCategoryFilters() {
                   categories.acupoints = data.acupoints;
                 }
                 if (Array.isArray(data.prescriptions)) {
-                  categories.prescriptions = data.prescriptions;
+                  categories.prescriptions = Array.from(new Set([...categories.prescriptions, ...data.prescriptions]));
                 }
                 if (Array.isArray(data.diagnosis)) {
-                  categories.diagnosis = data.diagnosis;
+                  categories.diagnosis = Array.from(new Set([...categories.diagnosis, ...data.diagnosis]));
                 }
+                persistCategoriesLocally();
               }
             } else {
               // 若文件不存在，初始化一份包含當前分類的文檔
