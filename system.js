@@ -2092,7 +2092,6 @@ let pendingPackagePurchases = [];
 
 async function commitPendingPackageChanges() {
     try {
-        
         const aggregated = {};
         for (const change of pendingPackageChanges) {
             if (!change || !change.patientId || !change.packageRecordId || typeof change.delta !== 'number') continue;
@@ -2105,45 +2104,56 @@ async function commitPendingPackageChanges() {
         
         for (const key in aggregated) {
             const { patientId, packageRecordId, delta } = aggregated[key];
-            
             if (!delta) continue;
             try {
-                
-                
-                
-                let packages = await getPatientPackages(patientId, true);
-                
-                const pkg = packages.find(p => String(p.id) === String(packageRecordId));
-                if (!pkg) continue;
-                let newRemaining = (pkg.remainingUses || 0) + delta;
-                
-                if (typeof pkg.totalUses === 'number') {
-                    newRemaining = Math.max(0, Math.min(pkg.totalUses, newRemaining));
-                } else {
-                    newRemaining = Math.max(0, newRemaining);
-                }
-                
-                const updatedPackage = { ...pkg, remainingUses: newRemaining };
-                
-                await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
-                await recordPatientPackageHistory(buildPatientPackageHistoryRecord({
-                    patientId,
-                    packageId: packageRecordId,
-                    packageName: pkg.name,
-                    source: delta < 0 ? 'consultationBillingUse' : 'consultationBillingReturn',
-                    type: delta < 0 ? 'consume' : 'restoreUse',
-                    fromRemainingUses: Number(pkg.remainingUses) || 0,
-                    toRemainingUses: newRemaining,
-                    changeCount: Math.abs(delta)
-                }));
-                
-                if (patientPackagesCache && Array.isArray(patientPackagesCache[patientId])) {
-                    patientPackagesCache[patientId] = patientPackagesCache[patientId].map(p => {
-                        if (String(p.id) === String(packageRecordId)) {
-                            return { ...p, ...updatedPackage };
+                if (window.firebaseDataManager && typeof window.firebaseDataManager.applyPatientPackageChangeWithTransaction === 'function') {
+                    const txRes = await window.firebaseDataManager.applyPatientPackageChangeWithTransaction(
+                        patientId,
+                        packageRecordId,
+                        delta,
+                        {
+                            source: delta < 0 ? 'consultationBillingUse' : 'consultationBillingReturn',
+                            type: delta < 0 ? 'consume' : 'restoreUse'
                         }
-                        return p;
-                    });
+                    );
+                    if (!txRes.success) {
+                        console.error('套票原子變更失敗:', txRes.error);
+                        if (typeof showToast === 'function') {
+                            showToast(txRes.error || '套票扣減失敗', 'error');
+                        }
+                    }
+                } else {
+                    let packages = await getPatientPackages(patientId, true);
+                    const pkg = packages.find(p => String(p.id) === String(packageRecordId));
+                    if (!pkg) continue;
+                    let newRemaining = (pkg.remainingUses || 0) + delta;
+                    if (typeof pkg.totalUses === 'number') {
+                        newRemaining = Math.max(0, Math.min(pkg.totalUses, newRemaining));
+                    } else {
+                        newRemaining = Math.max(0, newRemaining);
+                    }
+                    const updatedPackage = { ...pkg, remainingUses: newRemaining };
+                    await window.firebaseDataManager.updatePatientPackage(packageRecordId, updatedPackage);
+                    if (typeof recordPatientPackageHistory === 'function' && typeof buildPatientPackageHistoryRecord === 'function') {
+                        await recordPatientPackageHistory(buildPatientPackageHistoryRecord({
+                            patientId,
+                            packageId: packageRecordId,
+                            packageName: pkg.name,
+                            source: delta < 0 ? 'consultationBillingUse' : 'consultationBillingReturn',
+                            type: delta < 0 ? 'consume' : 'restoreUse',
+                            fromRemainingUses: Number(pkg.remainingUses) || 0,
+                            toRemainingUses: newRemaining,
+                            changeCount: Math.abs(delta)
+                        }));
+                    }
+                    if (patientPackagesCache && Array.isArray(patientPackagesCache[patientId])) {
+                        patientPackagesCache[patientId] = patientPackagesCache[patientId].map(p => {
+                            if (String(p.id) === String(packageRecordId)) {
+                                return { ...p, ...updatedPackage };
+                            }
+                            return p;
+                        });
+                    }
                 }
             } catch (err) {
                 console.error('套用暫存套票變更時發生錯誤:', err);
@@ -12969,6 +12979,137 @@ class FirebaseDataManager {
             return { success: true };
         } catch (error) {
             console.error('更新患者套票失敗:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * 使用 Firestore runTransaction 原子扣減/歸還套票次數並寫入流水
+     * 1. 讀取最新套票文檔（防快取不一致）
+     * 2. 嚴格校驗剩餘次數，防止超扣（扣成負數）
+     * 3. 在同一事務內原子更新 patientPackages 並寫入 patientPackageHistory
+     * 4. 同步更新本地快取、病患套票彙總與流水快取
+     */
+    async applyPatientPackageChangeWithTransaction(patientId, packageRecordId, delta, options = {}) {
+        if (!this.isReady) return { success: false, error: 'Database not ready' };
+        if (!packageRecordId || typeof delta !== 'number' || delta === 0) {
+            return { success: false, error: 'Invalid parameters' };
+        }
+        try {
+            await waitForFirebaseDb();
+            const pkgRef = window.firebase.doc(window.firebase.db, 'patientPackages', String(packageRecordId));
+            const historyColRef = window.firebase.collection(window.firebase.db, 'patientPackageHistory');
+            const newHistoryRef = window.firebase.doc(historyColRef);
+
+            const txResult = await window.firebase.runTransaction(window.firebase.db, async (transaction) => {
+                const pkgSnap = await transaction.get(pkgRef);
+                if (!pkgSnap.exists()) {
+                    throw new Error('套票記錄不存在或已被刪除');
+                }
+                const pkgData = pkgSnap.data() || {};
+                const currentRemaining = Number(pkgData.remainingUses) || 0;
+                const changeCount = Math.abs(delta);
+
+                // 扣減防超扣校驗
+                if (delta < 0 && currentRemaining < changeCount) {
+                    throw new Error(`【${pkgData.name || '套票'}】剩餘次數不足（現有 ${currentRemaining} 次，欲扣除 ${changeCount} 次）`);
+                }
+
+                let newRemaining = currentRemaining + delta;
+                if (typeof pkgData.totalUses === 'number') {
+                    newRemaining = Math.max(0, Math.min(pkgData.totalUses, newRemaining));
+                } else {
+                    newRemaining = Math.max(0, newRemaining);
+                }
+
+                const now = new Date();
+                const opUser = (currentUserData && currentUserData.username)
+                    ? String(currentUserData.username)
+                    : (currentUser || 'system');
+
+                // 1. 在事務內更新套票
+                transaction.update(pkgRef, {
+                    remainingUses: newRemaining,
+                    updatedAt: now,
+                    updatedBy: opUser
+                });
+
+                // 2. 在同一事務內新增歷史流水
+                const resolvedClinicId = String(
+                    options.clinicId
+                    || pkgData.clinicId
+                    || (typeof currentPackageClinicId === 'function' ? currentPackageClinicId() : '')
+                    || ''
+                );
+                const historyRecord = {
+                    patientId: String(patientId || pkgData.patientId || ''),
+                    clinicId: resolvedClinicId,
+                    packageId: String(packageRecordId),
+                    packageName: String(pkgData.name || ''),
+                    source: options.source || (delta < 0 ? 'consultationBillingUse' : 'consultationBillingReturn'),
+                    type: options.type || (delta < 0 ? 'consume' : 'restoreUse'),
+                    fromRemainingUses: currentRemaining,
+                    toRemainingUses: newRemaining,
+                    changeCount: changeCount,
+                    operatedAt: now.toISOString(),
+                    operatedBy: opUser,
+                    createdAt: now,
+                    createdBy: opUser
+                };
+                transaction.set(newHistoryRef, historyRecord);
+
+                return { pkgData, currentRemaining, newRemaining };
+            });
+
+            const pidStr = String(patientId || txResult.pkgData.patientId || '');
+            const updatedPackage = {
+                ...txResult.pkgData,
+                id: String(packageRecordId),
+                remainingUses: txResult.newRemaining
+            };
+
+            // 更新記憶體快取與 localStorage
+            try {
+                if (pidStr && patientPackagesCache && Array.isArray(patientPackagesCache[pidStr])) {
+                    patientPackagesCache[pidStr] = patientPackagesCache[pidStr].map(p => {
+                        if (String(p.id) === String(packageRecordId)) {
+                            return { ...p, ...updatedPackage };
+                        }
+                        return p;
+                    });
+                    try {
+                        const localKey = `patientPackages_${pidStr}`;
+                        localStorage.setItem(localKey, JSON.stringify(patientPackagesCache[pidStr]));
+                    } catch (_lsErr) {}
+                }
+            } catch (cacheErr) {
+                console.warn('更新套票本地快取失敗:', cacheErr);
+            }
+
+            // 更新病人套票彙總
+            try {
+                if (pidStr) {
+                    await this._schedulePatientPackageAggregate(pidStr);
+                }
+            } catch (aggErr) {
+                console.error('更新套票彙總欄位失敗:', aggErr);
+            }
+
+            // 失效歷史分頁快取
+            try {
+                if (pidStr && typeof invalidatePatientPackageHistoryCaches === 'function') {
+                    invalidatePatientPackageHistoryCaches(pidStr);
+                }
+            } catch (_invErr) {}
+
+            return {
+                success: true,
+                fromRemaining: txResult.currentRemaining,
+                toRemaining: txResult.newRemaining,
+                package: updatedPackage
+            };
+        } catch (error) {
+            console.error('以 runTransaction 變更套票次數失敗:', error);
             return { success: false, error: error.message };
         }
     }
