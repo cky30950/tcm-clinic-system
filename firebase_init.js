@@ -121,6 +121,18 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
       return false;
     }
 
+    function getTombstoneInfo(reference) {
+      if (!reference || typeof reference.path !== 'string') return null;
+      const parts = reference.path.split('/');
+      if (parts.length === 2 && BACKUP_TOP_COLLECTIONS.has(parts[0])) {
+        return { sourceKey: parts[0], docId: parts[1] };
+      }
+      if (parts.length === 4 && parts[0] === 'clinics' && parts[2] === 'billingItems') {
+        return { sourceKey: "clinics__" + parts[1] + "__billingItems", docId: parts[3] };
+      }
+      return null;
+    }
+
     function withUpdatedAt(data) {
       if (data && typeof data === 'object' && !Array.isArray(data) && data.updatedAt === undefined) {
         return Object.assign({}, data, { updatedAt: firestoreServerTimestamp() });
@@ -141,10 +153,26 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         : data;
       return updateDoc(reference, finalData);
     };
+    const trackedDeleteDoc = async function (reference) {
+      const tomb = getTombstoneInfo(reference);
+      if (tomb) {
+        try {
+          await addDoc(collection(db, 'deletionTombstones'), {
+            sourceKey: tomb.sourceKey,
+            docId: tomb.docId,
+            deletedAt: firestoreServerTimestamp()
+          });
+        } catch (tErr) {
+          console.warn('[backup tombstone] 記錄刪除墓碑失敗:', tErr);
+        }
+      }
+      return deleteDoc(reference);
+    };
     const trackedWriteBatch = function (firestoreDb) {
       const batch = writeBatch(firestoreDb);
       const rawSet = batch.set.bind(batch);
       const rawUpdate = batch.update.bind(batch);
+      const rawDelete = batch.delete.bind(batch);
       batch.set = function (reference, data, options) {
         const finalData = isBackupTrackedRef(reference) ? withUpdatedAt(data) : data;
         return arguments.length >= 3 ? rawSet(reference, finalData, options) : rawSet(reference, finalData);
@@ -154,6 +182,22 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
           ? Object.assign({}, data, { updatedAt: firestoreServerTimestamp() })
           : data;
         return rawUpdate(reference, finalData);
+      };
+      batch.delete = function (reference) {
+        const tomb = getTombstoneInfo(reference);
+        if (tomb) {
+          try {
+            const tombDoc = doc(collection(firestoreDb, 'deletionTombstones'));
+            rawSet(tombDoc, {
+              sourceKey: tomb.sourceKey,
+              docId: tomb.docId,
+              deletedAt: firestoreServerTimestamp()
+            });
+          } catch (tErr) {
+            console.warn('[backup tombstone] 批次記錄刪除墓碑失敗:', tErr);
+          }
+        }
+        return rawDelete(reference);
       };
       return batch;
     };
@@ -173,7 +217,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
         getDocs,
         doc,
         updateDoc: trackedUpdateDoc,
-        deleteDoc,
+        deleteDoc: trackedDeleteDoc,
         setDoc: trackedSetDoc,
         
         writeBatch: trackedWriteBatch,

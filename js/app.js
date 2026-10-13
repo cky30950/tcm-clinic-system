@@ -119,6 +119,7 @@ const FACADE = {
     getPatientByIdWithRefresh: Patients.getPatientByIdWithRefresh,
     fetchPatientsPage: Patients.fetchPatientsPage,
     fetchPatientsPageAsc: Patients.fetchPatientsPageAsc,
+    comparePatientsByCreatedAtDesc: Patients.comparePatientsByCreatedAtDesc,
     comparePatientsByNumberDesc: Patients.comparePatientsByNumberDesc,
     fetchPatientsPageOptimized: Patients.fetchPatientsPageOptimized,
     getPatientsCount: Patients.getPatientsCount,

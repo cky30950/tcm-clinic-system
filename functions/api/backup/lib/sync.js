@@ -19,6 +19,7 @@ import {
     SNAPSHOT_PREFIX,
     EXPORT_PREFIX,
     BASELINE_INTERVAL_MS,
+    TOMBSTONE_COLLECTION,
     TOP_COLLECTIONS,
     BILLING_EXPORT_KEY,
     snapshotKey,
@@ -156,7 +157,12 @@ async function syncSource(client, bucket, source, entry, forceBaseline) {
     const result = await client.queryChangedSince(source, entry.watermark);
     const docs = existingSnapshot;
     for (const doc of result.docs) {
-        docs[doc.id] = doc.data;
+        // 軟刪除支援：若文件標記為 deleted: true，從 R2 快照中移除
+        if (doc.data && doc.data.deleted === true) {
+            delete docs[doc.id];
+        } else {
+            docs[doc.id] = doc.data;
+        }
     }
     await writeSnapshot(bucket, source.key, source, docs);
     return {
@@ -168,11 +174,89 @@ async function syncSource(client, bucket, source, entry, forceBaseline) {
     };
 }
 
-function lastWatermarkFromDocs(docs) {
+function lastWatermarkFromDocs(docs, rawProp = '_rawUpdatedAt') {
     if (!Array.isArray(docs) || docs.length === 0) return null;
     const last = docs[docs.length - 1];
-    if (!last._rawUpdatedAt) return null;
-    return { ts: last._rawUpdatedAt, name: last.name };
+    const raw = last[rawProp] || last._rawUpdatedAt;
+    if (!raw) return null;
+    return { ts: raw, name: last.name };
+}
+
+/**
+ * 處理刪除墓碑（Tombstones）：
+ * 1. 增量讀取 deletionTombstones 集合
+ * 2. 依 sourceKey 與 docId 從各 R2 快照中剔除已被硬刪除的文件
+ * 3. 寫回受影響的快照至 R2
+ * 4. 回傳處理統計與新 watermark
+ */
+async function processTombstones(client, bucket, tombstoneState, sources) {
+    const watermark = tombstoneState && tombstoneState.watermark ? tombstoneState.watermark : null;
+    const result = await client.queryTombstonesSince(watermark);
+    if (!result.docs || result.docs.length === 0) {
+        return {
+            tombstonesRead: 0,
+            purgedCount: 0,
+            watermark
+        };
+    }
+
+    const sourcesByKey = {};
+    for (const s of sources) {
+        sourcesByKey[s.key] = s;
+    }
+
+    const toPurgeBySource = {};
+    for (const doc of result.docs) {
+        const sKey = doc.data && doc.data.sourceKey;
+        const docId = doc.data && doc.data.docId;
+        if (sKey && docId) {
+            if (!toPurgeBySource[sKey]) toPurgeBySource[sKey] = new Set();
+            toPurgeBySource[sKey].add(String(docId));
+        }
+    }
+
+    let purgedCount = 0;
+    for (const [sKey, docIds] of Object.entries(toPurgeBySource)) {
+        const docs = await readSnapshotDocs(bucket, snapshotKey(sKey));
+        if (!docs) continue;
+        let modified = false;
+        for (const docId of docIds) {
+            if (docs[docId]) {
+                delete docs[docId];
+                modified = true;
+                purgedCount++;
+            }
+        }
+        if (modified) {
+            const meta = sourcesByKey[sKey] || { collectionId: sKey, parentDocPath: null };
+            await writeSnapshot(bucket, sKey, meta, docs);
+        }
+    }
+
+    const newWatermark = lastWatermarkFromDocs(result.docs, '_rawDeletedAt') || watermark;
+
+    cleanupStaleTombstones(client, result.docs).catch((e) => {
+        console.warn('[backup] 清理過期墓碑失敗:', e && e.message);
+    });
+
+    return {
+        tombstonesRead: result.docs.length,
+        purgedCount,
+        watermark: newWatermark
+    };
+}
+
+async function cleanupStaleTombstones(client, docs) {
+    const sixtyDaysAgoMs = Date.now() - 60 * 24 * 60 * 60 * 1000;
+    for (const doc of docs) {
+        if (!doc._rawDeletedAt) continue;
+        const tMs = Date.parse(doc._rawDeletedAt);
+        if (!isNaN(tMs) && tMs < sixtyDaysAgoMs) {
+            try {
+                await client.deleteDocument("deletionTombstones/" + encodeURIComponent(doc.id));
+            } catch (_) {}
+        }
+    }
 }
 
 /**
@@ -197,6 +281,26 @@ function maxWatermarkFromDocs(docs) {
 }
 
 /**
+ * 瘦身過濾：清理備份 JSON 內純衍生索引與無效欄位，節省備份大小及 Workers 記憶體。
+ */
+function pruneDocForExport(data) {
+    if (!data || typeof data !== 'object') return data;
+    const cleaned = { ...data };
+    // 1. 剔除純搜尋索引（patients 與 consultations 的龐大子字串關鍵字陣列，還原時由腳本自動重新計算）
+    delete cleaned.searchKeywords;
+    delete cleaned.searchKeywordsLower;
+    // 2. 剔除暫存標記
+    delete cleaned.__finProjection;
+    // 3. 移除 null 與 undefined 冗餘屬性
+    for (const k of Object.keys(cleaned)) {
+        if (cleaned[k] === null || cleaned[k] === undefined) {
+            delete cleaned[k];
+        }
+    }
+    return cleaned;
+}
+
+/**
  * 組裝與舊版 exportClinicBackup() 相容的備份物件。
  */
 async function assembleExport(bucket, sourceDefs, rtdbData, stats) {
@@ -205,7 +309,7 @@ async function assembleExport(bucket, sourceDefs, rtdbData, stats) {
         docsByKey[def.key] = (await readSnapshotDocs(bucket, snapshotKey(def.key))) || {};
     }
 
-    const toArray = (map) => Object.entries(map).map(([id, data]) => ({ id, ...data }));
+    const toArray = (map) => Object.entries(map).map(([id, data]) => ({ id, ...pruneDocForExport(data) }));
 
     const exportObj = {
         patients: toArray(docsByKey.patients || {}),
@@ -230,13 +334,13 @@ function buildBillingItems(docsByKey, sourceDefs) {
     const items = [];
     // 全域項目：與前端 onSnapshot 讀取一致，強制 shared: true（覆蓋文件內的值）
     for (const [id, data] of Object.entries(docsByKey.globalBillingItems || {})) {
-        items.push({ id, ...data, shared: true });
+        items.push({ id, ...pruneDocForExport(data), shared: true });
     }
     // 各診所項目
     for (const def of sourceDefs) {
         if (def.key === 'globalBillingItems' || !isClinicBillingKey(def.key)) continue;
         for (const [id, data] of Object.entries(docsByKey[def.key] || {})) {
-            items.push({ id, ...data });
+            items.push({ id, ...pruneDocForExport(data) });
         }
     }
     return items;
@@ -317,6 +421,20 @@ export async function runBackupSync(env, options = {}) {
     }
 
     const staleRemoved = await pruneStaleClinicSnapshots(bucket, clinicIds);
+
+    // 1. 增量處理刪除墓碑（從 R2 快照中剔除已硬刪除文件，達成永久純增量）
+    state.tombstones = state.tombstones || { watermark: null, totalPurged: 0 };
+    let tombstoneStats = { tombstonesRead: 0, purgedCount: 0 };
+    try {
+        tombstoneStats = await processTombstones(client, bucket, state.tombstones, sources);
+        totalReads += tombstoneStats.tombstonesRead;
+        state.tombstones.watermark = tombstoneStats.watermark;
+        state.tombstones.totalPurged = (state.tombstones.totalPurged || 0) + tombstoneStats.purgedCount;
+        state.tombstones.lastSyncAt = new Date().toISOString();
+    } catch (tombErr) {
+        console.error('[backup] 處理刪除墓碑失敗:', tombErr);
+        failures.push({ source: 'deletionTombstones', error: String(tombErr.message || tombErr) });
+    }
 
     const sourceResults = {};
     const failures = [];
@@ -401,6 +519,8 @@ export async function runBackupSync(env, options = {}) {
         at: new Date().toISOString(),
         status: failures.length ? 'partial' : 'success',
         firestoreReads: totalReads,
+        tombstonesRead: tombstoneStats.tombstonesRead,
+        tombstonesPurged: tombstoneStats.purgedCount,
         failures,
         staleClinicSnapshotsRemoved: staleRemoved,
         exportBytes: compressedBytes.byteLength,
@@ -416,6 +536,8 @@ export async function runBackupSync(env, options = {}) {
         exportBytes: compressedBytes.byteLength,
         exportBytesUncompressed: exportJson.length,
         firestoreReads: totalReads,
+        tombstonesRead: tombstoneStats.tombstonesRead,
+        tombstonesPurged: tombstoneStats.purgedCount,
         failures,
         sources: Object.fromEntries(
             Object.entries(sourceResults).map(([k, v]) => [
@@ -461,7 +583,8 @@ export async function getStatus(bucket) {
                 error: v.error || null
             }])
         ),
-        rtdb: state.rtdb || null
+        rtdb: state.rtdb || null,
+        tombstones: state.tombstones || null
     };
 }
 
