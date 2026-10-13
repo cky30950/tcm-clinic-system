@@ -5,7 +5,7 @@
  * 含 #searchPatient 搜尋結果渲染與分頁。原樣遷入，舊服務經 G。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { comparePatientsByNumberDesc, getPatientsCount, fetchPatientsPageOptimized } from './store.js';
+import { comparePatientsByCreatedAtDesc, getPatientsCount, fetchPatientsPageOptimized } from './store.js';
 
 export async function loadPatientListFromFirebase() {
     const tbody = document.getElementById('patientList');
@@ -36,7 +36,7 @@ export async function loadPatientListFromFirebase() {
             
             
             filteredPatients = filteredPatients.slice();
-            filteredPatients.sort(comparePatientsByNumberDesc);
+            filteredPatients.sort(comparePatientsByCreatedAtDesc);
             G.patientListFiltered = filteredPatients;
             renderPatientListTable(false);
         } else {
@@ -98,7 +98,7 @@ export function renderPatientListTable(pageChange = false) {
     
     
     if (Array.isArray(G.patientListFiltered) && G.patientListFiltered.length > 1) {
-        G.patientListFiltered.sort(comparePatientsByNumberDesc);
+        G.patientListFiltered.sort(comparePatientsByCreatedAtDesc);
     }
     const totalItems = G.patientListFiltered.length;
     const itemsPerPage = G.paginationSettings.patientList.itemsPerPage;
@@ -221,7 +221,7 @@ export function renderPatientListPage(pageItems, totalItems, currentPage) {
     
     let sortedPageItems;
     if (Array.isArray(pageItems) && pageItems.length > 1) {
-        sortedPageItems = pageItems.slice().sort(comparePatientsByNumberDesc);
+        sortedPageItems = pageItems.slice().sort(comparePatientsByCreatedAtDesc);
     } else {
         sortedPageItems = pageItems;
     }
