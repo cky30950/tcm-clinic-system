@@ -2065,6 +2065,11 @@
         els.status.textContent = tt('等待手機掃碼連線…');
         els.expiry.textContent = '';
 
+        // 平行載入 QRCode 函式庫（若尚未載入）
+        var qrPromise = (!window.QRCode && window.TCMLazy && typeof window.TCMLazy.load === 'function')
+            ? window.TCMLazy.load('qrcode').catch(function () {})
+            : Promise.resolve();
+
         var info;
         try {
             info = await apiFetch('/capture-session', {
@@ -2094,7 +2099,8 @@
             unsub: null
         };
 
-        // QR Code（CDN 程式庫；未載入時只顯示連結）
+        // 等待 QRCode 函式庫就緒後繪製（若失敗則回退為純文字連結）
+        await qrPromise;
         els.qr.innerHTML = '';
         if (window.QRCode) {
             try {

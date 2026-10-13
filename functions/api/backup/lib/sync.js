@@ -286,7 +286,7 @@ function maxWatermarkFromDocs(docs) {
 function pruneDocForExport(data) {
     if (!data || typeof data !== 'object') return data;
     const cleaned = { ...data };
-    // 1. 剔除純搜尋索引（patients 與 consultations 的龐大子字串關鍵字陣列，還原時由腳本自動重新計算）
+    // 1. 剔除純搜尋索引
     delete cleaned.searchKeywords;
     delete cleaned.searchKeywordsLower;
     // 2. 剔除暫存標記
@@ -332,11 +332,9 @@ async function assembleExport(bucket, sourceDefs, rtdbData, stats) {
 
 function buildBillingItems(docsByKey, sourceDefs) {
     const items = [];
-    // 全域項目：與前端 onSnapshot 讀取一致，強制 shared: true（覆蓋文件內的值）
     for (const [id, data] of Object.entries(docsByKey.globalBillingItems || {})) {
         items.push({ id, ...pruneDocForExport(data), shared: true });
     }
-    // 各診所項目
     for (const def of sourceDefs) {
         if (def.key === 'globalBillingItems' || !isClinicBillingKey(def.key)) continue;
         for (const [id, data] of Object.entries(docsByKey[def.key] || {})) {
@@ -422,6 +420,11 @@ export async function runBackupSync(env, options = {}) {
 
     const staleRemoved = await pruneStaleClinicSnapshots(bucket, clinicIds);
 
+    // 關鍵修正：宣告提至最頂部，防止 TDZ ReferenceError
+    const sourceResults = {};
+    const failures = [];
+    let totalReads = 0;
+
     // 1. 增量處理刪除墓碑（從 R2 快照中剔除已硬刪除文件，達成永久純增量）
     state.tombstones = state.tombstones || { watermark: null, totalPurged: 0 };
     let tombstoneStats = { tombstonesRead: 0, purgedCount: 0 };
@@ -435,10 +438,6 @@ export async function runBackupSync(env, options = {}) {
         console.error('[backup] 處理刪除墓碑失敗:', tombErr);
         failures.push({ source: 'deletionTombstones', error: String(tombErr.message || tombErr) });
     }
-
-    const sourceResults = {};
-    const failures = [];
-    let totalReads = 0;
 
     for (const source of sources) {
         try {
@@ -479,7 +478,6 @@ export async function runBackupSync(env, options = {}) {
         console.error('同步 RTDB 失敗:', error);
         rtdbError = String(error.message || error);
         state.rtdb = { ...(state.rtdb || {}), lastSyncAt: new Date().toISOString(), error: rtdbError };
-        // RTDB 失敗時嘗試使用舊快照組裝
         const previous = await readSnapshotDocs(bucket, snapshotKey('rtdb'));
         if (previous) rtdbData = previous;
         failures.push({ source: 'rtdb', error: rtdbError });
@@ -500,13 +498,11 @@ export async function runBackupSync(env, options = {}) {
     };
     const exportObj = await assembleExport(bucket, sources, rtdbData, stats);
     const exportKey = buildExportKey();
-    // 緊湊 JSON（人類不可讀無所謂，下載後可解壓）後 gzip，醫療 JSON 一般縮 5–10 倍
     const exportJson = JSON.stringify(exportObj);
     const compressedBytes = await gzipString(exportJson);
     await bucket.put(exportKey, compressedBytes, {
         httpMetadata: {
             contentType: GZIP_TYPE,
-            // 刻意不設 contentEncoding：讓瀏覽器原樣下載 .json.gz，而不會自動解壓
             contentDisposition: `attachment; filename="${downloadFileNameFromKey(exportKey)}"`
         },
         customMetadata: { format: 'gzip-json', version: '1' }
