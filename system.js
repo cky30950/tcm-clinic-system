@@ -821,7 +821,6 @@ function refreshClinicScopedUi() {
         loadPermissionManagementPanel();
       }
     } catch (_eLoadPermissionPanel) {}
-
   } else if (currentSectionId === 'walletManagement') {
     try {
       if (typeof window.clearWalletCaches === 'function') {
@@ -5728,7 +5727,7 @@ function generateConsultationSearchKeywords(consultation = {}) {
  * `await window.markSearchKeywordsBackfillComplete()`。
  * 注意：中斷續跑若未掃到最後一頁，不會寫入完成旗標。
  */
-window.backfillConsultationSearchKeywords = async function(startAfterDocId = null, onProgress = null) {
+window.backfillConsultationSearchKeywords = async function(startAfterDocId = null) {
     await waitForFirebaseDb();
     const PAGE_SIZE = 500;
     const col = window.firebase.collection(window.firebase.db, 'consultations');
@@ -5772,11 +5771,6 @@ window.backfillConsultationSearchKeywords = async function(startAfterDocId = nul
         }
 
         console.log(`[backfill] 掃描 ${totalScanned}，回填 ${totalBackfilled}，最後處理 ${lastProcessedId}`);
-        if (typeof onProgress === 'function') {
-            try {
-                onProgress({ totalScanned, totalBackfilled, lastProcessedId, done: false });
-            } catch (_eProg) {}
-        }
 
         if (docs.length < PAGE_SIZE) break;
 
@@ -5834,29 +5828,6 @@ window.clearSearchKeywordsBackfillMarker = async function() {
     clearSearchKeywordsBackfillCache();
     console.log('[backfill] 完成旗標已清除，本機 legacy fallback 已重新開啟');
     return { ok: true };
-};
-
-/**
- * 取得 searchKeywords 回填完成與鎖定狀態。
- */
-window.getSearchKeywordsBackfillStatus = async function() {
-    await waitForFirebaseDb();
-    try {
-        const ref = window.firebase.doc(
-            window.firebase.db,
-            SEARCH_KEYWORDS_BACKFILL_COLLECTION,
-            SEARCH_KEYWORDS_BACKFILL_DOC
-        );
-        const snap = await window.firebase.getDoc(ref);
-        const exists = snap && snap.exists();
-        const data = exists ? (snap.data() || {}) : null;
-        const complete = !!data
-            && Number(data.version) === SEARCH_KEYWORDS_BACKFILL_VERSION
-            && !!data.completedAt;
-        return { complete, data };
-    } catch (e) {
-        return { complete: false, error: (e && e.message) || String(e) };
-    }
 };
 
 /**
@@ -6210,7 +6181,6 @@ async function fetchJsonWithFallback(fileName) {
                 try {
                     loadPermissionManagementPanel();
                 } catch (_eLoadPermissionPanel) {}
-
                 try {
                     if (versionFeatureEnabled('membership') && typeof renderWalletConfigForm === 'function') {
                         renderWalletConfigForm();
@@ -15666,10 +15636,10 @@ async function searchMedicalRecords(term, limitCount = 50) {
             });
         } catch (_e) {}
 
-        // ③ 回退：如果 searchKeywords 沒結果（且未鎖定回退），
-        // 用舊邏輯補查。若已鎖定或 searchKeywords 已命中結果（out.length > 0），
-        // 絕對不進入舊回退迴圈（避免一輪最多 34 次 getDocs 的暴增讀取）。
-        if (out.length === 0) {
+        // ③ 回退：如果 searchKeywords 沒結果（舊資料沒有這個欄位），
+        // 用舊邏輯補查。回填完成旗標寫入後此路徑關閉（一輪最多 34 次
+        // getDocs，debounce 下成本過高），只走 array-contains。
+        if (out.length < limitCount) {
             let fallbackDisabled = false;
             try {
                 fallbackDisabled = await isLegacySearchFallbackDisabled();
@@ -22399,6 +22369,3 @@ function hideGlobalCopyright() {
     window.openAcupointMapForNotes = openAcupointMapForNotes;
   }
 })();
-
-
-
