@@ -1,10 +1,11 @@
 {
   "projects": {
+    "1": "system-1e90a",
     "test": "clinic-bb064",
     "cheungec": "system-1e90a",
     "SHUN": "shunningtongsystem",
     "cheung": "system-1e90a",
-    "A": "shunningtongsystem"
+    "A": "clinic-bb064"
   },
   "targets": {},
   "etags": {}
