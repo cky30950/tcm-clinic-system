@@ -6599,47 +6599,120 @@ async function generatePatientNumberFromFirebase() {
             return Number.isFinite(parsed) ? parsed : 0;
         };
         const counterRef = window.firebase.doc(window.firebase.db, 'systemCounters', 'patientNumber');
-        let bootstrapMax = 0;
-        try {
-            const orderParts = [window.firebase.orderBy('patientNumber', 'desc')];
-            if (window.firebase.documentId) {
-                orderParts.push(window.firebase.orderBy(window.firebase.documentId, 'desc'));
-            }
-            const latestQuery = window.firebase.firestoreQuery(
-                window.firebase.collection(window.firebase.db, 'patients'),
-                ...orderParts,
-                window.firebase.limit(1)
-            );
-            const latestSnap = await window.firebase.getDocs(latestQuery);
-            latestSnap.forEach((docSnap) => {
-                const data = docSnap.data ? docSnap.data() : {};
-                bootstrapMax = Math.max(bootstrapMax, parsePatientNumber(data && data.patientNumber));
+
+        // 1. 優先利用本地快取（patientsCache 或 localStorage）從 1 開始尋找最小未用號碼（0 額外讀取量）
+        let candidate = 0;
+        const localPatients = (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.patientsCache) && window.firebaseDataManager.patientsCache.length > 0)
+            ? window.firebaseDataManager.patientsCache
+            : (() => {
+                try {
+                    const raw = localStorage.getItem('patients');
+                    const parsed = raw ? JSON.parse(raw) : null;
+                    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+                } catch (_e) { return null; }
+            })();
+
+        if (localPatients && localPatients.length > 0) {
+            const usedSet = new Set();
+            localPatients.forEach((p) => {
+                const num = parsePatientNumber(p && p.patientNumber);
+                if (num > 0) usedSet.add(num);
             });
-        } catch (queryErr) {
-            console.warn('讀取最新病人編號失敗，回退至全量掃描初始化 counter:', queryErr);
-            const result = await safeGetPatients(true);
-            if (result && result.success && Array.isArray(result.data)) {
-                bootstrapMax = result.data.reduce((max, patient) => {
-                    return Math.max(max, parsePatientNumber(patient && patient.patientNumber));
-                }, 0);
+            let checkNum = 1;
+            while (usedSet.has(checkNum)) {
+                checkNum++;
+            }
+            // 驗證此號碼在雲端是否確實未被佔用（僅 1 次 limit(1) 讀取）
+            try {
+                const checkQuery = window.firebase.firestoreQuery(
+                    window.firebase.collection(window.firebase.db, 'patients'),
+                    window.firebase.where('patientNumber', '==', formatPatientNumber(checkNum)),
+                    window.firebase.limit(1)
+                );
+                const checkSnap = await window.firebase.getDocs(checkQuery);
+                if (checkSnap.empty) {
+                    candidate = checkNum;
+                }
+            } catch (_verifyErr) {
+                console.warn('驗證本地候選編號失敗:', _verifyErr);
             }
         }
-        const nextNumber = await window.firebase.runTransaction(window.firebase.db, async (transaction) => {
+
+        // 2. 若本地快取未命中或候選已被使用，讀取計數器或從 1 往後升序搜尋首個斷號/空缺
+        if (!candidate) {
+            let startFrom = 1;
+            try {
+                const counterSnap = await window.firebase.getDoc(counterRef);
+                if (counterSnap && counterSnap.exists()) {
+                    const cData = counterSnap.data() || {};
+                    // 若有記錄 nextCandidate 且非先前的 bug 異常大數（< 10000），可作為搜尋起點
+                    if (cData.nextCandidate && Number(cData.nextCandidate) > 0 && Number(cData.nextCandidate) < 10000) {
+                        startFrom = Number(cData.nextCandidate);
+                    }
+                }
+            } catch (_cErr) {}
+
+            // 升序分批（每批 100 筆）尋找第一個斷號（通常僅需 1~2 次查詢）
+            let searchNum = startFrom;
+            let foundGap = false;
+            let guard = 0;
+            while (!foundGap && guard < 20) {
+                guard++;
+                const ascQuery = window.firebase.firestoreQuery(
+                    window.firebase.collection(window.firebase.db, 'patients'),
+                    window.firebase.where('patientNumber', '>=', formatPatientNumber(searchNum)),
+                    window.firebase.orderBy('patientNumber', 'asc'),
+                    window.firebase.limit(100)
+                );
+                const snap = await window.firebase.getDocs(ascQuery);
+                if (snap.empty) {
+                    candidate = searchNum;
+                    foundGap = true;
+                    break;
+                }
+                let expected = searchNum;
+                for (const d of snap.docs) {
+                    const val = parsePatientNumber(d.data() && d.data().patientNumber);
+                    if (val === expected) {
+                        expected++;
+                    } else if (val > expected) {
+                        candidate = expected;
+                        foundGap = true;
+                        break;
+                    }
+                }
+                if (!foundGap) {
+                    if (snap.size < 100) {
+                        candidate = expected;
+                        foundGap = true;
+                        break;
+                    }
+                    searchNum = expected;
+                }
+            }
+            if (!candidate) candidate = searchNum;
+        }
+
+        // 3. 透過 Transaction 原子更新 systemCounters/patientNumber，確保多人並發不撞號
+        const finalNumber = await window.firebase.runTransaction(window.firebase.db, async (transaction) => {
             const counterSnap = await transaction.get(counterRef);
-            const currentNumber = counterSnap && counterSnap.exists()
-                ? Math.max(bootstrapMax, Number(counterSnap.data().current) || 0)
-                : bootstrapMax;
-            const newNumber = currentNumber + 1;
+            const data = counterSnap && counterSnap.exists() ? (counterSnap.data() || {}) : {};
+            let allocated = candidate;
+            if (data.nextCandidate && Number(data.nextCandidate) > allocated) {
+                allocated = Number(data.nextCandidate);
+            }
             transaction.set(counterRef, {
-                current: newNumber,
+                current: allocated,
+                nextCandidate: allocated + 1,
                 updatedAt: new Date()
             }, { merge: true });
-            return newNumber;
+            return allocated;
         });
-        return formatPatientNumber(nextNumber);
+
+        return formatPatientNumber(finalNumber);
     } catch (error) {
         console.error('生成病人編號失敗:', error);
-        return `P${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`;
+        throw new Error('無法生成病人編號，請稍後再試');
     }
 }
 
