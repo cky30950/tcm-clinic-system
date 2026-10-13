@@ -159,16 +159,21 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
       }
 
       // 兜底：索引無結果時（舊文件缺 searchKeywords、dataManager 未備妥等），
-      // 確保病人全量快取已載入後做本地過濾，保證「輸入名字就能找到」。
+      // 僅使用現有記憶體／本地快取做本地過濾，避免發起遠端全量讀取。
       if (!found.length && kw) {
         let all = [];
         try {
-          if (window.firebaseDataManager) {
-            const pr = await window.firebaseDataManager.getPatients(false);
-            if (pr && pr.success && Array.isArray(pr.data)) all = pr.data;
+          if (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.patientsCache)) {
+            all = window.firebaseDataManager.patientsCache;
+          } else {
+            const stored = localStorage.getItem('patients');
+            if (stored) {
+              const arr = JSON.parse(stored);
+              if (Array.isArray(arr)) all = arr;
+            }
           }
         } catch (allErr) {
-          console.warn('wallet load all patients failed:', allErr);
+          console.warn('wallet load cached patients failed:', allErr);
         }
         if (!all.length && Array.isArray(G.patients)) all = G.patients;
         found = all.filter((p) => p && walletLocalMatch(p, kw, compact)).slice(0, 50);

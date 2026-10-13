@@ -821,11 +821,6 @@ function refreshClinicScopedUi() {
         loadPermissionManagementPanel();
       }
     } catch (_eLoadPermissionPanel) {}
-    try {
-      if (typeof refreshSearchKeywordsBackfillUi === 'function') {
-        refreshSearchKeywordsBackfillUi();
-      }
-    } catch (_eRefreshBackfillUi) {}
   } else if (currentSectionId === 'walletManagement') {
     try {
       if (typeof window.clearWalletCaches === 'function') {
@@ -5864,24 +5859,46 @@ window.getSearchKeywordsBackfillStatus = async function() {
 };
 
 /**
- * 全量重算所有病人的診症聚合欄位（consultationCount, latestConsultationAt, latestFollowUpDate）。
+ * 重算所有病人的診症聚合欄位（consultationCount, latestConsultationAt, latestFollowUpDate）。
  * 執行方式：在瀏覽器 Console 執行 `await window.recomputeAllPatientAggregates()`
- * 這會讀取所有病人 + 每個病人的診症計數，耗時較久，僅在資料不同步時使用。
+ * 全面改為游標串流分批載入（每批 100 筆），避免一次性全量讀取 patients 集合造成巨額讀取與記憶體負擔。
  */
 window.recomputeAllPatientAggregates = async function() {
     await waitForFirebaseDb();
     const dm = window.firebaseDataManager;
-    if (!dm || !dm.getPatients) { console.error('雲端數據管理器未就緒'); return; }
+    if (!dm) { console.error('雲端數據管理器未就緒'); return; }
 
-    const patientsRes = await dm.getPatients(true);
-    const patients = (patientsRes && patientsRes.success && patientsRes.data) || [];
     let done = 0;
-    for (const p of patients) {
-        await dm.recomputePatientConsultationAggregate(p.id).catch(() => {});
-        done++;
-        if (done % 20 === 0) console.log(`[recompute] ${done}/${patients.length}`);
+    let lastDoc = null;
+    let hasMore = true;
+    const batchSize = 100;
+    console.log('[recompute] 開始以游標分頁串流重算病人聚合...');
+
+    while (hasMore) {
+        let q = window.firebase.firestoreQuery(
+            window.firebase.collection(window.firebase.db, 'patients'),
+            window.firebase.orderBy('__name__'),
+            window.firebase.limit(batchSize)
+        );
+        if (lastDoc) {
+            q = window.firebase.firestoreQuery(q, window.firebase.startAfter(lastDoc));
+        }
+        const snap = await window.firebase.getDocs(q);
+        if (snap.empty) {
+            hasMore = false;
+            break;
+        }
+        for (const doc of snap.docs) {
+            await dm.recomputePatientConsultationAggregate(doc.id).catch(() => {});
+            done++;
+            if (done % 20 === 0) console.log(`[recompute] 已完成 ${done} 位病人`);
+        }
+        lastDoc = snap.docs[snap.docs.length - 1];
+        if (snap.size < batchSize) {
+            hasMore = false;
+        }
     }
-    console.log(`[recompute] 完成，共 ${done} 位病人`);
+    console.log(`[recompute] 完成，共重算 ${done} 位病人`);
     return { total: done };
 };
 
@@ -6215,9 +6232,6 @@ async function fetchJsonWithFallback(fileName) {
                     loadPermissionManagementPanel();
                 } catch (_eLoadPermissionPanel) {}
                 try {
-                    refreshSearchKeywordsBackfillUi();
-                } catch (_eRefreshBackfillUi) {}
-                try {
                     if (versionFeatureEnabled('membership') && typeof renderWalletConfigForm === 'function') {
                         renderWalletConfigForm();
                     }
@@ -6473,20 +6487,32 @@ async function findPatientByPhone(phone, excludePatientId) {
         && String(p.id) !== String(excludePatientId || '')
         && String(p.phone || '').replace(/\D/g, '') === normalized;
 
-    // 1) 本機快取
+    // 1) 僅查本機病人快取（記憶體或 localStorage，零網路開銷，不觸發遠端全量讀取）
     try {
-        const cached = await window.firebaseDataManager.getPatients();
-        if (cached && cached.success && Array.isArray(cached.data)) {
-            const hit = cached.data.find(isOther);
+        const memCache = (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.patientsCache))
+            ? window.firebaseDataManager.patientsCache
+            : null;
+        if (memCache) {
+            const hit = memCache.find(isOther);
             if (hit) return hit;
+        } else {
+            const stored = localStorage.getItem('patients');
+            if (stored) {
+                const arr = JSON.parse(stored);
+                if (Array.isArray(arr)) {
+                    const hit = arr.find(isOther);
+                    if (hit) return hit;
+                }
+            }
         }
-    } catch (_cacheErr) { /* 快取不可用就走遠端 */ }
+    } catch (_cacheErr) { /* 快取不可用就走遠端查詢 */ }
 
-    // 2) Firestore 權威 equality 查詢
+    // 2) Firestore 權威 equality 查詢（加上 limit(2) 防護，只需 1-2 次文件讀取）
     try {
         const dupQuery = window.firebase.firestoreQuery(
             window.firebase.collection(window.firebase.db, 'patients'),
-            window.firebase.where('phone', '==', String(phone).trim())
+            window.firebase.where('phone', '==', String(phone).trim()),
+            window.firebase.limit(2)
         );
         const snapshot = await window.firebase.getDocs(dupQuery);
         let found = null;
@@ -10734,8 +10760,10 @@ class FirebaseDataManager {
 
     /**
      * 讀取病人列表並使用內部快取。
-     * 預設情況下若已存在快取，直接回傳快取內容以避免重複讀取。
-     * 傳入 forceRefresh=true 可強制刷新快取並重新從 Firestore 取得最新資料。
+     * 注意：為避免集合過大時產生巨額 Firestore 讀取量，已全面改為依需分頁查詢
+     * （fetchPatientsPageOptimized）配合單筆快取（getPatientByIdWithRefresh）。
+     * 此處不再執行無條件全量載入；若無本機快取或強制刷新，僅安全讀取最新 100 筆，
+     * 並保留現有快取中已讀過的單筆資料。
      *
      * @param {boolean} forceRefresh 是否強制重新載入
      * @returns {Promise<{ success: boolean, data: Array }>} 病人資料
@@ -10759,30 +10787,96 @@ class FirebaseDataManager {
                     return { success: true, data: localData };
                 }
             }
-            const querySnapshot = await window.firebase.getDocs(
-                window.firebase.collection(window.firebase.db, 'patients')
+
+            // 若執行到此，代表需從遠端讀取：避免無條件全量掃描
+            console.warn('[firebaseDataManager.getPatients] 提示：全量載入病人集合已受保護，建議改用 fetchPatientsPageOptimized 分頁查詢或 getPatientByIdWithRefresh 單筆快取。此處僅安全讀取最新 100 筆。');
+
+            const safeLimit = 100;
+            let q = window.firebase.firestoreQuery(
+                window.firebase.collection(window.firebase.db, 'patients'),
+                window.firebase.orderBy('createdAt', 'desc'),
+                window.firebase.limit(safeLimit)
             );
-            const patients = [];
+            const querySnapshot = await window.firebase.getDocs(q);
+            const remotePatients = [];
             querySnapshot.forEach((doc) => {
-                patients.push({ id: doc.id, ...doc.data() });
+                remotePatients.push({ id: doc.id, ...doc.data() });
             });
+
+            // 與記憶體中既有快取進行合併（保留之前單筆讀取的病人，不遺失資料）
+            const mergedMap = new Map();
+            if (Array.isArray(this.patientsCache)) {
+                this.patientsCache.forEach(p => {
+                    if (p && p.id) mergedMap.set(String(p.id), p);
+                });
+            }
+            remotePatients.forEach(p => {
+                if (p && p.id) mergedMap.set(String(p.id), p);
+            });
+            const finalPatients = Array.from(mergedMap.values());
+
             // 將結果寫入快取與 localStorage，並記錄對應的 meta 時間戳
-            this.patientsCache = patients;
-            this.patientsCacheSource = 'remote';
+            this.patientsCache = finalPatients;
+            this.patientsCacheSource = 'remote_safe';
             this.patientsCacheFetchedAt = Date.now();
             try {
-                localStorage.setItem('patients', JSON.stringify(patients));
+                localStorage.setItem('patients', JSON.stringify(finalPatients));
                 const metaTs = await this.fetchCurrentPatientsMetaTimestamp();
                 writePatientsStorageMeta({ fetchedAt: Date.now(), metaTimestamp: metaTs });
             } catch (lsErr) {
                 console.warn('保存病人資料到本地失敗:', lsErr);
             }
-            console.log('已從雲端資料庫讀取病人數據:', patients.length, '筆');
-            return { success: true, data: patients };
+            console.log('已從雲端安全讀取最新病人數據:', remotePatients.length, '筆（快取累積共', finalPatients.length, '筆）');
+            return { success: true, data: finalPatients };
         } catch (error) {
             console.error('讀取病人數據失敗:', error);
-            return { success: false, data: [] };
+            return { success: false, data: this.patientsCache || [] };
         }
+    }
+
+    /**
+     * 以游標串流分批載入病人（每批 batchSize 筆），供批次運算或轉移工具使用，
+     * 避免單次發起全量讀取或塞爆記憶體。
+     *
+     * @param {number} batchSize 每批筆數，預設 100
+     * @param {Function} [onBatch] 批次回調 (batchDocs) => Promise<void> | void
+     * @returns {Promise<Array>} 所有病人資料陣列
+     */
+    async fetchAllPatientsBatched(batchSize = 100, onBatch = null) {
+        if (!this.isReady) return [];
+        await waitForFirebaseDb();
+        const allPatients = [];
+        let lastDoc = null;
+        let hasMore = true;
+        while (hasMore) {
+            let q = window.firebase.firestoreQuery(
+                window.firebase.collection(window.firebase.db, 'patients'),
+                window.firebase.orderBy('__name__'),
+                window.firebase.limit(batchSize)
+            );
+            if (lastDoc) {
+                q = window.firebase.firestoreQuery(q, window.firebase.startAfter(lastDoc));
+            }
+            const snap = await window.firebase.getDocs(q);
+            if (snap.empty) {
+                hasMore = false;
+                break;
+            }
+            const currentBatch = [];
+            snap.forEach(d => {
+                const item = { id: d.id, ...d.data() };
+                currentBatch.push(item);
+                allPatients.push(item);
+            });
+            if (typeof onBatch === 'function') {
+                await onBatch(currentBatch);
+            }
+            lastDoc = snap.docs[snap.docs.length - 1];
+            if (snap.size < batchSize) {
+                hasMore = false;
+            }
+        }
+        return allPatients;
     }
 
     async updatePatient(patientId, patientData) {
@@ -15107,9 +15201,13 @@ async function getConsultationsCount() {
     }
 }
 
-async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
+// 單次最大允許跨越的頁數上限，避免使用者大幅跳頁時引發連續逐頁 getDocs 查詢雪崩
+const MAX_MEDICAL_RECORD_PAGE_WALK = 3;
+
+async function fetchMedicalRecordPage(requestedPage = 1, pageSize = 10) {
     try {
         await waitForFirebaseDb();
+        let page = Math.max(1, parseInt(requestedPage, 10) || 1);
         if (medicalRecordPageCache[page]) {
             return medicalRecordPageCache[page];
         }
@@ -15117,6 +15215,8 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
         let q;
         const totalItems = typeof medicalRecordTotalCount === 'number' ? medicalRecordTotalCount : null;
         const totalPages = totalItems ? Math.ceil(totalItems / pageSize) : null;
+
+        // 特殊頁碼 1：最後一頁（直接以升序反向查詢讀取最後一頁筆數，免除游標遍歷）
         if (totalPages && page === totalPages) {
             const rem = totalItems % pageSize;
             const lastPageSize = rem === 0 ? pageSize : rem;
@@ -15135,6 +15235,8 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             trimCache(medicalRecordPageCache, 30);
             return arrLast;
         }
+
+        // 特殊頁碼 2：第 1 頁（直接讀取前 pageSize 筆並建立起點游標）
         if (page === 1) {
             q = window.firebase.firestoreQuery(
                 colRef,
@@ -15152,49 +15254,99 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             trimCache(medicalRecordPageCache, 30);
             return arr;
         }
-        // 確保擁有上一頁游標，若沒有則逐頁計算
-        let prevPage = page - 1;
-        if (!medicalRecordPageCursors[prevPage]) {
-            for (let p = 1; p <= prevPage; p++) {
-                if (medicalRecordPageCache[p]) continue;
-                await fetchMedicalRecordPage(p, pageSize);
-            }
+
+        // 確保第 1 頁起點游標存在
+        if (!medicalRecordPageCursors[1]) {
+            await fetchMedicalRecordPage(1, pageSize);
         }
-        const last = medicalRecordPageCursors[prevPage];
-        if (!last) {
+        if (!medicalRecordPageCursors[1]) {
             medicalRecordPageCache[page] = [];
-            medicalRecordPageCursors[page] = null;
             return [];
         }
+
+        // 尋找小於 page 的最大已知游標頁碼
+        let closestPage = 1;
+        for (let p = page - 1; p >= 1; p--) {
+            if (medicalRecordPageCursors[p]) {
+                closestPage = p;
+                break;
+            }
+        }
+
+        // 限制跳頁幅度：若跨頁步長超過 MAX_MEDICAL_RECORD_PAGE_WALK，clamp 目標頁碼
+        let effectivePage = page;
+        if (effectivePage - closestPage > MAX_MEDICAL_RECORD_PAGE_WALK) {
+            effectivePage = closestPage + MAX_MEDICAL_RECORD_PAGE_WALK;
+            if (paginationSettings.medicalRecordList) {
+                paginationSettings.medicalRecordList.currentPage = effectivePage;
+            }
+            try {
+                if (typeof showToast === 'function') {
+                    showToast(`跨頁保護：已為您前往相鄰第 ${effectivePage} 頁（單次跨頁上限為 ${MAX_MEDICAL_RECORD_PAGE_WALK} 頁）`, 'info');
+                }
+            } catch (_tErr) {}
+        }
+
+        // 若被 clamp 後的頁面已在快取中，直接返回
+        if (medicalRecordPageCache[effectivePage]) {
+            return medicalRecordPageCache[effectivePage];
+        }
+
+        // 單次躍遷查詢（Single Leap Query）：取代原本在 for 迴圈中逐頁連續發送 getDocs
+        const pagesToWalk = effectivePage - closestPage;
+        const leapDocLimit = pagesToWalk * pageSize;
+        const lastCursor = medicalRecordPageCursors[closestPage];
+
         q = window.firebase.firestoreQuery(
             colRef,
             window.firebase.orderBy('sortDate', 'desc'),
-            window.firebase.startAfter(last),
-            window.firebase.limit(pageSize),
+            window.firebase.startAfter(lastCursor),
+            window.firebase.limit(leapDocLimit)
         );
-        const snap2 = await window.firebase.getDocs(q);
-        let arr2 = [];
-        snap2.forEach(d => arr2.push(consultationProjectionForList({ id: d.id, ...d.data() })));
-        try {
-            arr2 = sortMedicalRecordsBySortDateDesc(arr2);
-        } catch (_e) {}
-        medicalRecordPageCache[page] = arr2;
-        medicalRecordPageCursors[page] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : medicalRecordPageCursors[prevPage];
-        trimCache(medicalRecordPageCache, 30);
-        return arr2;
+
+        const leapSnap = await window.firebase.getDocs(q);
+        const leapDocs = leapSnap.docs || [];
+
+        // 將單次查詢返回的多筆文件按 pageSize 區段填入快取與游標
+        for (let i = 0; i < pagesToWalk; i++) {
+            const pageIndex = closestPage + i + 1;
+            const startIdx = i * pageSize;
+            const endIdx = startIdx + pageSize;
+            const chunkSnapDocs = leapDocs.slice(startIdx, endIdx);
+
+            let chunkArr = [];
+            chunkSnapDocs.forEach(d => chunkArr.push(consultationProjectionForList({ id: d.id, ...d.data() })));
+            try {
+                chunkArr = sortMedicalRecordsBySortDateDesc(chunkArr);
+            } catch (_e) {}
+
+            medicalRecordPageCache[pageIndex] = chunkArr;
+            if (chunkSnapDocs.length > 0) {
+                medicalRecordPageCursors[pageIndex] = chunkSnapDocs[chunkSnapDocs.length - 1];
+            } else {
+                medicalRecordPageCursors[pageIndex] = medicalRecordPageCursors[pageIndex - 1] || lastCursor;
+            }
+            trimCache(medicalRecordPageCache, 30);
+        }
+
+        return medicalRecordPageCache[effectivePage] || [];
     } catch (_err) {
+        console.error('讀取病歷列表分頁失敗:', _err);
         return [];
     }
 }
 
-async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
+async function fetchMedicalRecordPageAsc(requestedAscIndex = 1, pageSize = 10) {
     try {
         await waitForFirebaseDb();
+        let ascIndex = Math.max(1, parseInt(requestedAscIndex, 10) || 1);
         if (medicalRecordAscPageCache[ascIndex]) {
             return medicalRecordAscPageCache[ascIndex];
         }
         const colRef = window.firebase.collection(window.firebase.db, 'consultations');
         let q;
+
+        // 特殊頁碼：升序第 1 頁（直接讀取前 pageSize 筆）
         if (ascIndex === 1) {
             q = window.firebase.firestoreQuery(
                 colRef,
@@ -15212,36 +15364,84 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             trimCache(medicalRecordAscPageCache, 30);
             return arr;
         }
-        let prev = ascIndex - 1;
-        if (!medicalRecordAscPageCursors[prev]) {
-            for (let a = 1; a <= prev; a++) {
-                if (medicalRecordAscPageCache[a]) continue;
-                await fetchMedicalRecordPageAsc(a, pageSize);
-            }
+
+        // 確保升序第 1 頁游標存在
+        if (!medicalRecordAscPageCursors[1]) {
+            await fetchMedicalRecordPageAsc(1, pageSize);
         }
-        const last = medicalRecordAscPageCursors[prev];
-        if (!last) {
+        if (!medicalRecordAscPageCursors[1]) {
             medicalRecordAscPageCache[ascIndex] = [];
-            medicalRecordAscPageCursors[ascIndex] = null;
             return [];
         }
+
+        // 尋找小於 ascIndex 的最大已知升序游標
+        let closestAsc = 1;
+        for (let a = ascIndex - 1; a >= 1; a--) {
+            if (medicalRecordAscPageCursors[a]) {
+                closestAsc = a;
+                break;
+            }
+        }
+
+        // 限制跳頁幅度：若跨頁步長超過 MAX_MEDICAL_RECORD_PAGE_WALK，clamp 目標頁碼
+        let effectiveAsc = ascIndex;
+        if (effectiveAsc - closestAsc > MAX_MEDICAL_RECORD_PAGE_WALK) {
+            effectiveAsc = closestAsc + MAX_MEDICAL_RECORD_PAGE_WALK;
+            const totalItems = typeof medicalRecordTotalCount === 'number' ? medicalRecordTotalCount : null;
+            const totalPages = totalItems ? Math.ceil(totalItems / pageSize) : null;
+            if (totalPages && paginationSettings.medicalRecordList) {
+                paginationSettings.medicalRecordList.currentPage = Math.max(1, totalPages - effectiveAsc + 1);
+            }
+            try {
+                if (typeof showToast === 'function') {
+                    showToast(`跨頁保護：已為您前往相鄰頁面（單次跨頁上限為 ${MAX_MEDICAL_RECORD_PAGE_WALK} 頁）`, 'info');
+                }
+            } catch (_tErr) {}
+        }
+
+        if (medicalRecordAscPageCache[effectiveAsc]) {
+            return medicalRecordAscPageCache[effectiveAsc];
+        }
+
+        // 單次躍遷查詢（Single Leap Query）取代原本的升序逐頁迴圈
+        const pagesToWalk = effectiveAsc - closestAsc;
+        const leapDocLimit = pagesToWalk * pageSize;
+        const lastCursor = medicalRecordAscPageCursors[closestAsc];
+
         q = window.firebase.firestoreQuery(
             colRef,
             window.firebase.orderBy('sortDate', 'asc'),
-            window.firebase.startAfter(last),
-            window.firebase.limit(pageSize),
+            window.firebase.startAfter(lastCursor),
+            window.firebase.limit(leapDocLimit)
         );
-        const snap2 = await window.firebase.getDocs(q);
-        let arr2 = [];
-        snap2.forEach(d => arr2.push(consultationProjectionForList({ id: d.id, ...d.data() })));
-        try {
-            arr2 = sortMedicalRecordsBySortDateDesc(arr2);
-        } catch (_e) {}
-        medicalRecordAscPageCache[ascIndex] = arr2;
-        medicalRecordAscPageCursors[ascIndex] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : medicalRecordAscPageCursors[prev];
-        trimCache(medicalRecordAscPageCache, 30);
-        return arr2;
+
+        const leapSnap = await window.firebase.getDocs(q);
+        const leapDocs = leapSnap.docs || [];
+
+        for (let i = 0; i < pagesToWalk; i++) {
+            const ascIdx = closestAsc + i + 1;
+            const startIdx = i * pageSize;
+            const endIdx = startIdx + pageSize;
+            const chunkSnapDocs = leapDocs.slice(startIdx, endIdx);
+
+            let chunkArr = [];
+            chunkSnapDocs.forEach(d => chunkArr.push(consultationProjectionForList({ id: d.id, ...d.data() })));
+            try {
+                chunkArr = sortMedicalRecordsBySortDateDesc(chunkArr);
+            } catch (_e) {}
+
+            medicalRecordAscPageCache[ascIdx] = chunkArr;
+            if (chunkSnapDocs.length > 0) {
+                medicalRecordAscPageCursors[ascIdx] = chunkSnapDocs[chunkSnapDocs.length - 1];
+            } else {
+                medicalRecordAscPageCursors[ascIdx] = medicalRecordAscPageCursors[ascIdx - 1] || lastCursor;
+            }
+            trimCache(medicalRecordAscPageCache, 30);
+        }
+
+        return medicalRecordAscPageCache[effectiveAsc] || [];
     } catch (_err) {
+        console.error('升序讀取病歷列表分頁失敗:', _err);
         return [];
     }
 }
@@ -22407,102 +22607,4 @@ function hideGlobalCopyright() {
 })();
 
 
-/**
- * 系統管理：病歷搜尋索引維護與鎖定 UI 控制器
- */
-async function refreshSearchKeywordsBackfillUi() {
-    const badge = document.getElementById('searchKeywordsStatusBadge');
-    const details = document.getElementById('backfillSummaryDetails');
-    if (!badge) return;
-    try {
-        const status = await window.getSearchKeywordsBackfillStatus();
-        if (status.complete) {
-            badge.className = 'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 whitespace-nowrap';
-            badge.innerHTML = '<span class="w-2 h-2 mr-1.5 rounded-full bg-green-500 inline-block"></span>已鎖定關閉回退（純高效索引，讀取極省）';
-            if (details && status.data) {
-                const at = status.data.completedAt ? new Date(status.data.completedAt).toLocaleString('zh-HK') : '';
-                const by = status.data.completedBy || '';
-                const scanned = status.data.totalScanned !== undefined ? status.data.totalScanned : '';
-                const fixed = status.data.totalBackfilled !== undefined ? status.data.totalBackfilled : '';
-                let extraTxt = at ? `鎖定時間：${at}` : '';
-                if (by) extraTxt += `，操作者：${by}`;
-                if (scanned !== '') extraTxt += `（已核驗 ${scanned} 筆病歷，補填 ${fixed} 筆）`;
-                details.textContent = extraTxt;
-            }
-        } else {
-            badge.className = 'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 whitespace-nowrap';
-            badge.innerHTML = '<span class="w-2 h-2 mr-1.5 rounded-full bg-amber-500 inline-block"></span>未鎖定（查無結果時會觸發舊搜尋回退迴圈）';
-            if (details) {
-                details.textContent = '尚未寫入完成旗標。若確認病歷皆具關鍵字，可直接點選「直接鎖定關閉」；或點選「一鍵檢查並回填」。';
-            }
-        }
-    } catch (_e) {
-        badge.className = 'inline-flex items-center px-3 py-1.5 rounded-full text-xs text-gray-500 bg-gray-100 whitespace-nowrap';
-        badge.textContent = '狀態檢查失敗';
-    }
-}
 
-async function startUiSearchKeywordsBackfill() {
-    const btn = document.getElementById('startBackfillKeywordsBtn');
-    const container = document.getElementById('backfillProgressContainer');
-    const bar = document.getElementById('backfillProgressBar');
-    const text = document.getElementById('backfillProgressText');
-    if (btn) btn.disabled = true;
-    if (container) container.classList.remove('hidden');
-    if (bar) bar.style.width = '10%';
-    if (text) text.textContent = '正在掃描病歷集合並補寫 searchKeywords，請稍候…';
-
-    try {
-        const res = await window.backfillConsultationSearchKeywords(null, (p) => {
-            if (p && bar && text) {
-                bar.style.width = '70%';
-                text.textContent = `已掃描 ${p.totalScanned} 筆病歷，已補填 ${p.totalBackfilled} 筆…`;
-            }
-        });
-        if (bar) bar.style.width = '100%';
-        if (text) {
-            text.textContent = `回填完成！共掃描 ${res.totalScanned} 筆，補填 ${res.totalBackfilled} 筆關鍵字，已成功寫入旗標並鎖定關閉舊搜尋回退！`;
-        }
-        if (typeof showToast === 'function') showToast('病歷 searchKeywords 回填完成並已鎖定！', 'success');
-        await refreshSearchKeywordsBackfillUi();
-    } catch (err) {
-        console.error('回填關鍵字失敗:', err);
-        if (text) text.textContent = '回填中斷：' + (err.message || err);
-        if (typeof showToast === 'function') showToast('回填失敗：' + (err.message || err), 'error');
-    } finally {
-        if (btn) btn.disabled = false;
-    }
-}
-
-async function lockUiSearchKeywordsFallback() {
-    if (!confirm(`確定要直接鎖定關閉病歷舊搜尋回退嗎？\n\n鎖定後，病歷搜尋將全面只使用高效 searchKeywords（每次僅 1~2 次讀取），徹底終止查無結果時多達 34 次查詢的舊回退迴圈。`)) {
-        return;
-    }
-    try {
-        await window.markSearchKeywordsBackfillComplete({ manuallyLocked: true });
-        if (typeof showToast === 'function') showToast('已成功鎖定關閉舊搜尋回退！', 'success');
-        await refreshSearchKeywordsBackfillUi();
-    } catch (err) {
-        console.error('鎖定失敗:', err);
-        if (typeof showToast === 'function') showToast('鎖定失敗（需診所管理權限）：' + (err.message || err), 'error');
-    }
-}
-
-async function unlockUiSearchKeywordsFallback() {
-    if (!confirm(`警告：確定要解除鎖定嗎？\n\n解除後，若搜尋關鍵字查無結果，系統將恢復執行多重欄位回退查詢（可能帶來大量讀取次數）。`)) {
-        return;
-    }
-    try {
-        await window.clearSearchKeywordsBackfillMarker();
-        if (typeof showToast === 'function') showToast('已解除鎖定，回退查詢已恢復。', 'warning');
-        await refreshSearchKeywordsBackfillUi();
-    } catch (err) {
-        console.error('解除鎖定失敗:', err);
-        if (typeof showToast === 'function') showToast('解除鎖定失敗：' + (err.message || err), 'error');
-    }
-}
-
-window.refreshSearchKeywordsBackfillUi = refreshSearchKeywordsBackfillUi;
-window.startUiSearchKeywordsBackfill = startUiSearchKeywordsBackfill;
-window.lockUiSearchKeywordsFallback = lockUiSearchKeywordsFallback;
-window.unlockUiSearchKeywordsFallback = unlockUiSearchKeywordsFallback;

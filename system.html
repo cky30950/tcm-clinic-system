@@ -3470,41 +3470,6 @@
                         </div>
                     </div>
 
-                    <div class="bg-gray-50 rounded-lg p-6 md:col-span-2">
-                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-                            <div>
-                                <h3 class="text-lg font-semibold mb-1">病歷搜尋索引維護（關閉舊搜尋回退迴圈）</h3>
-                                <p class="text-sm text-gray-600">
-                                    病歷搜尋預設使用高效關鍵字陣列（array-contains）。若歷史舊病歷未建立關鍵字，系統在查無結果時會執行多重欄位回退查詢（一輪最高 34 次讀取）。
-                                    建議執行全量回填並鎖定關閉回退迴圈，以徹底杜絕多餘讀取。
-                                </p>
-                            </div>
-                            <div id="searchKeywordsStatusBadge" class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 whitespace-nowrap">
-                                正在讀取狀態…
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col sm:flex-row gap-3 flex-wrap">
-                            <button id="startBackfillKeywordsBtn" onclick="startUiSearchKeywordsBackfill()" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200">
-                                一鍵檢查並回填病歷關鍵字
-                            </button>
-                            <button id="lockBackfillFallbackBtn" onclick="lockUiSearchKeywordsFallback()" class="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-lg transition duration-200">
-                                直接鎖定關閉舊搜尋回退
-                            </button>
-                            <button id="unlockBackfillFallbackBtn" onclick="unlockUiSearchKeywordsFallback()" class="bg-amber-600 hover:bg-amber-700 text-white py-2 px-4 rounded-lg transition duration-200">
-                                解除鎖定（緊急逃生）
-                            </button>
-                        </div>
-
-                        <div id="backfillProgressContainer" class="hidden mt-4">
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div id="backfillProgressBar" class="bg-blue-600 h-2.5 rounded-full" style="width:0%"></div>
-                            </div>
-                            <div id="backfillProgressText" class="mt-2 text-sm text-gray-700">正在準備回填…</div>
-                        </div>
-                        <div id="backfillSummaryDetails" class="mt-3 text-xs text-gray-500"></div>
-                    </div>
-
                     <div class="bg-gray-50 rounded-lg p-6 md:col-start-2">
                         <h3 class="text-lg font-semibold mb-4">資料備份與還原</h3>
                         <p class="text-sm text-gray-600 mb-4">系統每日會自動將資料增量備份至雲端，並每週進行一次完整比對。您可隨時手動同步，或直接下載雲端備份檔（下載不會額外讀取雲端資料庫）。實時掛號及問診資料不包含在備份中。</p>

@@ -10,18 +10,12 @@ import { G } from '../../lib/legacy.js';
 
 
 export async function fetchPatients(forceRefresh = false, pageNumber = null) {
-    
     if (pageNumber !== null && typeof pageNumber === 'number') {
         return await fetchPatientsPageOptimized(pageNumber, forceRefresh);
     }
-    
-    
-    G.patientCache = await G.fetchDataWithCache(
-        G.patientCache,
-        () => G.safeGetPatients(forceRefresh),
-        forceRefresh
-    );
-    return G.patientCache;
+    // 未指定頁碼時避免無條件全量載入，改為依需分頁查詢第 1 頁並記錄提示
+    console.warn('[fetchPatients] 未指定頁碼，請改用 fetchPatientsPageOptimized(pageNumber) 或 getPatientByIdWithRefresh；預設返回第 1 頁。');
+    return await fetchPatientsPageOptimized(1, forceRefresh);
 }
 
 

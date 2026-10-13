@@ -1585,10 +1585,9 @@ async function startLegacyDataMigration() {
     try {
         setLegacyMigrationProgress(1, '遷移進度 1%（初始化）', true);
         await ensureFirebaseReady();
-        const existingPatientsRes = await window.firebaseDataManager.getPatients(true);
-        const existingPatients = existingPatientsRes && existingPatientsRes.success && Array.isArray(existingPatientsRes.data)
-            ? existingPatientsRes.data
-            : [];
+        const existingPatients = (window.firebaseDataManager && typeof window.firebaseDataManager.fetchAllPatientsBatched === 'function')
+            ? await window.firebaseDataManager.fetchAllPatientsBatched(100)
+            : ((await window.firebaseDataManager.getPatients(false)).data || []);
         const lookup = buildPatientLookupMaps(existingPatients);
         const existingConsultations = await getAllConsultationsForLegacyMigration();
         const consultationLookup = buildConsultationLookupMaps(existingConsultations);
@@ -1664,10 +1663,9 @@ async function startLegacyDataMigration() {
             const percent = Math.round((currentStep / totalSteps) * 100);
             setLegacyMigrationProgress(percent, `遷移進度 ${percent}%（病人 ${i + 1}/${legacyMigrationParsedState.patients.length}）`, true);
         }
-        const latestPatientsRes = await window.firebaseDataManager.getPatients(true);
-        const latestPatients = latestPatientsRes && latestPatientsRes.success && Array.isArray(latestPatientsRes.data)
-            ? latestPatientsRes.data
-            : [];
+        const latestPatients = (window.firebaseDataManager && typeof window.firebaseDataManager.fetchAllPatientsBatched === 'function')
+            ? await window.firebaseDataManager.fetchAllPatientsBatched(100)
+            : ((await window.firebaseDataManager.getPatients(false)).data || []);
         const latestLookup = buildPatientLookupMaps(latestPatients);
         const patientNameMap = new Map();
         latestPatients.forEach(p => {
