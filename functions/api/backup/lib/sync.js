@@ -197,6 +197,26 @@ function maxWatermarkFromDocs(docs) {
 }
 
 /**
+ * 瘦身過濾：清理備份 JSON 內純衍生索引與無效欄位，節省備份大小及 Workers 記憶體。
+ */
+function pruneDocForExport(data) {
+    if (!data || typeof data !== 'object') return data;
+    const cleaned = { ...data };
+    // 1. 剔除純搜尋索引（patients 與 consultations 的龐大子字串關鍵字陣列，還原時由腳本自動重新計算）
+    delete cleaned.searchKeywords;
+    delete cleaned.searchKeywordsLower;
+    // 2. 剔除暫存標記
+    delete cleaned.__finProjection;
+    // 3. 移除 null 與 undefined 冗餘屬性
+    for (const k of Object.keys(cleaned)) {
+        if (cleaned[k] === null || cleaned[k] === undefined) {
+            delete cleaned[k];
+        }
+    }
+    return cleaned;
+}
+
+/**
  * 組裝與舊版 exportClinicBackup() 相容的備份物件。
  */
 async function assembleExport(bucket, sourceDefs, rtdbData, stats) {
@@ -205,7 +225,7 @@ async function assembleExport(bucket, sourceDefs, rtdbData, stats) {
         docsByKey[def.key] = (await readSnapshotDocs(bucket, snapshotKey(def.key))) || {};
     }
 
-    const toArray = (map) => Object.entries(map).map(([id, data]) => ({ id, ...data }));
+    const toArray = (map) => Object.entries(map).map(([id, data]) => ({ id, ...pruneDocForExport(data) }));
 
     const exportObj = {
         patients: toArray(docsByKey.patients || {}),
@@ -230,13 +250,13 @@ function buildBillingItems(docsByKey, sourceDefs) {
     const items = [];
     // 全域項目：與前端 onSnapshot 讀取一致，強制 shared: true（覆蓋文件內的值）
     for (const [id, data] of Object.entries(docsByKey.globalBillingItems || {})) {
-        items.push({ id, ...data, shared: true });
+        items.push({ id, ...pruneDocForExport(data), shared: true });
     }
     // 各診所項目
     for (const def of sourceDefs) {
         if (def.key === 'globalBillingItems' || !isClinicBillingKey(def.key)) continue;
         for (const [id, data] of Object.entries(docsByKey[def.key] || {})) {
-            items.push({ id, ...data });
+            items.push({ id, ...pruneDocForExport(data) });
         }
     }
     return items;

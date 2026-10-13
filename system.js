@@ -9400,12 +9400,17 @@ async function importClinicBackup(data) {
                         if (sortDate && !isNaN(sortDate.getTime())) {
                             dataToWrite.sortDate = sortDate;
                         }
+                        if (typeof generateConsultationSearchKeywords === 'function' && (!Array.isArray(dataToWrite.searchKeywords) || dataToWrite.searchKeywords.length === 0)) {
+                            dataToWrite.searchKeywords = generateConsultationSearchKeywords(dataToWrite);
+                        }
                     }
                     if (collectionName === 'patients') {
-                        dataToWrite.searchKeywords = generateSearchKeywords({
-                            ...dataToWrite,
-                            patientNumber: dataToWrite.patientNumber
-                        });
+                        if (typeof generateSearchKeywords === 'function' && (!Array.isArray(dataToWrite.searchKeywords) || dataToWrite.searchKeywords.length === 0)) {
+                            dataToWrite.searchKeywords = generateSearchKeywords({
+                                ...dataToWrite,
+                                patientNumber: dataToWrite.patientNumber
+                            });
+                        }
                     }
                     batch.set(docRef, dataToWrite);
                     opCount++;
