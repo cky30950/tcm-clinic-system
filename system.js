@@ -6600,116 +6600,84 @@ async function generatePatientNumberFromFirebase() {
         };
         const counterRef = window.firebase.doc(window.firebase.db, 'systemCounters', 'patientNumber');
 
-        // 1. 優先利用本地快取（patientsCache 或 localStorage）從 1 開始尋找最小未用號碼（0 額外讀取量）
-        let candidate = 0;
-        const localPatients = (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.patientsCache) && window.firebaseDataManager.patientsCache.length > 0)
-            ? window.firebaseDataManager.patientsCache
-            : (() => {
-                try {
-                    const raw = localStorage.getItem('patients');
-                    const parsed = raw ? JSON.parse(raw) : null;
-                    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
-                } catch (_e) { return null; }
-            })();
+        // 1. 一次性校正檢查：若雲端計數器未校正或殘留先前 bug 的異常大數（例如 >= 10000），
+        //    從 1 往後升序掃描找出第一個真正未使用的空缺號碼，並初始化計數器（僅在首次跑一次）
+        let counterSnap = null;
+        try {
+            counterSnap = await window.firebase.getDoc(counterRef);
+        } catch (_cErr) {}
 
-        if (localPatients && localPatients.length > 0) {
-            const usedSet = new Set();
-            localPatients.forEach((p) => {
-                const num = parsePatientNumber(p && p.patientNumber);
-                if (num > 0) usedSet.add(num);
-            });
-            let checkNum = 1;
-            while (usedSet.has(checkNum)) {
-                checkNum++;
-            }
-            // 驗證此號碼在雲端是否確實未被佔用（僅 1 次 limit(1) 讀取）
-            try {
-                const checkQuery = window.firebase.firestoreQuery(
-                    window.firebase.collection(window.firebase.db, 'patients'),
-                    window.firebase.where('patientNumber', '==', formatPatientNumber(checkNum)),
-                    window.firebase.limit(1)
-                );
-                const checkSnap = await window.firebase.getDocs(checkQuery);
-                if (checkSnap.empty) {
-                    candidate = checkNum;
-                }
-            } catch (_verifyErr) {
-                console.warn('驗證本地候選編號失敗:', _verifyErr);
-            }
-        }
+        const counterData = (counterSnap && counterSnap.exists()) ? (counterSnap.data() || {}) : {};
+        const isCalibrated = counterData.calibrated === true && Number(counterData.current || 0) < 10000;
 
-        // 2. 若本地快取未命中或候選已被使用，讀取計數器或從 1 往後升序搜尋首個斷號/空缺
-        if (!candidate) {
-            let startFrom = 1;
-            try {
-                const counterSnap = await window.firebase.getDoc(counterRef);
-                if (counterSnap && counterSnap.exists()) {
-                    const cData = counterSnap.data() || {};
-                    // 若有記錄 nextCandidate 且非先前的 bug 異常大數（< 10000），可作為搜尋起點
-                    if (cData.nextCandidate && Number(cData.nextCandidate) > 0 && Number(cData.nextCandidate) < 10000) {
-                        startFrom = Number(cData.nextCandidate);
-                    }
-                }
-            } catch (_cErr) {}
-
-            // 升序分批（每批 100 筆）尋找第一個斷號（通常僅需 1~2 次查詢）
-            let searchNum = startFrom;
+        if (!isCalibrated) {
+            let startNum = 1;
             let foundGap = false;
             let guard = 0;
             while (!foundGap && guard < 20) {
                 guard++;
                 const ascQuery = window.firebase.firestoreQuery(
                     window.firebase.collection(window.firebase.db, 'patients'),
-                    window.firebase.where('patientNumber', '>=', formatPatientNumber(searchNum)),
+                    window.firebase.where('patientNumber', '>=', formatPatientNumber(startNum)),
                     window.firebase.orderBy('patientNumber', 'asc'),
                     window.firebase.limit(100)
                 );
                 const snap = await window.firebase.getDocs(ascQuery);
                 if (snap.empty) {
-                    candidate = searchNum;
                     foundGap = true;
                     break;
                 }
-                let expected = searchNum;
+                let expected = startNum;
                 for (const d of snap.docs) {
                     const val = parsePatientNumber(d.data() && d.data().patientNumber);
                     if (val === expected) {
                         expected++;
                     } else if (val > expected) {
-                        candidate = expected;
+                        startNum = expected;
                         foundGap = true;
                         break;
                     }
                 }
                 if (!foundGap) {
                     if (snap.size < 100) {
-                        candidate = expected;
+                        startNum = expected;
                         foundGap = true;
                         break;
                     }
                     searchNum = expected;
                 }
             }
-            if (!candidate) candidate = searchNum;
+
+            // 初始化雲端計數器為「第一個空缺號碼的前一號」
+            const initialBase = Math.max(0, startNum - 1);
+            try {
+                await window.firebase.setDoc(counterRef, {
+                    current: initialBase,
+                    calibrated: true,
+                    updatedAt: new Date()
+                }, { merge: true });
+            } catch (_initErr) {
+                console.warn('初始化病人編號計數器失敗:', _initErr);
+            }
         }
 
-        // 3. 透過 Transaction 原子更新 systemCounters/patientNumber，確保多人並發不撞號
-        const finalNumber = await window.firebase.runTransaction(window.firebase.db, async (transaction) => {
-            const counterSnap = await transaction.get(counterRef);
-            const data = counterSnap && counterSnap.exists() ? (counterSnap.data() || {}) : {};
-            let allocated = candidate;
-            if (data.nextCandidate && Number(data.nextCandidate) > allocated) {
-                allocated = Number(data.nextCandidate);
-            }
+        // 2. 雲端 Transaction 原子排隊遞增：多裝置同時點擊時，由 Firestore 事務鎖嚴格序列化，絕不撞號
+        //    校正後每次新增病人僅耗費 1 次讀取 + 1 次寫入
+        const allocated = await window.firebase.runTransaction(window.firebase.db, async (transaction) => {
+            const snap = await transaction.get(counterRef);
+            const data = (snap && snap.exists()) ? (snap.data() || {}) : {};
+            let current = Number(data.current) || 0;
+            if (current >= 10000) current = 0;
+            const next = current + 1;
             transaction.set(counterRef, {
-                current: allocated,
-                nextCandidate: allocated + 1,
+                current: next,
+                calibrated: true,
                 updatedAt: new Date()
             }, { merge: true });
-            return allocated;
+            return next;
         });
 
-        return formatPatientNumber(finalNumber);
+        return formatPatientNumber(allocated);
     } catch (error) {
         console.error('生成病人編號失敗:', error);
         throw new Error('無法生成病人編號，請稍後再試');
