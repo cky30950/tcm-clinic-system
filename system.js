@@ -821,6 +821,11 @@ function refreshClinicScopedUi() {
         loadPermissionManagementPanel();
       }
     } catch (_eLoadPermissionPanel) {}
+    try {
+      if (typeof refreshSearchKeywordsBackfillUi === 'function') {
+        refreshSearchKeywordsBackfillUi();
+      }
+    } catch (_eRefreshBackfillUi) {}
   } else if (currentSectionId === 'walletManagement') {
     try {
       if (typeof window.clearWalletCaches === 'function') {
@@ -5727,7 +5732,7 @@ function generateConsultationSearchKeywords(consultation = {}) {
  * `await window.markSearchKeywordsBackfillComplete()`。
  * 注意：中斷續跑若未掃到最後一頁，不會寫入完成旗標。
  */
-window.backfillConsultationSearchKeywords = async function(startAfterDocId = null) {
+window.backfillConsultationSearchKeywords = async function(startAfterDocId = null, onProgress = null) {
     await waitForFirebaseDb();
     const PAGE_SIZE = 500;
     const col = window.firebase.collection(window.firebase.db, 'consultations');
@@ -5771,6 +5776,11 @@ window.backfillConsultationSearchKeywords = async function(startAfterDocId = nul
         }
 
         console.log(`[backfill] 掃描 ${totalScanned}，回填 ${totalBackfilled}，最後處理 ${lastProcessedId}`);
+        if (typeof onProgress === 'function') {
+            try {
+                onProgress({ totalScanned, totalBackfilled, lastProcessedId, done: false });
+            } catch (_eProg) {}
+        }
 
         if (docs.length < PAGE_SIZE) break;
 
@@ -5828,6 +5838,29 @@ window.clearSearchKeywordsBackfillMarker = async function() {
     clearSearchKeywordsBackfillCache();
     console.log('[backfill] 完成旗標已清除，本機 legacy fallback 已重新開啟');
     return { ok: true };
+};
+
+/**
+ * 取得 searchKeywords 回填完成與鎖定狀態。
+ */
+window.getSearchKeywordsBackfillStatus = async function() {
+    await waitForFirebaseDb();
+    try {
+        const ref = window.firebase.doc(
+            window.firebase.db,
+            SEARCH_KEYWORDS_BACKFILL_COLLECTION,
+            SEARCH_KEYWORDS_BACKFILL_DOC
+        );
+        const snap = await window.firebase.getDoc(ref);
+        const exists = snap && snap.exists();
+        const data = exists ? (snap.data() || {}) : null;
+        const complete = !!data
+            && Number(data.version) === SEARCH_KEYWORDS_BACKFILL_VERSION
+            && !!data.completedAt;
+        return { complete, data };
+    } catch (e) {
+        return { complete: false, error: (e && e.message) || String(e) };
+    }
 };
 
 /**
@@ -6181,6 +6214,9 @@ async function fetchJsonWithFallback(fileName) {
                 try {
                     loadPermissionManagementPanel();
                 } catch (_eLoadPermissionPanel) {}
+                try {
+                    refreshSearchKeywordsBackfillUi();
+                } catch (_eRefreshBackfillUi) {}
                 try {
                     if (versionFeatureEnabled('membership') && typeof renderWalletConfigForm === 'function') {
                         renderWalletConfigForm();
@@ -15636,10 +15672,10 @@ async function searchMedicalRecords(term, limitCount = 50) {
             });
         } catch (_e) {}
 
-        // ③ 回退：如果 searchKeywords 沒結果（舊資料沒有這個欄位），
-        // 用舊邏輯補查。回填完成旗標寫入後此路徑關閉（一輪最多 34 次
-        // getDocs，debounce 下成本過高），只走 array-contains。
-        if (out.length < limitCount) {
+        // ③ 回退：如果 searchKeywords 沒結果（且未鎖定回退），
+        // 用舊邏輯補查。若已鎖定或 searchKeywords 已命中結果（out.length > 0），
+        // 絕對不進入舊回退迴圈（避免一輪最多 34 次 getDocs 的暴增讀取）。
+        if (out.length === 0) {
             let fallbackDisabled = false;
             try {
                 fallbackDisabled = await isLegacySearchFallbackDisabled();
@@ -22369,3 +22405,104 @@ function hideGlobalCopyright() {
     window.openAcupointMapForNotes = openAcupointMapForNotes;
   }
 })();
+
+
+/**
+ * 系統管理：病歷搜尋索引維護與鎖定 UI 控制器
+ */
+async function refreshSearchKeywordsBackfillUi() {
+    const badge = document.getElementById('searchKeywordsStatusBadge');
+    const details = document.getElementById('backfillSummaryDetails');
+    if (!badge) return;
+    try {
+        const status = await window.getSearchKeywordsBackfillStatus();
+        if (status.complete) {
+            badge.className = 'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 whitespace-nowrap';
+            badge.innerHTML = '<span class="w-2 h-2 mr-1.5 rounded-full bg-green-500 inline-block"></span>已鎖定關閉回退（純高效索引，讀取極省）';
+            if (details && status.data) {
+                const at = status.data.completedAt ? new Date(status.data.completedAt).toLocaleString('zh-HK') : '';
+                const by = status.data.completedBy || '';
+                const scanned = status.data.totalScanned !== undefined ? status.data.totalScanned : '';
+                const fixed = status.data.totalBackfilled !== undefined ? status.data.totalBackfilled : '';
+                let extraTxt = at ? `鎖定時間：${at}` : '';
+                if (by) extraTxt += `，操作者：${by}`;
+                if (scanned !== '') extraTxt += `（已核驗 ${scanned} 筆病歷，補填 ${fixed} 筆）`;
+                details.textContent = extraTxt;
+            }
+        } else {
+            badge.className = 'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 whitespace-nowrap';
+            badge.innerHTML = '<span class="w-2 h-2 mr-1.5 rounded-full bg-amber-500 inline-block"></span>未鎖定（查無結果時會觸發舊搜尋回退迴圈）';
+            if (details) {
+                details.textContent = '尚未寫入完成旗標。若確認病歷皆具關鍵字，可直接點選「直接鎖定關閉」；或點選「一鍵檢查並回填」。';
+            }
+        }
+    } catch (_e) {
+        badge.className = 'inline-flex items-center px-3 py-1.5 rounded-full text-xs text-gray-500 bg-gray-100 whitespace-nowrap';
+        badge.textContent = '狀態檢查失敗';
+    }
+}
+
+async function startUiSearchKeywordsBackfill() {
+    const btn = document.getElementById('startBackfillKeywordsBtn');
+    const container = document.getElementById('backfillProgressContainer');
+    const bar = document.getElementById('backfillProgressBar');
+    const text = document.getElementById('backfillProgressText');
+    if (btn) btn.disabled = true;
+    if (container) container.classList.remove('hidden');
+    if (bar) bar.style.width = '10%';
+    if (text) text.textContent = '正在掃描病歷集合並補寫 searchKeywords，請稍候…';
+
+    try {
+        const res = await window.backfillConsultationSearchKeywords(null, (p) => {
+            if (p && bar && text) {
+                bar.style.width = '70%';
+                text.textContent = `已掃描 ${p.totalScanned} 筆病歷，已補填 ${p.totalBackfilled} 筆…`;
+            }
+        });
+        if (bar) bar.style.width = '100%';
+        if (text) {
+            text.textContent = `回填完成！共掃描 ${res.totalScanned} 筆，補填 ${res.totalBackfilled} 筆關鍵字，已成功寫入旗標並鎖定關閉舊搜尋回退！`;
+        }
+        if (typeof showToast === 'function') showToast('病歷 searchKeywords 回填完成並已鎖定！', 'success');
+        await refreshSearchKeywordsBackfillUi();
+    } catch (err) {
+        console.error('回填關鍵字失敗:', err);
+        if (text) text.textContent = '回填中斷：' + (err.message || err);
+        if (typeof showToast === 'function') showToast('回填失敗：' + (err.message || err), 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function lockUiSearchKeywordsFallback() {
+    if (!confirm(`確定要直接鎖定關閉病歷舊搜尋回退嗎？\n\n鎖定後，病歷搜尋將全面只使用高效 searchKeywords（每次僅 1~2 次讀取），徹底終止查無結果時多達 34 次查詢的舊回退迴圈。`)) {
+        return;
+    }
+    try {
+        await window.markSearchKeywordsBackfillComplete({ manuallyLocked: true });
+        if (typeof showToast === 'function') showToast('已成功鎖定關閉舊搜尋回退！', 'success');
+        await refreshSearchKeywordsBackfillUi();
+    } catch (err) {
+        console.error('鎖定失敗:', err);
+        if (typeof showToast === 'function') showToast('鎖定失敗（需診所管理權限）：' + (err.message || err), 'error');
+    }
+}
+
+async function unlockUiSearchKeywordsFallback() {
+    if (!confirm(`警告：確定要解除鎖定嗎？\n\n解除後，若搜尋關鍵字查無結果，系統將恢復執行多重欄位回退查詢（可能帶來大量讀取次數）。`)) {
+        return;
+    }
+    try {
+        await window.clearSearchKeywordsBackfillMarker();
+        if (typeof showToast === 'function') showToast('已解除鎖定，回退查詢已恢復。', 'warning');
+        await refreshSearchKeywordsBackfillUi();
+    } catch (err) {
+        console.error('解除鎖定失敗:', err);
+        if (typeof showToast === 'function') showToast('解除鎖定失敗：' + (err.message || err), 'error');
+    }
+}
+
+window.refreshSearchKeywordsBackfillUi = refreshSearchKeywordsBackfillUi;
+window.startUiSearchKeywordsBackfill = startUiSearchKeywordsBackfill;
+window.lockUiSearchKeywordsFallback = lockUiSearchKeywordsFallback;
+window.unlockUiSearchKeywordsFallback = unlockUiSearchKeywordsFallback;
