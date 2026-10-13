@@ -6,12 +6,13 @@
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
 import { getApportionedCost } from './expenses.js';
+import { getPatientByIdWithRefresh } from '../patients/store.js';
 
         let currentFinancialTabType = 'summary';
         const financialReportCache = {};
         const FINANCIAL_REPORT_MIN_REFRESH_MS = 15000;
         // 快取版本：統計口徑／快取結構調整時遞增，避免讀到舊格式快取
-        const FINANCIAL_REPORT_CACHE_VERSION = 'v5';
+        const FINANCIAL_REPORT_CACHE_VERSION = 'v6';
         export function getFinancialReportCacheKey(startDate, endDate, doctorFilter, clinicFilter) {
             return `${FINANCIAL_REPORT_CACHE_VERSION}|${startDate}|${endDate}|${doctorFilter || ''}|${clinicFilter || ''}`;
         }
@@ -47,6 +48,7 @@ import { getApportionedCost } from './expenses.js';
                 date: c.date,
                 doctor: c.doctor,
                 clinicId: c.clinicId,
+                patientId: c.patientId || '',
                 patientName: c.patientName,
                 status: c.status,
                 paymentStatus: c.paymentStatus,
@@ -712,6 +714,8 @@ import { getApportionedCost } from './expenses.js';
                 billingItemsStructured: item.billingItemsStructured || '[]',
                 clinicId: item.clinicId !== undefined ? item.clinicId : null,
                 clinicName: item.clinicName || '',
+                patientId: item.patientId || '',
+                patientName: item.patientName || '',
                 createdAt: item.createdAt || null,
                 updatedAt: item.updatedAt || null,
                 summarySyncedAt: item.syncedAt || null
@@ -1470,27 +1474,48 @@ import { getApportionedCost } from './expenses.js';
         // 對缺名但有 ID 的列，用病人主檔快取/即時查詢補回姓名。
         async function resolveDrilldownPatientNames(rows) {
             if (!Array.isArray(rows) || !rows.length) return rows;
-            if (typeof G.getPatientByIdWithRefresh !== 'function') return rows;
+            const fetchFn = typeof getPatientByIdWithRefresh === 'function'
+                ? getPatientByIdWithRefresh
+                : (typeof G.getPatientByIdWithRefresh === 'function' ? G.getPatientByIdWithRefresh : null);
+            if (!fetchFn) return rows;
+
+            const isMissingName = (r) => {
+                if (!r || !r.patientId) return false;
+                const name = r.patientName;
+                if (!name || typeof name !== 'string') return true;
+                const trimmed = name.trim();
+                return trimmed === '' || trimmed === '未知病人' || trimmed === 'Unknown Patient';
+            };
+
             const missingIds = Array.from(new Set(
                 rows
-                    .map(r => (r && !r.patientName && r.patientId) ? String(r.patientId) : '')
+                    .map(r => isMissingName(r) ? String(r.patientId) : '')
                     .filter(Boolean)
             ));
             if (!missingIds.length) return rows;
+
             const nameMap = new Map();
             await Promise.all(missingIds.map(async (pid) => {
                 try {
-                    const p = await G.getPatientByIdWithRefresh(pid);
+                    const p = await fetchFn(pid);
                     const name = p && (p.name || p.patientName || p.fullName || p.displayName || p.chineseName || p.englishName || '');
-                    if (name) nameMap.set(pid, String(name));
+                    if (name) nameMap.set(pid, String(name).trim());
                 } catch (_e) {}
             }));
+
             if (nameMap.size) {
                 rows.forEach((r) => {
-                    if (r && !r.patientName && r.patientId && nameMap.has(String(r.patientId))) {
+                    if (isMissingName(r) && nameMap.has(String(r.patientId))) {
                         r.patientName = nameMap.get(String(r.patientId));
                     }
                 });
+                if (Array.isArray(currentFinancialConsultations) && currentFinancialConsultations.length) {
+                    currentFinancialConsultations.forEach((c) => {
+                        if (isMissingName(c) && nameMap.has(String(c.patientId))) {
+                            c.patientName = nameMap.get(String(c.patientId));
+                        }
+                    });
+                }
             }
             return rows;
         }
@@ -1511,6 +1536,7 @@ import { getApportionedCost } from './expenses.js';
 
             if (hasLocalData) {
                 // 傳統路徑：本地已載入完整 consultations
+                showFinancialDrilldownLoading(modal, titleEl, body, label);
                 rows = currentFinancialConsultations.filter((c) => {
                     if (type === 'daily') return getFinancialDateKey(c.date) === key;
                     if (type === 'doctor') return String(c.doctor || '') === String(key);
