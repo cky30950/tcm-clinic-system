@@ -733,3 +733,75 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
     }
   }
 
+  // ── 會員端連結與 QR Code 彈窗 ──────────────────────────────────
+  export function getWalletMemberPortalUrl() {
+    try {
+      return new URL('member.html', window.location.origin + '/').href;
+    } catch (_e) {
+      return window.location.origin + '/member.html';
+    }
+  }
+
+  export async function openWalletMemberPortalModal() {
+    const modal = document.getElementById('walletMemberPortalModal');
+    if (!modal) return;
+    const url = getWalletMemberPortalUrl();
+    const linkEl = document.getElementById('walletMemberPortalLink');
+    const openLinkEl = document.getElementById('walletMemberPortalOpenLink');
+    const qrEl = document.getElementById('walletMemberPortalQr');
+    if (linkEl) linkEl.textContent = url;
+    if (openLinkEl) openLinkEl.href = url;
+    modal.classList.remove('hidden');
+
+    if (!qrEl) return;
+    qrEl.innerHTML = '<span class="text-xs text-gray-400">正在產生 QR Code…</span>';
+    try {
+      if (typeof window.QRCode !== 'function' && window.TCMLazy && typeof window.TCMLazy.load === 'function') {
+        await window.TCMLazy.load('qrcode');
+      }
+      qrEl.innerHTML = '';
+      if (typeof window.QRCode === 'function') {
+        new window.QRCode(qrEl, {
+          text: url,
+          width: 196,
+          height: 196,
+          colorDark: '#111827',
+          colorLight: '#ffffff',
+          correctLevel: window.QRCode.CorrectLevel ? window.QRCode.CorrectLevel.M : 0
+        });
+      } else {
+        qrEl.innerHTML = '<span class="text-xs text-gray-400">QR 元件尚未載入，請直接使用下方連結</span>';
+      }
+    } catch (err) {
+      console.warn('Wallet member portal QR error:', err);
+      qrEl.innerHTML = '<span class="text-xs text-red-500">QR 產生失敗，請直接使用下方連結</span>';
+    }
+  }
+
+  export function closeWalletMemberPortalModal() {
+    const modal = document.getElementById('walletMemberPortalModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  export async function copyWalletMemberPortalUrl() {
+    const url = getWalletMemberPortalUrl();
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      G.showToast('已複製會員端連結', 'success');
+    } catch (_e) {
+      G.showToast('複製失敗，請手動選取網址複製', 'error');
+    }
+  }
+
+

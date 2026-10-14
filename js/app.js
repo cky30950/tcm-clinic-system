@@ -10,7 +10,7 @@
  * ============================================================ */
 
 import * as Print from './domains/print/index.js?v=20261014c';
-import * as Wallet from './domains/wallet/index.js?v=20261014e';
+import * as Wallet from './domains/wallet/index.js?v=20261014f';
 import * as Auth from './domains/auth/index.js?v=20261014c';
 import * as Patients from './domains/patients/index.js?v=20261014c';
 import * as Billing from './domains/billing/index.js?v=20261014e';
@@ -49,6 +49,9 @@ const FACADE = {
     submitWalletConfig: Wallet.submitWalletConfig,
     walletGoToTxPage: Wallet.walletGoToTxPage,
     toggleWalletAdminOps: Wallet.toggleWalletAdminOps,
+    openWalletMemberPortalModal: Wallet.openWalletMemberPortalModal,
+    closeWalletMemberPortalModal: Wallet.closeWalletMemberPortalModal,
+    copyWalletMemberPortalUrl: Wallet.copyWalletMemberPortalUrl,
     setupConsultationWallet: Wallet.setupConsultationWallet,
     syncConsultWalletAvailability: Wallet.syncConsultWalletAvailability,
     processConsultationWalletPayment: Wallet.processConsultationWalletPayment,

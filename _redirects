@@ -4,3 +4,4 @@
 # 狀態碼 200 = 內部重寫（網址列維持不變、無跳轉）。
 /privacy.html  /privacy  200
 /terms.html    /terms    200
+/member.html   /member   200

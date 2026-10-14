@@ -2668,9 +2668,15 @@
             <div id="walletManagement" class="hidden bg-white rounded-xl shadow-lg p-3 lg:p-4 flex flex-col min-h-0 lg:min-h-[calc(100dvh-9rem)]">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 shrink-0 gap-4">
                     <h2 class="text-2xl font-bold text-gray-800"> <i data-lucide="credit-card" class="w-7 h-7 mr-3"></i>會員儲值</h2>
-                    <div class="relative">
-                        <input type="text" id="walletPatientSearch" placeholder="搜尋病人編號、姓名或電話..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
-                        <i data-lucide="search" class="absolute right-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"></i>
+                    <div class="flex items-center gap-2 w-full md:w-auto">
+                        <button type="button" onclick="openWalletMemberPortalModal()" class="shrink-0 bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-lg text-sm inline-flex items-center gap-1 whitespace-nowrap">
+                            <i data-lucide="qr-code" class="w-4 h-4"></i>
+                            <span>會員端連結</span>
+                        </button>
+                        <div class="relative flex-1 md:flex-initial">
+                            <input type="text" id="walletPatientSearch" placeholder="搜尋病人編號、姓名或電話..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
+                            <i data-lucide="search" class="absolute right-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"></i>
+                        </div>
                     </div>
                 </div>
 
@@ -6466,6 +6472,29 @@
         </div>
     </div>
 
+    <!-- 會員端連結與 QR Code 視窗 -->
+    <div id="walletMemberPortalModal" onclick="if(event.target===this)closeWalletMemberPortalModal()" class="fixed inset-0 bg-black/50 z-[1500] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div class="flex items-start justify-between px-5 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-bold text-gray-800"><i data-lucide="qr-code" class="w-4 h-4 inline-block align-text-bottom mr-1"></i> <span>會員端連結</span></h3>
+                <button type="button" onclick="closeWalletMemberPortalModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none px-2">&times;</button>
+            </div>
+            <div class="px-5 py-4 space-y-4">
+                <p class="text-sm text-gray-600">
+                    請病人用手機掃描下方 QR Code，或直接開啟網址登入會員儲值查詢頁面。
+                </p>
+                <div class="flex justify-center">
+                    <div id="walletMemberPortalQr" class="p-3 bg-white border border-gray-200 rounded-lg inline-flex items-center justify-center min-h-[220px]"></div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="walletMemberPortalLink" class="flex-1 text-xs text-blue-700 break-all bg-blue-50 border border-blue-100 rounded px-2 py-1.5 select-all"></span>
+                    <button type="button" onclick="copyWalletMemberPortalUrl()" class="shrink-0 text-xs bg-gray-100 hover:bg-gray-200 border border-gray-300 px-3 py-1.5 rounded">複製連結</button>
+                    <a id="walletMemberPortalOpenLink" href="member.html" target="_blank" rel="noopener noreferrer" class="shrink-0 text-xs bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded">開啟網頁</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="tooltip" class="hidden pointer-events-none fixed bg-gray-800 text-white text-xs px-3 py-1 rounded-lg shadow-lg z-50 whitespace-pre-line" style="z-index: 2147483647;"></div>
     <!-- Tailwind JIT safelist：按鈕標準化腳本動態加入的工具類 -->
     <span class="hidden rounded-md normal-case text-base btn-xs btn-sm btn-lg btn-ghost btn-circle"></span>
@@ -6491,7 +6520,7 @@
     <script src="pwa.js?v=20260923b" defer></script>
     <script src="schedule_management.js?v=20261011a" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
-    <script type="module" src="js/app.js?v=20261014e"></script>
+    <script type="module" src="js/app.js?v=20261014f"></script>
     <script src="system.js?v=20261014e" defer></script>
     <script src="attachments.js?v=20261014a" defer></script>
     <script src="personalStatistics.js?v=20261011a" defer></script>
