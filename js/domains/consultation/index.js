@@ -4,7 +4,7 @@
  * ============================================================ */
 export * from './form.js?v=20261014e';
 export * from './save.js?v=20261014c';
-export * from './registration.js?v=20261014c';
+export * from './registration.js?v=20261014d';
 export * from './profile.js?v=20261014c';
 export * from './access.js?v=20261014c';
 export * from './postvisit.js?v=20261014e';

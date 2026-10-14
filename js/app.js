@@ -14,7 +14,7 @@ import * as Wallet from './domains/wallet/index.js?v=20261014f';
 import * as Auth from './domains/auth/index.js?v=20261014c';
 import * as Patients from './domains/patients/index.js?v=20261014c';
 import * as Billing from './domains/billing/index.js?v=20261014e';
-import * as Consultation from './domains/consultation/index.js?v=20261014e';
+import * as Consultation from './domains/consultation/index.js?v=20261014f';
 
 const FACADE = {
     // ── print（收據／應診證明／病假紙／處方指示）──────────────
@@ -432,6 +432,10 @@ const FACADE = {
     handleAcupointComboSearchKeyDown: Consultation.handleAcupointComboSearchKeyDown,
     selectPatientForRegistration: Consultation.selectPatientForRegistration,
     clearPatientSearch: Consultation.clearPatientSearch,
+    getPreConsultUrl: Consultation.getPreConsultUrl,
+    openPreConsultQrModal: Consultation.openPreConsultQrModal,
+    closePreConsultQrModal: Consultation.closePreConsultQrModal,
+    copyPreConsultUrl: Consultation.copyPreConsultUrl,
     showRegistrationModal: Consultation.showRegistrationModal,
     loadDoctorOptions: Consultation.loadDoctorOptions,
     closeRegistrationModal: Consultation.closeRegistrationModal,

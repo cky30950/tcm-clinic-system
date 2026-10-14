@@ -484,6 +484,77 @@ export async function selectPatientForRegistration(patientId) {
             document.getElementById('patientSearchResults').classList.add('hidden');
             G.selectedPatientForRegistration = null;
         }
+
+        // ── 預先問診（inquiry.html）連結與 QR Code 彈窗 ──────────────
+        export function getPreConsultUrl() {
+            try {
+                return new URL('inquiry.html', window.location.origin + '/').href;
+            } catch (_e) {
+                return window.location.origin + '/inquiry.html';
+            }
+        }
+
+        export async function openPreConsultQrModal() {
+            const modal = document.getElementById('preConsultQrModal');
+            if (!modal) return;
+            const url = getPreConsultUrl();
+            const linkEl = document.getElementById('preConsultQrLink');
+            const openLinkEl = document.getElementById('preConsultQrOpenLink');
+            const qrEl = document.getElementById('preConsultQrCode');
+            if (linkEl) linkEl.textContent = url;
+            if (openLinkEl) openLinkEl.href = url;
+            modal.classList.remove('hidden');
+
+            if (!qrEl) return;
+            qrEl.innerHTML = '<span class="text-xs text-gray-400">正在產生 QR Code…</span>';
+            try {
+                if (typeof window.QRCode !== 'function' && window.TCMLazy && typeof window.TCMLazy.load === 'function') {
+                    await window.TCMLazy.load('qrcode');
+                }
+                qrEl.innerHTML = '';
+                if (typeof window.QRCode === 'function') {
+                    new window.QRCode(qrEl, {
+                        text: url,
+                        width: 196,
+                        height: 196,
+                        colorDark: '#111827',
+                        colorLight: '#ffffff',
+                        correctLevel: window.QRCode.CorrectLevel ? window.QRCode.CorrectLevel.M : 0
+                    });
+                } else {
+                    qrEl.innerHTML = '<span class="text-xs text-gray-400">QR 元件尚未載入，請直接使用下方連結</span>';
+                }
+            } catch (err) {
+                console.warn('Pre-consult QR error:', err);
+                qrEl.innerHTML = '<span class="text-xs text-red-500">QR 產生失敗，請直接使用下方連結</span>';
+            }
+        }
+
+        export function closePreConsultQrModal() {
+            const modal = document.getElementById('preConsultQrModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        export async function copyPreConsultUrl() {
+            const url = getPreConsultUrl();
+            try {
+                if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    await navigator.clipboard.writeText(url);
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = url;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                }
+                G.showToast('已複製預先問診連結', 'success');
+            } catch (_e) {
+                G.showToast('複製失敗，請手動選取網址複製', 'error');
+            }
+        }
         
 
         
