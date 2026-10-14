@@ -219,7 +219,7 @@
         })();
     </script>
 
-    <script type="module" src="firebase_init.js?v=20261014n"></script>
+    <script type="module" src="firebase_init.js?v=20261015a"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
@@ -913,6 +913,71 @@
             #shiftTypeFilter {
                 width: 100% !important;
             }
+
+            /* ==============================================
+             * 行動端日期／時間欄位自適應修復（避免超出容器）
+             * ============================================== */
+            input[type="date"],
+            input[type="datetime-local"],
+            input[type="month"],
+            input[type="time"],
+            .flatpickr-mobile {
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                box-sizing: border-box !important;
+                -webkit-appearance: none;
+                -moz-appearance: none;
+                appearance: none;
+            }
+            input[type="date"]::-webkit-date-and-time-value {
+                text-align: left;
+            }
+
+            /* ==============================================
+             * 分頁導航列自適應修復（避免按鈕橫排超出螢幕）
+             * ============================================== */
+            div[id$="Pagination"],
+            #patientListPagination {
+                flex-wrap: wrap !important;
+                justify-content: center !important;
+                max-width: 100% !important;
+                overflow-x: auto !important;
+                gap: 0.25rem !important;
+                padding-left: 0.25rem !important;
+                padding-right: 0.25rem !important;
+            }
+            div[id$="Pagination"] button,
+            #patientListPagination button {
+                white-space: nowrap !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+        }
+
+        /* flatpickr 在行動端彈出時避免超出螢幕邊界 */
+        .flatpickr-calendar {
+            max-width: calc(100vw - 16px) !important;
+        }
+        @media (max-width: 640px) {
+            .flatpickr-calendar {
+                left: 50% !important;
+                right: auto !important;
+                transform: translateX(-50%) !important;
+                max-width: calc(100vw - 16px) !important;
+                width: calc(100vw - 16px) !important;
+            }
+            .flatpickr-calendar .flatpickr-days,
+            .flatpickr-calendar .dayContainer {
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+            }
+            .flatpickr-calendar .flatpickr-day {
+                max-width: none !important;
+                height: 38px !important;
+                line-height: 38px !important;
+            }
         }
 
         /*
@@ -1195,12 +1260,12 @@
                 <p class="text-gray-600 text-lg mb-8">請點擊左上角選單按鈕開始使用系統功能</p>
             </div>
             
-            <div id="patientManagement" class="hidden bg-white rounded-xl shadow-lg p-6">
+            <div id="patientManagement" class="hidden bg-white rounded-xl shadow-lg p-3 sm:p-6 overflow-hidden">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h2 class="text-2xl font-bold text-gray-800"> <i data-lucide="users" class="w-7 h-7 mr-3"></i>病人資料管理</h2>
-                    <div class="flex flex-col md:flex-row gap-3">
-                        <div class="relative">
-                            <input type="text" id="searchPatient" placeholder="搜尋病人編號、姓名或電話..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full md:w-64">
+                    <div class="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                        <div class="relative w-full md:w-64">
+                            <input type="text" id="searchPatient" placeholder="搜尋病人編號、姓名或電話..." class="border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-green-500 focus:border-transparent w-full">
                             <i data-lucide="search" class="absolute right-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"></i>
                         </div>
                         <button id="showAddPatientButton" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200 whitespace-nowrap">
@@ -1209,55 +1274,55 @@
                     </div>
                 </div>
                 
-                <div id="addPatientModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
-                    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                        <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-xl">
+                <div id="addPatientModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-2 sm:p-4">
+                    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
+                        <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 flex justify-between items-center rounded-t-xl z-10">
                             <h3 id="formTitle" class="text-xl font-bold text-gray-800">新增病人資料</h3>
                             <button id="hideAddPatientButtonTop" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
                         </div>
                         
-                        <div class="p-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div>
+                        <div class="p-4 sm:p-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full min-w-0">
+                                <div class="min-w-0 w-full">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">姓名 *</label>
-                                    <input type="text" id="patientName" placeholder="請輸入姓名" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                    <input type="text" id="patientName" placeholder="請輸入姓名" class="w-full max-w-full min-w-0 box-border border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                 </div>
-                                <div>
+                                <div class="min-w-0 w-full">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">年齡</label>
-                                    <input type="number" id="patientAge" placeholder="系統自動計算" min="0" max="120" readonly class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-600">
+                                    <input type="number" id="patientAge" placeholder="系統自動計算" min="0" max="120" readonly class="w-full max-w-full min-w-0 box-border border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-600">
                                 </div>
-                                <div>
+                                <div class="min-w-0 w-full">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">性別 *</label>
-                                    <select id="patientGender" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                    <select id="patientGender" class="w-full max-w-full min-w-0 box-border border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                         <option value="">請選擇性別</option>
                                         <option value="男">男</option>
                                         <option value="女">女</option>
                                     </select>
                                 </div>
-                                <div>
+                                <div class="min-w-0 w-full">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">電話號碼 *</label>
-                                    <input type="tel" id="patientPhone" placeholder="例：0912-345-678" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                    <input type="tel" id="patientPhone" placeholder="例：0912-345-678" class="w-full max-w-full min-w-0 box-border border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                 </div>
-                                <div>
+                                <div class="min-w-0 w-full">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">緊急聯絡人姓名</label>
-                                    <input type="text" id="patientEmergencyContactName" placeholder="請輸入緊急聯絡人姓名" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                    <input type="text" id="patientEmergencyContactName" placeholder="請輸入緊急聯絡人姓名" class="w-full max-w-full min-w-0 box-border border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                 </div>
-                                <div>
+                                <div class="min-w-0 w-full">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">緊急聯絡人電話</label>
-                                    <input type="tel" id="patientEmergencyContactPhone" placeholder="例：0912-345-678" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                    <input type="tel" id="patientEmergencyContactPhone" placeholder="例：0912-345-678" class="w-full max-w-full min-w-0 box-border border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                 </div>
-                                <div>
+                                <div class="min-w-0 w-full">
                                     
                                     <label class="block text-sm font-medium text-gray-700 mb-1">身分證字號 *</label>
-                                    <input type="text" id="patientIdCard" placeholder="例：A123456789" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                    <input type="text" id="patientIdCard" placeholder="例：A123456789" required class="w-full max-w-full min-w-0 box-border border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                 </div>
-                                <div>
+                                <div class="min-w-0 w-full">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">出生日期 *</label>
-                                    <input type="date" id="patientBirthDate" data-fp="date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent" onchange="updatePatientAge()">
+                                    <input type="date" id="patientBirthDate" data-fp="date" class="w-full max-w-full min-w-0 box-border border border-gray-300 rounded-lg px-3 py-2 sm:px-4 sm:py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm sm:text-base" onchange="updatePatientAge()">
                                 </div>
-                                <div class="md:col-span-2 lg:col-span-3">
+                                <div class="md:col-span-2 lg:col-span-3 min-w-0 w-full">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">聯絡地址</label>
-                                    <textarea id="patientAddress" placeholder="請輸入完整地址" rows="2" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"></textarea>
+                                    <textarea id="patientAddress" placeholder="請輸入完整地址" rows="2" class="w-full max-w-full min-w-0 box-border border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"></textarea>
                                 </div>
                                 <div class="md:col-span-2 lg:col-span-3">
                                     <label class="block text-sm font-medium text-gray-700 mb-3">病史資料</label>
@@ -6543,14 +6608,14 @@
     <!-- tabulator.min.js 已改由 lazy-loader 動態載入，保留 CSS -->
     <link rel="stylesheet" href="js/vendor/tabulator/tabulator.min.css?v=20261005a">
     <script src="js/vendor/notiflix/notiflix.min.js?v=20261005a" defer></script>
-    <script src="js/lib/vendor-enhance.js?v=20261011b" defer></script>
+    <script src="js/lib/vendor-enhance.js?v=20261015a" defer></script>
 
     <script src="version-config.js?v=20261003a" defer></script>
     <script src="pwa.js?v=20260923b" defer></script>
     <script src="schedule_management.js?v=20261011a" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
-    <script type="module" src="js/app.js?v=20261014n"></script>
-    <script src="system.js?v=20261014n" defer></script>
+    <script type="module" src="js/app.js?v=20261015a"></script>
+    <script src="system.js?v=20261015a" defer></script>
     <script src="attachments.js?v=20261014i" defer></script>
     <script src="personalStatistics.js?v=20261011a" defer></script>
     <script src="systemmanagement.js?v=20261010a" defer></script>

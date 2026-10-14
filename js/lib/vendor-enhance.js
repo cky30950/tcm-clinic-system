@@ -38,9 +38,16 @@
 
 /* flatpickr：彈層須高於全站 modal（最高 z-[2100]） */
 .flatpickr-calendar.open{z-index:3000 !important;}
+.flatpickr-calendar{max-width:calc(100vw - 16px) !important;}
 .flatpickr-months .flatpickr-month,
 .flatpickr-current-month .flatpickr-monthDropdown-months,
 .flatpickr-weekdays,.flatpickr-days{font-family:inherit;}
+@media (max-width: 640px) {
+  .flatpickr-calendar{left:50% !important;right:auto !important;transform:translateX(-50%) !important;max-width:calc(100vw - 16px) !important;width:calc(100vw - 16px) !important;}
+  .flatpickr-calendar .flatpickr-days,.flatpickr-calendar .dayContainer{width:100% !important;min-width:100% !important;max-width:100% !important;}
+  .flatpickr-calendar .flatpickr-day{max-width:none !important;height:38px !important;line-height:38px !important;}
+}
+input[type="date"],input[type="datetime-local"],input[type="month"],input[type="time"],.flatpickr-mobile{max-width:100% !important;width:100% !important;min-width:0 !important;box-sizing:border-box !important;-webkit-appearance:none;}
 
 /* Tabulator：錢包交易試算表試點（其餘頁面不套用排版） */
 #walletTxGrid{tabulator:unset;}
@@ -96,6 +103,7 @@
         return {
             locale: FP_ZH_HANT,
             allowInput: true,
+            disableMobile: true,
             // 原生 min/max 屬性（如掛號日不得早於今日）映射給 flatpickr
             minDate: el.min || undefined,
             maxDate: el.max || undefined

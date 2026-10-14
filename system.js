@@ -437,9 +437,8 @@ function ensurePaginationContainer(parentId, paginationId) {
     if (!container) {
         container = document.createElement('div');
         container.id = paginationId;
-        
-        container.className = 'mt-4 flex justify-center';
     }
+    container.className = 'mt-4 flex flex-wrap justify-center items-center gap-1 sm:gap-1.5 max-w-full overflow-x-auto py-1 px-1';
 
     
     const parentTag = parentEl.tagName ? parentEl.tagName.toLowerCase() : '';
@@ -495,13 +494,20 @@ function renderPagination(totalItems, itemsPerPage, currentPage, onPageChange, c
         return;
     }
     container.classList.remove('hidden');
+    container.className = 'mt-4 flex flex-wrap justify-center items-center gap-1 sm:gap-1.5 max-w-full overflow-x-auto py-1 px-1';
     
-    const createBtn = (page, text, disabled = false, active = false) => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+
+    const createBtn = (page, text, disabled = false, active = false, mobileText = null) => {
         const btn = document.createElement('button');
-        btn.textContent = text;
-        btn.className = 'mx-1 px-3 py-1 rounded border text-sm ' +
+        if (mobileText && mobileText !== text) {
+            btn.innerHTML = `<span class="hidden sm:inline">${text}</span><span class="sm:hidden font-bold">${mobileText}</span>`;
+        } else {
+            btn.textContent = text;
+        }
+        btn.className = 'px-2 py-1 sm:px-3 sm:py-1 rounded border text-xs sm:text-sm transition-colors ' +
             (active
-                ? 'bg-blue-500 text-white border-blue-500'
+                ? 'bg-blue-500 text-white border-blue-500 font-medium'
                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100');
         if (disabled) {
             btn.className += ' cursor-not-allowed opacity-50';
@@ -515,12 +521,10 @@ function renderPagination(totalItems, itemsPerPage, currentPage, onPageChange, c
         return btn;
     };
     
+    container.appendChild(createBtn(1, '最前一頁', currentPage === 1, false, '«'));
+    container.appendChild(createBtn(Math.max(1, currentPage - 1), '上一頁', currentPage === 1, false, '‹'));
     
-    container.appendChild(createBtn(1, '最前一頁', currentPage === 1));
-    
-    container.appendChild(createBtn(Math.max(1, currentPage - 1), '上一頁', currentPage === 1));
-    
-    const maxVisible = 5;
+    const maxVisible = isMobile ? 3 : 5;
     let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
     let end = Math.min(totalPages, start + maxVisible - 1);
     if (end - start < maxVisible - 1) {
@@ -530,10 +534,8 @@ function renderPagination(totalItems, itemsPerPage, currentPage, onPageChange, c
         container.appendChild(createBtn(i, String(i), false, i === currentPage));
     }
     
-    container.appendChild(createBtn(Math.min(totalPages, currentPage + 1), '下一頁', currentPage === totalPages));
-    
-    
-    container.appendChild(createBtn(totalPages, '最後一頁', currentPage === totalPages));
+    container.appendChild(createBtn(Math.min(totalPages, currentPage + 1), '下一頁', currentPage === totalPages, false, '›'));
+    container.appendChild(createBtn(totalPages, '最後一頁', currentPage === totalPages, false, '»'));
 }
 
 
@@ -555,7 +557,7 @@ function navigatePagination(direction) {
         
         const prevBtn = buttons.find(btn => {
           const text = (btn.textContent || '').trim().toLowerCase();
-          return !btn.disabled && (text.includes('上一頁') || text.includes('上一页') || text.includes('previous') || text.includes('prev'));
+          return !btn.disabled && (text.includes('上一頁') || text.includes('上一页') || text.includes('previous') || text.includes('prev') || text.includes('‹'));
         });
         if (prevBtn && typeof prevBtn.click === 'function') {
           prevBtn.click();
@@ -565,7 +567,7 @@ function navigatePagination(direction) {
         
         const nextBtn = buttons.find(btn => {
           const text = (btn.textContent || '').trim().toLowerCase();
-          return !btn.disabled && (text.includes('下一頁') || text.includes('下一页') || text.includes('next'));
+          return !btn.disabled && (text.includes('下一頁') || text.includes('下一页') || text.includes('next') || text.includes('›'));
         });
         if (nextBtn && typeof nextBtn.click === 'function') {
           nextBtn.click();
