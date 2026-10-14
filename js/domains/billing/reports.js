@@ -2155,21 +2155,37 @@ import { getPatientByIdWithRefresh } from '../patients/store.js?v=20261014i';
         // （單欄位相等查詢，使用自動索引，無需複合索引），再於客戶端
         // 按報表日期範圍與診所篩選。
         let lastWalletFinQuery = null;
-        // 待收款查詢狀態：複合索引缺失旗標＋結果快取（與錢包財報同為 5 分鐘 TTL）＋全量 unpaid 文件的短快取
+        // 待收款查詢狀態：複合索引缺失旗標＋按日期範圍快取（切換診所／醫師篩選不重抓）＋全量 unpaid 文件短快取
         let walletReceivablesIndexMissing = false;
-        const walletReceivablesMemCache = new Map(); // key -> { at, result }
+        const walletReceivablesMemCache = new Map(); // `${startDate}|${endDate}` -> { at, allRows, truncated, indexed }
         let walletUnpaidDocsCache = null;
         let walletUnpaidDocsAt = 0;
+
+        export function invalidateWalletReceivablesCache() {
+            walletReceivablesMemCache.clear();
+            walletUnpaidDocsCache = null;
+            walletUnpaidDocsAt = 0;
+        }
+        window.invalidateWalletReceivablesCache = invalidateWalletReceivablesCache;
+
         export async function loadWalletReceivables(startDate, endDate, clinicFilter, forceRefresh = false) {
             const cid = clinicFilter ? String(clinicFilter) : '';
-            const cacheKey = `${startDate}|${endDate}|${cid}`;
+            const rangeKey = `${startDate}|${endDate}`;
+            const filterByClinic = (allRows) => {
+                if (!cid) return allRows.slice();
+                return allRows.filter((c) => c && String(c.clinicId || '') === cid);
+            };
             if (!forceRefresh) {
-                const cached = walletReceivablesMemCache.get(cacheKey);
+                const cached = walletReceivablesMemCache.get(rangeKey);
                 if (cached && (Date.now() - cached.at) < WALLET_FIN_CACHE_TTL_MS) {
-                    return cached.result;
+                    return {
+                        rows: filterByClinic(cached.allRows),
+                        truncated: cached.truncated,
+                        indexed: cached.indexed
+                    };
                 }
             } else {
-                walletReceivablesMemCache.delete(cacheKey);
+                walletReceivablesMemCache.delete(rangeKey);
             }
             const fb = window.firebase;
             const start = financialDayStart(startDate);
@@ -2185,16 +2201,23 @@ import { getPatientByIdWithRefresh } from '../patients/store.js?v=20261014i';
                     fb.where('date', '<=', end),
                     fb.orderBy('date')
                 ], { pageSize: 300, maxDocs: 5000 });
-                const rows = [];
+                const allRows = [];
                 docs.forEach((d) => {
                     const c = Object.assign({ id: d.id }, d.data() || {});
-                    if (clinicFilter && String(c.clinicId || '') !== String(clinicFilter)) return;
-                    rows.push(c);
+                    allRows.push(c);
                 });
-                rows.sort((a, b) => new Date(b.date) - new Date(a.date));
-                const result = { rows, truncated, indexed: true };
-                walletReceivablesMemCache.set(cacheKey, { at: Date.now(), result });
-                return result;
+                allRows.sort((a, b) => new Date(b.date) - new Date(a.date));
+                walletReceivablesMemCache.set(rangeKey, {
+                    at: Date.now(),
+                    allRows,
+                    truncated,
+                    indexed: true
+                });
+                return {
+                    rows: filterByClinic(allRows),
+                    truncated,
+                    indexed: true
+                };
             } catch (rangeErr) {
                 // 缺少複合索引時 Firestore 會回帶建立連結的錯誤；印出連結
                 // 並退回單欄位查詢（自動索引）＋客戶端過濾，功能不受影響。
@@ -2227,18 +2250,25 @@ import { getPatientByIdWithRefresh } from '../patients/store.js?v=20261014i';
                 walletUnpaidDocsCache = { docs, truncated };
                 walletUnpaidDocsAt = nowTs;
             }
-            const rows = [];
+            const allRows = [];
             docs.forEach((d) => {
                 const c = Object.assign({ id: d.id }, d.data() || {});
                 const dt = new Date(c.date);
                 if (!Number.isFinite(dt.getTime()) || dt < start || dt > end) return;
-                if (clinicFilter && String(c.clinicId || '') !== String(clinicFilter)) return;
-                rows.push(c);
+                allRows.push(c);
             });
-            rows.sort((a, b) => new Date(b.date) - new Date(a.date));
-            const result = { rows, truncated, indexed: false };
-            walletReceivablesMemCache.set(cacheKey, { at: Date.now(), result });
-            return result;
+            allRows.sort((a, b) => new Date(b.date) - new Date(a.date));
+            walletReceivablesMemCache.set(rangeKey, {
+                at: Date.now(),
+                allRows,
+                truncated,
+                indexed: false
+            });
+            return {
+                rows: filterByClinic(allRows),
+                truncated,
+                indexed: false
+            };
         }
 
         export function renderWalletReceivables(rows) {
@@ -2344,9 +2374,17 @@ import { getPatientByIdWithRefresh } from '../patients/store.js?v=20261014i';
                 'question'
             );
             if (!confirmed) return;
+            const cidStr = String(consultationId);
+            let paidPatientId = '';
+            walletReceivablesMemCache.forEach((entry) => {
+                if (entry && Array.isArray(entry.allRows)) {
+                    const hit = entry.allRows.find((r) => r && String(r.id) === cidStr);
+                    if (hit && hit.patientId) paidPatientId = String(hit.patientId);
+                }
+            });
             try {
                 await window.firebaseDataManager.updateConsultation(
-                    String(consultationId),
+                    cidStr,
                     {
                         paymentStatus: 'external_paid',
                         pendingAmount: 0,
@@ -2354,14 +2392,31 @@ import { getPatientByIdWithRefresh } from '../patients/store.js?v=20261014i';
                     },
                     { skipSideEffects: true }
                 );
+                // 就地從本機待收款快取移除該筆診症單，免去重抓整個期間的錢包流水與待收款清單（0 次 Firestore 讀取）
+                walletReceivablesMemCache.forEach((entry) => {
+                    if (entry && Array.isArray(entry.allRows)) {
+                        entry.allRows = entry.allRows.filter((r) => !r || String(r.id) !== cidStr);
+                    }
+                });
+                if (walletUnpaidDocsCache && Array.isArray(walletUnpaidDocsCache.docs)) {
+                    walletUnpaidDocsCache.docs = walletUnpaidDocsCache.docs.filter((d) => !d || String(d.id) !== cidStr);
+                }
+                // 通知其他在線裝置此病歷狀態已變更（帶本機 nonce 避免本機回聲）
+                if (typeof window.touchPatientsMeta === 'function') {
+                    window.touchPatientsMeta('update', paidPatientId || null, {
+                        nonce: typeof window.newSelfMetaNonce === 'function' ? window.newSelfMetaNonce() : undefined,
+                        kind: 'consultation'
+                    }).catch(() => {});
+                }
                 G.showToast('已標記為收款完成', 'success');
                 if (lastWalletFinQuery) {
-                    await refreshWalletFinancialSection(
+                    const recvResult = await loadWalletReceivables(
                         lastWalletFinQuery.startDate,
                         lastWalletFinQuery.endDate,
                         lastWalletFinQuery.clinicFilter,
-                        true
+                        false
                     );
+                    renderWalletReceivables(recvResult.rows);
                 }
             } catch (error) {
                 G.showToast('標記失敗：' + (error && error.message ? error.message : '未知錯誤'), 'error');

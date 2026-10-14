@@ -40,7 +40,7 @@ export const TOP_COLLECTIONS = [
     { key: 'patients', collectionId: 'patients', alwaysFull: false },
     { key: 'consultations', collectionId: 'consultations', alwaysFull: false },
     { key: 'users', collectionId: 'users', alwaysFull: true },
-    { key: 'patientPackages', collectionId: 'patientPackages', alwaysFull: true },
+    { key: 'patientPackages', collectionId: 'patientPackages', alwaysFull: false },
     { key: 'patientPackageHistory', collectionId: 'patientPackageHistory', alwaysFull: false },
     { key: 'globalBillingItems', collectionId: 'globalBillingItems', alwaysFull: true },
     // 診所主文件（名稱、設定等），數量極少（進階版上限 5 間），每次全量
@@ -48,24 +48,20 @@ export const TOP_COLLECTIONS = [
     // 診所支出記錄，每月僅零星筆數，每次全量
     { key: 'clinicExpenses', collectionId: 'clinicExpenses', alwaysFull: true },
     // 病歷審核追蹤（append-only，含修改前後快照，筆數可能龐大）：
-    // 日常走 updatedAt 增量，每 7 日 baseline 排除已刪除文件。
+    // 日常走 updatedAt 增量，每 90 日 baseline 排除已刪除文件。
     // 歷史舊文件若無 updatedAt，同步會自動退回 baseline，不漏資料。
     { key: 'consultationAuditLogs', collectionId: 'consultationAuditLogs', alwaysFull: false },
     // 病歷附件中繼資料（R2 檔案本體不在 Firestore）：
-    // 日常走 updatedAt 增量，每 7 日 baseline 排除已軟刪文件。
+    // 日常走 updatedAt 增量，每 90 日 baseline 排除已軟刪文件。
     { key: 'patientAttachments', collectionId: 'patientAttachments', alwaysFull: false },
-    // 會員錢包帳戶（每病人一筆，數量少），每次全量
-    { key: 'patientWalletAccounts', collectionId: 'patientWalletAccounts', alwaysFull: true },
-    // 錢包交易流水（append-only）：日常走 updatedAt 增量，每 7 日 baseline 排除已刪除
-    { key: 'patientWalletTransactions', collectionId: 'patientWalletTransactions', alwaysFull: false },
-    // 錢包冪等記錄：必須納入備份。還原備份後若 pay/topup 鍵消失，
-    // 進行中的重送可能重複扣款／入帳（pay 雖有歷史流水二次防護，
-    // topup/adjust 沒有）。新寫入的文件帶 updatedAt，可走增量同步；
-    // 另有 Firestore TTL（expiresAt，180 天）控制 live 端體積。
-    { key: 'walletIdempotency', collectionId: 'walletIdempotency', alwaysFull: false },
-    // 診症單退款累計（防重複退款／超額退款）：一診症單一筆，體積小，
-    // 每次全量；雖可從流水重建，備份可免去還原後的重建程序
-    { key: 'walletConsultationRefunds', collectionId: 'walletConsultationRefunds', alwaysFull: true }
+    // 會員錢包帳戶（wallet-store 寫入 ISO 字串 updatedAt，無硬刪除）：走字串增量同步
+    { key: 'patientWalletAccounts', collectionId: 'patientWalletAccounts', alwaysFull: false, updatedAtType: 'string' },
+    // 錢包交易流水（append-only，updatedAt 為 ISO 字串）：日常走 updatedAt 增量
+    { key: 'patientWalletTransactions', collectionId: 'patientWalletTransactions', alwaysFull: false, updatedAtType: 'string' },
+    // 錢包冪等記錄（updatedAt 為 ISO 字串）：走增量同步
+    { key: 'walletIdempotency', collectionId: 'walletIdempotency', alwaysFull: false, updatedAtType: 'string' },
+    // 診症單退款累計（updatedAt 為 ISO 字串，無硬刪除）：走增量同步
+    { key: 'walletConsultationRefunds', collectionId: 'walletConsultationRefunds', alwaysFull: false, updatedAtType: 'string' }
 ];
 
 // 匯出檔中「billingItems」＝全域收費項目＋各診所非公費項目

@@ -493,20 +493,46 @@ export function phoneMatchVariants(raw) {
 }
 
 export async function findPatientsByPhone(client, variants) {
-    const pages = await Promise.all(
-        variants.map((v) => client.queryCollection({
+    const list = Array.isArray(variants) ? variants.filter(Boolean).slice(0, 30) : [];
+    if (!list.length) return [];
+    try {
+        const page = await client.queryCollection({
             collectionId: 'patients',
-            where: eqFilter('phone', { stringValue: v }),
-            limit: 10
-        }))
-    );
-    const byId = new Map();
-    pages.forEach((page) => {
-        page.docs.forEach((d) => {
+            where: {
+                fieldFilter: {
+                    field: { fieldPath: 'phone' },
+                    op: 'IN',
+                    value: {
+                        arrayValue: {
+                            values: list.map((v) => ({ stringValue: String(v) }))
+                        }
+                    }
+                }
+            },
+            limit: 10,
+            maxDocs: 10
+        });
+        const byId = new Map();
+        (page.docs || []).forEach((d) => {
             if (!byId.has(d.id)) byId.set(d.id, d);
         });
-    });
-    return Array.from(byId.values()).slice(0, 10);
+        return Array.from(byId.values()).slice(0, 10);
+    } catch (_inErr) {
+        const pages = await Promise.all(
+            list.map((v) => client.queryCollection({
+                collectionId: 'patients',
+                where: eqFilter('phone', { stringValue: v }),
+                limit: 10
+            }))
+        );
+        const byId = new Map();
+        pages.forEach((page) => {
+            page.docs.forEach((d) => {
+                if (!byId.has(d.id)) byId.set(d.id, d);
+            });
+        });
+        return Array.from(byId.values()).slice(0, 10);
+    }
 }
 
 /**

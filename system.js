@@ -6638,6 +6638,9 @@ async function savePatient() {
     } 
 
         
+const PATIENT_NUMBER_CALIBRATED_LS_KEY = 'sys:patientNumberCalibratedV1';
+let _patientNumberCounterCalibrated = false;
+
 async function generatePatientNumberFromFirebase() {
     try {
         await waitForFirebaseDb();
@@ -6650,15 +6653,30 @@ async function generatePatientNumberFromFirebase() {
         };
         const counterRef = window.firebase.doc(window.firebase.db, 'systemCounters', 'patientNumber');
 
-        // 1. 一次性校正檢查：若雲端計數器未校正或殘留先前 bug 的異常大數（例如 >= 10000），
-        //    從 1 往後升序掃描找出第一個真正未使用的空缺號碼，並初始化計數器（僅在首次跑一次）
-        let counterSnap = null;
-        try {
-            counterSnap = await window.firebase.getDoc(counterRef);
-        } catch (_cErr) {}
+        // 1. 一次性校正檢查：若本機記憶體或 localStorage 已記錄校正完成，直接進入雲端 Transaction（每次新增病人省下 1 次 getDoc）
+        let isCalibrated = _patientNumberCounterCalibrated;
+        if (!isCalibrated) {
+            try {
+                if (localStorage.getItem(PATIENT_NUMBER_CALIBRATED_LS_KEY) === '1') {
+                    isCalibrated = true;
+                    _patientNumberCounterCalibrated = true;
+                }
+            } catch (_lsCalErr) {}
+        }
 
-        const counterData = (counterSnap && counterSnap.exists()) ? (counterSnap.data() || {}) : {};
-        const isCalibrated = counterData.calibrated === true && Number(counterData.current || 0) < 10000;
+        if (!isCalibrated) {
+            let counterSnap = null;
+            try {
+                counterSnap = await window.firebase.getDoc(counterRef);
+            } catch (_cErr) {}
+
+            const counterData = (counterSnap && counterSnap.exists()) ? (counterSnap.data() || {}) : {};
+            isCalibrated = counterData.calibrated === true && Number(counterData.current || 0) < 10000;
+            if (isCalibrated) {
+                _patientNumberCounterCalibrated = true;
+                try { localStorage.setItem(PATIENT_NUMBER_CALIBRATED_LS_KEY, '1'); } catch (_e) {}
+            }
+        }
 
         if (!isCalibrated) {
             let startNum = 1;
@@ -6694,7 +6712,7 @@ async function generatePatientNumberFromFirebase() {
                         foundGap = true;
                         break;
                     }
-                    searchNum = expected;
+                    startNum = expected;
                 }
             }
 
@@ -6706,6 +6724,8 @@ async function generatePatientNumberFromFirebase() {
                     calibrated: true,
                     updatedAt: new Date()
                 }, { merge: true });
+                _patientNumberCounterCalibrated = true;
+                try { localStorage.setItem(PATIENT_NUMBER_CALIBRATED_LS_KEY, '1'); } catch (_e) {}
             } catch (_initErr) {
                 console.warn('初始化病人編號計數器失敗:', _initErr);
             }
@@ -15071,6 +15091,9 @@ function invalidateMedicalRecordListCache(options = {}) {
         if (medicalRecordRefreshInFlight) return;
         clearMedicalRecordListPersistedCache();
         resetMedicalRecordManagementCaches();
+        if (typeof window.invalidateWalletReceivablesCache === 'function') {
+            window.invalidateWalletReceivablesCache();
+        }
         const pid = options.patientId ? String(options.patientId) : '';
         if (pid) invalidateConsultationDetailCacheForPatient(pid);
         if (options.reloadIfVisible && isMedicalRecordManagementVisible() && !hasMedicalRecordSearchTerm()) {

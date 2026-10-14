@@ -384,9 +384,33 @@ async function sweepDeleted(deps, stats) {
     const docs = rows.docs || [];
     stats.sweepScanned = docs.length;
 
+    // 軟刪且 R2 物件已清除滿 14 天（已跨越每日 R2 增量備份同步週期）的舊軟刪記錄，
+    // 直接刪除 Firestore 墓碑文件，避免每日 sweepDeleted 與 baseline 備份永久重複掃描。
+    const PURGED_RETENTION_MS = 14 * 86400 * 1000;
+    const nowMs = nowSec * 1000;
+
     for (const doc of docs) {
         const data = doc.data || {};
-        if (data.objectPurged === true) { stats.sweepAlreadyPurged += 1; continue; }
+        if (data.objectPurged === true) {
+            stats.sweepAlreadyPurged += 1;
+            if (!deps.dryRun) {
+                const purgedAtRaw = data.objectPurgedAt || data.deletedAt || data.updatedAt || null;
+                let purgedAtMs = null;
+                if (purgedAtRaw && typeof purgedAtRaw === 'object' && Number.isFinite(Number(purgedAtRaw.seconds))) {
+                    purgedAtMs = Number(purgedAtRaw.seconds) * 1000;
+                } else if (typeof purgedAtRaw === 'string') {
+                    const parsed = Date.parse(purgedAtRaw);
+                    if (!Number.isNaN(parsed)) purgedAtMs = parsed;
+                }
+                if (purgedAtMs !== null && (nowMs - purgedAtMs) > PURGED_RETENTION_MS) {
+                    try {
+                        await client.deleteDocument(`${COLLECTION}/${encodeURIComponent(doc.id)}`);
+                        stats.sweepTombstonesRemoved = (stats.sweepTombstonesRemoved || 0) + 1;
+                    } catch (_delErr) {}
+                }
+            }
+            continue;
+        }
 
         const { keys, invalid } = safeDocKeys(doc);
         if (invalid) {

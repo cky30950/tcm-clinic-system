@@ -302,10 +302,15 @@ export class FirestoreClient {
 
     /**
      * 增量查詢：updatedAt >= cursor.ts，並以 __name__ 做同分秒排序。
-     * @param {object} source {collectionId, parentDocPath?}
+     * 支援 Timestamp 型別與 ISO 字串型別（source.updatedAtType === 'string'）。
+     * @param {object} source {collectionId, parentDocPath?, updatedAtType?}
      * @param {object|null} watermark {ts: RFC3339, name: 完整文件路徑}
      */
     async queryChangedSince(source, watermark) {
+        const isStringTs = !!(source && source.updatedAtType === 'string');
+        const tsVal = isStringTs
+            ? { stringValue: watermark.ts }
+            : { timestampValue: watermark.ts };
         const orderBy = [
             { field: { fieldPath: 'updatedAt' }, direction: 'ASCENDING' },
             { field: { fieldPath: '__name__' }, direction: 'ASCENDING' }
@@ -314,13 +319,13 @@ export class FirestoreClient {
             fieldFilter: {
                 field: { fieldPath: 'updatedAt' },
                 op: 'GREATER_THAN_OR_EQUAL',
-                value: { timestampValue: watermark.ts }
+                value: tsVal
             }
         };
         const startAt = {
             before: false,
             values: [
-                { timestampValue: watermark.ts },
+                tsVal,
                 { referenceValue: watermark.name }
             ]
         };
@@ -377,11 +382,19 @@ export class FirestoreClient {
             } else if (fieldPath === 'updatedAt') {
                 const raw = lastDoc._rawUpdatedAt;
                 if (!raw) return null;
-                values.push({ timestampValue: raw });
+                values.push(
+                    lastDoc._rawUpdatedAtType === 'string'
+                        ? { stringValue: raw }
+                        : { timestampValue: raw }
+                );
             } else if (fieldPath === 'createdAt') {
                 const raw = lastDoc._rawCreatedAt;
                 if (!raw) return null;
-                values.push({ timestampValue: raw });
+                values.push(
+                    lastDoc._rawCreatedAtType === 'string'
+                        ? { stringValue: raw }
+                        : { timestampValue: raw }
+                );
             } else if (fieldPath === 'deletedAt') {
                 const raw = lastDoc._rawDeletedAt;
                 if (!raw) return null;
@@ -456,14 +469,28 @@ export function normalizeDocument(document) {
     const segments = (document.name || '').split('/documents/')[1] || '';
     const parts = segments.split('/');
     const id = parts.pop() || '';
-    const data = normalizeFields(document.fields || {});
+    const fields = document.fields || {};
+    const data = normalizeFields(fields);
+    const uField = fields.updatedAt || null;
+    const cField = fields.createdAt || null;
+    const dField = fields.deletedAt || null;
+    const rawUpdated = (uField && (uField.timestampValue || uField.stringValue))
+        || (cField && (cField.timestampValue || cField.stringValue))
+        || null;
+    const rawUpdatedType = uField
+        ? (uField.stringValue ? 'string' : 'timestamp')
+        : (cField && cField.stringValue ? 'string' : 'timestamp');
+    const rawCreated = (cField && (cField.timestampValue || cField.stringValue)) || null;
+    const rawCreatedType = (cField && cField.stringValue) ? 'string' : 'timestamp';
     return {
         id,
         name: document.name,
         data,
-        _rawUpdatedAt: (document.fields && document.fields.updatedAt && document.fields.updatedAt.timestampValue) || null,
-        _rawCreatedAt: (document.fields && document.fields.createdAt && document.fields.createdAt.timestampValue) || null,
-        _rawDeletedAt: (document.fields && document.fields.deletedAt && document.fields.deletedAt.timestampValue) || null
+        _rawUpdatedAt: rawUpdated,
+        _rawUpdatedAtType: rawUpdatedType,
+        _rawCreatedAt: rawCreated,
+        _rawCreatedAtType: rawCreatedType,
+        _rawDeletedAt: (dField && (dField.timestampValue || dField.stringValue)) || null
     };
 }
 

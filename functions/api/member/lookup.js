@@ -241,22 +241,49 @@ function expiryToMs(v) {
 }
 
 async function findPatients(client, variants) {
-    // 以各種可能格式查詢再去重（公開端點，每變體從嚴取 10 筆）
-    const pages = await Promise.all(
-        variants.map((v) => client.queryCollection({
+    const list = Array.isArray(variants) ? variants.filter(Boolean).slice(0, 30) : [];
+    if (!list.length) return [];
+    // 優先使用單次 IN 查詢（Firestore 單次 IN 支援最多 30 個值），將 4～8 次平行查詢縮減為 1 次
+    try {
+        const page = await client.queryCollection({
             collectionId: 'patients',
-            where: eqFilter('phone', { stringValue: v }),
-            orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
-            limit: LIMIT_PATIENTS_PER_VARIANT
-        }))
-    );
-    const byId = new Map();
-    pages.forEach((page) => {
-        page.docs.forEach((d) => {
+            where: {
+                fieldFilter: {
+                    field: { fieldPath: 'phone' },
+                    op: 'IN',
+                    value: {
+                        arrayValue: {
+                            values: list.map((v) => ({ stringValue: String(v) }))
+                        }
+                    }
+                }
+            },
+            limit: MAX_PATIENTS,
+            maxDocs: MAX_PATIENTS
+        });
+        const byId = new Map();
+        (page.docs || []).forEach((d) => {
             if (!byId.has(d.id)) byId.set(d.id, d);
         });
-    });
-    return Array.from(byId.values()).slice(0, MAX_PATIENTS);
+        return Array.from(byId.values()).slice(0, MAX_PATIENTS);
+    } catch (_inErr) {
+        // 後備：若環境不支援 IN 則退回逐變體 EQUAL 查詢
+        const pages = await Promise.all(
+            list.map((v) => client.queryCollection({
+                collectionId: 'patients',
+                where: eqFilter('phone', { stringValue: v }),
+                orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+                limit: LIMIT_PATIENTS_PER_VARIANT
+            }))
+        );
+        const byId = new Map();
+        pages.forEach((page) => {
+            page.docs.forEach((d) => {
+                if (!byId.has(d.id)) byId.set(d.id, d);
+            });
+        });
+        return Array.from(byId.values()).slice(0, MAX_PATIENTS);
+    }
 }
 
 async function fetchRtdbAppointment(rtdbUrl, token, appointmentId) {
