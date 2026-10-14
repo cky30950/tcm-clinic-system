@@ -5,12 +5,15 @@
  * 符號經 ESM import，舊全域存取一律經 G（js/lib/legacy.js）。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { getWalletMembershipConfig, invalidateWalletAccount, walletBonusFor } from './account.js';
-import { renderWalletPanel, syncWalletListEntry, walletLastPatientInfo, walletLastTxs, walletSelectedPatientId } from './panel.js?v=20261005w3';
-import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, walletRound2 } from './shared.js';
+import { getWalletMembershipConfig, invalidateWalletAccount, walletBonusFor } from './account.js?v=20261014d';
+import { renderWalletPanel, syncWalletListEntry, walletLastPatientInfo, walletLastTxs, walletSelectedPatientId } from './panel.js?v=20261014d';
+import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, walletRound2 } from './shared.js?v=20261014d';
 
   export async function submitWalletTopup() {
-    if (!walletSelectedPatientId) return;
+    if (!walletSelectedPatientId) {
+      G.showToast('請先選擇一位會員', 'warning');
+      return;
+    }
     if (!G.hasActionPermission('walletTopup')) {
       G.showToast('您沒有充值權限', 'error');
       return;

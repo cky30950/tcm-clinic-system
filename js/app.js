@@ -10,10 +10,10 @@
  * ============================================================ */
 
 import * as Print from './domains/print/index.js?v=20261014c';
-import * as Wallet from './domains/wallet/index.js?v=20261014c';
+import * as Wallet from './domains/wallet/index.js?v=20261014d';
 import * as Auth from './domains/auth/index.js?v=20261014c';
 import * as Patients from './domains/patients/index.js?v=20261014c';
-import * as Billing from './domains/billing/index.js?v=20261014c';
+import * as Billing from './domains/billing/index.js?v=20261014d';
 import * as Consultation from './domains/consultation/index.js?v=20261014c';
 
 const FACADE = {

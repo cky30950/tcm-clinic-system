@@ -5,7 +5,7 @@
  * 符號經 ESM import，舊全域存取一律經 G（js/lib/legacy.js）。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { currentWalletClinicId, walletAccountCache, walletAccountDocId, walletCacheKey, walletClinicDocCache, walletMembershipConfigCache, walletRound2 } from './shared.js';
+import { currentWalletClinicId, walletAccountCache, walletAccountDocId, walletCacheKey, walletClinicDocCache, walletMembershipConfigCache, walletRound2 } from './shared.js?v=20261014d';
 
   /**
    * 讀取病人在「指定診所」的儲值帳戶（SDK 單文件，session Map 快取）。

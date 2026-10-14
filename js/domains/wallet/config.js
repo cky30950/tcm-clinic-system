@@ -6,8 +6,8 @@
  * 會員設定面板已移至「系統管理」頁。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { getWalletClinicDoc } from './account.js';
-import { walletClinicDocCache, walletMembershipConfigCache } from './shared.js';
+import { getWalletClinicDoc } from './account.js?v=20261014d';
+import { walletClinicDocCache, walletMembershipConfigCache } from './shared.js?v=20261014d';
 
   export async function toggleWalletConfigForm() {
     const form = document.getElementById('walletConfigForm');
