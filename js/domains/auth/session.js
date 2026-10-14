@@ -6,7 +6,7 @@
 import { G } from '../../lib/legacy.js';
 import { archiveStaffAuthAccount, fetchAuthorizedUserByUidOrEmail } from './claims.js';
 // Phase 4：病人監聽拆除函式已移至 patients 領域，登出／清除流程直接跨域引用
-import { detachPatientListListener } from '../patients/store.js?v=20261014m';
+import { detachPatientListListener } from '../patients/store.js?v=20261014n';
 
 // SDK 原生錯誤訊息可能含基礎服務供應商名稱，於 UI 顯示前統一遮蔽
 function maskVendorError(msg) {

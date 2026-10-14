@@ -4,7 +4,7 @@
  * （Phase 6 子批 D2）。共享狀態經 G；套票/儲存/權限走 window facade。
  ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { touchPatientsMeta, refreshOpenConsultationHistory } from '../patients/store.js?v=20261014m';
+import { touchPatientsMeta, refreshOpenConsultationHistory } from '../patients/store.js?v=20261014n';
 
         export async function changeConsultationHistoryPage(direction, evt) {
             let loadingButton = null;

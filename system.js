@@ -10611,6 +10611,12 @@ class FirebaseDataManager {
         if (Array.isArray(this.patientsCache)) mergeIntoList(this.patientsCache);
         if (typeof patientCache !== 'undefined' && Array.isArray(patientCache)) mergeIntoList(patientCache);
         try {
+            if (window.singlePatientByIdCache && typeof window.singlePatientByIdCache.get === 'function') {
+                const prev = window.singlePatientByIdCache.get(idStr) || {};
+                window.singlePatientByIdCache.set(idStr, { ...prev, ...patient, id: idStr });
+            }
+        } catch (_spErr) {}
+        try {
             const updatedName = patient.name || patient.patientName || patient.fullName || patient.displayName || patient.chineseName || patient.englishName || '';
             if (updatedName && typeof medicalRecordPatients === 'object' && medicalRecordPatients) {
                 medicalRecordPatients[idStr.trim()] = String(updatedName).trim();
@@ -10646,7 +10652,8 @@ class FirebaseDataManager {
             const findIn = (arr) => Array.isArray(arr) ? arr.find((p) => p && String(p.id).trim() === pid) : null;
             let p = findIn(this.patientsCache)
                 || (typeof patientCache !== 'undefined' ? findIn(patientCache) : null)
-                || (typeof patients !== 'undefined' ? findIn(patients) : null);
+                || (typeof patients !== 'undefined' ? findIn(patients) : null)
+                || (window.singlePatientByIdCache && typeof window.singlePatientByIdCache.get === 'function' ? window.singlePatientByIdCache.get(pid) : null);
             if (!p) {
                 try {
                     const raw = localStorage.getItem('patients');
@@ -10678,6 +10685,11 @@ class FirebaseDataManager {
         };
         if (Array.isArray(this.patientsCache)) removeFromList(this.patientsCache);
         if (typeof patientCache !== 'undefined' && Array.isArray(patientCache)) removeFromList(patientCache);
+        try {
+            if (window.singlePatientByIdCache && typeof window.singlePatientByIdCache.delete === 'function') {
+                window.singlePatientByIdCache.delete(idStr);
+            }
+        } catch (_spDelErr) {}
         try {
             const raw = localStorage.getItem('patients');
             if (raw) {

@@ -4,7 +4,7 @@
  * viewPatient：載入病人、渲染基本資料／醫療資訊／診症摘要容器。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { getPatientByIdWithRefresh } from './store.js?v=20261014m';
+import { getPatientByIdWithRefresh } from './store.js?v=20261014n';
 
 export async function viewPatient(id) {
     try {

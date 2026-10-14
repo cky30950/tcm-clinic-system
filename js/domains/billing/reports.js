@@ -6,7 +6,7 @@
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
 import { getApportionedCost } from './expenses.js?v=20261014e';
-import { getPatientByIdWithRefresh } from '../patients/store.js?v=20261014m';
+import { getPatientByIdWithRefresh } from '../patients/store.js?v=20261014n';
 
         let currentFinancialTabType = 'summary';
         const financialReportCache = {};

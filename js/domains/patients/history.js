@@ -5,7 +5,7 @@
  * 原樣遷自 system.js；共享分頁狀態所有權仍在 system.js（G 讀寫）。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { getPatientByIdWithRefresh } from './store.js?v=20261014m';
+import { getPatientByIdWithRefresh } from './store.js?v=20261014n';
 import { printAttendanceCertificate, printConsultationRecord, printPrescriptionInstructions, printSickLeave } from '../print/index.js?v=20261014c';
 
         // 病歷是否「曾被修改」一律以審核日誌（consultationAuditLogs）為準：

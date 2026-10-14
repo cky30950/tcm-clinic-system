@@ -25,6 +25,32 @@ export async function fetchPatients(forceRefresh = false, pageNumber = null) {
 }
 
 
+const _singlePatientByIdCache = new Map();
+if (typeof window !== 'undefined') {
+    window.singlePatientByIdCache = _singlePatientByIdCache;
+}
+
+function findPatientInLoadedPageCaches(idStr) {
+    try {
+        if (Array.isArray(G.patientListFiltered) && G.patientListFiltered.length > 0) {
+            const hit = G.patientListFiltered.find(p => p && String(p.id) === idStr);
+            if (hit) return hit;
+        }
+        const pageMaps = [G.patientPagesCache, G.patientAscPagesCache];
+        for (const mapObj of pageMaps) {
+            if (!mapObj || typeof mapObj !== 'object') continue;
+            for (const key of Object.keys(mapObj)) {
+                const pageArr = mapObj[key];
+                if (Array.isArray(pageArr)) {
+                    const hit = pageArr.find(p => p && String(p.id) === idStr);
+                    if (hit) return hit;
+                }
+            }
+        }
+    } catch (_e) {}
+    return null;
+}
+
 export async function getPatientByIdWithRefresh(id) {
     
     if (id === undefined || id === null) return null;
@@ -36,7 +62,18 @@ export async function getPatientByIdWithRefresh(id) {
             : [];
         if (memoryCache.length > 0) {
             const found = memoryCache.find(p => p && String(p.id) === idStr);
-            if (found) return found;
+            if (found) {
+                _singlePatientByIdCache.set(idStr, found);
+                return found;
+            }
+        }
+        if (_singlePatientByIdCache.has(idStr)) {
+            return _singlePatientByIdCache.get(idStr);
+        }
+        const pageHit = findPatientInLoadedPageCaches(idStr);
+        if (pageHit) {
+            _singlePatientByIdCache.set(idStr, pageHit);
+            return pageHit;
         }
         try {
             const stored = localStorage.getItem('patients');
@@ -45,6 +82,7 @@ export async function getPatientByIdWithRefresh(id) {
                 if (Array.isArray(arr) && arr.length > 0) {
                     const found2 = arr.find(p => p && String(p.id) === idStr);
                     if (found2) {
+                        _singlePatientByIdCache.set(idStr, found2);
                         return found2;
                     }
                 }
@@ -56,6 +94,8 @@ export async function getPatientByIdWithRefresh(id) {
             const docSnap = await window.firebase.getDoc(docRef);
             if (docSnap && docSnap.exists()) {
                 const patient = { id: docSnap.id, ...docSnap.data() };
+                // 存入獨立單筆病人快取，確保後續重複按「診症記錄／病歷／查看」都是 0 次 Firestore 讀取
+                _singlePatientByIdCache.set(idStr, patient);
                 // 僅當全量快取已經載入（remote 或已驗證的 localStorage）時才就地更新，
                 // 切勿在 patientsCache === null 時把單筆病人塞進去冒充全量快取！
                 try {
@@ -731,6 +771,7 @@ export function invalidateAllPatientCaches() {
     _coldStartLocalValidated = false;
     _patientDescAnchors = {};
     _patientAscAnchors = {};
+    _singlePatientByIdCache.clear();
     if (window.firebaseDataManager) {
         window.firebaseDataManager.patientsCache = null;
         window.firebaseDataManager.patientsCacheSource = 'none';
