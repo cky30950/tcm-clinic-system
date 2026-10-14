@@ -1228,19 +1228,23 @@ export function subscribeToAppointments(forceToday) {
 
 
 // 新增：從 Firebase 載入診症記錄進行編輯
-export async function loadConsultationForEdit(consultationId) {
+export async function loadConsultationForEdit(consultationId, preloadedConsultation = null) {
     // 清除上一個診症操作遺留的套票變更記錄。
     G.pendingPackageChanges = [];
     try {
-        // 編輯病歷時一律強制單筆刷新，避免吃到其他裝置留下的舊 consultation 快取。
-        let consultation = null;
-        try {
-            const consultationResult = await window.firebaseDataManager.getConsultationById(String(consultationId), true);
-            if (consultationResult && consultationResult.success && consultationResult.data) {
-                consultation = consultationResult.data;
+        // 若呼叫端（如 editMedicalRecord）剛強制單筆刷新過同一筆病歷，直接沿用避免二次讀取
+        let consultation = (preloadedConsultation && String(preloadedConsultation.id) === String(consultationId))
+            ? preloadedConsultation
+            : null;
+        if (!consultation) {
+            try {
+                const consultationResult = await window.firebaseDataManager.getConsultationById(String(consultationId), true);
+                if (consultationResult && consultationResult.success && consultationResult.data) {
+                    consultation = consultationResult.data;
+                }
+            } catch (error) {
+                console.error('讀取診療記錄錯誤:', error);
             }
-        } catch (error) {
-            console.error('讀取診療記錄錯誤:', error);
         }
         if (consultation) {
             // 記錄已保存病歷的時間戳，供恢復草稿時判斷本機草稿是否已過期。
@@ -1341,13 +1345,9 @@ export async function loadConsultationForEdit(consultationId) {
             
             // 載入處方內容
             // 確保中藥庫已載入，避免 updatePrescriptionDisplay 因 G.herbLibrary 為空而出現不穩定行為
-            try { if (typeof G.initHerbLibrary === 'function') await G.initHerbLibrary(); } catch (_e) {}
-            // 保護性重試：如果 loaded flag 已設但陣列仍為空（例如 localStorage 存了空陣列），
-            // 強制重跑一次 init，確保拿到真實資料
-            try {
-                const hlEmpty = !Array.isArray(G.herbLibrary) || G.herbLibrary.length === 0;
-                if (hlEmpty && typeof G.initHerbLibrary === 'function') await G.initHerbLibrary(true);
-            } catch (_e) {}
+            if (!Array.isArray(G.herbLibrary) || G.herbLibrary.length === 0) {
+                try { if (typeof G.initHerbLibrary === 'function') await G.initHerbLibrary(); } catch (_e) {}
+            }
             try {
                 if (consultation.multiPrescriptions) {
                     const mp = JSON.parse(consultation.multiPrescriptions);
@@ -1437,14 +1437,10 @@ export async function loadConsultationForEdit(consultationId) {
             }
             
             // 載入收費項目
-            // 確保收費項目庫已載入，否則 G.billingItems.find 全部返回 null，所有收費項目的 name/價格/類別等
-            // 都只能靠 raw fallback，若 raw 也缺 name 則會被 filter(item => item && item.name) 過濾掉 → 顯示空白
-            try { if (typeof G.initBillingItems === 'function') await G.initBillingItems(); } catch (_e) {}
-            // 保護性重試：如果 init 完畢但 G.billingItems 仍為空，強制從 Firestore 重抓一次
-            try {
-                const biEmpty = !Array.isArray(G.billingItems) || G.billingItems.length === 0;
-                if (biEmpty && typeof G.initBillingItems === 'function') await G.initBillingItems(true);
-            } catch (_e) {}
+            // 確保收費項目庫已載入（僅在尚未載入時初始化，避免新診所尚無收費項目時每次點擊都強制重查 Firestore）
+            if (!G.billingItemsLoaded) {
+                try { if (typeof G.initBillingItems === 'function') await G.initBillingItems(); } catch (_e) {}
+            }
             G.selectedBillingItems = [];
             try {
             if (consultation.billingItemsStructured) {
@@ -2332,8 +2328,8 @@ export async function startConsultation(appointmentId) {
             new Date(apt.appointmentTime).toDateString() === new Date().toDateString()
         );
         if (consultingAppointment) {
-            const consultingPatient = result.data.find(p => p.id === consultingAppointment.patientId);
-            const consultingPatientName = consultingPatient ? consultingPatient.name : '未知病人';
+            const consultingPatient = await G.getPatientByIdWithRefresh(consultingAppointment.patientId);
+            const consultingPatientName = consultingPatient ? consultingPatient.name : (consultingAppointment.patientName || '未知病人');
             // 提示當前正在診症其他病人，詢問是否結束並開始新診症（支援中英文）
             const lang3 = localStorage.getItem('lang') || 'zh';
             const zhMsg2 = `您目前正在為 ${consultingPatientName} 診症。\n\n是否要結束該病人的診症並開始為 ${patient.name} 診症？\n\n注意：${consultingPatientName} 的狀態將改回候診中。`;

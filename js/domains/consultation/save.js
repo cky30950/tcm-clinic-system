@@ -387,14 +387,18 @@ export function updateConsultationCancelButtonLabel(isEditingMode) {
 }
 
 // 修復診症表單顯示函數
-export async function showConsultationForm(appointment) {
+export async function showConsultationForm(appointment, options = {}) {
     // 整個表單程式化填充（清空／從病歷載入／恢復草稿）期間暫停草稿自動寫入：
     // updateBillingDisplay 等渲染函式也會 queue 草稿寫入，若不在此懸浮，
     // 切換病人的 await 期間舊診次的防抖計時器可能把空白或他人資料寫進舊草稿 key。
     G.consultationSymptomsDraftState.suspended = true;
     G.consultationSymptomsDraftState.loadedRecordUpdatedAt = 0;
     try {
-        const patient = await G.getPatientByIdWithRefresh(appointment.patientId);
+        const preloadedPatient = options && options.patient && String(options.patient.id) === String(appointment.patientId)
+            ? options.patient
+            : null;
+        const preloadedConsultation = options && options.consultation ? options.consultation : null;
+        const patient = preloadedPatient || await G.getPatientByIdWithRefresh(appointment.patientId);
         if (!patient) {
             G.showToast('找不到病人資料！', 'error');
             G.consultationSymptomsDraftState.suspended = false;
@@ -433,7 +437,7 @@ export async function showConsultationForm(appointment) {
             G.activePrescriptionIndex = 0;
             G.selectedPrescriptionItems = G.prescriptions[0].items;
             G.pendingPackageChanges = [];
-            await G.loadConsultationForEdit(appointment.consultationId);
+            await G.loadConsultationForEdit(appointment.consultationId, preloadedConsultation);
         } else {
             // 新診症模式：使用空白表單
             clearConsultationForm();
@@ -560,16 +564,6 @@ export async function showConsultationForm(appointment) {
             }
         }
 
-        // 載入過往記錄：顯示患者既往的主訴及現病史，排除當前編輯的記錄
-        try {
-            await G.loadPastRecords(
-                appointment.patientId,
-                (appointment.status === 'completed' && appointment.consultationId) ? appointment.consultationId : null
-            );
-        } catch (err) {
-            console.error('載入過往記錄時發生錯誤:', err);
-        }
-
         try {
             restoreConsultationSymptomsDraft(appointment, patient);
             setupConsultationSymptomsDraftAutosave(appointment, patient);
@@ -577,15 +571,32 @@ export async function showConsultationForm(appointment) {
         // 表單內容就緒、自動保存已重新綁定後才恢復草稿寫入
         G.consultationSymptomsDraftState.suspended = false;
 
-        // 載入病人錢包狀態：有效會員自動帶入折扣，並顯示儲值支付選項
-        await window.setupConsultationWallet(appointment);
+        G.setConsultationEditRestrictionState(appointment, preloadedConsultation);
 
-        G.setConsultationEditRestrictionState(appointment, null);
-
+        // 先立即顯示表單並滾動，避免過往病歷或錢包查詢阻塞畫面開啟
         document.getElementById('consultationForm').classList.remove('hidden');
-
-        // 滾動到表單位置
         document.getElementById('consultationForm').scrollIntoView({ behavior: 'smooth' });
+
+        // 平行載入過往記錄與病人錢包狀態
+        await Promise.allSettled([
+            (async () => {
+                try {
+                    await G.loadPastRecords(
+                        appointment.patientId,
+                        (appointment.status === 'completed' && appointment.consultationId) ? appointment.consultationId : null
+                    );
+                } catch (err) {
+                    console.error('載入過往記錄時發生錯誤:', err);
+                }
+            })(),
+            (async () => {
+                try {
+                    await window.setupConsultationWallet(appointment, preloadedConsultation);
+                } catch (walletErr) {
+                    console.error('載入錢包狀態時發生錯誤:', walletErr);
+                }
+            })()
+        ]);
 
     } catch (error) {
         G.consultationSymptomsDraftState.suspended = false;
@@ -944,7 +955,9 @@ export async function showConsultationForm(appointment) {
                 }
             } catch (_e) {}
             try {
-                if (typeof showSection === 'function') {
+                const consultationSection = document.getElementById('consultationSystem');
+                const alreadyVisible = consultationSection && !consultationSection.classList.contains('hidden');
+                if (!alreadyVisible && typeof showSection === 'function') {
                     showSection('consultationSystem');
                 }
             } catch (_e) {}

@@ -1940,9 +1940,22 @@ export async function undoPackageUse(patientId, packageRecordId, usageItemId) {
 // 當舊病歷無法取消套票時，會嘗試透過病人當前的套票記錄推斷對應的套票ID
 export async function restorePackageUseMeta(patientId) {
     try {
-        // 取得病人的所有套票
-        // 強制重新載入套票，避免跨裝置快取不一致
-        const packages = await getPatientPackages(patientId, true);
+        if (!Array.isArray(G.selectedBillingItems) || G.selectedBillingItems.length === 0) {
+            return;
+        }
+        // 僅在已選收費項目確實含有缺失 meta 的「使用套票」項目時，才查詢套票資料
+        const needsRestore = G.selectedBillingItems.some(item => {
+            const isPackageUse = item && (item.category === 'packageUse' || (item.name && item.name.includes('使用套票')));
+            return isPackageUse && (item.isHistorical || !item.patientId || !item.packageRecordId);
+        });
+        if (!needsRestore) {
+            return;
+        }
+        // 取得病人的所有套票（優先沿用剛由 renderPatientPackages 刷新的快取，若無則讀取）
+        let packages = await getPatientPackages(patientId, false);
+        if (!Array.isArray(packages) || packages.length === 0) {
+            packages = await getPatientPackages(patientId, true);
+        }
         // 遍歷已選擇的收費項目，尋找缺乏 meta 的套票使用項目
         G.selectedBillingItems.forEach(item => {
             // 判斷是否為套票抵扣項目：品項類別為 packageUse 或名稱含有「使用套票」

@@ -531,7 +531,7 @@ export async function withdrawConsultation(appointmentId) {
 }
 
 // 修復修改病歷功能
-export async function editMedicalRecord(appointmentId) {
+export async function editMedicalRecord(appointmentId, preloadedConsultation = null) {
     // 取得觸發按鈕並顯示讀取狀態
     let loadingButton = null;
     try {
@@ -619,7 +619,9 @@ export async function editMedicalRecord(appointmentId) {
             return;
         }
         // 修改病歷前一律強制單筆刷新，避免編輯到本機舊 consultation 快取。
-        let consultation = null;
+        let consultation = (preloadedConsultation && String(preloadedConsultation.id) === String(appointment.consultationId))
+            ? preloadedConsultation
+            : null;
         if (!consultation) {
             try {
                 const singleRes = await window.firebaseDataManager.getConsultationById(String(appointment.consultationId), true);
@@ -657,9 +659,9 @@ export async function editMedicalRecord(appointmentId) {
             );
         }
         if (consultingAppointment) {
-            // 從 Firebase 獲取正在診症的病人資料
-            const consultingPatient = patientResult.data.find(p => p.id === consultingAppointment.patientId);
-            const consultingPatientName = consultingPatient ? consultingPatient.name : '未知病人';
+            // 單筆取得正在診症的病人資料（避免未定義變數或全量查詢）
+            const consultingPatient = await G.getPatientByIdWithRefresh(consultingAppointment.patientId);
+            const consultingPatientName = consultingPatient ? consultingPatient.name : (consultingAppointment.patientName || '未知病人');
             // 提示當前正在診症其他病人，詢問是否結束並改為修改病歷（支援中英文）
             const lang4 = localStorage.getItem('lang') || 'zh';
             const zhMsg4 = `您目前正在為 ${consultingPatientName} 診症。\n\n是否要結束該病人的診症並開始修改 ${patient.name} 的病歷？\n\n注意：${consultingPatientName} 的狀態將改回候診中。`;
@@ -694,7 +696,7 @@ export async function editMedicalRecord(appointmentId) {
         // 切換到診症系統，再進入病歷編輯模式
         prepareConsultationEditView();
         G.currentConsultingAppointmentId = appointmentId;
-        await showConsultationForm(appointment);
+        await showConsultationForm(appointment, { patient, consultation });
         scrollConsultationFormIntoView();
         {
             const lang = localStorage.getItem('lang') || 'zh';
@@ -775,8 +777,8 @@ export async function editMedicalRecordByConsultationId(consultationId) {
             );
         }
         if (consultingAppointment) {
-            const consultingPatient = patientResult.data.find(p => p.id === consultingAppointment.patientId);
-            const consultingPatientName = consultingPatient ? consultingPatient.name : '未知病人';
+            const consultingPatient = await G.getPatientByIdWithRefresh(consultingAppointment.patientId);
+            const consultingPatientName = consultingPatient ? consultingPatient.name : (consultingAppointment.patientName || '未知病人');
             const lang = localStorage.getItem('lang') || 'zh';
             const zhMsg = `您目前正在為 ${consultingPatientName} 診症。\n\n是否要結束該病人的診症並開始修改 ${patient.name} 的病歷？\n\n注意：${consultingPatientName} 的狀態將改回候診中。`;
             const enMsg = `You are currently consulting ${consultingPatientName}.\n\nDo you want to finish that patient's consultation and start editing ${patient.name}'s medical record?\n\nNote: ${consultingPatientName}'s status will revert to waiting.`;
@@ -798,7 +800,7 @@ export async function editMedicalRecordByConsultationId(consultationId) {
         G.currentConsultationEditContext = buildDirectConsultationEditContext(consultation);
         prepareConsultationEditView();
         G.currentConsultingAppointmentId = G.currentConsultationEditContext.id;
-        await showConsultationForm(G.currentConsultationEditContext);
+        await showConsultationForm(G.currentConsultationEditContext, { patient, consultation });
         scrollConsultationFormIntoView();
         {
             const lang = localStorage.getItem('lang') || 'zh';

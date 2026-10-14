@@ -9,12 +9,12 @@
  * 新增領域遷移時：import 該領域 → 在 FACADE 補上同名對應。
  * ============================================================ */
 
-import * as Print from './domains/print/index.js';
-import * as Wallet from './domains/wallet/index.js';
-import * as Auth from './domains/auth/index.js';
-import * as Patients from './domains/patients/index.js';
-import * as Billing from './domains/billing/index.js';
-import * as Consultation from './domains/consultation/index.js';
+import * as Print from './domains/print/index.js?v=20261014b';
+import * as Wallet from './domains/wallet/index.js?v=20261014b';
+import * as Auth from './domains/auth/index.js?v=20261014b';
+import * as Patients from './domains/patients/index.js?v=20261014b';
+import * as Billing from './domains/billing/index.js?v=20261014b';
+import * as Consultation from './domains/consultation/index.js?v=20261014b';
 
 const FACADE = {
     // ── print（收據／應診證明／病假紙／處方指示）──────────────

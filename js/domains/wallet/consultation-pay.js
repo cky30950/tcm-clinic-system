@@ -136,7 +136,7 @@ import { currentWalletClinicId, walletApi, walletRound2 } from './shared.js';
     }
   }
 
-  export async function setupConsultationWallet(appointment) {
+  export async function setupConsultationWallet(appointment, preloadedConsultation = null) {
     resetConsultWalletUI();
     // 版本限制：會員功能關閉時（如簡單版）不載入會員折扣與儲值支付
     if (!G.versionFeatureEnabled('membership')) return;
@@ -159,12 +159,14 @@ import { currentWalletClinicId, walletApi, walletRound2 } from './shared.js';
     consultWallet.config = config;
     consultWallet.discountItemId = config && config.discountItemId ? String(config.discountItemId) : '';
 
-    // 編輯模式：讀病歷確認是否曾以儲值支付
-    let existing = null;
-    if (isEdit && consultWallet.consultationId) {
+    // 編輯模式：讀病歷確認是否曾以儲值支付（優先沿用已預載的病歷，避免重複讀取）
+    let existing = (isEdit && preloadedConsultation && String(preloadedConsultation.id) === String(consultWallet.consultationId))
+      ? preloadedConsultation
+      : null;
+    if (isEdit && consultWallet.consultationId && !existing) {
       try {
         const r = await window.firebaseDataManager.getConsultationById(
-          consultWallet.consultationId, true
+          consultWallet.consultationId, false
         );
         if (r && r.success) existing = r.data;
       } catch (_e) {}
