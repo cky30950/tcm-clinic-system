@@ -1830,29 +1830,18 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
             return { docs, truncated };
         }
 
-        // ── 聚合查詢：一次性取得所有 KPI 指標（交易總額 + outstanding 餘額）
-        // 6 個並行 getAggregateFromServer，只回傳數字取代全量文件抓取。
-        // 失敗時（索引未部署）回傳 null，由呼叫端回退到 getDocs 路徑。
+        // ── 聚合查詢：僅針對 patientWalletAccounts 取得期末餘額（outstanding），
+        // 免去全量抓取 500+ 個帳戶文件。至於交易流水 KPI（充值／消費／退款／調整），
+        // 因下方 loadWalletFinRaw 本就必須拉取區間內全部 patientWalletTransactions
+        // 以產生每日明細，直接於客戶端單次走訪加總即可，不再重複發 5 次交易聚合查詢。
         export async function loadWalletFinAggregates(startDate, endDate, clinicFilter) {
             const fb = window.firebase;
             if (!fb || typeof fb.getAggregateFromServer !== 'function') {
                 return null; // 聚合函式不可用 → 回退
             }
             const cid = clinicFilter ? String(clinicFilter) : '';
-            const { startIso, endIso } = walletFinRangeIso(startDate, endDate);
 
             try {
-                const buildTxQ = (type) => {
-                    const col = fb.collection(fb.db, 'patientWalletTransactions');
-                    const c = [];
-                    if (cid) c.push(fb.where('clinicId', '==', cid));
-                    c.push(fb.where('at', '>=', startIso));
-                    c.push(fb.where('at', '<=', endIso));
-                    c.push(fb.where('type', '==', type));
-                    c.push(fb.orderBy('at', 'asc'));
-                    return fb.firestoreQuery(col, ...c);
-                };
-
                 const buildAccQ = () => {
                     const col = fb.collection(fb.db, 'patientWalletAccounts');
                     if (cid) {
@@ -1862,56 +1851,21 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
                     return fb.firestoreQuery(col, fb.where('walletMigratedAt', '==', null));
                 };
 
-                const [
-                    topupSnap, topupBonusSnap, paySnap, refundSnap, adjustSnap, accSnap
-                ] = await Promise.all([
-                    fb.getAggregateFromServer(buildTxQ('topup'), {
-                        total: fb.sum('amount'), count: fb.count()
-                    }),
-                    fb.getAggregateFromServer(buildTxQ('topupBonus'), {
-                        total: fb.sum('amount'), count: fb.count()
-                    }),
-                    fb.getAggregateFromServer(buildTxQ('payment'), {
-                        principal: fb.sum('fromBalance'),
-                        bonus: fb.sum('fromBonus'),
-                        count: fb.count()
-                    }),
-                    fb.getAggregateFromServer(buildTxQ('refund'), {
-                        principal: fb.sum('fromBalance'),
-                        bonus: fb.sum('fromBonus'),
-                        count: fb.count()
-                    }),
-                    fb.getAggregateFromServer(buildTxQ('adjust'), {
-                        net: fb.sum('amount'), count: fb.count()
-                    }),
-                    fb.getAggregateFromServer(buildAccQ(), {
-                        principal: fb.sum('balance'),
-                        bonus: fb.sum('bonusBalance')
-                    })
-                ]);
+                const accSnap = await fb.getAggregateFromServer(buildAccQ(), {
+                    principal: fb.sum('balance'),
+                    bonus: fb.sum('bonusBalance')
+                });
 
                 const rnd = (n) => Math.round((Number(n) || 0) * 100) / 100;
                 const n = (v) => Number(v) || 0;
                 const d = (s) => s.data();
 
                 return {
-                    topupPrincipal: rnd(n(d(topupSnap).total)),
-                    topupCount: n(d(topupSnap).count),
-                    bonusIssued: rnd(n(d(topupBonusSnap).total)),
-                    bonusCount: n(d(topupBonusSnap).count),
-                    payPrincipal: rnd(n(d(paySnap).principal)),
-                    payBonus: rnd(n(d(paySnap).bonus)),
-                    payCount: n(d(paySnap).count),
-                    refundPrincipal: rnd(n(d(refundSnap).principal)),
-                    refundBonus: rnd(n(d(refundSnap).bonus)),
-                    refundCount: n(d(refundSnap).count),
-                    adjustNet: rnd(n(d(adjustSnap).net)),
-                    adjustCount: n(d(adjustSnap).count),
                     outstandingPrincipal: rnd(n(d(accSnap).principal)),
                     outstandingBonus: rnd(n(d(accSnap).bonus))
                 };
             } catch (err) {
-                console.warn('錢包聚合查詢失敗，回退全量抓取:', err && err.message);
+                console.warn('錢包帳戶餘額聚合查詢失敗，回退全量抓取:', err && err.message);
                 return null;
             }
         }
@@ -1924,18 +1878,15 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
             const { startIso, endIso } = walletFinRangeIso(startDate, endDate);
             const warnings = [];
 
-            // 先嘗試聚合查詢拿 KPI（成功則 outstanding 帳戶不用全量抓）
+            // 先嘗試聚合查詢拿帳戶期末餘額（成功則 outstanding 帳戶不用全量抓）
             const aggregates = await loadWalletFinAggregates(startDate, endDate, cid);
             if (aggregates) {
-                console.info('[WalletFin] 聚合查詢成功，KPI 走 fast path', {
-                    topupPrincipal: aggregates.topupPrincipal,
-                    payPrincipal: aggregates.payPrincipal,
-                    payBonus: aggregates.payBonus,
+                console.info('[WalletFin] 帳戶餘額聚合查詢成功，跳過帳戶全量讀取', {
                     outstandingPrincipal: aggregates.outstandingPrincipal,
                     outstandingBonus: aggregates.outstandingBonus
                 });
             } else {
-                console.warn('[WalletFin] 聚合查詢失敗，回退 getDocs 全量路徑');
+                console.warn('[WalletFin] 帳戶餘額聚合查詢失敗，回退 getDocs 全量路徑');
             }
 
             // 交易文件：每日明細仍需 getDocs（Firestore 無 group by 日期）
@@ -2049,30 +2000,16 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
                     && patientClinics.get(String(acc.patientId)).has(f));
             };
 
-            // 有聚合結果 → KPI 直接用（與 getDocs 查詢條件一致，結果對齊）
-            const stats = aggregates ? {
-                topupCount: aggregates.topupCount,
-                topupPrincipal: aggregates.topupPrincipal,
-                bonusCount: aggregates.bonusCount,
-                bonusIssued: aggregates.bonusIssued,
-                payCount: aggregates.payCount,
-                payPrincipal: aggregates.payPrincipal,
-                payBonus: aggregates.payBonus,
-                refundCount: aggregates.refundCount,
-                refundPrincipal: aggregates.refundPrincipal,
-                refundBonus: aggregates.refundBonus,
-                adjustCount: aggregates.adjustCount,
-                adjustNet: aggregates.adjustNet,
-                outstandingPrincipal: aggregates.outstandingPrincipal,
-                outstandingBonus: aggregates.outstandingBonus,
-                daily: {}
-            } : {
+            // 交易 KPI 一律由已拉回的 raw.txs 單次走訪加總；
+            // 期末餘額（outstanding）優先採用帳戶聚合結果，失敗才由 raw.accounts 加總
+            const stats = {
                 topupCount: 0, topupPrincipal: 0,
                 bonusCount: 0, bonusIssued: 0,
                 payCount: 0, payPrincipal: 0, payBonus: 0,
                 refundCount: 0, refundPrincipal: 0, refundBonus: 0,
                 adjustCount: 0, adjustNet: 0,
-                outstandingPrincipal: 0, outstandingBonus: 0,
+                outstandingPrincipal: aggregates ? Number(aggregates.outstandingPrincipal) || 0 : 0,
+                outstandingBonus: aggregates ? Number(aggregates.outstandingBonus) || 0 : 0,
                 daily: {}
             };
             const ensureDay = (day) => {
@@ -2086,8 +2023,7 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
                 return stats.daily[day];
             };
 
-            // 無 aggregates 時才從交易文件加總 KPI；
-            // 有 aggregates 時只算每日明細（Firestore 無 group by 日期）
+            // 單次走訪交易文件同時累積期間 KPI 與每日明細
             (raw.txs || []).forEach((tx) => {
                 if (!tx || !txBelongs(tx)) return;
                 const amount = Number(tx.amount) || 0;
@@ -2096,51 +2032,37 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
                 const row = ensureDay(day);
                 switch (tx.type) {
                     case 'topup':
-                        if (!aggregates) {
-                            stats.topupCount += 1;
-                            stats.topupPrincipal += amount;
-                        }
+                        stats.topupCount += 1;
+                        stats.topupPrincipal += amount;
                         row.topupCount += 1;
                         row.topupAmount += amount;
                         break;
                     case 'topupBonus':
-                        if (!aggregates) {
-                            stats.bonusCount += 1;
-                            stats.bonusIssued += amount;
-                        }
+                        stats.bonusCount += 1;
+                        stats.bonusIssued += amount;
                         break;
                     case 'payment': {
-                        if (!aggregates) {
-                            stats.payCount += 1;
-                        }
+                        stats.payCount += 1;
                         const fromBalance = Number(tx.fromBalance) || 0;
                         const fromBonus = Number(tx.fromBonus) || 0;
-                        if (!aggregates) {
-                            stats.payPrincipal += fromBalance;
-                            stats.payBonus += fromBonus;
-                        }
+                        stats.payPrincipal += fromBalance;
+                        stats.payBonus += fromBonus;
                         row.payCount += 1;
                         row.payAmount += (fromBalance + fromBonus);
                         break;
                     }
                     case 'refund': {
-                        if (!aggregates) {
-                            stats.refundCount += 1;
-                        }
+                        stats.refundCount += 1;
                         const fromBalance = Number(tx.fromBalance) || 0;
                         const fromBonus = Number(tx.fromBonus) || 0;
-                        if (!aggregates) {
-                            stats.refundPrincipal += fromBalance;
-                            stats.refundBonus += fromBonus;
-                        }
+                        stats.refundPrincipal += fromBalance;
+                        stats.refundBonus += fromBonus;
                         row.refundAmount += (fromBalance + fromBonus);
                         break;
                     }
                     case 'adjust':
-                        if (!aggregates) {
-                            stats.adjustCount += 1;
-                            stats.adjustNet += amount;
-                        }
+                        stats.adjustCount += 1;
+                        stats.adjustNet += amount;
                         break;
                     default:
                         break;
@@ -2156,14 +2078,12 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
                 });
             }
 
-            // 統一圓整到 2 位小數（aggregates 已圓整過，但每日明細需要）
-            if (!aggregates) {
-                ['topupPrincipal', 'bonusIssued', 'payPrincipal', 'payBonus',
-                 'refundPrincipal', 'refundBonus', 'adjustNet',
-                 'outstandingPrincipal', 'outstandingBonus'].forEach((k) => {
-                    stats[k] = Math.round(stats[k] * 100) / 100;
-                });
-            }
+            // 統一圓整到 2 位小數
+            ['topupPrincipal', 'bonusIssued', 'payPrincipal', 'payBonus',
+             'refundPrincipal', 'refundBonus', 'adjustNet',
+             'outstandingPrincipal', 'outstandingBonus'].forEach((k) => {
+                stats[k] = Math.round(stats[k] * 100) / 100;
+            });
             Object.keys(stats.daily).forEach((d) => {
                 const r = stats.daily[d];
                 ['topupAmount', 'payAmount', 'refundAmount'].forEach((k) => {
@@ -2235,11 +2155,22 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
         // （單欄位相等查詢，使用自動索引，無需複合索引），再於客戶端
         // 按報表日期範圍與診所篩選。
         let lastWalletFinQuery = null;
-        // 待收款查詢狀態：複合索引缺失旗標＋全量 unpaid 文件的短快取
+        // 待收款查詢狀態：複合索引缺失旗標＋結果快取（與錢包財報同為 5 分鐘 TTL）＋全量 unpaid 文件的短快取
         let walletReceivablesIndexMissing = false;
+        const walletReceivablesMemCache = new Map(); // key -> { at, result }
         let walletUnpaidDocsCache = null;
         let walletUnpaidDocsAt = 0;
-        export async function loadWalletReceivables(startDate, endDate, clinicFilter) {
+        export async function loadWalletReceivables(startDate, endDate, clinicFilter, forceRefresh = false) {
+            const cid = clinicFilter ? String(clinicFilter) : '';
+            const cacheKey = `${startDate}|${endDate}|${cid}`;
+            if (!forceRefresh) {
+                const cached = walletReceivablesMemCache.get(cacheKey);
+                if (cached && (Date.now() - cached.at) < WALLET_FIN_CACHE_TTL_MS) {
+                    return cached.result;
+                }
+            } else {
+                walletReceivablesMemCache.delete(cacheKey);
+            }
             const fb = window.firebase;
             const start = financialDayStart(startDate);
             const end = financialDayEnd(endDate);
@@ -2261,7 +2192,9 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
                     rows.push(c);
                 });
                 rows.sort((a, b) => new Date(b.date) - new Date(a.date));
-                return { rows, truncated, indexed: true };
+                const result = { rows, truncated, indexed: true };
+                walletReceivablesMemCache.set(cacheKey, { at: Date.now(), result });
+                return result;
             } catch (rangeErr) {
                 // 缺少複合索引時 Firestore 會回帶建立連結的錯誤；印出連結
                 // 並退回單欄位查詢（自動索引）＋客戶端過濾，功能不受影響。
@@ -2277,12 +2210,12 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
             }
 
             // Fallback：單欄位相等查詢（自動索引），客戶端按日期與診所過濾。
-            // 全量 unpaid 文件（最多 5000 筆）做 15 秒短快取，快速重跑或
+            // 全量 unpaid 文件（最多 5000 筆）做 5 分鐘快取，快速重跑或
             // 連續改日期時直接複用，不再每次重撈。
             const nowTs = Date.now();
             let docs;
             let truncated = false;
-            if (walletUnpaidDocsCache && (nowTs - walletUnpaidDocsAt) < FINANCIAL_REPORT_MIN_REFRESH_MS) {
+            if (!forceRefresh && walletUnpaidDocsCache && (nowTs - walletUnpaidDocsAt) < WALLET_FIN_CACHE_TTL_MS) {
                 docs = walletUnpaidDocsCache.docs;
                 truncated = walletUnpaidDocsCache.truncated;
             } else {
@@ -2303,7 +2236,9 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
                 rows.push(c);
             });
             rows.sort((a, b) => new Date(b.date) - new Date(a.date));
-            return { rows, truncated, indexed: false };
+            const result = { rows, truncated, indexed: false };
+            walletReceivablesMemCache.set(cacheKey, { at: Date.now(), result });
+            return result;
         }
 
         export function renderWalletReceivables(rows) {
@@ -2372,7 +2307,7 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
                 }
                 // 待收款獨立查詢失敗不影響儲值主統計
                 try {
-                    const recvResult = await loadWalletReceivables(startDate, endDate, clinicFilter);
+                    const recvResult = await loadWalletReceivables(startDate, endDate, clinicFilter, !!forceRefresh);
                     renderWalletReceivables(recvResult.rows);
                     if (recvResult.truncated) {
                         G.showToast('待收款記錄超過五千筆，僅顯示部分，請縮短報表期間', 'error');

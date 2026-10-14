@@ -8,6 +8,7 @@ import { G } from '../../lib/legacy.js';
 
   // 帳戶快取 key 為「診所__病人」，確保切換診所後互不串用
   export const walletAccountCache = new Map();
+  export const walletClinicAccountsLoaded = new Set(); // 已載入全診所會員清單的 clinicId
   export const walletClinicDocCache = new Map(); // cid → clinics/{cid}
   export const walletMembershipConfigCache = new Map(); // cid → membershipConfig
   /**
@@ -45,6 +46,7 @@ import { G } from '../../lib/legacy.js';
   /** 切換診所／登出時清空錢包 session 快取 */
   export function clearWalletCaches() {
     walletAccountCache.clear();
+    walletClinicAccountsLoaded.clear();
     walletClinicDocCache.clear();
     walletMembershipConfigCache.clear();
   }

@@ -6,7 +6,7 @@
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
 import { getWalletAccount, getWalletMembershipConfig, loadWalletTransactions, walletBonusFor } from './account.js';
-import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, currentWalletClinicId, walletAccountDocId, walletRound2 } from './shared.js';
+import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, currentWalletClinicId, walletAccountCache, walletAccountDocId, walletCacheKey, walletClinicAccountsLoaded, walletRound2 } from './shared.js';
 
   export let walletSelectedPatientId = '';
 
@@ -32,32 +32,50 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
       <div class="mt-2">載入中…</div></div>`;
   }
 
-  // 解析病人姓名／編號／電話：優先用病人快取，缺者才按需讀取（session 快取）
-  // 解析病人姓名／編號／電話：優先用病人快取，缺者才按需讀取（session 快取）
+  // 解析病人姓名／編號／電話：優先用 session 快取、記憶體與 localStorage 病人快取，缺者才按需讀取
   export async function resolveWalletPatientInfo(ids) {
     const map = new Map();
+    const targetSet = new Set((Array.isArray(ids) ? ids : []).map((id) => String(id)));
+    if (!targetSet.size) return map;
+
+    targetSet.forEach((id) => {
+      const cached = walletPatientInfoCache.get(id);
+      if (cached) map.set(id, cached);
+    });
+
     const collect = (p) => {
       if (!p || !p.id) return;
       const id = String(p.id);
-      if (ids.indexOf(id) === -1 || map.has(id)) return;
-      map.set(id, {
+      if (!targetSet.has(id) || map.has(id)) return;
+      const info = {
         name: p.name || '',
         patientNumber: p.patientNumber || '',
         phone: p.phone || ''
-      });
+      };
+      walletPatientInfoCache.set(id, info);
+      map.set(id, info);
     };
-    try {
-      const dmCache = (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.patientsCache))
-        ? window.firebaseDataManager.patientsCache : [];
-      dmCache.forEach(collect);
-      (Array.isArray(G.patients) ? patients : []).forEach(collect);
-    } catch (_e) {}
+    if (map.size < targetSet.size) {
+      try {
+        const dmCache = (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.patientsCache))
+          ? window.firebaseDataManager.patientsCache : [];
+        dmCache.forEach(collect);
+        (Array.isArray(G.patients) ? G.patients : []).forEach(collect);
+      } catch (_e) {}
+    }
+    if (map.size < targetSet.size) {
+      try {
+        const rawLs = localStorage.getItem('patients');
+        if (rawLs) {
+          const lsArr = JSON.parse(rawLs);
+          if (Array.isArray(lsArr)) lsArr.forEach(collect);
+        }
+      } catch (_lsErr) {}
+    }
 
     const missing = [];
-    ids.forEach((id) => {
-      const cached = walletPatientInfoCache.get(id);
-      if (cached) map.set(id, cached);
-      else if (!map.has(id)) missing.push(id);
+    targetSet.forEach((id) => {
+      if (!map.has(id)) missing.push(id);
     });
     if (missing.length) {
       const snaps = await Promise.all(missing.map((id) =>
@@ -97,7 +115,16 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
       if (truncated) {
         G.showToast('會員帳戶超過一萬個，僅顯示最近部分，請用搜尋功能', 'error');
       }
-      const accounts = docs.map((d) => d.data());
+      const accounts = docs.map((d) => {
+        const acc = Object.assign({ id: d.id }, d.data());
+        if (acc.patientId != null) {
+          walletAccountCache.set(walletCacheKey(cid, acc.patientId), acc);
+        }
+        return acc;
+      });
+      if (!truncated) {
+        walletClinicAccountsLoaded.add(cid);
+      }
       // updatedAt 為 ISO 字串，Number() 會得到 NaN 令排序失效；
       // 統一用時間戳比較（兼容 Firestore Timestamp 物件與數字）
       const walletTs = (v) => {
@@ -128,7 +155,6 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
   }
 
   // 與病人資料管理一致的本地過濾條件（姓名／電話／病人編號／身份證）
-  // 與病人資料管理一致的本地過濾條件（姓名／電話／病人編號／身份證）
   export function walletLocalMatch(p, kw, compact) {
     return !!(
       (p.name && String(p.name).toLowerCase().includes(kw))
@@ -148,7 +174,7 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
       const compact = kw.replace(/\s/g, '');
       let found = [];
 
-      // 主力：與病人資料管理相同的 searchPatients（searchKeywords 索引）
+      // 主力：與病人資料管理相同的 searchPatients（searchKeywords 索引＋單欄位前綴兜底）
       try {
         if (window.firebaseDataManager) {
           const res = await window.firebaseDataManager.searchPatients(kw, 50);
@@ -158,29 +184,36 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
         console.warn('wallet searchPatients failed, fallback to local:', searchErr);
       }
 
-      // 兜底：索引無結果時（舊文件缺 searchKeywords、dataManager 未備妥等），
-      // 確保病人全量快取已載入後做本地過濾，保證「輸入名字就能找到」。
+      // 兜底：僅檢查記憶體中已載入的病人快取，不再呼叫 getPatients(false) 觸發全表掃描
       if (!found.length && kw) {
-        let all = [];
-        try {
-          if (window.firebaseDataManager) {
-            const pr = await window.firebaseDataManager.getPatients(false);
-            if (pr && pr.success && Array.isArray(pr.data)) all = pr.data;
-          }
-        } catch (allErr) {
-          console.warn('wallet load all patients failed:', allErr);
+        const memPatients = (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.patientsCache) && window.firebaseDataManager.patientsCache.length)
+          ? window.firebaseDataManager.patientsCache
+          : (Array.isArray(G.patients) ? G.patients : []);
+        if (memPatients.length) {
+          found = memPatients.filter((p) => p && walletLocalMatch(p, kw, compact)).slice(0, 50);
         }
-        if (!all.length && Array.isArray(G.patients)) all = G.patients;
-        found = all.filter((p) => p && walletLocalMatch(p, kw, compact)).slice(0, 50);
       }
 
       const cid = currentWalletClinicId();
       const ids = found.map((p) => String(p.id));
-      // 帳戶文件 ID 即為「診所__病人」複合鍵，直接以 getDoc 逐筆讀取
-      // （分兩批並行）。不可用 where('patientId','in',...)：那會跨診所
-      // 取回文件，在員工跨診所隔離規則下整個查詢會被拒絕。
+      // 優先複用 walletAccountCache（loadWalletMemberList 已預熱本診所全部帳戶）；
+      // 若本診所已完整載入過帳戶清單，未命中快取即代表該病人尚無儲值帳戶（0 次 getDoc）。
       const accMap = new Map();
+      const uncachedIds = [];
+      const clinicFullyLoaded = walletClinicAccountsLoaded.has(cid);
+      ids.forEach((pid) => {
+        const key = walletCacheKey(cid, pid);
+        if (walletAccountCache.has(key)) {
+          const cachedAcc = walletAccountCache.get(key);
+          if (cachedAcc) accMap.set(pid, cachedAcc);
+        } else if (clinicFullyLoaded) {
+          walletAccountCache.set(key, null);
+        } else {
+          uncachedIds.push(pid);
+        }
+      });
       const getOne = async (pid) => {
+        const key = walletCacheKey(cid, pid);
         try {
           const snap = await window.firebase.getDoc(
             window.firebase.doc(
@@ -189,11 +222,17 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
               walletAccountDocId(cid, pid)
             )
           );
-          if (snap && snap.exists()) accMap.set(pid, snap.data());
+          if (snap && snap.exists()) {
+            const acc = Object.assign({ id: snap.id }, snap.data());
+            walletAccountCache.set(key, acc);
+            accMap.set(pid, acc);
+          } else {
+            walletAccountCache.set(key, null);
+          }
         } catch (_e) { /* 無帳戶或無權限＝視為無帳戶 */ }
       };
-      for (let i = 0; i < ids.length; i += 10) {
-        await Promise.all(ids.slice(i, i + 10).map(getOne));
+      for (let i = 0; i < uncachedIds.length; i += 10) {
+        await Promise.all(uncachedIds.slice(i, i + 10).map(getOne));
       }
       walletCurrentEntries = found.map((p) => {
         const id = String(p.id);
@@ -310,7 +349,7 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
     if (panel) panel.classList.add('hidden');
     if (loading) loading.classList.remove('hidden');
     try {
-      await renderWalletPanel(patientId, true);
+      await renderWalletPanel(patientId, false);
     } finally {
       if (loading) loading.classList.add('hidden');
     }
@@ -321,11 +360,10 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
   }
 
   // 充值／退款／調整／狀態變更後，同步左欄列表的帳戶資料
-  // 充值／退款／調整／狀態變更後，同步左欄列表的帳戶資料
   export async function syncWalletListEntry(patientId) {
     const id = String(patientId);
     const idx = walletCurrentEntries.findIndex((e) => e.patientId === id);
-    const fresh = await getWalletAccount(id, true);
+    const fresh = await getWalletAccount(id, false);
     const total = fresh
       ? walletRound2(fresh.balance) + walletRound2(fresh.bonusBalance)
       : 0;
@@ -334,13 +372,19 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
       renderWalletMemberRows();
       return;
     }
-    // 預設列表只保留有餘額者；新產生餘額的帳戶則整個重載
+    // 預設列表只保留有餘額者；新產生餘額的帳戶直接就地插入列表，免去重抓全診所帳戶
     if (idx >= 0) {
       if (total > 0) walletCurrentEntries[idx].account = fresh;
       else walletCurrentEntries.splice(idx, 1);
       renderWalletMemberRows();
     } else if (total > 0) {
-      await loadWalletMemberList();
+      const infoMap = await resolveWalletPatientInfo([id]);
+      walletCurrentEntries.unshift({
+        patientId: id,
+        account: fresh,
+        info: infoMap.get(id) || null
+      });
+      renderWalletMemberRows();
     }
   }
 

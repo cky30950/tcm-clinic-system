@@ -10879,83 +10879,68 @@ class FirebaseDataManager {
             }
 
             /*
-             * 本地補強搜尋：只有當 searchKeywords 結果不足時才執行。
-             * 先嘗試用現有快取做本地補強；若快取不存在或補完仍不足，
-             * 則直接從 Firestore 遠端讀取補足，確保缺失 searchKeywords
-             * 的舊病人也能被搜到（主力查詢只匹配有 searchKeywords 的）。
+             * 本地與遠端補強搜尋：
+             * 1. 若記憶體已有 patientsCache，順手在本地補強（0 次 Firestore 讀取）。
+             * 2. 僅當 searchKeywords 與本地快取結果皆為 0 筆時，才依輸入特徵擇一執行
+             *    單一欄位的 startsWith 範圍查詢，避免每次正常搜尋（結果 < limit）
+             *    都無條件連發 3 次額外 getDocs，並修正 patientNumber 大寫前綴。
              */
             if (results.length < limit) {
-                let localPatients = [];
-                let usedCache = false;
-                try {
-                    const hasCache = Array.isArray(this.patientsCache) && this.patientsCache.length > 0;
-                    if (hasCache) {
-                        localPatients = this.patientsCache;
-                        usedCache = true;
-                    }
-                } catch (_e) {}
-
                 const seen = new Set(results.map(p => String(p.id)));
                 const low = searchTerm;
 
-                // 先在已有的 localPatients（快取）中補強
-                if (Array.isArray(localPatients) && localPatients.length > 0) {
-                    for (const p of localPatients) {
-                        if (results.length >= limit) break;
-                        if (seen.has(String(p.id))) continue;
-                        const nameMatch = p.name && String(p.name).toLowerCase().includes(low);
-                        const phoneMatch = p.phone && String(p.phone).toLowerCase().includes(low);
-                        const idMatch = p.idCard && String(p.idCard).toLowerCase().includes(low);
-                        const numberMatch = p.patientNumber && String(p.patientNumber).toLowerCase().includes(low);
-                        if (nameMatch || phoneMatch || idMatch || numberMatch) {
-                            results.push(p);
-                            seen.add(String(p.id));
+                // 1) 若記憶體已有全量快取，於本地零成本補強
+                try {
+                    if (Array.isArray(this.patientsCache) && this.patientsCache.length > 0) {
+                        for (const p of this.patientsCache) {
+                            if (results.length >= limit) break;
+                            if (!p || seen.has(String(p.id))) continue;
+                            const nameMatch = p.name && String(p.name).toLowerCase().includes(low);
+                            const phoneMatch = p.phone && String(p.phone).toLowerCase().includes(low);
+                            const idMatch = p.idCard && String(p.idCard).toLowerCase().includes(low);
+                            const numberMatch = p.patientNumber && String(p.patientNumber).toLowerCase().includes(low);
+                            if (nameMatch || phoneMatch || idMatch || numberMatch) {
+                                results.push(p);
+                                seen.add(String(p.id));
+                            }
                         }
                     }
-                }
+                } catch (_e) {}
 
-                // 快取補完仍不足 → 用 Firestore 範圍查詢補足（不掃描全量）
-                // Firestore 不支援 contains，改做 name / phone / patientNumber 的 startsWith 範圍查詢
-                // 每個欄位各讀最多 limit 筆，遠低於全量掃描
-                if (results.length < limit) {
+                // 2) 僅在完全查無結果（results.length === 0）時，才依關鍵字型態發單一欄位範圍查詢兜底
+                if (results.length === 0) {
                     const colRef2 = window.firebase.collection(window.firebase.db, 'patients');
-                    const rangeQueries = [];
-                    const termTrim = searchTerm.trim();
-                    // 名字開頭匹配（最常見搜尋）
-                    if (termTrim) {
-                        const safe = termTrim.toLowerCase();
-                        rangeQueries.push(
-                            window.firebase.firestoreQuery(
-                                colRef2,
-                                window.firebase.where('name', '>=', safe),
-                                window.firebase.where('name', '<=', safe + '\uf8ff'),
-                                window.firebase.limit(limit)
-                            )
+                    const rawTrim = String(term || '').trim();
+                    let fallbackQuery = null;
+                    if (/^p\d*/i.test(rawTrim)) {
+                        // 病人編號固定為大寫 P 開頭（如 P000001）
+                        const upperPrefix = rawTrim.toUpperCase();
+                        fallbackQuery = window.firebase.firestoreQuery(
+                            colRef2,
+                            window.firebase.where('patientNumber', '>=', upperPrefix),
+                            window.firebase.where('patientNumber', '<=', upperPrefix + '\uf8ff'),
+                            window.firebase.limit(limit)
                         );
-                        // 病人編號開頭匹配（支援搜尋 P000001 格式）
-                        rangeQueries.push(
-                            window.firebase.firestoreQuery(
-                                colRef2,
-                                window.firebase.where('patientNumber', '>=', safe),
-                                window.firebase.where('patientNumber', '<=', safe + '\uf8ff'),
-                                window.firebase.limit(limit)
-                            )
+                    } else if (/^\d+$/.test(rawTrim)) {
+                        // 純數字：電話號碼開頭匹配
+                        fallbackQuery = window.firebase.firestoreQuery(
+                            colRef2,
+                            window.firebase.where('phone', '>=', rawTrim),
+                            window.firebase.where('phone', '<=', rawTrim + '\uf8ff'),
+                            window.firebase.limit(limit)
                         );
-                        // 電話號碼開頭匹配
-                        rangeQueries.push(
-                            window.firebase.firestoreQuery(
-                                colRef2,
-                                window.firebase.where('phone', '>=', safe),
-                                window.firebase.where('phone', '<=', safe + '\uf8ff'),
-                                window.firebase.limit(limit)
-                            )
+                    } else if (rawTrim) {
+                        // 一般文字：姓名開頭匹配（保留原始大小寫以匹配儲存值）
+                        fallbackQuery = window.firebase.firestoreQuery(
+                            colRef2,
+                            window.firebase.where('name', '>=', rawTrim),
+                            window.firebase.where('name', '<=', rawTrim + '\uf8ff'),
+                            window.firebase.limit(limit)
                         );
                     }
-                    // 逐個範圍查詢，有一個找到足夠結果就停
-                    for (const rq of rangeQueries) {
-                        if (results.length >= limit) break;
+                    if (fallbackQuery) {
                         try {
-                            const snap = await window.firebase.getDocs(rq);
+                            const snap = await window.firebase.getDocs(fallbackQuery);
                             snap.forEach(doc => {
                                 if (results.length >= limit) return;
                                 const p = { id: doc.id, ...doc.data() };
@@ -10964,7 +10949,7 @@ class FirebaseDataManager {
                                 seen.add(String(p.id));
                             });
                         } catch (_rqErr) {
-                            // 單個欄位可能沒有 index（例如 phone 有 index 但 name 沒有），跳過即可
+                            // 單一欄位索引缺失或異常時靜默跳過
                         }
                     }
                 }
@@ -11665,12 +11650,17 @@ class FirebaseDataManager {
             const start = hkBoundOf(new Date(startDateStr), false);
             const end = hkBoundOf(new Date(endDateStr), true);
             const pageSize = 300;
+            // 只在 Firestore 端過濾 syncedAt（搭配可選的 doctor / clinicId 相等條件），
+            // 直接命中既有 ([doctor,][clinicId,] syncedAt) 索引，避免 sortDate + syncedAt
+            // 雙欄位不等式因缺少複合索引而失敗，再於客戶端過濾 sortDate 區間。
             const parts = [];
             if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
             if (clinicFilter) parts.push(window.firebase.where('clinicId', '==', clinicFilter));
-            parts.push(window.firebase.where('sortDate', '>=', start));
-            parts.push(window.firebase.where('sortDate', '<=', end));
             parts.push(window.firebase.where('syncedAt', '>', sinceDate));
+            const inDateRange = (data) => {
+                const d = parseConsultationDate((data && (data.sortDate || data.date || data.createdAt)) || null);
+                return !!(d && !isNaN(d.getTime()) && d >= start && d <= end);
+            };
             let q = window.firebase.firestoreQuery(
                 colRef,
                 ...parts,
@@ -11679,7 +11669,10 @@ class FirebaseDataManager {
             );
             let snap = await window.firebase.getDocs(q);
             const list = [];
-            snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+            snap.forEach(d => {
+                const data = d.data();
+                if (inDateRange(data)) list.push({ id: d.id, ...data });
+            });
             let lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
             while (snap.docs.length === pageSize && lastVisible) {
                 q = window.firebase.firestoreQuery(
@@ -11690,7 +11683,10 @@ class FirebaseDataManager {
                     window.firebase.limit(pageSize)
                 );
                 snap = await window.firebase.getDocs(q);
-                snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+                snap.forEach(d => {
+                    const data = d.data();
+                    if (inDateRange(data)) list.push({ id: d.id, ...data });
+                });
                 lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
             }
             return { success: true, data: list };
@@ -11705,21 +11701,32 @@ class FirebaseDataManager {
 
     async hasConsultationFinancialSummaryUpdates(startDateStr, endDateStr, doctorFilter = null, sinceDate, clinicFilter = null) {
         if (!this.isReady) return false;
+        if (!sinceDate) return true;
         try {
             const colRef = window.firebase.collection(window.firebase.db, 'consultationFinancialSummaries');
             const start = hkBoundOf(new Date(startDateStr), false);
             const end = hkBoundOf(new Date(endDateStr), true);
+            // 僅對 syncedAt 做單一不等式過濾，確保命中現有 ([doctor,][clinicId,] syncedAt) 索引；
+            // 若無任何 syncedAt > sinceDate 的文件（最常見情況），僅耗 1 次索引檢查即回傳 false，
+            // 讓財務報表快取正常命中。
             const parts = [];
             if (doctorFilter) parts.push(window.firebase.where('doctor', '==', doctorFilter));
             if (clinicFilter) parts.push(window.firebase.where('clinicId', '==', clinicFilter));
-            parts.push(window.firebase.where('sortDate', '>=', start));
-            parts.push(window.firebase.where('sortDate', '<=', end));
-            if (sinceDate) parts.push(window.firebase.where('syncedAt', '>', sinceDate));
+            parts.push(window.firebase.where('syncedAt', '>', sinceDate));
             parts.push(window.firebase.orderBy('syncedAt', 'asc'));
-            parts.push(window.firebase.limit(1));
+            parts.push(window.firebase.limit(50));
             const q = window.firebase.firestoreQuery(colRef, ...parts);
             const snap = await window.firebase.getDocs(q);
-            return !!(snap && snap.size > 0);
+            if (!snap || snap.empty) return false;
+            for (const docSnap of snap.docs) {
+                const data = docSnap.data() || {};
+                const d = parseConsultationDate(data.sortDate || data.date || data.createdAt || null);
+                if (d && !isNaN(d.getTime()) && d >= start && d <= end) {
+                    return true;
+                }
+            }
+            // 若前 50 筆增量皆不在報表日期範圍內，但剛好滿 50 筆，保守視為有更新
+            return snap.docs.length >= 50;
         } catch (error) {
             return true;
         }
