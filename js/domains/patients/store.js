@@ -95,73 +95,317 @@ export async function getPatientByIdWithRefresh(id) {
 }
 
 
+const PATIENT_PAGE_ANCHORS_LS_KEY = 'patientPageAnchorsV1';
+let _sortedPatientsViewCache = null;
+let _sortedPatientsViewCacheLen = -1;
+let _coldStartLocalValidationPromise = null;
+let _coldStartLocalValidated = false;
+let _patientDescAnchors = {};
+let _patientAscAnchors = {};
+let _patientAnchorsPageSize = 10;
+
+function extractPatientCursorAnchor(docOrObj) {
+    if (!docOrObj) return null;
+    const isSnap = typeof docOrObj.data === 'function';
+    const data = isSnap ? (docOrObj.data() || {}) : docOrObj;
+    const id = String(docOrObj.id || data.id || '');
+    if (!id) return null;
+    const raw = data.createdAt;
+    if (!raw) return null;
+    let sec = null;
+    let nano = 0;
+    let ms = 0;
+    if (typeof raw.seconds === 'number') {
+        sec = raw.seconds;
+        nano = typeof raw.nanoseconds === 'number' ? raw.nanoseconds : 0;
+        ms = sec * 1000 + Math.floor(nano / 1000000);
+    } else {
+        ms = parsePatientCreatedAtMillis(data);
+        if (ms > 0) {
+            sec = Math.floor(ms / 1000);
+            nano = (ms % 1000) * 1000000;
+        }
+    }
+    if (!ms && sec === null) return null;
+    return { sec, nano, ms, id };
+}
+
+function buildStartAfterArgsFromAnchor(anchor, useDocId) {
+    if (!anchor) return null;
+    let tsVal = null;
+    if (window.firebase && typeof window.firebase.Timestamp === 'function' && typeof anchor.sec === 'number') {
+        try {
+            tsVal = new window.firebase.Timestamp(anchor.sec, anchor.nano || 0);
+        } catch (_e) {
+            tsVal = null;
+        }
+    }
+    if (!tsVal) {
+        if (typeof anchor.ms === 'number' && anchor.ms > 0) {
+            tsVal = new Date(anchor.ms);
+        } else {
+            return null;
+        }
+    }
+    return useDocId && anchor.id ? [tsVal, anchor.id] : [tsVal];
+}
+
+function loadPersistedPatientAnchors(pageSize) {
+    if (_patientAnchorsPageSize !== pageSize) {
+        _patientDescAnchors = {};
+        _patientAscAnchors = {};
+        _patientAnchorsPageSize = pageSize;
+    }
+    if (Object.keys(_patientDescAnchors).length > 0 || Object.keys(_patientAscAnchors).length > 0) {
+        return;
+    }
+    try {
+        const raw = localStorage.getItem(PATIENT_PAGE_ANCHORS_LS_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || parsed.pageSize !== pageSize) return;
+        const meta = readPatientsStorageMeta();
+        if (meta && meta.metaTimestamp && parsed.metaTimestamp && parsed.metaTimestamp !== meta.metaTimestamp) {
+            return;
+        }
+        if (typeof G.patientsCountCache === 'number' && parsed.totalCount && parsed.totalCount !== G.patientsCountCache) {
+            return;
+        }
+        if (parsed.desc && typeof parsed.desc === 'object') {
+            _patientDescAnchors = { ...parsed.desc };
+        }
+        if (parsed.asc && typeof parsed.asc === 'object') {
+            _patientAscAnchors = { ...parsed.asc };
+        }
+    } catch (_e) {}
+}
+
+function savePersistedPatientAnchors(pageSize) {
+    try {
+        const meta = readPatientsStorageMeta();
+        const payload = {
+            pageSize,
+            metaTimestamp: (meta && meta.metaTimestamp) || null,
+            totalCount: typeof G.patientsCountCache === 'number' ? G.patientsCountCache : null,
+            savedAt: Date.now(),
+            desc: _patientDescAnchors,
+            asc: _patientAscAnchors
+        };
+        localStorage.setItem(PATIENT_PAGE_ANCHORS_LS_KEY, JSON.stringify(payload));
+    } catch (_e) {}
+}
+
+function setDescAnchor(page, pageSize, docOrObj) {
+    loadPersistedPatientAnchors(pageSize);
+    const anchor = extractPatientCursorAnchor(docOrObj);
+    if (anchor) {
+        _patientDescAnchors[page] = anchor;
+        savePersistedPatientAnchors(pageSize);
+    }
+}
+
+function setAscAnchor(ascPage, pageSize, docOrObj) {
+    loadPersistedPatientAnchors(pageSize);
+    const anchor = extractPatientCursorAnchor(docOrObj);
+    if (anchor) {
+        _patientAscAnchors[ascPage] = anchor;
+        savePersistedPatientAnchors(pageSize);
+    }
+}
+
+function getDescAnchor(page, pageSize) {
+    loadPersistedPatientAnchors(pageSize);
+    return _patientDescAnchors[page] || null;
+}
+
+function getAscAnchor(ascPage, pageSize) {
+    loadPersistedPatientAnchors(pageSize);
+    return _patientAscAnchors[ascPage] || null;
+}
+
+function buildAndPersistAnchorsFromSortedList(sortedDescList, pageSize) {
+    if (!Array.isArray(sortedDescList) || sortedDescList.length === 0) return;
+    _patientAnchorsPageSize = pageSize;
+    _patientDescAnchors = {};
+    _patientAscAnchors = {};
+    const total = sortedDescList.length;
+    const totalPages = Math.ceil(total / pageSize);
+    for (let p = 1; p <= totalPages; p++) {
+        const endIdx = Math.min(p * pageSize, total) - 1;
+        const lastItem = sortedDescList[endIdx];
+        const anchor = extractPatientCursorAnchor(lastItem);
+        if (anchor) _patientDescAnchors[p] = anchor;
+    }
+    for (let ascP = 1; ascP <= totalPages; ascP++) {
+        const ascEndOffset = Math.min(ascP * pageSize, total);
+        const descIdx = total - ascEndOffset;
+        const lastAscItem = sortedDescList[descIdx];
+        const anchor = extractPatientCursorAnchor(lastAscItem);
+        if (anchor) _patientAscAnchors[ascP] = anchor;
+    }
+    savePersistedPatientAnchors(pageSize);
+}
+
+/**
+ * 方案 1：優先取得本機已同步的全量病人快取（記憶體 patientsCache 或經 patientsMeta 驗證的 localStorage）。
+ * 若已存在則翻頁、跳頁及統計皆直接於記憶體切分（0 次 Firestore 讀取）。
+ */
+async function resolveVerifiedFullPatientsCache(forceRefresh = false) {
+    if (forceRefresh) {
+        _sortedPatientsViewCache = null;
+        _sortedPatientsViewCacheLen = -1;
+        return null;
+    }
+    const dm = window.firebaseDataManager;
+    if (dm && Array.isArray(dm.patientsCache)) {
+        return dm.patientsCache;
+    }
+    if (Array.isArray(G.patientCache) && G.patientCache.length > 0) {
+        if (dm) dm.patientsCache = G.patientCache;
+        return G.patientCache;
+    }
+    if (_coldStartLocalValidated) {
+        return (dm && Array.isArray(dm.patientsCache)) ? dm.patientsCache : null;
+    }
+    if (dm && typeof dm.loadPatientsFromLocalStorageWithValidation === 'function') {
+        let hasLocalRaw = false;
+        try {
+            hasLocalRaw = !!localStorage.getItem('patients');
+        } catch (_e) {}
+        if (!hasLocalRaw) {
+            _coldStartLocalValidated = true;
+            return null;
+        }
+        if (!_coldStartLocalValidationPromise) {
+            _coldStartLocalValidationPromise = (async () => {
+                try {
+                    const localData = await dm.loadPatientsFromLocalStorageWithValidation();
+                    _coldStartLocalValidated = true;
+                    if (Array.isArray(localData)) {
+                        dm.patientsCache = localData;
+                        dm.patientsCacheSource = 'localStorage';
+                        const cacheMeta = readPatientsStorageMeta();
+                        dm.patientsCacheFetchedAt = (cacheMeta && cacheMeta.fetchedAt) || Date.now();
+                        G.patientsCountCache = localData.length;
+                        return localData;
+                    }
+                    return null;
+                } catch (_err) {
+                    _coldStartLocalValidated = true;
+                    return null;
+                } finally {
+                    _coldStartLocalValidationPromise = null;
+                }
+            })();
+        }
+        return await _coldStartLocalValidationPromise;
+    }
+    return null;
+}
+
+function getSortedPatientsFromFullCache(fullList, pageSize) {
+    if (!Array.isArray(fullList)) return null;
+    if (!_sortedPatientsViewCache || _sortedPatientsViewCacheLen !== fullList.length) {
+        _sortedPatientsViewCache = fullList.slice().sort(comparePatientsByCreatedAtDesc);
+        _sortedPatientsViewCacheLen = _sortedPatientsViewCache.length;
+        buildAndPersistAnchorsFromSortedList(_sortedPatientsViewCache, pageSize);
+    }
+    return _sortedPatientsViewCache;
+}
+
 export async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
-    
     if (pageNumber < 1) pageNumber = 1;
-    
+    const pageSize = G.paginationSettings && G.paginationSettings.patientList && G.paginationSettings.patientList.itemsPerPage
+        ? G.paginationSettings.patientList.itemsPerPage
+        : 10;
+
     if (forceRefresh) {
         G.patientPagesCache = {};
         G.patientPageCursors = {};
         G.patientAscPagesCache = {};
         G.patientAscPageCursors = {};
+        _sortedPatientsViewCache = null;
+        _sortedPatientsViewCacheLen = -1;
     }
-    
+
     if (!forceRefresh && G.patientPagesCache[pageNumber]) {
         return G.patientPagesCache[pageNumber];
     }
 
-    
-    if (!forceRefresh && pageNumber > 1) {
-        const prevPage = pageNumber - 1;
-        
-        if (!G.patientPageCursors[prevPage] || !G.patientPagesCache[prevPage]) {
-            for (let i = 1; i < pageNumber; i++) {
-                if (!G.patientPagesCache[i]) {
-                    await fetchPatientsPage(i, forceRefresh);
-                }
-            }
-        }
+    // 方案 1：若已有通過驗證的全量快取，直接切頁返回（0 次讀取）
+    const fullList = await resolveVerifiedFullPatientsCache(forceRefresh);
+    if (Array.isArray(fullList)) {
+        const sorted = getSortedPatientsFromFullCache(fullList, pageSize);
+        const startIdx = (pageNumber - 1) * pageSize;
+        const pageSlice = sorted.slice(startIdx, startIdx + pageSize);
+        G.patientPagesCache[pageNumber] = pageSlice;
+        return pageSlice;
     }
 
     await G.waitForFirebaseDb();
     try {
-        const pageSize = G.paginationSettings && G.paginationSettings.patientList && G.paginationSettings.patientList.itemsPerPage
-            ? G.paginationSettings.patientList.itemsPerPage
-            : 10;
-        
-        let q = window.firebase.firestoreQuery(
-            window.firebase.collection(window.firebase.db, 'patients'),
-            window.firebase.orderBy('createdAt', 'desc'),
-        );
-        // 如果 documentId FieldPath 可用，加入穩定次排序；不可用時退回單一排序
-        if (window.firebase.documentId) {
-            q = window.firebase.firestoreQuery(q, window.firebase.orderBy(window.firebase.documentId, 'desc'));
-        }
-        q = window.firebase.firestoreQuery(q, window.firebase.limit(pageSize));
-        
-        if (pageNumber > 1) {
-            const prevCursor = G.patientPageCursors[pageNumber - 1];
-            if (prevCursor) {
-                q = window.firebase.firestoreQuery(q, window.firebase.startAfter(prevCursor));
+        const hasDocId = !!window.firebase.documentId;
+        const buildBaseQuery = () => {
+            let baseQ = window.firebase.firestoreQuery(
+                window.firebase.collection(window.firebase.db, 'patients'),
+                window.firebase.orderBy('createdAt', 'desc')
+            );
+            if (hasDocId) {
+                baseQ = window.firebase.firestoreQuery(baseQ, window.firebase.orderBy(window.firebase.documentId, 'desc'));
+            }
+            return baseQ;
+        };
+
+        // 方案 3 + 方案 2：尋找距離目標頁碼最近的已知游標（DocumentSnapshot）或持久化輕量錨點
+        let startFromPage = 0; // 0 代表從第 1 頁頭開始抓
+        let startAfterCursorSnap = null;
+        let startAfterAnchorArgs = null;
+
+        if (pageNumber > 1 && !forceRefresh) {
+            for (let p = pageNumber - 1; p >= 1; p--) {
+                if (G.patientPageCursors[p]) {
+                    startFromPage = p;
+                    startAfterCursorSnap = G.patientPageCursors[p];
+                    break;
+                }
+                const anchor = getDescAnchor(p, pageSize);
+                const args = buildStartAfterArgsFromAnchor(anchor, hasDocId);
+                if (args) {
+                    startFromPage = p;
+                    startAfterAnchorArgs = args;
+                    break;
+                }
             }
         }
-        const snapshot = await window.firebase.getDocs(q);
-        const docs = [];
-        snapshot.forEach((doc) => {
-            docs.push({ id: doc.id, ...doc.data() });
-        });
-        
-        if (docs.length > 0) {
-            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-            G.patientPageCursors[pageNumber] = lastDoc;
+
+        const pagesToFetch = pageNumber - startFromPage; // 若有上一頁錨點則為 1（只抓目標頁 10 筆）；否則單次批量抓齊
+        let q = buildBaseQuery();
+        if (startAfterCursorSnap) {
+            q = window.firebase.firestoreQuery(q, window.firebase.startAfter(startAfterCursorSnap));
+        } else if (startAfterAnchorArgs) {
+            q = window.firebase.firestoreQuery(q, window.firebase.startAfter(...startAfterAnchorArgs));
         }
-        
-        G.patientPagesCache[pageNumber] = docs;
-        // 緩存大小保護：超過上限時自動清理
+        q = window.firebase.firestoreQuery(q, window.firebase.limit(pagesToFetch * pageSize));
+
+        const snapshot = await window.firebase.getDocs(q);
+        const rawDocSnaps = snapshot.docs || [];
+
+        for (let offset = 0; offset < pagesToFetch; offset++) {
+            const targetP = startFromPage + offset + 1;
+            const chunkSnaps = rawDocSnaps.slice(offset * pageSize, (offset + 1) * pageSize);
+            const chunkDocs = chunkSnaps.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+            if (chunkSnaps.length > 0) {
+                const lastSnap = chunkSnaps[chunkSnaps.length - 1];
+                G.patientPageCursors[targetP] = lastSnap;
+                setDescAnchor(targetP, pageSize, lastSnap);
+            }
+            G.patientPagesCache[targetP] = chunkDocs;
+        }
+
         if (typeof window.trimCache === 'function') {
             window.trimCache(G.patientPagesCache, 50);
         }
-        return docs;
+        return G.patientPagesCache[pageNumber] || [];
     } catch (error) {
         console.error('分頁讀取病人資料失敗:', error);
         return [];
@@ -170,60 +414,86 @@ export async function fetchPatientsPage(pageNumber = 1, forceRefresh = false) {
 
 export async function fetchPatientsPageAsc(ascPageNumber = 1, forceRefresh = false) {
     if (ascPageNumber < 1) ascPageNumber = 1;
+    const pageSize = G.paginationSettings && G.paginationSettings.patientList && G.paginationSettings.patientList.itemsPerPage
+        ? G.paginationSettings.patientList.itemsPerPage
+        : 10;
+
     if (forceRefresh) {
         G.patientPagesCache = {};
         G.patientPageCursors = {};
         G.patientAscPagesCache = {};
         G.patientAscPageCursors = {};
+        _sortedPatientsViewCache = null;
+        _sortedPatientsViewCacheLen = -1;
     }
     if (!forceRefresh && G.patientAscPagesCache[ascPageNumber]) {
         return G.patientAscPagesCache[ascPageNumber];
     }
-    if (!forceRefresh && ascPageNumber > 1) {
-        const prevPage = ascPageNumber - 1;
-        if (!G.patientAscPageCursors[prevPage] || !G.patientAscPagesCache[prevPage]) {
-            for (let i = 1; i < ascPageNumber; i++) {
-                if (!G.patientAscPagesCache[i]) {
-                    await fetchPatientsPageAsc(i, forceRefresh);
+
+    await G.waitForFirebaseDb();
+    try {
+        const hasDocId = !!window.firebase.documentId;
+        const buildBaseAscQuery = () => {
+            let baseQ = window.firebase.firestoreQuery(
+                window.firebase.collection(window.firebase.db, 'patients'),
+                window.firebase.orderBy('createdAt', 'asc')
+            );
+            if (hasDocId) {
+                baseQ = window.firebase.firestoreQuery(baseQ, window.firebase.orderBy(window.firebase.documentId, 'asc'));
+            }
+            return baseQ;
+        };
+
+        let startFromAscPage = 0;
+        let startAfterCursorSnap = null;
+        let startAfterAnchorArgs = null;
+
+        if (ascPageNumber > 1 && !forceRefresh) {
+            for (let p = ascPageNumber - 1; p >= 1; p--) {
+                if (G.patientAscPageCursors[p]) {
+                    startFromAscPage = p;
+                    startAfterCursorSnap = G.patientAscPageCursors[p];
+                    break;
+                }
+                const anchor = getAscAnchor(p, pageSize);
+                const args = buildStartAfterArgsFromAnchor(anchor, hasDocId);
+                if (args) {
+                    startFromAscPage = p;
+                    startAfterAnchorArgs = args;
+                    break;
                 }
             }
         }
-    }
-    await G.waitForFirebaseDb();
-    try {
-        const pageSize = G.paginationSettings && G.paginationSettings.patientList && G.paginationSettings.patientList.itemsPerPage
-            ? G.paginationSettings.patientList.itemsPerPage
-            : 10;
-        let q = window.firebase.firestoreQuery(
-            window.firebase.collection(window.firebase.db, 'patients'),
-            window.firebase.orderBy('createdAt', 'asc'),
-        );
-        if (window.firebase.documentId) {
-            q = window.firebase.firestoreQuery(q, window.firebase.orderBy(window.firebase.documentId, 'asc'));
+
+        const pagesToFetch = ascPageNumber - startFromAscPage;
+        let q = buildBaseAscQuery();
+        if (startAfterCursorSnap) {
+            q = window.firebase.firestoreQuery(q, window.firebase.startAfter(startAfterCursorSnap));
+        } else if (startAfterAnchorArgs) {
+            q = window.firebase.firestoreQuery(q, window.firebase.startAfter(...startAfterAnchorArgs));
         }
-        q = window.firebase.firestoreQuery(q, window.firebase.limit(pageSize));
-        if (ascPageNumber > 1) {
-            const prevCursor = G.patientAscPageCursors[ascPageNumber - 1];
-            if (prevCursor) {
-                q = window.firebase.firestoreQuery(q, window.firebase.startAfter(prevCursor));
-            }
-        }
+        q = window.firebase.firestoreQuery(q, window.firebase.limit(pagesToFetch * pageSize));
+
         const snapshot = await window.firebase.getDocs(q);
-        const docs = [];
-        snapshot.forEach((doc) => {
-            docs.push({ id: doc.id, ...doc.data() });
-        });
-        if (docs.length > 0) {
-            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-            G.patientAscPageCursors[ascPageNumber] = lastDoc;
+        const rawDocSnaps = snapshot.docs || [];
+
+        for (let offset = 0; offset < pagesToFetch; offset++) {
+            const targetAscP = startFromAscPage + offset + 1;
+            const chunkSnaps = rawDocSnaps.slice(offset * pageSize, (offset + 1) * pageSize);
+            const chunkDocs = chunkSnaps.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+            if (chunkSnaps.length > 0) {
+                const lastSnap = chunkSnaps[chunkSnaps.length - 1];
+                G.patientAscPageCursors[targetAscP] = lastSnap;
+                setAscAnchor(targetAscP, pageSize, lastSnap);
+            }
+            chunkDocs.sort(comparePatientsByCreatedAtDesc);
+            G.patientAscPagesCache[targetAscP] = chunkDocs;
         }
-        docs.sort(comparePatientsByCreatedAtDesc);
-        G.patientAscPagesCache[ascPageNumber] = docs;
-        // 緩存大小保護：超過上限時自動清理
+
         if (typeof window.trimCache === 'function') {
             window.trimCache(G.patientAscPagesCache, 50);
         }
-        return docs;
+        return G.patientAscPagesCache[ascPageNumber] || [];
     } catch (error) {
         console.error('升序分頁讀取病人資料失敗:', error);
         return [];
@@ -274,6 +544,21 @@ export async function fetchPatientsPageOptimized(pageNumber = 1, forceRefresh = 
     const pageSize = G.paginationSettings && G.paginationSettings.patientList && G.paginationSettings.patientList.itemsPerPage
         ? G.paginationSettings.patientList.itemsPerPage
         : 10;
+
+    // 方案 1：優先使用記憶體或已通過 patientsMeta 驗證的 localStorage 全量病人快取切頁（0 次 Firestore 讀取）
+    const fullList = await resolveVerifiedFullPatientsCache(forceRefresh);
+    if (Array.isArray(fullList)) {
+        const sorted = getSortedPatientsFromFullCache(fullList, pageSize);
+        const totalItems = sorted.length;
+        G.patientsCountCache = totalItems;
+        const totalPages = totalItems > 0 ? Math.ceil(totalItems / pageSize) : 1;
+        let clampedPage = pageNumber < 1 ? 1 : (pageNumber > totalPages ? totalPages : pageNumber);
+        const startIdx = (clampedPage - 1) * pageSize;
+        const pageSlice = sorted.slice(startIdx, startIdx + pageSize);
+        G.patientPagesCache[clampedPage] = pageSlice;
+        return pageSlice;
+    }
+
     const totalItems = typeof knownTotalItems === 'number'
         ? knownTotalItems
         : await getPatientsCount(forceRefresh);
@@ -291,8 +576,13 @@ export async function fetchPatientsPageOptimized(pageNumber = 1, forceRefresh = 
 
 
 export async function getPatientsCount(forceRefresh = false) {
-    
     if (!forceRefresh && typeof G.patientsCountCache === 'number') {
+        return G.patientsCountCache;
+    }
+    // 方案 1：若本機全量快取可用，直接取其長度，省去 getCountFromServer 讀取
+    const fullList = await resolveVerifiedFullPatientsCache(forceRefresh);
+    if (Array.isArray(fullList)) {
+        G.patientsCountCache = fullList.length;
         return G.patientsCountCache;
     }
     try {
@@ -390,12 +680,22 @@ export function stampPatientsStorageMetaTimestamp(metaTs) {
 }
 
 /** 清平分頁快取（不含全量病人快取，全量快取改由單筆 patch 維持新鮮度） */
-export function resetPatientPaginationCaches() {
+export function resetPatientPaginationCaches(options = {}) {
+    const preserveAnchors = !!(options && options.preserveAnchors);
     G.patientCache = null;
     G.patientPagesCache = {};
     G.patientPageCursors = {};
     G.patientAscPagesCache = {};
     G.patientAscPageCursors = {};
+    _sortedPatientsViewCache = null;
+    _sortedPatientsViewCacheLen = -1;
+    if (!preserveAnchors) {
+        _patientDescAnchors = {};
+        _patientAscAnchors = {};
+        try {
+            localStorage.removeItem(PATIENT_PAGE_ANCHORS_LS_KEY);
+        } catch (_e) {}
+    }
 }
 
 /** 就地微調病人總數快取（create/delete），避免一次 getCountFromServer */
@@ -423,6 +723,11 @@ export function invalidateAllPatientCaches() {
     G.patientAscPagesCache = {};
     G.patientAscPageCursors = {};
     G.patientsCountCache = null;
+    _sortedPatientsViewCache = null;
+    _sortedPatientsViewCacheLen = -1;
+    _coldStartLocalValidated = false;
+    _patientDescAnchors = {};
+    _patientAscAnchors = {};
     if (window.firebaseDataManager) {
         window.firebaseDataManager.patientsCache = null;
         window.firebaseDataManager.patientsCacheSource = 'none';
@@ -431,6 +736,7 @@ export function invalidateAllPatientCaches() {
     try {
         localStorage.removeItem('patients');
         localStorage.removeItem(PATIENTS_CACHE_META_KEY);
+        localStorage.removeItem(PATIENT_PAGE_ANCHORS_LS_KEY);
     } catch (_lsErr) { /* 忽略 */ }
 }
 
@@ -508,7 +814,7 @@ export async function handleRemotePatientMetaChange(meta, metaTs) {
 
         // patch 成功後才為本地快取蓋上「對應此 meta」的戳記
         if (metaTs != null) stampPatientsStorageMetaTimestamp(metaTs);
-        resetPatientPaginationCaches();
+        resetPatientPaginationCaches({ preserveAnchors: operation === 'update' });
         reloadVisiblePatientList();
     } catch (err) {
         console.error('單筆同步病人快取失敗，退回全量刷新:', err);

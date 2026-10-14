@@ -25,6 +25,7 @@ import {
   writeBatch,
   FieldPath,
   FieldValue,
+  Timestamp,
   increment as firestoreIncrement,
   serverTimestamp as firestoreServerTimestamp,
   onSnapshot,
@@ -247,6 +248,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
             }
         })(),
         FieldValue,
+        Timestamp,
         increment: firestoreIncrement,
 
         firestoreQuery: query,

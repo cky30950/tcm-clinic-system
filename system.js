@@ -6603,25 +6603,8 @@ async function savePatient() {
         
         
         
-        patientCache = null;
-        
-        if (typeof patientPagesCache === 'object') {
-            patientPagesCache = {};
-        }
-        if (typeof patientPageCursors === 'object') {
-            patientPageCursors = {};
-        }
-        if (typeof patientAscPagesCache === 'object') {
-            patientAscPagesCache = {};
-        }
-        if (typeof patientAscPageCursors === 'object') {
-            patientAscPageCursors = {};
-        }
-        
-        patientsCountCache = null;
-
-        
-        await loadPatientListFromFirebase();
+        // addPatient / updatePatient 內部已同步就地更新 patientsCache、調整 patientsCountCache、
+        // 重置分頁快取並觸發 reloadVisiblePatientList()，此處不再清空 patientsCountCache 或重複載入列表
         hideAddPatientForm();
         updateStatistics();
 
@@ -6973,23 +6956,9 @@ async function deletePatient(id) {
                 
                 
                 
-                patientCache = null;
-                if (typeof patientPagesCache === 'object') {
-                    patientPagesCache = {};
-                }
-                if (typeof patientPageCursors === 'object') {
-                    patientPageCursors = {};
-                }
-                if (typeof patientAscPagesCache === 'object') {
-                    patientAscPagesCache = {};
-                }
-                if (typeof patientAscPageCursors === 'object') {
-                    patientAscPageCursors = {};
-                }
-                patientsCountCache = null;
-            
-            await loadPatientListFromFirebase();
-            updateStatistics();
+                // deletePatient 內部已就地更新 patientsCache、adjustPatientsCountCache(-1)、
+                // resetPatientPaginationCaches() 並觸發 reloadVisiblePatientList()，此處不再清空總數或重複載入
+                updateStatistics();
             try {
                 if (typeof loadTodayAppointments === 'function') {
                     await loadTodayAppointments();
@@ -10871,7 +10840,7 @@ class FirebaseDataManager {
             touchPatientsMeta('update', patientId, { nonce: newSelfMetaNonce() }).catch(() => {});
             // 樂觀就地更新本機所有快取層（局部欄位與舊記錄合併），不再清空全量快取
             this.applyPatientUpsertToCaches({ id: patientId, ...patchData });
-            resetPatientPaginationCaches();
+            resetPatientPaginationCaches({ preserveAnchors: true });
             reloadVisiblePatientList();
             return { success: true };
         } catch (error) {
@@ -15455,53 +15424,47 @@ async function fetchMedicalRecordPage(page = 1, pageSize = 10) {
             trimCache(medicalRecordPageCache, 30);
             return arrLast;
         }
-        if (page === 1) {
-            q = window.firebase.firestoreQuery(
+        // 尋找距離目標頁碼最近的已知游標，並以單次批量查詢補齊中間頁與目標頁（消除多次串列請求）
+        let startFromPage = 0;
+        let startCursor = null;
+        if (page > 1) {
+            for (let p = page - 1; p >= 1; p--) {
+                if (medicalRecordPageCursors[p]) {
+                    startFromPage = p;
+                    startCursor = medicalRecordPageCursors[p];
+                    break;
+                }
+            }
+        }
+        const pagesToFetch = page - startFromPage;
+        q = startCursor
+            ? window.firebase.firestoreQuery(
                 colRef,
                 window.firebase.orderBy('sortDate', 'desc'),
-                window.firebase.limit(pageSize),
+                window.firebase.startAfter(startCursor),
+                window.firebase.limit(pagesToFetch * pageSize)
+            )
+            : window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.orderBy('sortDate', 'desc'),
+                window.firebase.limit(pagesToFetch * pageSize)
             );
-            const snap = await window.firebase.getDocs(q);
-            let arr = [];
-            snap.forEach(d => arr.push(consultationProjectionForList({ id: d.id, ...d.data() })));
+        const snap = await window.firebase.getDocs(q);
+        const rawDocs = snap.docs || [];
+        for (let offset = 0; offset < pagesToFetch; offset++) {
+            const targetP = startFromPage + offset + 1;
+            const chunkSnaps = rawDocs.slice(offset * pageSize, (offset + 1) * pageSize);
+            let arr = chunkSnaps.map(d => consultationProjectionForList({ id: d.id, ...d.data() }));
             try {
                 arr = sortMedicalRecordsBySortDateDesc(arr);
             } catch (_e) {}
-            medicalRecordPageCache[1] = arr;
-            medicalRecordPageCursors[1] = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
-            trimCache(medicalRecordPageCache, 30);
-            return arr;
+            medicalRecordPageCache[targetP] = arr;
+            medicalRecordPageCursors[targetP] = chunkSnaps.length
+                ? chunkSnaps[chunkSnaps.length - 1]
+                : (medicalRecordPageCursors[targetP - 1] || null);
         }
-        // 確保擁有上一頁游標，若沒有則逐頁計算
-        let prevPage = page - 1;
-        if (!medicalRecordPageCursors[prevPage]) {
-            for (let p = 1; p <= prevPage; p++) {
-                if (medicalRecordPageCache[p]) continue;
-                await fetchMedicalRecordPage(p, pageSize);
-            }
-        }
-        const last = medicalRecordPageCursors[prevPage];
-        if (!last) {
-            medicalRecordPageCache[page] = [];
-            medicalRecordPageCursors[page] = null;
-            return [];
-        }
-        q = window.firebase.firestoreQuery(
-            colRef,
-            window.firebase.orderBy('sortDate', 'desc'),
-            window.firebase.startAfter(last),
-            window.firebase.limit(pageSize),
-        );
-        const snap2 = await window.firebase.getDocs(q);
-        let arr2 = [];
-        snap2.forEach(d => arr2.push(consultationProjectionForList({ id: d.id, ...d.data() })));
-        try {
-            arr2 = sortMedicalRecordsBySortDateDesc(arr2);
-        } catch (_e) {}
-        medicalRecordPageCache[page] = arr2;
-        medicalRecordPageCursors[page] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : medicalRecordPageCursors[prevPage];
         trimCache(medicalRecordPageCache, 30);
-        return arr2;
+        return medicalRecordPageCache[page] || [];
     } catch (_err) {
         return [];
     }
@@ -15514,53 +15477,46 @@ async function fetchMedicalRecordPageAsc(ascIndex = 1, pageSize = 10) {
             return medicalRecordAscPageCache[ascIndex];
         }
         const colRef = window.firebase.collection(window.firebase.db, 'consultations');
-        let q;
-        if (ascIndex === 1) {
-            q = window.firebase.firestoreQuery(
+        let startFromAsc = 0;
+        let startCursor = null;
+        if (ascIndex > 1) {
+            for (let a = ascIndex - 1; a >= 1; a--) {
+                if (medicalRecordAscPageCursors[a]) {
+                    startFromAsc = a;
+                    startCursor = medicalRecordAscPageCursors[a];
+                    break;
+                }
+            }
+        }
+        const pagesToFetch = ascIndex - startFromAsc;
+        const q = startCursor
+            ? window.firebase.firestoreQuery(
                 colRef,
                 window.firebase.orderBy('sortDate', 'asc'),
-                window.firebase.limit(pageSize),
+                window.firebase.startAfter(startCursor),
+                window.firebase.limit(pagesToFetch * pageSize)
+            )
+            : window.firebase.firestoreQuery(
+                colRef,
+                window.firebase.orderBy('sortDate', 'asc'),
+                window.firebase.limit(pagesToFetch * pageSize)
             );
-            const snap = await window.firebase.getDocs(q);
-            let arr = [];
-            snap.forEach(d => arr.push(consultationProjectionForList({ id: d.id, ...d.data() })));
+        const snap = await window.firebase.getDocs(q);
+        const rawDocs = snap.docs || [];
+        for (let offset = 0; offset < pagesToFetch; offset++) {
+            const targetAsc = startFromAsc + offset + 1;
+            const chunkSnaps = rawDocs.slice(offset * pageSize, (offset + 1) * pageSize);
+            let arr = chunkSnaps.map(d => consultationProjectionForList({ id: d.id, ...d.data() }));
             try {
                 arr = sortMedicalRecordsBySortDateDesc(arr);
             } catch (_e) {}
-            medicalRecordAscPageCache[1] = arr;
-            medicalRecordAscPageCursors[1] = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
-            trimCache(medicalRecordAscPageCache, 30);
-            return arr;
+            medicalRecordAscPageCache[targetAsc] = arr;
+            medicalRecordAscPageCursors[targetAsc] = chunkSnaps.length
+                ? chunkSnaps[chunkSnaps.length - 1]
+                : (medicalRecordAscPageCursors[targetAsc - 1] || null);
         }
-        let prev = ascIndex - 1;
-        if (!medicalRecordAscPageCursors[prev]) {
-            for (let a = 1; a <= prev; a++) {
-                if (medicalRecordAscPageCache[a]) continue;
-                await fetchMedicalRecordPageAsc(a, pageSize);
-            }
-        }
-        const last = medicalRecordAscPageCursors[prev];
-        if (!last) {
-            medicalRecordAscPageCache[ascIndex] = [];
-            medicalRecordAscPageCursors[ascIndex] = null;
-            return [];
-        }
-        q = window.firebase.firestoreQuery(
-            colRef,
-            window.firebase.orderBy('sortDate', 'asc'),
-            window.firebase.startAfter(last),
-            window.firebase.limit(pageSize),
-        );
-        const snap2 = await window.firebase.getDocs(q);
-        let arr2 = [];
-        snap2.forEach(d => arr2.push(consultationProjectionForList({ id: d.id, ...d.data() })));
-        try {
-            arr2 = sortMedicalRecordsBySortDateDesc(arr2);
-        } catch (_e) {}
-        medicalRecordAscPageCache[ascIndex] = arr2;
-        medicalRecordAscPageCursors[ascIndex] = snap2.docs.length ? snap2.docs[snap2.docs.length - 1] : medicalRecordAscPageCursors[prev];
         trimCache(medicalRecordAscPageCache, 30);
-        return arr2;
+        return medicalRecordAscPageCache[ascIndex] || [];
     } catch (_err) {
         return [];
     }

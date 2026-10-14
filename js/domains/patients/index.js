@@ -32,7 +32,7 @@ export {
     touchPatientsMeta,
     attachPatientConsultationsListener,
     detachPatientConsultationsListener
-} from './store.js?v=20261014i';
+} from './store.js?v=20261014k';
 export {
     loadPatientListFromFirebase,
     loadPatientList,
