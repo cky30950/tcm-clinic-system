@@ -482,6 +482,30 @@ export async function handleRemotePatientMetaChange(meta, metaTs) {
             }
             if (operation === 'delete' && existedBefore) adjustPatientsCountCache(-1);
         }
+        // 他人裝置可能剛新增／扣減／修改此病人的套票：同步清除本機的該病人套票快取，
+        // 並在診症表單或病人詳情視窗正開著此病人時即時重繪，確保多人同時操作套票不讀到舊快取。
+        try {
+            if (G.patientPackagesCache && Object.prototype.hasOwnProperty.call(G.patientPackagesCache, pid)) {
+                delete G.patientPackagesCache[pid];
+            }
+            try { localStorage.removeItem(`patientPackages_${pid}`); } catch (_lsPkgErr) {}
+            if (typeof G.invalidatePatientPackageHistoryCaches === 'function') {
+                G.invalidatePatientPackageHistoryCaches(pid);
+            }
+            const currAppt = (G.currentConsultingAppointmentId && Array.isArray(G.appointments))
+                ? G.appointments.find(a => a && String(a.id) === String(G.currentConsultingAppointmentId))
+                : null;
+            if (currAppt && String(currAppt.patientId) === pid && typeof G.refreshPatientPackagesUI === 'function') {
+                G.refreshPatientPackagesUI().catch(() => {});
+            }
+            const detailModal = document.getElementById('patientDetailModal');
+            const detailOpen = detailModal && !detailModal.classList.contains('hidden');
+            const sameDetailPid = String(G.patientDetailClinicState && G.patientDetailClinicState.patientId || '') === pid;
+            if (detailOpen && sameDetailPid && typeof G.loadPatientConsultationSummary === 'function') {
+                G.loadPatientConsultationSummary(pid).catch(() => {});
+            }
+        } catch (_pkgSyncErr) {}
+
         // patch 成功後才為本地快取蓋上「對應此 meta」的戳記
         if (metaTs != null) stampPatientsStorageMetaTimestamp(metaTs);
         resetPatientPaginationCaches();

@@ -59,17 +59,21 @@ export function filterPackagesByClinic(packages, clinicId) {
  *
  * @param {string} patientId 病人 ID
  */
+// 以 session 內記憶體標記紀錄已嘗試過診所歸屬遷移的病人，避免無法歸屬的舊套票每次開面板都重刷 200 筆病歷
+const packageClinicBackfillAttempted = new Set();
+
 export async function ensurePatientPackagesClinicScoped(patientId) {
+    const pidKey = String(patientId || '');
     // 先走快取（本地完整清單；空清單也會被快取）：全部已標注時
-    // 完全不產生讀取。僅發現未標注舊套票時，才強制刷新確認最新狀態。
+    // 完全不產生讀取。僅首次發現未標注舊套票時，才強制刷新確認最新狀態。
     let allPackages = await getPatientPackages(patientId, false, '*');
     let missing = allPackages.filter(pkg => pkg && !pkg.clinicId);
-    if (missing.length > 0) {
+    if (missing.length > 0 && !packageClinicBackfillAttempted.has(pidKey)) {
         allPackages = await getPatientPackages(patientId, true, '*');
         missing = allPackages.filter(pkg => pkg && !pkg.clinicId);
     }
-    if (missing.length === 0) {
-        // 套票均已標注：仍確認歷史流水是否需要補標（記憶體標記命中時零成本）
+    if (missing.length === 0 || packageClinicBackfillAttempted.has(pidKey)) {
+        // 套票均已標注或本 session 已嘗試過遷移：仍確認歷史流水是否需要補標（記憶體標記命中時零成本）
         const pkgClinicMap0 = new Map();
         allPackages.forEach(p => {
             if (p && p.clinicId) pkgClinicMap0.set(String(p.id), String(p.clinicId));
@@ -77,6 +81,7 @@ export async function ensurePatientPackagesClinicScoped(patientId) {
         await ensurePatientPackageHistoryClinicScoped(patientId, pkgClinicMap0, null);
         return;
     }
+    if (pidKey) packageClinicBackfillAttempted.add(pidKey);
 
     // 套票 packageId → 已標注診所（先以快取中已知者預填）
     const pkgClinicById = new Map();
@@ -737,11 +742,15 @@ export async function purchasePackage(patientId, item) {
     try {
         const result = await window.firebaseDataManager.addPatientPackage(record);
         if (result.success) {
-            // 建立新套票記錄並更新本地快取
+            // 建立新套票記錄並更新本地快取（若 addPatientPackage 已寫入則去重更新）
             const newPkg = { ...record, id: result.id };
             if (Array.isArray(G.patientPackagesCache[patientId])) {
-                // 若快取存在，附加新套票
-                G.patientPackagesCache[patientId] = [...patientPackagesCache[patientId], newPkg];
+                const existingIdx = G.patientPackagesCache[patientId].findIndex(p => p && String(p.id) === String(result.id));
+                if (existingIdx >= 0) {
+                    G.patientPackagesCache[patientId][existingIdx] = { ...G.patientPackagesCache[patientId][existingIdx], ...newPkg };
+                } else {
+                    G.patientPackagesCache[patientId] = [...G.patientPackagesCache[patientId], newPkg];
+                }
             } else {
                 // 建立新的快取陣列
                 G.patientPackagesCache[patientId] = [newPkg];
@@ -779,10 +788,13 @@ export async function purchasePackage(patientId, item) {
 export async function consumePackage(patientId, packageRecordId, options = {}) {
     try {
         const historySource = options && options.historySource ? String(options.historySource) : 'other';
-        // 始終從資料庫重新取得套票，避免跨裝置快取不一致
-        const packages = await getPatientPackages(patientId, true);
-        // 比對 ID 時統一轉為字串，避免類型不一致導致找不到套票
-        const pkg = packages.find(p => String(p.id) === String(packageRecordId));
+        // 優先使用記憶體快取，找不到時才強制重抓，避免剛載入或購買後重複 getDocs
+        let packages = await getPatientPackages(patientId, false);
+        let pkg = packages.find(p => String(p.id) === String(packageRecordId));
+        if (!pkg) {
+            packages = await getPatientPackages(patientId, true);
+            pkg = packages.find(p => String(p.id) === String(packageRecordId));
+        }
         
         if (!pkg) return { ok: false, msg: '找不到套票' };
         
@@ -845,10 +857,13 @@ export async function consumePackage(patientId, packageRecordId, options = {}) {
  */
 export async function consumePackageLocally(patientId, packageRecordId) {
     try {
-        // 始終重新載入套票，避免跨裝置快取不一致
-        const packages = await getPatientPackages(patientId, true);
-        // 比對 ID 時統一轉為字串，避免類型不一致導致找不到套票
-        const pkg = packages.find(p => String(p.id) === String(packageRecordId));
+        // 本地預扣：直接沿用當前已載入的套票快取，找不到才回退重抓
+        let packages = await getPatientPackages(patientId, false);
+        let pkg = packages.find(p => String(p.id) === String(packageRecordId));
+        if (!pkg) {
+            packages = await getPatientPackages(patientId, true);
+            pkg = packages.find(p => String(p.id) === String(packageRecordId));
+        }
         if (!pkg) {
             return { ok: false, msg: '找不到套票' };
         }
@@ -986,8 +1001,12 @@ export async function updatePatientPackageExpiry(patientId, packageRecordId, cli
         G.setButtonLoading(loadingButton, isEn ? 'Loading...' : '讀取中...');
     }
     try {
-        const packages = await getPatientPackages(patientId, true, targetClinicId);
-        const pkg = Array.isArray(packages) ? packages.find(p => String(p.id) === String(packageRecordId)) : null;
+        let packages = await getPatientPackages(patientId, false, targetClinicId);
+        let pkg = Array.isArray(packages) ? packages.find(p => String(p.id) === String(packageRecordId)) : null;
+        if (!pkg) {
+            packages = await getPatientPackages(patientId, true, targetClinicId);
+            pkg = Array.isArray(packages) ? packages.find(p => String(p.id) === String(packageRecordId)) : null;
+        }
         if (!pkg) {
             G.showToast(isEn ? 'Package not found' : '找不到套票', 'warning');
             return;
@@ -1046,8 +1065,12 @@ export async function deletePatientPackageRecord(patientId, packageRecordId, cli
         G.setButtonLoading(loadingButton, isEn ? 'Deleting...' : '刪除中...');
     }
     try {
-        const packages = await getPatientPackages(patientId, true, targetClinicId);
-        const pkg = Array.isArray(packages) ? packages.find(p => String(p.id) === String(packageRecordId)) : null;
+        let packages = await getPatientPackages(patientId, false, targetClinicId);
+        let pkg = Array.isArray(packages) ? packages.find(p => String(p.id) === String(packageRecordId)) : null;
+        if (!pkg) {
+            packages = await getPatientPackages(patientId, true, targetClinicId);
+            pkg = Array.isArray(packages) ? packages.find(p => String(p.id) === String(packageRecordId)) : null;
+        }
         if (!pkg) {
             G.showToast(isEn ? 'Package not found' : '找不到套票', 'warning');
             return;
@@ -1095,8 +1118,12 @@ export async function updatePatientPackageRemainingUses(patientId, packageRecord
         G.setButtonLoading(loadingButton, isEn ? 'Loading...' : '讀取中...');
     }
     try {
-        const packages = await getPatientPackages(patientId, true, targetClinicId);
-        const pkg = Array.isArray(packages) ? packages.find(p => String(p.id) === String(packageRecordId)) : null;
+        let packages = await getPatientPackages(patientId, false, targetClinicId);
+        let pkg = Array.isArray(packages) ? packages.find(p => String(p.id) === String(packageRecordId)) : null;
+        if (!pkg) {
+            packages = await getPatientPackages(patientId, true, targetClinicId);
+            pkg = Array.isArray(packages) ? packages.find(p => String(p.id) === String(packageRecordId)) : null;
+        }
         if (!pkg) {
             G.showToast(isEn ? 'Package not found' : '找不到套票', 'warning');
             return;
@@ -1154,13 +1181,13 @@ export async function updatePatientPackageRemainingUses(patientId, packageRecord
     }
 }
 
-export async function renderPatientPackages(patientId) {
+export async function renderPatientPackages(patientId, forceRefresh = false) {
     const container = document.getElementById('patientPackagesList');
     if (!container) return;
     
     try {
-        // 始終重新載入套票資料，避免跨裝置快取不一致
-        const pkgs = await getPatientPackages(patientId, true);
+        // 預設沿用快取（本地增刪改與預扣皆已同步快取），避免每次點擊「使用一次／取消」都重抓 Firestore
+        const pkgs = await getPatientPackages(patientId, !!forceRefresh);
         // 應用暫存變更，調整每個套票的剩餘次數
         const modifiedPkgs = pkgs.map(pkg => {
             const delta = G.pendingPackageChanges
@@ -1832,8 +1859,11 @@ export async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         // 若缺少 packageRecordId，嘗試透過名稱匹配
         if (!item.packageRecordId && item.patientId) {
             try {
-                // 使用強制刷新取得最新套票資料，避免跨裝置快取不一致
-                const pkgsForUndo = await getPatientPackages(item.patientId, true);
+                // 優先使用記憶體快取匹配套票名稱，未命中才重抓
+                let pkgsForUndo = await getPatientPackages(item.patientId, false);
+                if (!Array.isArray(pkgsForUndo) || pkgsForUndo.length === 0) {
+                    pkgsForUndo = await getPatientPackages(item.patientId, true);
+                }
                 // 從品項名稱中移除「(使用套票)」或「（使用套票）」，並處理可能出現的全形或半形括號與額外空格
                 let baseName = item.name || '';
                 baseName = baseName
@@ -1886,11 +1916,13 @@ export async function undoPackageUse(patientId, packageRecordId, usageItemId) {
         // 以項目中的 packageRecordId 為準
         const pkgId = item.packageRecordId;
         try {
-            // 取得病人的套票，如果沒有取得則重試一次
-            // 強制重新取得病人的套票，避免跨裝置快取不一致
-            const packages = await getPatientPackages(item.patientId, true);
-            // 比較套票 ID 時統一轉為字串，以避免類型不一致導致匹配失敗
-            const pkg = packages.find(p => String(p.id) === String(pkgId));
+            // 優先從記憶體快取取得套票，找不到才重抓
+            let packages = await getPatientPackages(item.patientId, false);
+            let pkg = packages.find(p => String(p.id) === String(pkgId));
+            if (!pkg) {
+                packages = await getPatientPackages(item.patientId, true);
+                pkg = packages.find(p => String(p.id) === String(pkgId));
+            }
             if (!pkg) {
                 // 找不到對應的套票，直接移除項目
                 G.selectedBillingItems = G.selectedBillingItems.filter(it => it.id !== usageItemId);

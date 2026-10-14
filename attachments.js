@@ -44,6 +44,7 @@
     var patientCache = {};       // patientId -> [{...doc}]（ready，已排序）
     var patientInflight = {};    // patientId -> Promise
     var sessionMap = {};         // sessionKey -> sessionId
+    var dirtyVisitSessions = {}; // sessionKey -> true（僅當本次診症實際發起上傳或手機代拍時標記）
     var gallery = null;          // 當前 gallery 狀態
     var lightbox = null;         // 當前 lightbox 狀態
 
@@ -501,6 +502,22 @@
 
         var sKey = sessionKey(appointmentId, patientId);
         var sessionId = sessionMap[sKey];
+        // 檢查跨裝置掛號紀錄（RTDB 即時同步）或本機是否曾在此診次上傳／開啟手機代拍
+        var aptHasUploads = false;
+        if (appointmentId) {
+            try {
+                var aptList = (typeof appointments !== 'undefined' && Array.isArray(appointments)) ? appointments : [];
+                var matchedApt = aptList.find(function (a) { return a && String(a.id) === appointmentId; });
+                if (matchedApt && matchedApt.hasVisitAttachments) {
+                    aptHasUploads = true;
+                }
+            } catch (_eApt) {}
+        }
+        // 若本機與跨裝置皆未曾發起任何上傳或手機代拍，直接回傳 0（0 次 Firestore getDocs 讀取）
+        if (!dirtyVisitSessions[sKey] && !aptHasUploads) {
+            if (sessionId) delete sessionMap[sKey];
+            return { count: 0 };
+        }
 
         var fb = window.firebase;
         var updates = {
@@ -521,9 +538,8 @@
                 if (!seen[d.id]) { seen[d.id] = true; candidates.push(d); }
             });
         }
-        // 候選來源 2（競態後備）：presign 文件剛建立、尚未帶上 sessionId 的亞秒級窗口，
-        // 以 appointmentId 單欄查詢（免複合索引）＋客戶端過濾未歸檔
-        if (appointmentId) {
+        // 候選來源 2（競態後備）：僅當 sessionId 查無結果或無 sessionId 時，才以 appointmentId 單欄查詢
+        if (appointmentId && candidates.length === 0) {
             var aSnap = await fb.getDocs(fb.firestoreQuery(
                 fb.collection(fb.db, COLLECTION),
                 fb.where('appointmentId', '==', appointmentId)
@@ -551,6 +567,7 @@
             });
         }
         if (sessionId) delete sessionMap[sKey];
+        delete dirtyVisitSessions[sKey];
         return { count: count };
     }
 
@@ -806,6 +823,17 @@
         var cfg = await ensureConfig();
         var prepared = await prepareImage(file, cfg.maxBytes);
         var sessionId = ctx.consultationId ? '' : ensureSessionId(ctx);
+        if (!ctx.consultationId && ctx.patientId) {
+            dirtyVisitSessions[sessionKey(ctx.appointmentId, ctx.patientId)] = true;
+            if (ctx.appointmentId && window.firebase && window.firebase.rtdb && typeof window.firebase.update === 'function') {
+                try {
+                    window.firebase.update(
+                        window.firebase.ref(window.firebase.rtdb, 'appointments/' + String(ctx.appointmentId)),
+                        { hasVisitAttachments: true }
+                    ).catch(function () {});
+                } catch (_rtdbErr) {}
+            }
+        }
         var presign = await requestPresign({
             patientId: ctx.patientId,
             patientName: ctx.patientName || '',
@@ -2090,6 +2118,17 @@
             return;
         }
 
+        if (!ctx.consultationId && ctx.patientId) {
+            dirtyVisitSessions[sessionKey(ctx.appointmentId, ctx.patientId)] = true;
+            if (ctx.appointmentId && window.firebase && window.firebase.rtdb && typeof window.firebase.update === 'function') {
+                try {
+                    window.firebase.update(
+                        window.firebase.ref(window.firebase.rtdb, 'appointments/' + String(ctx.appointmentId)),
+                        { hasVisitAttachments: true }
+                    ).catch(function () {});
+                } catch (_rtdbErr) {}
+            }
+        }
         relay = {
             sid: info.sid,
             url: info.captureUrl,

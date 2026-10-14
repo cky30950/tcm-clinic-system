@@ -12,9 +12,9 @@
 import * as Print from './domains/print/index.js?v=20261014c';
 import * as Wallet from './domains/wallet/index.js?v=20261014f';
 import * as Auth from './domains/auth/index.js?v=20261014c';
-import * as Patients from './domains/patients/index.js?v=20261014c';
-import * as Billing from './domains/billing/index.js?v=20261014e';
-import * as Consultation from './domains/consultation/index.js?v=20261014g';
+import * as Patients from './domains/patients/index.js?v=20261014i';
+import * as Billing from './domains/billing/index.js?v=20261014h';
+import * as Consultation from './domains/consultation/index.js?v=20261014h';
 
 const FACADE = {
     // ── print（收據／應診證明／病假紙／處方指示）──────────────

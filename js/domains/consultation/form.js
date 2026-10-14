@@ -7,7 +7,7 @@
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
 import { initBillingItems } from '../billing/items.js?v=20261014e';
-import { restorePackageUseMeta, undoPackageUse } from '../billing/packages.js?v=20261014e';
+import { restorePackageUseMeta, undoPackageUse } from '../billing/packages.js?v=20261014h';
 
         export function searchHerbsForPrescription() {
             const searchTerm = document.getElementById('prescriptionSearch').value.trim().toLowerCase();

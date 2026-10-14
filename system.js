@@ -11094,13 +11094,8 @@ class FirebaseDataManager {
             }
 
             console.log('診症記錄已添加到雲端資料庫:', consRef.id);
-            // 新增診症後清除全域診症快取並移除本地存檔
-            this.consultationsCache = null;
-            try {
-                localStorage.removeItem('consultations');
-            } catch (_lsErr) {
-                // 忽略 localStorage 錯誤
-            }
+            // 新增診症後就地更新本機診症詳情快取（免去緊接其後的套票快照／儲值狀態回寫再次 getDoc）
+            this._upsertCachedConsultation({ id: String(consRef.id), ...fullRecord });
             // 同時清除或更新單一病人的診症快取，以便下次重新讀取
             try {
                 if (consultationData && consultationData.patientId) {
@@ -12147,6 +12142,68 @@ class FirebaseDataManager {
      *        套票餘次快照回填、儲值付款狀態（walletPaid/paymentStatus/pendingAmount）、
      *        待收款核銷。這些更新若走完整鏈，會產生淨值為 0 的重複統計寫入。
      */
+    _findCachedConsultation(consultationId) {
+        const idStr = String(consultationId || '');
+        if (!idStr) return null;
+        if (Array.isArray(this.consultationsCache)) {
+            const hit = this.consultationsCache.find(c => c && String(c.id) === idStr);
+            if (hit) return hit;
+        }
+        try {
+            if (typeof consultations !== 'undefined' && Array.isArray(consultations)) {
+                const hit2 = consultations.find(c => c && String(c.id) === idStr);
+                if (hit2) return hit2;
+            }
+        } catch (_e) {}
+        return null;
+    }
+
+    _upsertCachedConsultation(record) {
+        if (!record || !record.id) return;
+        const idStr = String(record.id);
+        if (Array.isArray(this.consultationsCache)) {
+            const idx = this.consultationsCache.findIndex(c => c && String(c.id) === idStr);
+            if (idx >= 0) {
+                this.consultationsCache[idx] = { ...this.consultationsCache[idx], ...record, id: idStr };
+            } else {
+                this.consultationsCache.push({ ...record, id: idStr });
+            }
+        } else {
+            this.consultationsCache = [{ ...record, id: idStr }];
+        }
+        try {
+            if (typeof consultations !== 'undefined' && Array.isArray(consultations)) {
+                const idx2 = consultations.findIndex(c => c && String(c.id) === idStr);
+                if (idx2 >= 0) {
+                    consultations[idx2] = { ...consultations[idx2], ...record, id: idStr };
+                } else {
+                    consultations.push({ ...record, id: idStr });
+                }
+            }
+        } catch (_e) {}
+        try {
+            if (Array.isArray(this.consultationsCache)) {
+                localStorage.setItem('consultations', JSON.stringify(this.consultationsCache));
+            }
+        } catch (_lsErr) {}
+    }
+
+    _removeCachedConsultation(consultationId) {
+        const idStr = String(consultationId || '');
+        if (!idStr) return;
+        if (Array.isArray(this.consultationsCache)) {
+            this.consultationsCache = this.consultationsCache.filter(c => !c || String(c.id) !== idStr);
+            try {
+                localStorage.setItem('consultations', JSON.stringify(this.consultationsCache));
+            } catch (_lsErr) {}
+        }
+        try {
+            if (typeof consultations !== 'undefined' && Array.isArray(consultations)) {
+                consultations = consultations.filter(c => !c || String(c.id) !== idStr);
+            }
+        } catch (_e) {}
+    }
+
     async updateConsultation(consultationId, consultationData, options = {}) {
         try {
             const skipSideEffects = !!(options && options.skipSideEffects);
@@ -12160,12 +12217,16 @@ class FirebaseDataManager {
                 dataToWrite = consultationData;
             }
             const updatedAt = new Date();
-            try {
-                const existingDoc = await window.firebase.getDoc(window.firebase.doc(window.firebase.db, 'consultations', consultationId));
-                if (existingDoc && existingDoc.exists()) {
-                    existingRecord = existingDoc.data() || null;
-                }
-            } catch (_existingErr) {}
+            // 優先從記憶體快取取得舊病歷（特別是剛儲存後的套票快照回填／儲值扣款回寫，可省下 getDoc）
+            existingRecord = this._findCachedConsultation(consultationId);
+            if (!existingRecord) {
+                try {
+                    const existingDoc = await window.firebase.getDoc(window.firebase.doc(window.firebase.db, 'consultations', consultationId));
+                    if (existingDoc && existingDoc.exists()) {
+                        existingRecord = existingDoc.data() || null;
+                    }
+                } catch (_existingErr) {}
+            }
             this.enrichConsultationPatientMetaFromCache(dataToWrite, existingRecord);
             let temporalBase = { ...(existingRecord || {}), ...dataToWrite, updatedAt };
             const sortDate = getConsultationEffectiveDate(temporalBase, updatedAt);
@@ -12260,13 +12321,8 @@ class FirebaseDataManager {
                     console.warn('更新診症後同步財務日聚合失敗:', _finStatsErr);
                 }
             }
-            // 更新診症後清除全域診症快取並移除本地存檔
-            this.consultationsCache = null;
-            try {
-                localStorage.removeItem('consultations');
-            } catch (_lsErr) {
-                // 忽略 localStorage 錯誤
-            }
+            // 更新診症後就地同步本機詳情快取，免去後續重複 getDoc
+            this._upsertCachedConsultation(afterRecord);
             // 更新單一病人診症快取或清除全部快取
             try {
                 const affectedPatientIds = Array.from(new Set(
@@ -12330,13 +12386,15 @@ class FirebaseDataManager {
         try {
             const idStr = String(consultationId || '');
             if (!idStr) return { success: false, error: 'missing_consultation_id' };
-            let existingRecord = null;
-            try {
-                const existingDoc = await window.firebase.getDoc(window.firebase.doc(window.firebase.db, 'consultations', idStr));
-                if (existingDoc && existingDoc.exists()) {
-                    existingRecord = { id: existingDoc.id, ...existingDoc.data() };
-                }
-            } catch (_getErr) {}
+            let existingRecord = this._findCachedConsultation(idStr);
+            if (!existingRecord) {
+                try {
+                    const existingDoc = await window.firebase.getDoc(window.firebase.doc(window.firebase.db, 'consultations', idStr));
+                    if (existingDoc && existingDoc.exists()) {
+                        existingRecord = { id: existingDoc.id, ...existingDoc.data() };
+                    }
+                } catch (_getErr) {}
+            }
             // 刪除主文件 + 財務摘要標記刪除 + 病人聚合 + patientsMeta 單一批次原子提交。
             const deletedAt = new Date();
             const batch = window.firebase.writeBatch(window.firebase.db);
@@ -13066,16 +13124,34 @@ class FirebaseDataManager {
             } catch (_omitErr) {
                 dataToWrite = packageData;
             }
+            const createdAt = new Date();
+            const createdBy = currentUser || 'system';
             const docRef = await window.firebase.addDoc(
                 window.firebase.collection(window.firebase.db, 'patientPackages'),
                 {
                     ...dataToWrite,
-                    createdAt: new Date(),
-                    createdBy: currentUser || 'system'
+                    createdAt,
+                    createdBy
                 }
             );
             
             console.log('患者套票已添加到雲端資料庫:', docRef.id);
+            // 同步更新本地快取，使緊接其後的套票彙總計算可直接讀取記憶體快取（免去重複 getDocs）
+            try {
+                const pidStr = packageData && packageData.patientId ? String(packageData.patientId) : '';
+                if (pidStr && typeof patientPackagesCache === 'object' && patientPackagesCache && Array.isArray(patientPackagesCache[pidStr])) {
+                    const exists = patientPackagesCache[pidStr].some(p => p && String(p.id) === String(docRef.id));
+                    if (!exists) {
+                        patientPackagesCache[pidStr] = [
+                            ...patientPackagesCache[pidStr],
+                            { ...dataToWrite, id: docRef.id, createdAt, createdBy }
+                        ];
+                        try {
+                            localStorage.setItem(`patientPackages_${pidStr}`, JSON.stringify(patientPackagesCache[pidStr]));
+                        } catch (_lsErr) {}
+                    }
+                }
+            } catch (_cacheErr) {}
             // 在成功添加套票後，更新病人文件中的套票彙總欄位。
             try {
                 // 套票資料中應包含 patientId
@@ -13536,29 +13612,40 @@ class FirebaseDataManager {
             return { success: false, error: 'Data manager not ready' };
         }
         try {
-            // 構建查詢：篩選此病人的套票且剩餘次數大於 0
-            const packagesCollection = window.firebase.collection(window.firebase.db, 'patientPackages');
-            const activeQuery = window.firebase.firestoreQuery(
-                packagesCollection,
-                window.firebase.where('patientId', '==', patientId),
-                window.firebase.where('remainingUses', '>', 0)
-            );
-            // 使用單次 getDocs 取得所有有效套票，計算數量及剩餘次數
+            // 優先從記憶體已載入的 patientPackagesCache 計算有效套票數量與剩餘次數（0 次 Firestore 讀取）；
+            // 僅在該病人的套票尚未載入記憶體快取時，才回退發起 getDocs 查詢。
+            const pidKey = String(patientId || '');
             let activeCount = 0;
             let totalRemainingUses = 0;
-            try {
-                const snap = await window.firebase.getDocs(activeQuery);
-                activeCount = snap.size;
-                snap.forEach((docSnap) => {
-                    const d = docSnap.data();
-                    if (d && typeof d.remainingUses === 'number') {
-                        totalRemainingUses += d.remainingUses;
+            if (pidKey && typeof patientPackagesCache === 'object' && patientPackagesCache && Array.isArray(patientPackagesCache[pidKey])) {
+                patientPackagesCache[pidKey].forEach((d) => {
+                    const rem = d && typeof d.remainingUses === 'number' ? d.remainingUses : Number(d && d.remainingUses);
+                    if (Number.isFinite(rem) && rem > 0) {
+                        activeCount += 1;
+                        totalRemainingUses += rem;
                     }
                 });
-            } catch (err) {
-                console.warn('取得有效套票資料失敗:', err);
-                activeCount = 0;
-                totalRemainingUses = 0;
+            } else {
+                const packagesCollection = window.firebase.collection(window.firebase.db, 'patientPackages');
+                const activeQuery = window.firebase.firestoreQuery(
+                    packagesCollection,
+                    window.firebase.where('patientId', '==', patientId),
+                    window.firebase.where('remainingUses', '>', 0)
+                );
+                try {
+                    const snap = await window.firebase.getDocs(activeQuery);
+                    activeCount = snap.size;
+                    snap.forEach((docSnap) => {
+                        const d = docSnap.data();
+                        if (d && typeof d.remainingUses === 'number') {
+                            totalRemainingUses += d.remainingUses;
+                        }
+                    });
+                } catch (err) {
+                    console.warn('取得有效套票資料失敗:', err);
+                    activeCount = 0;
+                    totalRemainingUses = 0;
+                }
             }
             // 更新病人文件中的彙總欄位
             try {
@@ -13569,8 +13656,11 @@ class FirebaseDataManager {
                     updatedAt: new Date(),
                     updatedBy: currentUser || 'system'
                 });
-                // 通知其他裝置病人列表有變更
-                touchPatientsMeta('update', patientId).catch(() => {});
+                // 通知其他裝置病人列表與套票快取有變更（帶本機 nonce 避免本機回聲重讀）
+                touchPatientsMeta('update', patientId, {
+                    nonce: typeof newSelfMetaNonce === 'function' ? newSelfMetaNonce() : undefined,
+                    kind: 'package'
+                }).catch(() => {});
             } catch (updateErr) {
                 console.error('更新病人套票彙總欄位失敗:', updateErr);
                 return { success: false, error: updateErr.message };
