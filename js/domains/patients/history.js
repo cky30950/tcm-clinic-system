@@ -20,6 +20,11 @@ import { printAttendanceCertificate, printConsultationRecord, printPrescriptionI
             if (medicalRecordAuditStatusCache.has(id)) {
                 return medicalRecordAuditStatusCache.get(id);
             }
+            // 新病歷儲存時自帶 hasAuditLog: false，修改後標記為 true，可直接免去 consultationAuditLogs 查詢
+            if (consultation && typeof consultation.hasAuditLog === 'boolean') {
+                medicalRecordAuditStatusCache.set(id, consultation.hasAuditLog);
+                return consultation.hasAuditLog;
+            }
             let edited = false;
             try {
                 if (window.firebaseDataManager && typeof window.firebaseDataManager.getConsultationAuditLogs === 'function') {

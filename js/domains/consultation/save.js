@@ -479,27 +479,22 @@ export async function showConsultationForm(appointment, options = {}) {
                 console.warn('無法設定預設複診時間', _e);
             }
             
-            // 嘗試從 Firestore 取得問診資料，用於預填主訴與現病史。
-            // 這裡不再使用 appointment.inquiryData，本地僅保存 inquiryId 與摘要。
+            // 嘗試從 Firestore 單筆取得問診資料（1 次讀取），用於預填主訴與現病史。
             let inquiryDataForPrefill = null;
             if (appointment && appointment.inquiryId) {
                 try {
-                    // 對病人姓名進行修剪，避免前後空白導致查詢不到
-                    const nameForSearch = patient && patient.name ? String(patient.name).trim() : '';
-                    let inquiryResult = await window.firebaseDataManager.getInquiryRecords(nameForSearch);
                     let rec = null;
-                    if (inquiryResult && inquiryResult.success && Array.isArray(inquiryResult.data)) {
-                        rec = inquiryResult.data.find(r => String(r.id) === String(appointment.inquiryId));
+                    if (window.firebaseDataManager && typeof window.firebaseDataManager.getInquiryById === 'function') {
+                        const singleInquiryRes = await window.firebaseDataManager.getInquiryById(String(appointment.inquiryId));
+                        if (singleInquiryRes && singleInquiryRes.success && singleInquiryRes.data) {
+                            rec = singleInquiryRes.data;
+                        }
                     }
-                    // 如果按姓名查詢找不到，改為查詢所有記錄再搜尋 id
-                    if (!rec) {
-                        try {
-                            const allResult = await window.firebaseDataManager.getInquiryRecords('');
-                            if (allResult && allResult.success && Array.isArray(allResult.data)) {
-                                rec = allResult.data.find(r => String(r.id) === String(appointment.inquiryId));
-                            }
-                        } catch (e2) {
-                            console.warn('取得全部問診記錄時發生錯誤:', e2);
+                    if (!rec && window.firebaseDataManager && typeof window.firebaseDataManager.getInquiryRecords === 'function') {
+                        const nameForSearch = patient && patient.name ? String(patient.name).trim() : '';
+                        const inquiryResult = await window.firebaseDataManager.getInquiryRecords(nameForSearch);
+                        if (inquiryResult && inquiryResult.success && Array.isArray(inquiryResult.data)) {
+                            rec = inquiryResult.data.find(r => String(r.id) === String(appointment.inquiryId)) || null;
                         }
                     }
                     if (rec && rec.data) {
@@ -1471,8 +1466,9 @@ export async function saveConsultation() {
                         afterData: updatedSnapshot
                     });
                     // 有實質變更才會寫入審核日誌（skipped 代表無欄位變更）；
-                    // 同步預熱病歷修改狀態快取，令「已修改」標籤與「審核追蹤」按鈕即時出現
+                    // 同步預熱病歷修改狀態快取與 hasAuditLog 標記，令「已修改」標籤與「審核追蹤」按鈕即時出現
                     if (auditWriteResult && auditWriteResult.success && !auditWriteResult.skipped) {
+                        consultationData.hasAuditLog = true;
                         try {
                             if (typeof G.primeMedicalRecordAuditStatus === 'function') {
                                 G.primeMedicalRecordAuditStatus(String(appointment.consultationId), true);

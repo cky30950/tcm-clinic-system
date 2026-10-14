@@ -14,19 +14,15 @@ import { G } from '../../lib/legacy.js';
                     console.error('切換掛號系統時清除過期掛號錯誤:', err);
                 })
                 .finally(() => {
-                    
-                    try {
-                        if (typeof subscribeToAppointments === 'function') {
-                            subscribeToAppointments();
-                        }
-                    } catch (_err) {
-                        console.error('啟動掛號監聽時失敗:', _err);
-                    }
-                    
+                    // setupAppointmentDatePicker 內部已同步日期並呼叫 subscribeToAppointments()，此處不重複綁定
                     try {
                         setupAppointmentDatePicker();
                     } catch (_e) {
-                        
+                        try {
+                            if (typeof subscribeToAppointments === 'function') {
+                                subscribeToAppointments();
+                            }
+                        } catch (_err) {}
                     }
                     
                     loadTodayAppointments();
@@ -842,8 +838,8 @@ export async function loadTodayAppointments() {
     // 如果需要手動清除，請在調用 loadConsultationSystem 前呼叫 clearOldAppointments。
     // await clearOldAppointments();
 
-    // 如果全域 appointments 尚未有資料，則從 Firebase 讀取掛號資料。若已有資料則直接使用，避免重複讀取。
-    if (!Array.isArray(G.appointments) || G.appointments.length === 0) {
+    // 僅在全域 appointments 尚未初始化為陣列時才讀取；當日 0 筆掛號（空陣列）時不重複抓取整個 appointments 節點。
+    if (!Array.isArray(G.appointments)) {
         try {
             const result = await window.firebaseDataManager.getAppointments();
             if (result.success) {
@@ -1009,6 +1005,11 @@ export function subscribeToAppointments(forceToday) {
     const startIso = startOfDay.toISOString();
     const endIso = endOfDay.toISOString();
 
+    const rangeKey = `${startIso}|${endIso}`;
+    // 若已經在監聽相同日期範圍，無需拆掉重連 RTDB，直接沿用現有監聽器
+    if (window.appointmentsListener && window.appointmentsQuery && window.appointmentsSubscribedRangeKey === rangeKey) {
+        return;
+    }
     // 構建基本參考路徑
     const appointmentsRef = window.firebase.ref(window.firebase.rtdb, 'appointments');
     // 使用 Realtime Database 查詢以篩選當天的掛號資料，減少監聽範圍
@@ -1026,8 +1027,9 @@ export function subscribeToAppointments(forceToday) {
             console.error('取消掛號監聽器時發生錯誤:', e);
         }
     }
-    // 存儲本次查詢，以便後續取消監聽
+    // 存儲本次查詢與範圍鍵，以便後續取消監聽或去重
     window.appointmentsQuery = appointmentsQuery;
+    window.appointmentsSubscribedRangeKey = rangeKey;
     // 初始化前一次狀態記錄
     if (!window.previousAppointmentStatuses) {
         window.previousAppointmentStatuses = {};

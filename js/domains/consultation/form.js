@@ -1859,8 +1859,11 @@ export async function searchBillingForConsultation() {
                     G.showToast('找不到病人資料！', 'error');
                     return;
                 }
-                // 讀取病人的診症記錄（使用快取）：單病人 onSnapshot 已保證即時性，無需強制刷新
-                const consultationResult = await window.firebaseDataManager.getPatientConsultations(patient.id, false);
+                // 僅需最近 1～2 筆病歷（優先命中 loadPastRecords 已載入的輕量快取，避免全量拉取所有歷史病歷）
+                const recentLimit = appointment.consultationId ? 2 : 1;
+                const consultationResult = (window.firebaseDataManager && typeof window.firebaseDataManager.getRecentPatientConsultations === 'function')
+                    ? await window.firebaseDataManager.getRecentPatientConsultations(patient.id, recentLimit, false)
+                    : await window.firebaseDataManager.getPatientConsultations(patient.id, false);
                 if (!consultationResult.success) {
                     G.showToast('無法讀取診症記錄！', 'error');
                     return;
@@ -2073,8 +2076,11 @@ export async function searchBillingForConsultation() {
                     G.showToast('找不到病人資料！', 'error');
                     return;
                 }
-                // 從 Firebase 取得病人的診症記錄並按日期排序（使用快取）：單病人 onSnapshot 已保證即時性
-                const consultationResult = await window.firebaseDataManager.getPatientConsultations(patient.id, false);
+                // 僅需最近 1～2 筆病歷（優先命中 loadPastRecords 已載入的輕量快取，避免全量拉取所有歷史病歷）
+                const recentLimit = appointment.consultationId ? 2 : 1;
+                const consultationResult = (window.firebaseDataManager && typeof window.firebaseDataManager.getRecentPatientConsultations === 'function')
+                    ? await window.firebaseDataManager.getRecentPatientConsultations(patient.id, recentLimit, false)
+                    : await window.firebaseDataManager.getPatientConsultations(patient.id, false);
                 if (!consultationResult.success) {
                     G.showToast('無法讀取診症記錄！', 'error');
                     return;

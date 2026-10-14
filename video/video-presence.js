@@ -73,7 +73,7 @@
     var PATH_ROOT = 'videoPresence';
 
     // ── Firestore 相容橋接（過渡期後整段移除）──
-    var FIRESTORE_COMPAT_ENABLED = true;
+    var FIRESTORE_COMPAT_ENABLED = false;
     var FIRESTORE_VERSION = '12.15.0';
     var FIRESTORE_MODULE_URL =
         'https://www.gstatic.com/firebasejs/' + FIRESTORE_VERSION + '/firebase-firestore.js';

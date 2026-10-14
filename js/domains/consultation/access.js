@@ -636,11 +636,13 @@ export async function loadInquiryOptions(patient) {
     
     select.innerHTML = '<option value="">不使用問診資料</option>';
     try {
-        
         const userLoggedIn = (window.firebase && window.firebase.auth && window.firebase.auth.currentUser) ||
                              (typeof G.currentUserData !== 'undefined' && G.currentUserData);
         if (userLoggedIn && window.firebaseDataManager && window.firebaseDataManager.clearOldInquiries) {
-            await window.firebaseDataManager.clearOldInquiries();
+            // 背景執行每日一次的過期問診清理，不阻塞掛號選單載入
+            window.firebaseDataManager.clearOldInquiries().catch(err => {
+                console.error('清除過期問診資料時發生錯誤:', err);
+            });
         }
     } catch (err) {
         console.error('清除過期問診資料時發生錯誤:', err);

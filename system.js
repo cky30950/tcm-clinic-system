@@ -308,17 +308,16 @@ function changeInventoryType(type) {
     }
     
     if (typeof initHerbInventory === 'function') {
-        initHerbInventory(true).then(() => {
-            
-            if (typeof displayHerbLibrary === 'function') {
-                displayHerbLibrary();
-            }
-        }).catch((_err) => {
-            
-            if (typeof displayHerbLibrary === 'function') {
-                displayHerbLibrary();
-            }
-        });
+        const refreshHerbLibraryIfVisible = () => {
+            try {
+                const herbSection = document.getElementById('herbLibrary');
+                if (herbSection && !herbSection.classList.contains('hidden') && typeof displayHerbLibrary === 'function') {
+                    displayHerbLibrary();
+                }
+            } catch (_e) {}
+        };
+        // 非強制刷新：若目前診所的同模式 RTDB 監聽已就緒則直接沿用，不拆監聽重抓整棵庫存樹
+        initHerbInventory(false).then(refreshHerbLibraryIfVisible).catch(refreshHerbLibraryIfVisible);
     }
 }
 
@@ -996,10 +995,14 @@ async function computeGlobalUsageCounts() {
 
 async function loadPastRecords(patientId, excludeConsultationId = null) {
     try {
+        const MAX_PAST_RECORDS = 10;
+        const fetchLimit = excludeConsultationId ? (MAX_PAST_RECORDS + 1) : MAX_PAST_RECORDS;
         let records = [];
         try {
-            // 使用快取：單病人 consultations onSnapshot 已保證跨裝置即時同步，無需每次強制全量刷新
-            const res = await window.firebaseDataManager.getPatientConsultations(patientId, false);
+            // 僅讀取最近 10 筆過往病歷（獨立快取，不覆蓋完整病歷分頁快取）
+            const res = (window.firebaseDataManager && typeof window.firebaseDataManager.getRecentPatientConsultations === 'function')
+                ? await window.firebaseDataManager.getRecentPatientConsultations(patientId, fetchLimit, false)
+                : await window.firebaseDataManager.getPatientConsultations(patientId, false);
             if (res && res.success && Array.isArray(res.data)) {
                 records = res.data;
             }
@@ -1033,7 +1036,7 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
                 return d ? d.getTime() : 0;
             };
             return getTime(b) - getTime(a);
-        });
+        }).slice(0, MAX_PAST_RECORDS);
         
         const lines = records.map(c => {
             let dateObj = null;
@@ -1070,10 +1073,9 @@ async function loadPastRecords(patientId, excludeConsultationId = null) {
         
         const historyField = document.getElementById('formCurrentHistory');
         if (historyField) {
-            
-            
             const separator = '\n──────────\n';
-            historyField.value = lines.join(separator);
+            const bodyText = lines.join(separator);
+            historyField.value = bodyText ? `${bodyText}${separator}只顯示最近10筆記錄` : '';
         }
     } catch (e) {
         console.error('載入過往記錄時發生錯誤:', e);
@@ -10154,6 +10156,8 @@ class FirebaseDataManager {
         this.consultationsHasMore = false;
         this.consultationSortDateReadyPatients = {};
         this.consultationSortDatePromises = {};
+        // 單病人最近 N 筆病歷輕量快取（供診症表單「過往記錄」與「載入上次處方/收費」共用，不污染全量 patientConsultationsCache）
+        this.recentPatientConsultationsCache = {};
         // 用於緩存用戶列表與其分頁資訊
         this.usersCache = null;
         this.usersLastVisible = null;
@@ -10997,6 +11001,7 @@ class FirebaseDataManager {
                 createdAt,
                 sortDate: sortDate || createdAt,
                 createdBy: currentUser,
+                hasAuditLog: false,
                 searchKeywords
             };
             // 客戶端預先產生病歷 ID，使「病歷主文件 + 財務摘要 + 病人聚合 + patientsMeta」
@@ -11074,10 +11079,11 @@ class FirebaseDataManager {
             // 同時清除或更新單一病人的診症快取，以便下次重新讀取
             try {
                 if (consultationData && consultationData.patientId) {
-                    delete patientConsultationsCache[consultationData.patientId];
-                    try { localStorage.removeItem('patientConsultations:' + String(consultationData.patientId)); } catch (_e) {}
+                    const pid = String(consultationData.patientId || '');
+                    delete patientConsultationsCache[pid];
+                    if (this.recentPatientConsultationsCache) delete this.recentPatientConsultationsCache[pid];
+                    try { localStorage.removeItem('patientConsultations:' + pid); } catch (_e) {}
                     try {
-                        const pid = String(consultationData.patientId || '');
                         if (pid && consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
                             delete consultationHistoryPager.patientPagedCache[pid];
                         }
@@ -11085,6 +11091,7 @@ class FirebaseDataManager {
                 } else {
                     // 如果缺少病人 ID，清除所有病人診症快取
                     patientConsultationsCache = {};
+                    this.recentPatientConsultationsCache = {};
                     try {
                         if (consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
                             consultationHistoryPager.patientPagedCache = {};
@@ -11094,6 +11101,7 @@ class FirebaseDataManager {
             } catch (_err) {
                 // 若執行快取清理時發生錯誤，直接重置快取
                 patientConsultationsCache = {};
+                this.recentPatientConsultationsCache = {};
                 try {
                     if (consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
                         consultationHistoryPager.patientPagedCache = {};
@@ -12221,6 +12229,7 @@ class FirebaseDataManager {
                 if (affectedPatientIds.length > 0) {
                     affectedPatientIds.forEach((pid) => {
                         delete patientConsultationsCache[pid];
+                        if (this.recentPatientConsultationsCache) delete this.recentPatientConsultationsCache[pid];
                         try { localStorage.removeItem('patientConsultations:' + pid); } catch (_e) {}
                         try {
                             if (consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
@@ -12231,6 +12240,7 @@ class FirebaseDataManager {
                 } else {
                     // 如果無法確定病人 ID，則清除所有病人診症快取
                     patientConsultationsCache = {};
+                    this.recentPatientConsultationsCache = {};
                     try {
                         if (consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
                             consultationHistoryPager.patientPagedCache = {};
@@ -12239,6 +12249,7 @@ class FirebaseDataManager {
                 }
             } catch (_err) {
                 patientConsultationsCache = {};
+                this.recentPatientConsultationsCache = {};
                 try {
                     if (consultationHistoryPager && consultationHistoryPager.patientPagedCache) {
                         consultationHistoryPager.patientPagedCache = {};
@@ -12428,6 +12439,13 @@ class FirebaseDataManager {
                     editedAt: new Date()
                 }
             );
+            // 同步標記病歷主文件 hasAuditLog: true，讓日後檢視病歷時無需額外查詢 consultationAuditLogs
+            try {
+                await window.firebase.updateDoc(
+                    window.firebase.doc(window.firebase.db, 'consultations', consultationId),
+                    { hasAuditLog: true }
+                );
+            } catch (_flagErr) {}
             return { success: true, id: docRef.id };
         } catch (error) {
             console.error('新增病歷審核追蹤失敗:', error);
@@ -12518,6 +12536,76 @@ class FirebaseDataManager {
             return { success: true, data: patientConsultations };
         } catch (error) {
             console.error('讀取病人診症記錄失敗:', error);
+            return { success: false, data: [] };
+        }
+    }
+
+    /**
+     * 輕量讀取病人最近 N 筆診症記錄（供診症表單「過往記錄」小框及「載入上次處方/收費」使用）。
+     * 使用獨立快取 recentPatientConsultationsCache，絕不覆蓋全量 patientConsultationsCache，
+     * 因此「診症記錄／病歷記錄」彈窗與「病歷管理」查閱 10 筆以前的舊病歷完全不受影響。
+     */
+    async getRecentPatientConsultations(patientId, limitCount = 10, forceRefresh = false) {
+        if (!this.isReady) return { success: false, data: [] };
+        const pid = String(patientId || '');
+        if (!pid) return { success: false, data: [] };
+        const maxCount = Math.max(1, Number(limitCount) || 10);
+        try {
+            if (forceRefresh && this.recentPatientConsultationsCache) {
+                delete this.recentPatientConsultationsCache[pid];
+            }
+            // 1. 若全量快取已存在於記憶體，直接切片回傳（0 次 Firestore 讀取）
+            if (!forceRefresh && patientConsultationsCache && Array.isArray(patientConsultationsCache[pid])) {
+                return { success: true, data: patientConsultationsCache[pid].slice(0, maxCount) };
+            }
+            // 2. 若輕量快取已存在且筆數足夠（或已包含該病人全部記錄），直接回傳（0 次 Firestore 讀取）
+            if (!forceRefresh && this.recentPatientConsultationsCache && this.recentPatientConsultationsCache[pid]) {
+                const cachedEntry = this.recentPatientConsultationsCache[pid];
+                if (Array.isArray(cachedEntry.items) && (cachedEntry.items.length >= maxCount || cachedEntry.exhausted)) {
+                    return { success: true, data: cachedEntry.items.slice(0, maxCount) };
+                }
+            }
+            // 3. 查詢最近 maxCount（最少抓 11 筆以同時覆蓋 loadPastRecords 10 筆 + 編輯排除 1 筆 與載入上次處方）
+            const fetchSize = Math.max(maxCount, 11);
+            const colRef = window.firebase.collection(window.firebase.db, 'consultations');
+            let docs = [];
+            try {
+                const qSort = window.firebase.firestoreQuery(
+                    colRef,
+                    window.firebase.where('patientId', '==', pid),
+                    window.firebase.orderBy('sortDate', 'desc'),
+                    window.firebase.limit(fetchSize)
+                );
+                const snap = await window.firebase.getDocs(qSort);
+                snap.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
+            } catch (_sortQueryErr) {
+                docs = [];
+            }
+            // 後備：若舊匯入病歷尚未有 sortDate 欄位導致查不到，改用 createdAt desc limit 查詢
+            if (docs.length === 0) {
+                try {
+                    const qCreated = window.firebase.firestoreQuery(
+                        colRef,
+                        window.firebase.where('patientId', '==', pid),
+                        window.firebase.orderBy('createdAt', 'desc'),
+                        window.firebase.limit(fetchSize)
+                    );
+                    const snap2 = await window.firebase.getDocs(qCreated);
+                    snap2.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
+                } catch (_createdQueryErr) {
+                    docs = [];
+                }
+            }
+            docs.sort((a, b) => getConsultationEffectiveTimestamp(b) - getConsultationEffectiveTimestamp(a));
+            if (!this.recentPatientConsultationsCache) this.recentPatientConsultationsCache = {};
+            this.recentPatientConsultationsCache[pid] = {
+                items: docs,
+                exhausted: docs.length < fetchSize
+            };
+            trimCache(this.recentPatientConsultationsCache, 100);
+            return { success: true, data: docs.slice(0, maxCount) };
+        } catch (error) {
+            console.error('讀取病人最近診症記錄失敗:', error);
             return { success: false, data: [] };
         }
     }
@@ -13504,20 +13592,46 @@ class FirebaseDataManager {
      * @param {string} patientName 病人姓名
      * @returns {Promise<{success: boolean, data: Array}>}
      */
-    async getInquiryRecords(patientName) {
+    async getInquiryById(inquiryId) {
+        if (!this.isReady || !inquiryId) return { success: false, data: null };
+        try {
+            const idStr = String(inquiryId).trim();
+            if (!idStr) return { success: false, data: null };
+            if (typeof inquiryOptionsData !== 'undefined' && inquiryOptionsData && inquiryOptionsData[idStr]) {
+                return { success: true, data: inquiryOptionsData[idStr] };
+            }
+            const docRef = window.firebase.doc(window.firebase.db, 'inquiries', idStr);
+            const snap = await window.firebase.getDoc(docRef);
+            if (snap && snap.exists()) {
+                return { success: true, data: { id: snap.id, ...snap.data() } };
+            }
+            return { success: false, data: null };
+        } catch (error) {
+            console.error('單筆讀取問診資料失敗:', error);
+            return { success: false, data: null };
+        }
+    }
+
+    async getInquiryRecords(patientName, maxCount = 30) {
         if (!this.isReady) return { success: false, data: [] };
         try {
             let baseRef = window.firebase.collection(window.firebase.db, 'inquiries');
-            // 若有提供 patientName，則使用 where 條件
+            const limitNum = Math.max(1, Number(maxCount) || 30);
+            // 若有提供 patientName，則使用 where 條件；統一加上 limit 避免無上限全表掃描
             let q;
             if (patientName) {
                 q = window.firebase.firestoreQuery(
                     baseRef,
                     window.firebase.where('patientName', '==', patientName),
-                    window.firebase.orderBy('createdAt', 'desc')
+                    window.firebase.orderBy('createdAt', 'desc'),
+                    window.firebase.limit(limitNum)
                 );
             } else {
-                q = window.firebase.firestoreQuery(baseRef, window.firebase.orderBy('createdAt', 'desc'));
+                q = window.firebase.firestoreQuery(
+                    baseRef,
+                    window.firebase.orderBy('createdAt', 'desc'),
+                    window.firebase.limit(limitNum)
+                );
             }
             const snapshot = await window.firebase.getDocs(q);
             const now = new Date();
@@ -13562,20 +13676,19 @@ class FirebaseDataManager {
     }
 
     /**
-     * 清除過期的問診資料。
-     *
-     * Security Rules 規定 `inquiries` 客戶端一律不可寫入/刪除
-     * （allow create, update, delete: if false），舊式直接 deleteDoc
-     * 會回報 Missing or insufficient permissions。改為呼叫
-     * POST /api/inquiry/cleanup，由 Pages Function 驗證職員身份後
-     * 以 Service Account 刪除 createdAt／expireAt 早於香港時間今日
-     * 00:00 的文件（只保留今天及未來的資料）。
-     *
-     * @returns {Promise<{success: boolean, deletedCount?: number, error?: string}>}
+     * 清除過期的問診資料（每台裝置每日最多自動執行一次，避免每次開啟掛號彈窗都呼叫後端掃描）。
      */
-    async clearOldInquiries() {
+    async clearOldInquiries(force = false) {
         if (!this.isReady) return { success: false };
         try {
+            const todayKey = new Date().toISOString().slice(0, 10);
+            if (!force) {
+                try {
+                    if (localStorage.getItem('lastInquiryCleanupDate') === todayKey) {
+                        return { success: true, skipped: true, deletedCount: 0 };
+                    }
+                } catch (_lsErr) {}
+            }
             const fbUser = window.firebase && window.firebase.auth && window.firebase.auth.currentUser;
             if (!fbUser) return { success: false };
 
@@ -13598,6 +13711,9 @@ class FirebaseDataManager {
             if (!response.ok) {
                 throw new Error((data && data.message) || ('HTTP ' + response.status));
             }
+            try {
+                localStorage.setItem('lastInquiryCleanupDate', todayKey);
+            } catch (_lsWriteErr) {}
             return { success: true, deletedCount: (data && data.deletedCount) || 0 };
         } catch (error) {
             console.error('清除過期問診資料失敗:', error);
@@ -15321,11 +15437,11 @@ function clearSearchKeywordsBackfillCache() {
 
 /**
  * legacy fallback 是否已關閉（＝searchKeywords 回填完成且版本相符）。
- * 失敗時回 false（fail-open：寧可多查也不要讓舊資料搜不到）。
+ * 失敗時預設關閉回退（true），避免無效關鍵字或網路波動造成最多 34 次連環 getDocs 讀取；
+ * 僅當 Firestore 文檔明確標記 fallbackNeeded: true 時才開啟。
  */
 async function isLegacySearchFallbackDisabled() {
-    // 記憶體結論（含負面）於本頁生命週期直接信任；同一頁執行回填或
-    // 管理員切換旗標時會主動重設此變數，故不會卡住
+    // 記憶體結論於本頁生命週期直接信任
     if (typeof _searchKeywordsBackfillComplete === 'boolean') {
         return _searchKeywordsBackfillComplete;
     }
@@ -15345,18 +15461,19 @@ async function isLegacySearchFallbackDisabled() {
         );
         const snap = await window.firebase.getDoc(ref);
         const data = snap.exists() ? snap.data() : null;
-        const complete = !!data
-            && Number(data.version) === SEARCH_KEYWORDS_BACKFILL_VERSION
-            && !!data.completedAt;
+        // 若文檔存在且明確標記 fallbackNeeded: true 才開啟回退；其餘情況一律關閉回退以節省讀取流量
+        const fallbackExplicitlyNeeded = !!data && data.fallbackNeeded === true;
+        const complete = !fallbackExplicitlyNeeded;
         _searchKeywordsBackfillComplete = complete;
         writeSearchKeywordsBackfillCache(
             complete,
-            complete ? BACKFILL_POSITIVE_CACHE_MS : BACKFILL_NEGATIVE_CACHE_MS
+            BACKFILL_POSITIVE_CACHE_MS
         );
         return complete;
     } catch (_e) {
-        // 網路/權限異常：本輪 fail-open，不寫長期負面快取
-        return false;
+        // 網路/權限異常：預設關閉回退，避免觸發 34 次連環查詢
+        _searchKeywordsBackfillComplete = true;
+        return true;
     }
 }
 
@@ -15463,17 +15580,17 @@ async function isSortDateBackfillComplete() {
         );
         const snap = await window.firebase.getDoc(ref);
         const data = snap.exists() ? snap.data() : null;
-        const complete = !!data
-            && Number(data.version) === SORT_DATE_BACKFILL_VERSION
-            && !!data.completedAt;
+        // 預設視為完成，除非顯式標記 backfillNeeded === true；避免每個 session 首次開啟病人病歷時都進行無限制全量掃描
+        const complete = !data || (data.backfillNeeded !== true);
         _sortDateBackfillComplete = complete;
         writeSortDateBackfillCache(
             complete,
-            complete ? BACKFILL_POSITIVE_CACHE_MS : BACKFILL_NEGATIVE_CACHE_MS
+            BACKFILL_POSITIVE_CACHE_MS
         );
         return complete;
     } catch (_e) {
-        return false;
+        _sortDateBackfillComplete = true;
+        return true;
     }
 }
 
@@ -15670,7 +15787,7 @@ async function searchMedicalRecords(term, limitCount = 50) {
         // 用舊邏輯補查。若已鎖定或 searchKeywords 已命中結果（out.length > 0），
         // 絕對不進入舊回退迴圈（避免一輪最多 34 次 getDocs 的暴增讀取）。
         if (out.length === 0) {
-            let fallbackDisabled = false;
+            let fallbackDisabled = true;
             try {
                 fallbackDisabled = await isLegacySearchFallbackDisabled();
             } catch (_e) {}

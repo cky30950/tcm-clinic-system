@@ -509,8 +509,13 @@ export function refreshOpenConsultationHistory(patientId, operation) {
     const pid = String(patientId || '');
     if (!pid) return;
 
-    // 1. 清除單筆病人診症快取
+    // 1. 清除單筆病人診症快取與最近 10 筆輕量快取
     try { delete G.patientConsultationsCache[pid]; } catch (_e) {}
+    try {
+        if (window.firebaseDataManager && window.firebaseDataManager.recentPatientConsultationsCache) {
+            delete window.firebaseDataManager.recentPatientConsultationsCache[pid];
+        }
+    } catch (_eRecent) {}
     // 2. 清除 localStorage 的該病人病歷快取
     try { localStorage.removeItem('patientConsultations:' + pid); } catch (_e) {}
     // 3. 從全域 consultations 陣列中移除屬於該病人的記錄，並同步到 localStorage

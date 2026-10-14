@@ -19,9 +19,8 @@ import {
   
   initializeFirestore,
   persistentLocalCache,
-  
-  persistentMultipleTabManager
-  ,
+  persistentMultipleTabManager,
+  CACHE_SIZE_UNLIMITED,
   
   writeBatch,
   FieldPath,
@@ -67,8 +66,8 @@ import firebaseConfig from './firebaseConfig.js?v=20261001b';
     
     const db = initializeFirestore(app, {
       localCache: persistentLocalCache({
-        // 限制 IndexedDB 緩存大小為 20MB（默認 40MB），避免長期運行 SPA 的緩存無限制增長
-        cacheSizeBytes: 20 * 1024 * 1024,
+        // 設定 IndexedDB 緩存上限為 200MB（原 20MB），兼顧硬碟容量上限與高快取命中率，避免頻繁 LRU 淘洗
+        cacheSizeBytes: 200 * 1024 * 1024,
         tabManager: persistentMultipleTabManager()
       })
     });
