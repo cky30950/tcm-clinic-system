@@ -273,17 +273,24 @@
         <button class="lang-btn" id="langToggle" type="button">English</button>
     </div>
 
-    <!-- 輸入電話查詢（無需驗證碼） -->
+    <!-- 輸入電話與身份證頭四位查詢（無需 SMS 驗證碼） -->
     <div id="authView">
         <div class="card">
             <h1 data-i18n="authTitle">會員查詢</h1>
-            <p class="sub" data-i18n="authSub">輸入於診所登記之手機號碼，即可查閱儲值餘額、套票及交易記錄。</p>
+            <p class="sub" data-i18n="authSub">輸入於診所登記之手機號碼及身份證頭 4 位，即可查閱儲值餘額、套票及交易記錄。</p>
 
             <div class="field">
                 <label for="phoneInput" data-i18n="phoneLabel">手機號碼</label>
                 <input type="tel" id="phoneInput" inputmode="tel" autocomplete="tel"
                        placeholder="9123 4567">
                 <p class="hint" data-i18n="phoneHint">請輸入於診所登記之手機號碼。</p>
+            </div>
+
+            <div class="field">
+                <label for="idCardPrefixInput" data-i18n="idCardPrefixLabel">身份證號碼頭 4 位</label>
+                <input type="text" id="idCardPrefixInput" maxlength="4" autocapitalize="characters" autocomplete="off"
+                       placeholder="A123">
+                <p class="hint" data-i18n="idCardPrefixHint">請輸入香港身份證／證件號碼頭 4 位字元（連英文字母，例如 A123）。</p>
             </div>
 
             <div class="turnstile-box" id="turnstileBox">
@@ -402,6 +409,6 @@
     </div>
 </div>
 
-<script type="module" src="/member.js"></script>
+<script type="module" src="/member.js?v=20261014j"></script>
 </body>
 </html>

@@ -12,9 +12,11 @@ const I18N = {
     zh: {
         clinicName: '名醫診所系統',
         authTitle: '會員查詢',
-        authSub: '輸入於診所登記之手機號碼，即可查閱儲值餘額、套票及交易記錄。',
+        authSub: '輸入於診所登記之手機號碼及身份證頭 4 位，即可查閱儲值餘額、套票及交易記錄。',
         phoneLabel: '手機號碼',
         phoneHint: '請輸入於診所登記之手機號碼。',
+        idCardPrefixLabel: '身份證號碼頭 4 位',
+        idCardPrefixHint: '請輸入香港身份證／證件號碼頭 4 位字元（連英文字母，例如 A123）。',
         lookup: '查詢',
         looking: '查詢中…',
         errCaptcha: '請先完成人機驗證',
@@ -40,6 +42,8 @@ const I18N = {
         txAdjust: '人工調整',
         txStatus: '狀態變更',
         errPhone: '請輸入於診所登記的電話號碼',
+        errIdCardPrefix: '請輸入身份證號碼頭 4 位字元（例如 A123）',
+        errIdCardMismatch: '電話號碼與身份證頭 4 位不相符，請核對後再試。',
         errNoPatient: '系統中沒有以此電話登記的病人記錄。',
         errNotMember: '閣下尚未登記成為會員，未能進入會員端。請親臨診所開通儲值帳戶，或聯絡診所職員協助。',
         errLoad: '查詢失敗，請稍後再試',
@@ -89,9 +93,11 @@ const I18N = {
     en: {
         clinicName: 'Dr.Great Clinic System',
         authTitle: 'Member Portal',
-        authSub: 'Enter your mobile number registered with the clinic to view your stored-value balance, packages and transactions.',
+        authSub: 'Enter your registered mobile number and the first 4 characters of your ID card to view your balance, packages and transactions.',
         phoneLabel: 'Mobile number',
         phoneHint: 'Enter the number registered with the clinic.',
+        idCardPrefixLabel: 'First 4 characters of ID card',
+        idCardPrefixHint: 'Enter the first 4 alphanumeric characters of your HKID / ID document (including letter, e.g. A123).',
         lookup: 'Look up',
         looking: 'Looking up…',
         errCaptcha: 'Please complete the human verification',
@@ -117,6 +123,8 @@ const I18N = {
         txAdjust: 'Manual adjustment',
         txStatus: 'Status change',
         errPhone: 'Please enter the phone number registered with the clinic',
+        errIdCardPrefix: 'Please enter the first 4 characters of your ID card (e.g. A123)',
+        errIdCardMismatch: 'Phone number and ID card prefix do not match. Please check and try again.',
         errNoPatient: 'No patient record is registered with this phone number.',
         errNotMember: "You are not a registered member yet, so you cannot access the member portal. Please visit the clinic to open a stored-value account, or contact our staff for assistance.",
         errLoad: 'Lookup failed, please try again later',
@@ -353,6 +361,7 @@ let activePatientIndex = 0;
 let activeClinicIndex = 0;
 let txPage = 1;
 let lastPhone = '';
+let lastIdCardPrefix = '';
 const TX_PAGE_SIZE = 10;
 
 function activeEntry() {
@@ -380,11 +389,18 @@ async function lookup() {
         return;
     }
     const rawPhone = String($('phoneInput').value || '').trim();
+    const rawIdPrefix = String(($('idCardPrefixInput') && $('idCardPrefixInput').value) || '').trim();
+    const cleanIdPrefix = rawIdPrefix.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 4);
     lastPhone = rawPhone;
+    lastIdCardPrefix = cleanIdPrefix;
     const digits = rawPhone.replace(/\D/g, '');
     // 不限制位數，只要輸入了電話號碼即可，比對由後端依登記電話處理
     if (digits.length < 4) {
         showAuthMsg('errPhone');
+        return;
+    }
+    if (cleanIdPrefix.length < 4) {
+        showAuthMsg('errIdCardPrefix');
         return;
     }
 
@@ -395,7 +411,11 @@ async function lookup() {
         const res = await fetch('/api/member/lookup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: rawPhone, turnstileToken: turnstileToken })
+            body: JSON.stringify({
+                phone: rawPhone,
+                idCardPrefix: cleanIdPrefix,
+                turnstileToken: turnstileToken
+            })
         });
         let data;
         try {
@@ -404,9 +424,17 @@ async function lookup() {
             data = null;
         }
         if (!res.ok) {
-            // 後端會員把關：非會員統一顯示本地化提示
+            // 後端會員把關：非會員或身份證不符統一顯示本地化提示
             if (data && data.error === 'NOT_MEMBER') {
                 showAuthMsg('errNotMember', 'info');
+                return;
+            }
+            if (data && data.error === 'ID_MISMATCH') {
+                showAuthMsg('errIdCardMismatch');
+                return;
+            }
+            if (data && data.error === 'INVALID_ID_PREFIX') {
+                showAuthMsg('errIdCardPrefix');
                 return;
             }
             showAuthMsg((data && data.message) || 'errLoad');
@@ -441,6 +469,11 @@ $('lookupBtn').addEventListener('click', lookup);
 $('phoneInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') lookup();
 });
+if ($('idCardPrefixInput')) {
+    $('idCardPrefixInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') lookup();
+    });
+}
 
 $('clinicSelect').addEventListener('change', (e) => {
     activeClinicIndex = Number(e.target.value) || 0;
@@ -861,6 +894,7 @@ async function submitBooking() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 phone: lastPhone,
+                idCardPrefix: lastIdCardPrefix,
                 turnstileToken: bookingToken,
                 patientId: entry.patientId,
                 clinicId: bookingClinicId,
@@ -970,6 +1004,7 @@ function renderMyAppointments() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         phone: lastPhone,
+                        idCardPrefix: lastIdCardPrefix,
                         turnstileToken: humanToken,
                         appointmentId: id
                     })

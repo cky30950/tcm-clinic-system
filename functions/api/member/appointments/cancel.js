@@ -75,17 +75,34 @@ export async function onRequestPost(context) {
             return jsonResponse({ error: 'NOT_FOUND', message: '找不到此預約記錄' }, 404);
         }
 
-        // 電話身份舉證
+        // 電話與身份證頭 4 位身份舉證
         const variants = phoneMatchVariants(body && body.phone);
         if (!variants.length) {
             return jsonResponse({ error: 'INVALID_PHONE', message: '請輸入於診所登記的電話號碼' }, 400);
         }
+        const idCardPrefix = String((body && body.idCardPrefix) || '')
+            .replace(/[^A-Za-z0-9]/g, '')
+            .toUpperCase()
+            .slice(0, 4);
+        if (idCardPrefix.length < 4) {
+            return jsonResponse({ error: 'INVALID_ID_PREFIX', message: '請輸入身份證頭 4 位字元' }, 400);
+        }
         const patientDocs = await findPatientsByPhone(client, variants);
-        const owns = patientDocs.some((d) => d.id === String(appointment.patientId));
-        if (!owns) {
+        const ownerDoc = patientDocs.find((d) => d.id === String(appointment.patientId));
+        if (!ownerDoc) {
             return jsonResponse({
                 error: 'FORBIDDEN',
                 message: '此預約不屬於該電話登記之會員'
+            }, 403);
+        }
+        const docIdPrefix = String((ownerDoc.data && ownerDoc.data.idCard) || '')
+            .replace(/[^A-Za-z0-9]/g, '')
+            .toUpperCase()
+            .slice(0, 4);
+        if (docIdPrefix !== idCardPrefix) {
+            return jsonResponse({
+                error: 'ID_MISMATCH',
+                message: '電話號碼與身份證頭 4 位不相符，請重新查詢'
             }, 403);
         }
 

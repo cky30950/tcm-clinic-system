@@ -91,10 +91,17 @@ export async function onRequestPost(context) {
 
         const { auth, client } = await buildServiceContext(env);
 
-        // ── 電話身份舉證 ──
+        // ── 電話與身份證頭 4 位身份舉證 ──
         const variants = phoneMatchVariants(body && body.phone);
         if (!variants.length) {
             return jsonResponse({ error: 'INVALID_PHONE', message: '請輸入於診所登記的電話號碼' }, 400);
+        }
+        const idCardPrefix = String((body && body.idCardPrefix) || '')
+            .replace(/[^A-Za-z0-9]/g, '')
+            .toUpperCase()
+            .slice(0, 4);
+        if (idCardPrefix.length < 4) {
+            return jsonResponse({ error: 'INVALID_ID_PREFIX', message: '請輸入身份證頭 4 位字元' }, 400);
         }
         const patientDocs = await findPatientsByPhone(client, variants);
         const patientDoc = patientDocs.find((d) => d.id === patientId);
@@ -102,6 +109,16 @@ export async function onRequestPost(context) {
             return jsonResponse({
                 error: 'PATIENT_MISMATCH',
                 message: '此病人並非登記於該電話號碼，請重新查詢'
+            }, 403);
+        }
+        const docIdPrefix = String((patientDoc.data && patientDoc.data.idCard) || '')
+            .replace(/[^A-Za-z0-9]/g, '')
+            .toUpperCase()
+            .slice(0, 4);
+        if (docIdPrefix !== idCardPrefix) {
+            return jsonResponse({
+                error: 'ID_MISMATCH',
+                message: '電話號碼與身份證頭 4 位不相符，請重新查詢'
             }, 403);
         }
 

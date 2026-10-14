@@ -823,6 +823,15 @@ export async function onRequestPost(context) {
             }, 429);
         }
 
+        const rawIdPrefix = body && body.idCardPrefix ? String(body.idCardPrefix) : '';
+        const idCardPrefix = rawIdPrefix.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 4);
+        if (idCardPrefix.length < 4) {
+            return jsonResponse({
+                error: 'INVALID_ID_PREFIX',
+                message: '請輸入身份證頭 4 位字元（例如：A123）'
+            }, 400);
+        }
+
         const token = body && body.turnstileToken ? String(body.turnstileToken) : '';
         const human = await verifyTurnstile(token, ip, env);
         if (!human) {
@@ -839,6 +848,25 @@ export async function onRequestPost(context) {
             env.FIREBASE_RTDB_URL || ''
         );
 
+        const patientDocs = await findPatients(client, phoneVariants);
+        // 完全沒有病人記錄 → 維持原「查無病人」流程（前端顯示 errNoPatient）
+        if (!patientDocs.length) return jsonResponse({ patients: [] });
+
+        // 驗證身份證頭 4 位（先過濾，避免電話被猜測時觸發後續錢包/套票讀取）
+        const matchedPatientDocs = patientDocs.filter((d) => {
+            const docIdPrefix = String((d.data && d.data.idCard) || '')
+                .replace(/[^A-Za-z0-9]/g, '')
+                .toUpperCase()
+                .slice(0, 4);
+            return docIdPrefix === idCardPrefix;
+        });
+        if (!matchedPatientDocs.length) {
+            return jsonResponse({
+                error: 'ID_MISMATCH',
+                message: '電話號碼與身份證頭 4 位不相符，請核對後再試。'
+            }, 403);
+        }
+
         // 診所名稱表（id → 中英文名），跨請求快取 30 分鐘；
         // 員工表（uid/username → clinicId）同快取，供舊資料歸屬補證；
         // 同時以一次 range 查詢取回未來 30 天掛號供會員端展示
@@ -848,13 +876,11 @@ export async function onRequestPost(context) {
             fetchUpcomingByPatient(client, auth.token, 30)
         ]);
 
-        const patientDocs = await findPatients(client, phoneVariants);
         const allEntries = await Promise.all(
-            patientDocs.map((d) => buildPatientEntry(
+            matchedPatientDocs.map((d) => buildPatientEntry(
                 client, auth.token, d, clinicTable.nameMap, clinicTable.ids, upcomingMap, staffTable))
         );
 
-        // 完全沒有病人記錄 → 維持原「查無病人」流程（前端顯示 errNoPatient）
         if (!allEntries.length) return jsonResponse({ patients: [] });
 
         // 會員端把關：病人存在但非會員（無有效儲值帳戶或零結餘）不得進入。

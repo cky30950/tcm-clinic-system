@@ -25,7 +25,7 @@
     "appointments": {
       ".read": "auth !== null && auth.token.staff === true && auth.token.active === true",
       ".write": "auth !== null && auth.token.staff === true && auth.token.active === true",
-      ".indexOn": ["appointmentTime"]
+      ".indexOn": ["appointmentTime", "patientId", "clinicId"]
     },
 
     "consultationStatus": {
