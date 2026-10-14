@@ -5,7 +5,7 @@
  * 快取與篩選狀態為本模組私有；其餘共享狀態經 G 讀寫。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { getApportionedCost } from './expenses.js';
+import { getApportionedCost } from './expenses.js?v=20261014e';
 import { getPatientByIdWithRefresh } from '../patients/store.js';
 
         let currentFinancialTabType = 'summary';
@@ -332,14 +332,14 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
                     if (canUseSummary && summaryCovered) {
                         const summaryRes = await window.firebaseDataManager.getConsultationFinancialSummariesByRangeAndDoctor(startVal, endVal, doctorVal || null, true, clinicVal || null);
                         if (summaryRes && summaryRes.success) {
-                            consultations = summaryRes.data.map(normalizeFinancialRecordForReport).filter(Boolean);
+                            G.consultations = summaryRes.data.map(normalizeFinancialRecordForReport).filter(Boolean);
                             return;
                         }
                     }
 
                     const targeted = await window.firebaseDataManager.getConsultationsByRangeAndDoctor(startVal, endVal, doctorVal || null, true, clinicVal || null);
                     if (targeted && targeted.success) {
-                        consultations = targeted.data.map(normalizeFinancialRecordForReport).filter(Boolean);
+                        G.consultations = targeted.data.map(normalizeFinancialRecordForReport).filter(Boolean);
                         if (canUseSummary) {
                             // 回填改為背景執行：大量舊資料時不再阻塞報表顯示。
                             // 旗標於回填成功後才寫入；此期間重跑只會多做一次查詢，不影響正確性。
@@ -354,13 +354,13 @@ import { getPatientByIdWithRefresh } from '../patients/store.js';
                     if (canUseSummary) {
                         const summaryFallback = await window.firebaseDataManager.getConsultationFinancialSummariesByRangeAndDoctor(startVal, endVal, doctorVal || null, true, clinicVal || null);
                         if (summaryFallback && summaryFallback.success) {
-                            consultations = summaryFallback.data.map(normalizeFinancialRecordForReport).filter(Boolean);
+                            G.consultations = summaryFallback.data.map(normalizeFinancialRecordForReport).filter(Boolean);
                             return;
                         }
                     }
                 }
                 // 取消全量回退載入：避免財務報表在索引問題時掃描整個 consultations 集合。
-                consultations = [];
+                G.consultations = [];
             } catch (error) {
                 console.error('載入雲端診症資料失敗:', error);
             }

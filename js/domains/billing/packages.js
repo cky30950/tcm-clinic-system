@@ -5,7 +5,7 @@
  * initBillingItems 與收費項目模組同域直接 import。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { initBillingItems } from './items.js';
+import { initBillingItems } from './items.js?v=20261014e';
 
 export function currentPackageClinicId() {
     try {
@@ -185,6 +185,10 @@ export async function ensurePatientPackageHistoryClinicScoped(patientId, pkgClin
     const pid = String(patientId || '');
     if (!pid || historyClinicBackfillDone.has(pid)) return;
     historyClinicBackfillDone.add(pid);
+    // 若該病人既無已標注套票、亦無診症使用證據，查出未標注歷史也無法推導 clinicId，直接跳過查詢（0 次讀取）
+    const hasPkgMap = !!(pkgClinicMap && pkgClinicMap.size > 0);
+    const hasEvidenceMap = !!(useEvidenceMap && useEvidenceMap.size > 0);
+    if (!hasPkgMap && !hasEvidenceMap) return;
     try {
         // 兩個相等過濾可由自動單欄索引服務，無需複合索引
         const q = window.firebase.firestoreQuery(

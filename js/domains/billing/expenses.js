@@ -20,6 +20,19 @@ export function monthsInDateRange(startDateStr, endDateStr) {
     return list;
 }
 
+// 月份支出記憶體快取（key: month，存該月完整文件列表，TTL 5 分鐘），
+// 供財報分攤成本（含當期＋上期環比）與支出列表彈窗共用，寫入／修改／刪除時主動失效。
+const CLINIC_EXPENSES_CACHE_TTL_MS = 5 * 60 * 1000;
+const clinicExpensesMonthCache = new Map();
+
+export function invalidateClinicExpensesCache(month = '') {
+    if (month) {
+        clinicExpensesMonthCache.delete(String(month));
+    } else {
+        clinicExpensesMonthCache.clear();
+    }
+}
+
 export async function getClinicExpensesByMonths(months, clinicId = null) {
     await G.waitForFirebaseDb();
     const validMonths = Array.from(new Set((Array.isArray(months) ? months : []).filter(Boolean)));
@@ -31,6 +44,8 @@ export async function getClinicExpensesByMonths(months, clinicId = null) {
     // 按月保留總額與類別明細，供部分月份按天數分攤
     const byMonth = {};
     const addExpense = (d) => {
+        if (!d) return;
+        if (clinicId && String(d.clinicId || '') !== String(clinicId)) return;
         const amt = Number(d.amount) || 0;
         const t = d.type || '其他費用';
         const monthKey = d.month || '';
@@ -42,35 +57,62 @@ export async function getClinicExpensesByMonths(months, clinicId = null) {
             byMonth[monthKey].byType[t] = (byMonth[monthKey].byType[t] || 0) + amt;
         }
     };
-    const chunkSize = 10;
-    const chunks = [];
-    for (let i = 0; i < validMonths.length; i += chunkSize) {
-        chunks.push(validMonths.slice(i, i + chunkSize));
-    }
-    for (const chunk of chunks) {
-        const colRef = window.firebase.collection(window.firebase.db, 'clinicExpenses');
-        const parts = [window.firebase.where('month', 'in', chunk)];
-        if (clinicId) {
-            parts.push(window.firebase.where('clinicId', '==', clinicId));
+
+    const now = Date.now();
+    const missingMonths = [];
+    for (const m of validMonths) {
+        const cached = clinicExpensesMonthCache.get(m);
+        if (cached && (now - cached.at < CLINIC_EXPENSES_CACHE_TTL_MS) && Array.isArray(cached.docs)) {
+            cached.docs.forEach(addExpense);
+        } else {
+            missingMonths.push(m);
         }
-        let snapshot = null;
-        try {
-            snapshot = await window.firebase.getDocs(window.firebase.firestoreQuery(colRef, ...parts));
-        } catch (_batchErr) {
-            // 若缺少複合索引，退回逐月查詢，仍避免全集合掃描。
-            if (typeof window.indexManager !== 'undefined') {
-                window.indexManager.register(_batchErr, '成本查詢（month + clinicId）');
-            }
-            for (const monthKey of chunk) {
-                const fallbackParts = [window.firebase.where('month', '==', monthKey)];
-                if (clinicId) fallbackParts.push(window.firebase.where('clinicId', '==', clinicId));
-                const fallbackSnap = await window.firebase.getDocs(window.firebase.firestoreQuery(colRef, ...fallbackParts));
-                fallbackSnap.forEach(docSnap => addExpense(docSnap.data() || {}));
-            }
-            continue;
-        }
-        snapshot.forEach(docSnap => addExpense(docSnap.data() || {}));
     }
+
+    if (missingMonths.length > 0) {
+        const chunkSize = 10;
+        const chunks = [];
+        for (let i = 0; i < missingMonths.length; i += chunkSize) {
+            chunks.push(missingMonths.slice(i, i + chunkSize));
+        }
+        const fetchedByMonth = new Map();
+        missingMonths.forEach(m => fetchedByMonth.set(m, []));
+
+        for (const chunk of chunks) {
+            const colRef = window.firebase.collection(window.firebase.db, 'clinicExpenses');
+            const parts = [window.firebase.where('month', 'in', chunk)];
+            let snapshot = null;
+            try {
+                snapshot = await window.firebase.getDocs(window.firebase.firestoreQuery(colRef, ...parts));
+            } catch (_batchErr) {
+                for (const monthKey of chunk) {
+                    const fallbackSnap = await window.firebase.getDocs(
+                        window.firebase.firestoreQuery(colRef, window.firebase.where('month', '==', monthKey))
+                    );
+                    fallbackSnap.forEach(docSnap => {
+                        const item = { id: docSnap.id, ...(docSnap.data() || {}) };
+                        if (!fetchedByMonth.has(monthKey)) fetchedByMonth.set(monthKey, []);
+                        fetchedByMonth.get(monthKey).push(item);
+                    });
+                }
+                continue;
+            }
+            snapshot.forEach(docSnap => {
+                const item = { id: docSnap.id, ...(docSnap.data() || {}) };
+                const mk = item.month || '';
+                if (mk && fetchedByMonth.has(mk)) {
+                    fetchedByMonth.get(mk).push(item);
+                }
+            });
+        }
+
+        const stamp = Date.now();
+        fetchedByMonth.forEach((docs, mk) => {
+            clinicExpensesMonthCache.set(mk, { at: stamp, docs });
+            docs.forEach(addExpense);
+        });
+    }
+
     return { totalCost: total, byType, byMonth };
 }
 
@@ -135,6 +177,7 @@ export async function saveClinicExpense() {
         window.firebase.collection(window.firebase.db, 'clinicExpenses'),
         { month, type, amount: Number(amount), note: note || '', clinicId: G.currentClinicId || null, clinicName: (G.clinicSettings && (G.clinicSettings.chineseName || G.clinicSettings.englishName)) ? (G.clinicSettings.chineseName || G.clinicSettings.englishName) : '', createdAt: new Date(), updatedAt: new Date(), createdBy }
     );
+    invalidateClinicExpensesCache(month);
     G.showToast('成本已儲存', 'success');
     closeExpenseImportModal();
     try { await G.generateFinancialReport(); } catch (_e) {}
@@ -142,16 +185,25 @@ export async function saveClinicExpense() {
     try { await loadClinicExpensesForListMonth(); } catch (_e) {}
 }
 
-export async function listClinicExpensesForMonth(month) {
+export async function listClinicExpensesForMonth(month, forceRefresh = false) {
     await G.waitForFirebaseDb();
-    const colRef = window.firebase.collection(window.firebase.db, 'clinicExpenses');
-    const q = window.firebase.firestoreQuery(colRef, window.firebase.where('month', '==', month));
-    const snapshot = await window.firebase.getDocs(q);
-    const list = [];
-    snapshot.forEach(docSnap => {
-        const d = docSnap.data() || {};
-        list.push({ id: docSnap.id, ...d });
-    });
+    const cached = !forceRefresh && month ? clinicExpensesMonthCache.get(String(month)) : null;
+    let list;
+    if (cached && (Date.now() - cached.at < CLINIC_EXPENSES_CACHE_TTL_MS) && Array.isArray(cached.docs)) {
+        list = cached.docs.slice();
+    } else {
+        const colRef = window.firebase.collection(window.firebase.db, 'clinicExpenses');
+        const q = window.firebase.firestoreQuery(colRef, window.firebase.where('month', '==', month));
+        const snapshot = await window.firebase.getDocs(q);
+        list = [];
+        snapshot.forEach(docSnap => {
+            const d = docSnap.data() || {};
+            list.push({ id: docSnap.id, ...d });
+        });
+        if (month) {
+            clinicExpensesMonthCache.set(String(month), { at: Date.now(), docs: list.slice() });
+        }
+    }
     list.sort((a, b) => {
         const ta = a.updatedAt && a.updatedAt.seconds ? new Date(a.updatedAt.seconds * 1000) : (a.updatedAt ? new Date(a.updatedAt) : new Date(0));
         const tb = b.updatedAt && b.updatedAt.seconds ? new Date(b.updatedAt.seconds * 1000) : (b.updatedAt ? new Date(b.updatedAt) : new Date(0));
@@ -318,6 +370,7 @@ export async function saveEditExpense(id) {
         window.firebase.doc(window.firebase.db, 'clinicExpenses', id),
         { type, amount, note, updatedAt: new Date(), updatedBy: G.currentUser || 'system' }
     );
+    invalidateClinicExpensesCache();
     G.showToast('成本已更新', 'success');
     await loadClinicExpensesForSelectedMonth();
 }
@@ -331,6 +384,7 @@ export async function deleteExpense(id) {
     await window.firebase.deleteDoc(
         window.firebase.doc(window.firebase.db, 'clinicExpenses', id)
     );
+    invalidateClinicExpensesCache();
     G.showToast('成本已刪除', 'success');
     await loadClinicExpensesForSelectedMonth();
 }

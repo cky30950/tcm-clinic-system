@@ -971,26 +971,36 @@ export async function loadPatientConsultationSummary(patientId) {
 
     try {
         let patient = await G.getPatientByIdWithRefresh(patientId);
-        let totalConsultations = patient && typeof patient.consultationCount === 'number'
+        let hasDenormalizedCount = !!(patient && typeof patient.consultationCount === 'number');
+        let totalConsultations = hasDenormalizedCount
             ? Math.max(0, Number(patient.consultationCount) || 0)
             : 0;
         let latestConsultation = null;
         try {
-            const stateResult = await G.consultationHistoryPager.ensurePatientState(patientId, false);
-            if (stateResult && stateResult.success && stateResult.state) {
-                totalConsultations = Math.max(0, Number(stateResult.state.totalCount) || 0);
-                patient = {
-                    ...(patient || {}),
-                    consultationCount: totalConsultations
-                };
-                if (totalConsultations > 0) {
-                    const latestIndex = totalConsultations - 1;
-                    const loaded = await G.consultationHistoryPager.ensureLoadedAtIndex(patientId, latestIndex);
-                    if (loaded) {
-                        const cachedState = G.consultationHistoryPager.getCachedPatientState(patientId);
-                        if (cachedState && Array.isArray(cachedState.recordsByIndex)) {
-                            latestConsultation = cachedState.recordsByIndex[latestIndex] || null;
-                        }
+            // 優先複用記憶體中已載入的分頁狀態（0 次 Firestore 讀取）
+            const cachedState = G.consultationHistoryPager && typeof G.consultationHistoryPager.getCachedPatientState === 'function'
+                ? G.consultationHistoryPager.getCachedPatientState(patientId)
+                : null;
+            if (cachedState && cachedState.countReady) {
+                totalConsultations = Math.max(0, Number(cachedState.totalCount) || 0);
+                if (totalConsultations > 0 && Array.isArray(cachedState.recordsByIndex)) {
+                    latestConsultation = cachedState.recordsByIndex[totalConsultations - 1] || null;
+                }
+            } else if (!hasDenormalizedCount) {
+                // 僅在舊病人文件尚未有 consultationCount 聚合欄位時，才初始化分頁器取得總數
+                const stateResult = await G.consultationHistoryPager.ensurePatientState(patientId, false);
+                if (stateResult && stateResult.success && stateResult.state) {
+                    totalConsultations = Math.max(0, Number(stateResult.state.totalCount) || 0);
+                }
+            }
+            // 若總診療次數 > 0，但病人聚合欄位缺少最近診療日期且缺少下次複診日期，才單筆讀取最新 1 筆病歷（避免每次開詳情預抓 20 筆）
+            const hasLatestAt = !!(patient && patient.latestConsultationAt);
+            const hasFollowUpField = !!(patient && patient.latestFollowUpDate !== undefined);
+            if (totalConsultations > 0 && !latestConsultation && (!hasLatestAt || !hasFollowUpField)) {
+                if (window.firebaseDataManager && typeof window.firebaseDataManager.getLatestPatientConsultation === 'function') {
+                    const latestRes = await window.firebaseDataManager.getLatestPatientConsultation(patientId);
+                    if (latestRes && latestRes.success && latestRes.data) {
+                        latestConsultation = latestRes.data;
                     }
                 }
             }

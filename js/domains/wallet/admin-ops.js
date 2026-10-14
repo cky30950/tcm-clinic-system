@@ -28,6 +28,8 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       G.showToast('金額最多只可兩位小數（最小 HK$0.01）', 'error');
       return;
     }
+    // 在非同步操作前先捕獲觸發按鈕（相容 event.currentTarget 與選擇器後備）
+    const topupButton = G.getLoadingButtonFromEvent('button[onclick="submitWalletTopup()"]');
     const methodSelect = document.getElementById('walletTopupMethod');
     const paymentMethod = methodSelect ? methodSelect.value : 'cash';
     const methodLabel = WALLET_METHOD_LABELS[paymentMethod] || paymentMethod;
@@ -43,6 +45,9 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
     } catch (_e) { /* 贈送額查詢失敗不阻擋確認 */ }
     const confirmed = await G.showConfirmation(confirmMsg, 'question');
     if (!confirmed) return;
+    if (topupButton) {
+      G.setButtonLoading(topupButton, '充值中...');
+    }
     try {
       const result = await walletApi('topup', {
         patientId: walletSelectedPatientId,
@@ -62,6 +67,10 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       await syncWalletListEntry(walletSelectedPatientId);
     } catch (error) {
       G.showToast('充值失敗：' + error.message, 'error');
+    } finally {
+      if (topupButton) {
+        G.clearButtonLoading(topupButton);
+      }
     }
   }
 
@@ -152,6 +161,8 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       }
       payload.amount = refundAmount;
     }
+    const refundButton = G.getLoadingButtonFromEvent('button[onclick="submitWalletRefund()"]');
+    if (refundButton) G.setButtonLoading(refundButton, '處理中...');
     try {
       await walletApi('refund', payload);
       invalidateWalletAccount(walletSelectedPatientId);
@@ -161,6 +172,8 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       await syncWalletListEntry(walletSelectedPatientId);
     } catch (error) {
       G.showToast('退款失敗：' + error.message, 'error');
+    } finally {
+      if (refundButton) G.clearButtonLoading(refundButton);
     }
   }
 
@@ -201,6 +214,8 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       G.showToast('調整金額最多只可兩位小數（最小 HK$0.01）', 'error');
       return;
     }
+    const adjustButton = G.getLoadingButtonFromEvent('button[onclick="submitWalletAdjust()"]');
+    if (adjustButton) G.setButtonLoading(adjustButton, '處理中...');
     try {
       await walletApi('adjust', {
         patientId: walletSelectedPatientId,
@@ -216,6 +231,8 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       await syncWalletListEntry(walletSelectedPatientId);
     } catch (error) {
       G.showToast('調整失敗：' + error.message, 'error');
+    } finally {
+      if (adjustButton) G.clearButtonLoading(adjustButton);
     }
   }
 
@@ -245,6 +262,8 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
   export async function submitWalletStatus() {
     const status = String(document.getElementById('walletStatusSelect').value || '');
     const note = String(document.getElementById('walletStatusNote').value || '');
+    const statusButton = G.getLoadingButtonFromEvent('button[onclick="submitWalletStatus()"]');
+    if (statusButton) G.setButtonLoading(statusButton, '處理中...');
     try {
       await walletApi('status', {
         patientId: walletSelectedPatientId,
@@ -259,6 +278,8 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       await syncWalletListEntry(walletSelectedPatientId);
     } catch (error) {
       G.showToast('更新失敗：' + error.message, 'error');
+    } finally {
+      if (statusButton) G.clearButtonLoading(statusButton);
     }
   }
 

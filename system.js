@@ -925,24 +925,17 @@ let globalUsageCounts = {};
 
 
 async function computeGlobalUsageCounts() {
-    
     try {
-        
-        try {
-            if (typeof stopInactivityMonitoring === 'function') {
-                stopInactivityMonitoring();
-            }
-        } catch (_e) {
-            
-        }
         if (!Array.isArray(consultations) || consultations.length === 0) {
-            if (typeof loadConsultationsForFinancial === 'function') {
-                await loadConsultationsForFinancial();
+            const stored = localStorage.getItem('consultations');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    consultations = parsed;
+                }
             }
         }
-    } catch (_e) {
-        
-    }
+    } catch (_e) {}
     globalUsageCounts = {};
     let list = Array.isArray(consultations) ? consultations.slice() : [];
     try {
@@ -974,9 +967,7 @@ async function computeGlobalUsageCounts() {
                     if (!name) return;
                     globalUsageCounts[name] = (globalUsageCounts[name] || 0) + 1;
                 });
-            } catch (_e) {
-                
-            }
+            } catch (_e) {}
         });
     }
     if (Array.isArray(herbLibrary)) {
@@ -2459,15 +2450,18 @@ async function fetchUsers(forceRefresh = false) {
                 currentClinicId = firstRealClinic.id;
                 localStorage.setItem('currentClinicId', currentClinicId);
             }
-            if (currentClinicId && currentClinicId !== 'local-default') {
+            const matchedClinic = clinicsList.find(c => c && String(c.id) === String(currentClinicId));
+            if (matchedClinic) {
+                clinicSettings = matchedClinic;
+            } else if (currentClinicId && currentClinicId !== 'local-default') {
                 try {
                     const cur = await window.firebaseDataManager.getClinicById(currentClinicId);
                     clinicSettings = cur && cur.success && cur.data ? cur.data : {};
                 } catch (_eCur) {
-                    clinicSettings = clinicsList.find(c => c.id === currentClinicId) || {};
+                    clinicSettings = {};
                 }
             } else {
-                clinicSettings = clinicsList.find(c => c.id === currentClinicId) || {};
+                clinicSettings = {};
             }
             updateClinicSettingsDisplay();
             populateClinicSelectors();
@@ -2739,7 +2733,7 @@ async function fetchUsers(forceRefresh = false) {
             try { loadTodayAppointments(); } catch (_e) {}
             advanceGlobalLoading();
             try { if (typeof window.scheduleReloadForClinic === 'function') window.scheduleReloadForClinic(); } catch (_e4) {}
-            try { await initBillingItems(true); } catch (_e5) {}
+            try { await initBillingItems(false); } catch (_e5) {}
             advanceGlobalLoading();
             try { await initHerbInventory(true); } catch (_eInv) {}
             try { if (typeof computeGlobalUsageCounts === 'function') await computeGlobalUsageCounts(); } catch (_eUsage) {}
@@ -12234,6 +12228,9 @@ class FirebaseDataManager {
                         .map((id) => String(id))
                 ));
                 if (affectedPatientIds.length > 0) {
+                    if (this.consultationAuditLogsCache && consultationId) {
+                        delete this.consultationAuditLogsCache[String(consultationId)];
+                    }
                     affectedPatientIds.forEach((pid) => {
                         delete patientConsultationsCache[pid];
                         if (this.recentPatientConsultationsCache) delete this.recentPatientConsultationsCache[pid];
@@ -12460,16 +12457,25 @@ class FirebaseDataManager {
         }
     }
 
-    async getConsultationAuditLogs(consultationId, limitCount = 100) {
+    async getConsultationAuditLogs(consultationId, limitCount = 100, forceRefresh = false) {
         if (!this.isReady) return { success: false, data: [] };
         try {
             const idStr = String(consultationId || '');
             if (!idStr) return { success: true, data: [] };
+            const maxLimit = Math.max(1, Number(limitCount) || 100);
+            if (!this.consultationAuditLogsCache) this.consultationAuditLogsCache = {};
+            if (forceRefresh) {
+                delete this.consultationAuditLogsCache[idStr];
+            }
+            const cachedEntry = !forceRefresh ? this.consultationAuditLogsCache[idStr] : null;
+            if (cachedEntry && Array.isArray(cachedEntry.logs) && (cachedEntry.limit >= maxLimit || cachedEntry.exhausted)) {
+                return { success: true, data: cachedEntry.logs.slice(0, maxLimit) };
+            }
             const colRef = window.firebase.collection(window.firebase.db, 'consultationAuditLogs');
             const q = window.firebase.firestoreQuery(
                 colRef,
                 window.firebase.where('consultationId', '==', idStr),
-                window.firebase.limit(Math.max(1, Number(limitCount) || 100))
+                window.firebase.limit(maxLimit)
             );
             const snapshot = await window.firebase.getDocs(q);
             const logs = [];
@@ -12481,6 +12487,12 @@ class FirebaseDataManager {
                 const tb = b && b.editedAt && b.editedAt.seconds ? (b.editedAt.seconds * 1000) : new Date(b && b.editedAt ? b.editedAt : 0).getTime();
                 return tb - ta;
             });
+            this.consultationAuditLogsCache[idStr] = {
+                logs,
+                limit: maxLimit,
+                exhausted: logs.length < maxLimit
+            };
+            trimCache(this.consultationAuditLogsCache, 100);
             return { success: true, data: logs };
         } catch (error) {
             console.error('讀取病歷審核追蹤失敗:', error);
@@ -12797,33 +12809,37 @@ class FirebaseDataManager {
             } catch (_omitErr) {
                 dataToWrite = userData;
             }
-            let existingUser = null;
-            try {
-                const userRef = window.firebase.doc(window.firebase.db, 'users', userId);
-                const userSnap = await window.firebase.getDoc(userRef);
-                if (userSnap && userSnap.exists()) {
-                    existingUser = { id: userSnap.id, ...userSnap.data() };
-                }
-            } catch (readErr) {
-                console.warn('更新用戶前讀取舊資料失敗:', readErr);
-            }
+            const patchPayload = {
+                ...dataToWrite,
+                updatedAt: new Date(),
+                updatedBy: currentUser || 'system'
+            };
             await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'users', userId),
-                {
-                    ...dataToWrite,
-                    updatedAt: new Date(),
-                    updatedBy: currentUser || 'system'
-                }
+                patchPayload
             );
             // 授權索引與 custom claims 由後端 /api/admin/claims/sync 維護，
-            // 此處不再做客戶端索引寫入（Rules 已拒絕）
-            // 更新用戶後清除用戶緩存並移除本地存檔
-            this.usersCache = null;
-            try {
-                localStorage.removeItem('users');
-            } catch (_lsErr) {
-                // 忽略 localStorage 錯誤
+            // 此處不再做客戶端索引寫入（Rules 已拒絕），並直接就地更新快取避免全量重抓
+            const uidStr = String(userId);
+            if (Array.isArray(this.usersCache)) {
+                const idx = this.usersCache.findIndex(u => u && String(u.id) === uidStr);
+                if (idx >= 0) {
+                    this.usersCache[idx] = { ...this.usersCache[idx], ...patchPayload, id: this.usersCache[idx].id };
+                }
             }
+            try {
+                const stored = localStorage.getItem('users');
+                if (stored) {
+                    const arr = JSON.parse(stored);
+                    if (Array.isArray(arr)) {
+                        const idx2 = arr.findIndex(u => u && String(u.id) === uidStr);
+                        if (idx2 >= 0) {
+                            arr[idx2] = { ...arr[idx2], ...patchPayload, id: arr[idx2].id };
+                            localStorage.setItem('users', JSON.stringify(arr));
+                        }
+                    }
+                }
+            } catch (_lsErr) {}
             return { success: true };
         } catch (error) {
             console.error('更新用戶數據失敗:', error);
@@ -12833,27 +12849,24 @@ class FirebaseDataManager {
 
     async deleteUser(userId) {
         try {
-            let existingUser = null;
-            try {
-                const userRef = window.firebase.doc(window.firebase.db, 'users', userId);
-                const userSnap = await window.firebase.getDoc(userRef);
-                if (userSnap && userSnap.exists()) {
-                    existingUser = { id: userSnap.id, ...userSnap.data() };
-                }
-            } catch (readErr) {
-                console.warn('刪除用戶前讀取舊資料失敗:', readErr);
-            }
             await window.firebase.deleteDoc(
                 window.firebase.doc(window.firebase.db, 'users', userId)
             );
             // userAuthIndex 與 Auth 帳號由後端 /api/admin/claims/delete 一併清除
-            // 刪除用戶後清除緩存並移除本地存檔
-            this.usersCache = null;
-            try {
-                localStorage.removeItem('users');
-            } catch (_lsErr) {
-                // 忽略 localStorage 錯誤
+            // 刪除用戶後從快取就地移除
+            const uidStr = String(userId);
+            if (Array.isArray(this.usersCache)) {
+                this.usersCache = this.usersCache.filter(u => !(u && String(u.id) === uidStr));
             }
+            try {
+                const stored = localStorage.getItem('users');
+                if (stored) {
+                    const arr = JSON.parse(stored);
+                    if (Array.isArray(arr)) {
+                        localStorage.setItem('users', JSON.stringify(arr.filter(u => !(u && String(u.id) === uidStr))));
+                    }
+                }
+            } catch (_lsErr) {}
             return { success: true };
         } catch (error) {
             console.error('刪除用戶數據失敗:', error);
@@ -15756,21 +15769,25 @@ window.clearSortDateBackfillMarker = async function() {
 async function searchMedicalRecords(term, limitCount = 50) {
     try {
         await waitForFirebaseDb();
-        const lc = (term || '').toLowerCase();
+        const rawTerm = String(term || '').trim();
+        const lc = rawTerm.toLowerCase();
         const seen = new Set();
         let out = [];
         if (!lc) return out;
 
-        // ① 快速路徑：輸入剛好是 consultation document ID
-        try {
-            const dref = window.firebase.doc(window.firebase.db, 'consultations', lc);
-            const dsnap = await window.firebase.getDoc(dref);
-            if (dsnap && dsnap.exists()) {
-                const rec = { id: dsnap.id, ...dsnap.data() };
-                out.push(rec);
-                seen.add(String(rec.id));
-            }
-        } catch (_e) {}
+        // ① 快速路徑：僅當輸入符合 Firestore 文件 ID 格式（15–32 字元英數）時才單筆 getDoc，
+        // 並保留原始大小寫，避免一般中文姓名／短關鍵字每次搜尋都白發 1 次 getDoc
+        if (/^[A-Za-z0-9_-]{15,32}$/.test(rawTerm)) {
+            try {
+                const dref = window.firebase.doc(window.firebase.db, 'consultations', rawTerm);
+                const dsnap = await window.firebase.getDoc(dref);
+                if (dsnap && dsnap.exists()) {
+                    const rec = { id: dsnap.id, ...dsnap.data() };
+                    out.push(rec);
+                    seen.add(String(rec.id));
+                }
+            } catch (_e) {}
+        }
 
         // ② 主力：透過 searchKeywords array-contains 查詢（新資料都有這個欄位）
         try {
@@ -19014,7 +19031,8 @@ async function deleteAcupointCombination(id) {
            * 從 Firestore 載入當前用戶的個人設置，包括慣用中藥組合與穴位組合。
            * 如果未找到任何設定，則使用當前的預設數據或維持空陣列。
            */
-          async function loadPersonalSettings() {
+          let _personalSettingsLoadedUserId = null;
+          async function loadPersonalSettings(forceRefresh = false) {
             try {
               // 等待 Firebase 與資料管理器初始化
               await waitForFirebaseDb();
@@ -19023,35 +19041,41 @@ async function deleteAcupointCombination(id) {
               if (!currentUserData || !currentUserData.id) {
                 return;
               }
-              /*
-               * 優先嘗試利用 Firestore 的 getDoc API 直接讀取當前用戶的文件，
-               * 以避免拉取所有用戶資料。如果 getDoc 不存在或失敗，則退回
-               * 到透過 FirebaseDataManager.getUsers() 取得用戶清單後再篩選，
-               * 以確保兼容舊環境。
-               */
+              const currentUidStr = String(currentUserData.id);
               let userRecord = null;
-              // 嘗試直接讀取當前用戶的文件
-              try {
-                if (window.firebase && window.firebase.getDoc && window.firebase.doc) {
-                  const docRef = window.firebase.doc(window.firebase.db, 'users', String(currentUserData.id));
-                  const docSnap = await window.firebase.getDoc(docRef);
-                  if (docSnap && docSnap.exists()) {
-                    userRecord = { id: docSnap.id, ...docSnap.data() };
-                  }
-                }
-              } catch (err) {
-                console.error('直接讀取用戶文件時發生錯誤:', err);
+              // 優先沿用記憶體中已載入的當前用戶個人設置（登入時或本工作階段已讀取／更新過），免去每次切換分頁都 getDoc
+              if (!forceRefresh && (currentUserData.personalSettings || _personalSettingsLoadedUserId === currentUidStr)) {
+                userRecord = currentUserData;
               }
-              // 若無法直接取得，改為從用戶清單中篩選
+              // 若尚未有快取或要求強制刷新，才讀取當前用戶的文件
               if (!userRecord) {
                 try {
-                  // 透過 fetchUsers(true) 獲取用戶列表，並以快取降低讀取頻率
-                  const userList = await fetchUsers(true);
+                  if (window.firebase && window.firebase.getDoc && window.firebase.doc) {
+                    const docRef = window.firebase.doc(window.firebase.db, 'users', currentUidStr);
+                    const docSnap = await window.firebase.getDoc(docRef);
+                    if (docSnap && docSnap.exists()) {
+                      userRecord = { id: docSnap.id, ...docSnap.data() };
+                      currentUserData.personalSettings = userRecord.personalSettings || null;
+                      _personalSettingsLoadedUserId = currentUidStr;
+                    }
+                  }
+                } catch (err) {
+                  console.error('直接讀取用戶文件時發生錯誤:', err);
+                }
+              }
+              // 若無法直接取得，改為從用戶清單快取中篩選（不強制重抓全表）
+              if (!userRecord) {
+                try {
+                  const userList = await fetchUsers(false);
                   if (Array.isArray(userList) && userList.length > 0) {
                     userRecord = userList.find(u => {
                       const idMatches = u && u.id !== undefined && currentUserData.id !== undefined;
-                      return idMatches && String(u.id) === String(currentUserData.id);
+                      return idMatches && String(u.id) === currentUidStr;
                     });
+                    if (userRecord) {
+                      currentUserData.personalSettings = userRecord.personalSettings || null;
+                      _personalSettingsLoadedUserId = currentUidStr;
+                    }
                   }
                 } catch (err) {
                   console.error('讀取用戶資料時發生錯誤:', err);
@@ -19164,22 +19188,25 @@ async function deleteAcupointCombination(id) {
               if (!currentUserData || !currentUserData.id) {
                 return;
               }
+              const nextPersonalSettings = {
+                herbCombinations: Array.isArray(herbCombinations) ? herbCombinations : [],
+                acupointCombinations: Array.isArray(acupointCombinations) ? acupointCombinations : [],
+                // 保存個人分類：中藥組合分類與穴位組合分類
+                herbComboCategories: Array.isArray(herbComboCategories) ? herbComboCategories : [],
+                acupointComboCategories: Array.isArray(acupointComboCategories) ? acupointComboCategories : [],
+                diagnosisSettingsByClinic: normalizeDiagnosisSettingsMap(diagnosisSettingsByClinic),
+                diagnosisSettings: normalizeDiagnosisSettings(diagnosisSettings)
+              };
               await window.firebase.updateDoc(
                 window.firebase.doc(window.firebase.db, 'users', String(currentUserData.id)),
                 {
-                  personalSettings: {
-                    herbCombinations: Array.isArray(herbCombinations) ? herbCombinations : [],
-                    acupointCombinations: Array.isArray(acupointCombinations) ? acupointCombinations : [],
-                    // 保存個人分類：中藥組合分類與穴位組合分類
-                    herbComboCategories: Array.isArray(herbComboCategories) ? herbComboCategories : [],
-                    acupointComboCategories: Array.isArray(acupointComboCategories) ? acupointComboCategories : [],
-                    diagnosisSettingsByClinic: normalizeDiagnosisSettingsMap(diagnosisSettingsByClinic),
-                    diagnosisSettings: normalizeDiagnosisSettings(diagnosisSettings)
-                  },
+                  personalSettings: nextPersonalSettings,
                   updatedAt: new Date(),
                   updatedBy: currentUser || 'system'
                 }
               );
+              currentUserData.personalSettings = nextPersonalSettings;
+              _personalSettingsLoadedUserId = String(currentUserData.id);
             } catch (error) {
               console.error('更新個人設置至雲端資料庫失敗:', error);
             }

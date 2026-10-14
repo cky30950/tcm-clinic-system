@@ -283,10 +283,9 @@ export async function initBillingItems(forceRefresh = false) {
         G.showToast('權限不足，無法存取收費項目管理', 'error');
         return;
     }
-            // 每次進入收費項目管理時，強制從 Firestore 取得最新資料，
-            // 以避免其他裝置在本地儲存的舊資料未同步更新。
+            // 進入收費項目管理時直接沿用 billingMeta 即時同步與本地快取，不再每次強制重讀兩個集合
             if (typeof initBillingItems === 'function') {
-                await initBillingItems(true);
+                await initBillingItems(false);
             }
             displayBillingItems();
             
