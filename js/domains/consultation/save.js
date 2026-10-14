@@ -1283,11 +1283,40 @@ export async function saveConsultation() {
             return;
         }
 
+        // 從掛號或本機病人快取解析 patientName 與 patientNumber，一併寫入病歷文件，
+        // 讓病歷列表直接讀取病歷本身的姓名與編號，免去額外 getDoc 查詢 patients。
+        const resolvedPid = appointment.patientId != null ? String(appointment.patientId).trim() : '';
+        let resolvedPatientName = String(appointment.patientName || '').trim();
+        let resolvedPatientNumber = String(appointment.patientNumber || '').trim();
+        if (resolvedPid && (!resolvedPatientName || !resolvedPatientNumber)) {
+            const pickFromList = (list) => {
+                if (!Array.isArray(list)) return null;
+                return list.find(p => p && String(p.id) === resolvedPid) || null;
+            };
+            let cachedP = (window.firebaseDataManager && pickFromList(window.firebaseDataManager.patientsCache))
+                || pickFromList(G.patients);
+            if (!cachedP) {
+                try {
+                    const rawLs = localStorage.getItem('patients');
+                    if (rawLs) cachedP = pickFromList(JSON.parse(rawLs));
+                } catch (_eLs) {}
+            }
+            if (cachedP) {
+                if (!resolvedPatientName) {
+                    resolvedPatientName = String(cachedP.name || cachedP.patientName || cachedP.fullName || '').trim();
+                }
+                if (!resolvedPatientNumber) {
+                    resolvedPatientNumber = String(cachedP.patientNumber || '').trim();
+                }
+            }
+        }
+
         // Assemble consultation data common to both new and edit operations
         const consultationData = {
             appointmentId: appointment && !appointment.isDirectConsultationEdit ? G.currentConsultingAppointmentId : '',
             patientId: appointment.patientId,
-            patientName: appointment.patientName,
+            patientName: resolvedPatientName || appointment.patientName || '',
+            ...(resolvedPatientNumber ? { patientNumber: resolvedPatientNumber } : {}),
             symptoms: symptoms,
             tongue: document.getElementById('formTongue').value.trim(),
             pulse: document.getElementById('formPulse').value.trim(),

@@ -10622,6 +10622,12 @@ class FirebaseDataManager {
         if (Array.isArray(this.patientsCache)) mergeIntoList(this.patientsCache);
         if (typeof patientCache !== 'undefined' && Array.isArray(patientCache)) mergeIntoList(patientCache);
         try {
+            const updatedName = patient.name || patient.patientName || patient.fullName || patient.displayName || patient.chineseName || patient.englishName || '';
+            if (updatedName && typeof medicalRecordPatients === 'object' && medicalRecordPatients) {
+                medicalRecordPatients[idStr.trim()] = String(updatedName).trim();
+            }
+        } catch (_mrErr) {}
+        try {
             const raw = localStorage.getItem('patients');
             if (raw) {
                 const arr = JSON.parse(raw);
@@ -10631,6 +10637,45 @@ class FirebaseDataManager {
                 }
             }
         } catch (_lsErr) { /* 忽略 localStorage 錯誤 */ }
+    }
+
+    /** 從本機快取同步補齊病歷的 patientName 與 patientNumber（0 次 Firestore 讀取） */
+    enrichConsultationPatientMetaFromCache(targetData, fallbackRecord = null) {
+        if (!targetData || typeof targetData !== 'object') return targetData;
+        const pidRaw = targetData.patientId !== undefined && targetData.patientId !== null
+            ? targetData.patientId
+            : (fallbackRecord && fallbackRecord.patientId);
+        const pid = pidRaw !== undefined && pidRaw !== null ? String(pidRaw).trim() : '';
+        if (!pid) return targetData;
+
+        let curName = String(targetData.patientName || (fallbackRecord && fallbackRecord.patientName) || '').trim();
+        let curNumber = String(targetData.patientNumber || (fallbackRecord && fallbackRecord.patientNumber) || '').trim();
+        if (!curName && typeof medicalRecordPatients === 'object' && medicalRecordPatients && medicalRecordPatients[pid]) {
+            curName = String(medicalRecordPatients[pid]).trim();
+        }
+        if (!curName || !curNumber) {
+            const findIn = (arr) => Array.isArray(arr) ? arr.find((p) => p && String(p.id).trim() === pid) : null;
+            let p = findIn(this.patientsCache)
+                || (typeof patientCache !== 'undefined' ? findIn(patientCache) : null)
+                || (typeof patients !== 'undefined' ? findIn(patients) : null);
+            if (!p) {
+                try {
+                    const raw = localStorage.getItem('patients');
+                    if (raw) p = findIn(JSON.parse(raw));
+                } catch (_e) {}
+            }
+            if (p) {
+                if (!curName) {
+                    curName = String(p.name || p.patientName || p.fullName || p.displayName || p.chineseName || p.englishName || '').trim();
+                }
+                if (!curNumber) {
+                    curNumber = String(p.patientNumber || '').trim();
+                }
+            }
+        }
+        if (curName && !targetData.patientName) targetData.patientName = curName;
+        if (curNumber && !targetData.patientNumber) targetData.patientNumber = curNumber;
+        return targetData;
     }
 
     /** 從所有全量病人快取層移除單筆病人（分頁快取由呼叫端清屏） */
@@ -10968,10 +11013,11 @@ class FirebaseDataManager {
             let dataToWrite;
             try {
                 const { id, ...rest } = consultationData || {};
-                dataToWrite = rest;
+                dataToWrite = { ...rest };
             } catch (_omitErr) {
-                dataToWrite = consultationData;
+                dataToWrite = { ...(consultationData || {}) };
             }
+            this.enrichConsultationPatientMetaFromCache(dataToWrite, null);
             const createdAt = new Date();
             const sortDate = getConsultationEffectiveDate({ ...dataToWrite, createdAt }, createdAt);
             const searchKeywords = generateConsultationSearchKeywords({ ...dataToWrite, createdAt, sortDate });
@@ -12120,6 +12166,7 @@ class FirebaseDataManager {
                     existingRecord = existingDoc.data() || null;
                 }
             } catch (_existingErr) {}
+            this.enrichConsultationPatientMetaFromCache(dataToWrite, existingRecord);
             let temporalBase = { ...(existingRecord || {}), ...dataToWrite, updatedAt };
             const sortDate = getConsultationEffectiveDate(temporalBase, updatedAt);
             const searchKeywords = generateConsultationSearchKeywords({ ...temporalBase, sortDate: sortDate || updatedAt });
@@ -14802,6 +14849,36 @@ function updateMedicalRecordPatientLookup(patients) {
 async function ensureMedicalRecordPatientLookupForRecords(records) {
     const list = Array.isArray(records) ? records : [];
     if (!list.length) return;
+
+    // 1. 先從記憶體與本機已載入的病人快取補齊（確保當日剛改名的病人優先反映最新名稱，0 次讀取）
+    try {
+        if (window.firebaseDataManager && Array.isArray(window.firebaseDataManager.patientsCache)) {
+            updateMedicalRecordPatientLookup(window.firebaseDataManager.patientsCache);
+        }
+        if (typeof patientCache !== 'undefined' && Array.isArray(patientCache)) {
+            updateMedicalRecordPatientLookup(patientCache);
+        }
+        if (typeof patients !== 'undefined' && Array.isArray(patients)) {
+            updateMedicalRecordPatientLookup(patients);
+        }
+    } catch (_memErr) {}
+
+    // 2. 直接採用病歷文件本身已冗餘儲存的 patientName（0 次 Firestore getDoc 讀取）
+    list.forEach(rec => {
+        if (!rec || rec.patientId === undefined || rec.patientId === null) return;
+        const id = String(rec.patientId).trim();
+        if (!id || medicalRecordPatients[id]) return;
+        const embeddedName = String(
+            rec.patientName
+            || (rec.patient && (rec.patient.name || rec.patient.patientName || rec.patient.fullName))
+            || ''
+        ).trim();
+        if (embeddedName) {
+            medicalRecordPatients[id] = embeddedName;
+        }
+    });
+
+    // 3. 僅針對「既不在病人快取、病歷文件本身也沒有 patientName」的極少數舊病歷，才按需 getDoc
     const missingIds = Array.from(new Set(
         list
             .map(rec => rec && rec.patientId !== undefined && rec.patientId !== null ? String(rec.patientId).trim() : '')
