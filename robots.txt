@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /system.html
+Disallow: /system
+Disallow: /api/
+Disallow: /mobile-capture.html
+Disallow: /mobile-capture
+Disallow: /video/
+
+Sitemap: https://drgreattcm.com/sitemap.xml

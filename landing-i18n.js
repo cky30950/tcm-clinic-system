@@ -30,7 +30,7 @@
     'cta.wa.long': 'WhatsApp：+852 54393401',
 
     'hero.badge': '专为中医诊所量身打造',
-    'hero.title': '名医诊所系统：全方位香港中医数字化管理方案',
+    'hero.title': '名医诊所系统：全方位中医诊所数字化管理方案',
     'hero.subtitle': '简便 · 易用 · 高效',
     'hero.desc': '将千年中医智慧与现代科技完美结合，从「望闻问切」到「辨证论治」全面数字化',
     'hero.designer': '由中医师设计的中医诊所系统，更符合中医需求',
@@ -323,10 +323,10 @@
 
     'wa.float': 'WhatsApp 咨询名医诊所系统',
 
-    'meta.title': '名医诊所系统 | 香港中医诊所管理系统 (TCM Clinic System) - 专为中医量身打造',
-    'meta.desc': '名医诊所系统提供专业的中医诊所管理解决方案，包含在线预约、智能问诊、电子病历、中药库存及针灸穴位地图。由中医师亲自参与设计，专为香港诊所打造，贴合真实看诊流程。',
-    'meta.ogtitle': '名医诊所系统 | 香港中医诊所管理系统',
-    'meta.ogdesc': '名医诊所系统提供专业的中医诊所管理解决方案，包含在线预约、智能问诊、电子病历、中药库存及针灸穴位地图。'
+    'meta.title': '名医诊所系统 | 中医诊所管理系统与电子病历软件 (TCM Clinic Software) - 首3个月免费试用',
+    'meta.desc': '由中医师亲自设计的全方位中医诊所管理系统（TCM Clinic Management & EMR Software），支持简体、繁体及英文三语，适用于中国内地、香港、新加坡、马来西亚及海外中医针灸诊所。涵盖在线预约、智能问诊、电子病历、中药房库存、交互式穴位图及视频看诊。首三个月免费试用。',
+    'meta.ogtitle': '名医诊所系统 | 专业中医诊所管理系统与电子病历软件 - 首3个月免费试用',
+    'meta.ogdesc': '支持简／繁／英三语，涵盖在线预约、电子病历、中药库存、针灸穴位地图及全球视频看诊。首三个月免费试用，年费低至 HK$900。'
   };
 
   /* ---------------- English ---------------- */
@@ -347,8 +347,8 @@
     'cta.wa': 'Chat on WhatsApp',
     'cta.wa.long': 'WhatsApp: +852 54393401',
 
-    'hero.badge': 'Tailor-made for TCM Clinics',
-    'hero.title': 'MingYI Clinic System: A Complete Digital Management Solution for Hong Kong TCM Clinics',
+    'hero.badge': 'Tailor-made for TCM & Acupuncture Clinics',
+    'hero.title': 'MingYI Clinic System: All-in-One TCM & Acupuncture Practice Management Software',
     'hero.subtitle': 'Simple · Intuitive · Efficient',
     'hero.desc': 'Combining thousand-year TCM wisdom with modern technology — fully digitalising everything from the "Four Examinations" to "Syndrome Differentiation and Treatment"',
     'hero.designer': 'A TCM clinic system designed by TCM practitioners — built around real TCM needs',
@@ -641,10 +641,10 @@
 
     'wa.float': 'Chat with MingYI Clinic System on WhatsApp',
 
-    'meta.title': 'MingYI Clinic System | Hong Kong TCM Clinic Management Software - Built for TCM Practitioners',
-    'meta.desc': 'MingYI Clinic System offers a professional TCM clinic management solution: online booking, smart intake questionnaires, electronic medical records, herbal pharmacy inventory and an acupoint map. Designed with practising TCM practitioners for Hong Kong clinics.',
-    'meta.ogtitle': 'MingYI Clinic System | Hong Kong TCM Clinic Management System',
-    'meta.ogdesc': 'A professional TCM clinic management solution with online booking, smart intake, EMR, herbal inventory and an interactive acupoint map.'
+    'meta.title': 'MingYI Clinic System | TCM & Acupuncture Clinic Management Software (EMR) - 3-Month Free Trial',
+    'meta.desc': 'Designed by TCM practitioners for clinics worldwide: an all-in-one Traditional Chinese Medicine (TCM) & Acupuncture practice management software featuring online booking, smart intake, EMR, herbal pharmacy inventory, interactive acupoint map & telemedicine. Supports English, Simplified & Traditional Chinese. 3-month free trial.',
+    'meta.ogtitle': 'MingYI Clinic System | All-in-One TCM & Acupuncture Practice Management Software',
+    'meta.ogdesc': 'Professional TCM & Acupuncture EMR with online booking, herbal pharmacy inventory, interactive acupoint map and global telemedicine. Start your 3-month free trial today.'
   };
 
   var DICTS = { 'zh-CN': zhCN, 'en': en };
@@ -710,6 +710,15 @@
     setMeta('meta[name="description"]', 'content', desc);
     setMeta('meta[property="og:title"]', 'content', ogTitle);
     setMeta('meta[property="og:description"]', 'content', ogDesc);
+    setMeta('meta[name="twitter:title"]', 'content', ogTitle || title);
+    setMeta('meta[name="twitter:description"]', 'content', ogDesc || desc);
+    var canonicalUrl = lang === 'zh-HK'
+      ? 'https://drgreattcm.com/'
+      : ('https://drgreattcm.com/?lang=' + encodeURIComponent(lang));
+    var ogLocale = lang === 'en' ? 'en_US' : (lang === 'zh-CN' ? 'zh_CN' : 'zh_HK');
+    setMeta('link[rel="canonical"]', 'href', canonicalUrl);
+    setMeta('meta[property="og:url"]', 'content', canonicalUrl);
+    setMeta('meta[property="og:locale"]', 'content', ogLocale);
   }
 
   function setMeta(selector, attr, value) {
@@ -719,7 +728,7 @@
   }
 
   function updateChrome(lang) {
-    document.documentElement.lang = lang;
+    document.documentElement.lang = lang === 'zh-HK' ? 'zh-Hant' : (lang === 'zh-CN' ? 'zh-Hans' : 'en');
 
     var current = document.getElementById('lang-current');
     if (current) current.textContent = LANG_LABEL[lang] || lang;
@@ -763,16 +772,34 @@
     }
   }
 
+  function normalizeLangParam(raw) {
+    if (!raw) return null;
+    var s = String(raw).trim().toLowerCase();
+    if (s === 'en' || s.indexOf('en-') === 0) return 'en';
+    if (s === 'zh-cn' || s === 'zh-hans' || s === 'zh-sg' || s === 'zh-my' || s === 'cn') return 'zh-CN';
+    if (s === 'zh-hk' || s === 'zh-tw' || s === 'zh-hant' || s === 'zh-mo' || s === 'hk' || s === 'tw') return 'zh-HK';
+    return null;
+  }
+
   function detectLang() {
+    // 1. 優先讀取網址 ?lang= 參數（支援搜尋引擎爬蟲依 hreflang 索引繁／簡／英三語版本）
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      var fromUrl = normalizeLangParam(params.get('lang'));
+      if (fromUrl) return fromUrl;
+    } catch (eUrl) { /* ignore */ }
+
+    // 2. 讀取使用者先前手動選擇的語言
     try {
       var saved = localStorage.getItem(STORAGE_KEY);
       if (saved && SUPPORTED.indexOf(saved) !== -1) return saved;
     } catch (e) { /* localStorage 不可用時忽略 */ }
 
+    // 3. 依瀏覽器語系自動判斷（中國內地／星馬簡體自動顯示簡體，英語系自動顯示英文）
     var nav = navigator.language || navigator.userLanguage || 'zh-HK';
     var l = nav.toLowerCase();
     if (l.indexOf('zh') === 0) {
-      if (l.indexOf('cn') !== -1 || l.indexOf('hans') !== -1 || l.indexOf('sg') !== -1) return 'zh-CN';
+      if (l.indexOf('cn') !== -1 || l.indexOf('hans') !== -1 || l.indexOf('sg') !== -1 || l.indexOf('my') !== -1) return 'zh-CN';
       return 'zh-HK';
     }
     if (l.indexOf('en') === 0) return 'en';
