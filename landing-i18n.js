@@ -39,7 +39,7 @@
     'promo.title': '首三个月免费试用',
     'promo.desc': '试用三个月后不用也不会收费',
     'promo.note': '名额有限 · 即开即用',
-    'promo.cta': '索取免费试用',
+    'promo.cta': '联系我索取免费使用',
     'hero.stat.stable': '系统稳定运行',
     'hero.stat.time': '看诊时间节省',
 
