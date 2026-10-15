@@ -764,8 +764,9 @@ function renderBookingDates() {
     const nowHm = new Date(Date.now() + HKT_FIXED_OFFSET_MS).toISOString().slice(11, 16);
     const nowMin = hmToMin(nowHm);
     const sessions = Array.isArray(bookingRules.sessions) ? bookingRules.sessions : [];
-    const closeMin = sessions.reduce(
-        (mx, s2) => Math.max(mx, hmToMin(s2 && s2.end)), -1);
+    const weekdaySessions = (bookingRules.weekdaySessions && typeof bookingRules.weekdaySessions === 'object')
+        ? bookingRules.weekdaySessions
+        : null;
     const closedSet = new Set(
         (Array.isArray(bookingRules.closedWeekdays) ? bookingRules.closedWeekdays : []).map(Number)
     );
@@ -777,7 +778,13 @@ function renderBookingDates() {
         const wd = new Date(`${ds}T12:00:00+08:00`).getUTCDay();
         if (closedSet.has(wd)) continue;
         if (openSet && !openSet.has(wd)) continue;
-        if (i === 0 && closeMin >= 0 && nowMin >= closeMin) continue;
+        const daySessions = (weekdaySessions && Array.isArray(weekdaySessions[String(wd)]))
+            ? weekdaySessions[String(wd)]
+            : sessions;
+        if (weekdaySessions && Array.isArray(weekdaySessions[String(wd)]) && daySessions.length === 0) continue;
+        const dayCloseMin = daySessions.reduce(
+            (mx, s2) => Math.max(mx, hmToMin(s2 && s2.end)), -1);
+        if (i === 0 && dayCloseMin >= 0 && nowMin >= dayCloseMin) continue;
         let label = `${ds.slice(5)} ${t('weekdaysShort')[wd]}`;
         if (i === 0) label += ` · ${t('today')}`;
         if (i === 1) label += ` · ${t('tomorrow')}`;

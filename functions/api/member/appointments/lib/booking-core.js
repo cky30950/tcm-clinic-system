@@ -230,13 +230,25 @@ function sanitizeConfig(over) {
 }
 
 /**
- * 以診所文件（clinics/{clinicId}）的應診星期（openWeekdays / closedWeekdays）
+ * 以診所文件（clinics/{clinicId}）的應診星期（weeklyBusinessHours / openWeekdays / closedWeekdays）
  * 計算每週休診日陣列（0=日, 1=一, ..., 6=六）。
  * 若診所文件未設定應診星期，回傳 null（由呼叫端沿用預設值）。
  */
 function closedWeekdaysFromClinicDoc(clinicDoc) {
     const d = clinicDoc && clinicDoc.data ? clinicDoc.data : clinicDoc;
     if (!d || typeof d !== 'object') return null;
+    if (d.weeklyBusinessHours && typeof d.weeklyBusinessHours === 'object') {
+        const closed = [];
+        let hasAnyKey = false;
+        for (let w = 0; w <= 6; w++) {
+            const entry = d.weeklyBusinessHours[String(w)];
+            if (entry && typeof entry === 'object') {
+                hasAnyKey = true;
+                if (!entry.open) closed.push(w);
+            }
+        }
+        if (hasAnyKey) return closed;
+    }
     if (Array.isArray(d.openWeekdays)) {
         const openSet = new Set(
             d.openWeekdays
@@ -263,17 +275,14 @@ function closedWeekdaysFromClinicDoc(clinicDoc) {
 }
 
 /**
- * 以診所文件（clinics/{clinicId}）的結構化營業時間生成應診 sessions：
- * 營業 [open,close]；若設定午飯 [ls,le]，則切成開診两段，午飯時段不給約。
- * 欄位缺失或無效 → []（由呼叫端退回預設 sessions）。
+ * 將單日（上班 start、下班 end、午飯 lunchStart~lunchEnd）轉換為應診時段陣列 [{start, end}]
  */
-function sessionsFromClinicDoc(clinicDoc) {
-    const d = clinicDoc && clinicDoc.data ? clinicDoc.data : clinicDoc;
-    const open = parseHM(d && d.businessHoursStart);
-    const close = parseHM(d && d.businessHoursEnd);
+function buildDaySessions(startStr, endStr, lunchStartStr, lunchEndStr) {
+    const open = parseHM(startStr);
+    const close = parseHM(endStr);
     if (open < 0 || close <= open) return [];
-    const ls = parseHM(d && d.lunchStart);
-    const le = parseHM(d && d.lunchEnd);
+    const ls = parseHM(lunchStartStr);
+    const le = parseHM(lunchEndStr);
     const hasLunch = ls >= 0 && le >= 0 && le > ls;
     const windows = [];
     if (hasLunch) {
@@ -284,6 +293,49 @@ function sessionsFromClinicDoc(clinicDoc) {
         windows.push([open, close]);
     }
     return windows.map(([a, b]) => ({ start: toHM(a), end: toHM(b) }));
+}
+
+/**
+ * 以診所文件（clinics/{clinicId}）的結構化營業時間生成應診 sessions：
+ * 營業 [open,close]；若設定午飯 [ls,le]，則切成開診两段，午飯時段不給約。
+ * 欄位缺失或無效 → []（由呼叫端退回預設 sessions）。
+ */
+function sessionsFromClinicDoc(clinicDoc) {
+    const d = clinicDoc && clinicDoc.data ? clinicDoc.data : clinicDoc;
+    if (!d || typeof d !== 'object') return [];
+    return buildDaySessions(d.businessHoursStart, d.businessHoursEnd, d.lunchStart, d.lunchEnd);
+}
+
+/**
+ * 以診所文件（clinics/{clinicId}）的 weeklyBusinessHours 生成各星期專屬應診時段映射：
+ * 回傳 { "0": [...], "1": [...], ..., "6": [...] }，若未設定則回傳 null。
+ */
+function weekdaySessionsFromClinicDoc(clinicDoc, fallbackSessions) {
+    const d = clinicDoc && clinicDoc.data ? clinicDoc.data : clinicDoc;
+    if (!d || typeof d !== 'object' || !d.weeklyBusinessHours || typeof d.weeklyBusinessHours !== 'object') {
+        return null;
+    }
+    const map = {};
+    let hasAny = false;
+    for (let w = 0; w <= 6; w++) {
+        const key = String(w);
+        const entry = d.weeklyBusinessHours[key];
+        if (entry && typeof entry === 'object') {
+            hasAny = true;
+            if (!entry.open) {
+                map[key] = [];
+            } else {
+                const s = buildDaySessions(
+                    entry.start || d.businessHoursStart,
+                    entry.end || d.businessHoursEnd,
+                    typeof entry.lunchStart === 'string' ? entry.lunchStart : d.lunchStart,
+                    typeof entry.lunchEnd === 'string' ? entry.lunchEnd : d.lunchEnd
+                );
+                map[key] = s.length ? s : (Array.isArray(fallbackSessions) ? fallbackSessions : []);
+            }
+        }
+    }
+    return hasAny ? map : null;
 }
 
 export async function loadBookingConfig(clientOrUrl, token, clinicId) {
@@ -303,7 +355,7 @@ export async function loadBookingConfig(clientOrUrl, token, clinicId) {
             : Promise.resolve(null)
     ]);
     const config = Object.assign({}, DEFAULT_BOOKING_CONFIG, override);
-    // 應診星期掛鉤：診所文件設定了 openWeekdays / closedWeekdays → 以其為準
+    // 應診星期掛鉤：診所文件設定了 weeklyBusinessHours / openWeekdays / closedWeekdays → 以其為準
     const clinicClosedWeekdays = closedWeekdaysFromClinicDoc(clinicDoc);
     if (clinicClosedWeekdays !== null) {
         config.closedWeekdays = clinicClosedWeekdays;
@@ -319,6 +371,13 @@ export async function loadBookingConfig(clientOrUrl, token, clinicId) {
         config.hoursSource = 'clinic';
     } else {
         config.hoursSource = 'default';
+    }
+    const weekdaySessions = weekdaySessionsFromClinicDoc(clinicDoc, config.sessions);
+    if (weekdaySessions) {
+        config.weekdaySessions = weekdaySessions;
+        config.hoursSource = 'clinic';
+    } else {
+        config.weekdaySessions = null;
     }
     configCache.set(clinicId, { at: Date.now(), config });
     return config;
@@ -383,10 +442,11 @@ function findDoctorShift(shifts, doctorDocId, dateStr) {
         && s.status !== 'cancelled' && s.status !== 'rejected') || null;
 }
 
-// 應診窗口 = 預設 sessions ∩ 當日排班
-function availabilityWindows(config, doctorShift) {
+// 應診窗口 = 當日應診 sessions ∩ 當日排班
+function availabilityWindows(config, doctorShift, baseSessions) {
+    const sessionsToUse = Array.isArray(baseSessions) ? baseSessions : config.sessions;
     if (!doctorShift) {
-        return config.sessions
+        return sessionsToUse
             .map((s) => ({ start: parseHM(s.start), end: parseHM(s.end) }))
             .filter((w) => w.start >= 0 && w.end > w.start);
     }
@@ -394,7 +454,7 @@ function availabilityWindows(config, doctorShift) {
     const shEnd = parseHM(doctorShift.endTime);
     if (shStart < 0 || shEnd <= shStart) return [];
     const windows = [];
-    for (const sess of config.sessions) {
+    for (const sess of sessionsToUse) {
         const start = Math.max(parseHM(sess.start), shStart);
         const end = Math.min(parseHM(sess.end), shEnd);
         if (end > start) windows.push({ start, end });
@@ -483,15 +543,23 @@ export function decorateSlots(config, slots, dayAppointments, doctorUsername, da
  * closed＝診所休診／醫師無排班；slots 為已 decorate 結果。
  */
 export async function evaluateDay(client, token, clinicId, config, doctor, dateStr) {
-    if (Array.isArray(config.closedWeekdays) && config.closedWeekdays.includes(hktWeekday(dateStr))) {
+    const wd = hktWeekday(dateStr);
+    if (Array.isArray(config.closedWeekdays) && config.closedWeekdays.includes(wd)) {
         return { closed: true, reason: 'clinic_closed', slots: [] };
+    }
+    let daySessions = config.sessions;
+    if (config.weekdaySessions && Array.isArray(config.weekdaySessions[String(wd)])) {
+        daySessions = config.weekdaySessions[String(wd)];
+        if (!daySessions.length) {
+            return { closed: true, reason: 'clinic_closed', slots: [] };
+        }
     }
     const { hasAny, shifts } = await loadMonthShifts(client, token, clinicId, dateStr);
     const doctorShift = hasAny ? findDoctorShift(shifts, doctor.docId, dateStr) : null;
     if (hasAny && !doctorShift) {
         return { closed: true, reason: 'doctor_off', slots: [] };
     }
-    const windows = availabilityWindows(config, doctorShift);
+    const windows = availabilityWindows(config, doctorShift, daySessions);
     if (!windows.length) {
         return { closed: true, reason: 'doctor_off', slots: [] };
     }

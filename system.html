@@ -4283,54 +4283,176 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">診所營業時間</label>
-                        <div class="mb-2">
-                            <span class="block text-xs text-gray-500 mb-1">應診星期（勾選營業日，未勾選視為休診日）</span>
-                            <div class="flex flex-wrap gap-2" id="clinicBusinessDaysGroup">
-                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                    <input type="checkbox" id="clinicOpenDay_1" data-weekday="1" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
-                                    <span>星期一</span>
-                                </label>
-                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                    <input type="checkbox" id="clinicOpenDay_2" data-weekday="2" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
-                                    <span>星期二</span>
-                                </label>
-                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                    <input type="checkbox" id="clinicOpenDay_3" data-weekday="3" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
-                                    <span>星期三</span>
-                                </label>
-                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                    <input type="checkbox" id="clinicOpenDay_4" data-weekday="4" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
-                                    <span>星期四</span>
-                                </label>
-                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                    <input type="checkbox" id="clinicOpenDay_5" data-weekday="5" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
-                                    <span>星期五</span>
-                                </label>
-                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                    <input type="checkbox" id="clinicOpenDay_6" data-weekday="6" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
-                                    <span>星期六</span>
-                                </label>
-                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                    <input type="checkbox" id="clinicOpenDay_0" data-weekday="0" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                    <span>星期日</span>
-                                </label>
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                            <label class="block text-sm font-medium text-gray-700">診所營業時間（星期一至星期日，可按日設定不同上下班及休息時間）</label>
+                        </div>
+                        <!-- 快速統一設定列 -->
+                        <div class="bg-blue-50/60 border border-blue-200 rounded-lg p-3 mb-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                <span class="text-xs font-medium text-blue-800">快速批量設定（可先輸入常用時間，一鍵套用至所有已勾選營業日，再逐日微調）</span>
+                                <button type="button" onclick="applyDefaultHoursToOpenDays('clinic')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-md transition">
+                                    套用至已勾選星期
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <span class="block text-xs text-gray-600 mb-1">預設上班／下班時間</span>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <input type="time" id="clinicBusinessHoursStart" value="09:00" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                        <input type="time" id="clinicBusinessHoursEnd" value="18:00" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                </div>
+                                <div>
+                                    <span class="block text-xs text-gray-600 mb-1">預設休息時間（選填）</span>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <input type="time" id="clinicLunchStart" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                        <input type="time" id="clinicLunchEnd" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <input type="time" id="clinicBusinessHoursStart" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            <input type="time" id="clinicBusinessHoursEnd" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <!-- 星期一至星期日逐日設定 -->
+                        <div class="space-y-2 border border-gray-200 rounded-lg p-3 bg-gray-50/50" id="clinicBusinessDaysGroup">
+                            <div class="hidden sm:grid sm:grid-cols-12 gap-2 text-xs font-medium text-gray-500 pb-1 border-b border-gray-200">
+                                <div class="col-span-3">應診星期</div>
+                                <div class="col-span-5">上班時間 — 下班時間</div>
+                                <div class="col-span-4">休息時間（選填）</div>
+                            </div>
+                            <!-- 星期一 -->
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="clinicWeekdayRow_1">
+                                <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_1" data-weekday="1" onchange="toggleClinicWeekdayRow('clinic', 1)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期一</span>
+                                    <span id="clinicDayClosedBadge_1" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                                </label>
+                                <div id="clinicDayHoursWrap_1" class="sm:col-span-5 flex items-center gap-1.5">
+                                    <input type="time" id="clinicDayStart_1" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">至</span>
+                                    <input type="time" id="clinicDayEnd_1" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div id="clinicDayLunchWrap_1" class="sm:col-span-4 flex items-center gap-1.5">
+                                    <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                    <input type="time" id="clinicDayLunchStart_1" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">-</span>
+                                    <input type="time" id="clinicDayLunchEnd_1" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+                            <!-- 星期二 -->
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="clinicWeekdayRow_2">
+                                <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_2" data-weekday="2" onchange="toggleClinicWeekdayRow('clinic', 2)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期二</span>
+                                    <span id="clinicDayClosedBadge_2" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                                </label>
+                                <div id="clinicDayHoursWrap_2" class="sm:col-span-5 flex items-center gap-1.5">
+                                    <input type="time" id="clinicDayStart_2" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">至</span>
+                                    <input type="time" id="clinicDayEnd_2" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div id="clinicDayLunchWrap_2" class="sm:col-span-4 flex items-center gap-1.5">
+                                    <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                    <input type="time" id="clinicDayLunchStart_2" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">-</span>
+                                    <input type="time" id="clinicDayLunchEnd_2" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+                            <!-- 星期三 -->
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="clinicWeekdayRow_3">
+                                <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_3" data-weekday="3" onchange="toggleClinicWeekdayRow('clinic', 3)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期三</span>
+                                    <span id="clinicDayClosedBadge_3" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                                </label>
+                                <div id="clinicDayHoursWrap_3" class="sm:col-span-5 flex items-center gap-1.5">
+                                    <input type="time" id="clinicDayStart_3" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">至</span>
+                                    <input type="time" id="clinicDayEnd_3" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div id="clinicDayLunchWrap_3" class="sm:col-span-4 flex items-center gap-1.5">
+                                    <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                    <input type="time" id="clinicDayLunchStart_3" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">-</span>
+                                    <input type="time" id="clinicDayLunchEnd_3" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+                            <!-- 星期四 -->
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="clinicWeekdayRow_4">
+                                <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_4" data-weekday="4" onchange="toggleClinicWeekdayRow('clinic', 4)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期四</span>
+                                    <span id="clinicDayClosedBadge_4" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                                </label>
+                                <div id="clinicDayHoursWrap_4" class="sm:col-span-5 flex items-center gap-1.5">
+                                    <input type="time" id="clinicDayStart_4" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">至</span>
+                                    <input type="time" id="clinicDayEnd_4" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div id="clinicDayLunchWrap_4" class="sm:col-span-4 flex items-center gap-1.5">
+                                    <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                    <input type="time" id="clinicDayLunchStart_4" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">-</span>
+                                    <input type="time" id="clinicDayLunchEnd_4" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+                            <!-- 星期五 -->
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="clinicWeekdayRow_5">
+                                <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_5" data-weekday="5" onchange="toggleClinicWeekdayRow('clinic', 5)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期五</span>
+                                    <span id="clinicDayClosedBadge_5" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                                </label>
+                                <div id="clinicDayHoursWrap_5" class="sm:col-span-5 flex items-center gap-1.5">
+                                    <input type="time" id="clinicDayStart_5" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">至</span>
+                                    <input type="time" id="clinicDayEnd_5" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div id="clinicDayLunchWrap_5" class="sm:col-span-4 flex items-center gap-1.5">
+                                    <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                    <input type="time" id="clinicDayLunchStart_5" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">-</span>
+                                    <input type="time" id="clinicDayLunchEnd_5" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+                            <!-- 星期六 -->
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="clinicWeekdayRow_6">
+                                <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_6" data-weekday="6" onchange="toggleClinicWeekdayRow('clinic', 6)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期六</span>
+                                    <span id="clinicDayClosedBadge_6" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                                </label>
+                                <div id="clinicDayHoursWrap_6" class="sm:col-span-5 flex items-center gap-1.5">
+                                    <input type="time" id="clinicDayStart_6" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">至</span>
+                                    <input type="time" id="clinicDayEnd_6" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div id="clinicDayLunchWrap_6" class="sm:col-span-4 flex items-center gap-1.5">
+                                    <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                    <input type="time" id="clinicDayLunchStart_6" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">-</span>
+                                    <input type="time" id="clinicDayLunchEnd_6" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+                            <!-- 星期日 -->
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1" id="clinicWeekdayRow_0">
+                                <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_0" data-weekday="0" onchange="toggleClinicWeekdayRow('clinic', 0)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <span>星期日</span>
+                                    <span id="clinicDayClosedBadge_0" class="text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                                </label>
+                                <div id="clinicDayHoursWrap_0" class="sm:col-span-5 flex items-center gap-1.5 opacity-40 pointer-events-none">
+                                    <input type="time" id="clinicDayStart_0" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">至</span>
+                                    <input type="time" id="clinicDayEnd_0" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div id="clinicDayLunchWrap_0" class="sm:col-span-4 flex items-center gap-1.5 opacity-40 pointer-events-none">
+                                    <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                    <input type="time" id="clinicDayLunchStart_0" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-400 text-xs">-</span>
+                                    <input type="time" id="clinicDayLunchEnd_0" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
                         </div>
-                        <p class="text-xs text-gray-400 mt-1">設定後，收據將顯示應診星期與營業時間，且會員端線上預約僅開放已勾選的上班星期與營業時段。</p>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">休息時間</label>
-                        <div class="grid grid-cols-2 gap-3">
-                            <input type="time" id="clinicLunchStart" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            <input type="time" id="clinicLunchEnd" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                        </div>
-                        <p class="text-xs text-gray-400 mt-1">休息時段不開放預約。</p>
+                        <p class="text-xs text-gray-400 mt-1">可為不同星期設定各自的上班、下班及休息時間；儲存後收據將自動合併或分列顯示，且會員端預約會依該日對應時段開放。</p>
                     </div>
                     
                     <div>
@@ -4376,54 +4498,176 @@
                     <input type="text" id="addClinicEnglishName" placeholder="請輸入診所英文名稱" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">診所營業時間</label>
-                    <div class="mb-2">
-                        <span class="block text-xs text-gray-500 mb-1">應診星期（勾選營業日，未勾選視為休診日）</span>
-                        <div class="flex flex-wrap gap-2" id="addClinicBusinessDaysGroup">
-                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                <input type="checkbox" id="addClinicOpenDay_1" data-weekday="1" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
-                                <span>星期一</span>
-                            </label>
-                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                <input type="checkbox" id="addClinicOpenDay_2" data-weekday="2" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
-                                <span>星期二</span>
-                            </label>
-                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                <input type="checkbox" id="addClinicOpenDay_3" data-weekday="3" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
-                                <span>星期三</span>
-                            </label>
-                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                <input type="checkbox" id="addClinicOpenDay_4" data-weekday="4" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
-                                <span>星期四</span>
-                            </label>
-                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                <input type="checkbox" id="addClinicOpenDay_5" data-weekday="5" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
-                                <span>星期五</span>
-                            </label>
-                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                <input type="checkbox" id="addClinicOpenDay_6" data-weekday="6" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
-                                <span>星期六</span>
-                            </label>
-                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
-                                <input type="checkbox" id="addClinicOpenDay_0" data-weekday="0" class="rounded border-gray-300 text-green-600 focus:ring-green-500">
-                                <span>星期日</span>
-                            </label>
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <label class="block text-sm font-medium text-gray-700">診所營業時間（星期一至星期日，可按日設定不同上下班及休息時間）</label>
+                    </div>
+                    <!-- 快速統一設定列 -->
+                    <div class="bg-green-50/60 border border-green-200 rounded-lg p-3 mb-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                            <span class="text-xs font-medium text-green-800">快速批量設定（可先輸入常用時間，一鍵套用至所有已勾選營業日，再逐日微調）</span>
+                            <button type="button" onclick="applyDefaultHoursToOpenDays('addClinic')" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded-md transition">
+                                套用至已勾選星期
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <span class="block text-xs text-gray-600 mb-1">預設上班／下班時間</span>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input type="time" id="addClinicBusinessHoursStart" value="09:00" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                    <input type="time" id="addClinicBusinessHoursEnd" value="18:00" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                </div>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-gray-600 mb-1">預設休息時間（選填）</span>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input type="time" id="addClinicLunchStart" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                    <input type="time" id="addClinicLunchEnd" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <input type="time" id="addClinicBusinessHoursStart" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                        <input type="time" id="addClinicBusinessHoursEnd" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    <!-- 星期一至星期日逐日設定 -->
+                    <div class="space-y-2 border border-gray-200 rounded-lg p-3 bg-gray-50/50" id="addClinicBusinessDaysGroup">
+                        <div class="hidden sm:grid sm:grid-cols-12 gap-2 text-xs font-medium text-gray-500 pb-1 border-b border-gray-200">
+                            <div class="col-span-3">應診星期</div>
+                            <div class="col-span-5">上班時間 — 下班時間</div>
+                            <div class="col-span-4">休息時間（選填）</div>
+                        </div>
+                        <!-- 星期一 -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="addClinicWeekdayRow_1">
+                            <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_1" data-weekday="1" onchange="toggleClinicWeekdayRow('addClinic', 1)" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期一</span>
+                                <span id="addClinicDayClosedBadge_1" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                            </label>
+                            <div id="addClinicDayHoursWrap_1" class="sm:col-span-5 flex items-center gap-1.5">
+                                <input type="time" id="addClinicDayStart_1" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">至</span>
+                                <input type="time" id="addClinicDayEnd_1" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div id="addClinicDayLunchWrap_1" class="sm:col-span-4 flex items-center gap-1.5">
+                                <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                <input type="time" id="addClinicDayLunchStart_1" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">-</span>
+                                <input type="time" id="addClinicDayLunchEnd_1" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                        </div>
+                        <!-- 星期二 -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="addClinicWeekdayRow_2">
+                            <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_2" data-weekday="2" onchange="toggleClinicWeekdayRow('addClinic', 2)" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期二</span>
+                                <span id="addClinicDayClosedBadge_2" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                            </label>
+                            <div id="addClinicDayHoursWrap_2" class="sm:col-span-5 flex items-center gap-1.5">
+                                <input type="time" id="addClinicDayStart_2" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">至</span>
+                                <input type="time" id="addClinicDayEnd_2" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div id="addClinicDayLunchWrap_2" class="sm:col-span-4 flex items-center gap-1.5">
+                                <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                <input type="time" id="addClinicDayLunchStart_2" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">-</span>
+                                <input type="time" id="addClinicDayLunchEnd_2" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                        </div>
+                        <!-- 星期三 -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="addClinicWeekdayRow_3">
+                            <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_3" data-weekday="3" onchange="toggleClinicWeekdayRow('addClinic', 3)" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期三</span>
+                                <span id="addClinicDayClosedBadge_3" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                            </label>
+                            <div id="addClinicDayHoursWrap_3" class="sm:col-span-5 flex items-center gap-1.5">
+                                <input type="time" id="addClinicDayStart_3" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">至</span>
+                                <input type="time" id="addClinicDayEnd_3" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div id="addClinicDayLunchWrap_3" class="sm:col-span-4 flex items-center gap-1.5">
+                                <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                <input type="time" id="addClinicDayLunchStart_3" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">-</span>
+                                <input type="time" id="addClinicDayLunchEnd_3" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                        </div>
+                        <!-- 星期四 -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="addClinicWeekdayRow_4">
+                            <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_4" data-weekday="4" onchange="toggleClinicWeekdayRow('addClinic', 4)" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期四</span>
+                                <span id="addClinicDayClosedBadge_4" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                            </label>
+                            <div id="addClinicDayHoursWrap_4" class="sm:col-span-5 flex items-center gap-1.5">
+                                <input type="time" id="addClinicDayStart_4" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">至</span>
+                                <input type="time" id="addClinicDayEnd_4" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div id="addClinicDayLunchWrap_4" class="sm:col-span-4 flex items-center gap-1.5">
+                                <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                <input type="time" id="addClinicDayLunchStart_4" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">-</span>
+                                <input type="time" id="addClinicDayLunchEnd_4" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                        </div>
+                        <!-- 星期五 -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="addClinicWeekdayRow_5">
+                            <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_5" data-weekday="5" onchange="toggleClinicWeekdayRow('addClinic', 5)" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期五</span>
+                                <span id="addClinicDayClosedBadge_5" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                            </label>
+                            <div id="addClinicDayHoursWrap_5" class="sm:col-span-5 flex items-center gap-1.5">
+                                <input type="time" id="addClinicDayStart_5" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">至</span>
+                                <input type="time" id="addClinicDayEnd_5" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div id="addClinicDayLunchWrap_5" class="sm:col-span-4 flex items-center gap-1.5">
+                                <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                <input type="time" id="addClinicDayLunchStart_5" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">-</span>
+                                <input type="time" id="addClinicDayLunchEnd_5" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                        </div>
+                        <!-- 星期六 -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1 border-b border-gray-100 last:border-0" id="addClinicWeekdayRow_6">
+                            <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_6" data-weekday="6" onchange="toggleClinicWeekdayRow('addClinic', 6)" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期六</span>
+                                <span id="addClinicDayClosedBadge_6" class="hidden text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                            </label>
+                            <div id="addClinicDayHoursWrap_6" class="sm:col-span-5 flex items-center gap-1.5">
+                                <input type="time" id="addClinicDayStart_6" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">至</span>
+                                <input type="time" id="addClinicDayEnd_6" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div id="addClinicDayLunchWrap_6" class="sm:col-span-4 flex items-center gap-1.5">
+                                <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                <input type="time" id="addClinicDayLunchStart_6" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">-</span>
+                                <input type="time" id="addClinicDayLunchEnd_6" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                        </div>
+                        <!-- 星期日 -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center py-1" id="addClinicWeekdayRow_0">
+                            <label class="sm:col-span-3 inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_0" data-weekday="0" onchange="toggleClinicWeekdayRow('addClinic', 0)" class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+                                <span>星期日</span>
+                                <span id="addClinicDayClosedBadge_0" class="text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">休診</span>
+                            </label>
+                            <div id="addClinicDayHoursWrap_0" class="sm:col-span-5 flex items-center gap-1.5 opacity-40 pointer-events-none">
+                                <input type="time" id="addClinicDayStart_0" value="09:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">至</span>
+                                <input type="time" id="addClinicDayEnd_0" value="18:00" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div id="addClinicDayLunchWrap_0" class="sm:col-span-4 flex items-center gap-1.5 opacity-40 pointer-events-none">
+                                <span class="sm:hidden text-xs text-gray-500 shrink-0">休息：</span>
+                                <input type="time" id="addClinicDayLunchStart_0" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                                <span class="text-gray-400 text-xs">-</span>
+                                <input type="time" id="addClinicDayLunchEnd_0" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-green-500">
+                            </div>
+                        </div>
                     </div>
-                    <p class="text-xs text-gray-400 mt-1">設定後，收據將顯示應診星期與營業時間，且會員端線上預約僅開放已勾選的上班星期與營業時段。</p>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">休息時間</label>
-                    <div class="grid grid-cols-2 gap-3">
-                        <input type="time" id="addClinicLunchStart" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                        <input type="time" id="addClinicLunchEnd" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    </div>
-                    <p class="text-xs text-gray-400 mt-1">休息時段不開放預約。</p>
+                    <p class="text-xs text-gray-400 mt-1">可為不同星期設定各自的上班、下班及休息時間；儲存後收據將自動合併或分列顯示，且會員端預約會依該日對應時段開放。</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">診所電話</label>
@@ -6681,10 +6925,10 @@
     <script src="schedule_management.js?v=20261011a" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
     <script type="module" src="js/app.js?v=20261015a"></script>
-    <script src="system.js?v=20261016a" defer></script>
+    <script src="system.js?v=20261016b" defer></script>
     <script src="attachments.js?v=20261014i" defer></script>
     <script src="personalStatistics.js?v=20261011a" defer></script>
-    <script src="systemmanagement.js?v=20261016a" defer></script>
+    <script src="systemmanagement.js?v=20261016b" defer></script>
     <script src="chat_module.js?v=20261010a" defer></script>
     <script src="i18n.js?v=20261011b" defer></script>
 

@@ -5,6 +5,13 @@ const SM_WEEKDAY_LABELS = {
 };
 
 function smResolveOpenWeekdays(settings) {
+    if (settings && settings.weeklyBusinessHours && typeof settings.weeklyBusinessHours === 'object') {
+        const fromWeekly = SM_WEEKDAY_ORDER.filter((d) => {
+            const entry = settings.weeklyBusinessHours[String(d)];
+            return entry && entry.open === true;
+        });
+        if (fromWeekly.length) return fromWeekly;
+    }
     if (settings && Array.isArray(settings.openWeekdays)) {
         const nums = settings.openWeekdays.map(Number);
         return SM_WEEKDAY_ORDER.filter((d) => nums.includes(d));
@@ -53,22 +60,11 @@ function smFormatOpenWeekdaysText(openDays) {
 }
 
 function showClinicSettingsModal() {
-
     document.getElementById('clinicChineseName').value = clinicSettings.chineseName || '';
     document.getElementById('clinicEnglishName').value = clinicSettings.englishName || '';
-    const setVal = (id, v) => {
-        const el = document.getElementById(id);
-        if (el) el.value = v || '';
-    };
-    const openSet = new Set(smResolveOpenWeekdays(clinicSettings).map(Number));
-    SM_WEEKDAY_ORDER.forEach((d) => {
-        const cb = document.getElementById(`clinicOpenDay_${d}`);
-        if (cb) cb.checked = openSet.has(d);
-    });
-    setVal('clinicBusinessHoursStart', clinicSettings.businessHoursStart);
-    setVal('clinicBusinessHoursEnd', clinicSettings.businessHoursEnd);
-    setVal('clinicLunchStart', clinicSettings.lunchStart);
-    setVal('clinicLunchEnd', clinicSettings.lunchEnd);
+    if (typeof window.setWeeklyBusinessHoursUI === 'function') {
+        window.setWeeklyBusinessHoursUI('clinic', clinicSettings);
+    }
     document.getElementById('clinicPhone').value = clinicSettings.phone || '';
     document.getElementById('clinicAddress').value = clinicSettings.address || '';
     const thankYouInput = document.getElementById('clinicReceiptThankYouText');
@@ -85,29 +81,9 @@ function hideClinicSettingsModal() {
 async function saveClinicSettings() {
     const chineseName = document.getElementById('clinicChineseName').value.trim();
     const englishName = document.getElementById('clinicEnglishName').value.trim();
-    const readTime = (id) => {
-        const el = document.getElementById(id);
-        return el ? String(el.value || '').trim() : '';
-    };
-    const openWeekdays = SM_WEEKDAY_ORDER.filter((d) => {
-        const cb = document.getElementById(`clinicOpenDay_${d}`);
-        return !!(cb && cb.checked);
-    });
-    const closedWeekdays = SM_WEEKDAY_ORDER.filter((d) => !openWeekdays.includes(d));
-    const daysText = smFormatOpenWeekdaysText(openWeekdays);
-    const businessHoursStart = readTime('clinicBusinessHoursStart');
-    const businessHoursEnd = readTime('clinicBusinessHoursEnd');
-    const lunchStart = readTime('clinicLunchStart');
-    const lunchEnd = readTime('clinicLunchEnd');
-    let businessHours = '';
-    if (businessHoursStart && businessHoursEnd) {
-        businessHours = daysText ? `${daysText} ${businessHoursStart}-${businessHoursEnd}` : `${businessHoursStart}-${businessHoursEnd}`;
-    } else if (openWeekdays.length) {
-        businessHours = daysText;
-    }
-    if (businessHoursStart && businessHoursEnd && lunchStart && lunchEnd) {
-        businessHours += `（休息 ${lunchStart}-${lunchEnd}）`;
-    }
+    const hours = (typeof window.collectBusinessHoursUI === 'function')
+        ? window.collectBusinessHoursUI('clinic')
+        : null;
     const phone = document.getElementById('clinicPhone').value.trim();
     const address = document.getElementById('clinicAddress').value.trim();
     const thankYouInput = document.getElementById('clinicReceiptThankYouText');
@@ -117,47 +93,25 @@ async function saveClinicSettings() {
         showToast('請輸入診所中文名稱！', 'error');
         return;
     }
-    if (!openWeekdays.length) {
+    if (!hours || !hours.openWeekdays.length) {
         showToast('請至少勾選一天診所營業日（星期一至星期日）', 'error');
         return;
     }
-    // 營業時間須成對且結束晚於開始；午飯須落在營業時間內
-    const hm = (x) => {
-        const m = /^(\d{2}):(\d{2})$/.exec(x || '');
-        return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
-    };
-    const open = hm(businessHoursStart);
-    const close = hm(businessHoursEnd);
-    if ((businessHoursStart && !businessHoursEnd) || (!businessHoursStart && businessHoursEnd)) {
-        showToast('請完整設定診所營業時間（開始及結束）', 'error');
-        return;
-    }
-    if (businessHoursStart && close <= open) {
-        showToast('診所結束時間必須晚於開始時間', 'error');
-        return;
-    }
-    const lunchS = hm(lunchStart);
-    const lunchE = hm(lunchEnd);
-    if ((lunchStart && !lunchEnd) || (!lunchStart && lunchEnd)
-        || (lunchStart && lunchE <= lunchS)) {
-        showToast('請完整設定休息時間，且結束須晚於開始', 'error');
-        return;
-    }
-    if (businessHoursStart && lunchStart
-        && (lunchS < open || lunchE > close)) {
-        showToast('休息時間必須設定於診所營業時間之內', 'error');
+    if (hours.validationError) {
+        showToast(hours.validationError, 'error');
         return;
     }
 
     clinicSettings.chineseName = chineseName;
     clinicSettings.englishName = englishName;
-    clinicSettings.businessHours = businessHours;
-    clinicSettings.businessHoursStart = businessHoursStart;
-    clinicSettings.businessHoursEnd = businessHoursEnd;
-    clinicSettings.lunchStart = lunchStart;
-    clinicSettings.lunchEnd = lunchEnd;
-    clinicSettings.openWeekdays = openWeekdays;
-    clinicSettings.closedWeekdays = closedWeekdays;
+    clinicSettings.businessHours = hours.businessHours;
+    clinicSettings.businessHoursStart = hours.start;
+    clinicSettings.businessHoursEnd = hours.end;
+    clinicSettings.lunchStart = hours.lunchStart;
+    clinicSettings.lunchEnd = hours.lunchEnd;
+    clinicSettings.openWeekdays = hours.openWeekdays;
+    clinicSettings.closedWeekdays = hours.closedWeekdays;
+    clinicSettings.weeklyBusinessHours = hours.weeklyBusinessHours;
     clinicSettings.phone = phone;
     clinicSettings.address = address;
     clinicSettings.receiptThankYouText = receiptThankYouText;
