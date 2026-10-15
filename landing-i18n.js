@@ -348,7 +348,7 @@
     'cta.wa.long': 'WhatsApp: +852 54393401',
 
     'hero.badge': 'Tailor-made for TCM & Acupuncture Clinics',
-    'hero.title': 'MingYI Clinic System: All-in-One TCM & Acupuncture Practice Management Software',
+    'hero.title': 'DrGreat Clinic System: All-in-One TCM & Acupuncture Practice Management Software',
     'hero.subtitle': 'Simple · Intuitive · Efficient',
     'hero.desc': 'Combining thousand-year TCM wisdom with modern technology — fully digitalising everything from the "Four Examinations" to "Syndrome Differentiation and Treatment"',
     'hero.designer': 'A TCM clinic system designed by TCM practitioners — built around real TCM needs',
@@ -397,10 +397,10 @@
     'ss.tag': 'Interface Preview',
     'ss.title': 'An Intuitive, Easy-to-Use Experience',
     'ss.sub': 'A thoughtfully designed interface your team can master without lengthy training',
-    'ss.alt1': 'MingYI Clinic System – TCM registration and waiting-list management interface',
+    'ss.alt1': 'DrGreat Clinic System – TCM registration and waiting-list management interface',
     'ss.alt2': 'Interactive acupoint map and meridian locator in the TCM system',
     'ss.alt3': 'Automated Chinese herb inventory management and materia medica database',
-    'ss.alt4': 'MingYI Clinic System – staff scheduling synced across multiple clinics',
+    'ss.alt4': 'DrGreat Clinic System – staff scheduling synced across multiple clinics',
     'ss.t1': 'Efficient Registration & Consultation',
     'ss.d1': 'A clear waiting list with real-time status management',
     'ss.t2': 'Interactive Acupoint Map',
@@ -625,7 +625,7 @@
     'final.title': 'Ready to take your clinic<br>into the digital era?',
     'final.p': 'Contact us now to learn more',
 
-    'footer.logoalt': 'MingYI Clinic System Logo',
+    'footer.logoalt': 'DrGreat Clinic System Logo',
     'footer.about': 'A smart management system tailor-made for TCM clinics<br>Simple · Intuitive · Efficient',
     'footer.products': 'Product',
     'footer.f1': 'Online Booking',
@@ -635,15 +635,15 @@
     'footer.f5': 'Herb Database',
     'footer.f6': 'FAQ',
     'footer.contact': 'Contact Us',
-    'footer.copy': '© 2025 MingYI Clinic System. All rights reserved.',
+    'footer.copy': '© 2025 DrGreat Clinic System. All rights reserved.',
     'footer.privacy': 'Privacy Policy',
     'footer.terms': 'Terms of Service',
 
-    'wa.float': 'Chat with MingYI Clinic System on WhatsApp',
+    'wa.float': 'Chat with DrGreat Clinic System on WhatsApp',
 
-    'meta.title': 'MingYI Clinic System | TCM & Acupuncture Clinic Management Software (EMR) - 3-Month Free Trial',
+    'meta.title': 'DrGreat Clinic System | TCM & Acupuncture Clinic Management Software (EMR) - 3-Month Free Trial',
     'meta.desc': 'Designed by TCM practitioners for clinics worldwide: an all-in-one Traditional Chinese Medicine (TCM) & Acupuncture practice management software featuring online booking, smart intake, EMR, herbal pharmacy inventory, interactive acupoint map & telemedicine. Supports English, Simplified & Traditional Chinese. 3-month free trial.',
-    'meta.ogtitle': 'MingYI Clinic System | All-in-One TCM & Acupuncture Practice Management Software',
+    'meta.ogtitle': 'DrGreat Clinic System | All-in-One TCM & Acupuncture Practice Management Software',
     'meta.ogdesc': 'Professional TCM & Acupuncture EMR with online booking, herbal pharmacy inventory, interactive acupoint map and global telemedicine. Start your 3-month free trial today.'
   };
 
