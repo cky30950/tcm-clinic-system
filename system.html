@@ -4284,11 +4284,44 @@
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">診所營業時間</label>
+                        <div class="mb-2">
+                            <span class="block text-xs text-gray-500 mb-1">應診星期（勾選營業日，未勾選視為休診日）</span>
+                            <div class="flex flex-wrap gap-2" id="clinicBusinessDaysGroup">
+                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_1" data-weekday="1" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期一</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_2" data-weekday="2" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期二</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_3" data-weekday="3" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期三</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_4" data-weekday="4" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期四</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_5" data-weekday="5" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期五</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_6" data-weekday="6" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span>星期六</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                    <input type="checkbox" id="clinicOpenDay_0" data-weekday="0" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <span>星期日</span>
+                                </label>
+                            </div>
+                        </div>
                         <div class="grid grid-cols-2 gap-3">
                             <input type="time" id="clinicBusinessHoursStart" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             <input type="time" id="clinicBusinessHoursEnd" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
-                        <p class="text-xs text-gray-400 mt-1">設定後，病人端線上預約時段會自動跟隨營業時間。</p>
+                        <p class="text-xs text-gray-400 mt-1">設定後，收據將顯示應診星期與營業時間，且會員端線上預約僅開放已勾選的上班星期與營業時段。</p>
                     </div>
 
                     <div>
@@ -4344,11 +4377,44 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">診所營業時間</label>
+                    <div class="mb-2">
+                        <span class="block text-xs text-gray-500 mb-1">應診星期（勾選營業日，未勾選視為休診日）</span>
+                        <div class="flex flex-wrap gap-2" id="addClinicBusinessDaysGroup">
+                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_1" data-weekday="1" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期一</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_2" data-weekday="2" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期二</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_3" data-weekday="3" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期三</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_4" data-weekday="4" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期四</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_5" data-weekday="5" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期五</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_6" data-weekday="6" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                                <span>星期六</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-300 bg-gray-50 text-xs text-gray-700 cursor-pointer">
+                                <input type="checkbox" id="addClinicOpenDay_0" data-weekday="0" class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+                                <span>星期日</span>
+                            </label>
+                        </div>
+                    </div>
                     <div class="grid grid-cols-2 gap-3">
                         <input type="time" id="addClinicBusinessHoursStart" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                         <input type="time" id="addClinicBusinessHoursEnd" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
                     </div>
-                    <p class="text-xs text-gray-400 mt-1">設定後，病人端線上預約時段會自動跟隨營業時間。</p>
+                    <p class="text-xs text-gray-400 mt-1">設定後，收據將顯示應診星期與營業時間，且會員端線上預約僅開放已勾選的上班星期與營業時段。</p>
                 </div>
 
                 <div>
@@ -6615,10 +6681,10 @@
     <script src="schedule_management.js?v=20261011a" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
     <script type="module" src="js/app.js?v=20261015a"></script>
-    <script src="system.js?v=20261015a" defer></script>
+    <script src="system.js?v=20261016a" defer></script>
     <script src="attachments.js?v=20261014i" defer></script>
     <script src="personalStatistics.js?v=20261011a" defer></script>
-    <script src="systemmanagement.js?v=20261010a" defer></script>
+    <script src="systemmanagement.js?v=20261016a" defer></script>
     <script src="chat_module.js?v=20261010a" defer></script>
     <script src="i18n.js?v=20261011b" defer></script>
 

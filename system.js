@@ -7504,23 +7504,98 @@ async function initializeSystemAfterLogin() {
             }
         }
 
-        // 收集「診所營業時間＋午飯時間」時間輸入（prefix＝'' 或 'addClinic'），
+        // 星期順序（星期一至星期日：1..6, 0）與中文名稱
+        const CLINIC_WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+        const CLINIC_WEEKDAY_LABELS = {
+            1: '星期一', 2: '星期二', 3: '星期三', 4: '星期四',
+            5: '星期五', 6: '星期六', 0: '星期日'
+        };
+
+        // 由診所設定物件解析應診星期（預設星期一至星期六 [1,2,3,4,5,6]）
+        function resolveOpenWeekdaysFromClinic(settings) {
+            if (settings && Array.isArray(settings.openWeekdays)) {
+                const nums = settings.openWeekdays.map(Number);
+                return CLINIC_WEEKDAY_ORDER.filter((d) => nums.includes(d));
+            }
+            if (settings && Array.isArray(settings.closedWeekdays)) {
+                const closed = settings.closedWeekdays.map(Number);
+                return CLINIC_WEEKDAY_ORDER.filter((d) => !closed.includes(d));
+            }
+            const bh = String((settings && settings.businessHours) || '');
+            if (bh.includes('週一至週五') || bh.includes('星期一至星期五')) {
+                return [1, 2, 3, 4, 5];
+            }
+            if (bh.includes('週一至週日') || bh.includes('星期一至星期日')) {
+                return [1, 2, 3, 4, 5, 6, 0];
+            }
+            return [1, 2, 3, 4, 5, 6];
+        }
+
+        // 將應診星期陣列格式化為「星期一至星期六」等文字
+        function formatOpenWeekdaysText(openDays) {
+            const set = new Set((Array.isArray(openDays) ? openDays : []).map(Number));
+            const activeIndices = [];
+            CLINIC_WEEKDAY_ORDER.forEach((d, idx) => {
+                if (set.has(d)) activeIndices.push(idx);
+            });
+            if (!activeIndices.length) return '全週休診';
+            const runs = [];
+            let runStart = activeIndices[0];
+            let prev = activeIndices[0];
+            for (let i = 1; i < activeIndices.length; i++) {
+                const cur = activeIndices[i];
+                if (cur === prev + 1) {
+                    prev = cur;
+                } else {
+                    runs.push([runStart, prev]);
+                    runStart = cur;
+                    prev = cur;
+                }
+            }
+            runs.push([runStart, prev]);
+            return runs.map(([s, e]) => {
+                const startDay = CLINIC_WEEKDAY_ORDER[s];
+                const endDay = CLINIC_WEEKDAY_ORDER[e];
+                if (s === e) return CLINIC_WEEKDAY_LABELS[startDay];
+                return `${CLINIC_WEEKDAY_LABELS[startDay]}至${CLINIC_WEEKDAY_LABELS[endDay]}`;
+            }).join('、');
+        }
+
+        function setOpenWeekdaysUI(prefix, openDays) {
+            const set = new Set((Array.isArray(openDays) ? openDays : [1, 2, 3, 4, 5, 6]).map(Number));
+            CLINIC_WEEKDAY_ORDER.forEach((d) => {
+                const cb = document.getElementById(`${prefix}OpenDay_${d}`);
+                if (cb) cb.checked = set.has(d);
+            });
+        }
+
+        // 收集「診所應診星期＋營業時間＋午飯時間」輸入（prefix＝'clinic' 或 'addClinic'），
         // 同時生成 businessHours 顯示字串，供收據/頁腳等既有展示沿用。
         function collectBusinessHoursUI(prefix) {
             const val = (id) => {
                 const el = document.getElementById(prefix + id);
                 return el ? String(el.value || '').trim() : '';
             };
+            const openWeekdays = CLINIC_WEEKDAY_ORDER.filter((d) => {
+                const cb = document.getElementById(`${prefix}OpenDay_${d}`);
+                return !!(cb && cb.checked);
+            });
+            const closedWeekdays = CLINIC_WEEKDAY_ORDER.filter((d) => !openWeekdays.includes(d));
+            const daysText = formatOpenWeekdaysText(openWeekdays);
             const start = val('BusinessHoursStart');
             const end = val('BusinessHoursEnd');
             const lunchStart = val('LunchStart');
             const lunchEnd = val('LunchEnd');
             let businessHours = '';
-            if (start && end) businessHours = `${start}-${end}`;
-            if (lunchStart && lunchEnd && businessHours) {
+            if (start && end) {
+                businessHours = daysText ? `${daysText} ${start}-${end}` : `${start}-${end}`;
+            } else if (openWeekdays.length) {
+                businessHours = daysText;
+            }
+            if (lunchStart && lunchEnd && start && end) {
                 businessHours += `（休息 ${lunchStart}-${lunchEnd}）`;
             }
-            return { start, end, lunchStart, lunchEnd, businessHours };
+            return { openWeekdays, closedWeekdays, daysText, start, end, lunchStart, lunchEnd, businessHours };
         }
 
         // 以時間字串（HH:mm）換算分鐘，便於驗證先後
@@ -7537,6 +7612,7 @@ async function initializeSystemAfterLogin() {
                 const el = document.getElementById(id);
                 if (el) el.value = v || '';
             };
+            setOpenWeekdaysUI('clinic', resolveOpenWeekdaysFromClinic(clinicSettings));
             setVal('clinicBusinessHoursStart', clinicSettings.businessHoursStart);
             setVal('clinicBusinessHoursEnd', clinicSettings.businessHoursEnd);
             setVal('clinicLunchStart', clinicSettings.lunchStart);
@@ -7576,6 +7652,7 @@ async function initializeSystemAfterLogin() {
                 const el = document.getElementById(id);
                 if (el && 'value' in el) el.value = '';
             });
+            setOpenWeekdaysUI('addClinic', [1, 2, 3, 4, 5, 6]);
             const modal = document.getElementById('addClinicModal');
             if (modal) modal.classList.remove('hidden');
         }
@@ -7594,6 +7671,10 @@ async function initializeSystemAfterLogin() {
             const receiptThankYouText = String((document.getElementById('addClinicReceiptThankYouText') || {}).value || '').trim();
             if (!chineseName) {
                 showToast('請輸入診所中文名稱！', 'error');
+                return;
+            }
+            if (!hours.openWeekdays.length) {
+                showToast('請至少勾選一天診所營業日（星期一至星期日）', 'error');
                 return;
             }
             // 營業時間須成對且結束晚於開始；午飯須落在營業時間內
@@ -7626,6 +7707,8 @@ async function initializeSystemAfterLogin() {
                     businessHoursEnd: hours.end,
                     lunchStart: hours.lunchStart,
                     lunchEnd: hours.lunchEnd,
+                    openWeekdays: hours.openWeekdays,
+                    closedWeekdays: hours.closedWeekdays,
                     phone,
                     address,
                     receiptThankYouText,
@@ -7662,6 +7745,10 @@ async function initializeSystemAfterLogin() {
                 showToast('請輸入診所中文名稱！', 'error');
                 return;
             }
+            if (!hours.openWeekdays.length) {
+                showToast('請至少勾選一天診所營業日（星期一至星期日）', 'error');
+                return;
+            }
             // 營業時間須成對且結束晚於開始；午飯須落在營業時間內
             if ((hours.start && !hours.end) || (!hours.start && hours.end)) {
                 showToast('請完整設定診所營業時間（開始及結束）', 'error');
@@ -7691,6 +7778,8 @@ async function initializeSystemAfterLogin() {
             clinicSettings.businessHoursEnd = hours.end;
             clinicSettings.lunchStart = hours.lunchStart;
             clinicSettings.lunchEnd = hours.lunchEnd;
+            clinicSettings.openWeekdays = hours.openWeekdays;
+            clinicSettings.closedWeekdays = hours.closedWeekdays;
             clinicSettings.phone = phone;
             clinicSettings.address = address;
             clinicSettings.receiptThankYouText = receiptThankYouText;
@@ -7705,6 +7794,8 @@ async function initializeSystemAfterLogin() {
                         businessHoursEnd: hours.end,
                         lunchStart: hours.lunchStart,
                         lunchEnd: hours.lunchEnd,
+                        openWeekdays: hours.openWeekdays,
+                        closedWeekdays: hours.closedWeekdays,
                         phone,
                         address,
                         receiptThankYouText,

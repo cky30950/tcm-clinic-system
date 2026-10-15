@@ -199,7 +199,7 @@ export async function rtdbPush(clientOrUrl, token, path, value) {
 
 /* ---------------- 預約設定 ---------------- */
 
-const CONFIG_CACHE_TTL_MS = 60 * 1000;
+const CONFIG_CACHE_TTL_MS = 5 * 1000;
 const configCache = new Map(); // clinicId → { at, config }
 
 function sanitizeConfig(over) {
@@ -217,7 +217,7 @@ function sanitizeConfig(over) {
             const days = over.closedWeekdays
                 .map((x) => Number(x))
                 .filter((x) => Number.isInteger(x) && x >= 0 && x <= 6);
-            if (days.length) out.closedWeekdays = Array.from(new Set(days));
+            out.closedWeekdays = Array.from(new Set(days));
         }
         if (Array.isArray(over.sessions)) {
             const sessions = over.sessions
@@ -227,6 +227,39 @@ function sanitizeConfig(over) {
         }
     }
     return out;
+}
+
+/**
+ * 以診所文件（clinics/{clinicId}）的應診星期（openWeekdays / closedWeekdays）
+ * 計算每週休診日陣列（0=日, 1=一, ..., 6=六）。
+ * 若診所文件未設定應診星期，回傳 null（由呼叫端沿用預設值）。
+ */
+function closedWeekdaysFromClinicDoc(clinicDoc) {
+    const d = clinicDoc && clinicDoc.data ? clinicDoc.data : clinicDoc;
+    if (!d || typeof d !== 'object') return null;
+    if (Array.isArray(d.openWeekdays)) {
+        const openSet = new Set(
+            d.openWeekdays
+                .map((x) => Number(x))
+                .filter((x) => Number.isInteger(x) && x >= 0 && x <= 6)
+        );
+        return [0, 1, 2, 3, 4, 5, 6].filter((w) => !openSet.has(w));
+    }
+    if (Array.isArray(d.closedWeekdays)) {
+        return Array.from(new Set(
+            d.closedWeekdays
+                .map((x) => Number(x))
+                .filter((x) => Number.isInteger(x) && x >= 0 && x <= 6)
+        ));
+    }
+    const bh = String(d.businessHours || '');
+    if (bh.includes('週一至週五') || bh.includes('星期一至星期五')) {
+        return [0, 6];
+    }
+    if (bh.includes('週一至週日') || bh.includes('星期一至星期日')) {
+        return [];
+    }
+    return null;
 }
 
 /**
@@ -257,7 +290,7 @@ export async function loadBookingConfig(clientOrUrl, token, clinicId) {
     const cached = configCache.get(clinicId);
     if (cached && Date.now() - cached.at < CONFIG_CACHE_TTL_MS) return cached.config;
     // 並行：① RTDB bookingConfig 覆寫（規則數值）；② Firestore 診所文件
-    // （營業時間＋午飯時間為預約時段的權威來源）
+    // （營業時間＋午飯時間＋應診星期為預約時段的權威來源）
     const [override, clinicDoc] = await Promise.all([
         rtdbGet(clientOrUrl, token,
             `clinics/${encodeURIComponent(clinicId)}/bookingConfig`)
@@ -270,6 +303,14 @@ export async function loadBookingConfig(clientOrUrl, token, clinicId) {
             : Promise.resolve(null)
     ]);
     const config = Object.assign({}, DEFAULT_BOOKING_CONFIG, override);
+    // 應診星期掛鉤：診所文件設定了 openWeekdays / closedWeekdays → 以其為準
+    const clinicClosedWeekdays = closedWeekdaysFromClinicDoc(clinicDoc);
+    if (clinicClosedWeekdays !== null) {
+        config.closedWeekdays = clinicClosedWeekdays;
+    }
+    config.openWeekdays = [1, 2, 3, 4, 5, 6, 0].filter(
+        (w) => !(config.closedWeekdays || []).includes(w)
+    );
     // 營業時間掛鉤：診所文件設定了營業時間 → 預約 sessions 以其為準
     // （午飯自動扣除）；未設定才使用預設 sessions。
     const clinicSessions = sessionsFromClinicDoc(clinicDoc);
@@ -442,6 +483,9 @@ export function decorateSlots(config, slots, dayAppointments, doctorUsername, da
  * closed＝診所休診／醫師無排班；slots 為已 decorate 結果。
  */
 export async function evaluateDay(client, token, clinicId, config, doctor, dateStr) {
+    if (Array.isArray(config.closedWeekdays) && config.closedWeekdays.includes(hktWeekday(dateStr))) {
+        return { closed: true, reason: 'clinic_closed', slots: [] };
+    }
     const { hasAny, shifts } = await loadMonthShifts(client, token, clinicId, dateStr);
     const doctorShift = hasAny ? findDoctorShift(shifts, doctor.docId, dateStr) : null;
     if (hasAny && !doctorShift) {

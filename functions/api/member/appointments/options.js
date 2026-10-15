@@ -53,6 +53,7 @@ export async function onRequestGet(context) {
                 maxActivePerPatient: config.maxActivePerPatient,
                 maxPerDayPerPatient: config.maxPerDayPerPatient,
                 closedWeekdays: config.closedWeekdays,
+                openWeekdays: config.openWeekdays,
                 sessions: config.sessions
             },
             doctors: doctors.map((d) => ({

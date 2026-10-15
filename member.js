@@ -766,11 +766,17 @@ function renderBookingDates() {
     const sessions = Array.isArray(bookingRules.sessions) ? bookingRules.sessions : [];
     const closeMin = sessions.reduce(
         (mx, s2) => Math.max(mx, hmToMin(s2 && s2.end)), -1);
+    const closedSet = new Set(
+        (Array.isArray(bookingRules.closedWeekdays) ? bookingRules.closedWeekdays : []).map(Number)
+    );
+    const hasOpenList = Array.isArray(bookingRules.openWeekdays);
+    const openSet = hasOpenList ? new Set(bookingRules.openWeekdays.map(Number)) : null;
     let html = `<option value="">${t('datePlaceholder')}</option>`;
     for (let i = 0; i <= bookingRules.advanceDays; i++) {
         const ds = clientAddDays(start, i);
         const wd = new Date(`${ds}T12:00:00+08:00`).getUTCDay();
-        if (bookingRules.closedWeekdays.includes(wd)) continue;
+        if (closedSet.has(wd)) continue;
+        if (openSet && !openSet.has(wd)) continue;
         if (i === 0 && closeMin >= 0 && nowMin >= closeMin) continue;
         let label = `${ds.slice(5)} ${t('weekdaysShort')[wd]}`;
         if (i === 0) label += ` · ${t('today')}`;
