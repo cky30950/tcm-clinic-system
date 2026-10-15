@@ -5,7 +5,7 @@
  *
  *   'simple'    簡單版：只能使用 1 間診所，且不提供
  *                       視訊診症、會員功能（會員儲值／折扣）、
- *                       病歷附件；相關按鈕與區塊會實際隱藏。
+ *                       備份功能、病歷附件；相關按鈕與區塊會實際隱藏。
  *
  *   'standard'  普通版：只能使用 1 間診所
  *                       系統管理的「新增診所」「刪除目前診所」
@@ -17,6 +17,7 @@
  * window.isVersionFeatureEnabled('xxx') 判斷，例如：
  *   videoConsultation   視訊診症
  *   membership          會員功能（會員儲值、會員折扣）
+ *   backup              備份功能（資料備份與還原）
  *   medicalAttachments  病歷附件
  * ============================================================ */
 
@@ -30,6 +31,7 @@ window.APP_VERSION_OPTIONS = {
         features: {
             videoConsultation: false,  // 不提供視訊診症
             membership: false,         // 不提供會員功能（會員儲值、會員折扣）
+            backup: false,             // 不提供備份功能（資料備份與還原）
             medicalAttachments: false  // 不提供病歷附件
         }
     },

@@ -8993,6 +8993,7 @@ function setBackupCloudStatus(message, tone) {
 let backupStatusRequestSeq = 0;
 
 async function refreshCloudBackupStatus() {
+    if (!versionFeatureEnabled('backup')) return null;
     const seq = ++backupStatusRequestSeq;
     try {
         const status = await callBackupApi('/status');
@@ -9033,6 +9034,10 @@ async function refreshCloudBackupStatus() {
  * @param {boolean} forceBaseline true 時強制全部集合全量讀取（可用於立即校正刪除）
  */
 async function syncCloudBackup(forceBaseline) {
+    if (!versionFeatureEnabled('backup')) {
+        showToast('目前版本不支援備份功能', 'error');
+        return;
+    }
     const button = document.getElementById('backupSyncBtn');
     if (button) button.disabled = true;
     const progressContainer = document.getElementById('backupProgressContainer');
@@ -9089,6 +9094,10 @@ async function syncCloudBackup(forceBaseline) {
  * R2 尚無備份時引導使用者先執行雲端同步；不再提供會大量讀取 Firestore 的本機匯出。
  */
 async function exportClinicBackupFromCloud() {
+    if (!versionFeatureEnabled('backup')) {
+        showToast('目前版本不支援備份功能', 'error');
+        return;
+    }
     const button = document.getElementById('backupExportBtn');
     if (button) button.disabled = true;
     try {
@@ -9146,8 +9155,10 @@ async function exportClinicBackupFromCloud() {
                 // 都能收到跨裝置的病人資料／診症 CRUD 通知。
                 // 函數內有 G.patientListListenerAttached 守護，重複調用安全。
                 try { if (typeof attachPatientListListener === 'function') attachPatientListListener(); } catch (_e) {}
-                refreshCloudBackupStatus();
-            } else {
+                if (versionFeatureEnabled('backup')) {
+                    refreshCloudBackupStatus();
+                }
+            } else if (versionFeatureEnabled('backup')) {
                 setBackupCloudStatus('登入後可查看雲端備份狀態');
             }
         });
@@ -9228,6 +9239,10 @@ async function exportClinicBackupFromCloud() {
  * 觸發備份檔案匯入流程：清空檔案輸入框並打開檔案選擇視窗。
  */
 function triggerBackupImport() {
+    if (!versionFeatureEnabled('backup')) {
+        showToast('目前版本不支援備份功能', 'error');
+        return;
+    }
     const input = document.getElementById('backupFileInput');
     if (input) {
         input.value = '';  // 重置 value，確保可重新選檔
@@ -9264,6 +9279,10 @@ async function parseBackupFileJson(file) {
  * @param {File} file 使用者選擇的 JSON／JSON.GZ 檔案
  */
 async function handleBackupFile(file) {
+    if (!versionFeatureEnabled('backup')) {
+        showToast('目前版本不支援備份功能', 'error');
+        return;
+    }
     if (!file) return;
     {
         const lang = localStorage.getItem('lang') || 'zh';
