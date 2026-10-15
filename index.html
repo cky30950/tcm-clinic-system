@@ -292,6 +292,14 @@
         height: 60px;
       }
     }
+
+    .promo-float {
+      animation: promoFloat 3.5s ease-in-out infinite;
+    }
+    @keyframes promoFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
   </style>
   <style>body { box-sizing: border-box; }</style>
   <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
@@ -395,7 +403,7 @@
          <button type="button" role="menuitem" data-lang="en">English <i data-lucide="check" class="lang-check w-4 h-4"></i></button>
         </div>
        </div>
-       <a href="#footer-contact" id="nav-cta-btn" data-i18n="cta.contact" class="btn btn-primary btn-sm rounded-full px-5 normal-case">聯絡我索取免費試用</a>
+       <a href="#footer-contact" id="nav-cta-btn" data-i18n="cta.contact" class="btn btn-primary btn-sm rounded-full px-5 normal-case">聯絡我</a>
       </div><button class="md:hidden p-2" onclick="toggleMobileMenu()">
        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
        </svg></button>
@@ -417,10 +425,9 @@
      <h1 id="hero-title" data-i18n="hero.title" class="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 animate-fade-in opacity-0" style="color: #1E1E1E; animation-delay: 0.2s;">名醫診所系統：全方位香港中醫數位化管理方案</h1>
      <p id="hero-subtitle" data-i18n="hero.subtitle" class="text-lg sm:text-xl lg:text-2xl mb-4 animate-fade-in opacity-0" style="color: #666; animation-delay: 0.3s;">簡便 · 易用 · 高效</p>
      <p data-i18n="hero.desc" class="text-base sm:text-lg max-w-3xl mx-auto mb-6 animate-fade-in opacity-0" style="color: #888; animation-delay: 0.4s;">將千年中醫智慧與現代科技完美結合，從「望聞問切」到「辯證論治」全面數位化</p>
-     <p data-i18n="hero.designer" class="font-serif text-lg sm:text-xl lg:text-2xl font-semibold max-w-3xl mx-auto mb-4 animate-fade-in opacity-0" style="color: #B8621F; animation-delay: 0.45s;">由中醫師設計的中醫診所系統，更符合中醫需要</p>
-     <p data-i18n="hero.promo" class="font-serif text-base sm:text-lg lg:text-xl font-semibold max-w-3xl mx-auto mb-10 animate-fade-in opacity-0" style="color: #D9782B; animation-delay: 0.48s;">限時推廣：首三個月免費試用，試用三個月後不用也不會收費</p>
+     <p data-i18n="hero.designer" class="font-serif text-lg sm:text-xl lg:text-2xl font-semibold max-w-3xl mx-auto mb-10 animate-fade-in opacity-0" style="color: #B8621F; animation-delay: 0.45s;">由中醫師設計的中醫診所系統，更符合中醫需要</p>
      <!-- TODO: 登記 Cal.com / Calendly 後，把以下連結換成你真正的預約頁面網址 -->
-     <div class="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in opacity-0" style="animation-delay: 0.5s;"><a href="#footer-contact" id="hero-cta-btn" data-i18n="cta.contact" class="btn btn-primary btn-lg rounded-md px-8 text-base normal-case">聯絡我索取免費試用</a>
+     <div class="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in opacity-0" style="animation-delay: 0.5s;"><a href="#footer-contact" id="hero-cta-btn" data-i18n="cta.trial" class="btn btn-primary btn-lg rounded-md px-8 text-base normal-case">聯絡我索取免費試用</a>
        <a href="https://cal.com/drgreattcm/15-min-demo" target="_blank" rel="noopener" class="btn btn-outline btn-lg rounded-md px-8 text-base gap-2 normal-case" style="border-color:#D9782B;color:#B8621F;"><i data-lucide="calendar-days" class="w-5 h-5" aria-hidden="true"></i><span data-i18n="cta.demo">預約 15 分鐘網上示範</span></a>
      </div><div class="grid grid-cols-2 gap-6 mt-16 max-w-2xl mx-auto animate-fade-in opacity-0" style="animation-delay: 0.6s;">
       <div class="text-center">
@@ -1084,7 +1091,7 @@
           <li class="flex items-center gap-3 text-sm" style="color: #666;"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#D9782B;" aria-hidden="true"></i> <span data-i18n="pr.b1">伺服器架設</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: #666;"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#D9782B;" aria-hidden="true"></i> <span data-i18n="pr.b2">診所系統設置</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: #666;"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#D9782B;" aria-hidden="true"></i> <span data-i18n="pr.b3">1 間診所使用</span></li>
-         </ul><a href="#footer-contact" data-i18n="cta.contact" class="btn btn-outline btn-block rounded-md normal-case" style="color:#D9782B;border-color:#D9782B;">聯絡我索取免費試用</a>
+         </ul><a href="#footer-contact" data-i18n="cta.trial" class="btn btn-outline btn-block rounded-md normal-case" style="color:#D9782B;border-color:#D9782B;">聯絡我索取免費試用</a>
         </div>
         <div class="pricing-card rounded-xl p-8 relative h-full flex flex-col" style="background-color: #D9782B;">
          <div data-i18n="pr.badge" class="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-semibold text-white whitespace-nowrap" style="background-color: #B8621F;">
@@ -1093,14 +1100,14 @@
          <div class="text-center mb-8">
           <h4 data-i18n="pr.yearly" class="font-serif text-xl font-semibold mb-2 text-white">診所系統年費</h4>
           <p data-i18n="pr.peryear" class="text-sm mb-4" style="color: rgba(255,255,255,0.7);">每年年費</p>
-          <div class="flex items-baseline justify-center gap-1"><span class="text-4xl font-bold" style="color: #B8621F;">HK$800</span> <span data-i18n="pr.year" class="text-sm" style="color: rgba(255,255,255,0.7);">/年</span>
+          <div class="flex items-baseline justify-center gap-1"><span class="text-4xl font-bold" style="color: #B8621F;">HK$900</span> <span data-i18n="pr.year" class="text-sm" style="color: rgba(255,255,255,0.7);">/年</span>
           </div>
          </div>
          <ul class="space-y-4 mb-8 flex-1">
           <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#B8621F;" aria-hidden="true"></i> <span data-i18n="pr.b4">伺服器租用</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#B8621F;" aria-hidden="true"></i> <span data-i18n="pr.b5">診所系統的更新及維護</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#B8621F;" aria-hidden="true"></i> <span data-i18n="pr.b6">技術支援</span></li>
-         </ul><a href="#footer-contact" data-i18n="cta.contact" class="btn btn-secondary btn-block rounded-md normal-case">聯絡我索取免費試用</a>
+         </ul><a href="#footer-contact" data-i18n="cta.trial" class="btn btn-secondary btn-block rounded-md normal-case">聯絡我索取免費試用</a>
         </div>
        </div>
       </div>
@@ -1128,7 +1135,7 @@
           <li class="flex items-center gap-3 text-sm" style="color: #666;"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#D9782B;" aria-hidden="true"></i> <span data-i18n="pr.b1">伺服器架設</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: #666;"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#D9782B;" aria-hidden="true"></i> <span data-i18n="pr.b2">診所系統設置</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: #666;"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#D9782B;" aria-hidden="true"></i> <span data-i18n="pr.b3">1 間診所使用</span></li>
-         </ul><a href="#footer-contact" data-i18n="cta.contact" class="btn btn-outline btn-block rounded-md normal-case" style="color:#D9782B;border-color:#D9782B;">聯絡我索取免費試用</a>
+         </ul><a href="#footer-contact" data-i18n="cta.trial" class="btn btn-outline btn-block rounded-md normal-case" style="color:#D9782B;border-color:#D9782B;">聯絡我索取免費試用</a>
         </div>
         <div class="pricing-card rounded-xl p-8 relative h-full flex flex-col" style="background-color: #D9782B;">
          <div data-i18n="pr.badge" class="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-semibold text-white whitespace-nowrap" style="background-color: #B8621F;">
@@ -1144,7 +1151,7 @@
           <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#B8621F;" aria-hidden="true"></i> <span data-i18n="pr.b4">伺服器租用</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#B8621F;" aria-hidden="true"></i> <span data-i18n="pr.b5">診所系統的更新及維護</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#B8621F;" aria-hidden="true"></i> <span data-i18n="pr.b6">技術支援</span></li>
-         </ul><a href="#footer-contact" data-i18n="cta.contact" class="btn btn-secondary btn-block rounded-md normal-case">聯絡我索取免費試用</a>
+         </ul><a href="#footer-contact" data-i18n="cta.trial" class="btn btn-secondary btn-block rounded-md normal-case">聯絡我索取免費試用</a>
         </div>
        </div>
       </div>
@@ -1173,7 +1180,7 @@
           <li class="flex items-center gap-3 text-sm" style="color: #666;"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#D9782B;" aria-hidden="true"></i> <span data-i18n="pr.p2">SEO（搜尋引擎最佳化）</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: #666;"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#D9782B;" aria-hidden="true"></i> <span data-i18n="pr.p3">自定義域名</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: #666;"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#D9782B;" aria-hidden="true"></i> <span data-i18n="pr.p4">診所系統設置（最多 5 間診所）</span></li>
-         </ul><a href="#footer-contact" data-i18n="cta.contact" class="btn btn-outline btn-block rounded-md normal-case" style="color:#D9782B;border-color:#D9782B;">聯絡我索取免費試用</a>
+         </ul><a href="#footer-contact" data-i18n="cta.trial" class="btn btn-outline btn-block rounded-md normal-case" style="color:#D9782B;border-color:#D9782B;">聯絡我索取免費試用</a>
         </div>
         <div class="pricing-card rounded-xl p-8 relative h-full flex flex-col" style="background-color: #D9782B; border: 2px solid #B8621F;">
          <div data-i18n="pr.badge" class="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-semibold text-white whitespace-nowrap" style="background-color: #B8621F;">
@@ -1190,7 +1197,7 @@
           <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#B8621F;" aria-hidden="true"></i> <span data-i18n="pr.p6">自定義域名租用</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#B8621F;" aria-hidden="true"></i> <span data-i18n="pr.p7">診所系統的更新及維護（5 間診所）</span></li>
           <li class="flex items-center gap-3 text-sm" style="color: rgba(255,255,255,0.9);"><i data-lucide="check" class="w-4 h-4 flex-shrink-0" style="color:#B8621F;" aria-hidden="true"></i> <span data-i18n="pr.b6">技術支援</span></li>
-         </ul><a href="#footer-contact" data-i18n="cta.contact" class="btn btn-secondary btn-block rounded-md normal-case">聯絡我索取免費試用</a>
+         </ul><a href="#footer-contact" data-i18n="cta.trial" class="btn btn-secondary btn-block rounded-md normal-case">聯絡我索取免費試用</a>
         </div>
        </div>
       </div>
@@ -1311,6 +1318,40 @@
     </div>
    </footer>
   </div>
+  <!-- 限時推廣動態浮窗 -->
+  <div id="promo-modal" class="promo-float fixed bottom-5 left-4 sm:bottom-7 sm:left-7 z-50 max-w-[calc(100vw-32px)] sm:max-w-sm transition-all duration-300" role="dialog" aria-labelledby="promo-title">
+   <div class="relative bg-white/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-2xl border border-[#D9782B]/30 hover:border-[#D9782B] transition-all" style="box-shadow: 0 16px 40px -10px rgba(217, 120, 43, 0.25);">
+    <!-- 關閉按鈕 -->
+    <button type="button" onclick="closePromoModal()" class="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-[#F6EFE8] hover:bg-[#E8DED5] text-[#888] hover:text-[#1E1E1E] flex items-center justify-center text-xs transition-colors" aria-label="關閉優惠推廣">
+     ✕
+    </button>
+    <div class="flex items-start gap-3 pr-4">
+     <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white shadow-md" style="background: linear-gradient(135deg, #D9782B, #B8621F);">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg>
+     </div>
+     <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 mb-1">
+       <span data-i18n="promo.badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold" style="background-color: rgba(217, 120, 43, 0.12); color: #B8621F;">
+        <span class="w-1.5 h-1.5 rounded-full animate-ping" style="background-color: #D9782B;"></span>
+        限時推廣
+       </span>
+      </div>
+      <h4 id="promo-title" data-i18n="promo.title" class="font-serif text-base font-bold text-[#1E1E1E] leading-snug">
+       首三個月免費試用
+      </h4>
+      <p data-i18n="promo.desc" class="text-xs text-[#666] mt-1 leading-relaxed">
+       試用三個月後不用也不會收費
+      </p>
+     </div>
+    </div>
+    <div class="mt-3 pt-2.5 border-t border-[#E8DED5] flex items-center justify-between gap-3">
+     <span data-i18n="promo.note" class="text-[11px] text-[#888]">名額有限 · 即開即用</span>
+     <a href="#footer-contact" onclick="closePromoModal()" data-i18n="promo.cta" class="btn btn-primary btn-sm rounded-lg px-3.5 text-xs font-semibold normal-case shadow-sm">
+      索取免費試用
+     </a>
+    </div>
+   </div>
+  </div>
   <!-- 固定浮動 WhatsApp 查詢 -->
   <a class="whatsapp-float" href="https://wa.me/85254393401?text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%83%B3%E4%BA%86%E8%A7%A3%E4%B8%AD%E9%86%AB%E8%A8%BA%E6%89%80%E7%B3%BB%E7%B5%B1%E7%A4%BA%E7%AF%84" target="_blank" rel="noopener" aria-label="WhatsApp 查詢名醫診所系統" data-i18n-aria-label="wa.float">
    <svg width="30" height="30" viewBox="0 0 32 32" fill="white" aria-hidden="true"><path d="M16 .5C7.4.5.5 7.4.5 16c0 2.8.8 5.5 2.2 7.9L.5 31.5l7.8-2.1c2.3 1.3 4.9 1.9 7.7 1.9 8.6 0 15.5-6.9 15.5-15.5S24.6.5 16 .5zm0 28.2c-2.5 0-4.8-.7-6.8-1.9l-.5-.3-4.6 1.2 1.2-4.5-.3-.5C3.8 20.6 3.1 18.3 3.1 16c0-7.1 5.8-12.9 12.9-12.9S28.9 8.9 28.9 16 23.1 28.7 16 28.7zm7.1-9.7c-.4-.2-2.3-1.1-2.6-1.3-.3-.1-.6-.2-.8.2-.2.4-.8 1.3-1 1.5-.2.2-.4.3-.8.1-.4-.2-1.6-.6-3.1-1.9-1.1-1-1.9-2.3-2.2-2.7-.2-.4 0-.6.2-.8.2-.2.4-.4.5-.7.2-.2.2-.4.4-.6.1-.2.1-.4 0-.6-.1-.2-.8-1.9-1.1-2.6-.3-.7-.5-.6-.8-.6h-.7c-.2 0-.6.1-.9.4-.3.4-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.4c.2.2 2.3 3.6 5.7 5 .8.3 1.4.5 1.9.7.8.2 1.5.2 2.1.1.6-.1 2-.8 2.2-1.6.3-.8.3-1.5.2-1.6-.1-.2-.4-.3-.8-.5z" /></svg>
@@ -1320,7 +1361,7 @@
     const defaultConfig = {
       hero_title: '名醫診所系統：全方位香港中醫數位化管理方案',
       hero_subtitle: '簡便 · 易用 · 高效',
-      cta_button_text: '聯絡我索取免費試用',
+      cta_button_text: '聯絡我',
       contact_phone: '+852 54393401',
       contact_email: 'drgreattcm@gmail.com',
       primary_color: '#D9782B',
@@ -1351,7 +1392,6 @@
           
           // Update CTA buttons
           const ctaButtons = [
-            document.getElementById('hero-cta-btn'),
             document.getElementById('nav-cta-btn'),
             document.getElementById('final-cta-btn')
           ];
@@ -1493,6 +1533,18 @@
         }
       });
     });
+
+    // 關閉限時推廣動態浮窗
+    window.closePromoModal = function() {
+      const modal = document.getElementById('promo-modal');
+      if (modal) {
+        modal.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        modal.style.opacity = '0';
+        modal.style.transform = 'translateY(20px)';
+        modal.style.pointerEvents = 'none';
+        setTimeout(() => { modal.style.display = 'none'; }, 300);
+      }
+    };
 
   </script>
  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd2e1adb34d04fa',t:'MTc3MDk3MDU2NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script src="/pwa.js" defer></script>

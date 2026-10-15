@@ -23,7 +23,8 @@
     'nav.security': '安全保障',
     'nav.pricing': '方案价格',
 
-    'cta.contact': '联系我索取免费试用',
+    'cta.contact': '联系我',
+    'cta.trial': '联系我索取免费试用',
     'cta.demo': '预约 15 分钟网上演示',
     'cta.wa': 'WhatsApp 直接咨询',
     'cta.wa.long': 'WhatsApp：+852 54393401',
@@ -33,7 +34,12 @@
     'hero.subtitle': '简便 · 易用 · 高效',
     'hero.desc': '将千年中医智慧与现代科技完美结合，从「望闻问切」到「辨证论治」全面数字化',
     'hero.designer': '由中医师设计的中医诊所系统，更符合中医需求',
-    'hero.promo': '限时推广：首三个月免费试用，试用三个月后不用也不会收费',
+
+    'promo.badge': '限时推广',
+    'promo.title': '首三个月免费试用',
+    'promo.desc': '试用三个月后不用也不会收费',
+    'promo.note': '名额有限 · 即开即用',
+    'promo.cta': '索取免费试用',
     'hero.stat.stable': '系统稳定运行',
     'hero.stat.time': '看诊时间节省',
 
@@ -335,7 +341,8 @@
     'nav.security': 'Security',
     'nav.pricing': 'Pricing',
 
-    'cta.contact': 'Contact Us for Free Trial',
+    'cta.contact': 'Contact Us',
+    'cta.trial': 'Contact Us for Free Trial',
     'cta.demo': 'Book a 15-min Online Demo',
     'cta.wa': 'Chat on WhatsApp',
     'cta.wa.long': 'WhatsApp: +852 54393401',
@@ -345,7 +352,12 @@
     'hero.subtitle': 'Simple · Intuitive · Efficient',
     'hero.desc': 'Combining thousand-year TCM wisdom with modern technology — fully digitalising everything from the "Four Examinations" to "Syndrome Differentiation and Treatment"',
     'hero.designer': 'A TCM clinic system designed by TCM practitioners — built around real TCM needs',
-    'hero.promo': 'Limited-Time Offer: First 3 months free trial — no charge if you decide not to continue after 3 months',
+
+    'promo.badge': 'Limited-Time Offer',
+    'promo.title': 'First 3 Months Free Trial',
+    'promo.desc': 'No charge if you decide not to continue after 3 months',
+    'promo.note': 'Limited availability · Ready to use',
+    'promo.cta': 'Claim Free Trial',
     'hero.stat.stable': 'System uptime',
     'hero.stat.time': 'Consultation time saved',
 
