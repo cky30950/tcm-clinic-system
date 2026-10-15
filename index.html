@@ -293,12 +293,85 @@
       }
     }
 
-    .promo-float {
+    .promo-float-card {
+      position: fixed;
+      left: 16px;
+      bottom: 20px;
+      z-index: 65;
+      width: calc(100vw - 96px);
+      max-width: 340px;
+      background-color: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 16px 18px;
+      border: 1.5px solid rgba(217, 120, 43, 0.35);
+      box-shadow: 0 16px 40px -10px rgba(217, 120, 43, 0.28), 0 8px 20px -6px rgba(30, 30, 30, 0.12);
       animation: promoFloat 3.5s ease-in-out infinite;
+      transition: opacity 0.3s ease, transform 0.3s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .promo-float-card:hover {
+      border-color: #D9782B;
+      box-shadow: 0 20px 44px -10px rgba(217, 120, 43, 0.35), 0 10px 24px -6px rgba(30, 30, 30, 0.16);
+    }
+    .promo-close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      border-radius: 9999px;
+      background-color: #F6EFE8;
+      color: #888;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      line-height: 1;
+      border: none;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    .promo-close-btn:hover {
+      background-color: #E8DED5;
+      color: #1E1E1E;
+    }
+    .promo-dot {
+      position: relative;
+      display: inline-flex;
+      width: 8px;
+      height: 8px;
+    }
+    .promo-dot::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 9999px;
+      background-color: #D9782B;
+      animation: promoPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+    .promo-dot::after {
+      content: '';
+      position: relative;
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      background-color: #D9782B;
     }
     @keyframes promoFloat {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-6px); }
+    }
+    @keyframes promoPing {
+      0% { transform: scale(1); opacity: 0.8; }
+      75%, 100% { transform: scale(2.2); opacity: 0; }
+    }
+    @media (min-width: 640px) {
+      .promo-float-card {
+        left: 28px;
+        bottom: 28px;
+        max-width: 360px;
+        padding: 18px 20px;
+      }
     }
   </style>
   <style>body { box-sizing: border-box; }</style>
@@ -415,7 +488,7 @@
        <button type="button" data-lang="zh-CN" class="py-2 rounded-full text-xs font-medium border" style="border-color:#E8DED5; color:#555;">简体中文</button>
        <button type="button" data-lang="en" class="py-2 rounded-full text-xs font-medium border" style="border-color:#E8DED5; color:#555;">English</button>
       </div>
-      <a href="#footer-contact" data-i18n="cta.contact" class="btn btn-primary btn-block rounded-full normal-case">聯絡我索取免費試用</a>
+      <a href="#footer-contact" data-i18n="cta.trial" class="btn btn-primary btn-block rounded-full normal-case">聯絡我索取免費試用</a>
      </div>
     </div>
    </nav><section class="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
@@ -1319,37 +1392,35 @@
    </footer>
   </div>
   <!-- 限時推廣動態浮窗 -->
-  <div id="promo-modal" class="promo-float fixed bottom-5 left-4 sm:bottom-7 sm:left-7 z-50 max-w-[calc(100vw-32px)] sm:max-w-sm transition-all duration-300" role="dialog" aria-labelledby="promo-title">
-   <div class="relative bg-white/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-2xl border border-[#D9782B]/30 hover:border-[#D9782B] transition-all" style="box-shadow: 0 16px 40px -10px rgba(217, 120, 43, 0.25);">
-    <!-- 關閉按鈕 -->
-    <button type="button" onclick="closePromoModal()" class="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-[#F6EFE8] hover:bg-[#E8DED5] text-[#888] hover:text-[#1E1E1E] flex items-center justify-center text-xs transition-colors" aria-label="關閉優惠推廣">
-     ✕
-    </button>
-    <div class="flex items-start gap-3 pr-4">
-     <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white shadow-md" style="background: linear-gradient(135deg, #D9782B, #B8621F);">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg>
-     </div>
-     <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-2 mb-1">
-       <span data-i18n="promo.badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold" style="background-color: rgba(217, 120, 43, 0.12); color: #B8621F;">
-        <span class="w-1.5 h-1.5 rounded-full animate-ping" style="background-color: #D9782B;"></span>
-        限時推廣
-       </span>
-      </div>
-      <h4 id="promo-title" data-i18n="promo.title" class="font-serif text-base font-bold text-[#1E1E1E] leading-snug">
-       首三個月免費試用
-      </h4>
-      <p data-i18n="promo.desc" class="text-xs text-[#666] mt-1 leading-relaxed">
-       試用三個月後不用也不會收費
-      </p>
-     </div>
+  <div id="promo-modal" class="promo-float-card" role="dialog" aria-labelledby="promo-title">
+   <!-- 關閉按鈕 -->
+   <button type="button" onclick="closePromoModal()" class="promo-close-btn" aria-label="關閉優惠推廣">
+    ✕
+   </button>
+   <div class="flex items-start gap-3" style="padding-right: 24px;">
+    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white shadow-md" style="background: linear-gradient(135deg, #D9782B, #B8621F);">
+     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg>
     </div>
-    <div class="mt-3 pt-2.5 border-t border-[#E8DED5] flex items-center justify-between gap-3">
-     <span data-i18n="promo.note" class="text-[11px] text-[#888]">名額有限 · 即開即用</span>
-     <a href="#footer-contact" onclick="closePromoModal()" data-i18n="promo.cta" class="btn btn-primary btn-sm rounded-lg px-3.5 text-xs font-semibold normal-case shadow-sm">
-      索取免費試用
-     </a>
+    <div class="flex-1" style="min-width: 0;">
+     <div class="flex items-center gap-2 mb-1">
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold" style="background-color: rgba(217, 120, 43, 0.14); color: #B8621F;">
+       <span class="promo-dot" aria-hidden="true"></span>
+       <span data-i18n="promo.badge">限時推廣</span>
+      </span>
+     </div>
+     <h4 id="promo-title" data-i18n="promo.title" class="font-serif text-base font-bold leading-snug" style="color: #1E1E1E;">
+      首三個月免費試用
+     </h4>
+     <p data-i18n="promo.desc" class="text-xs mt-1 leading-relaxed" style="color: #666;">
+      試用三個月後不用也不會收費
+     </p>
     </div>
+   </div>
+   <div class="mt-3 pt-3 border-t flex items-center justify-between gap-3" style="border-color: #E8DED5;">
+    <span data-i18n="promo.note" class="text-xs" style="color: #888;">名額有限 · 即開即用</span>
+    <a href="#footer-contact" onclick="closePromoModal()" data-i18n="promo.cta" class="btn btn-primary btn-sm rounded-lg px-4 text-xs font-semibold normal-case shadow-sm">
+     索取免費試用
+    </a>
    </div>
   </div>
   <!-- 固定浮動 WhatsApp 查詢 -->
@@ -1548,6 +1619,6 @@
 
   </script>
  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd2e1adb34d04fa',t:'MTc3MDk3MDU2NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script src="/pwa.js" defer></script>
-<script src="/landing-i18n.js" defer></script>
+<script src="/landing-i18n.js?v=20261016b" defer></script>
 </body>
 </html>
