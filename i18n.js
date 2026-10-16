@@ -3350,7 +3350,153 @@ window.translations = {
             '載入診療記錄失敗': 'Failed to load consultation records',
             '處方': 'Prescription',
             '編輯中': 'Editing',
-            '設為編輯': 'Set Active'
+            '設為編輯': 'Set Active',
+
+            // ===== 掛號列表空白狀態與提示補充 =====
+            '今日暫無掛號記錄': 'No registrations for today',
+            '所選日期暫無掛號記錄': 'No registrations for the selected date',
+            '今日暫無掛給您的病人': 'No patients registered for you today',
+            '所選日期暫無掛給您的病人': 'No patients registered for you on the selected date',
+            '所選日期': 'Selected Date',
+            '未指定醫師': 'Unassigned Doctor',
+            '某位病人': 'Patient',
+            '診所助理': 'Clinic Assistant',
+            '狀態異常': 'Abnormal Status',
+            '已取消': 'Cancelled',
+            '沒有過期掛號需要清除。': 'No expired registrations to clear.',
+            '無法從雲端讀取掛號資料，使用本地資料': 'Unable to load registration data from cloud; using local data',
+            '取消候診時發生錯誤': 'Error cancelling waiting status',
+            '只有管理員或護理師才能為一般掛號開始診症！': 'Only admins or nurses can start consultations for general registrations!',
+            '只有管理員或護理師才能繼續一般掛號的診症！': 'Only admins or nurses can resume consultations for general registrations!',
+            '只有該掛號的醫師才能繼續診症！': 'Only the assigned doctor can resume this consultation!',
+
+            // ===== 視訊診症（醫師端與通話元件）補充 =====
+            '等待病人進入診間…': 'Waiting for patient to enter the room…',
+            '等待病人進入診間...': 'Waiting for patient to enter the room...',
+            '正在與病人連線…': 'Connecting with patient…',
+            '連線中…': 'Connecting…',
+            '連線失敗': 'Connection failed',
+            '已離開診間': 'Left consultation room',
+            '已進入診間，等待對方加入…': 'Entered room, waiting for peer to join…',
+            '關閉視訊': 'Close Video',
+            '頻道：': 'Channel:',
+            '開關麥克風': 'Toggle Microphone',
+            '開關鏡頭': 'Toggle Camera',
+            '舌象截圖': 'Tongue Screenshot',
+            '離開診間': 'Leave Room',
+            '確認將此畫面上傳到本次病歷的舌象圖片？': 'Upload this screenshot to the tongue images of this medical record?',
+            '將此舌象截圖上傳到本次病歷？': 'Upload this tongue screenshot to this medical record?',
+            '上傳到本次病歷': 'Upload to Record',
+            '取消重拍': 'Retake',
+            '舌象截圖預覽': 'Tongue Screenshot Preview',
+            '舌象截圖上傳中…': 'Uploading tongue screenshot…',
+            '舌象截圖已上傳至本次病歷': 'Tongue screenshot uploaded to this medical record',
+            '病人目前未開啟鏡頭，請病人開啟鏡頭後再截圖': 'The patient’s camera is currently off. Please ask the patient to turn on their camera before taking a screenshot.',
+            '目前沒有病人的影像畫面，無法截圖（請確認病人已加入診間並開啟鏡頭）': 'No patient video feed available for screenshot (please ensure the patient has joined and turned on their camera)',
+            '尚未偵測到病人，已暫時離開頻道，等待病人重新進入…': 'Patient not detected yet; temporarily left the channel and waiting for patient to re-enter…',
+            '就緒檢查服務暫不可用，已直接進入診間': 'Readiness check unavailable; entered consultation room directly',
+            '視訊診症僅限醫師帳號使用': 'Video consultation is restricted to doctor accounts',
+            '請先開始或進入一筆掛號診症，再開啟視訊診症': 'Please start or open a consultation before launching video consultation',
+            '請先開啟一筆診症的視訊診間': 'Please open a video consultation room first',
+            '已複製病人診間連結，可直接傳送給病人': 'Patient room link copied; ready to send to the patient',
+            '複製失敗，請稍後再試': 'Copy failed, please try again later',
+            '尚未登入，無法開啟視訊診間': 'Not logged in; cannot open video consultation room',
+            '尚未設置視訊診症': 'Video Consultation Not Configured',
+            '我知道了': 'Got It',
+            '目前版本未提供視訊診症功能': 'Video consultation is not included in the current plan',
+            '請允許瀏覽器使用鏡頭與麥克風（可按網址列左側鎖頭圖示調整權限）後重新進入。': 'Please allow camera and microphone access in your browser (click the lock icon in the address bar) and re-enter.',
+            '找不到鏡頭或麥克風，請確認設備已連接。': 'Camera or microphone not found. Please check that your device is connected.',
+            '鏡頭或麥克風正被其他程式佔用，請關閉其他視訊應用程式（如 FaceTime、Zoom）後再試。': 'Camera or microphone is in use by another application. Please close other video apps (e.g. FaceTime, Zoom) and try again.',
+            '請先完成視像診症同意書後再進入診間。': 'Please complete the telemedicine consent form before entering the room.',
+            '登入憑證已逾期，請重新整理頁面後再試。': 'Login session expired. Please refresh the page and try again.',
+            '診間連結已失效或過期，請聯絡診所重新索取連結。': 'The consultation room link has expired or is invalid. Please contact the clinic for a new link.',
+            '視訊伺服器回應異常，請聯絡診所。': 'Video server response error. Please contact the clinic.',
+            'Agora RTC SDK 未載入': 'Agora RTC SDK not loaded',
+
+            // ===== 會員儲值完整補充 =====
+            '會員錢包': 'Member Wallet',
+            '充值、扣款與會員帳戶管理': 'Top-ups, deductions, and member account management',
+            '儲值總餘額 (HKD)': 'Total Wallet Balance (HKD)',
+            '可用餘額': 'Available Balance',
+            '本金': 'Principal',
+            '贈送額': 'Bonus',
+            '贈送餘額': 'Bonus Balance',
+            '運作中': 'Active',
+            '已凍結': 'Frozen',
+            '已關閉': 'Closed',
+            '未開戶': 'No Account',
+            '暫無已儲值會員': 'No members with stored value yet',
+            '沒有找到符合條件的病人': 'No matching patients found',
+            '（未知姓名）': '(Unknown Name)',
+            '未知病人': 'Unknown Patient',
+            '病人姓名：': 'Patient Name:',
+            '載入中…': 'Loading…',
+            '載入中...': 'Loading...',
+            '讀取中…': 'Loading…',
+            '載入儲值餘額中...': 'Loading wallet balance...',
+            '無法載入儲值餘額': 'Unable to load wallet balance',
+            '尚未開立儲值帳戶': 'No wallet account opened yet',
+            '充值': 'Top-Up',
+            '充值贈送': 'Top-Up Bonus',
+            '看診付款': 'Consultation Payment',
+            '診症扣款': 'Consultation Payment',
+            '退款': 'Refund',
+            '調整': 'Adjustment',
+            '狀態變更': 'Status Change',
+            '轉數快': 'FPS',
+            'EPS': 'EPS',
+            '其他': 'Other',
+            '充值（現金）': 'Top-Up (Cash)',
+            '充值（轉數快）': 'Top-Up (FPS)',
+            '充值（轉數快 FPS）': 'Top-Up (FPS)',
+            '充值（EPS）': 'Top-Up (EPS)',
+            '充值（信用卡）': 'Top-Up (Credit Card)',
+            '充值（支票）': 'Top-Up (Cheque)',
+            '充值（其他）': 'Top-Up (Other)',
+            '此金額沒有贈送': 'No bonus for this amount',
+            '充值中...': 'Topping up...',
+            '處理中...': 'Processing...',
+            '充值成功': 'Top-up successful',
+            '金額最多只可兩位小數（最小 HK$0.01）': 'Amount can have at most 2 decimal places (min HK$0.01)',
+            '退款金額最多只可兩位小數（最小 HK$0.01）': 'Refund amount can have at most 2 decimal places (min HK$0.01)',
+            '調整金額最多只可兩位小數（最小 HK$0.01）': 'Adjustment amount can have at most 2 decimal places (min HK$0.01)',
+            '20 字病歷 ID': '20-char Consultation ID',
+            '每頁筆數': 'Rows per page',
+            '上一頁': 'Prev',
+            '下一頁': 'Next',
+            '最後一頁': 'Last Page',
+            '全部': 'All',
+            '顯示': 'Showing',
+            '／共': 'of',
+            '筆': 'records',
+            '頁': 'pages',
+            '時間': 'Time',
+            '篩選時間…': 'Filter time…',
+            '篩選類型…': 'Filter type…',
+            '篩選說明…': 'Filter note…',
+            '充值滿 HK$': 'Top up HK$',
+            '送 HK$': 'Get Bonus HK$',
+            '找不到診所文件，請先建立診所。': 'Clinic document not found. Please create a clinic first.',
+            '找不到診所文件': 'Clinic document not found',
+            '所選折扣項目不存在或類型不符': 'Selected discount item does not exist or has an invalid category',
+            '尚未選擇診所，請先切換至正確診所再操作儲值功能': 'No clinic selected. Please switch to a valid clinic before using Member Wallet.',
+            '未登入，無法操作儲值功能': 'Not logged in; cannot use Member Wallet.',
+            '未登入，無法讀取儲值記錄': 'Not logged in; cannot load wallet records.',
+            '會員帳戶超過一萬個，僅顯示最近部分，請用搜尋功能': 'More than 10,000 member accounts; showing most recent only. Please use search.',
+            '載入失敗，請重試': 'Failed to load, please try again',
+            '複製失敗，請手動選取網址複製': 'Copy failed; please select and copy the URL manually',
+            '此診症單先前已以儲值餘額支付': 'This consultation was already paid via Member Wallet',
+            '已取消儲值扣款，請以現金／其他方式向病人收款，並於財報「待收款追蹤」核銷；如需調整儲值帳戶，可於會員錢包人工調整。': 'Wallet deduction cancelled. Please collect payment via cash/other method and mark it as paid under "Pending Payments" in Financial Reports; use Manual Adjustment in Member Wallet if needed.',
+            '儲值帳戶不存在，請改用其他付款方式': 'Wallet account does not exist; please use another payment method',
+            '無法確認儲值帳戶狀態，請稍後再試或改用其他付款方式': 'Unable to verify wallet account status; please try again later or use another payment method',
+            '。編輯時不會自動追加差額；如需退款，請使用「': '. Editing will not auto-charge differences; for refunds, please use "',
+            '會員錢包」內的退款功能。': 'Member Wallet" refund.',
+            '充值金額': 'Top-Up Amount',
+            '消費金額': 'Spend Amount',
+            '退款金額': 'Refund Amount',
+            '待收款記錄超過五千筆，僅顯示部分，請縮短報表期間': 'More than 5,000 pending records; showing partial results. Please narrow the report period.',
+            '儲值流水超過一萬筆，僅統計最近部分，請縮短報表期間': 'More than 10,000 wallet transactions; showing recent statistics only. Please narrow the report period.',
+            '儲值帳戶超過一萬個，期末餘額僅含部分帳戶': 'More than 10,000 wallet accounts; closing balance includes partial accounts only.'
         };
         
         Object.keys(dynamicTranslations).forEach(function(key) {
@@ -3389,10 +3535,18 @@ function resolveTextTranslation(original, dict, lang) {
         }
     }
 
-    // 2. 可用數量與年齡／時間單位
+    // 2. 可用數量與年齡／時間／會員／結果單位
     const availableMatch = original.match(/^(\d+)\s*個可用$/);
     if (availableMatch && Object.prototype.hasOwnProperty.call(dict, '個可用')) {
         return availableMatch[1] + ' ' + dict['個可用'];
+    }
+    const memberCountMatch = original.match(/^(\d+)\s*位會員$/);
+    if (memberCountMatch) {
+        return lang === 'en' ? (memberCountMatch[1] + ' member(s)') : (memberCountMatch[1] + ' 位会员');
+    }
+    const resultCountMatch = original.match(/^(\d+)\s*個結果$/);
+    if (resultCountMatch) {
+        return lang === 'en' ? (resultCountMatch[1] + ' result(s)') : (resultCountMatch[1] + ' 个结果');
     }
     const ageMatch = original.match(/^(\d+)\s*(歲|個月|天|次|項|筆)$/);
     if (ageMatch) {
@@ -3458,6 +3612,117 @@ function resolveTextTranslation(original, dict, lang) {
         if (notFoundMatch) {
             return 'No results for "' + notFoundMatch[1] + '"';
         }
+
+        // 分頁與頁碼
+        const pageFullMatch = original.match(/^第\s*(\d+)\s*\/\s*(\d+)\s*頁（共\s*(\d+)\s*筆）$/);
+        if (pageFullMatch) {
+            return 'Page ' + pageFullMatch[1] + ' / ' + pageFullMatch[2] + ' (' + pageFullMatch[3] + ' total)';
+        }
+        const pageSlashMatch = original.match(/^第\s*(\d+)\s*\/\s*(\d+)\s*頁$/);
+        if (pageSlashMatch) {
+            return 'Page ' + pageSlashMatch[1] + ' / ' + pageSlashMatch[2];
+        }
+        const pageSingleMatch = original.match(/^第\s*(\d+)\s*頁$/);
+        if (pageSingleMatch) {
+            return 'Page ' + pageSingleMatch[1];
+        }
+
+        // 會員儲值動態文字
+        const walletMetaMatch = original.match(/^病人編號：\s*(.+?)　電話：\s*(.+)$/);
+        if (walletMetaMatch) {
+            return 'Patient ID: ' + walletMetaMatch[1] + '　Phone: ' + walletMetaMatch[2];
+        }
+        const topupHintMatch = original.match(/^此金額可獲贈\s*HK\$(.+)$/);
+        if (topupHintMatch) {
+            return 'Bonus for this amount: HK$' + topupHintMatch[1];
+        }
+        const topupConfirmMatch = original.match(/^確認以「(.+?)」為病人「(.+?)」充值\s*HK\$([0-9.,]+)？(?:\n此金額可獲贈\s*HK\$([0-9.,]+))?$/);
+        if (topupConfirmMatch) {
+            const mLabel = dict[topupConfirmMatch[1]] || topupConfirmMatch[1];
+            return 'Confirm top-up of HK$' + topupConfirmMatch[3] + ' for "' + topupConfirmMatch[2] + '" via ' + mLabel + '?'
+                + (topupConfirmMatch[4] ? '\nBonus for this amount: HK$' + topupConfirmMatch[4] : '');
+        }
+        const topupSuccessMatch = original.match(/^充值成功，贈送\s*HK\$(.+)$/);
+        if (topupSuccessMatch) {
+            return 'Top-up successful! Bonus added: HK$' + topupSuccessMatch[1];
+        }
+        const topupMethodMatch = original.match(/^充值（(.+)）$/);
+        if (topupMethodMatch) {
+            const mLabel = dict[topupMethodMatch[1]] || topupMethodMatch[1];
+            return 'Top-Up (' + mLabel + ')';
+        }
+        const statusChangeMatch = original.match(/^狀態變更（(.+?)→(.+?)）$/);
+        if (statusChangeMatch) {
+            const fromL = dict[statusChangeMatch[1]] || statusChangeMatch[1];
+            const toL = dict[statusChangeMatch[2]] || statusChangeMatch[2];
+            return 'Status Change (' + fromL + ' → ' + toL + ')';
+        }
+        const walletAvailMatch = original.match(/^[（(]可用\s*HK\$([0-9.,]+)[）)]$/);
+        if (walletAvailMatch) {
+            return '(Available: HK$' + walletAvailMatch[1] + ')';
+        }
+        const walletInsuffMatch = original.match(/^儲值餘額不足，可用\s*HK\$([0-9.,]+)$/);
+        if (walletInsuffMatch) {
+            return 'Insufficient wallet balance (Available: HK$' + walletInsuffMatch[1] + ')';
+        }
+        const walletPrecheckInsuffMatch = original.match(/^儲值餘額不足（可用\s*HK\$([0-9.,]+)），請改用其他付款方式$/);
+        if (walletPrecheckInsuffMatch) {
+            return 'Insufficient wallet balance (Available: HK$' + walletPrecheckInsuffMatch[1] + '). Please use another payment method.';
+        }
+        const walletPrecheckStatusMatch = original.match(/^儲值帳戶(.+?)，請改用其他付款方式$/);
+        if (walletPrecheckStatusMatch) {
+            const st = dict[walletPrecheckStatusMatch[1]] || walletPrecheckStatusMatch[1];
+            return 'Wallet account is ' + st.toLowerCase() + '; please use another payment method.';
+        }
+        const walletPaidMatch = original.match(/^已以儲值餘額支付\s*HK\$([0-9.,]+)$/);
+        if (walletPaidMatch) {
+            return 'Paid HK$' + walletPaidMatch[1] + ' via Member Wallet';
+        }
+        const walletEditPaidMatch = original.match(/^此診症已以儲值餘額支付\s*HK\$([0-9.,]+)。編輯時不會自動追加差額；如需退款，請使用「$/);
+        if (walletEditPaidMatch) {
+            return 'Paid HK$' + walletEditPaidMatch[1] + ' via Member Wallet. Editing will not auto-charge differences; for refunds, please use "';
+        }
+        const walletOverTotalMatch = original.match(/^總費用\s*HK\$([0-9.,]+)\s*高於儲值餘額\s*HK\$([0-9.,]+)，已取消「使用儲值餘額支付」；總費用調低至餘額以內後將自動解鎖。$/);
+        if (walletOverTotalMatch) {
+            return 'Total fee HK$' + walletOverTotalMatch[1] + ' exceeds wallet balance HK$' + walletOverTotalMatch[2] + '; "Pay with Wallet Balance" has been unchecked and will unlock automatically once total is within balance.';
+        }
+        const walletFailMatch = original.match(/^儲值扣款失敗：(.+?)（病歷已保存，已列入待收款追蹤）。$/);
+        if (walletFailMatch) {
+            return 'Wallet deduction failed: ' + walletFailMatch[1] + ' (Record saved and added to Pending Payments).';
+        }
+        const walletAfterBalMatch = original.match(/^儲值餘額（支付後）：\s*HK\$([0-9.,]+)$/);
+        if (walletAfterBalMatch) {
+            return 'Wallet Balance (After Payment): HK$' + walletAfterBalMatch[1];
+        }
+        const recvTruncMatch = original.match(/^只顯示最近\s*(\d+)\s*筆，尚有\s*(\d+)\s*筆（可縮短報表期間查看）$/);
+        if (recvTruncMatch) {
+            return 'Showing latest ' + recvTruncMatch[1] + ' records; ' + recvTruncMatch[2] + ' more not shown (narrow report period to view)';
+        }
+
+        // 視訊診症動態狀態
+        const videoConnectedMatch = original.match(/^已連線（通話中\s*(\d+)\s*人）$/);
+        if (videoConnectedMatch) {
+            return 'Connected (' + videoConnectedMatch[1] + ' in call)';
+        }
+
+        // 常見錯誤前綴
+        const errPrefixMatch = original.match(/^(充值失敗|退款失敗|調整失敗|更新失敗|儲存失敗|標記失敗|開啟視訊診症失敗|無法核發診間連結|舌象截圖上傳失敗|無法開啟視訊)：\s*(.*)$/);
+        if (errPrefixMatch) {
+            const prefixMap = {
+                '充值失敗': 'Top-up failed: ',
+                '退款失敗': 'Refund failed: ',
+                '調整失敗': 'Adjustment failed: ',
+                '更新失敗': 'Update failed: ',
+                '儲存失敗': 'Save failed: ',
+                '標記失敗': 'Mark failed: ',
+                '開啟視訊診症失敗': 'Failed to start video consultation: ',
+                '無法核發診間連結': 'Failed to issue consultation room link: ',
+                '舌象截圖上傳失敗': 'Failed to upload tongue screenshot: ',
+                '無法開啟視訊': 'Unable to start video: '
+            };
+            const rhs = errPrefixMatch[2].trim();
+            return (prefixMap[errPrefixMatch[1]] || (errPrefixMatch[1] + ': ')) + (dict[rhs] || rhs);
+        }
     }
 
     // 4. 診症記錄／病歷記錄後綴
@@ -3470,7 +3735,7 @@ function resolveTextTranslation(original, dict, lang) {
         return medMatch[1] + dict[medMatch[2]];
     }
 
-    // 5. 冒號前綴（例如「醫師：張醫師」、「庫存：100g」）
+    // 5. 冒號前綴（例如「醫師：張醫師」、「病人姓名：陳大文」、「頻道：tcm-consult-1」）
     const colonMatch = original.match(/^(.+?：)\s*(.*)$/);
     if (colonMatch && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
         const rhs = colonMatch[2].trim();
@@ -3546,7 +3811,12 @@ function translateNode(node, dict, lang) {
         const trimmed = fullText.trim();
         if (!trimmed) return;
         
-        if (node.__originalText === undefined || (lang !== 'zh' && /[\u4e00-\u9fff]/.test(trimmed) && trimmed !== dict[node.__originalText])) {
+        // 若首次處理此文字節點，或外部 JS 已將節點內容改為與上次翻譯結果不同的新文字，
+        // 重新記錄 __originalText 並重新翻譯（避免舊 __originalText 殘留覆蓋動態文字）
+        if (
+            node.__originalText === undefined ||
+            (node.__lastTranslatedText !== undefined && trimmed !== node.__lastTranslatedText)
+        ) {
             node.__originalText = trimmed;
             const leadingMatch = fullText.match(/^\s*/);
             const trailingMatch = fullText.match(/\s*$/);
@@ -3558,6 +3828,7 @@ function translateNode(node, dict, lang) {
         if (node.__lastLang !== lang) {
             const original = node.__originalText;
             const replacement = resolveTextTranslation(original, dict, lang);
+            node.__lastTranslatedText = String(replacement == null ? '' : replacement).trim();
             node.nodeValue = (node.__leadingWhitespace || '') + replacement + (node.__trailingWhitespace || '');
             node.__lastLang = lang;
         }
@@ -3568,23 +3839,6 @@ function translateNode(node, dict, lang) {
     if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE') return;
 
     translateElementAttributes(node, dict);
-    
-    if (node.children.length === 0) {
-        const currentText = (node.textContent || '').trim();
-        // 若 JS 動態寫入了新的中文字串，更新 originalText 並重新翻譯
-        if (currentText && (!node.dataset.originalText || (lang !== 'zh' && /[\u4e00-\u9fff]/.test(currentText) && currentText !== dict[node.dataset.originalText]))) {
-            node.dataset.originalText = currentText;
-            node.dataset.lastLang = '';
-        }
-        if (node.dataset.lastLang !== lang) {
-            if (currentText && node.dataset.originalText) {
-                const original = node.dataset.originalText;
-                const replacement = resolveTextTranslation(original, dict, lang);
-                node.textContent = replacement;
-            }
-            node.dataset.lastLang = lang;
-        }
-    }
     
     Array.from(node.childNodes).forEach(child => translateNode(child, dict, lang));
 }
@@ -3608,12 +3862,21 @@ function applyTranslations() {
         isTranslating = false;
     }
 }
+window.applyTranslations = applyTranslations;
 
 
 function setLanguage(lang) {
     if (lang !== 'zh') everTranslatedAway = true;
     localStorage.setItem('lang', lang);
     applyTranslations();
+    // 若會員儲值區正在顯示，同步重繪 Tabulator 交易表與會員列表以套用新語系
+    try {
+        const walletSec = document.getElementById('walletManagement');
+        if (walletSec && !walletSec.classList.contains('hidden')) {
+            if (typeof window.renderWalletMemberRows === 'function') window.renderWalletMemberRows();
+            if (typeof window.renderWalletTxRows === 'function') window.renderWalletTxRows();
+        }
+    } catch (_e) {}
 }
 
 
@@ -3624,14 +3887,29 @@ const observer = new MutationObserver(mutations => {
     if (isTranslating) return;
     const lang = localStorage.getItem('lang') || 'zh';
     if (lang === 'zh') {
+        if (!everTranslatedAway) return;
         for (const m of mutations) {
+            if (m.type === 'characterData' && m.target) {
+                if (m.target.__lastLang && m.target.__lastLang !== 'zh') {
+                    isTranslating = true;
+                    try {
+                        translateNode(m.target, window.translations.zh || {}, 'zh');
+                    } finally {
+                        isTranslating = false;
+                    }
+                }
+                continue;
+            }
             if (!m.addedNodes || m.addedNodes.length === 0) continue;
             for (const node of m.addedNodes) {
-                if (node.nodeType !== 1) continue;
-                const selfTagged = node.dataset && node.dataset.lastLang && node.dataset.lastLang !== 'zh';
-                const childTagged = node.querySelector
-                    && node.querySelector('[data-last-lang]:not([data-last-lang="zh"])');
-                if (selfTagged || childTagged) {
+                if (node.nodeType === Node.TEXT_NODE && node.__lastLang && node.__lastLang !== 'zh') {
+                    isTranslating = true;
+                    try {
+                        translateNode(node, window.translations.zh || {}, 'zh');
+                    } finally {
+                        isTranslating = false;
+                    }
+                } else if (node.nodeType === 1) {
                     isTranslating = true;
                     try {
                         translateNode(node, window.translations.zh || {}, 'zh');
@@ -3647,6 +3925,10 @@ const observer = new MutationObserver(mutations => {
     try {
         const dict = window.translations[lang] || {};
         mutations.forEach(m => {
+            if (m.type === 'characterData' && m.target) {
+                translateNode(m.target, dict, lang);
+                return;
+            }
             if (m.addedNodes && m.addedNodes.length > 0) {
                 m.addedNodes.forEach(node => {
                     translateNode(node, dict, lang);
@@ -3696,6 +3978,6 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTranslations();
     
     // 觀察範圍涵蓋 document.body（包含登入頁、主系統及動態掛載於 body 的彈窗／通知）
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 });
 

@@ -440,9 +440,9 @@
     "offers": {
       "@type": "AggregateOffer",
       "lowPrice": "900",
-      "highPrice": "7040",
+      "highPrice": "6700",
       "priceCurrency": "HKD",
-      "offerCount": "6",
+      "offerCount": "7",
       "offers": [
         {
           "@type": "Offer",
@@ -481,17 +481,17 @@
         },
         {
           "@type": "Offer",
-          "name": "進階版年費 (Advanced Plan Annual Fee)",
-          "price": "3900",
+          "name": "進階版系統架設費 88 折優惠 (Advanced Plan Setup Fee)",
+          "price": "5192",
           "priceCurrency": "HKD",
-          "description": "進階版每年年費，支援最多 5 間診所、包含診所主頁設計及自訂域名"
+          "description": "進階版一次性系統架設費（原價 HK$5,900，限時 88 折 HK$5,192，最多 5 間診所）"
         },
         {
           "@type": "Offer",
-          "name": "進階版系統架設費 88 折優惠 (Advanced Plan Setup Fee)",
-          "price": "7040",
+          "name": "進階版年費 (Advanced Plan Annual Fee)",
+          "price": "6700",
           "priceCurrency": "HKD",
-          "description": "進階版一次性系統架設費（原價 HK$8,000，限時 88 折 HK$7,040，最多 5 間診所）"
+          "description": "進階版每年年費，支援最多 5 間診所、包含診所主頁設計及自訂域名"
         }
       ]
     }
@@ -555,7 +555,19 @@
         <img src="images/myLogo.png" alt="名醫診所系統 Logo" width="95" height="89" class="w-full h-full object-contain">
        </div><span class="font-serif text-lg font-semibold" style="color: #1E1E1E;">名醫診所系統</span>
       </div>
-      <div class="hidden md:flex items-center gap-6 lg:gap-8"><a href="#features" data-i18n="nav.features" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">功能特色</a> <a href="#pwa" data-i18n="nav.pwa" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">PWA 應用</a> <a href="#tcm" data-i18n="nav.tcm" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">中醫特色</a> <a href="#telemedicine" data-i18n="nav.tele" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">視像診症</a> <a href="#attachments" data-i18n="nav.att" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">病歷附件</a> <a href="#backup" data-i18n="nav.backup" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">自動備份</a> <a href="#membership" data-i18n="nav.member" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">會員系統</a> <a href="#security" data-i18n="nav.security" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">安全保障</a> <a href="#pricing" data-i18n="nav.pricing" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">方案價格</a>
+      <div class="hidden md:flex items-center gap-5 lg:gap-6"><a href="#features" data-i18n="nav.features" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">功能特色</a> <a href="#pwa" data-i18n="nav.pwa" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">PWA 應用</a> <a href="#tcm" data-i18n="nav.tcm" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">中醫特色</a> <a href="#telemedicine" data-i18n="nav.tele" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">視像診症</a> <a href="#attachments" data-i18n="nav.att" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">病歷附件</a> <a href="#backup" data-i18n="nav.backup" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">自動備份</a> <a href="#membership" data-i18n="nav.member" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">會員系統</a> <a href="#security" data-i18n="nav.security" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">安全保障</a> <a href="#pricing" data-i18n="nav.pricing" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: #1E1E1E;">方案價格</a>
+       <div class="relative">
+        <button type="button" id="curr-btn" class="btn btn-outline btn-sm rounded-full px-3 gap-1.5 normal-case" style="border-color: rgba(217,120,43,0.5); color: #B8621F;" aria-haspopup="true" aria-expanded="false"><i data-lucide="coins" class="w-4 h-4" aria-hidden="true"></i><span id="curr-current">HKD</span><i data-lucide="chevron-down" class="w-3 h-3" aria-hidden="true"></i></button>
+        <div id="curr-dropdown" class="lang-dropdown hidden" role="menu" style="min-width: 175px;">
+         <button type="button" role="menuitem" data-currency="HKD" aria-current="true">HKD (HK$ 港幣) <i data-lucide="check" class="lang-check w-4 h-4"></i></button>
+         <button type="button" role="menuitem" data-currency="CNY">CNY (¥ 人民幣) <i data-lucide="check" class="lang-check w-4 h-4"></i></button>
+         <button type="button" role="menuitem" data-currency="USD">USD (US$ 美金) <i data-lucide="check" class="lang-check w-4 h-4"></i></button>
+         <button type="button" role="menuitem" data-currency="TWD">TWD (NT$ 台幣) <i data-lucide="check" class="lang-check w-4 h-4"></i></button>
+         <button type="button" role="menuitem" data-currency="SGD">SGD (S$ 新幣) <i data-lucide="check" class="lang-check w-4 h-4"></i></button>
+         <button type="button" role="menuitem" data-currency="MYR">MYR (RM 馬幣) <i data-lucide="check" class="lang-check w-4 h-4"></i></button>
+         <button type="button" role="menuitem" data-currency="GBP">GBP (£ 英鎊) <i data-lucide="check" class="lang-check w-4 h-4"></i></button>
+        </div>
+       </div>
        <div class="relative">
         <button type="button" id="lang-btn" class="btn btn-outline btn-sm rounded-full px-3 gap-1.5 normal-case" style="border-color: rgba(217,120,43,0.5); color: #B8621F;" aria-haspopup="true" aria-expanded="false"><i data-lucide="globe" class="w-4 h-4" aria-hidden="true"></i><span id="lang-current">繁體</span><i data-lucide="chevron-down" class="w-3 h-3" aria-hidden="true"></i></button>
         <div id="lang-dropdown" class="lang-dropdown hidden" role="menu">
@@ -575,6 +587,15 @@
        <button type="button" data-lang="zh-HK" class="py-2 rounded-full text-xs font-medium border" style="border-color:#D9782B; color:#B8621F;">繁體中文</button>
        <button type="button" data-lang="zh-CN" class="py-2 rounded-full text-xs font-medium border" style="border-color:#E8DED5; color:#555;">简体中文</button>
        <button type="button" data-lang="en" class="py-2 rounded-full text-xs font-medium border" style="border-color:#E8DED5; color:#555;">English</button>
+      </div>
+      <div class="pt-2 border-t flex flex-wrap gap-1.5" style="border-color: #E8DED5;">
+       <button type="button" data-currency="HKD" class="px-2.5 py-1 rounded-full text-xs font-medium border" style="border-color:#D9782B; color:#B8621F;">HKD</button>
+       <button type="button" data-currency="CNY" class="px-2.5 py-1 rounded-full text-xs font-medium border" style="border-color:#E8DED5; color:#555;">CNY</button>
+       <button type="button" data-currency="USD" class="px-2.5 py-1 rounded-full text-xs font-medium border" style="border-color:#E8DED5; color:#555;">USD</button>
+       <button type="button" data-currency="TWD" class="px-2.5 py-1 rounded-full text-xs font-medium border" style="border-color:#E8DED5; color:#555;">TWD</button>
+       <button type="button" data-currency="SGD" class="px-2.5 py-1 rounded-full text-xs font-medium border" style="border-color:#E8DED5; color:#555;">SGD</button>
+       <button type="button" data-currency="MYR" class="px-2.5 py-1 rounded-full text-xs font-medium border" style="border-color:#E8DED5; color:#555;">MYR</button>
+       <button type="button" data-currency="GBP" class="px-2.5 py-1 rounded-full text-xs font-medium border" style="border-color:#E8DED5; color:#555;">GBP</button>
       </div>
       <a href="#footer-contact" data-i18n="cta.contact" class="btn btn-primary btn-block rounded-full normal-case">聯絡我</a>
      </div>
@@ -1222,9 +1243,20 @@
     </div>
    </section><section id="pricing" class="py-20 lg:py-32" style="background-color: #E8DED5;">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-     <div class="text-center mb-16"><span class="inline-block px-4 py-2 rounded-full text-sm font-medium mb-4" style="background-color: rgba(184, 98, 31, 0.2); color: #B8621F;"> <i data-lucide="wallet" class="w-4 h-4 inline-block align-[-2px] mr-1" aria-hidden="true"></i> <span data-i18n="pr.tag">方案價格</span> </span>
+     <div class="text-center mb-12"><span class="inline-block px-4 py-2 rounded-full text-sm font-medium mb-4" style="background-color: rgba(184, 98, 31, 0.2); color: #B8621F;"> <i data-lucide="wallet" class="w-4 h-4 inline-block align-[-2px] mr-1" aria-hidden="true"></i> <span data-i18n="pr.tag">方案價格</span> </span>
       <h2 data-i18n="pr.title" class="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-4" style="color: #1E1E1E;">簡單透明的收費模式 以實惠的價錢享受全面服務</h2>
-      <p data-i18n="pr.sub" class="text-lg max-w-2xl mx-auto" style="color: #666;">首次架設費 + 每年維護費，無隱藏費用</p>
+      <p data-i18n="pr.sub" class="text-lg max-w-2xl mx-auto mb-6" style="color: #666;">首次架設費 + 每年維護費，無隱藏費用</p>
+      <!-- 貨幣切換器 -->
+      <div class="inline-flex flex-wrap items-center justify-center gap-1.5 p-1.5 rounded-full bg-white/90 shadow-sm border" style="border-color: rgba(184, 98, 31, 0.25);" id="pricing-currency-bar" role="group" aria-label="切換顯示貨幣">
+       <button type="button" data-currency="HKD" class="px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all" style="background-color: #D9782B; color: #FFFFFF;">HKD (HK$)</button>
+       <button type="button" data-currency="CNY" class="px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all" style="color: #555;">CNY (¥ 人民幣)</button>
+       <button type="button" data-currency="USD" class="px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all" style="color: #555;">USD (US$)</button>
+       <button type="button" data-currency="TWD" class="px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all" style="color: #555;">TWD (NT$)</button>
+       <button type="button" data-currency="SGD" class="px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all" style="color: #555;">SGD (S$)</button>
+       <button type="button" data-currency="MYR" class="px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all" style="color: #555;">MYR (RM)</button>
+       <button type="button" data-currency="GBP" class="px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all" style="color: #555;">GBP (£)</button>
+      </div>
+      <p data-i18n="pr.currency.note" class="text-xs mt-2.5" style="color: #777;">以港幣 (HKD) 為基準，其他貨幣按參考匯率換算顯示</p>
      </div>
      <div class="max-w-4xl mx-auto space-y-16">
 
@@ -1243,8 +1275,8 @@
           <h4 data-i18n="pr.setup" class="font-serif text-xl font-semibold mb-2" style="color: #1E1E1E;">診所系統架設費</h4>
           <p data-i18n="pr.once" class="text-sm mb-4" style="color: #666;">一次性費用</p>
           <div class="flex flex-col items-center justify-center gap-1">
-           <div class="flex items-center gap-2"><span class="text-base line-through" style="color: #999;">HK$3,000</span><span data-i18n="pr.discount.tag" class="px-2 py-0.5 rounded text-xs font-semibold" style="background-color: rgba(217, 120, 43, 0.15); color: #B8621F;">限時優惠 88 折</span></div>
-           <div class="flex items-baseline justify-center gap-1"><span class="text-4xl font-bold" style="color: #D9782B;">HK$2,640</span></div>
+           <div class="flex items-center gap-2"><span data-price-hkd="3000" class="text-base line-through" style="color: #999;">HK$3,000</span><span data-i18n="pr.discount.tag" class="px-2 py-0.5 rounded text-xs font-semibold" style="background-color: rgba(217, 120, 43, 0.15); color: #B8621F;">限時優惠 88 折</span></div>
+           <div class="flex items-baseline justify-center gap-1"><span data-price-hkd="2640" class="text-4xl font-bold" style="color: #D9782B;">HK$2,640</span></div>
           </div>
          </div>
          <ul class="space-y-4 mb-8 flex-1">
@@ -1260,7 +1292,7 @@
          <div class="text-center mb-8">
           <h4 data-i18n="pr.yearly" class="font-serif text-xl font-semibold mb-2 text-white">診所系統年費</h4>
           <p data-i18n="pr.peryear" class="text-sm mb-4" style="color: rgba(255,255,255,0.7);">每年年費</p>
-          <div class="flex items-baseline justify-center gap-1"><span class="text-4xl font-bold" style="color: #B8621F;">HK$900</span> <span data-i18n="pr.year" class="text-sm" style="color: rgba(255,255,255,0.7);">/年</span>
+          <div class="flex items-baseline justify-center gap-1"><span data-price-hkd="900" class="text-4xl font-bold" style="color: #B8621F;">HK$900</span> <span data-i18n="pr.year" class="text-sm" style="color: rgba(255,255,255,0.7);">/年</span>
           </div>
          </div>
          <ul class="space-y-4 mb-8 flex-1">
@@ -1287,8 +1319,8 @@
           <h4 data-i18n="pr.setup" class="font-serif text-xl font-semibold mb-2" style="color: #1E1E1E;">診所系統架設費</h4>
           <p data-i18n="pr.once" class="text-sm mb-4" style="color: #666;">一次性費用</p>
           <div class="flex flex-col items-center justify-center gap-1">
-           <div class="flex items-center gap-2"><span class="text-base line-through" style="color: #999;">HK$4,500</span><span data-i18n="pr.discount.tag" class="px-2 py-0.5 rounded text-xs font-semibold" style="background-color: rgba(217, 120, 43, 0.15); color: #B8621F;">限時優惠 88 折</span></div>
-           <div class="flex items-baseline justify-center gap-1"><span class="text-4xl font-bold" style="color: #D9782B;">HK$3,960</span></div>
+           <div class="flex items-center gap-2"><span data-price-hkd="4500" class="text-base line-through" style="color: #999;">HK$4,500</span><span data-i18n="pr.discount.tag" class="px-2 py-0.5 rounded text-xs font-semibold" style="background-color: rgba(217, 120, 43, 0.15); color: #B8621F;">限時優惠 88 折</span></div>
+           <div class="flex items-baseline justify-center gap-1"><span data-price-hkd="3960" class="text-4xl font-bold" style="color: #D9782B;">HK$3,960</span></div>
           </div>
          </div>
          <ul class="space-y-4 mb-8 flex-1">
@@ -1304,7 +1336,7 @@
          <div class="text-center mb-8">
           <h4 data-i18n="pr.yearly" class="font-serif text-xl font-semibold mb-2 text-white">診所系統年費</h4>
           <p data-i18n="pr.peryear" class="text-sm mb-4" style="color: rgba(255,255,255,0.7);">每年年費</p>
-          <div class="flex items-baseline justify-center gap-1"><span class="text-4xl font-bold" style="color: #B8621F;">HK$1,900</span> <span data-i18n="pr.year" class="text-sm" style="color: rgba(255,255,255,0.7);">/年</span>
+          <div class="flex items-baseline justify-center gap-1"><span data-price-hkd="1900" class="text-4xl font-bold" style="color: #B8621F;">HK$1,900</span> <span data-i18n="pr.year" class="text-sm" style="color: rgba(255,255,255,0.7);">/年</span>
           </div>
          </div>
          <ul class="space-y-4 mb-8 flex-1">
@@ -1331,8 +1363,8 @@
           <h4 data-i18n="pr.setup" class="font-serif text-xl font-semibold mb-2" style="color: #1E1E1E;">診所系統架設費</h4>
           <p data-i18n="pr.once" class="text-sm mb-4" style="color: #666;">一次性費用</p>
           <div class="flex flex-col items-center justify-center gap-1">
-           <div class="flex items-center gap-2"><span class="text-base line-through" style="color: #999;">HK$5,900</span><span data-i18n="pr.discount.tag" class="px-2 py-0.5 rounded text-xs font-semibold" style="background-color: rgba(217, 120, 43, 0.15); color: #B8621F;">限時優惠 88 折</span></div>
-           <div class="flex items-baseline justify-center gap-1"><span class="text-4xl font-bold" style="color: #D9782B;">HK$5,192</span></div>
+           <div class="flex items-center gap-2"><span data-price-hkd="5900" class="text-base line-through" style="color: #999;">HK$5,900</span><span data-i18n="pr.discount.tag" class="px-2 py-0.5 rounded text-xs font-semibold" style="background-color: rgba(217, 120, 43, 0.15); color: #B8621F;">限時優惠 88 折</span></div>
+           <div class="flex items-baseline justify-center gap-1"><span data-price-hkd="5192" class="text-4xl font-bold" style="color: #D9782B;">HK$5,192</span></div>
           </div>
          </div>
          <ul class="space-y-4 mb-8 flex-1">
@@ -1349,7 +1381,7 @@
          <div class="text-center mb-8">
           <h4 data-i18n="pr.yearly" class="font-serif text-xl font-semibold mb-2 text-white">診所系統年費</h4>
           <p data-i18n="pr.peryear" class="text-sm mb-4" style="color: rgba(255,255,255,0.7);">每年年費</p>
-          <div class="flex items-baseline justify-center gap-1"><span class="text-4xl font-bold" style="color: #B8621F;">HK$6,700</span> <span data-i18n="pr.year" class="text-sm" style="color: rgba(255,255,255,0.7);">/年</span>
+          <div class="flex items-baseline justify-center gap-1"><span data-price-hkd="6700" class="text-4xl font-bold" style="color: #B8621F;">HK$6,700</span> <span data-i18n="pr.year" class="text-sm" style="color: rgba(255,255,255,0.7);">/年</span>
           </div>
          </div>
          <ul class="space-y-4 mb-8 flex-1">
@@ -1702,6 +1734,6 @@
 
   </script>
  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd2e1adb34d04fa',t:'MTc3MDk3MDU2NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script src="/pwa.js" defer></script>
-<script src="/landing-i18n.js?v=20261016e" defer></script>
+<script src="/landing-i18n.js?v=20261016f" defer></script>
 </body>
 </html>

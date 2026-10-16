@@ -276,6 +276,7 @@
     'pr.badge': '包含维护服务',
     'pr.promo.badge': '限时优惠 88 折',
     'pr.discount.tag': '限时优惠 88 折',
+    'pr.currency.note': '以港币 (HKD) 为基准，其他货币按参考汇率换算显示',
     'pr.b1': '服务器架设',
     'pr.b2': '诊所系统设置',
     'pr.b3': '1 间诊所使用',
@@ -594,6 +595,7 @@
     'pr.badge': 'Maintenance included',
     'pr.promo.badge': 'Limited-Time 12% Off',
     'pr.discount.tag': 'Limited-Time 12% Off',
+    'pr.currency.note': 'Billed in HKD; other currencies are shown at approximate reference rates',
     'pr.b1': 'Server setup',
     'pr.b2': 'Clinic system configuration',
     'pr.b3': '1 clinic',
@@ -727,6 +729,119 @@
     if (el) el.setAttribute(attr, value);
   }
 
+  /* ---------------- 貨幣切換與匯率換算 ---------------- */
+  var CURRENCY_KEY = 'landing-currency';
+  var CURRENCY_ORDER = ['HKD', 'CNY', 'USD', 'TWD', 'SGD', 'MYR', 'GBP'];
+  var CURRENCIES = {
+    HKD: {
+      symbol: 'HK$',
+      rate: 1,
+      dropdownLabel: { 'zh-HK': 'HKD (HK$ 港幣)', 'zh-CN': 'HKD (HK$ 港币)', 'en': 'HKD (HK$)' },
+      pillLabel:     { 'zh-HK': 'HKD (HK$)',      'zh-CN': 'HKD (HK$)',      'en': 'HKD (HK$)' }
+    },
+    CNY: {
+      symbol: '¥',
+      rate: 0.92,
+      dropdownLabel: { 'zh-HK': 'CNY (¥ 人民幣)', 'zh-CN': 'CNY (¥ 人民币)', 'en': 'CNY (¥ RMB)' },
+      pillLabel:     { 'zh-HK': 'CNY (¥ 人民幣)', 'zh-CN': 'CNY (¥ 人民币)', 'en': 'CNY (¥ RMB)' }
+    },
+    USD: {
+      symbol: 'US$',
+      rate: 0.128,
+      dropdownLabel: { 'zh-HK': 'USD (US$ 美金)', 'zh-CN': 'USD (US$ 美元)', 'en': 'USD (US$)' },
+      pillLabel:     { 'zh-HK': 'USD (US$)',      'zh-CN': 'USD (US$)',      'en': 'USD (US$)' }
+    },
+    TWD: {
+      symbol: 'NT$',
+      rate: 4.1,
+      dropdownLabel: { 'zh-HK': 'TWD (NT$ 台幣)', 'zh-CN': 'TWD (NT$ 台币)', 'en': 'TWD (NT$)' },
+      pillLabel:     { 'zh-HK': 'TWD (NT$)',      'zh-CN': 'TWD (NT$)',      'en': 'TWD (NT$)' }
+    },
+    SGD: {
+      symbol: 'S$',
+      rate: 0.172,
+      dropdownLabel: { 'zh-HK': 'SGD (S$ 新幣)',  'zh-CN': 'SGD (S$ 新币)',  'en': 'SGD (S$)' },
+      pillLabel:     { 'zh-HK': 'SGD (S$)',       'zh-CN': 'SGD (S$)',       'en': 'SGD (S$)' }
+    },
+    MYR: {
+      symbol: 'RM',
+      rate: 0.56,
+      dropdownLabel: { 'zh-HK': 'MYR (RM 馬幣)',  'zh-CN': 'MYR (RM 马币)',  'en': 'MYR (RM)' },
+      pillLabel:     { 'zh-HK': 'MYR (RM)',       'zh-CN': 'MYR (RM)',       'en': 'MYR (RM)' }
+    },
+    GBP: {
+      symbol: '£',
+      rate: 0.10,
+      dropdownLabel: { 'zh-HK': 'GBP (£ 英鎊)',   'zh-CN': 'GBP (£ 英镑)',   'en': 'GBP (£)' },
+      pillLabel:     { 'zh-HK': 'GBP (£)',        'zh-CN': 'GBP (£)',        'en': 'GBP (£)' }
+    }
+  };
+  var currentCurrency = 'HKD';
+
+  function formatNumber(n) {
+    return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  function applyCurrency(code) {
+    if (!CURRENCIES[code]) code = 'HKD';
+    currentCurrency = code;
+    var info = CURRENCIES[code];
+
+    document.querySelectorAll('[data-price-hkd]').forEach(function (el) {
+      var hkd = parseFloat(el.getAttribute('data-price-hkd'));
+      if (isNaN(hkd)) return;
+      var converted = hkd * info.rate;
+      el.textContent = info.symbol + formatNumber(converted);
+    });
+
+    var currLabel = document.getElementById('curr-current');
+    if (currLabel) currLabel.textContent = code;
+
+    document.querySelectorAll('#curr-dropdown [data-currency]').forEach(function (btn) {
+      btn.setAttribute('aria-current', btn.getAttribute('data-currency') === code ? 'true' : 'false');
+    });
+
+    document.querySelectorAll('#mobile-menu [data-currency]').forEach(function (btn) {
+      var active = btn.getAttribute('data-currency') === code;
+      btn.style.borderColor = active ? '#D9782B' : '#E8DED5';
+      btn.style.color = active ? '#B8621F' : '#555';
+    });
+
+    document.querySelectorAll('#pricing-currency-bar [data-currency]').forEach(function (btn) {
+      var active = btn.getAttribute('data-currency') === code;
+      btn.style.backgroundColor = active ? '#D9782B' : 'transparent';
+      btn.style.color = active ? '#FFFFFF' : '#555';
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
+  function detectCurrency() {
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      var fromUrl = (params.get('currency') || '').trim().toUpperCase();
+      if (fromUrl && CURRENCIES[fromUrl]) return fromUrl;
+    } catch (eUrl) { /* ignore */ }
+
+    try {
+      var saved = localStorage.getItem(CURRENCY_KEY);
+      if (saved && CURRENCIES[saved]) return saved;
+    } catch (e) { /* ignore */ }
+
+    return 'HKD';
+  }
+
+  function setCurrency(code, persist) {
+    if (!CURRENCIES[code]) code = 'HKD';
+    applyCurrency(code);
+    if (persist !== false) {
+      try { localStorage.setItem(CURRENCY_KEY, code); } catch (e) { /* ignore */ }
+    }
+    var btn = document.getElementById('curr-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    var dd = document.getElementById('curr-dropdown');
+    if (dd) dd.classList.add('hidden');
+  }
+
   function updateChrome(lang) {
     document.documentElement.lang = lang === 'zh-HK' ? 'zh-Hant' : (lang === 'zh-CN' ? 'zh-Hans' : 'en');
 
@@ -741,6 +856,23 @@
       var active = btn.getAttribute('data-lang') === lang;
       btn.style.borderColor = active ? '#D9782B' : '#E8DED5';
       btn.style.color = active ? '#B8621F' : '#555';
+    });
+
+    document.querySelectorAll('#curr-dropdown [data-currency]').forEach(function (btn) {
+      var c = btn.getAttribute('data-currency');
+      var info = CURRENCIES[c];
+      if (info && info.dropdownLabel) {
+        var lbl = info.dropdownLabel[lang] || info.dropdownLabel['zh-HK'];
+        btn.innerHTML = lbl + ' <i data-lucide="check" class="lang-check w-4 h-4"></i>';
+      }
+    });
+
+    document.querySelectorAll('#pricing-currency-bar [data-currency]').forEach(function (btn) {
+      var c = btn.getAttribute('data-currency');
+      var info = CURRENCIES[c];
+      if (info && info.pillLabel) {
+        btn.textContent = info.pillLabel[lang] || info.pillLabel['zh-HK'];
+      }
     });
   }
 
@@ -818,13 +950,21 @@
     if (dd) dd.classList.add('hidden');
   }
 
-  function initDropdown() {
-    var btn = document.getElementById('lang-btn');
-    var dd = document.getElementById('lang-dropdown');
+  function bindDropdown(btnId, ddId, otherBtnId, otherDdId) {
+    var btn = document.getElementById(btnId);
+    var dd = document.getElementById(ddId);
     if (!btn || !dd) return;
 
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
+      if (otherDdId) {
+        var otherDd = document.getElementById(otherDdId);
+        var otherBtn = document.getElementById(otherBtnId);
+        if (otherDd && !otherDd.classList.contains('hidden')) {
+          otherDd.classList.add('hidden');
+          if (otherBtn) otherBtn.setAttribute('aria-expanded', 'false');
+        }
+      }
       var open = dd.classList.toggle('hidden') === false;
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
@@ -848,6 +988,11 @@
     });
   }
 
+  function initDropdown() {
+    bindDropdown('lang-btn', 'lang-dropdown', 'curr-btn', 'curr-dropdown');
+    bindDropdown('curr-btn', 'curr-dropdown', 'lang-btn', 'lang-dropdown');
+  }
+
   function init() {
     snapshotOriginals();
     initDropdown();
@@ -858,10 +1003,22 @@
       });
     });
 
+    document.querySelectorAll('[data-currency]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setCurrency(btn.getAttribute('data-currency'));
+      });
+    });
+
     setLanguage(detectLang(), false);
+    setCurrency(detectCurrency(), false);
   }
 
-  window.landingI18n = { setLanguage: setLanguage, detectLang: detectLang };
+  window.landingI18n = {
+    setLanguage: setLanguage,
+    detectLang: detectLang,
+    setCurrency: setCurrency,
+    detectCurrency: detectCurrency
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

@@ -466,6 +466,7 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
   export let walletLastPatientInfo = null;
 
   export function walletTxRowHtml(tx) {
+    const tr = (s) => (typeof window.t === 'function' ? window.t(s) : s);
     const amount = walletRound2(tx.amount);
     const isPayment = tx.type === 'payment' || amount < 0;
     let atText = '';
@@ -484,6 +485,8 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
       const toL = WALLET_STATUS_LABELS[tx.toStatus] || tx.toStatus;
       typeText += `（${fromL}→${toL}）`;
     }
+    typeText = tr(typeText);
+    const noteText = tx.note ? tr(tx.note) : '';
     // 狀態變更不涉金額，顯示「—」，不套用紅綠色
     const isZeroAmount = tx.type === 'statusChange' || amount === 0;
     const amountCell = isZeroAmount
@@ -495,13 +498,14 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
         <td class="px-3 py-1.5 text-gray-600 whitespace-nowrap">${window.escapeHtml(atText)}</td>
         <td class="px-3 py-1.5 text-gray-800">${window.escapeHtml(typeText)}</td>
         <td class="px-3 py-1.5 text-right font-medium">${amountCell}</td>
-        <td class="px-3 py-1.5 text-gray-500 max-w-sm truncate">${window.escapeHtml(tx.note || '')}</td>
+        <td class="px-3 py-1.5 text-gray-500 max-w-sm truncate">${window.escapeHtml(noteText)}</td>
       </tr>`;
   }
 
   // 分頁列：上一頁／頁碼／下一頁（頁碼過多時首尾與目前頁附近保留，其餘省略）
   // 分頁列：上一頁／頁碼／下一頁（頁碼過多時首尾與目前頁附近保留，其餘省略）
   export function walletTxPagerHtml(totalPages) {
+    const tr = (s) => (typeof window.t === 'function' ? window.t(s) : s);
     const pages = [];
     const push = (p) => pages.push(p);
     for (let p = 1; p <= totalPages; p++) {
@@ -518,16 +522,17 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
       <div class="flex items-center gap-1">
         <button onclick="walletGoToTxPage(${walletTxPage - 1})"
           ${walletTxPage <= 1 ? 'disabled class="px-2 py-1 text-gray-300 cursor-default"'
-            : 'class="px-2 py-1 text-teal-700 hover:bg-teal-50 rounded"'}>上一頁</button>
+            : 'class="px-2 py-1 text-teal-700 hover:bg-teal-50 rounded"'}>${tr('上一頁')}</button>
         ${btns}
         <button onclick="walletGoToTxPage(${walletTxPage + 1})"
           ${walletTxPage >= totalPages ? 'disabled class="px-2 py-1 text-gray-300 cursor-default"'
-            : 'class="px-2 py-1 text-teal-700 hover:bg-teal-50 rounded"'}>下一頁</button>
+            : 'class="px-2 py-1 text-teal-700 hover:bg-teal-50 rounded"'}>${tr('下一頁')}</button>
       </div>
-      <span class="text-xs text-gray-500 whitespace-nowrap">第 ${walletTxPage} / ${totalPages} 頁</span>`;
+      <span class="text-xs text-gray-500 whitespace-nowrap">${tr(`第 ${walletTxPage} / ${totalPages} 頁`)}</span>`;
   }
 
   export function renderWalletTxRows() {
+    const tr = (s) => (typeof window.t === 'function' ? window.t(s) : s);
     const tbody = document.getElementById('walletTxTable');
     const pager = document.getElementById('walletTxPager');
     if (!tbody) return;
@@ -540,7 +545,7 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
     if (legacyWrap) legacyWrap.classList.remove('hidden');
     if (gridWrap) gridWrap.classList.add('hidden');
     if (!walletLastTxs.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">尚無交易記錄</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">${tr('尚無交易記錄')}</td></tr>`;
       if (pager) pager.classList.add('hidden');
       return;
     }
@@ -572,9 +577,11 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
 
   // ── Tabulator 互動交易表（試點） ──────────────────────────────────
   let walletTxGrid = null;
+  let walletTxGridLang = '';
 
   // 將交易列轉為表格資料；顯示文字與 walletTxRowHtml 規格一致
   function walletTxRowData(tx) {
+    const tr = (s) => (typeof window.t === 'function' ? window.t(s) : s);
     const amount = walletRound2(tx.amount);
     const isPayment = tx.type === 'payment' || amount < 0;
     let atText = '';
@@ -594,8 +601,8 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
     return {
       at: tx.at || '',
       atText: atText,
-      typeText: typeText,
-      note: tx.note || '',
+      typeText: tr(typeText),
+      note: tx.note ? tr(tx.note) : '',
       amount: amount,
       isPayment: isPayment,
       isZero: tx.type === 'statusChange' || amount === 0
@@ -623,6 +630,8 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
     const gridEl = document.getElementById('walletTxGrid');
     const legacyWrap = document.getElementById('walletTxLegacy');
     if (!gridEl || !window.Tabulator) return false;
+    const tr = (s) => (typeof window.t === 'function' ? window.t(s) : s);
+    const curLang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
     const esc = (s) => (typeof window.escapeHtml === 'function'
       ? window.escapeHtml(s)
       : String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c])));
@@ -631,11 +640,17 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
       gridEl.classList.remove('hidden');
       if (legacyWrap) legacyWrap.classList.add('hidden');
 
+      if (walletTxGrid && walletTxGridLang !== curLang) {
+        try { walletTxGrid.destroy(); } catch (_e) {}
+        walletTxGrid = null;
+      }
+
       if (!walletTxGrid) {
+        walletTxGridLang = curLang;
         walletTxGrid = new window.Tabulator(gridEl, {
           data: rows,
           layout: 'fitColumns',
-          placeholder: '尚無交易記錄',
+          placeholder: tr('尚無交易記錄'),
           // 初始高度取容器實際像素（容器有 min-h 保底 220）；隱藏期間
           // clientHeight 為 0 時用 220，顯示後由 ResizeObserver 修正
           height: Math.max(220, gridEl.clientHeight || 0),
@@ -647,32 +662,32 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
           langs: {
             'zh-hant': {
               pagination: {
-                page_size: '每頁筆數',
-                first: '«', first_title: '第一頁',
-                prev: '上一頁', prev_title: '上一頁',
-                next: '下一頁', next_title: '下一頁',
-                last: '»', last_title: '最後一頁',
-                all: '全部',
-                counter: { showing: '顯示', of: '／共', rows: '筆', pages: '頁' },
-                button_tip: (page) => `第 ${page} 頁`
+                page_size: tr('每頁筆數'),
+                first: '«', first_title: tr('第一頁'),
+                prev: tr('上一頁'), prev_title: tr('上一頁'),
+                next: tr('下一頁'), next_title: tr('下一頁'),
+                last: '»', last_title: tr('最後一頁'),
+                all: tr('全部'),
+                counter: { showing: tr('顯示'), of: tr('／共'), rows: tr('筆'), pages: tr('頁') },
+                button_tip: (page) => tr(`第 ${page} 頁`)
               }
             }
           },
           columns: [
             {
-              title: '時間', field: 'atText', widthGrow: 2,
-              headerFilter: 'input', headerFilterPlaceholder: '篩選時間…',
+              title: tr('時間'), field: 'atText', widthGrow: 2,
+              headerFilter: 'input', headerFilterPlaceholder: tr('篩選時間…'),
               formatter: (cell) => esc(cell.getData().atText),
               // 顯示欄是本地化字串，排序仍以原始 ISO 時間為準
               sorter: (a, b, aRow, bRow) => String(aRow.getData().at).localeCompare(String(bRow.getData().at))
             },
             {
-              title: '類型', field: 'typeText', widthGrow: 2,
-              headerFilter: 'input', headerFilterPlaceholder: '篩選類型…',
+              title: tr('類型'), field: 'typeText', widthGrow: 2,
+              headerFilter: 'input', headerFilterPlaceholder: tr('篩選類型…'),
               formatter: (cell) => esc(cell.getValue() || '')
             },
             {
-              title: '金額', field: 'amount', width: 112, hozAlign: 'right', sorter: 'number',
+              title: tr('金額'), field: 'amount', width: 112, hozAlign: 'right', sorter: 'number',
               formatter: (cell) => {
                 const d = cell.getData();
                 if (d.isZero) return '<span class="text-gray-400">—</span>';
@@ -681,8 +696,8 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
               }
             },
             {
-              title: '說明', field: 'note', widthGrow: 3,
-              headerFilter: 'input', headerFilterPlaceholder: '篩選說明…',
+              title: tr('說明'), field: 'note', widthGrow: 3,
+              headerFilter: 'input', headerFilterPlaceholder: tr('篩選說明…'),
               formatter: (cell) => esc(cell.getValue() || '')
             }
           ]
@@ -803,5 +818,7 @@ import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, current
       G.showToast('複製失敗，請手動選取網址複製', 'error');
     }
   }
-
-
+  if (typeof window !== 'undefined') {
+    window.renderWalletMemberRows = renderWalletMemberRows;
+    window.renderWalletTxRows = renderWalletTxRows;
+  }
