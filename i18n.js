@@ -2803,7 +2803,554 @@ window.translations = {
             '無法更新統計，目前顯示快取資料。': 'Unable to update statistics. Showing cached data.',
             '無法更新統計，目前顯示的快取已超過 24 小時，可能非最新。': 'Unable to update statistics. The cached data shown is over 24 hours old and may be outdated.',
             '無法辨識登入階段，請重新整理頁面後再試。': 'Unable to identify your login session. Please refresh the page and try again.',
-            '部分歷史統計仍在準備中，目前僅顯示已同步的資料；若長期未更新，請聯絡管理員檢查索引設定。': 'Some historical statistics are still being prepared, so only synced data is shown for now. If it stays outdated, please contact the administrator to check the index settings.'
+            '部分歷史統計仍在準備中，目前僅顯示已同步的資料；若長期未更新，請聯絡管理員檢查索引設定。': 'Some historical statistics are still being prepared, so only synced data is shown for now. If it stays outdated, please contact the administrator to check the index settings.',
+
+            // ===== 診所設定、營業時間與系統管理補充翻譯 =====
+            '名醫診所系統': 'Dr.Great Clinic System',
+            '歡迎使用名醫診所系統': 'Welcome to Dr.Great Clinic System',
+            '繁體中文': 'Traditional Chinese',
+            '简体中文': 'Simplified Chinese',
+            '診所': 'Clinic',
+            '目前診所：': 'Current Clinic: ',
+            '目前套用診所：': 'Applied Clinic: ',
+            '目前主題：': 'Current Theme: ',
+            '新增診所': 'Add Clinic',
+            '刪除目前診所': 'Delete Current Clinic',
+            '診所營業時間（星期一至星期日，可按日設定不同上下班及休息時間）': 'Clinic Opening Hours (Mon–Sun, customizable opening/closing & break hours per day)',
+            '快速批量設定（可先輸入常用時間，一鍵套用至所有已勾選營業日，再逐日微調）': 'Quick Batch Setup (Enter default hours to apply to all checked open days, then fine-tune per day)',
+            '套用至已勾選星期': 'Apply to Checked Days',
+            '預設上班／下班時間': 'Default Opening / Closing Time',
+            '預設休息時間（選填）': 'Default Break Time (Optional)',
+            '應診星期': 'Consultation Days',
+            '應診星期（勾選營業日，未勾選視為休診日）': 'Consultation Days (Check open days; unchecked days are closed)',
+            '上班時間 — 下班時間': 'Opening Time — Closing Time',
+            '休息時間（選填）': 'Break Time (Optional)',
+            '休息時間': 'Break Time',
+            '休息時段不開放預約。': 'Break hours are not open for booking.',
+            '休息：': 'Break:',
+            '休診': 'Closed',
+            '全週休診': 'Closed all week',
+            '星期一': 'Monday',
+            '星期二': 'Tuesday',
+            '星期三': 'Wednesday',
+            '星期四': 'Thursday',
+            '星期五': 'Friday',
+            '星期六': 'Saturday',
+            '星期日': 'Sunday',
+            '可為不同星期設定各自的上班、下班及休息時間；儲存後收據將自動合併或分列顯示，且會員端預約會依該日對應時段開放。': 'Set custom opening, closing, and break hours for each day of the week; receipts will format them automatically, and member online booking will follow each day’s schedule.',
+            '設定後，收據將顯示應診星期與營業時間，且會員端線上預約僅開放已勾選的上班星期與營業時段。': 'Once saved, receipts will display the working days and hours, and member online booking will only open on checked working days and hours.',
+            '收據感謝語（列印收據底部）': 'Receipt Thank-You Message (Printed at bottom of receipt)',
+            '預設：謝謝您的光臨，祝您身體健康！': 'Default: Thank you for your visit. Stay healthy!',
+            '請先輸入預設上班與下班時間': 'Please enter default opening and closing times first',
+            '請先勾選至少一天應診星期': 'Please check at least one consultation day first',
+            '請至少勾選一天診所營業日（星期一至星期日）': 'Please select at least one clinic open day (Monday to Sunday)',
+            '請完整設定診所營業時間（開始及結束）': 'Please complete the clinic opening hours (start and end)',
+            '診所結束時間必須晚於開始時間': 'Clinic closing time must be later than opening time',
+            '請完整設定休息時間，且結束須晚於開始': 'Please complete the break time, and end time must be later than start time',
+            '休息時間必須設定於診所營業時間之內': 'Break time must fall within clinic opening hours',
+            '已新增診所': 'Clinic added',
+            '新增診所失敗': 'Failed to add clinic',
+            '診所已刪除': 'Clinic deleted',
+            '刪除診所失敗': 'Failed to delete clinic',
+            '更新診所資料失敗': 'Failed to update clinic info',
+            '更新診所資料失敗！': 'Failed to update clinic info!',
+            '未選擇診所': 'No clinic selected',
+            '未選擇診所或此診所不可刪除': 'No clinic selected or this clinic cannot be deleted',
+            '至少保留一間診所，無法刪除': 'At least one clinic must be kept; cannot delete',
+            '簡單版僅可使用一間診所，無法新增診所': 'Simple Plan supports 1 clinic only; cannot add clinics',
+            '簡單版僅可使用一間診所，無法刪除診所': 'Simple Plan supports 1 clinic only; cannot delete clinics',
+            '「新增診所」為進階版系統專屬功能': '"Add Clinic" is an Advanced Plan exclusive feature',
+            '「刪除目前診所」為進階版系統專屬功能': '"Delete Current Clinic" is an Advanced Plan exclusive feature',
+
+            // ===== 權限管理、收據自定義、中藥存庫與雲端備份 =====
+            '以下設定會根據所選診所切換，權限管理、收據自定義與中藥存庫開關都會套用到目前選擇的診所。': 'The settings below switch with the selected clinic. Permission management, receipt customization, and herb inventory toggle apply to the currently selected clinic.',
+            '權限管理': 'Permission Management',
+            '可設定各職位的功能顯示與細節操作權限': 'Configure feature visibility and detailed operation permissions for each role',
+            '選擇職位': 'Select Role',
+            '請先選擇職位': 'Please select a role first',
+            '請先選擇要設定權限的職位': 'Please select a role to configure permissions',
+            '請先選擇要設定的職位': 'Please select a role to configure',
+            '請選擇要設定權限的職位': 'Please select a role to configure permissions',
+            '功能顯示權限': 'Feature Visibility Permissions',
+            '細節操作權限': 'Detailed Operation Permissions',
+            '儲存權限設定': 'Save Permission Settings',
+            '權限設定已儲存': 'Permission settings saved',
+            '儲存權限設定失敗，請稍後再試': 'Failed to save permission settings, please try again later',
+            '病人資料管理：新增病人': 'Patient Management: Add Patient',
+            '病人資料管理：編輯病人': 'Patient Management: Edit Patient',
+            '病人資料管理：刪除病人': 'Patient Management: Delete Patient',
+            '病歷管理：刪除病歷': 'Medical Records: Delete Record',
+            '中藥庫：批量入庫': 'Herb Library: Batch Stock-In',
+            '中藥庫：編輯庫存': 'Herb Library: Edit Inventory',
+            '會員儲值：充值': 'Member Wallet: Top Up',
+            '會員儲值：人工調整': 'Member Wallet: Manual Adjustment',
+            '會員儲值：退款': 'Member Wallet: Refund',
+            '收據自定義設定': 'Receipt Customization',
+            '以下設定會套用到目前選擇的診所，可分別控制「列印收據」與「藥單醫囑」欄位顯示。': 'These settings apply to the selected clinic and control field visibility on printed receipts and prescription instructions.',
+            '收據類型': 'Receipt Paper Size',
+            'A5 大小（原本類型）': 'A5 Size (Default)',
+            'A4 大小': 'A4 Size',
+            '會套用到列印收據、藥單醫囑、到診證明及病假證明。': 'Applies to printed receipts, prescription instructions, attendance certificates, and sick leave certificates.',
+            '收據編號': 'Receipt No.',
+            '病人號碼': 'Patient ID',
+            '病人編號': 'Patient ID',
+            '病人編號：': 'Patient ID: ',
+            '診療日期': 'Consultation Date',
+            '診療時間': 'Consultation Time',
+            '應收金額': 'Amount Due',
+            '儲存收據自定義設定': 'Save Receipt Settings',
+            '收據自定義設定已儲存': 'Receipt customization saved',
+            '儲存收據自定義設定失敗': 'Failed to save receipt customization',
+            '中藥存庫啟動': 'Enable Herb Inventory',
+            '目前選擇診所切換後會同步更新。關閉後，系統不會扣減中藥庫存，醫師開藥時也不會顯示中藥餘量。': 'Updates when switching clinics. When turned off, the system will not deduct herb stock or display remaining stock during prescribing.',
+            '儲存中藥存庫設定': 'Save Herb Inventory Settings',
+            '中藥存庫設定已儲存': 'Herb inventory settings saved',
+            '儲存中藥存庫設定失敗': 'Failed to save herb inventory settings',
+            '系統每日自動執行純增量雲端備份，透過刪除追蹤機制確保資料同步完整，無須頻繁全量掃描。備份檔採用 Gzip 壓縮封存，匯入備份不用解壓縮，可隨時手動同步或直接下載，並支援一鍵還原。實時掛號及進行中之即時診症資料不包含在備份中。': 'The system performs daily incremental cloud backups with deletion tracking. Backups are Gzip-compressed and can be synced manually, downloaded, or restored directly without decompression. Real-time queue and active consultation data are excluded.',
+            '正在讀取雲端備份狀態…': 'Loading cloud backup status…',
+            '立即同步雲端備份': 'Sync Cloud Backup Now',
+            '下載雲端備份': 'Download Cloud Backup',
+            '雲端備份已下載！': 'Cloud backup downloaded!',
+            '雲端備份同步失敗，請稍後再試': 'Cloud backup sync failed, please try again later',
+            '雲端尚未有備份檔，請先按「立即同步雲端備份」建立備份後再下載': 'No cloud backup found yet. Please click "Sync Cloud Backup Now" first.',
+            '目前版本不支援備份功能': 'Backup feature is not supported in the current plan',
+            '讀取備份檔案失敗，請確認檔案格式是否正確': 'Failed to read backup file, please verify the file format',
+
+            // ===== 舊資料轉移系統 =====
+            '舊資料轉移系統': 'Legacy Data Migration',
+            '可匯入舊診所系統的 JSON、CSV 或 Excel（.xlsx）。支援病人與病歷資料，系統會先解析預覽，再執行遷移並回報成功/略過/失敗筆數。': 'Import JSON, CSV, or Excel (.xlsx) from your legacy clinic system. Supports patient profiles and medical records with preview before migration.',
+            '匯入檔案格式': 'Import File Format',
+            '自動判斷': 'Auto Detect',
+            '資料類型': 'Data Type',
+            '病人+病歷': 'Patients + Medical Records',
+            '病人資料': 'Patient Profiles',
+            '病歷資料': 'Medical Records',
+            '選擇舊資料檔案': 'Select Legacy File',
+            '尚未選擇檔案': 'No file selected',
+            '開始資料轉移': 'Start Migration',
+            '遷移進度 0%': 'Migration progress 0%',
+            '資料轉移完成': 'Data Migration Complete',
+            '舊資料轉移完成': 'Legacy data migration completed',
+            '舊資料轉移失敗，請稍後再試': 'Legacy data migration failed, please try again later',
+            '舊資料檔案解析完成，請確認預覽後開始轉移': 'Legacy file parsed. Please review the preview and start migration.',
+            '舊資料轉移將新增/合併病人並匯入病歷，確定開始嗎？': 'Legacy migration will add/merge patients and import medical records. Start now?',
+            '請先選擇並解析舊資料檔案': 'Please select and parse a legacy data file first',
+            '解析失敗，請確認檔案格式（JSON/CSV/Excel）': 'Parse failed, please check the file format (JSON/CSV/Excel)',
+            '沒有可遷移的有效資料': 'No valid data found to migrate',
+            '舊系統 ID': 'Legacy System ID',
+            '舊系統病人 ID': 'Legacy Patient ID',
+
+            // ===== 會員儲值系統 =====
+            '會員設定': 'Membership Settings',
+            '會員列表': 'Member List',
+            '會員端連結': 'Member Portal Link',
+            '。啟用會員功能、會員折扣項目、扣款順序及充值贈送級距均按所選診所儲存，切換診所後會同步更新。': '. Membership toggle, discount item, deduction order, and top-up bonus tiers are saved per clinic and update when switching clinics.',
+            '啟用會員功能': 'Enable Membership Feature',
+            '會員折扣項目': 'Member Discount Item',
+            '— 不套用自動折扣 —': '— No Automatic Discount —',
+            '只列出 category 為 discount 的收費項目；會員開診單時自動帶入，職員可手動移除。': 'Lists discount billing items only; automatically applied on member bills and can be removed manually.',
+            '扣款時先扣贈送額': 'Deduct Bonus Balance First',
+            '充值贈送級距': 'Top-Up Bonus Tiers',
+            '+ 新增級距': '+ Add Tier',
+            '儲存設定': 'Save Settings',
+            '會員設定已儲存': 'Membership settings saved',
+            '請從左邊列表選擇會員查看詳情': 'Select a member from the left list to view details',
+            '請先選擇一位會員': 'Please select a member first',
+            '帳戶狀態': 'Account Status',
+            '本金餘額': 'Principal Balance',
+            '儲值充值': 'Top Up Wallet',
+            '確認充值': 'Confirm Top-Up',
+            '人工調整': 'Manual Adjustment',
+            '確認調整': 'Confirm Adjustment',
+            '儲值退款回補': 'Wallet Refund',
+            '確認退款': 'Confirm Refund',
+            '凍結／關閉': 'Freeze / Close',
+            '凍結／關閉／復用': 'Freeze / Close / Reactivate',
+            '凍結（frozen）': 'Frozen',
+            '關閉（closed）': 'Closed',
+            '復用（active）': 'Active (Reactivate)',
+            '最近交易': 'Recent Transactions',
+            '近期交易（最近 5 次）': 'Recent Transactions (Last 5)',
+            '僅顯示最近 5 次，其他交易紀錄請至會員儲值查看': 'Showing last 5 transactions only. View all in Member Wallet.',
+            '尚無交易記錄': 'No transactions yet',
+            '無法載入近期交易': 'Unable to load recent transactions',
+            '前往會員儲值': 'Go to Member Wallet',
+            '使用儲值餘額支付': 'Pay with Wallet Balance',
+            '未儲值': 'No Wallet Balance',
+            '儲值扣款成功': 'Wallet payment deducted',
+            '重試扣款': 'Retry Deduction',
+            '改以其他方式收款': 'Paid via Another Method',
+            '本金調整（正增負減）': 'Principal Adjustment (+ / -)',
+            '贈送額調整': 'Bonus Adjustment',
+            '原因 *': 'Reason *',
+            '選擇診症單 *': 'Select Consultation *',
+            '診症單 ID（或自行輸入）': 'Consultation ID (or enter manually)',
+            '退款金額（留空＝全額）': 'Refund Amount (blank = full refund)',
+            '新狀態 *': 'New Status *',
+            '說明': 'Description / Note',
+            '說明（凍結／關閉必填）': 'Reason (required for freeze/close)',
+            '輸入金額': 'Enter amount',
+            '金額 HK$': 'Amount HK$',
+            '請病人用手機掃描下方 QR Code，或直接開啟網址登入會員儲值查詢頁面。': 'Ask the patient to scan the QR code below or open the link to access the Member Wallet inquiry page.',
+            '複製連結': 'Copy Link',
+            '複製': 'Copy',
+            '已複製': 'Copied',
+            '已複製會員端連結': 'Member portal link copied',
+            '開啟網頁': 'Open Page',
+            '重新產生': 'Regenerate',
+            '正在產生 QR Code…': 'Generating QR Code…',
+            'QR 元件尚未載入，請直接使用下方連結': 'QR component not loaded; please use the link below',
+            'QR 產生失敗，請直接使用下方連結': 'Failed to generate QR code; please use the link below',
+            '目前版本未提供會員儲值功能': 'Member Wallet is not included in the current plan',
+            '您沒有充值權限': 'You do not have permission to top up',
+            '請輸入有效的充值金額': 'Please enter a valid top-up amount',
+            '必須填寫調整原因': 'Adjustment reason is required',
+            '請輸入診症單 ID': 'Please enter a Consultation ID',
+            '沒有可退款的儲值付款記錄': 'No refundable wallet payment records found',
+            '調整完成': 'Adjustment completed',
+            '退款完成': 'Refund completed',
+            '狀態已更新': 'Status updated',
+
+            // ===== 財務報表（儲值摘要、待收款、成本分類、支付方式） =====
+            '儲值摘要': 'Wallet Summary',
+            '本期儲值充值': 'Period Wallet Top-Ups',
+            '現金流入（未賺取）': 'Cash Inflow (Unearned)',
+            '本期儲值消費': 'Period Wallet Spend',
+            '本期退款': 'Period Refunds',
+            '會員預存（診所負債）': 'Member Prepayment (Clinic Liability)',
+            '說明：儲值充值屬會員預存，並非營業收入，故不計入上方「總收入」；以儲值支付的診症金額已按全數計入診症收入，避免重複計算。本區不套用醫師篩選。': 'Note: Wallet top-ups are member prepayments (not earned revenue) and are excluded from Total Income above; consultations paid via wallet are counted in consultation revenue. Doctor filter does not apply here.',
+            '待收款追蹤': 'Pending Payments',
+            '病歷已保存但儲值扣款失敗（或已改其他方式）的診症單；實際收到款項後請按「標記已收款」核銷。僅列出報表期間內記錄。': 'Consultations where the record was saved but wallet deduction failed (or switched payment method). Click "Mark as Paid" once payment is received.',
+            '本期待收款診症單': 'Pending Consultations in Period',
+            '待收金額': 'Pending Amount',
+            '應收款明細': 'Receivables Details',
+            '已標記為收款完成': 'Marked as paid',
+            '確認此診症單已全數收款（現金／其他方式）？\n確認後將自待收款清單移除。': 'Confirm this consultation has been paid in full (cash/other)?\nIt will be removed from the pending list.',
+            '場地租金': 'Premises Rent',
+            '工資費用': 'Staff Wages',
+            '水電費用': 'Utilities',
+            '針灸用具': 'Acupuncture Supplies',
+            '健康食品': 'Health Supplements',
+            '中成藥': 'Proprietary Chinese Medicine',
+            '現金': 'Cash',
+            '轉數快 FPS': 'FPS',
+            '信用卡': 'Credit Card',
+            '支票': 'Cheque',
+            '月份': 'Month',
+            '類型': 'Type',
+            '成本已儲存': 'Cost saved',
+            '成本已更新': 'Cost updated',
+            '成本已刪除': 'Cost deleted',
+            '此月份尚無成本資料': 'No cost records for this month',
+            '請填寫月份、類型與金額': 'Please fill in month, type, and amount',
+            '財務報表已更新（使用快取）！': 'Financial report updated (cached)!',
+            '財務報表已更新（短時間內使用快取）': 'Financial report updated (using recent cache)',
+            '財務報表已更新（聚合快取）！': 'Financial report updated (aggregated cache)!',
+            '財務報表已更新（聚合模式，點擊表格可鑽取明細）！': 'Financial report updated (click rows to drill down)!',
+            '財務報表 Excel 已匯出！': 'Financial report exported to Excel!',
+            '財務報表 TXT 已匯出！': 'Financial report exported to TXT!',
+
+            // ===== 個人設置、診症設定、主訴及既往史、視訊診症、病歷附件、審核追蹤 =====
+            '診症設定': 'Consultation Settings',
+            '以下設定會隨目前所在診所切換，並套用到新開的診症表單，包括處方預設值、複診時間及預設收費項目。': 'These settings switch with the current clinic and apply to new consultation forms, including prescription defaults, follow-up interval, and default billing items.',
+            '處方預設': 'Prescription Defaults',
+            '處方預設克數': 'Default Herb Dosage (g)',
+            '預設天數': 'Default Days',
+            '預設次數': 'Default Daily Frequency',
+            '預設中藥服用方法': 'Default Administration Method',
+            '例如：溫水化開，飯後服': 'e.g. Dissolve in warm water, take after meals',
+            '預設複診時間': 'Default Follow-up Interval',
+            '預設複診相隔日數': 'Default Follow-up Days',
+            '例如：一周': 'e.g. 1 week',
+            '預設醫囑及注意事項': 'Default Instructions & Precautions',
+            '例如：注意休息，飲食清淡': 'e.g. Rest well, keep a light diet',
+            '預設收費項目': 'Default Billing Items',
+            '可選擇多個收費項目，於新開診症時自動加入。': 'Select multiple billing items to auto-add when starting a new consultation.',
+            '尚未選擇預設收費項目': 'No default billing items selected',
+            '已選擇項目': 'Selected Items',
+            '保存診症設定': 'Save Consultation Settings',
+            '預設用量（克）': 'Default Dosage (g)',
+            '預設療程': 'Default Course',
+            '主訴及現病史 *': 'Chief Complaint & Present Illness *',
+            '病人主要不適症狀、發病時間、症狀特點、治療經過等...': 'Main symptoms, onset time, characteristics, prior treatments...',
+            '過往主訴及現病史將自動載入': 'Past chief complaints & history will load automatically',
+            '複診與醫囑': 'Follow-up & Instructions',
+            '醫囑內容及注意事項': 'Instructions & Precautions',
+            '病歷修改原因（編輯時必填）': 'Reason for Record Modification (Required when editing)',
+            '例如：補充望聞問切資料、修正誤填處方、更新病人回報症狀': 'e.g. Added examination findings, corrected prescription, updated symptoms',
+            '請填寫病歷修改原因，以符合審核追蹤要求。': 'Please enter the reason for modifying the medical record for audit trail compliance.',
+            '病歷審核追蹤': 'Medical Record Audit Trail',
+            '審核追蹤': 'Audit Trail',
+            '目前沒有病歷修改紀錄。': 'No modification history for this record.',
+            '目前沒有可查看的病歷審核追蹤。': 'No audit trail available to view.',
+            '讀取審核追蹤失敗，請稍後再試。': 'Failed to load audit trail, please try again later.',
+            '無可顯示欄位差異': 'No field differences to display',
+            '無可顯示的變更內容': 'No change details to display',
+            '修改原因：': 'Modification Reason: ',
+            '已修改': 'Modified',
+            '視訊診症': 'Video Consultation',
+            '關閉視訊診症': 'Close Video Consultation',
+            '診間連結': 'Consultation Room Link',
+            '複製病人診間連結': 'Copy Patient Room Link',
+            '已簽同意書': 'Consent Signed',
+            '病人已簽署視像診症電子同意書': 'Patient has signed the telemedicine electronic consent form',
+            '預先問診': 'Pre-consultation Intake',
+            '請病人用手機掃描下方 QR Code，或直接開啟網址填寫預先問診。': 'Ask the patient to scan the QR code below or open the URL to complete the pre-consultation questionnaire.',
+            '已複製預先問診連結': 'Pre-consultation link copied',
+            '手機拍照上傳': 'Phone Camera Upload',
+            '用手機掃描下方 QR Code（或開啟連結），於手機拍照後照片會自動上傳到此病人的病歷附件。': 'Scan the QR code below with a phone to take photos and automatically upload them to this patient’s record attachments.',
+            '目前版本未提供病歷附件功能': 'Medical record attachments are not included in the current plan',
+            '目前沒有進行中的診症，無法上傳附件': 'No active consultation in progress; cannot upload attachments',
+            '上傳圖片…': 'Uploading image…',
+            '上傳已取消': 'Upload cancelled',
+            '載入附件失敗': 'Failed to load attachments',
+            '穴位圖': 'Acupoint Map',
+            '穴位列表': 'Acupoint List',
+            '過往記錄': 'Past Records',
+            '只顯示最近10筆記錄': 'Showing last 10 records only',
+            '日曆': 'Calendar',
+            '藍色日期代表有病歷，點擊可跳轉': 'Blue dates indicate records; click to jump',
+            '使用一次': 'Use Once',
+            '新增套票': 'Add Package',
+            '套票記錄': 'Package History',
+            '修改剩餘次數': 'Edit Remaining Count',
+            '修改有限期': 'Edit Expiry Date',
+            '已用完': 'Used Up',
+            '已到期': 'Expired',
+            '已自動復原未儲存的診症暫存內容': 'Unsaved consultation draft restored automatically',
+            '護理師編輯模式：只可修改收費項目及套票，其他病歷欄位已鎖定並反白顯示。': 'Nurse Edit Mode: Only billing items and packages can be modified; other medical record fields are locked.',
+            '修改收費': 'Edit Billing',
+            '不可在不同診所修改病歷': 'Cannot modify medical records across different clinics',
+            '您沒有修改病歷的權限！': 'You do not have permission to modify medical records!',
+            '您沒有查看此病歷的權限': 'You do not have permission to view this medical record',
+            '您沒有查看此病歷的權限！': 'You do not have permission to view this medical record!',
+
+            // ===== 病史／既往史（Past Medical History） =====
+            '病史資料': 'Medical History',
+            '修改既住史': 'Edit Past History',
+            '儲存既住史': 'Save Past History',
+            '病人既住史已更新': 'Patient past medical history updated',
+            '儲存既住史失敗，請稍後再試': 'Failed to save past medical history, please try again later',
+            '1. 疾病史 (Medical Conditions)': '1. Medical Conditions',
+            '2. 手術與外傷史 (Surgical & Trauma History)': '2. Surgical & Trauma History',
+            '3. 過敏史 (Allergies)': '3. Allergies',
+            '4. 用藥史 (Medications)': '4. Medications',
+            '疾病史': 'Medical Conditions',
+            '手術與外傷史': 'Surgical & Trauma History',
+            '用藥史': 'Medications',
+            '請剔選患者既往疾病史；如有其他情況或補充說明，請在下方備註填寫': 'Check any past medical conditions; add details or other conditions in the notes below.',
+            '請剔選曾接受的手術或重大外傷；如需補充年份、部位、後遺症或其他情況，請在下方備註填寫': 'Check any past surgeries or major trauma; add year, site, sequelae, or other details below.',
+            '請剔選已知過敏項目；如有反應詳情或其他未列出的過敏原，請在下方備註填寫': 'Check any known allergies; add reaction details or unlisted allergens below.',
+            '請剔選現時或長期服用藥物類別；劑量、服用頻率或其他補充請在下方備註填寫': 'Check current or long-term medications; add dosage, frequency, or notes below.',
+            '其他或備註，例如：確診年份、目前控制情況、其他未列出的疾病': 'Other / Notes, e.g. year of diagnosis, current control status, unlisted conditions',
+            '其他或備註，例如：手術或受傷年份、受傷部位、是否有後遺症、其他未列出的手術或外傷': 'Other / Notes, e.g. year of surgery/injury, body part, sequelae, unlisted surgeries',
+            '其他或備註，例如：過敏反應表現、嚴重程度、其他未列出的過敏原': 'Other / Notes, e.g. allergic reaction symptoms, severity, unlisted allergens',
+            '備註：劑量與服用頻率或其他補充': 'Notes: dosage, frequency, or other details',
+            '高血壓': 'Hypertension',
+            '糖尿病': 'Diabetes',
+            '高脂血症': 'Hyperlipidemia',
+            '心肌梗塞': 'Myocardial Infarction',
+            '中風': 'Stroke',
+            '哮喘': 'Asthma',
+            '慢性腎病': 'Chronic Kidney Disease',
+            '肝炎': 'Hepatitis',
+            '肺結核': 'Tuberculosis',
+            '癌症': 'Cancer',
+            '蠶豆症（G6PD 缺乏症）': 'G6PD Deficiency (Favism)',
+            '心臟金屬支架手術': 'Coronary Stent Implantation',
+            '心律調節器植入手術': 'Pacemaker Implantation',
+            '血管內取栓術': 'Endovascular Thrombectomy',
+            '血管栓塞術': 'Vascular Embolization',
+            '洗腎瘻管成形術': 'AV Fistula Surgery',
+            '人工關節手術': 'Joint Replacement Surgery',
+            '內視鏡止血術': 'Endoscopic Hemostasis',
+            '息肉切除術': 'Polypectomy',
+            '骨折': 'Bone Fracture',
+            '車禍': 'Traffic Accident Trauma',
+            '頭部創傷': 'Head Trauma',
+            '海鮮過敏': 'Seafood Allergy',
+            '堅果': 'Nuts',
+            '蛋白質': 'Egg / Protein',
+            '麩質': 'Gluten',
+            '大豆': 'Soy',
+            '芒果': 'Mango',
+            '降血壓藥': 'Antihypertensives',
+            '降血糖藥': 'Antidiabetics',
+            '降血脂藥': 'Lipid-Lowering Drugs',
+            '抗凝血藥物': 'Anticoagulants / Blood Thinners',
+            '抗癲癇藥': 'Antiepileptics',
+            '抗抑鬱/焦慮藥': 'Antidepressants / Anxiolytics',
+            '安眠藥': 'Sleeping Pills / Sedatives',
+            '胃藥': 'Gastric Medications',
+            '痛風預防藥': 'Gout Medications',
+            '甲狀腺藥物': 'Thyroid Medications',
+            '荷爾蒙類藥物': 'Hormone Medications',
+            '骨質疏鬆藥': 'Osteoporosis Medications',
+            '氣喘/COPD 藥物': 'Asthma / COPD Medications',
+            '抗組織胺藥物': 'Antihistamines',
+            '帕金森氏症藥物': 'Parkinson’s Medications',
+            '免疫抑制劑藥物': 'Immunosuppressants',
+            '維他命': 'Vitamins',
+
+            // ===== 帳號安全設定、介面主題、推播通知 =====
+            '介面主題': 'Interface Theme',
+            '系統預設': 'System Default',
+            '還原系統預設': 'Reset to Default',
+            'daisyUI 內建 35 個現成主題，一按即時預覽。偏好只儲存於本機瀏覽器，唔會同步到其他裝置。': '35 built-in daisyUI themes with instant preview. Saved locally in this browser only.',
+            '備註：系統部分版面使用固定配色，主題主要改變按鈕、輸入框等 daisyUI 元件同頁面底色。': 'Note: Some sections use fixed brand colors; themes mainly style buttons, inputs, and page backgrounds.',
+            '推播通知': 'Push Notifications',
+            '傳送測試通知': 'Send Test Notification',
+            '接收的通知類型': 'Notification Types to Receive',
+            '開啟後可自行勾選要接收的通知類型。通知依裝置各自開啟；iPhone 使用者請先用 Safari 將系統「加入主畫面」（需 iOS 16.4 或以上）。': 'Once enabled, select which notifications to receive. Enabled per device; iPhone users must first "Add to Home Screen" in Safari (iOS 16.4+).',
+            '各裝置開啟推播教學': 'Device Push Notification Setup Guide',
+            '展開 iPhone／iPad 推播教學': 'Expand iPhone / iPad Push Guide',
+            '展開 Android 推播教學': 'Expand Android Push Guide',
+            '展開 Windows 推播教學': 'Expand Windows Push Guide',
+            '展開 Mac 推播教學': 'Expand Mac Push Guide',
+            '展開': 'Expand',
+            '收合': 'Collapse',
+            '必須使用': 'Required:',
+            '建議 Chrome／Edge': 'Chrome / Edge Recommended',
+            'Android 手機／平板': 'Android Phone / Tablet',
+            'Windows 電腦': 'Windows PC',
+            'Mac 電腦': 'Mac Computer',
+            '確認系統版本：「設定 → 一般 → 關於本機」，iOS 版本需為 16.4 或以上。': 'Check iOS version: "Settings → General → About", iOS 16.4 or above is required.',
+            '開啟診所系統並登入（不支援 Chrome、LINE／Facebook 內嵌瀏覽器）。': 'Open the clinic system in Safari and log in (Chrome and in-app browsers are not supported on iOS).',
+            '點 Safari 底部的「分享」鈕（方框向上箭頭）→「加入主畫面」→ 右上角「加入」。': 'Tap the "Share" button in Safari → "Add to Home Screen" → "Add".',
+            '離開 Safari，改從主畫面新出現的「名醫診所」圖示進入系統並登入。': 'Leave Safari and open the newly added home screen icon to log in.',
+            '進入「帳號安全設定 → 推播通知」打開開關，於彈窗點「允許」。': 'Go to "Account Security Settings → Push Notifications", turn on the toggle, and tap "Allow".',
+            '進入「帳號安全設定 → 推播通知」打開開關，瀏覽器詢問時點「允許」。': 'Go to "Account Security Settings → Push Notifications", turn on the toggle, and click "Allow" when prompted.',
+            '確認系統通知：「設定 → 通知 → 名醫診所」內開啟「允許通知」。': 'Verify iOS notification settings: enable "Allow Notifications" under "Settings → Notifications".',
+            'iPhone 無法在一般 Safari 分頁接收推播，日後請一律從主畫面圖示進入；刪除該圖示即等同移除推播。': 'iPhones cannot receive web push in regular Safari tabs; always launch from the Home Screen icon.',
+            '用 Chrome 開啟診所系統並登入。': 'Open the clinic system in Chrome and log in.',
+            '確認系統層通知：「設定 → 應用程式 → Chrome（或 Edge）→ 通知」設為允許，並放寬該瀏覽器的省電／背景活動限制。': 'Ensure system notifications are allowed for Chrome/Edge in Android Settings and battery restrictions are relaxed.',
+            '若曾按「封鎖」：點網址列鎖頭圖示 → 網站權限 → 通知 → 允許，再重新整理頁面。': 'If previously blocked: tap the lock icon in the address bar → Permissions → Notifications → Allow, then reload.',
+            '建議：Chrome 選單 →「加入主畫面」或「安裝應用程式」，日後開啟更方便。': 'Tip: Use Chrome menu → "Add to Home screen" or "Install app" for faster access.',
+            '開啟「勿擾模式」時通知會被靜音；部分品牌手機（如小米、OPPO）需另行允許 Chrome 的自啟動與通知權限。': 'Notifications are silenced during Do Not Disturb; some Android brands require enabling auto-start and background permissions.',
+            '用一般瀏覽視窗開啟系統（InPrivate／無痕視窗不支援推播）。': 'Open the system in a normal browser window (Incognito/InPrivate windows do not support push).',
+            '在診所系統打開推播開關，瀏覽器詢問時點「允許」。': 'Turn on the push toggle in the clinic system and click "Allow" when the browser prompts.',
+            '打開推播開關，瀏覽器詢問時點「允許」。': 'Turn on the push toggle and click "Allow" when prompted.',
+            '開啟「Windows 設定 → 系統 → 通知」：通知總開關需打開，並確認 Chrome／Edge 的個別通知為允許。': 'In "Windows Settings → System → Notifications", ensure notifications are enabled globally and for Chrome/Edge.',
+            '關閉「專注輔助／勿擾」及「省電模式」，否則通知可能不彈出。': 'Turn off Focus Assist / Do Not Disturb and Battery Saver so notifications can pop up.',
+            '若之前曾按「封鎖」：點網址列左邊的鎖頭圖示 → 權限 → 通知 → 改為「允許」，重新整理頁面後再試。': 'If previously blocked: click the lock icon in the address bar → Permissions → Notifications → Allow, then reload.',
+            '公司電腦若仍無法開啟，請確認沒有公司群組原則封鎖瀏覽器通知。': 'On corporate PCs, check that group policies are not blocking browser notifications.',
+            '打開「系統設定 → 通知」，找到 Chrome（或 Edge），開啟「允許通知」。': 'Open macOS "System Settings → Notifications", find Chrome (or Edge), and enable "Allow Notifications".',
+            '確認「專注模式」已關閉（選單列的月亮圖示）。': 'Ensure macOS Focus / Do Not Disturb mode is turned off.',
+            '若曾按「封鎖」：點網址列的網站設定，將通知改為「允許」後重新整理頁面。': 'If previously blocked: open site settings in the address bar, set Notifications to "Allow", and reload.',
+            'Safari 需 macOS 13 Ventura（Safari 16.1）以上才支援網頁推播，求穩定建議直接使用 Chrome 或 Edge。': 'Safari requires macOS 13 Ventura (Safari 16.1+) for web push; Chrome or Edge is recommended.',
+            '推播依「個別裝置＋瀏覽器」各自開啟，每台手機／電腦需分別設定一次；清除瀏覽器網站資料或移除主畫面圖示後，需重新打開開關。開啟後可按上方「傳送測試通知」確認是否成功。': 'Push notifications are enabled per device and browser. After enabling, click "Send Test Notification" above to verify.',
+
+            // ===== 其他常用按鈕、欄位與提示 =====
+            '建檔日期': 'Created Date',
+            '緊急聯絡人姓名': 'Emergency Contact Name',
+            '請輸入緊急聯絡人姓名': 'Enter emergency contact name',
+            '緊急聯絡人電話': 'Emergency Contact Phone',
+            '主要診所': 'Primary Clinic',
+            '主要診所 *': 'Primary Clinic *',
+            '請選擇主要診所': 'Select primary clinic',
+            '初始密碼 *': 'Initial Password *',
+            '請輸入初始密碼': 'Enter initial password',
+            '確認密碼 *': 'Confirm Password *',
+            '請再次輸入密碼': 'Re-enter password',
+            '電子郵件 *': 'Email *',
+            '可選填': 'Optional',
+            '新增用戶時設定登入電子郵件；建立後請透過帳號遷移流程調整。': 'Set login email when creating user; use account migration to change later.',
+            '勾選後此項目將供所有診所使用': 'When checked, this item is shared across all clinics',
+            '診所共用項目': 'Shared Across Clinics',
+            '今日': 'Today',
+            '第一頁': 'First Page',
+            '已儲存': 'Saved',
+            '確認': 'Confirm',
+            '移除': 'Remove',
+            '加入': 'Add',
+            '套用': 'Apply',
+            '稍後': 'Later',
+            '顯示詳情': 'Show Details',
+            '搜尋中...': 'Searching...',
+            '正在載入病歷...': 'Loading medical records...',
+            '載入病歷中...': 'Loading medical record...',
+            '載入套票資料中...': 'Loading package data...',
+            '主頻道新訊息': 'New Channel Message',
+            '私人聊天新訊息': 'New Private Message',
+            '你收到一則新訊息': 'You received a new message',
+            '新訊息': 'New Message',
+            '您正在診症中，操作暫時禁用': 'Consultation in progress; action temporarily disabled',
+            '排班總覽': 'Schedule Overview',
+            '門診': 'Outpatient',
+            '病房': 'Ward',
+            '手術房': 'Operating Room',
+            '兒科門診': 'Pediatric Outpatient',
+            '兒科病房': 'Pediatric Ward',
+            '其他/急診': 'Other / Emergency',
+            '管理員操作': 'Admin Action',
+            '自己': 'Me',
+            '+ 新增穴位': '+ Add Acupoint',
+            '0 項': '0 items',
+            '一鍵建立（開啟資料庫管理後台）': 'One-Click Create (Open Database Console)',
+            '建立雲端資料庫索引': 'Create Cloud Database Indexes',
+            '所有索引都已建立，沒有缺失': 'All indexes are built; none missing',
+            '索引建立需要幾分鐘（視資料量而定），完成後刷新頁面即可。': 'Index creation takes a few minutes; refresh the page once completed.',
+            '中醫診斷：': 'TCM Diagnosis:',
+            '證型診斷：': 'Pattern:',
+            '主訴：': 'Chief Complaint:',
+            '現病史：': 'Present Illness:',
+            '脈象：': 'Pulse:',
+            '舌象：': 'Tongue:',
+            '主治：': 'Indications:',
+            '功效：': 'Effects:',
+            '功能：': 'Functions:',
+            '性味：': 'Nature & Flavor:',
+            '歸經：': 'Meridian Entry:',
+            '用法：': 'Usage:',
+            '組成：': 'Composition:',
+            '劑量：': 'Dosage:',
+            '定位：': 'Location:',
+            '針法：': 'Needling:',
+            '穴性：': 'Acupoint Property:',
+            '注意：': 'Note:',
+            '電話：': 'Phone:',
+            '小計：': 'Subtotal:',
+            '小計': 'Subtotal',
+            '服藥天數：': 'Medication Days:',
+            '每日次數：': 'Daily Frequency:',
+            '服用方法：': 'Administration:',
+            '服用方法': 'Administration Method',
+            '療程時間': 'Course Duration',
+            '科別': 'Department',
+            '使用套票': 'Use Package',
+            '套票抵扣一次': 'Deduct 1 package session',
+            '（從上次處方載入）': '(Loaded from last prescription)',
+            '已載入上次處方': 'Loaded last prescription',
+            '已載入上次收費': 'Loaded last billing items',
+            '尚未設定常用藥方組合': 'No common formula combinations set yet',
+            '尚未設定常用穴位組合': 'No common acupoint combinations set yet',
+            '暫無診斷模板': 'No diagnosis templates yet',
+            '暫無醫囑模板': 'No instruction templates yet',
+            '模板名稱 *': 'Template Name *',
+            '此處方尚未添加項目，請使用上方搜索功能': 'No items in this prescription yet; please use the search above',
+            '找不到符合條件的中藥材或方劑': 'No matching herbs or formulas found',
+            '找不到符合條件的收費項目': 'No matching billing items found',
+            '找不到符合條件的病人': 'No matching patients found',
+            '找不到符合條件的穴位': 'No matching acupoints found',
+            '找不到符合條件的藥材': 'No matching herbs found',
+            '沒有找到相關收費項目': 'No related billing items found',
+            '沒有找到相關穴位': 'No related acupoints found',
+            '沒有找到相關資料': 'No related data found',
+            '未找到可用的收費項目': 'No available billing items found',
+            '未開始搜尋': 'Search not started',
+            '搜索結果': 'Search Results',
+            '請先輸入收費項目名稱或描述進行搜尋': 'Please enter a billing item name or description to search',
+            '請嘗試其他搜尋條件': 'Please try different search criteria',
+            '請嘗試其他搜尋條件或新增中藥材/方劑': 'Please try different search criteria or add a new herb/formula',
+            '請嘗試其他搜尋條件或新增收費項目': 'Please try different search criteria or add a new billing item',
+            '搜尋失敗，請檢查網路連接': 'Search failed, please check your network connection',
+            '搜尋失敗，請重試': 'Search failed, please try again',
+            '載入套票資料失敗': 'Failed to load package data',
+            '載入掛號列表失敗，請重新整理頁面': 'Failed to load registration list, please refresh the page',
+            '載入診療記錄失敗': 'Failed to load consultation records',
+            '處方': 'Prescription',
+            '編輯中': 'Editing',
+            '設為編輯': 'Set Active'
         };
         
         Object.keys(dynamicTranslations).forEach(function(key) {
@@ -2824,113 +3371,193 @@ window.translations = {
 
 var isTranslating = false;
 
+// 統一文字與動態句型翻譯解析器（供 TEXT_NODE、ELEMENT_NODE 與 window.t 共用）
+function resolveTextTranslation(original, dict, lang) {
+    if (!original || !dict) return original;
+    if (Object.prototype.hasOwnProperty.call(dict, original)) {
+        return dict[original];
+    }
+    if (lang === 'zh') return original;
 
+    // 1. 括號數字後綴，如「全部 (12)」
+    const parenMatch = original.match(/^(.*?)(\s*\(\d+\))$/);
+    if (parenMatch) {
+        const base = parenMatch[1].trim();
+        const suffix = parenMatch[2];
+        if (Object.prototype.hasOwnProperty.call(dict, base)) {
+            return dict[base] + suffix;
+        }
+    }
 
+    // 2. 可用數量與年齡／時間單位
+    const availableMatch = original.match(/^(\d+)\s*個可用$/);
+    if (availableMatch && Object.prototype.hasOwnProperty.call(dict, '個可用')) {
+        return availableMatch[1] + ' ' + dict['個可用'];
+    }
+    const ageMatch = original.match(/^(\d+)\s*(歲|個月|天|次|項|筆)$/);
+    if (ageMatch) {
+        if (lang === 'en') {
+            const unitMap = { '歲': 'yrs', '個月': 'mos', '天': 'days', '次': 'times', '項': 'items', '筆': 'records' };
+            return ageMatch[1] + ' ' + (unitMap[ageMatch[2]] || ageMatch[2]);
+        }
+        if (Object.prototype.hasOwnProperty.call(dict, ageMatch[2])) {
+            return ageMatch[1] + ' ' + dict[ageMatch[2]];
+        }
+    }
 
+    // 3. 常見動態句型（英文與簡體）
+    if (lang === 'en') {
+        const welcomeMatch = original.match(/^歡迎使用(.+)$/);
+        if (welcomeMatch) {
+            const cName = welcomeMatch[1].trim();
+            return 'Welcome to ' + (dict[cName] || cName);
+        }
+        const curClinicMatch = original.match(/^(目前診所：|目前套用診所：|目前主題：)\s*(.+)$/);
+        if (curClinicMatch) {
+            const prefix = dict[curClinicMatch[1]] || curClinicMatch[1];
+            const val = curClinicMatch[2].trim();
+            return prefix + (dict[val] || val);
+        }
+        const migMatch = original.match(/^遷移進度\s*(\d+)%(?:（(.+)）)?$/);
+        if (migMatch) {
+            return 'Migration progress ' + migMatch[1] + '%' + (migMatch[2] ? ' (' + migMatch[2] + ')' : '');
+        }
+        const impMatch = original.match(/^匯入進度\s*(\d+)%$/);
+        if (impMatch) {
+            return 'Import progress ' + impMatch[1] + '%';
+        }
+        const applyDaysMatch = original.match(/^已將預設時間套用至\s*(\d+)\s*個營業日$/);
+        if (applyDaysMatch) {
+            return 'Applied default hours to ' + applyDaysMatch[1] + ' open day(s)';
+        }
+        const dayHoursErr1 = original.match(/^請完整設定(.+)的上班與下班時間$/);
+        if (dayHoursErr1) {
+            const dName = dict[dayHoursErr1[1]] || dayHoursErr1[1];
+            return 'Please set both opening and closing times for ' + dName;
+        }
+        const dayHoursErr2 = original.match(/^(.+)的下班時間必須晚於上班時間$/);
+        if (dayHoursErr2) {
+            const dName = dict[dayHoursErr2[1]] || dayHoursErr2[1];
+            return 'Closing time must be later than opening time for ' + dName;
+        }
+        const dayHoursErr3 = original.match(/^請完整設定(.+)的休息時間，且結束須晚於開始$/);
+        if (dayHoursErr3) {
+            const dName = dict[dayHoursErr3[1]] || dayHoursErr3[1];
+            return 'Please set a valid break time (end after start) for ' + dName;
+        }
+        const dayHoursErr4 = original.match(/^(.+)的休息時間必須設定於該日營業時間之內$/);
+        if (dayHoursErr4) {
+            const dName = dict[dayHoursErr4[1]] || dayHoursErr4[1];
+            return 'Break time for ' + dName + ' must be within its opening hours';
+        }
+        const remainMatch = original.match(/^剩餘\s*(\d+)\s*次$/);
+        if (remainMatch) {
+            return remainMatch[1] + ' sessions left';
+        }
+        const notFoundMatch = original.match(/^找不到「(.+)」$/);
+        if (notFoundMatch) {
+            return 'No results for "' + notFoundMatch[1] + '"';
+        }
+    }
 
+    // 4. 診症記錄／病歷記錄後綴
+    const diagMatch = original.match(/^(.+?)(的診症記錄)$/);
+    if (diagMatch && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
+        return diagMatch[1] + dict[diagMatch[2]];
+    }
+    const medMatch = original.match(/^(.+?)(的病歷記錄)$/);
+    if (medMatch && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
+        return medMatch[1] + dict[medMatch[2]];
+    }
 
+    // 5. 冒號前綴（例如「醫師：張醫師」、「庫存：100g」）
+    const colonMatch = original.match(/^(.+?：)\s*(.*)$/);
+    if (colonMatch && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
+        const rhs = colonMatch[2].trim();
+        const rhsTranslated = Object.prototype.hasOwnProperty.call(dict, rhs) ? dict[rhs] : colonMatch[2];
+        return dict[colonMatch[1]] + (rhsTranslated ? ' ' + rhsTranslated : '');
+    }
 
+    return original;
+}
 
+// 供各 JS 模組直接呼叫的即時翻譯輔助函式
+window.t = function(text) {
+    const raw = String(text == null ? '' : text);
+    const trimmed = raw.trim();
+    if (!trimmed) return raw;
+    const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'zh';
+    if (lang === 'zh') return raw;
+    const dict = (window.translations && window.translations[lang]) || {};
+    return resolveTextTranslation(trimmed, dict, lang);
+};
 
 function storeOriginalText() {
     const all = document.querySelectorAll('*');
     all.forEach(el => {
-        
         if (el.children.length === 0) {
             const text = (el.textContent || '').trim();
-            if (text) {
-                if (!el.dataset.originalText) {
-                    el.dataset.originalText = text;
-                }
+            if (text && !el.dataset.originalText) {
+                el.dataset.originalText = text;
             }
-            if (el.getAttribute('placeholder')) {
-                const ph = el.getAttribute('placeholder').trim();
-                if (ph && !el.dataset.originalPlaceholder) {
-                    el.dataset.originalPlaceholder = ph;
-                }
+        }
+        if (el.getAttribute('placeholder')) {
+            const ph = el.getAttribute('placeholder').trim();
+            if (ph && !el.dataset.originalPlaceholder) {
+                el.dataset.originalPlaceholder = ph;
             }
         }
     });
 }
 
 
+function translateElementAttributes(node, dict) {
+    const attrs = [
+        ['placeholder', 'originalPlaceholder'],
+        ['data-placeholder', 'originalDataPlaceholder'],
+        ['title', 'originalTitle'],
+        ['aria-label', 'originalAriaLabel']
+    ];
+    for (let i = 0; i < attrs.length; i++) {
+        const attrName = attrs[i][0];
+        const dataKey = attrs[i][1];
+        if (node.hasAttribute(attrName)) {
+            const val = (node.getAttribute(attrName) || '').trim();
+            if (val && (!node.dataset[dataKey] || (/[\u4e00-\u9fff]/.test(val) && val !== dict[node.dataset[dataKey]]))) {
+                node.dataset[dataKey] = val;
+            }
+            const orig = node.dataset[dataKey];
+            if (orig) {
+                const translated = resolveTextTranslation(orig, dict, (localStorage.getItem('lang') || 'zh'));
+                if (translated && translated !== val) {
+                    node.setAttribute(attrName, translated);
+                }
+            }
+        }
+    }
+}
+
+
 function translateNode(node, dict, lang) {
-    
     if (!node) return;
     
     if (node.nodeType === Node.TEXT_NODE) {
         const fullText = node.nodeValue || '';
-        
-        
-        
         const trimmed = fullText.trim();
         if (!trimmed) return;
         
-        if (node.__originalText === undefined) {
+        if (node.__originalText === undefined || (lang !== 'zh' && /[\u4e00-\u9fff]/.test(trimmed) && trimmed !== dict[node.__originalText])) {
             node.__originalText = trimmed;
-            
             const leadingMatch = fullText.match(/^\s*/);
             const trailingMatch = fullText.match(/\s*$/);
             node.__leadingWhitespace = leadingMatch ? leadingMatch[0] : '';
             node.__trailingWhitespace = trailingMatch ? trailingMatch[0] : '';
+            node.__lastLang = undefined;
         }
-        
-        
-        
         
         if (node.__lastLang !== lang) {
             const original = node.__originalText;
-            let replacement = original;
-            if (dict && Object.prototype.hasOwnProperty.call(dict, original)) {
-                
-                replacement = dict[original];
-            } else {
-                
-                
-                
-                
-                
-                
-                const parenMatch = original.match(/^(.*?)(\s*\(\d+\))$/);
-                if (parenMatch) {
-                    const base = parenMatch[1].trim();
-                    const suffix = parenMatch[2];
-                    if (dict && Object.prototype.hasOwnProperty.call(dict, base)) {
-                        replacement = dict[base] + suffix;
-                    }
-                } else {
-                    
-                    
-                    const availableMatch = original.match(/^(\d+)\s*個可用$/);
-                    
-                    
-                    const ageMatch = original.match(/^(\d+)\s*(歲|個月|天)$/);
-                    if (availableMatch && dict && Object.prototype.hasOwnProperty.call(dict, '個可用')) {
-                        replacement = availableMatch[1] + ' ' + dict['個可用'];
-                    } else if (ageMatch && dict && Object.prototype.hasOwnProperty.call(dict, ageMatch[2])) {
-                        replacement = ageMatch[1] + ' ' + dict[ageMatch[2]];
-                    } else {
-                        
-                        
-                        const diagMatch = original.match(/^(.+?)(的診症記錄)$/);
-                        const medMatch = original.match(/^(.+?)(的病歷記錄)$/);
-                        if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
-                            replacement = diagMatch[1] + dict[diagMatch[2]];
-                        } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
-                            replacement = medMatch[1] + dict[medMatch[2]];
-                        } else {
-                            
-                            
-                            
-                            const colonMatch = original.match(/^(.+?：)(.*)$/);
-                            if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
-                                replacement = dict[colonMatch[1]] + colonMatch[2];
-                            }
-                        }
-                    }
-                }
-            }
-            
+            const replacement = resolveTextTranslation(original, dict, lang);
             node.nodeValue = (node.__leadingWhitespace || '') + replacement + (node.__trailingWhitespace || '');
             node.__lastLang = lang;
         }
@@ -2938,80 +3565,26 @@ function translateNode(node, dict, lang) {
     }
     
     if (node.nodeType !== Node.ELEMENT_NODE) return;
-    
-    
+    if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE') return;
+
+    translateElementAttributes(node, dict);
     
     if (node.children.length === 0) {
+        const currentText = (node.textContent || '').trim();
+        // 若 JS 動態寫入了新的中文字串，更新 originalText 並重新翻譯
+        if (currentText && (!node.dataset.originalText || (lang !== 'zh' && /[\u4e00-\u9fff]/.test(currentText) && currentText !== dict[node.dataset.originalText]))) {
+            node.dataset.originalText = currentText;
+            node.dataset.lastLang = '';
+        }
         if (node.dataset.lastLang !== lang) {
-            const currentText = (node.textContent || '').trim();
-            if (currentText) {
-                if (!node.dataset.originalText) {
-                    node.dataset.originalText = currentText;
-                }
+            if (currentText && node.dataset.originalText) {
                 const original = node.dataset.originalText;
-                let replacement = original;
-                if (dict && Object.prototype.hasOwnProperty.call(dict, original)) {
-                    
-                    replacement = dict[original];
-                } else {
-                    
-                    const parenMatch = original && original.match(/^(.*?)(\s*\(\d+\))$/);
-                    if (parenMatch) {
-                        const base = parenMatch[1].trim();
-                        const suffix = parenMatch[2];
-                        if (dict && Object.prototype.hasOwnProperty.call(dict, base)) {
-                            replacement = dict[base] + suffix;
-                        }
-                    } else {
-                        
-                        const ageMatch = original && original.match(/^(\d+)\s*(歲|個月|天)$/);
-                        if (ageMatch && dict && Object.prototype.hasOwnProperty.call(dict, ageMatch[2])) {
-                            replacement = ageMatch[1] + ' ' + dict[ageMatch[2]];
-                        } else {
-                            const diagMatch = original && original.match(/^(.+?)(的診症記錄)$/);
-                            const medMatch = original && original.match(/^(.+?)(的病歷記錄)$/);
-                            if (diagMatch && dict && Object.prototype.hasOwnProperty.call(dict, diagMatch[2])) {
-                                replacement = diagMatch[1] + dict[diagMatch[2]];
-                            } else if (medMatch && dict && Object.prototype.hasOwnProperty.call(dict, medMatch[2])) {
-                                replacement = medMatch[1] + dict[medMatch[2]];
-                            } else {
-                                
-                                const colonMatch = original && original.match(/^(.+?：)(.*)$/);
-                                if (colonMatch && dict && Object.prototype.hasOwnProperty.call(dict, colonMatch[1])) {
-                                    replacement = dict[colonMatch[1]] + colonMatch[2];
-                                }
-                            }
-                        }
-                    }
-                }
+                const replacement = resolveTextTranslation(original, dict, lang);
                 node.textContent = replacement;
-            }
-            
-            if (node.hasAttribute('placeholder')) {
-                const phVal = node.getAttribute('placeholder').trim();
-                if (!node.dataset.originalPlaceholder && phVal) {
-                    node.dataset.originalPlaceholder = phVal;
-                }
-                const originalPh = node.dataset.originalPlaceholder;
-                if (originalPh && dict && Object.prototype.hasOwnProperty.call(dict, originalPh)) {
-                    node.setAttribute('placeholder', dict[originalPh]);
-                }
-            }
-            
-            if (node.hasAttribute('data-placeholder')) {
-                const dpVal = node.getAttribute('data-placeholder').trim();
-                if (!node.dataset.originalDataPlaceholder && dpVal) {
-                    node.dataset.originalDataPlaceholder = dpVal;
-                }
-                const originalDP = node.dataset.originalDataPlaceholder;
-                if (originalDP && dict && Object.prototype.hasOwnProperty.call(dict, originalDP)) {
-                    node.setAttribute('data-placeholder', dict[originalDP]);
-                }
             }
             node.dataset.lastLang = lang;
         }
     }
-    
     
     Array.from(node.childNodes).forEach(child => translateNode(child, dict, lang));
 }
@@ -3023,7 +3596,6 @@ function translateNode(node, dict, lang) {
 var everTranslatedAway = false;
 
 function applyTranslations() {
-
     if (isTranslating) return;
     const lang = localStorage.getItem('lang') || 'zh';
     if (lang !== 'zh') everTranslatedAway = true;
@@ -3031,10 +3603,8 @@ function applyTranslations() {
     isTranslating = true;
     try {
         const dict = window.translations[lang] || {};
-
         translateNode(document.body, dict, lang);
     } finally {
-
         isTranslating = false;
     }
 }
@@ -3047,22 +3617,12 @@ function setLanguage(lang) {
 }
 
 
-
-
-
-
-
-
 const observer = new MutationObserver(mutations => {
     /* isTranslating 保護：translateNode 設 textContent/nodeValue 會造成
      * 新的 DOM mutations（移除舊子節點、新增新文字節點），這些會再次觸發
-     * observer。設保護旗標防止反饋循環造成多輪無謂重排（手機上看起來像
-     * 按鈕不停跳動）。 */
+     * observer。設保護旗標防止反饋循環造成多輪無謂重排。 */
     if (isTranslating) return;
     const lang = localStorage.getItem('lang') || 'zh';
-    // zh 為原始語言：新增節點本身即中文，逐文字節點走訪＋regex 比對純浪費。
-    // 例外：子樹帶有非 zh 的 data-last-lang 標記（如 cloneNode 複製的已翻譯
-    // 節點），仍需進 translateNode 處理。
     if (lang === 'zh') {
         for (const m of mutations) {
             if (!m.addedNodes || m.addedNodes.length === 0) continue;
@@ -3108,21 +3668,34 @@ document.addEventListener('DOMContentLoaded', () => {
             setLanguage(langSelector.value);
         });
     }
+
+    // 攔截 showToast 與 showConfirmation，讓彈出的即時提示與確認對話框自動套用當前語系翻譯
+    if (typeof window.showToast === 'function' && !window.showToast.__i18nWrapped) {
+        const origShowToast = window.showToast;
+        const wrappedToast = function(message, type) {
+            const translated = (typeof window.t === 'function' && typeof message === 'string')
+                ? window.t(message)
+                : message;
+            return origShowToast.call(this, translated, type);
+        };
+        wrappedToast.__i18nWrapped = true;
+        window.showToast = wrappedToast;
+    }
+    if (typeof window.showConfirmation === 'function' && !window.showConfirmation.__i18nWrapped) {
+        const origShowConf = window.showConfirmation;
+        const wrappedConf = function(message, type) {
+            const translated = (typeof window.t === 'function' && typeof message === 'string')
+                ? window.t(message)
+                : message;
+            return origShowConf.call(this, translated, type);
+        };
+        wrappedConf.__i18nWrapped = true;
+        window.showConfirmation = wrappedConf;
+    }
+
     applyTranslations();
     
-    
-    
-    
-    
-    // 觀察範圍縮小到登入頁 + 主系統區域，避免頁面其他區域的變化
-    // （如 service worker 注入、瀏覽器擴充套件節點）觸發不必要的翻譯掃描
-    const observeTargets = [];
-    const lp = document.getElementById('loginPage');
-    const ms = document.getElementById('mainSystem');
-    if (lp) observeTargets.push(lp);
-    if (ms) observeTargets.push(ms);
-    if (!observeTargets.length) observeTargets.push(document.body);
-    observeTargets.forEach(function (el) {
-        observer.observe(el, { childList: true, subtree: true });
-    });
+    // 觀察範圍涵蓋 document.body（包含登入頁、主系統及動態掛載於 body 的彈窗／通知）
+    observer.observe(document.body, { childList: true, subtree: true });
 });
+
