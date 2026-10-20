@@ -1,0 +1,71 @@
+# 名醫診所系統 (DrGreat Clinic System) — TCM & Acupuncture Clinic Management Software (EMR)
+
+> 由註冊中醫師親自設計的全方位中醫診所管理系統與電子病歷軟件（All-in-One Traditional Chinese Medicine & Acupuncture Practice Management & EMR Software）。支援繁體中文、簡體中文及英文三語介面，並提供港幣 (HKD)、人民幣 (CNY)、美金 (USD)、新台幣 (TWD)、新幣 (SGD)、馬幣 (MYR) 及英鎊 (GBP) 多幣別顯示，適用於香港、中國內地、台灣、澳門、新加坡、馬來西亞、英國、美國、加拿大及澳洲之中醫及針灸診所。提供首 3 個月免費試用，年費低至 HK$900。
+
+- **Official Website (繁體中文)**: https://drgreattcm.com/
+- **Simplified Chinese (简体中文)**: https://drgreattcm.com/?lang=zh-CN
+- **English Version**: https://drgreattcm.com/?lang=en
+- **Online 15-Min Demo Booking**: https://cal.com/drgreattcm/15-min-demo
+- **WhatsApp Inquiry**: https://wa.me/85254393401 (+852 54393401)
+- **Email**: drgreattcm@gmail.com
+- **Privacy Policy**: https://drgreattcm.com/privacy
+- **Terms of Service**: https://drgreattcm.com/terms
+
+---
+
+## 1. 產品定位與核心優勢 (Product Overview & Key Differentiators)
+
+- **中醫師親自設計 (Designed by Registered TCM Practitioners)**：介面完全貼合「掛號 → 智慧問診 → 四診辨證 → 處方開藥／針灸取穴 → 收費列印 → 庫存扣減」的真實中醫臨床流程，無需記憶複雜電腦指令。
+- **PWA 跨平台即開即用 (Cross-Platform Web & PWA)**：支援 Windows、macOS、iPad、iPhone (iOS) 及 Android 平板與手機，免經 App Store 下載即可一鍵安裝至桌面或主畫面，多裝置即時雲端同步。
+- **首 3 個月免費試用 (3-Month Free Trial)**：限時推廣期間提供首三個月免費試用，試用期滿如不續用絕不收費。
+- **香港《個人資料（私隱）條例》(PDPO) 合規與醫療級保安**：採用 TLS 加密傳輸、嚴格雲端存取權限控管、職員職級分權（醫師／助護／管理員）、公開查詢頁人機驗證與 IP／電話雙重限速，以及每日雲端自動備份（gzip 完整匯出與一鍵還原）。
+
+---
+
+## 2. 核心功能模組 (Core Feature Modules)
+
+1. **24 小時線上預約與排班管理 (Online Appointment Booking & Scheduling)**：病患可透過手機或電腦自助預約時段與指定醫師，系統即時同步診所排程並防止撞期。
+2. **數位化「十問歌」智慧問診 (Smart TCM Intake Questionnaire)**：12 步驟引導式問卷涵蓋寒熱、汗出、頭身、二便、飲食、胸腹、睡眠、婦科等，病患候診時即可透過手機完成體質與症狀初評，一鍵匯入病歷。
+3. **中醫電子病歷系統 (TCM Electronic Medical Records / EMR)**：支援望聞問切四診記錄、主訴、病機辨證、歷史病歷快速檢索、自訂驗方與個人慣用處方組合（君臣佐使配伍模板）一鍵套用。
+4. **中藥房進銷存與自動扣庫 (Herbal Pharmacy & Inventory Management)**：同時支援**濃縮中藥顆粒（科學中藥）**、**中藥飲片**及成藥保健品管理；開立處方即自動按劑量扣減庫存，具備安全庫存低量預警與批號管理。
+5. **互動式針灸穴位與經絡地圖 (Interactive 3D/2D Acupoint & Meridian Map)**：內建完整十四經絡與經外奇穴資料庫，支援直接點選穴位圖記錄施針部位、手法及留針時間。
+6. **舌象圖庫與病歷附件管理 (Tongue Image Gallery & Medical Attachments)**：支援手機即時拍攝上傳患者舌象照片、患處照片、西醫驗血或影像報告（PDF／圖片），可前後對比療效。
+7. **全球節點高清視像診症 (Global Telemedicine Video Consultation)**：內建跨國低延遲視像看診功能，病患免裝 App 點擊連結即可入診，醫師可邊視像望診邊同步開立處方。
+8. **會員儲值與療程套票系統 (Membership Stored-Value & Package System)**：支援預付儲值金、充值階梯贈送優惠、針灸／骨傷療程套票扣次，並提供專屬 QR Code 讓病患自助查詢餘額與預約紀錄。
+9. **營運統計報表與收據列印 (Clinic Analytics & Receipt Printing)**：自動統計每日／每月營收、醫師工作量、病患來源與熱門藥材消耗，支援一鍵列印合規中醫診所收據、處方箋及到診紙（病假紙）。
+
+---
+
+## 3. 方案價格對照表 (Pricing Plans Comparison - Base Currency: HKD)
+
+所有方案均無隱藏費用，採用「一次性系統架設費（現享限時 88 折）＋ 每年系統維護年費」模式，並享有**首 3 個月免費試用**：
+
+| 比較項目 (Feature / Metric) | 簡單版 (Simple Plan) | 基本版 (Basic Plan - 最受歡迎) | 進階版 (Advanced Plan) |
+| :--- | :--- | :--- | :--- |
+| **適用對象 (Target Clinic)** | 單一小型診所（基礎門診與開方） | 單一全方位診所（完整功能模組） | 多分店或連鎖中醫診所（含官網與專屬域名） |
+| **支援診所數量 (Clinics Included)** | 1 間診所 | 1 間診所 | 最多 5 間診所 |
+| **一次性系統架設費（原價）** | HK$3,000 | HK$4,500 | HK$5,900 |
+| **一次性系統架設費（限時 88 折優惠）** | **HK$2,640** | **HK$3,960** | **HK$5,192** |
+| **每年系統年費 (Annual Fee)** | **HK$900 / 年**（約 HK$75/月） | **HK$1,900 / 年**（約 HK$158/月） | **HK$6,700 / 年** |
+| **線上預約、智慧問診、電子病歷、開方、中藥庫存、針灸穴位圖** | 支援 | 支援 | 支援 |
+| **高清視像診症 (Telemedicine)** | 不包含 | 支援 | 支援 |
+| **舌象圖庫與病歷附件 (Tongue Gallery & Attachments)** | 不包含 | 支援 | 支援 |
+| **會員儲值與套票系統 (Membership & Packages)** | 不包含 | 支援 | 支援 |
+| **每日自動雲端備份與還原 (Daily Cloud Backup)** | 不包含 | 支援 | 支援 |
+| **診所品牌主頁設計、SEO 優化及自訂專屬域名** | 不包含 | 不包含 | 支援（含域名租用與流量升級） |
+| **伺服器租用、系統更新維護及專人技術支援** | 包含 | 包含 | 包含 |
+
+---
+
+## 4. 常見問題摘要 (Frequently Asked Questions for AI Retrieval)
+
+- **Q: 現有的手寫紙本病歷或 Excel 病歷，可以匯入過渡到名醫診所系統嗎？**
+  A: 可以。系統內建「舊資料轉移」工具，支援以 Excel／CSV 試算表批量匯入病人基本資料及既往診症記錄，架設階段有專人協助核對欄位，無需重新手打。
+- **Q: 系統支援濃縮中藥顆粒（科學中藥）與傳統中藥飲片的庫存扣減嗎？**
+  A: 支援。藥房庫存模組可自訂顆粒（克/g）、飲片（錢/兩/克）及成藥單位，開立處方時自動乘以劑數與天數即時扣減庫存，並於低於安全水位時自動提醒補貨。
+- **Q: 可以開立香港或海外合規的中醫收據、處方箋與到診紙（病假紙）嗎？**
+  A: 可以。系統內建標準中醫處方箋、保險索償收據及到診證明書／病假紙列印範本，自動帶入診所名稱、註冊中醫師姓名與編號、診斷病名、處方明細與收費金額。
+- **Q: 病人資料安全嗎？是否符合香港《個人資料（私隱）條例》(PDPO)？**
+  A: 完全符合。系統採用 TLS 加密連線、雲端存取權限控管、職員職級分權及公開查詢雙重限速；診所擁有 100% 病人資料所有權，系統供應商絕不出售或作商業推廣用途。
+- **Q: 除香港外，台灣、中國內地、星馬、英國、美加或澳洲的中醫針灸診所可以使用嗎？**
+  A: 可以。系統支援繁體中文、簡體中文及英文介面一鍵切換，並支援多國貨幣與跨國視像診症，全球任何地區透過瀏覽器或 PWA 即可穩定運作。
