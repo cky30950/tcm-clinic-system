@@ -1,6 +1,5 @@
 User-agent: *
 Allow: /
-Allow: /llms.txt
 Disallow: /system.html
 Disallow: /system
 Disallow: /api/
@@ -8,41 +7,4 @@ Disallow: /mobile-capture.html
 Disallow: /mobile-capture
 Disallow: /video/
 
-# Explicitly allow AI Search & Generative Engine Crawlers (GEO)
-User-agent: GPTBot
-Allow: /
-Allow: /llms.txt
-Disallow: /system.html
-Disallow: /system
-Disallow: /api/
-
-User-agent: OAI-SearchBot
-Allow: /
-Allow: /llms.txt
-
-User-agent: ChatGPT-User
-Allow: /
-Allow: /llms.txt
-
-User-agent: ClaudeBot
-Allow: /
-Allow: /llms.txt
-
-User-agent: Claude-Web
-Allow: /
-Allow: /llms.txt
-
-User-agent: PerplexityBot
-Allow: /
-Allow: /llms.txt
-
-User-agent: Google-Extended
-Allow: /
-Allow: /llms.txt
-
-User-agent: Applebot-Extended
-Allow: /
-Allow: /llms.txt
-
 Sitemap: https://drgreattcm.com/sitemap.xml
-# LLM Context File: https://drgreattcm.com/llms.txt

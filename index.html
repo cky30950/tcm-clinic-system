@@ -38,22 +38,17 @@
   <link rel="alternate" hreflang="en-CA" href="https://drgreattcm.com/?lang=en">
   <link rel="alternate" hreflang="en-SG" href="https://drgreattcm.com/?lang=en">
   <link rel="alternate" hreflang="x-default" href="https://drgreattcm.com/">
-  <link rel="alternate" type="text/markdown" href="https://drgreattcm.com/llms.txt" title="名醫診所系統 DrGreat Clinic System AI &amp; LLM Context (llms.txt)">
-  <meta name="geo.region" content="HK">
-  <meta name="geo.placename" content="Hong Kong">
-  <meta name="author" content="名醫診所系統 DrGreat Clinic System (註冊中醫師設計團隊)">
   <link rel="icon" type="image/png" href="images/myLogo.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#D9782B">
-  <meta name=\"mobile-web-app-capable\" content=\"yes\">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="名醫診所">
   <link rel="apple-touch-icon" href="/images/icons/apple-touch-icon.png">
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5.7.47/daisyui.css" rel="stylesheet" type="text/css" />
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/daisyui.css" rel="stylesheet" type="text/css" />
   <!-- Tailwind CSS v4 預編譯靜態 CSS -->
-  <link rel="stylesheet" href="/css/tailwind.css?v=1f144c94">
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.475.0/dist/umd/lucide.min.js" defer></script>
+  <link rel="stylesheet" href="/css/tailwind.css?v=20261009a">
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&amp;family=Noto+Sans+TC:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
@@ -403,217 +398,149 @@
   <style>body { box-sizing: border-box; }</style>
   <script type="application/ld+json">
   {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "Organization",
-        "@id": "https://drgreattcm.com/#organization",
-        "name": "名醫診所系統 DrGreat Clinic System",
-        "alternateName": ["名医诊所系统", "DrGreat TCM Clinic System", "DrGreat Clinic Software"],
-        "url": "https://drgreattcm.com/",
-        "logo": {
-          "@type": "ImageObject",
-          "url": "https://drgreattcm.com/images/myLogo.png"
-        },
-        "description": "由註冊中醫師親自參與設計的中醫診所管理系統與電子病歷軟件研發團隊，為香港、中國內地、台灣、星馬及歐美澳加中醫針灸診所提供數位化營運方案。",
-        "areaServed": ["HK", "CN", "TW", "MO", "SG", "MY", "US", "GB", "CA", "AU"],
-        "knowsAbout": [
-          "中醫診所管理系統 (TCM Clinic Management System)",
-          "中醫電子病歷系統 (TCM Electronic Medical Records / EMR)",
-          "中藥顆粒與飲片庫存管理 (Herbal Granules & Decoction Pieces Inventory)",
-          "針灸穴位與經絡圖譜 (Acupoint & Meridian Mapping)",
-          "中醫視像診症 (TCM Telemedicine)",
-          "香港個人資料（私隱）條例合規 (Hong Kong PDPO Compliance)"
-        ],
-        "contactPoint": [
-          {
-            "@type": "ContactPoint",
-            "telephone": "+852-54393401",
-            "email": "drgreattcm@gmail.com",
-            "contactType": "customer service",
-            "areaServed": ["HK", "CN", "TW", "MO", "SG", "MY", "US", "GB", "CA", "AU"],
-            "availableLanguage": ["zh-Hant", "zh-Hans", "en"]
-          }
-        ],
-        "sameAs": [
-          "https://wa.me/85254393401",
-          "https://cal.com/drgreattcm/15-min-demo"
-        ]
-      },
-      {
-        "@type": "WebSite",
-        "@id": "https://drgreattcm.com/#website",
-        "url": "https://drgreattcm.com/",
-        "name": "名醫診所系統 | 中醫診所管理系統及電子病歷軟件 (DrGreat TCM Clinic System)",
-        "inLanguage": ["zh-Hant", "zh-Hans", "en"],
-        "publisher": { "@id": "https://drgreattcm.com/#organization" }
-      },
-      {
-        "@type": "SoftwareApplication",
-        "@id": "https://drgreattcm.com/#software",
-        "name": "名醫診所系統",
-        "alternateName": [
-          "名医诊所系统",
-          "DrGreat Clinic System",
-          "DrGreat TCM & Acupuncture Clinic Management Software"
-        ],
-        "url": "https://drgreattcm.com/",
-        "image": "https://drgreattcm.com/landing/tcmScreenshot1.webp",
-        "screenshot": [
-          "https://drgreattcm.com/landing/tcmScreenshot1.webp",
-          "https://drgreattcm.com/landing/tcmScreenshot2.webp",
-          "https://drgreattcm.com/landing/tcmScreenshot3.webp",
-          "https://drgreattcm.com/landing/tcmScreenshot4.webp"
-        ],
-        "description": "由中醫師親自參與設計的全方位中醫診所管理系統（TCM & Acupuncture Practice Management & EMR Software），支援繁體中文、簡體中文及英文三語介面，適用於香港、中國內地、台灣、星馬及海外中醫針灸診所。涵蓋24小時線上預約、數位化十問歌智慧問診、中醫電子病歷、濃縮中藥顆粒與飲片庫存自動扣減、互動式針灸穴位地圖、高清視像診症、舌象圖庫、會員儲值套票及每日雲端自動備份。首三個月免費試用，年費低至 HK$900。",
-        "operatingSystem": "Windows, macOS, Android, iOS, iPadOS, Web Browser (PWA)",
-        "applicationCategory": "HealthApplication, BusinessApplication",
-        "applicationSubCategory": "Traditional Chinese Medicine (TCM) & Acupuncture Electronic Medical Record (EMR) & Practice Management Software",
-        "inLanguage": ["zh-Hant", "zh-Hans", "en"],
-        "availableLanguage": ["Traditional Chinese", "Simplified Chinese", "English"],
-        "areaServed": ["HK", "CN", "TW", "MO", "SG", "MY", "US", "GB", "CA", "AU"],
-        "featureList": [
-          "24小時線上預約掛號與排班同步 (24/7 Online Appointment Booking & Scheduling)",
-          "數位化十問歌 12 步驟智慧問診系統 (Digital 12-Step Ten Questions Smart Intake)",
-          "中醫四診與辨證論治電子病歷系統 (TCM Four Examinations & Syndrome Differentiation EMR)",
-          "濃縮中藥顆粒與飲片進銷存及開方自動扣庫 (Herbal Granules & Decoction Pieces Inventory Management)",
-          "互動式 3D/2D 針灸穴位與經絡地圖 (Interactive Acupoint & Meridian Map)",
-          "全球節點高清視像診症與遠距開方 (Global HD Telemedicine Video Consultation)",
-          "舌象圖庫與西醫檢驗報告病歷附件管理 (Tongue Image Gallery & Medical Report Attachments)",
-          "會員儲值金、充值優惠與療程套票系統 (Membership Stored-Value, Top-up Bonus & Package System)",
-          "合規中醫收據、處方箋及到診紙/病假紙一鍵列印 (Medical Receipt, Prescription & Sick Leave Certificate Printing)",
-          "每日雲端自動備份與 gzip 完整匯出還原 (Automated Daily Cloud Backup & One-Click Restore)"
-        ],
-        "author": { "@id": "https://drgreattcm.com/#organization" },
-        "publisher": { "@id": "https://drgreattcm.com/#organization" },
-        "offers": {
-          "@type": "AggregateOffer",
-          "lowPrice": "900",
-          "highPrice": "6700",
+    "@context": "https://schema.org/",
+    "@type": "SoftwareApplication",
+    "name": "名醫診所系統",
+    "alternateName": [
+      "名医诊所系统",
+      "DrGreat Clinic System",
+      "DrGreat TCM & Acupuncture Clinic Management Software"
+    ],
+    "url": "https://drgreattcm.com/",
+    "image": "https://drgreattcm.com/landing/tcmScreenshot1.webp",
+    "description": "由中醫師親自參與設計的全方位中醫診所管理系統（TCM & Acupuncture Practice Management & EMR Software），支援繁體中文、簡體中文及英文三語介面，適用於香港、中國內地、台灣、星馬及海外中醫針灸診所。涵蓋線上預約、智慧問診、電子病歷、中藥庫存、針灸穴位地圖、視像診症、會員儲值套票及每日雲端自動備份。首三個月免費試用。",
+    "operatingSystem": "Windows, macOS, Android, iOS, Web Browser (PWA)",
+    "applicationCategory": "HealthApplication, BusinessApplication",
+    "inLanguage": ["zh-Hant", "zh-Hans", "en"],
+    "availableLanguage": ["Traditional Chinese", "Simplified Chinese", "English"],
+    "areaServed": ["HK", "CN", "TW", "MO", "SG", "MY", "US", "GB", "CA", "AU"],
+    "featureList": [
+      "線上預約掛號 (Online Appointment Booking)",
+      "中醫電子病歷系統 (TCM Electronic Medical Records / EMR)",
+      "中藥房進銷存與庫存管理 (Herbal Pharmacy Inventory Management)",
+      "互動式針灸穴位與經絡地圖 (Interactive Acupoint & Meridian Map)",
+      "全球節點高清視像診症 (Global Telemedicine Video Consultation)",
+      "舌象圖庫與病歷附件管理 (Tongue Image Gallery & Medical Attachments)",
+      "會員儲值與療程套票系統 (Membership Stored-Value & Package System)",
+      "每日雲端自動備份與一鍵還原 (Automated Daily Cloud Backup & Restore)"
+    ],
+    "publisher": {
+      "@type": "Organization",
+      "name": "名醫診所系統 DrGreat Clinic System",
+      "url": "https://drgreattcm.com/",
+      "logo": "https://drgreattcm.com/images/myLogo.png",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+852-54393401",
+        "email": "drgreattcm@gmail.com",
+        "contactType": "customer service",
+        "availableLanguage": ["zh-Hant", "zh-Hans", "en"]
+      }
+    },
+    "offers": {
+      "@type": "AggregateOffer",
+      "lowPrice": "900",
+      "highPrice": "6700",
+      "priceCurrency": "HKD",
+      "offerCount": "7",
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "首三個月免費試用 (3-Month Free Trial)",
+          "price": "0",
           "priceCurrency": "HKD",
-          "offerCount": "7",
-          "offers": [
-            {
-              "@type": "Offer",
-              "name": "首三個月免費試用 (3-Month Free Trial)",
-              "price": "0",
-              "priceCurrency": "HKD",
-              "description": "限時推廣：首三個月免費試用，試用三個月後不用也不會收費"
-            },
-            {
-              "@type": "Offer",
-              "name": "簡單版年費 (Simple Plan Annual Fee)",
-              "price": "900",
-              "priceCurrency": "HKD",
-              "description": "簡單版每年年費 HK$900，包含伺服器租用、系統更新維護及技術支援（1 間診所）"
-            },
-            {
-              "@type": "Offer",
-              "name": "簡單版系統架設費 88 折優惠 (Simple Plan Setup Fee)",
-              "price": "2640",
-              "priceCurrency": "HKD",
-              "description": "簡單版一次性系統架設費（原價 HK$3,000，限時 88 折 HK$2,640，1 間診所）"
-            },
-            {
-              "@type": "Offer",
-              "name": "基本版年費 (Basic Plan Annual Fee)",
-              "price": "1900",
-              "priceCurrency": "HKD",
-              "description": "基本版每年年費 HK$1,900，包含全部功能：視像診症、會員系統、每日自動備份、舌象病歷附件及技術支援（1 間診所）"
-            },
-            {
-              "@type": "Offer",
-              "name": "基本版系統架設費 88 折優惠 (Basic Plan Setup Fee)",
-              "price": "3960",
-              "priceCurrency": "HKD",
-              "description": "基本版一次性系統架設費（原價 HK$4,500，限時 88 折 HK$3,960，1 間診所）"
-            },
-            {
-              "@type": "Offer",
-              "name": "進階版系統架設費 88 折優惠 (Advanced Plan Setup Fee)",
-              "price": "5192",
-              "priceCurrency": "HKD",
-              "description": "進階版一次性系統架設費（原價 HK$5,900，限時 88 折 HK$5,192，最多 5 間診所、含診所主頁設計、SEO 及自訂域名）"
-            },
-            {
-              "@type": "Offer",
-              "name": "進階版年費 (Advanced Plan Annual Fee)",
-              "price": "6700",
-              "priceCurrency": "HKD",
-              "description": "進階版每年年費 HK$6,700，支援最多 5 間診所、包含伺服器流量升級、自訂域名租用及系統更新維護"
-            }
-          ]
+          "description": "限時推廣：首三個月免費試用，試用三個月後不用也不會收費"
+        },
+        {
+          "@type": "Offer",
+          "name": "簡單版年費 (Simple Plan Annual Fee)",
+          "price": "900",
+          "priceCurrency": "HKD",
+          "description": "簡單版每年年費，包含伺服器租用、系統更新維護及技術支援（1 間診所）"
+        },
+        {
+          "@type": "Offer",
+          "name": "簡單版系統架設費 88 折優惠 (Simple Plan Setup Fee)",
+          "price": "2640",
+          "priceCurrency": "HKD",
+          "description": "簡單版一次性系統架設費（原價 HK$3,000，限時 88 折 HK$2,640，1 間診所）"
+        },
+        {
+          "@type": "Offer",
+          "name": "基本版年費 (Basic Plan Annual Fee)",
+          "price": "1900",
+          "priceCurrency": "HKD",
+          "description": "基本版每年年費，包含全部功能：視像診症、會員系統、備份功能、病歷附件及技術支援（1 間診所）"
+        },
+        {
+          "@type": "Offer",
+          "name": "基本版系統架設費 88 折優惠 (Basic Plan Setup Fee)",
+          "price": "3960",
+          "priceCurrency": "HKD",
+          "description": "基本版一次性系統架設費（原價 HK$4,500，限時 88 折 HK$3,960，1 間診所）"
+        },
+        {
+          "@type": "Offer",
+          "name": "進階版系統架設費 88 折優惠 (Advanced Plan Setup Fee)",
+          "price": "5192",
+          "priceCurrency": "HKD",
+          "description": "進階版一次性系統架設費（原價 HK$5,900，限時 88 折 HK$5,192，最多 5 間診所）"
+        },
+        {
+          "@type": "Offer",
+          "name": "進階版年費 (Advanced Plan Annual Fee)",
+          "price": "6700",
+          "priceCurrency": "HKD",
+          "description": "進階版每年年費，支援最多 5 間診所、包含診所主頁設計及自訂域名"
+        }
+      ]
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "而家嘅手寫／Excel 病歷，可唔可以過渡到系統？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "可以。系統內建「舊資料轉移」工具，支援以試算表批量匯入病人基本資料及既往診症記錄；架設階段我們會協助核對欄位及抽樣檢查，由紙本、Excel 或其他軟件過渡都唔會漏資料、唔使重新輸入。"
         }
       },
       {
-        "@type": "FAQPage",
-        "@id": "https://drgreattcm.com/#faq-schema",
-        "mainEntity": [
-          {
-            "@type": "Question",
-            "name": "而家嘅手寫／Excel 病歷，可唔可以過渡到中醫診所系統？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "可以。系統內建「舊資料轉移」工具，支援以試算表批量匯入病人基本資料及既往診症記錄；架設階段我們會協助核對欄位及抽樣檢查，由紙本、Excel 或其他軟件過渡都唔會漏資料、唔使重新輸入。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "病人資料安全嗎？係咪符合香港《個人資料（私隱）條例》(PDPO)？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "系統按香港《個人資料（私隱）條例》（PDPO）的保障資料原則設計：只收集診症及營運所需資料，傳輸採用加密連線，診療記錄與附件儲存於設有存取管控的雲端平台，職員帳號按職級分權，公開查詢頁有人機驗證及 IP／電話雙重限速。診所是病人資料的擁有人，我們不會出售或用於推廣。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "我唔識電腦，用唔用得到呢套中醫系統？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "系統由中醫師參與設計，畫面跟隨「掛號 → 睇症 → 開方 → 收費 → 列印」的真實流程，唔使記指令。手機、平板、電腦都可用瀏覽器開啟，並可一鍵加到主畫面，如同 App 一樣使用。架設時提供設定及操作教學，日常使用有技術支援。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "用開之後會唔會突然加價？收費模式係點？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "收費好簡單：一次性系統架設費加每年年費（簡單版年費 HK$900、基本版年費 HK$1,900、進階版年費 HK$6,700），年費已包括伺服器、系統更新、維護及技術支援。如下一年度需要調整價格，我們會提前不少於 30 日通知現有客戶，客戶可自行決定是否續約，現有年度合約期內不會單方面加價。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "病歷同處方資料可否隨時匯出？如果將來唔用點算？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "可以。系統每日自動雲端備份，管理員亦可隨時手動下載完整備份檔（gzip 壓縮）並可匯入還原；病人、診症、處方及收費記錄皆屬於診所。終止服務後，你可以在合理時間內索取及匯出全部資料，備份亦會按週期輪替清除。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "系統支援濃縮中藥顆粒（科學中藥）同傳統中藥飲片嘅庫存自動扣減嗎？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "全面支援。藥房庫存模組可分別管理濃縮中藥顆粒（克/g）、傳統中藥飲片（錢/兩/克）及成藥產品。醫師開立處方時，系統會自動根據每味藥份量乘以劑數／日數即時扣減庫存，並喺低於安全存量時發出補貨提醒，支援慣用驗方及君臣佐使組合一鍵套用。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "可唔可以一鍵列印中醫收據、處方箋同到診紙（病假紙）？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "可以。系統內建合規中醫診所收據（適用於醫療保險索償及醫療券記錄）、詳細處方箋及到診證明書／病假紙範本，自動帶入診所資料、註冊中醫師姓名及編號、診斷病名、處方明細與收費金額，支援中英文格式即時列印或匯出。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "除咗香港，台灣、內地、星馬或英美澳加嘅中醫針灸診所用唔用得？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "完全適用。系統內建繁體中文、簡體中文及英文三語介面一鍵切換，支援多國貨幣（HKD、CNY、TWD、SGD、MYR、USD、GBP）及跨國高清視像診症，無論係香港、台灣、中國內地、新加坡、馬來西亞定係英國、美國、加拿大、澳洲嘅中醫及針灸診所均可即開即用。"
-            }
-          }
-        ]
+        "@type": "Question",
+        "name": "病人資料安全嗎？係咪符合《個人資料（私隱）條例》？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "系統按香港《個人資料（私隱）條例》（PDPO）的保障資料原則設計：只收集診症及營運所需資料，傳輸採用加密連線，診療記錄與附件儲存於設有存取管控的雲端平台，職員帳號按職級分權，公開查詢頁有人機驗證及 IP／電話雙重限速。診所是病人資料的擁有人，我們不會出售或用於推廣。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "我唔識電腦，用唔用得到？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "系統由中醫師參與設計，畫面跟隨「掛號 → 睇症 → 開方 → 收費 → 列印」的真實流程，唔使記指令。手機、電腦都可用瀏覽器開啟，並可一鍵加到主畫面，如同 App 一樣使用。架設時提供設定及操作教學，日常使用有技術支援。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "用開之後會唔會突然加價？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "收費好簡單：一次性架設費加每年年費，年費已包括伺服器、系統更新、維護及技術支援。如下一年度需要調整價格，我們會提前不少於 30 日通知現有客戶，客戶可自行決定是否續約。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "資料可否隨時匯出？如果將來唔用點算？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "可以。系統每日自動雲端備份，管理員亦可隨時手動下載完整備份檔（gzip 壓縮）並可匯入還原；病人、診症、處方及收費記錄皆屬於診所。終止服務後，你可以在合理時間內索取及匯出全部資料，備份亦會按週期輪替清除。"
+        }
       }
     ]
   }
@@ -796,7 +723,7 @@
        <div class="rounded-lg overflow-hidden shadow-xl transition-all duration-500 group-hover:shadow-2xl" style="border: 1px solid rgba(217, 120, 43, 0.1);">
            <picture>
              <source type="image/webp" srcset="landing/tcmScreenshot1.webp">
-             <img src="landing/tcmScreenshot1.webp" alt="名醫診所系統 - 中醫掛號與候診管理介面" data-i18n-alt="ss.alt1" width="2208" height="1612" class="w-full h-auto object-cover" loading="lazy">
+             <img src="landing/tcmScreenshot1.png" alt="名醫診所系統 - 中醫掛號與候診管理介面" data-i18n-alt="ss.alt1" width="2208" height="1612" class="w-full h-auto object-cover" loading="lazy">
            </picture>
        </div>
        <div class="mt-6 text-center">
@@ -809,7 +736,7 @@
        <div class="rounded-lg overflow-hidden shadow-xl transition-all duration-500 group-hover:shadow-2xl" style="border: 1px solid rgba(217, 120, 43, 0.1);">
            <picture>
              <source type="image/webp" srcset="landing/tcmScreenshot2.webp">
-             <img src="landing/tcmScreenshot2.webp" alt="中醫系統互動式穴位地圖與經絡定位功能" data-i18n-alt="ss.alt2" width="2216" height="1592" class="w-full h-auto object-cover" loading="lazy">
+             <img src="landing/tcmScreenshot2.png" alt="中醫系統互動式穴位地圖與經絡定位功能" data-i18n-alt="ss.alt2" width="2216" height="1592" class="w-full h-auto object-cover" loading="lazy">
            </picture>
        </div>
        <div class="mt-6 text-center">
@@ -822,7 +749,7 @@
        <div class="rounded-lg overflow-hidden shadow-xl transition-all duration-500 group-hover:shadow-2xl" style="border: 1px solid rgba(217, 120, 43, 0.1);">
            <picture>
              <source type="image/webp" srcset="landing/tcmScreenshot3.webp">
-             <img src="landing/tcmScreenshot3.webp" alt="中醫診所自動化中藥庫存管理與本草綱目資料庫" data-i18n-alt="ss.alt3" width="2158" height="1406" class="w-full h-auto object-cover" loading="lazy">
+             <img src="landing/tcmScreenshot3.png" alt="中醫診所自動化中藥庫存管理與本草綱目資料庫" data-i18n-alt="ss.alt3" width="2158" height="1406" class="w-full h-auto object-cover" loading="lazy">
            </picture>
        </div>
        <div class="mt-6 text-center">
@@ -835,7 +762,7 @@
        <div class="rounded-lg overflow-hidden shadow-xl transition-all duration-500 group-hover:shadow-2xl" style="border: 1px solid rgba(217, 120, 43, 0.1);">
            <picture>
              <source type="image/webp" srcset="landing/tcmScreenshot4.webp">
-             <img src="landing/tcmScreenshot4.webp" alt="名醫診所系統 - 醫護排班與多診所同步規劃" data-i18n-alt="ss.alt4" width="2240" height="1614" class="w-full h-auto object-cover" loading="lazy">
+             <img src="landing/tcmScreenshot4.png" alt="名醫診所系統 - 醫護排班與多診所同步規劃" data-i18n-alt="ss.alt4" width="2240" height="1614" class="w-full h-auto object-cover" loading="lazy">
            </picture>
        </div>
        <div class="mt-6 text-center">
@@ -1467,70 +1394,6 @@
        </div>
       </div>
 
-      <!-- 方案功能與收費一覽對照表 (GEO 結構化語意表格) -->
-      <div class="bg-white rounded-xl p-6 sm:p-8 shadow-sm border" style="border-color: #EFE7DD;">
-       <div class="text-center mb-6">
-        <h3 data-i18n="pr.cmp.title" class="font-serif text-xl sm:text-2xl font-bold mb-2" style="color: #1E1E1E;">三大方案功能與收費完整對照表</h3>
-        <p data-i18n="pr.cmp.sub" class="text-xs sm:text-sm" style="color: #666;">所有方案均享首 3 個月免費試用，並包含雲端伺服器租用、系統更新維護及專人技術支援</p>
-       </div>
-       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-sm" id="pricing-comparison-table">
-         <thead>
-          <tr class="border-b-2" style="border-color: #E8DED5; color: #1E1E1E;">
-           <th data-i18n="pr.cmp.col.feature" class="py-3.5 px-4 font-serif font-semibold">比較項目 / 功能模組</th>
-           <th data-i18n="pr.simple.name" class="py-3.5 px-4 font-serif font-semibold text-center">簡單版</th>
-           <th data-i18n="pr.basic.name" class="py-3.5 px-4 font-serif font-semibold text-center" style="color: #B8621F; background-color: rgba(217, 120, 43, 0.06);">基本版</th>
-           <th data-i18n="pr.pro.name" class="py-3.5 px-4 font-serif font-semibold text-center">進階版</th>
-          </tr>
-         </thead>
-         <tbody class="divide-y" style="border-color: #EFE7DD; color: #444;">
-          <tr>
-           <td data-i18n="pr.cmp.row.clinics" class="py-3 px-4 font-medium">適用診所數量</td>
-           <td data-i18n="pr.cmp.val.1clinic" class="py-3 px-4 text-center">1 間診所</td>
-           <td data-i18n="pr.cmp.val.1clinic" class="py-3 px-4 text-center font-medium" style="background-color: rgba(217, 120, 43, 0.06);">1 間診所</td>
-           <td data-i18n="pr.cmp.val.5clinics" class="py-3 px-4 text-center font-medium">最多 5 間診所</td>
-          </tr>
-          <tr>
-           <td data-i18n="pr.cmp.row.trial" class="py-3 px-4 font-medium">免費試用期</td>
-           <td data-i18n="pr.cmp.val.trial" class="py-3 px-4 text-center" style="color: #D9782B;">首 3 個月免費</td>
-           <td data-i18n="pr.cmp.val.trial" class="py-3 px-4 text-center font-semibold" style="color: #D9782B; background-color: rgba(217, 120, 43, 0.06);">首 3 個月免費</td>
-           <td data-i18n="pr.cmp.val.trial" class="py-3 px-4 text-center" style="color: #D9782B;">首 3 個月免費</td>
-          </tr>
-          <tr>
-           <td data-i18n="pr.cmp.row.setup" class="py-3 px-4 font-medium">一次性系統架設費（限時 88 折）</td>
-           <td class="py-3 px-4 text-center font-semibold" style="color: #1E1E1E;"><span data-price-hkd="2640">HK$2,640</span> <span class="text-xs line-through font-normal" style="color: #999;" data-price-hkd="3000">HK$3,000</span></td>
-           <td class="py-3 px-4 text-center font-bold" style="color: #D9782B; background-color: rgba(217, 120, 43, 0.06);"><span data-price-hkd="3960">HK$3,960</span> <span class="text-xs line-through font-normal" style="color: #999;" data-price-hkd="4500">HK$4,500</span></td>
-           <td class="py-3 px-4 text-center font-semibold" style="color: #1E1E1E;"><span data-price-hkd="5192">HK$5,192</span> <span class="text-xs line-through font-normal" style="color: #999;" data-price-hkd="5900">HK$5,900</span></td>
-          </tr>
-          <tr>
-           <td data-i18n="pr.cmp.row.annual" class="py-3 px-4 font-medium">每年系統維護年費</td>
-           <td class="py-3 px-4 text-center font-semibold" style="color: #1E1E1E;"><span data-price-hkd="900">HK$900</span><span data-i18n="pr.year">/年</span></td>
-           <td class="py-3 px-4 text-center font-bold" style="color: #B8621F; background-color: rgba(217, 120, 43, 0.06);"><span data-price-hkd="1900">HK$1,900</span><span data-i18n="pr.year">/年</span></td>
-           <td class="py-3 px-4 text-center font-semibold" style="color: #1E1E1E;"><span data-price-hkd="6700">HK$6,700</span><span data-i18n="pr.year">/年</span></td>
-          </tr>
-          <tr>
-           <td data-i18n="pr.cmp.row.core" class="py-3 px-4 font-medium">線上預約、十問歌問診、電子病歷、開方、中藥庫存、針灸穴位圖</td>
-           <td data-i18n="pr.cmp.val.yes" class="py-3 px-4 text-center" style="color: #D9782B;">✓ 支援</td>
-           <td data-i18n="pr.cmp.val.yes" class="py-3 px-4 text-center font-semibold" style="color: #D9782B; background-color: rgba(217, 120, 43, 0.06);">✓ 支援</td>
-           <td data-i18n="pr.cmp.val.yes" class="py-3 px-4 text-center" style="color: #D9782B;">✓ 支援</td>
-          </tr>
-          <tr>
-           <td data-i18n="pr.cmp.row.adv" class="py-3 px-4 font-medium">高清視像診症、舌象與病歷附件、會員儲值套票、每日自動雲端備份</td>
-           <td data-i18n="pr.cmp.val.no" class="py-3 px-4 text-center" style="color: #999;">—</td>
-           <td data-i18n="pr.cmp.val.yes" class="py-3 px-4 text-center font-semibold" style="color: #D9782B; background-color: rgba(217, 120, 43, 0.06);">✓ 支援</td>
-           <td data-i18n="pr.cmp.val.yes" class="py-3 px-4 text-center" style="color: #D9782B;">✓ 支援</td>
-          </tr>
-          <tr>
-           <td data-i18n="pr.cmp.row.web" class="py-3 px-4 font-medium">診所品牌主頁設計、SEO 優化及自訂專屬域名</td>
-           <td data-i18n="pr.cmp.val.no" class="py-3 px-4 text-center" style="color: #999;">—</td>
-           <td data-i18n="pr.cmp.val.no" class="py-3 px-4 text-center" style="color: #999; background-color: rgba(217, 120, 43, 0.06);">—</td>
-           <td data-i18n="pr.cmp.val.yes" class="py-3 px-4 text-center font-semibold" style="color: #D9782B;">✓ 支援</td>
-          </tr>
-         </tbody>
-        </table>
-       </div>
-      </div>
-
      </div>
     </div>
    </section><section id="faq" class="py-20 lg:py-32">
@@ -1589,36 +1452,6 @@
        </summary>
        <div data-i18n="faq.a5" class="px-6 pb-6 text-sm sm:text-base leading-7" style="color: #555;">
         可以。系統每日自動雲端備份，管理員亦可隨時手動下載完整備份檔（gzip 壓縮），並可匯入還原；病人、診症、處方及收費記錄皆屬於診所。終止服務後，你可以喺合理時間內索取及匯出全部資料，備份亦會按週期輪替清除。
-       </div>
-      </details>
-
-      <details class="faq-group bg-white rounded-lg border" style="border-color: #E8DED5;">
-       <summary class="flex items-center justify-between gap-4 px-6 py-5">
-        <span data-i18n="faq.q6" class="font-serif text-base sm:text-lg font-semibold text-left" style="color: #1E1E1E;">系統支援濃縮中藥顆粒（科學中藥）同傳統中藥飲片嘅庫存扣減嗎？</span>
-        <svg class="faq-icon w-5 h-5" fill="none" stroke="#D9782B" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-       </summary>
-       <div data-i18n="faq.a6" class="px-6 pb-6 text-sm sm:text-base leading-7" style="color: #555;">
-        全面支援。藥房庫存模組可同時管理濃縮中藥顆粒（克/g）、傳統中藥飲片（錢/兩/克）及中成藥。醫師開方時，系統會自動按每味藥劑量乘以服數／天數即時扣減庫存，低於安全水位時自動提醒補貨，並支援自訂驗方及君臣佐使組合一鍵套用。
-       </div>
-      </details>
-
-      <details class="faq-group bg-white rounded-lg border" style="border-color: #E8DED5;">
-       <summary class="flex items-center justify-between gap-4 px-6 py-5">
-        <span data-i18n="faq.q7" class="font-serif text-base sm:text-lg font-semibold text-left" style="color: #1E1E1E;">可唔可以一鍵列印中醫收據、處方箋同到診紙（病假紙）？</span>
-        <svg class="faq-icon w-5 h-5" fill="none" stroke="#D9782B" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-       </summary>
-       <div data-i18n="faq.a7" class="px-6 pb-6 text-sm sm:text-base leading-7" style="color: #555;">
-        可以。系統內建合規中醫診所收據（適用於保險索償及醫療券記錄）、詳細處方箋及到診證明書／病假紙範本，自動帶入診所名稱、註冊中醫師姓名與編號、診斷病名、處方明細與收費金額，支援中英文格式一鍵列印。
-       </div>
-      </details>
-
-      <details class="faq-group bg-white rounded-lg border" style="border-color: #E8DED5;">
-       <summary class="flex items-center justify-between gap-4 px-6 py-5">
-        <span data-i18n="faq.q8" class="font-serif text-base sm:text-lg font-semibold text-left" style="color: #1E1E1E;">除咗香港，台灣、內地、星馬或英美澳加嘅中醫針灸診所用唔用得？</span>
-        <svg class="faq-icon w-5 h-5" fill="none" stroke="#D9782B" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-       </summary>
-       <div data-i18n="faq.a8" class="px-6 pb-6 text-sm sm:text-base leading-7" style="color: #555;">
-        完全適用。系統內建繁體中文、簡體中文及英文三語介面一鍵切換，支援多國貨幣（HKD、CNY、TWD、SGD、MYR、USD、GBP）及全球節點高清視像診症，無論係香港、台灣、中國內地、新加坡、馬來西亞定係英國、美國、加拿大、澳洲嘅中醫及針灸診所均可即開即用。
        </div>
       </details>
 
@@ -1900,7 +1733,7 @@
     };
 
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd2e1adb34d04fa',t:'MTc3MDk3MDU2NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script src="/pwa.js?v=b1653b67" defer></script>
-<script src="/landing-i18n.js?v=b9b84e80" defer></script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd2e1adb34d04fa',t:'MTc3MDk3MDU2NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script src="/pwa.js" defer></script>
+<script src="/landing-i18n.js?v=20261016f" defer></script>
 </body>
 </html>

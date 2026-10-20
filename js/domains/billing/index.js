@@ -3,7 +3,7 @@
  * Phase 5 漸進 ESM 化；差異僅限以 G 存取舊全域。
  * ============================================================ */
 
-export * from './items.js?v=c24ce95e';
-export * from './packages.js?v=a5ad45f9';
-export * from './expenses.js?v=e6b713f6';
-export * from './reports.js?v=cab49ca4';
+export * from './items.js?v=20261014e';
+export * from './packages.js?v=20261014h';
+export * from './expenses.js?v=20261014e';
+export * from './reports.js?v=20261015a';

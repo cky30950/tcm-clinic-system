@@ -32,14 +32,14 @@ export {
     touchPatientsMeta,
     attachPatientConsultationsListener,
     detachPatientConsultationsListener
-} from './store.js?v=2f8d059e';
+} from './store.js?v=20261015a';
 export {
     loadPatientListFromFirebase,
     loadPatientList,
     renderPatientListTable,
     renderPatientListPage
-} from './list.js?v=04f95df1';
+} from './list.js?v=20261015a';
 export {
     viewPatient
-} from './detail.js?v=99c69e8c';
-export * from './history.js?v=e1a7ba9b';
+} from './detail.js?v=20261015a';
+export * from './history.js?v=20261015a';

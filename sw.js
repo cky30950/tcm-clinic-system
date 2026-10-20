@@ -23,7 +23,7 @@
 // v1.1.13：修復殘留舊版用戶的手機排版崩壞——遞增版本以清空 Play CDN 時代遺留的
 //          shell 快取（舊 HTML 無 daisyUI、按鈕尺寸全亂）；文件導航因逾時／斷網
 //          而回放舊快取後，改為背景補刷新，避免慢網路用戶每次都反覆載入過時頁面
-const CACHE_VERSION = 'v1.1.31';
+const CACHE_VERSION = 'v1.1.30';
 const SHELL_CACHE = 'shell-' + CACHE_VERSION;
 const CDN_CACHE = 'cdn-' + CACHE_VERSION;
 
@@ -55,6 +55,7 @@ function isSensitiveDocument(url) {
 /* 跨域僅快取以下明確白名單主機；其餘跨域直接通過 */
 const CDN_HOSTS = new Set([
     'www.gstatic.com',
+    'cdn.tailwindcss.com',
     'cdnjs.cloudflare.com',
     'unpkg.com',
     'cdn.jsdelivr.net',

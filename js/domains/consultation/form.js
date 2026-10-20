@@ -6,8 +6,8 @@
  * 套票撤銷與收費同步直接同域 import billing 模組。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { initBillingItems } from '../billing/items.js?v=c24ce95e';
-import { restorePackageUseMeta, undoPackageUse } from '../billing/packages.js?v=a5ad45f9';
+import { initBillingItems } from '../billing/items.js?v=20261014e';
+import { restorePackageUseMeta, undoPackageUse } from '../billing/packages.js?v=20261014h';
 
         export function searchHerbsForPrescription() {
             const searchTerm = document.getElementById('prescriptionSearch').value.trim().toLowerCase();
