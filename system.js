@@ -14947,8 +14947,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     el.removeAttribute(attrName);
                     el.addEventListener(eventName, function (event) {
                         try {
+                            let expr = handlerCode.trim().replace(/;+\s*$/, '');
+                            // 支援彈窗背景遮罩常見的 "if(event.target===this)fnName(...)" 寫法
+                            const selfTargetMatch = expr.match(/^if\s*\(\s*event\.target\s*={2,3}\s*this\s*\)\s*(.+)$/);
+                            if (selfTargetMatch) {
+                                if (event.target !== el) {
+                                    return;
+                                }
+                                expr = selfTargetMatch[1].trim().replace(/;+\s*$/, '');
+                            }
                             // 匹配類似 "functionName(arg1, arg2)" 的字串
-                            const match = handlerCode.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
+                            const match = expr.match(/^\s*([^(]+)\s*\((.*)\)\s*$/);
                             if (!match) {
                                 return;
                             }

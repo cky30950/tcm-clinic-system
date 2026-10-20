@@ -67,6 +67,9 @@ import firebaseConfig from './firebaseConfig.js?v=20261001b';
     const app = initializeApp(firebaseConfig);
     
     const db = initializeFirestore(app, {
+      // 當網路環境（如部分路由器、ISP 或防火牆）對長時間 QUIC/HTTP3 WebChannel 連線產生 RTO 超時中斷時，
+      // 自動偵測並無縫降級為標準 HTTP Long Polling，避免 Listen/channel ERR_QUIC_PROTOCOL_ERROR
+      experimentalAutoDetectLongPolling: true,
       localCache: persistentLocalCache({
         // 設定 IndexedDB 緩存上限為 200MB（原 20MB），兼顧硬碟容量上限與高快取命中率，避免頻繁 LRU 淘洗
         cacheSizeBytes: 200 * 1024 * 1024,
