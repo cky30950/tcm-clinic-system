@@ -2,7 +2,6 @@
  * 名醫診所系統 — PWA 用戶端
  * ------------------------------------------------------------
  *  - Service Worker 註冊與「有新版本」提示（使用者確認才更新）
- *  - 線上/離線狀態橫幅
  *  - 推播通知開關、訂閱同步、測試通知（僅已登入頁面）
  * 對外：window.TCMPwa
  * ============================================================ */
@@ -313,44 +312,6 @@
         document.body.appendChild(el);
     }
 
-    /* ---------- 離線橫幅 ---------- */
-
-    var banner = null;
-
-    function ensureBanner() {
-        if (banner) return banner;
-        banner = document.createElement('div');
-        banner.setAttribute('role', 'status');
-        banner.style.cssText =
-            'background:linear-gradient(135deg,#D9782B,#8E4E19);color:#fff;' +
-            'padding:10px 16px;font-size:13px;line-height:1.5;text-align:center;' +
-            'display:none;font-family:inherit;';
-        if (document.body) {
-            document.body.insertBefore(banner, document.body.firstChild);
-        }
-        return banner;
-    }
-
-    function updateBanner() {
-        ensureBanner();
-        banner.textContent = t('offlineBanner');
-        banner.style.display = navigator.onLine ? 'none' : 'block';
-    }
-
-    function initOfflineBanner() {
-        window.addEventListener('online', updateBanner);
-        window.addEventListener('offline', updateBanner);
-        window.addEventListener('firebaseConnectionChanged', function (e) {
-            if (e && e.detail && e.detail.connected === false) {
-                ensureBanner();
-                banner.textContent = t('offlineBanner');
-                banner.style.display = 'block';
-            } else {
-                updateBanner();
-            }
-        });
-        updateBanner();
-    }
 
     /* ---------- 推播 ---------- */
 
@@ -1370,7 +1331,6 @@
 
     function init() {
         registerServiceWorker();
-        initOfflineBanner();
         bindUi();
         observeLoginGate();
         bindClientLifecycle();
