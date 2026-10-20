@@ -33,9 +33,9 @@ export function optionsResponse() {
 /**
  * 管理員驗證；成功回傳 {uid, email, via}，失敗拋出帶 status 的錯誤。
  *
- * users 集合文件 ID 是 Firestore 自動 ID（非 Auth uid），需依前端
- * fetchAuthorizedUserByUidOrEmail 相同順序解析：
- *   1. userAuthIndex/{uid} 之 userId 欄位 → users/{userId}
+ * 主要路徑由 requireAdmin 以 custom claims (admin === true) 直接放行；
+ * 備援解析順序：
+ *   1. claims.userId → users/{userId}
  *   2. users where uid == Auth uid
  *   3. users where email == token 內 email
  */
@@ -51,21 +51,16 @@ export async function authenticateAdmin(request, env) {
             const uid = claims.sub;
             let userData = null;
 
-            // 1. 授權索引：userAuthIndex/{uid} -> users/{userId}
-            try {
-                const indexDoc = await client.getDocument(
-                    `userAuthIndex/${encodeURIComponent(uid)}`
-                );
-                const userId = indexDoc && indexDoc.data && indexDoc.data.userId;
-                if (userId) {
+            // 1. 直接由 custom claims 內的 userId 讀取 users/{userId}
+            if (claims.userId) {
+                try {
                     const target = await client.getDocument(
-                        `users/${encodeURIComponent(String(userId))}`
+                        `users/${encodeURIComponent(String(claims.userId))}`
                     );
                     if (target) userData = target.data;
+                } catch (error) {
+                    console.warn('依 claims.userId 讀取 users 失敗，嘗試查詢解析:', error.message);
                 }
-            } catch (error) {
-                // 索引缺失或異常時退回舊式查詢
-                console.warn('讀取 userAuthIndex 失敗，嘗試舊式解析:', error.message);
             }
 
             // 2. users where uid == Auth uid

@@ -5,20 +5,16 @@ service cloud.firestore {
     // ============================================================
     // 授權基礎
     // ------------------------------------------------------------
-    // 主要機制：Firebase Auth Custom Claims（由 Pages Function 以
+    // 機制：Firebase Auth Custom Claims（由 Pages Function 以
     // Service Account 寫入，客戶端無法自行竄改）：
     //   staff=true、active=true、admin=true、userId、clinicId、position
-    //
-    // 過渡 fallback：userAuthIndex 文件（供部署後一小時內、尚未刷新
-    // ID Token 的舊工作階段使用）。所有用戶重新登入後可移除
-    // isActiveByIndex / isAdminByIndex 及 canAccess/canAdmin 中的引用。
     // ============================================================
 
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // ── Custom claims（主要）──
+    // ── Custom claims ──
     function isActiveStaff() {
       return isSignedIn()
         && request.auth.token.staff == true
@@ -28,36 +24,18 @@ service cloud.firestore {
       return isActiveStaff() && request.auth.token.admin == true;
     }
 
-    // ── userAuthIndex 過渡 fallback ──
-    function indexPath() {
-      return /databases/$(database)/documents/userAuthIndex/$(request.auth.uid);
-    }
-    function staffIndex() {
-      return get(indexPath()).data;
-    }
-    function isActiveByIndex() {
-      return isSignedIn()
-        && exists(indexPath())
-        && staffIndex().active == true;
-    }
-    function isAdminByIndex() {
-      return isActiveByIndex()
-        && staffIndex().position == '診所管理';
-    }
-
     function canAccess() {
-      return isActiveStaff() || isActiveByIndex();
+      return isActiveStaff();
     }
     function canAdmin() {
-      return isAdmin() || isAdminByIndex();
+      return isAdmin();
     }
 
     // 本人更新自己的 users 文件：只允許個人設定與登入時間，
     // 身份/權限欄位一律不得透過此路徑變更。
     function selfProfileUpdate() {
       return canAccess()
-        && (request.auth.token.userId == resource.id
-            || (exists(indexPath()) && staffIndex().userId == resource.id))
+        && request.auth.token.userId == resource.id
         && request.resource.data.position == resource.data.position
         && request.resource.data.active == resource.data.active
         && request.resource.data.clinicId == resource.data.clinicId
@@ -75,7 +53,7 @@ service cloud.firestore {
     // 注意：get 一個「不存在」的文件時 resource 為 null（員工探測病人
     // 是否已開戶屬正常路徑，snapshot 不含任何欄位，不構成外洩）。
     function walletStaffRead() {
-      return resource == null || isActiveStaff() || isActiveByIndex();
+      return resource == null || isActiveStaff();
     }
 
     // ============================================================
@@ -287,7 +265,7 @@ service cloud.firestore {
     // ============================================================
     // Catch-all：其他業務集合（consultations、clinics、
     // clinicExpenses、globalBillingItems 等）。
-    // 必須持有活躍員工身份（claims 或過渡索引）才可讀寫。
+    // 必須持有活躍員工身份（Custom Claims）才可讀寫。
     // 注意：Firestore 多條 match 為聯集（OR），故所有上方專用集合
     // 都必須在此排除，否則這條規則會重新放寬它們。
     // ============================================================
@@ -305,6 +283,7 @@ service cloud.firestore {
         && collectionId != 'patientsMeta'
         && collectionId != 'backupMeta'
         && collectionId != 'billingMeta'
+        && collectionId != 'systemMeta'
         && collectionId != 'patientWalletAccounts'
         && collectionId != 'patientWalletTransactions'
         && collectionId != 'walletIdempotency'

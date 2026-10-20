@@ -5,8 +5,8 @@
  * 快取與篩選狀態為本模組私有；其餘共享狀態經 G 讀寫。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { getApportionedCost } from './expenses.js?v=20261014e';
-import { getPatientByIdWithRefresh } from '../patients/store.js?v=20261015a';
+import { getApportionedCost } from './expenses.js?v=e6b713f6';
+import { getPatientByIdWithRefresh } from '../patients/store.js?v=2f8d059e';
 
         let currentFinancialTabType = 'summary';
         const financialReportCache = {};

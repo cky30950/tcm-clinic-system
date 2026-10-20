@@ -6,8 +6,10 @@
   "scripts": {
     "test": "node --test functions/api/wallet/lib/wallet-core.test.js",
     "build:css": "tailwindcss -i tailwind.css -o css/tailwind.css -c tailwind.config.js --minify",
-    "deploy": "npm run build:css && npx --yes wrangler pages deploy . --project-name=cheungec --branch=main --commit-dirty=true",
-    "deploy:preview": "npm run build:css && npx --yes wrangler pages deploy . --project-name=cheungec --branch=preview --commit-dirty=true"
+    "build:version": "node tool/update-version-hash.mjs",
+    "build": "npm run build:css && npm run build:version",
+    "deploy": "npm test && npm run build && npx --yes wrangler pages deploy . --project-name=cheungec --branch=main --commit-dirty=true",
+    "deploy:preview": "npm test && npm run build && npx --yes wrangler pages deploy . --project-name=cheungec --branch=preview --commit-dirty=true"
   },
   "dependencies": {
     "@block65/webcrypto-web-push": "^2.0.0"

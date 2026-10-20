@@ -1,10 +1,10 @@
 /* ============================================================
  * 病歷附件 API 認證輔助
  * ------------------------------------------------------------
- * - authenticateStaff()：只要求有效 Firebase ID Token（任何已登入員工）
+ * - authenticateStaff()：要求有效 Firebase ID Token 且具活躍員工 custom claims
  * - resolveUserData()：以 Service Account 經 Firestore REST 解析
- *   users 集合文件（userAuthIndex → uid → email 三步），供刪除
- *   權限判斷使用。邏輯與 backup/lib/http.js authenticateAdmin 相同。
+ *   users 集合文件（優先使用 claims.userId，次選 uid → email），供刪除
+ *   權限與經手人判斷使用。
  * ============================================================ */
 
 import {
@@ -16,9 +16,7 @@ import {
 import { FirestoreClient } from '../../backup/lib/firestore.js';
 
 /**
- * 驗證請求者為有效員工。
- * 優先以 custom claims 判斷（staff=true、active!=false）；
- * claims 未同步的過渡期，退回 users 文件驗證（文件不存在或 active=false 拒絕）。
+ * 驗證請求者為有效員工（以 custom claims 判斷 staff=true、active=true）。
  * @returns {Promise<{uid:string, email:string, claims:object, via:string}>}
  */
 export async function authenticateStaff(request, env) {
@@ -38,7 +36,6 @@ export async function authenticateStaff(request, env) {
         throw err;
     }
 
-    // 主要路徑：custom claims
     if (claims.staff === true) {
         if (claims.active === false) {
             const err = new Error('帳號已停用');
@@ -48,12 +45,6 @@ export async function authenticateStaff(request, env) {
         return { uid: claims.sub, email: claims.email || '', claims, via: 'claims' };
     }
 
-    // 過渡 fallback：以 users 文件（userAuthIndex → uid → email）確認員工身份
-    const userData = await resolveUserData(claims, env);
-    if (userData && userData.active !== false) {
-        console.warn('員工 claims 未同步，暫以 users 文件放行：', claims.sub);
-        return { uid: claims.sub, email: claims.email || '', claims, via: 'legacy-doc' };
-    }
     const err = new Error('未授權：此帳號不是啟用中的員工');
     err.status = 403;
     throw err;
@@ -72,8 +63,8 @@ async function getFirestoreClient(env) {
 
 /**
  * 依 Auth claims 解析 users 集合文件。
- * 解析順序（與前端 fetchAuthorizedUserByUidOrEmail 一致）：
- *   1. userAuthIndex/{uid}.userId → users/{userId}
+ * 解析順序：
+ *   1. claims.userId → users/{userId}（直接命中，免讀 userAuthIndex）
  *   2. users where uid == claims.sub
  *   3. users where email == claims.email
  * @returns {Promise<object|null>} users 文件資料（含 position 等）
@@ -83,19 +74,15 @@ export async function resolveUserData(claims, env) {
     const uid = claims.sub;
     let userData = null;
 
-    try {
-        const indexDoc = await client.getDocument(
-            `userAuthIndex/${encodeURIComponent(uid)}`
-        );
-        const userId = indexDoc && indexDoc.data && indexDoc.data.userId;
-        if (userId) {
+    if (claims.userId) {
+        try {
             const target = await client.getDocument(
-                `users/${encodeURIComponent(String(userId))}`
+                `users/${encodeURIComponent(String(claims.userId))}`
             );
             if (target) userData = target.data;
+        } catch (error) {
+            console.warn('依 claims.userId 讀取 users 失敗，嘗試查詢解析:', error.message);
         }
-    } catch (error) {
-        console.warn('讀取 userAuthIndex 失敗，嘗試舊式解析:', error.message);
     }
 
     if (!userData) {

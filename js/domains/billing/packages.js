@@ -5,7 +5,7 @@
  * initBillingItems 與收費項目模組同域直接 import。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { initBillingItems } from './items.js?v=20261014e';
+import { initBillingItems } from './items.js?v=c24ce95e';
 
 export function currentPackageClinicId() {
     try {

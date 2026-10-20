@@ -28,8 +28,8 @@ export async function authenticateSignedIn(request, env) {
 }
 
 /**
- * 以 Auth uid 解析對應的 users 文件（後端自我服務用，不信客户端傳入的 userId）。
- * 解析順序同 authenticateAdmin：userAuthIndex → uid 欄位 → email。
+ * 以 Auth claims 解析對應的 users 文件（後端自我服務用，不信客户端傳入的 userId）。
+ * 解析順序：claims.userId → uid 欄位 → email。
  * @returns {Promise<{userId:string, data:object}>}
  */
 export async function resolveStaffUser(env, claims) {
@@ -39,21 +39,20 @@ export async function resolveStaffUser(env, claims) {
     let userId = '';
     let data = null;
 
-    // 1. 授權索引：userAuthIndex/{uid} -> users/{userId}
-    try {
-        const indexDoc = await client.getDocument(
-            `userAuthIndex/${encodeURIComponent(uid)}`
-        );
-        const mappedUserId = indexDoc && indexDoc.data && indexDoc.data.userId;
-        if (mappedUserId) {
-            userId = String(mappedUserId);
+    // 1. 直接由 custom claims 內的 userId 讀取 users/{userId}
+    if (claims.userId) {
+        try {
+            const mappedUserId = String(claims.userId);
             const target = await client.getDocument(
-                `users/${encodeURIComponent(userId)}`
+                `users/${encodeURIComponent(mappedUserId)}`
             );
-            if (target) data = target.data;
+            if (target) {
+                userId = mappedUserId;
+                data = target.data;
+            }
+        } catch (error) {
+            console.warn('依 claims.userId 讀取 users 失敗，嘗試查詢解析:', error.message);
         }
-    } catch (error) {
-        console.warn('讀取 userAuthIndex 失敗，嘗試舊式解析:', error.message);
     }
 
     // 2. users where uid == Auth uid

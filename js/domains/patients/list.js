@@ -5,7 +5,7 @@
  * 含 #searchPatient 搜尋結果渲染與分頁。原樣遷入，舊服務經 G。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { comparePatientsByCreatedAtDesc, getPatientsCount, fetchPatientsPageOptimized } from './store.js?v=20261015a';
+import { comparePatientsByCreatedAtDesc, getPatientsCount, fetchPatientsPageOptimized } from './store.js?v=2f8d059e';
 
 export async function loadPatientListFromFirebase() {
     const tbody = document.getElementById('patientList');

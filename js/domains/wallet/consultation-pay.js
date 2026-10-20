@@ -5,8 +5,8 @@
  * 符號經 ESM import，舊全域存取一律經 G（js/lib/legacy.js）。
  * ============================================================ */
 import { G } from '../../lib/legacy.js';
-import { getWalletAccount, getWalletMembershipConfig, invalidateWalletAccount, walletAvailable } from './account.js?v=20261014d';
-import { currentWalletClinicId, walletApi, walletRound2 } from './shared.js?v=20261014d';
+import { getWalletAccount, getWalletMembershipConfig, invalidateWalletAccount, walletAvailable } from './account.js?v=89ec90d2';
+import { currentWalletClinicId, walletApi, walletRound2 } from './shared.js?v=0ef0daaa';
 
   /* ============================================================
    * 診症表單整合：會員自動折扣 + 儲值餘額支付

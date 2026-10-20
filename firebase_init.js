@@ -1,4 +1,3 @@
-
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
 import {
   collection,
@@ -62,7 +61,7 @@ import { getAuth, signInWithEmailAndPassword, signOut, setPersistence,
         onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
 
 
-import firebaseConfig from './firebaseConfig.js?v=20261001b';
+import firebaseConfig from './firebaseConfig.js?v=5d861c63';
 
     const app = initializeApp(firebaseConfig);
     
@@ -71,8 +70,8 @@ import firebaseConfig from './firebaseConfig.js?v=20261001b';
       // 自動偵測並無縫降級為標準 HTTP Long Polling，避免 Listen/channel ERR_QUIC_PROTOCOL_ERROR
       experimentalAutoDetectLongPolling: true,
       localCache: persistentLocalCache({
-        // 設定 IndexedDB 緩存上限為 200MB（原 20MB），兼顧硬碟容量上限與高快取命中率，避免頻繁 LRU 淘洗
-        cacheSizeBytes: 200 * 1024 * 1024,
+        // 設定 IndexedDB 緩存上限為 100MB，兼顧行動裝置儲存空間與高快取命中率，避免頻繁 LRU 淘洗
+        cacheSizeBytes: 100 * 1024 * 1024,
         tabManager: persistentMultipleTabManager()
       })
     });
@@ -160,15 +159,15 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
     const trackedDeleteDoc = async function (reference) {
       const tomb = getTombstoneInfo(reference);
       if (tomb) {
-        try {
-          await addDoc(collection(db, 'deletionTombstones'), {
-            sourceKey: tomb.sourceKey,
-            docId: tomb.docId,
-            deletedAt: firestoreServerTimestamp()
-          });
-        } catch (tErr) {
-          console.warn('[backup tombstone] 記錄刪除墓碑失敗:', tErr);
-        }
+        const batch = writeBatch(db);
+        const tombDoc = doc(collection(db, 'deletionTombstones'));
+        batch.set(tombDoc, {
+          sourceKey: tomb.sourceKey,
+          docId: tomb.docId,
+          deletedAt: firestoreServerTimestamp()
+        });
+        batch.delete(reference);
+        return batch.commit();
       }
       return deleteDoc(reference);
     };
@@ -339,5 +338,3 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
 
     console.log('帳號認證模組初始化完成');
     console.log('[auth init] increment 類型:', typeof firestoreIncrement, '| FieldValue 類型:', typeof FieldValue);
-
-    
