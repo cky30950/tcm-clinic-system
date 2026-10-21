@@ -3,7 +3,7 @@
  * 醫生可視／可編輯範圍、病歷編輯限制、症狀摘要（Phase 6 子批 D3）。
  * 唯讀狀態經 G；parseConsultationDate 走 window facade。
  ============================================================ */
-import { G } from '../../lib/legacy.js';
+import { G } from '../../lib/legacy.js?v=55da59d5';
 
 export function isGeneralRegistrationDoctorValue(value) {
     return String(value || '').trim() === G.GENERAL_REGISTRATION_DOCTOR_KEY;

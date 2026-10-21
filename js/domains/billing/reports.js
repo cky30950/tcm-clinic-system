@@ -4,9 +4,9 @@
  * 錢包財務與應收款、Txt/Excel 匯出（Phase 5 子批 D）。
  * 快取與篩選狀態為本模組私有；其餘共享狀態經 G 讀寫。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
-import { getApportionedCost } from './expenses.js?v=20261014e';
-import { getPatientByIdWithRefresh } from '../patients/store.js?v=20261015a';
+import { G } from '../../lib/legacy.js?v=55da59d5';
+import { getApportionedCost } from './expenses.js?v=65d188fe';
+import { getPatientByIdWithRefresh } from '../patients/store.js?v=a38461a0';
 
         let currentFinancialTabType = 'summary';
         const financialReportCache = {};

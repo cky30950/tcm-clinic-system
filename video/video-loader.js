@@ -25,12 +25,12 @@
 
     // 依賴順序：每個檔案載入完成後才插入下一個
     var DEPS = [
-        'video/agora-config.js',
-        'video/agora-rtc-sdk.js',
-        'video/agora-call.js',
-        'video/video-presence.js',
-        'video/video-consent.js',
-        'video/video-consultation.js'
+        'video/agora-config.js?v=05e873ad',
+        'video/agora-rtc-sdk.js?v=bb39de2b',
+        'video/agora-call.js?v=acb9b8ef',
+        'video/video-presence.js?v=17904878',
+        'video/video-consent.js?v=962b220b',
+        'video/video-consultation.js?v=cab8e249'
     ];
 
     // 動態插入單一 <script> 並回傳 Promise

@@ -3,10 +3,10 @@
  * ------------------------------------------------------------
  * Phase 3 自 system.js 原樣遷入，邏輯零改動；舊全域存取一律經 G。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
-import { archiveStaffAuthAccount, fetchAuthorizedUserByUidOrEmail } from './claims.js';
+import { G } from '../../lib/legacy.js?v=55da59d5';
+import { archiveStaffAuthAccount, fetchAuthorizedUserByUidOrEmail } from './claims.js?v=2c69f8d9';
 // Phase 4：病人監聽拆除函式已移至 patients 領域，登出／清除流程直接跨域引用
-import { detachPatientListListener } from '../patients/store.js?v=20261015a';
+import { detachPatientListListener } from '../patients/store.js?v=a38461a0';
 
 // SDK 原生錯誤訊息可能含基礎服務供應商名稱，於 UI 顯示前統一遮蔽
 function maskVendorError(msg) {

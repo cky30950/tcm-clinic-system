@@ -4,7 +4,7 @@
  * Phase 2 自 system.js IIFE 原樣拆分，邏輯零改動；跨檔共享
  * 符號經 ESM import，舊全域存取一律經 G（js/lib/legacy.js）。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
+import { G } from '../../lib/legacy.js?v=55da59d5';
 
   // 帳戶快取 key 為「診所__病人」，確保切換診所後互不串用
   export const walletAccountCache = new Map();

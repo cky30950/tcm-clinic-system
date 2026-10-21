@@ -4,9 +4,9 @@
  * 病人管理頁與診症頁的病歷檢視：日曆導覽、分頁、action 按鈕群。
  * 原樣遷自 system.js；共享分頁狀態所有權仍在 system.js（G 讀寫）。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
-import { getPatientByIdWithRefresh } from './store.js?v=20261015a';
-import { printAttendanceCertificate, printConsultationRecord, printPrescriptionInstructions, printSickLeave } from '../print/index.js?v=20261014c';
+import { G } from '../../lib/legacy.js?v=55da59d5';
+import { getPatientByIdWithRefresh } from './store.js?v=a38461a0';
+import { printAttendanceCertificate, printConsultationRecord, printPrescriptionInstructions, printSickLeave } from '../print/index.js?v=758cc1b0';
 
         // 病歷是否「曾被修改」一律以審核日誌（consultationAuditLogs）為準：
         // 新建病歷儲存時 updatedAt 就已存在，錢包收款／財務回寫等無關編輯

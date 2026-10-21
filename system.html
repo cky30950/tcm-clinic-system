@@ -34,10 +34,10 @@
         })();
     </script>
     <!-- Tailwind CSS v4 預編譯靜態 CSS（取代 browser CDN 即時編譯器，消除手機端 CPU 掃描） -->
-    <link rel="stylesheet" href="/css/tailwind.css?v=20261013a">
+    <link rel="stylesheet" href="/css/tailwind.css?v=0f065972">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.7.47/daisyui.css">
     <!-- daisyUI 5 全套 35 個內建主題（本地釘版本，配合帳號安全設定內的主題切換器） -->
-    <link rel="stylesheet" href="js/vendor/daisyui/themes.css?v=20261006a">
+    <link rel="stylesheet" href="js/vendor/daisyui/themes.css?v=0bca2654">
     <script>
         /* 主題偏好（只存本裝置 localStorage）：喺首次繪製前套用 data-theme，避免畫面閃一下預設色。
            無偏好時唔加 data-theme，保留品牌橙啡 token。 */
@@ -219,7 +219,7 @@
         })();
     </script>
 
-    <script type="module" src="firebase_init.js?v=20261020a"></script>
+    <script type="module" src="firebase_init.js?v=25f5403f"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
@@ -229,13 +229,13 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
     <!-- 本地第三方 UI 插件（釘版本；SW 對同源 JS/CSS 採 stale-while-revalidate 快取策略） -->
-    <link rel="stylesheet" href="js/vendor/flatpickr/flatpickr.min.css?v=20261005a">
-    <link rel="stylesheet" href="js/vendor/flatpickr/monthSelect.css?v=20261005a">
-    <link rel="stylesheet" href="js/vendor/tom-select/tom-select.bootstrap5.min.css?v=20261005a">
-    <link rel="stylesheet" href="js/vendor/tabulator/tabulator.min.css?v=20261005a">
-    <link rel="stylesheet" href="js/vendor/notiflix/notiflix.min.css?v=20261005a">
+    <link rel="stylesheet" href="js/vendor/flatpickr/flatpickr.min.css?v=a67742a9">
+    <link rel="stylesheet" href="js/vendor/flatpickr/monthSelect.css?v=3d968667">
+    <link rel="stylesheet" href="js/vendor/tom-select/tom-select.bootstrap5.min.css?v=73f58e46">
+    <link rel="stylesheet" href="js/vendor/tabulator/tabulator.min.css?v=0b778371">
+    <link rel="stylesheet" href="js/vendor/notiflix/notiflix.min.css?v=843081c0">
 
-    <script defer src="acupointIntegration.js?v=20261010a"></script>
+    <script defer src="acupointIntegration.js?v=c1f9e4f8"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
@@ -6914,35 +6914,35 @@
     <span class="hidden rounded-md normal-case text-base btn-xs btn-sm btn-lg btn-ghost btn-circle"></span>
 
     <!-- 延遲載入器：xlsx / qrcode 等真的少用的大庫 -->
-    <script src="js/lib/lazy-loader.js?v=20261011a" defer></script>
+    <script src="js/lib/lazy-loader.js?v=a51669b9" defer></script>
     <!-- 對話框輔助庫（取代 SweetAlert2：Notiflix 確認/提示 + 輸入/HTML 彈窗） -->
-    <script src="js/lib/dialog.js?v=20261013b" defer></script>
+    <script src="js/lib/dialog.js?v=592cd15f" defer></script>
 
     <!-- chart.js + tabulator：改由 lazy-loader 動態載入（個人統計/財務報表/錢包面板） -->
 
     <!-- 本地第三方插件（釘版本；tabulator 已恢復首屏載入；全部 defer，按此順序在 app.js/system.js 前就緒） -->
-    <script src="js/vendor/dompurify/purify.min.js?v=20261005a" defer></script>
-    <script src="js/vendor/flatpickr/flatpickr.min.js?v=20261005a" defer></script>
-    <script src="js/vendor/flatpickr/monthSelect.js?v=20261005a" defer></script>
-    <script src="js/vendor/tom-select/tom-select.complete.min.js?v=20261005a" defer></script>
+    <script src="js/vendor/dompurify/purify.min.js?v=846e2071" defer></script>
+    <script src="js/vendor/flatpickr/flatpickr.min.js?v=bd04bb49" defer></script>
+    <script src="js/vendor/flatpickr/monthSelect.js?v=07782c68" defer></script>
+    <script src="js/vendor/tom-select/tom-select.complete.min.js?v=7c21e409" defer></script>
     <!-- tabulator.min.js 已改由 lazy-loader 動態載入，保留 CSS -->
-    <link rel="stylesheet" href="js/vendor/tabulator/tabulator.min.css?v=20261005a">
-    <script src="js/vendor/notiflix/notiflix.min.js?v=20261005a" defer></script>
-    <script src="js/lib/vendor-enhance.js?v=20261015a" defer></script>
+    <link rel="stylesheet" href="js/vendor/tabulator/tabulator.min.css?v=0b778371">
+    <script src="js/vendor/notiflix/notiflix.min.js?v=58cc7075" defer></script>
+    <script src="js/lib/vendor-enhance.js?v=47803d59" defer></script>
 
-    <script src="version-config.js?v=20261003a" defer></script>
-    <script src="pwa.js?v=20261020a" defer></script>
-    <script src="schedule_management.js?v=20261011a" defer></script>
+    <script src="version-config.js?v=f8893873" defer></script>
+    <script src="pwa.js?v=b1653b67" defer></script>
+    <script src="schedule_management.js?v=8657a987" defer></script>
     <!-- ESM 模組入口（漸進模組化）：匯入已遷移領域並掛回同名 window facade，須在 system.js 前 -->
-    <script type="module" src="js/app.js?v=20261016g"></script>
-    <script src="system.js?v=20261020a" defer></script>
-    <script src="attachments.js?v=20261014i" defer></script>
-    <script src="personalStatistics.js?v=20261011a" defer></script>
-    <script src="systemmanagement.js?v=20261016b" defer></script>
-    <script src="chat_module.js?v=20261010a" defer></script>
-    <script src="i18n.js?v=20261016i" defer></script>
+    <script type="module" src="js/app.js?v=ecd8fe9b"></script>
+    <script src="system.js?v=c499a3c5" defer></script>
+    <script src="attachments.js?v=667d61a7" defer></script>
+    <script src="personalStatistics.js?v=091b5324" defer></script>
+    <script src="systemmanagement.js?v=5e8e8348" defer></script>
+    <script src="chat_module.js?v=a12bbe55" defer></script>
+    <script src="i18n.js?v=96bbb0e7" defer></script>
 
     <!-- 視訊診症延遲載入器：只有醫師點擊「視訊診症」時才動態下載 Agora SDK -->
-    <script src="video/video-loader.js?v=20261010a" defer></script>
+    <script src="video/video-loader.js?v=cde98fec" defer></script>
 </body>
 </html>

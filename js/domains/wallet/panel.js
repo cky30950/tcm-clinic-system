@@ -4,9 +4,9 @@
  * Phase 2 自 system.js IIFE 原樣拆分，邏輯零改動；跨檔共享
  * 符號經 ESM import，舊全域存取一律經 G（js/lib/legacy.js）。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
-import { getWalletAccount, getWalletMembershipConfig, loadWalletTransactions, walletBonusFor } from './account.js?v=20261014d';
-import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, currentWalletClinicId, walletAccountCache, walletAccountDocId, walletCacheKey, walletClinicAccountsLoaded, walletRound2 } from './shared.js?v=20261014d';
+import { G } from '../../lib/legacy.js?v=55da59d5';
+import { getWalletAccount, getWalletMembershipConfig, loadWalletTransactions, walletBonusFor } from './account.js?v=74e8f303';
+import { WALLET_METHOD_LABELS, WALLET_STATUS_LABELS, WALLET_TYPE_LABELS, currentWalletClinicId, walletAccountCache, walletAccountDocId, walletCacheKey, walletClinicAccountsLoaded, walletRound2 } from './shared.js?v=9a10e565';
 
   export let walletSelectedPatientId = '';
 

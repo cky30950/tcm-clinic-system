@@ -4,7 +4,7 @@
  * 差異僅限：以 G 存取尚未遷移的舊全域。
  * ============================================================ */
 
-import { G } from '../../lib/legacy.js';
+import { G } from '../../lib/legacy.js?v=55da59d5';
 
 // 2. 修改從掛號記錄列印到診證明函數
 export async function printAttendanceCertificateFromAppointment(appointmentId) {

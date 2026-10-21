@@ -4,8 +4,8 @@
  * loadPatientList(FromFirebase)／renderPatientList(Table/Page)，
  * 含 #searchPatient 搜尋結果渲染與分頁。原樣遷入，舊服務經 G。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
-import { comparePatientsByCreatedAtDesc, getPatientsCount, fetchPatientsPageOptimized } from './store.js?v=20261015a';
+import { G } from '../../lib/legacy.js?v=55da59d5';
+import { comparePatientsByCreatedAtDesc, getPatientsCount, fetchPatientsPageOptimized } from './store.js?v=a38461a0';
 
 export async function loadPatientListFromFirebase() {
     const tbody = document.getElementById('patientList');

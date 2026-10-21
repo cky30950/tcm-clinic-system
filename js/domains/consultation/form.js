@@ -5,9 +5,9 @@
  * 表單共享狀態所有權仍在 system.js，經 G 讀寫；
  * 套票撤銷與收費同步直接同域 import billing 模組。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
-import { initBillingItems } from '../billing/items.js?v=20261014e';
-import { restorePackageUseMeta, undoPackageUse } from '../billing/packages.js?v=20261014h';
+import { G } from '../../lib/legacy.js?v=55da59d5';
+import { initBillingItems } from '../billing/items.js?v=1139eed2';
+import { restorePackageUseMeta, undoPackageUse } from '../billing/packages.js?v=136a9933';
 
         export function searchHerbsForPrescription() {
             const searchTerm = document.getElementById('prescriptionSearch').value.trim().toLowerCase();

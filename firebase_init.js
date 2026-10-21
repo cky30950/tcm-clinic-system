@@ -62,7 +62,7 @@ import { getAuth, signInWithEmailAndPassword, signOut, setPersistence,
         onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
 
 
-import firebaseConfig from './firebaseConfig.js?v=20261001b';
+import firebaseConfig from './firebaseConfig.js?v=5d861c63';
 
     const app = initializeApp(firebaseConfig);
     
@@ -160,15 +160,20 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
     const trackedDeleteDoc = async function (reference) {
       const tomb = getTombstoneInfo(reference);
       if (tomb) {
+        const batch = writeBatch(db);
         try {
-          await addDoc(collection(db, 'deletionTombstones'), {
+          const tombDoc = doc(collection(db, 'deletionTombstones'));
+          batch.set(tombDoc, {
             sourceKey: tomb.sourceKey,
             docId: tomb.docId,
             deletedAt: firestoreServerTimestamp()
           });
         } catch (tErr) {
           console.warn('[backup tombstone] 記錄刪除墓碑失敗:', tErr);
+          return deleteDoc(reference);
         }
+        batch.delete(reference);
+        return batch.commit();
       }
       return deleteDoc(reference);
     };

@@ -13,8 +13,8 @@
     <link rel="apple-touch-icon" href="/images/icons/apple-touch-icon.png">
     <title>視訊診間</title>
     <!-- Tailwind CSS v4 預編譯靜態 CSS -->
-    <link rel="stylesheet" href="/css/tailwind.css?v=20261009a">
-    <link rel="stylesheet" href="room.css">
+    <link rel="stylesheet" href="/css/tailwind.css?v=0f065972">
+    <link rel="stylesheet" href="room.css?v=1b4452c1">
     <style>
         html, body { height: 100%; }
     </style>
@@ -142,14 +142,14 @@
     </div>
 
     <!-- Firebase：用於雙方就緒檢測（雙方到齊才進入 Agora 頻道，避免等待期間計費） -->
-    <script type="module" src="../firebase_init.js"></script>
+    <script type="module" src="../firebase_init.js?v=25f5403f"></script>
     <!-- 與醫師端共用：設定 → RTC SDK → 通話介面模組 → 就緒信號 → 病人端邏輯 -->
-    <script src="agora-config.js"></script>
-    <script src="agora-rtc-sdk.js"></script>
-    <script src="agora-call.js"></script>
-    <script src="video-presence.js"></script>
-    <script src="video-consent.js"></script>
-    <script src="room.js"></script>
-    <script src="/pwa.js" defer></script>
+    <script src="agora-config.js?v=05e873ad"></script>
+    <script src="agora-rtc-sdk.js?v=bb39de2b"></script>
+    <script src="agora-call.js?v=acb9b8ef"></script>
+    <script src="video-presence.js?v=17904878"></script>
+    <script src="video-consent.js?v=962b220b"></script>
+    <script src="room.js?v=32ed5bb5"></script>
+    <script src="/pwa.js?v=b1653b67" defer></script>
 </body>
 </html>

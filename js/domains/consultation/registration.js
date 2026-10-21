@@ -4,7 +4,7 @@
  * loadConsultationForEdit、約診列渲染與 parser（Phase 6 子批 C）。
  * 共享狀態經 G；開方/收費/儲存/套票/列印走 window facade。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
+import { G } from '../../lib/legacy.js?v=55da59d5';
 
         export function loadConsultationSystem() {
             

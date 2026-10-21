@@ -4,9 +4,9 @@
  * Phase 2 自 system.js IIFE 原樣拆分，邏輯零改動；跨檔共享
  * 符號經 ESM import，舊全域存取一律經 G（js/lib/legacy.js）。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
-import { getWalletAccount, getWalletMembershipConfig, invalidateWalletAccount, walletAvailable } from './account.js?v=20261014d';
-import { currentWalletClinicId, walletApi, walletRound2 } from './shared.js?v=20261014d';
+import { G } from '../../lib/legacy.js?v=55da59d5';
+import { getWalletAccount, getWalletMembershipConfig, invalidateWalletAccount, walletAvailable } from './account.js?v=74e8f303';
+import { currentWalletClinicId, walletApi, walletRound2 } from './shared.js?v=9a10e565';
 
   /* ============================================================
    * 診症表單整合：會員自動折扣 + 儲值餘額支付

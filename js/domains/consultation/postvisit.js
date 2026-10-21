@@ -3,8 +3,8 @@
  * 套票/錢包扣減與餘額、撤回診症、病歷編輯入口、診症摘要載入
  * （Phase 6 子批 D2）。共享狀態經 G；套票/儲存/權限走 window facade。
  ============================================================ */
-import { G } from '../../lib/legacy.js';
-import { touchPatientsMeta, refreshOpenConsultationHistory } from '../patients/store.js?v=20261015a';
+import { G } from '../../lib/legacy.js?v=55da59d5';
+import { touchPatientsMeta, refreshOpenConsultationHistory } from '../patients/store.js?v=a38461a0';
 
         export async function changeConsultationHistoryPage(direction, evt) {
             let loadingButton = null;

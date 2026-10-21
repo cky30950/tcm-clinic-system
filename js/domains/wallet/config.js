@@ -5,9 +5,9 @@
  * 符號經 ESM import，舊全域存取一律經 G（js/lib/legacy.js）。
  * 會員設定面板已移至「系統管理」頁。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
-import { getWalletClinicDoc } from './account.js?v=20261014d';
-import { walletClinicDocCache, walletMembershipConfigCache } from './shared.js?v=20261014d';
+import { G } from '../../lib/legacy.js?v=55da59d5';
+import { getWalletClinicDoc } from './account.js?v=74e8f303';
+import { walletClinicDocCache, walletMembershipConfigCache } from './shared.js?v=9a10e565';
 
   export async function toggleWalletConfigForm() {
     const form = document.getElementById('walletConfigForm');

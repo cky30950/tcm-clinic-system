@@ -4,7 +4,7 @@
  * 差異僅限：以 G 存取尚未遷移的舊全域。
  * ============================================================ */
 
-import { G } from '../../lib/legacy.js';
+import { G } from '../../lib/legacy.js?v=55da59d5';
 
 // 新增：從掛號記錄列印方藥醫囑
 export async function printPrescriptionInstructionsFromAppointment(appointmentId) {

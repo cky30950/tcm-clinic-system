@@ -4,6 +4,6 @@
  * 差異僅限：以 G 存取尚未遷移的舊全域。
  * ============================================================ */
 
-export * from './receipt.js';
-export * from './certificate.js';
-export * from './prescription.js';
+export * from './receipt.js?v=90d53bd8';
+export * from './certificate.js?v=59ba128e';
+export * from './prescription.js?v=0c495c9e';

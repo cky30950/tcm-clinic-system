@@ -6,7 +6,7 @@
  * 狀態所有權仍在 system.js（經 G 讀寫），後續批次再收斂。
  * 由 js/app.js 以同名掛回 window。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
+import { G } from '../../lib/legacy.js?v=55da59d5';
 
 
 export async function fetchPatients(forceRefresh = false, pageNumber = null) {

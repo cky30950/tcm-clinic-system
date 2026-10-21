@@ -3,8 +3,8 @@
  * ------------------------------------------------------------
  * Phase 3 自 system.js 原樣遷入，邏輯零改動；舊全域存取一律經 G。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
-import { archiveStaffAuthAccount, createStaffAuthAccount, syncStaffClaims } from './claims.js';
+import { G } from '../../lib/legacy.js?v=55da59d5';
+import { archiveStaffAuthAccount, createStaffAuthAccount, syncStaffClaims } from './claims.js?v=2c69f8d9';
 
 let editingUserId = null;
 let currentUserFilter = 'all';

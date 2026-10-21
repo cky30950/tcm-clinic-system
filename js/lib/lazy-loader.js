@@ -22,7 +22,7 @@
     }
 
     define('xlsx', [
-        'js/vendor/xlsx/xlsx.full.min.js?v=20261005a'
+        'js/vendor/xlsx/xlsx.full.min.js?v=ac8d774d'
     ], function () { return !!window.XLSX; });
 
     define('qrcode', [
@@ -30,23 +30,23 @@
     ], function () { return !!window.QRCode; });
 
     define('flatpickr', [
-        'js/vendor/flatpickr/flatpickr.min.css?v=20261005a',
-        'js/vendor/flatpickr/flatpickr.min.js?v=20261005a',
-        'js/vendor/flatpickr/monthSelect.js?v=20261005a'
+        'js/vendor/flatpickr/flatpickr.min.css?v=a67742a9',
+        'js/vendor/flatpickr/flatpickr.min.js?v=bd04bb49',
+        'js/vendor/flatpickr/monthSelect.js?v=07782c68'
     ], function () { return !!window.flatpickr; });
 
     define('tom-select', [
-        'js/vendor/tom-select/tom-select.bootstrap5.min.css?v=20261005a',
-        'js/vendor/tom-select/tom-select.complete.min.js?v=20261005a'
+        'js/vendor/tom-select/tom-select.bootstrap5.min.css?v=73f58e46',
+        'js/vendor/tom-select/tom-select.complete.min.js?v=7c21e409'
     ], function () { return !!window.TomSelect; });
 
     define('notiflix', [
-        'js/vendor/notiflix/notiflix.min.css?v=20261005a',
-        'js/vendor/notiflix/notiflix.min.js?v=20261005a'
+        'js/vendor/notiflix/notiflix.min.css?v=843081c0',
+        'js/vendor/notiflix/notiflix.min.js?v=58cc7075'
     ], function () { return !!window.Notiflix; });
 
     define('dompurify', [
-        'js/vendor/dompurify/purify.min.js?v=20261005a'
+        'js/vendor/dompurify/purify.min.js?v=846e2071'
     ], function () { return !!window.DOMPurify; });
 
     define('chartjs', [
@@ -54,7 +54,7 @@
     ], function () { return !!window.Chart; });
 
     define('tabulator', [
-        'js/vendor/tabulator/tabulator.min.js?v=20261005a'
+        'js/vendor/tabulator/tabulator.min.js?v=b54392b1'
     ], function () { return !!window.Tabulator; });
 
     /* 插入一個 <script> 或 <link>，回傳 Promise

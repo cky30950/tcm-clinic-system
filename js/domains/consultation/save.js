@@ -4,7 +4,7 @@
  * 中樞（Phase 6 子批 B）。共享狀態所有權留 system.js，經 G 讀寫；
  * 開方/收費操作與套票提交走 window facade。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
+import { G } from '../../lib/legacy.js?v=55da59d5';
 
 export function buildConsultationSymptomsDraftKey(appointment, patient) {
     const pid = patient && (patient.id !== undefined && patient.id !== null) ? String(patient.id) : '';

@@ -3,7 +3,7 @@
  * 表單 collect/populate/clear、編輯器開合與儲存）（Phase 6 子批 D1）。
  * 共享狀態與 UI helper 經 G；firebase/escapeHtml 走 window。
  ============================================================ */
-import { G } from '../../lib/legacy.js';
+import { G } from '../../lib/legacy.js?v=55da59d5';
 
         export function normalizePatientMedicalProfile(profile) {
             const normalized = {};

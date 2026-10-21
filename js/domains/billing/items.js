@@ -5,7 +5,7 @@
  * ＋ 收費項目管理頁（load/filter/display/create/edit/save/delete）。
  * 共享狀態所有權仍在 system.js，經 G 讀寫。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
+import { G } from '../../lib/legacy.js?v=55da59d5';
 
 // 模組級 UI 狀態
 let currentBillingFilter = 'all';

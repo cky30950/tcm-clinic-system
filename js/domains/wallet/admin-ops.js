@@ -4,10 +4,10 @@
  * Phase 2 自 system.js IIFE 原樣拆分，邏輯零改動；跨檔共享
  * 符號經 ESM import，舊全域存取一律經 G（js/lib/legacy.js）。
  * ============================================================ */
-import { G } from '../../lib/legacy.js';
-import { getWalletMembershipConfig, invalidateWalletAccount, walletBonusFor } from './account.js?v=20261014d';
-import { renderWalletPanel, syncWalletListEntry, walletLastPatientInfo, walletLastTxs, walletSelectedPatientId } from './panel.js?v=20261016g';
-import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, walletRound2 } from './shared.js?v=20261014d';
+import { G } from '../../lib/legacy.js?v=55da59d5';
+import { getWalletMembershipConfig, invalidateWalletAccount, walletBonusFor } from './account.js?v=74e8f303';
+import { renderWalletPanel, syncWalletListEntry, walletLastPatientInfo, walletLastTxs, walletSelectedPatientId } from './panel.js?v=4e7aad2c';
+import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, walletRound2 } from './shared.js?v=9a10e565';
 
   let isSubmittingWalletTopup = false;
   export async function submitWalletTopup() {
