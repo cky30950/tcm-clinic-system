@@ -669,7 +669,11 @@ export async function selectPatientForRegistration(patientId) {
         }
         
         // 確認掛號
+        let isConfirmingRegistration = false;
         export async function confirmRegistration() {
+            if (isConfirmingRegistration) {
+                return;
+            }
             if (!G.selectedPatientForRegistration) {
                 G.showToast('系統錯誤：未選擇病人！', 'error');
                 return;
@@ -726,6 +730,7 @@ export async function selectPatientForRegistration(patientId) {
                 return;
             }
 
+            isConfirmingRegistration = true;
             // 在進入非同步處理前，為掛號按鈕顯示讀取圈。
             // 使用通用輔助函式以兼容事件與非事件觸發的情況。
             let loadingButton = G.getLoadingButtonFromEvent('button[onclick="confirmRegistration()"]');
@@ -812,6 +817,7 @@ export async function selectPatientForRegistration(patientId) {
                 console.error('掛號失敗:', error);
                 G.showToast('掛號失敗，請稍後再試', 'error');
             } finally {
+                isConfirmingRegistration = false;
                 // 無論成功或失敗，皆還原按鈕狀態
                 if (loadingButton) {
                     G.clearButtonLoading(loadingButton);

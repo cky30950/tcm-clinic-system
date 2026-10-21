@@ -1177,7 +1177,11 @@ export async function buildBillingItemsStructuredWithPackageSnapshot(patientId) 
 }
 
         // 儲存診症記錄（醫師操作）
+let isSavingConsultation = false;
 export async function saveConsultation() {
+    if (isSavingConsultation) {
+        return;
+    }
     if (!G.currentConsultingAppointmentId) {
         G.showToast('系統錯誤：找不到診症記錄！', 'error');
         return;
@@ -1202,79 +1206,78 @@ export async function saveConsultation() {
         G.showToast('請填寫病歷修改原因，以符合審核追蹤要求。', 'warning');
         return;
     }
-    // 預處理套票購買（僅在非編輯模式下處理，以免重複購買）
-    // 不立即呼叫 purchasePackage，而是將欲購買的套票記錄至 pendingPackagePurchases，
-    // 等診症記錄成功保存後再一次性購買，以免未完成診症時已經寫入資料庫。
-    if (appointment && !isEditing && Array.isArray(G.selectedBillingItems)) {
-        try {
-            // 初始化暫存購買清單
-            G.pendingPackagePurchases = [];
-            // 找出所有套票項目
-            const packageItems = G.selectedBillingItems.filter(item => item && item.category === 'package');
-            // 按購買數量逐一記錄
-            for (const item of packageItems) {
-                const qty = Math.max(1, Number(item.quantity) || 1);
-                for (let i = 0; i < qty; i++) {
-                    // 先詢問使用者是否立即使用第一次，但不立即購買
-                    // 套票購買成功後詢問是否立即使用第一次（支援中英文）
-                    const lang6 = localStorage.getItem('lang') || 'zh';
-                    const zhMsg6 = `套票「${item.name}」購買成功！\n\n是否立即使用第一次？\n\n套票詳情：\n• 總次數：${item.packageUses} 次\n• 有效期：${item.validityDays} 天`;
-                    const enMsg6 = `Package \"${item.name}\" purchased successfully!\n\nDo you want to use the first session now?\n\nPackage details:\n• Total uses: ${item.packageUses}\n• Valid for: ${item.validityDays} days`;
-                    const confirmUse = await showConfirmation(lang6 === 'en' ? enMsg6 : zhMsg6, 'question');
-                    // 如使用者選擇立即使用，先在收費列表中加入一個套票使用項目（尚未取得 packageRecordId）
-                    let usageItemId = null;
-                    if (confirmUse) {
-                        usageItemId = `pending-use-${Date.now()}-${Math.random()}`;
-                        G.selectedBillingItems.push({
-                            id: usageItemId,
-                            name: `${item.name} (使用套票)`,
-                            category: 'packageUse',
-                            price: 0,
-                            unit: '次',
-                            description: '套票抵扣一次',
-                            quantity: 1,
-                            includedInDiscount: false,
-                            patientId: (appointment.patientId !== undefined && appointment.patientId !== null) ? String(appointment.patientId) : '',
-                            packageRecordId: ''
-                        });
-                    }
-                    // 將擬購買項目與使用選擇存入暫存清單，包括對應的暫存使用項目 ID
-                    G.pendingPackagePurchases.push({
-                        patientId: appointment.patientId,
-                        item: item,
-                        confirmUse: confirmUse,
-                        usageItemId: usageItemId
-                    });
-                }
-            }
-            // 更新收費顯示以反映暫存的套票使用
-            if (typeof updateBillingDisplay === 'function') {
-                updateBillingDisplay();
-            }
-        } catch (e) {
-            console.error('預處理套票購買時發生錯誤：', e);
-        }
-    }
 
-    // --- 儲值支付預檢查：保存病歷前先驗證扣款是否可行 ---
-    // 避免扣款失敗時病歷已標記為 completed 造成狀態不一致
-    if (typeof window.preCheckConsultationWalletPayment === 'function') {
-        const walletOk = await window.preCheckConsultationWalletPayment();
-        if (!walletOk) {
-            // 預檢查不通過，中止保存
-            return;
-        }
-    }
-
-    // 在進入 try 區塊之前禁用保存按鈕並顯示讀取中小圈
-    // 由於 saveConsultation 函式可能透過 onclick 直接呼叫，
-    // 無法保證 event 物件始終存在，故使用通用輔助函式取得按鈕。
+    isSavingConsultation = true;
+    // 在進入非同步流程前先捕獲並禁用保存按鈕、顯示讀取中小圈
     let saveButton = G.getLoadingButtonFromEvent('button[onclick="saveConsultation()"]');
     if (saveButton) {
-        // 傳入的文字僅用於語意描述，實際 setButtonLoading 只顯示讀取圈
         G.setButtonLoading(saveButton, '保存中...');
     }
+
     try {
+        // 預處理套票購買（僅在非編輯模式下處理，以免重複購買）
+        // 不立即呼叫 purchasePackage，而是將欲購買的套票記錄至 pendingPackagePurchases，
+        // 等診症記錄成功保存後再一次性購買，以免未完成診症時已經寫入資料庫。
+        if (appointment && !isEditing && Array.isArray(G.selectedBillingItems)) {
+            try {
+                // 初始化暫存購買清單
+                G.pendingPackagePurchases = [];
+                // 找出所有套票項目
+                const packageItems = G.selectedBillingItems.filter(item => item && item.category === 'package');
+                // 按購買數量逐一記錄
+                for (const item of packageItems) {
+                    const qty = Math.max(1, Number(item.quantity) || 1);
+                    for (let i = 0; i < qty; i++) {
+                        // 先詢問使用者是否立即使用第一次，但不立即購買
+                        // 套票購買成功後詢問是否立即使用第一次（支援中英文）
+                        const lang6 = localStorage.getItem('lang') || 'zh';
+                        const zhMsg6 = `套票「${item.name}」購買成功！\n\n是否立即使用第一次？\n\n套票詳情：\n• 總次數：${item.packageUses} 次\n• 有效期：${item.validityDays} 天`;
+                        const enMsg6 = `Package \"${item.name}\" purchased successfully!\n\nDo you want to use the first session now?\n\nPackage details:\n• Total uses: ${item.packageUses}\n• Valid for: ${item.validityDays} days`;
+                        const confirmUse = await showConfirmation(lang6 === 'en' ? enMsg6 : zhMsg6, 'question');
+                        // 如使用者選擇立即使用，先在收費列表中加入一個套票使用項目（尚未取得 packageRecordId）
+                        let usageItemId = null;
+                        if (confirmUse) {
+                            usageItemId = `pending-use-${Date.now()}-${Math.random()}`;
+                            G.selectedBillingItems.push({
+                                id: usageItemId,
+                                name: `${item.name} (使用套票)`,
+                                category: 'packageUse',
+                                price: 0,
+                                unit: '次',
+                                description: '套票抵扣一次',
+                                quantity: 1,
+                                includedInDiscount: false,
+                                patientId: (appointment.patientId !== undefined && appointment.patientId !== null) ? String(appointment.patientId) : '',
+                                packageRecordId: ''
+                            });
+                        }
+                        // 將擬購買項目與使用選擇存入暫存清單，包括對應的暫存使用項目 ID
+                        G.pendingPackagePurchases.push({
+                            patientId: appointment.patientId,
+                            item: item,
+                            confirmUse: confirmUse,
+                            usageItemId: usageItemId
+                        });
+                    }
+                }
+                // 更新收費顯示以反映暫存的套票使用
+                if (typeof updateBillingDisplay === 'function') {
+                    updateBillingDisplay();
+                }
+            } catch (e) {
+                console.error('預處理套票購買時發生錯誤：', e);
+            }
+        }
+
+        // --- 儲值支付預檢查：保存病歷前先驗證扣款是否可行 ---
+        // 避免扣款失敗時病歷已標記為 completed 造成狀態不一致
+        if (typeof window.preCheckConsultationWalletPayment === 'function') {
+            const walletOk = await window.preCheckConsultationWalletPayment();
+            if (!walletOk) {
+                // 預檢查不通過，中止保存
+                return;
+            }
+        }
         // 預留變數以記錄新診症 ID，供後續更新庫存使用
         let newConsultationIdForInventory = null;
         // 確認預先取得的 appointment 是否存在，若不存在則提示錯誤
@@ -1800,6 +1803,7 @@ export async function saveConsultation() {
         console.error('保存診症記錄錯誤:', error);
         G.showToast('保存時發生錯誤', 'error');
     } finally {
+        isSavingConsultation = false;
         // 恢復按鈕狀態與內容。使用前面取得的 saveButton 以避免重複查找。
         if (saveButton) {
             G.clearButtonLoading(saveButton);

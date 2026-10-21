@@ -3516,14 +3516,21 @@ function generateMedicalRecordNumber() {
             let btn = null;
             try {
                 if (typeof event !== 'undefined' && event && event.currentTarget) {
-                    btn = event.currentTarget;
+                    const target = event.currentTarget;
+                    if (target.tagName === 'BUTTON' || (target.getAttribute && target.getAttribute('role') === 'button')) {
+                        btn = target;
+                    }
                 }
             } catch (_e) {
                 
             }
-            if (!btn) {
+            if (!btn && fallbackSelector) {
                 try {
                     btn = document.querySelector(fallbackSelector);
+                    if (!btn && fallbackSelector.indexOf('onclick') !== -1) {
+                        const fallbackDataSelector = fallbackSelector.replace(/\[onclick(?=[=~^$*|\]])/g, '[data-inline-onclick');
+                        btn = document.querySelector(fallbackDataSelector);
+                    }
                 } catch (_e) {
                     btn = null;
                 }
@@ -4529,12 +4536,15 @@ function hideInventoryModal() {
 }
 
 
+let isSavingInventoryChanges = false;
 async function saveInventoryChanges() {
+    if (isSavingInventoryChanges) return;
     if (!hasActionPermission('herbInventoryEdit')) {
         showToast('權限不足，無法編輯中藥庫存', 'error');
         return;
     }
     
+    isSavingInventoryChanges = true;
     const saveBtn = getLoadingButtonFromEvent('button[onclick="saveInventoryChanges()"]');
     setButtonLoading(saveBtn);
     try {
@@ -4609,7 +4619,7 @@ async function saveInventoryChanges() {
             console.error('保存庫存變更時發生錯誤:', err);
             showToast('保存庫存變更失敗！', 'error');
         } finally {
-            
+            isSavingInventoryChanges = false;
             clearButtonLoading(saveBtn);
         }
     }
@@ -4920,12 +4930,15 @@ async function saveInventoryChanges() {
             rowsContainer.appendChild(row);
         }
 
+        let isSavingBatchInventory = false;
         async function saveBatchInventory() {
+            if (isSavingBatchInventory) return;
             if (!hasActionPermission('herbBatchInventory')) {
                 showToast('權限不足，無法使用中藥批量入庫', 'error');
                 return;
             }
             
+            isSavingBatchInventory = true;
             const saveBtn = getLoadingButtonFromEvent('#batchInventoryModal button[onclick="saveBatchInventory()"]');
             setButtonLoading(saveBtn);
             
@@ -5093,6 +5106,7 @@ async function saveInventoryChanges() {
                 } catch (_initErr) {
                     
                 }
+                isSavingBatchInventory = false;
                 clearButtonLoading(saveBtn);
             }
         }
@@ -6494,7 +6508,12 @@ async function findPatientByPhone(phone, excludePatientId) {
     }
 }
 
+let isSavingPatient = false;
+
 async function savePatient() {
+    if (isSavingPatient) {
+        return;
+    }
     if (editingPatientId && !hasActionPermission('patientEdit')) {
         showToast('權限不足，無法編輯病人資料', 'error');
         return;
@@ -6555,29 +6574,25 @@ async function savePatient() {
         return;
     }
 
-    // 電話號碼唯一性：新增及編輯均不可與其他病人重複
-    // （緊急聯絡人電話不在管制範圍）；編輯時排除病人自身
-    const duplicatePatient = await findPatientByPhone(patient.phone, editingPatientId);
-    if (duplicatePatient) {
-        showToast(
-            `電話號碼已使用於病人「${duplicatePatient.name || duplicatePatient.id}」，不可重複登記！`,
-            'error'
-        );
-        return;
-    }
-
-
-
-    
-    
+    isSavingPatient = true;
     const saveButton = document.getElementById('savePatientButton') || document.querySelector('[onclick="savePatient()"]');
     if (saveButton) {
-        
         const loadingText = (typeof editingPatientId !== 'undefined' && editingPatientId) ? '更新中...' : '儲存中...';
         setButtonLoading(saveButton, loadingText);
     }
 
     try {
+        // 電話號碼唯一性：新增及編輯均不可與其他病人重複
+        // （緊急聯絡人電話不在管制範圍）；編輯時排除病人自身
+        const duplicatePatient = await findPatientByPhone(patient.phone, editingPatientId);
+        if (duplicatePatient) {
+            showToast(
+                `電話號碼已使用於病人「${duplicatePatient.name || duplicatePatient.id}」，不可重複登記！`,
+                'error'
+            );
+            return;
+        }
+
         if (editingPatientId) {
             
             const result = await window.firebaseDataManager.updatePatient(editingPatientId, patient);
@@ -6614,7 +6629,7 @@ async function savePatient() {
         console.error('保存病人資料錯誤:', error);
         showToast('保存時發生錯誤，請稍後再試', 'error');
     } finally {
-        
+        isSavingPatient = false;
         if (saveButton) {
             clearButtonLoading(saveButton);
         }
@@ -7871,7 +7886,9 @@ async function initializeSystemAfterLogin() {
             if (modal) modal.classList.add('hidden');
         }
 
+        let isSavingNewClinic = false;
         async function saveNewClinic() {
+            if (isSavingNewClinic) return;
             const chineseName = String((document.getElementById('addClinicChineseName') || {}).value || '').trim();
             const englishName = String((document.getElementById('addClinicEnglishName') || {}).value || '').trim();
             const hours = collectBusinessHoursUI('addClinic');
@@ -7890,6 +7907,9 @@ async function initializeSystemAfterLogin() {
                 showToast(hours.validationError, 'error');
                 return;
             }
+            isSavingNewClinic = true;
+            const saveBtn = getLoadingButtonFromEvent('button[onclick="saveNewClinic()"]');
+            if (saveBtn) setButtonLoading(saveBtn, '儲存中...');
             try {
                 const created = await window.firebaseDataManager.addClinic({
                     chineseName,
@@ -7922,10 +7942,15 @@ async function initializeSystemAfterLogin() {
             } catch (error) {
                 console.error('新增診所失敗:', error);
                 showToast('新增診所失敗', 'error');
+            } finally {
+                isSavingNewClinic = false;
+                if (saveBtn) clearButtonLoading(saveBtn);
             }
         }
         
+        let isSavingClinicSettings = false;
         async function saveClinicSettings() {
+            if (isSavingClinicSettings) return;
             const chineseName = document.getElementById('clinicChineseName').value.trim();
             const englishName = document.getElementById('clinicEnglishName').value.trim();
             const hours = collectBusinessHoursUI('clinic');
@@ -7947,6 +7972,9 @@ async function initializeSystemAfterLogin() {
                 return;
             }
 
+            isSavingClinicSettings = true;
+            const saveBtn = getLoadingButtonFromEvent('button[onclick="saveClinicSettings()"]');
+            if (saveBtn) setButtonLoading(saveBtn, '儲存中...');
             clinicSettings.chineseName = chineseName;
             clinicSettings.englishName = englishName;
             clinicSettings.businessHours = hours.businessHours;
@@ -7991,6 +8019,9 @@ async function initializeSystemAfterLogin() {
                 }
             } catch (e) {
                 showToast('更新診所資料失敗', 'error');
+            } finally {
+                isSavingClinicSettings = false;
+                if (saveBtn) clearButtonLoading(saveBtn);
             }
         }
 
@@ -14943,6 +14974,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll(selector).forEach(function (el) {
                     const handlerCode = el.getAttribute(attrName);
                     if (!handlerCode) return;
+                    if (attrName === 'onclick') {
+                        el.dataset.inlineOnclick = handlerCode;
+                    }
                     // 移除 inline 屬性，避免瀏覽器原生執行
                     el.removeAttribute(attrName);
                     el.addEventListener(eventName, function (event) {
@@ -15020,6 +15054,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // onclick
                 if (el.hasAttribute('onclick') && !el.dataset.inlineClickBound) {
                     const code = el.getAttribute('onclick');
+                    el.dataset.inlineOnclick = code;
                     el.removeAttribute('onclick');
                     el.dataset.inlineClickBound = 'true';
                     el.addEventListener('click', function (event) {

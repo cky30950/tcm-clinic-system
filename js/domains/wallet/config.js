@@ -107,7 +107,12 @@ import { walletClinicDocCache, walletMembershipConfigCache } from './shared.js?v
     box.innerHTML = tiers.map((t) => walletTierRowHtml(t.minAmount, t.bonus)).join('');
   }
 
+  let isSubmittingWalletConfig = false;
   export async function submitWalletConfig() {
+    if (isSubmittingWalletConfig) return;
+    isSubmittingWalletConfig = true;
+    const saveBtn = G.getLoadingButtonFromEvent('button[onclick="submitWalletConfig()"]');
+    if (saveBtn) G.setButtonLoading(saveBtn, '儲存中...');
     const msg = document.getElementById('wcfgMessage');
     try {
       const clinic = await getWalletClinicDoc();
@@ -149,5 +154,8 @@ import { walletClinicDocCache, walletMembershipConfigCache } from './shared.js?v
     } catch (error) {
       msg.textContent = '儲存失敗：' + error.message;
       msg.className = 'text-sm text-red-600';
+    } finally {
+      isSubmittingWalletConfig = false;
+      if (saveBtn) G.clearButtonLoading(saveBtn);
     }
   }

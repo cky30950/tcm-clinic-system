@@ -911,7 +911,10 @@ export function formatPackageStatus(pkg) {
         : `剩餘 ${pkg.remainingUses}/${pkg.totalUses} 次 · ${exp.toLocaleDateString('zh-TW')} 到期（約 ${daysLeft} 天）`;
 }
 
+let isCreatingManualPatientPackage = false;
 export async function createManualPatientPackage(patientId, clinicId = null) {
+    if (isCreatingManualPatientPackage) return;
+    isCreatingManualPatientPackage = true;
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     const isEn = lang && lang.toLowerCase().startsWith('en');
     // 歸屬診所：預設目前診所，或由套票區的診所選單顯式帶入
@@ -986,13 +989,17 @@ export async function createManualPatientPackage(patientId, clinicId = null) {
         await G.loadPatientConsultationSummary(patientId);
         await refreshPatientPackagesUI();
     } finally {
+        isCreatingManualPatientPackage = false;
         if (loadingButton) {
             G.clearButtonLoading(loadingButton);
         }
     }
 }
 
+let isUpdatingPatientPackageExpiry = false;
 export async function updatePatientPackageExpiry(patientId, packageRecordId, clinicId = null) {
+    if (isUpdatingPatientPackageExpiry) return;
+    isUpdatingPatientPackageExpiry = true;
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     const isEn = lang && lang.toLowerCase().startsWith('en');
     const targetClinicId = clinicId ? String(clinicId) : currentPackageClinicId();
@@ -1050,13 +1057,17 @@ export async function updatePatientPackageExpiry(patientId, packageRecordId, cli
         await G.loadPatientConsultationSummary(patientId);
         await refreshPatientPackagesUI();
     } finally {
+        isUpdatingPatientPackageExpiry = false;
         if (loadingButton) {
             G.clearButtonLoading(loadingButton);
         }
     }
 }
 
+let isDeletingPatientPackageRecord = false;
 export async function deletePatientPackageRecord(patientId, packageRecordId, clinicId = null) {
+    if (isDeletingPatientPackageRecord) return;
+    isDeletingPatientPackageRecord = true;
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     const isEn = lang && lang.toLowerCase().startsWith('en');
     const targetClinicId = clinicId ? String(clinicId) : currentPackageClinicId();
@@ -1103,13 +1114,17 @@ export async function deletePatientPackageRecord(patientId, packageRecordId, cli
         await G.loadPatientConsultationSummary(patientId);
         await refreshPatientPackagesUI();
     } finally {
+        isDeletingPatientPackageRecord = false;
         if (loadingButton) {
             G.clearButtonLoading(loadingButton);
         }
     }
 }
 
+let isUpdatingPatientPackageRemainingUses = false;
 export async function updatePatientPackageRemainingUses(patientId, packageRecordId, clinicId = null) {
+    if (isUpdatingPatientPackageRemainingUses) return;
+    isUpdatingPatientPackageRemainingUses = true;
     const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) ? localStorage.getItem('lang') : 'zh';
     const isEn = lang && lang.toLowerCase().startsWith('en');
     const targetClinicId = clinicId ? String(clinicId) : currentPackageClinicId();
@@ -1175,6 +1190,7 @@ export async function updatePatientPackageRemainingUses(patientId, packageRecord
         await G.loadPatientConsultationSummary(patientId);
         await refreshPatientPackagesUI();
     } finally {
+        isUpdatingPatientPackageRemainingUses = false;
         if (loadingButton) {
             G.clearButtonLoading(loadingButton);
         }
@@ -1706,23 +1722,12 @@ export async function refreshPatientPackagesUI() {
     await renderPatientPackages(appointment.patientId);
 }
 
+let isUsingOnePackage = false;
 export async function useOnePackage(patientId, packageRecordId) {
-    // 在按鈕上顯示讀取狀態：嘗試從事件對象取得當前按鈕，若無則從 DOM 查找
-    let loadingButton = null;
-    try {
-        if (typeof event !== 'undefined' && event && event.currentTarget) {
-            loadingButton = event.currentTarget;
-        }
-    } catch (_e) {}
-    if (!loadingButton) {
-        try {
-            // 透過 onclick 屬性匹配對應按鈕（使用模板字串避免引號問題）
-            const selector = `button[onclick="useOnePackage('${patientId}', '${packageRecordId}')"]`;
-            loadingButton = document.querySelector(selector);
-        } catch (_e) {
-            loadingButton = null;
-        }
-    }
+    if (isUsingOnePackage) return;
+    isUsingOnePackage = true;
+    // 在按鈕上顯示讀取狀態：優先從事件目標取得，否則透過 getLoadingButtonFromEvent 匹配 onclick / data-inline-onclick
+    const loadingButton = G.getLoadingButtonFromEvent(`button[onclick="useOnePackage('${patientId}', '${packageRecordId}')"]`);
     if (loadingButton) {
         G.setButtonLoading(loadingButton, '處理中...');
     }
@@ -1777,28 +1782,19 @@ export async function useOnePackage(patientId, packageRecordId) {
             G.showToast(msg, 'error');
         }
     } finally {
+        isUsingOnePackage = false;
         if (loadingButton) {
             G.clearButtonLoading(loadingButton);
         }
     }
 }
 
+let isUndoingPackageUse = false;
 export async function undoPackageUse(patientId, packageRecordId, usageItemId) {
-    // 先取得觸發按鈕：優先使用事件目標，其次透過 DOM 查找
-    let loadingButton = null;
-    try {
-        if (typeof event !== 'undefined' && event && event.currentTarget) {
-            loadingButton = event.currentTarget;
-        }
-    } catch (_e) {}
-    if (!loadingButton) {
-        try {
-            // 使用部分匹配，以 usageItemId 為關鍵字查找對應的取消按鈕
-            loadingButton = document.querySelector(`button[onclick*="undoPackageUse("][onclick*="'${usageItemId}'"]`);
-        } catch (_e) {
-            loadingButton = null;
-        }
-    }
+    if (isUndoingPackageUse) return;
+    isUndoingPackageUse = true;
+    // 先取得觸發按鈕：優先使用事件目標，其次透過 getLoadingButtonFromEvent 查找 onclick / data-inline-onclick
+    const loadingButton = G.getLoadingButtonFromEvent(`button[onclick*="undoPackageUse("][onclick*="'${usageItemId}'"]`);
     if (loadingButton) {
         G.setButtonLoading(loadingButton, '處理中...');
     }
@@ -1966,6 +1962,7 @@ export async function undoPackageUse(patientId, packageRecordId, usageItemId) {
             G.showToast('取消套票使用時發生錯誤', 'error');
         }
     } finally {
+        isUndoingPackageUse = false;
         if (loadingButton) {
             G.clearButtonLoading(loadingButton);
         }

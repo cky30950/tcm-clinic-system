@@ -455,13 +455,18 @@ import { G } from '../../lib/legacy.js';
             }
         }
 
+        let isSavingConsultationMedicalHistory = false;
         export async function saveConsultationMedicalHistory() {
+            if (isSavingConsultationMedicalHistory) {
+                return;
+            }
             const patientId = getCurrentConsultationPatientId();
             if (!patientId) {
                 G.showToast('找不到當前病人資料', 'error');
                 return;
             }
 
+            isSavingConsultationMedicalHistory = true;
             const saveButton = document.getElementById('saveConsultationMedicalHistoryButton');
             try {
                 if (saveButton) {
@@ -500,6 +505,7 @@ import { G } from '../../lib/legacy.js';
                 console.error('儲存診症既住史失敗:', error);
                 G.showToast('儲存既住史時發生錯誤', 'error');
             } finally {
+                isSavingConsultationMedicalHistory = false;
                 if (saveButton) {
                     G.clearButtonLoading(saveButton);
                 }

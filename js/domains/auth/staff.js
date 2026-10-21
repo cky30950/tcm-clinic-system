@@ -551,7 +551,11 @@ export async function editUser(id) {
     }
 }
 
+let isSavingUser = false;
 export async function saveUser() {
+    if (isSavingUser) {
+        return;
+    }
     // 檢查權限：未具備用戶管理權限則阻止操作
     if (!G.hasAccessToSection('userManagement')) {
         G.showToast('權限不足，無法執行此操作', 'error');
@@ -665,6 +669,7 @@ export async function saveUser() {
         return;
     }
 
+    isSavingUser = true;
     // 顯示保存中狀態：在按鈕中顯示旋轉小圈並禁用按鈕
     // 透過 id 取得按鈕，以避免使用 onclick 選擇器時無法精確匹配
     const saveButton = document.getElementById('userSaveButton');
@@ -841,6 +846,7 @@ export async function saveUser() {
         console.error('保存用戶資料錯誤:', error);
         G.showToast('保存時發生錯誤', 'error');
     } finally {
+        isSavingUser = false;
         // 恢復按鈕狀態與內容
         G.clearButtonLoading(saveButton);
     }

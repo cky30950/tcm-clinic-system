@@ -162,7 +162,9 @@ export function closeExpenseImportModal() {
     if (el) el.classList.add('hidden');
 }
 
+let isSavingClinicExpense = false;
 export async function saveClinicExpense() {
+    if (isSavingClinicExpense) return;
     const month = document.getElementById('expenseMonth').value;
     const type = document.getElementById('expenseType').value;
     const amount = document.getElementById('expenseAmount').value;
@@ -171,18 +173,26 @@ export async function saveClinicExpense() {
         G.showToast('請填寫月份、類型與金額', 'error');
         return;
     }
-    await G.waitForFirebaseDb();
-    const createdBy = G.currentUserData ? G.currentUserData.username : (G.currentUser || 'system');
-    await window.firebase.addDoc(
-        window.firebase.collection(window.firebase.db, 'clinicExpenses'),
-        { month, type, amount: Number(amount), note: note || '', clinicId: G.currentClinicId || null, clinicName: (G.clinicSettings && (G.clinicSettings.chineseName || G.clinicSettings.englishName)) ? (G.clinicSettings.chineseName || G.clinicSettings.englishName) : '', createdAt: new Date(), updatedAt: new Date(), createdBy }
-    );
-    invalidateClinicExpensesCache(month);
-    G.showToast('成本已儲存', 'success');
-    closeExpenseImportModal();
-    try { await G.generateFinancialReport(); } catch (_e) {}
-    try { await loadClinicExpensesForSelectedMonth(); } catch (_e) {}
-    try { await loadClinicExpensesForListMonth(); } catch (_e) {}
+    isSavingClinicExpense = true;
+    const saveBtn = G.getLoadingButtonFromEvent('button[onclick="saveClinicExpense()"]');
+    if (saveBtn) G.setButtonLoading(saveBtn, '儲存中...');
+    try {
+        await G.waitForFirebaseDb();
+        const createdBy = G.currentUserData ? G.currentUserData.username : (G.currentUser || 'system');
+        await window.firebase.addDoc(
+            window.firebase.collection(window.firebase.db, 'clinicExpenses'),
+            { month, type, amount: Number(amount), note: note || '', clinicId: G.currentClinicId || null, clinicName: (G.clinicSettings && (G.clinicSettings.chineseName || G.clinicSettings.englishName)) ? (G.clinicSettings.chineseName || G.clinicSettings.englishName) : '', createdAt: new Date(), updatedAt: new Date(), createdBy }
+        );
+        invalidateClinicExpensesCache(month);
+        G.showToast('成本已儲存', 'success');
+        closeExpenseImportModal();
+        try { await G.generateFinancialReport(); } catch (_e) {}
+        try { await loadClinicExpensesForSelectedMonth(); } catch (_e) {}
+        try { await loadClinicExpensesForListMonth(); } catch (_e) {}
+    } finally {
+        isSavingClinicExpense = false;
+        if (saveBtn) G.clearButtonLoading(saveBtn);
+    }
 }
 
 export async function listClinicExpensesForMonth(month, forceRefresh = false) {
@@ -357,7 +367,9 @@ export function startEditExpense(id) {
     `;
 }
 
+let isSavingEditExpense = false;
 export async function saveEditExpense(id) {
+    if (isSavingEditExpense) return;
     const typeEl = document.getElementById(`exp_type_${id}`);
     const amountEl = document.getElementById(`exp_amount_${id}`);
     const noteEl = document.getElementById(`exp_note_${id}`);
@@ -365,14 +377,22 @@ export async function saveEditExpense(id) {
     const type = typeEl.value;
     const amount = Number(amountEl.value) || 0;
     const note = noteEl ? noteEl.value : '';
-    await G.waitForFirebaseDb();
-    await window.firebase.updateDoc(
-        window.firebase.doc(window.firebase.db, 'clinicExpenses', id),
-        { type, amount, note, updatedAt: new Date(), updatedBy: G.currentUser || 'system' }
-    );
-    invalidateClinicExpensesCache();
-    G.showToast('成本已更新', 'success');
-    await loadClinicExpensesForSelectedMonth();
+    isSavingEditExpense = true;
+    const saveBtn = document.querySelector(`#expenseListBody button[data-action="save-expense"][data-id="${id}"]`);
+    if (saveBtn) G.setButtonLoading(saveBtn, '儲存中...');
+    try {
+        await G.waitForFirebaseDb();
+        await window.firebase.updateDoc(
+            window.firebase.doc(window.firebase.db, 'clinicExpenses', id),
+            { type, amount, note, updatedAt: new Date(), updatedBy: G.currentUser || 'system' }
+        );
+        invalidateClinicExpensesCache();
+        G.showToast('成本已更新', 'success');
+        await loadClinicExpensesForSelectedMonth();
+    } finally {
+        isSavingEditExpense = false;
+        if (saveBtn) G.clearButtonLoading(saveBtn);
+    }
 }
 
 export function cancelEditExpense() {

@@ -535,7 +535,11 @@ export async function initBillingItems(forceRefresh = false) {
             document.getElementById('addBillingItemModal').classList.remove('hidden');
         }
         
+        let isSavingBillingItem = false;
         export async function saveBillingItem() {
+            if (isSavingBillingItem) {
+                return;
+            }
             // 權限檢查：無權限者不得儲存
             if (!G.hasAccessToSection('billingManagement')) {
                 G.showToast('權限不足，無法保存收費項目', 'error');
@@ -597,6 +601,7 @@ export async function initBillingItems(forceRefresh = false) {
                 }
             }
             
+            isSavingBillingItem = true;
             // 取得當前觸發的按鈕並在開始執行儲存時顯示讀取圈
             const saveBtn = G.getLoadingButtonFromEvent('button[onclick="saveBillingItem()"]');
             G.setButtonLoading(saveBtn);
@@ -694,6 +699,7 @@ export async function initBillingItems(forceRefresh = false) {
                 // 新增或更新收費項目後，標記已載入，避免診症搜尋時判定為未載入
                 G.billingItemsLoaded = true;
             } finally {
+                isSavingBillingItem = false;
                 // 恢復按鈕狀態與內容
                 G.clearButtonLoading(saveBtn);
             }

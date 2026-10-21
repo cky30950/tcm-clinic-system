@@ -332,18 +332,28 @@ import { currentWalletClinicId, walletApi, walletRound2 } from './shared.js?v=20
     }
   }
 
+  let isRetryingWalletPayment = false;
   export async function retryConsultationWalletPayment() {
-    const ok = await processConsultationWalletPayment({
-      clinicId: consultWallet.clinicId,
-      patientId: consultWallet.patientId,
-      consultationId: consultWallet.consultationId
-    });
-    if (ok) {
-      G.showToast('儲值扣款成功', 'success');
-      G.closeConsultationForm();
-      G.loadTodayAppointments();
-      G.updateStatistics();
-      G.clearAllSearchFields();
+    if (isRetryingWalletPayment) return;
+    isRetryingWalletPayment = true;
+    const retryBtn = G.getLoadingButtonFromEvent('button[onclick="retryConsultationWalletPayment()"]');
+    if (retryBtn) G.setButtonLoading(retryBtn, '處理中...');
+    try {
+      const ok = await processConsultationWalletPayment({
+        clinicId: consultWallet.clinicId,
+        patientId: consultWallet.patientId,
+        consultationId: consultWallet.consultationId
+      });
+      if (ok) {
+        G.showToast('儲值扣款成功', 'success');
+        G.closeConsultationForm();
+        G.loadTodayAppointments();
+        G.updateStatistics();
+        G.clearAllSearchFields();
+      }
+    } finally {
+      isRetryingWalletPayment = false;
+      if (retryBtn) G.clearButtonLoading(retryBtn);
     }
   }
 

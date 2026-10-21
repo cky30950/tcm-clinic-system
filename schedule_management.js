@@ -1148,8 +1148,11 @@
         }
 
         
+        let isQuickAddingShift = false;
         async function quickAddShiftFromDrag(staffMember, date, hour) {
-            
+            if (isQuickAddingShift) {
+                return;
+            }
             if (!ensureAdmin('新增排班')) {
                 return;
             }
@@ -1171,45 +1174,43 @@
                 return;
             }
             
-            
-            const newShift = {
-                id: Date.now(),
+            isQuickAddingShift = true;
+            try {
+                const newShift = {
+                    id: Date.now(),
+                    
+                    staffId: String(staffMember.id),
+                    date: date,
+                    startTime: startTime,
+                    endTime: endTime,
+                    type: shiftType,
+                    status: 'confirmed',
+                    
+                    notes: '',
+                    clinicId: getCurrentClinicId()
+                };
                 
-                staffId: String(staffMember.id),
-                date: date,
-                startTime: startTime,
-                endTime: endTime,
-                type: shiftType,
-                status: 'confirmed',
-                
-                notes: '',
-                clinicId: getCurrentClinicId()
-            };
-            
-            shifts.push(newShift);
+                shifts.push(newShift);
 
-            const saved = await saveShiftToDb(newShift);
-            if (!saved) {
-                // 寫入失敗：重新載入還原本地狀態
-                await loadShiftsFromDb();
+                const saved = await saveShiftToDb(newShift);
+                if (!saved) {
+                    // 寫入失敗：重新載入還原本地狀態
+                    await loadShiftsFromDb();
+                    renderCalendar();
+                    renderStaffPanel();
+                    updateStats();
+                    showNotification(translate('排班新增失敗，請稍後再試'), 'error');
+                    return;
+                }
                 renderCalendar();
                 renderStaffPanel();
                 updateStats();
-                showNotification(translate('排班新增失敗，請稍後再試'), 'error');
-                return;
+                
+                const shiftTypeName = translate(getShiftTypeName(shiftType));
+                showNotification(`${translate('已為')} ${staffMember.name} ${translate('新增')} ${shiftTypeName} (${startTime}-${endTime})${translate('！')}`);
+            } finally {
+                isQuickAddingShift = false;
             }
-            renderCalendar();
-            renderStaffPanel();
-            updateStats();
-            
-            
-            
-            
-            
-            
-            const shiftTypeName = translate(getShiftTypeName(shiftType));
-            
-            showNotification(`${translate('已為')} ${staffMember.name} ${translate('新增')} ${shiftTypeName} (${startTime}-${endTime})${translate('！')}`);
         }
 
         
@@ -2015,8 +2016,11 @@
         }
 
         
+        let isCreatingFixedSchedule = false;
         async function createFixedSchedule() {
-            
+            if (isCreatingFixedSchedule) {
+                return;
+            }
             if (!ensureAdmin('建立固定排班')) {
                 return;
             }
@@ -2127,88 +2131,93 @@
             
             
             
-            let shiftIdCounter = Date.now();
-            let addedCount = 0;
-            let replacedCount = 0;
-            let failedCount = 0;
+            isCreatingFixedSchedule = true;
+            try {
+                let shiftIdCounter = Date.now();
+                let addedCount = 0;
+                let replacedCount = 0;
+                let failedCount = 0;
 
-            for (let dt = new Date(startDate); dt <= endDate; dt.setDate(dt.getDate() + 1)) {
-                const dayOfWeek = dt.getDay();
-                if (selectedDays.includes(dayOfWeek)) {
-                    const dateStr = formatDate(dt);
+                for (let dt = new Date(startDate); dt <= endDate; dt.setDate(dt.getDate() + 1)) {
+                    const dayOfWeek = dt.getDay();
+                    if (selectedDays.includes(dayOfWeek)) {
+                        const dateStr = formatDate(dt);
 
-                    const existingShiftIndex = shifts.findIndex(s =>
-                        String(s.staffId) === String(staffId) && s.date === dateStr
-                    );
-                    if (existingShiftIndex !== -1) {
-                        if (replaceExisting) {
+                        const existingShiftIndex = shifts.findIndex(s =>
+                            String(s.staffId) === String(staffId) && s.date === dateStr
+                        );
+                        if (existingShiftIndex !== -1) {
+                            if (replaceExisting) {
 
-                            const previousShift = { ...shifts[existingShiftIndex] };
-                            shifts[existingShiftIndex] = {
-                                ...shifts[existingShiftIndex],
+                                const previousShift = { ...shifts[existingShiftIndex] };
+                                shifts[existingShiftIndex] = {
+                                    ...shifts[existingShiftIndex],
+                                    startTime: startTime,
+                                    endTime: endTime,
+                                    type: shiftType,
+                                    notes: notes
+                                };
+                                const batchUpdated = await saveShiftToDb(shifts[existingShiftIndex]);
+                                if (batchUpdated) {
+                                    replacedCount++;
+                                } else {
+                                    failedCount++;
+                                    shifts[existingShiftIndex] = previousShift;
+                                }
+                            }
+
+                        } else {
+
+                            const newShift = {
+                                id: shiftIdCounter++,
+                                staffId: staffId,
+                                date: dateStr,
                                 startTime: startTime,
                                 endTime: endTime,
                                 type: shiftType,
-                                notes: notes
+                                status: 'confirmed',
+                                notes: notes,
+                                clinicId: getCurrentClinicId()
                             };
-                            const batchUpdated = await saveShiftToDb(shifts[existingShiftIndex]);
-                            if (batchUpdated) {
-                                replacedCount++;
+                            shifts.push(newShift);
+                            const batchCreated = await saveShiftToDb(newShift);
+                            if (batchCreated) {
+                                addedCount++;
                             } else {
                                 failedCount++;
-                                shifts[existingShiftIndex] = previousShift;
+                                shifts.splice(shifts.indexOf(newShift), 1);
                             }
-                        }
-
-                    } else {
-
-                        const newShift = {
-                            id: shiftIdCounter++,
-                            staffId: staffId,
-                            date: dateStr,
-                            startTime: startTime,
-                            endTime: endTime,
-                            type: shiftType,
-                            status: 'confirmed',
-                            notes: notes,
-                            clinicId: getCurrentClinicId()
-                        };
-                        shifts.push(newShift);
-                        const batchCreated = await saveShiftToDb(newShift);
-                        if (batchCreated) {
-                            addedCount++;
-                        } else {
-                            failedCount++;
-                            shifts.splice(shifts.indexOf(newShift), 1);
                         }
                     }
                 }
+
+                if (failedCount > 0) {
+                    // 有寫入失敗：以資料庫實際狀態為準重新載入，避免本地計數與畫面不實
+                    await loadShiftsFromDb();
+                }
+                renderCalendar();
+                updateStats();
+                closeFixedScheduleModal();
+
+
+                const staffMember = findStaffById(staffId);
+
+                let message = `${translate('固定排班建立完成！')}\n\n`;
+                message += `${translate('人員：')}${staffMember.name}\n`;
+                message += `${translate('新增排班：')}${addedCount} ${translate('天')}\n`;
+                if (replacedCount > 0) {
+                    message += `${translate('替換排班：')}${replacedCount} ${translate('天')}\n`;
+                }
+                message += `${translate('時間：')}${startTime} - ${endTime}\n`;
+
+                message += `${translate('工作日：')}${selectedDays.map(d => translate(['日','一','二','三','四','五','六'][d])).join('、')}`;
+
+
+                const failureSuffix = failedCount > 0 ? ` ${translate('（部分排班儲存失敗，請檢查網路連線後重試）')}` : '';
+                showNotification(`${translate('已為')} ${staffMember.name} ${translate('建立固定排班')}！${translate('新增')} ${addedCount} ${translate('天')}${replacedCount > 0 ? `${translate('，替換')} ${replacedCount} ${translate('天')}` : ''}${translate('。')}${failureSuffix}`, failedCount > 0 ? 'error' : undefined);
+            } finally {
+                isCreatingFixedSchedule = false;
             }
-
-            if (failedCount > 0) {
-                // 有寫入失敗：以資料庫實際狀態為準重新載入，避免本地計數與畫面不實
-                await loadShiftsFromDb();
-            }
-            renderCalendar();
-            updateStats();
-            closeFixedScheduleModal();
-
-
-            const staffMember = findStaffById(staffId);
-
-            let message = `${translate('固定排班建立完成！')}\n\n`;
-            message += `${translate('人員：')}${staffMember.name}\n`;
-            message += `${translate('新增排班：')}${addedCount} ${translate('天')}\n`;
-            if (replacedCount > 0) {
-                message += `${translate('替換排班：')}${replacedCount} ${translate('天')}\n`;
-            }
-            message += `${translate('時間：')}${startTime} - ${endTime}\n`;
-
-            message += `${translate('工作日：')}${selectedDays.map(d => translate(['日','一','二','三','四','五','六'][d])).join('、')}`;
-
-
-            const failureSuffix = failedCount > 0 ? ` ${translate('（部分排班儲存失敗，請檢查網路連線後重試）')}` : '';
-            showNotification(`${translate('已為')} ${staffMember.name} ${translate('建立固定排班')}！${translate('新增')} ${addedCount} ${translate('天')}${replacedCount > 0 ? `${translate('，替換')} ${replacedCount} ${translate('天')}` : ''}${translate('。')}${failureSuffix}`, failedCount > 0 ? 'error' : undefined);
         }
 
         

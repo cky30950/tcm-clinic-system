@@ -9,7 +9,9 @@ import { getWalletMembershipConfig, invalidateWalletAccount, walletBonusFor } fr
 import { renderWalletPanel, syncWalletListEntry, walletLastPatientInfo, walletLastTxs, walletSelectedPatientId } from './panel.js?v=20261016g';
 import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, walletRound2 } from './shared.js?v=20261014d';
 
+  let isSubmittingWalletTopup = false;
   export async function submitWalletTopup() {
+    if (isSubmittingWalletTopup) return;
     if (!walletSelectedPatientId) {
       G.showToast('請先選擇一位會員', 'warning');
       return;
@@ -28,8 +30,12 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       G.showToast('金額最多只可兩位小數（最小 HK$0.01）', 'error');
       return;
     }
+    isSubmittingWalletTopup = true;
     // 在非同步操作前先捕獲觸發按鈕（相容 event.currentTarget 與選擇器後備）
     const topupButton = G.getLoadingButtonFromEvent('button[onclick="submitWalletTopup()"]');
+    if (topupButton) {
+      G.setButtonLoading(topupButton, '充值中...');
+    }
     const methodSelect = document.getElementById('walletTopupMethod');
     const paymentMethod = methodSelect ? methodSelect.value : 'cash';
     const methodLabel = WALLET_METHOD_LABELS[paymentMethod] || paymentMethod;
@@ -37,18 +43,15 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
     const patientName = (walletLastPatientInfo && walletLastPatientInfo.name) || '未知病人';
     let confirmMsg = `確認以「${methodLabel}」為病人「${patientName}」充值 HK$${walletRound2(amount).toFixed(2)}？`;
     try {
-      const cfg = await getWalletMembershipConfig();
-      const bonusAmount = walletBonusFor(cfg, amount);
-      if (bonusAmount > 0) {
-        confirmMsg += `\n此金額可獲贈 HK$${bonusAmount.toFixed(2)}`;
-      }
-    } catch (_e) { /* 贈送額查詢失敗不阻擋確認 */ }
-    const confirmed = await G.showConfirmation(confirmMsg, 'question');
-    if (!confirmed) return;
-    if (topupButton) {
-      G.setButtonLoading(topupButton, '充值中...');
-    }
-    try {
+      try {
+        const cfg = await getWalletMembershipConfig();
+        const bonusAmount = walletBonusFor(cfg, amount);
+        if (bonusAmount > 0) {
+          confirmMsg += `\n此金額可獲贈 HK$${bonusAmount.toFixed(2)}`;
+        }
+      } catch (_e) { /* 贈送額查詢失敗不阻擋確認 */ }
+      const confirmed = await G.showConfirmation(confirmMsg, 'question');
+      if (!confirmed) return;
       const result = await walletApi('topup', {
         patientId: walletSelectedPatientId,
         amount,
@@ -68,6 +71,7 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
     } catch (error) {
       G.showToast('充值失敗：' + error.message, 'error');
     } finally {
+      isSubmittingWalletTopup = false;
       if (topupButton) {
         G.clearButtonLoading(topupButton);
       }
@@ -140,7 +144,9 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
     }
   }
 
+  let isSubmittingWalletRefund = false;
   export async function submitWalletRefund() {
+    if (isSubmittingWalletRefund) return;
     const consultationId = String(document.getElementById('walletRefundCid').value || '').trim();
     if (!consultationId) {
       G.showToast('請輸入診症單 ID', 'error');
@@ -161,6 +167,7 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       }
       payload.amount = refundAmount;
     }
+    isSubmittingWalletRefund = true;
     const refundButton = G.getLoadingButtonFromEvent('button[onclick="submitWalletRefund()"]');
     if (refundButton) G.setButtonLoading(refundButton, '處理中...');
     try {
@@ -173,6 +180,7 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
     } catch (error) {
       G.showToast('退款失敗：' + error.message, 'error');
     } finally {
+      isSubmittingWalletRefund = false;
       if (refundButton) G.clearButtonLoading(refundButton);
     }
   }
@@ -202,7 +210,9 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       </div>`;
   }
 
+  let isSubmittingWalletAdjust = false;
   export async function submitWalletAdjust() {
+    if (isSubmittingWalletAdjust) return;
     const reason = String(document.getElementById('walletAdjustReason').value || '').trim();
     if (!reason) {
       G.showToast('必須填寫調整原因', 'error');
@@ -214,6 +224,7 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       G.showToast('調整金額最多只可兩位小數（最小 HK$0.01）', 'error');
       return;
     }
+    isSubmittingWalletAdjust = true;
     const adjustButton = G.getLoadingButtonFromEvent('button[onclick="submitWalletAdjust()"]');
     if (adjustButton) G.setButtonLoading(adjustButton, '處理中...');
     try {
@@ -232,6 +243,7 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
     } catch (error) {
       G.showToast('調整失敗：' + error.message, 'error');
     } finally {
+      isSubmittingWalletAdjust = false;
       if (adjustButton) G.clearButtonLoading(adjustButton);
     }
   }
@@ -259,9 +271,12 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
       </div>`;
   }
 
+  let isSubmittingWalletStatus = false;
   export async function submitWalletStatus() {
+    if (isSubmittingWalletStatus) return;
     const status = String(document.getElementById('walletStatusSelect').value || '');
     const note = String(document.getElementById('walletStatusNote').value || '');
+    isSubmittingWalletStatus = true;
     const statusButton = G.getLoadingButtonFromEvent('button[onclick="submitWalletStatus()"]');
     if (statusButton) G.setButtonLoading(statusButton, '處理中...');
     try {
@@ -279,6 +294,7 @@ import { WALLET_METHOD_LABELS, newIdempotencyKey, walletApi, walletIsMoney2, wal
     } catch (error) {
       G.showToast('更新失敗：' + error.message, 'error');
     } finally {
+      isSubmittingWalletStatus = false;
       if (statusButton) G.clearButtonLoading(statusButton);
     }
   }
